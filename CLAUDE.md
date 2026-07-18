@@ -184,6 +184,15 @@ each with a test that rejects a violating definition.
   HistoryEntry fits step changes, not a pure version change).
 - The full formal expression context (exact shape of `instance` and `actor`).
 
+## Codebase memory (knowledge graph)
+The repo is indexed into codebase-memory-mcp. Resolve the `project` arg via
+`list_projects` (match on root_path); the slug is machine-specific, never
+hardcode it. Entry points: `search_graph` (find symbols), `get_code_snippet`
+(read a body), `trace_path` (callers/callees), `manage_adr(mode="get")` for the
+stored ADR. Payoff scales with the codebase: it is schema-only today, so
+Read/grep is usually faster now — reach for the graph once the engine lands and
+real call chains exist.
+
 ## Conventions
 - TypeScript strict, ESM.
 - Bun is the runtime, package manager, and test runner. Use `bun`, not npm/pnpm:
