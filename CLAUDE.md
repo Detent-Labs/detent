@@ -159,6 +159,16 @@ each with a test that rejects a violating definition.
 - `test/validate.test.ts`: a bun:test suite that parses the example and asserts
   that each invariant rejects a violating variant, and that a label rename stays
   valid. Run with `bun test`.
+- `src/cel/check.ts`: authoring-time CEL validation via `@marcbachmann/cel-js`
+  (v8.0.0, the one library for both parse/check and the engine's later evaluate).
+  `validateProcessBody(body)` parse- and type-checks every Expression against the
+  field catalog and the formal expression context, returning located `CelIssue[]`.
+  Kept out of definition.ts so the contract has no CEL dependency. CEL references
+  fields by `key` (a `field_<uuid>` id is not a valid CEL identifier); scopes are
+  enforced by which namespaces are registered (`result` only in Action.output,
+  `child` only in subprocess steps); `now()`/`timestamp()`/`duration()` are blocked.
+  `test/cel.test.ts` covers each rule. Known papercut: `number`->CEL `double`, so
+  `data.count == 5` needs `== 5.0`.
 - No engine and no editor exist yet.
 
 ## Roadmap
@@ -169,8 +179,12 @@ each with a test that rejects a violating definition.
    inputMapping's keys must be in the child contract's inputFields; a callable
    child must not require fields outside its inputFields) once a process registry
    exists to resolve the child.
-2. CEL wiring: pick the library, define the expression context, add
-   authoring-time type-checking of every Expression against the field catalog.
+2. CEL wiring: DONE (authoring-time). Library `@marcbachmann/cel-js`, formal
+   expression context defined, every Expression parse- and type-checked against
+   the field catalog (`src/cel/check.ts`). Remaining: engine-side evaluation of
+   guards/paths and Action.output result-writeback (belongs to #3), and CEL checks
+   for migration `transforms` once migration lands (they need the from-version
+   catalog).
 3. Engine skeleton: instance store, transactional outbox, transition executor
    (onExit/onPath/onEntry ordering), timer scheduler, crash recovery. Persists to
    PostgreSQL via Bun's native `Bun.sql` (no client dependency); connection via
@@ -182,7 +196,9 @@ each with a test that rejects a violating definition.
   cancellation propagation.
 - A dedicated audit event type for version migrations (the transition-shaped
   HistoryEntry fits step changes, not a pure version change).
-- The full formal expression context (exact shape of `instance` and `actor`).
+- The formal expression context is pinned (`src/cel/check.ts`): `instance`
+  `{id, status, transitionSeq, currentStepId}`, `actor` `{id, roles}`. Both are
+  deliberately minimal; widen when the engine surfaces a concrete need.
 
 ## Codebase memory (knowledge graph)
 The repo is indexed into codebase-memory-mcp. Resolve the `project` arg via
