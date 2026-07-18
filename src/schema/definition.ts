@@ -1,0 +1,489 @@
+/**
+ * Workflow / BPM Process Definition Model (Zod source of truth).
+ *
+ * The Zod schemas below are the contract; the TypeScript types are derived via
+ * z.infer, so there is no drift between validation and types. JSON is the one
+ * serialized artifact. Two schemas are recursive (Literal, FieldDef) and so
+ * carry a hand-written type annotation, which is the only place a type is not
+ * inferred.
+ *
+ * Paradigm: state-based FSM, exactly one active step per instance. No
+ * parallelism in v1. The definitionHash is the JCS hash of ProcessBody only.
+ */
+
+import { z } from "zod";
+
+// ============================================================
+// Identity: opaque, type-prefixed, lowercase. Sole reference anchor.
+// .brand keeps the ids nominally distinct (a StepId is not a PathId).
+// ============================================================
+
+export const processId = z.string().regex(/^proc_/).brand<"ProcessId">();
+export const stepId = z.string().regex(/^step_/).brand<"StepId">();
+export const pathId = z.string().regex(/^path_/).brand<"PathId">();
+export const fieldId = z.string().regex(/^field_/).brand<"FieldId">();
+export const actionId = z.string().regex(/^action_/).brand<"ActionId">();
+export const timerId = z.string().regex(/^timer_/).brand<"TimerId">();
+export const dataSourceId = z.string().regex(/^ds_/).brand<"DataSourceId">();
+export const instanceId = z.string().regex(/^inst_/).brand<"InstanceId">();
+export const historyEntryId = z.string().regex(/^hist_/).brand<"HistoryEntryId">();
+
+export type ProcessId = z.infer<typeof processId>;
+export type StepId = z.infer<typeof stepId>;
+export type PathId = z.infer<typeof pathId>;
+export type FieldId = z.infer<typeof fieldId>;
+export type ActionId = z.infer<typeof actionId>;
+export type TimerId = z.infer<typeof timerId>;
+export type DataSourceId = z.infer<typeof dataSourceId>;
+export type InstanceId = z.infer<typeof instanceId>;
+export type HistoryEntryId = z.infer<typeof historyEntryId>;
+
+/** Human-readable slug. References nothing; may change. */
+export type Key = string;
+
+/** ISO 8601 duration, e.g. "P7D", "PT30S". */
+export const duration = z.string();
+export type Duration = z.infer<typeof duration>;
+
+/** ISO 8601 timestamp. */
+export const timestamp = z.string();
+export type Timestamp = z.infer<typeof timestamp>;
+
+// ============================================================
+// Expression: CEL, pure and total, no now(). Guards read data / instance /
+// actor / named data sources, plus child.outcome + child.data in a subprocess
+// step. `result` is scoped only to an Action.output mapping, never to guards.
+// ============================================================
+
+export const expression = z.object({
+  lang: z.literal("cel"),
+  src: z.string(),
+});
+export type Expression = z.infer<typeof expression>;
+
+/** Recursive JSON literal (field defaults, payload values). */
+export type Literal = string | number | boolean | null | Literal[] | { [k: string]: Literal };
+export const literal: z.ZodType<Literal> = z.lazy(() =>
+  z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(literal), z.record(z.string(), literal)]),
+);
+
+// ============================================================
+// Plugin envelope. Core validates only this shape; each plugin ships its own
+// JSON Schema, resolved via a type -> { config schema, output schema } registry
+// at publish time. A breaking plugin change takes a new `type` identity.
+// ============================================================
+
+export const plugin = z.object({
+  type: z.string(),
+  config: z.record(z.string(), z.unknown()),
+  description: z.string().optional(),
+});
+export type Plugin = z.infer<typeof plugin>;
+
+// ============================================================
+// Closed enums (the stable core).
+// ============================================================
+
+export const definitionStatus = z.enum(["draft", "published", "deprecated", "archived"]);
+export const compatibility = z.enum(["compatible", "breaking"]);
+export const stepType = z.enum(["task", "subprocess"]); // terminal is a property, not a type
+export const pathTrigger = z.enum(["manual", "automatic"]);
+export const execution = z.enum(["async", "blocking"]); // v1 implements async only
+export const instanceStatus = z.enum(["running", "completed", "cancelled", "faulted"]);
+export const baseFieldType = z.enum([
+  "string", "number", "boolean", "date", "datetime",
+  "select", "multiselect", "reference", "file", "group",
+]);
+
+export type DefinitionStatus = z.infer<typeof definitionStatus>;
+export type Compatibility = z.infer<typeof compatibility>;
+export type StepType = z.infer<typeof stepType>;
+export type PathTrigger = z.infer<typeof pathTrigger>;
+export type Execution = z.infer<typeof execution>;
+export type InstanceStatus = z.infer<typeof instanceStatus>;
+export type BaseFieldType = z.infer<typeof baseFieldType>;
+
+// ============================================================
+// Fields: central catalog, referenced by steps.
+// ============================================================
+
+export const fieldOption = z.object({ value: z.string(), label: z.string() });
+export type FieldOption = z.infer<typeof fieldOption>;
+
+/** Catalog-level validation. Requiredness is per-step and lives in the view. */
+export const fieldValidation = z.object({
+  min: z.number().optional(),
+  max: z.number().optional(),
+  minLength: z.number().optional(),
+  maxLength: z.number().optional(),
+  pattern: z.string().optional(),
+  rule: expression.optional(),
+});
+export type FieldValidation = z.infer<typeof fieldValidation>;
+
+/** Recursive because a "group" field carries sub-fields. */
+export type FieldDef = {
+  id: FieldId;
+  key: Key;
+  label: string;
+  description?: string;
+  type: BaseFieldType | Plugin;
+  options?: FieldOption[];
+  dataSource?: DataSourceId;
+  validation?: FieldValidation;
+  default?: Literal | Expression;
+  fields?: FieldDef[];
+};
+export const fieldDef: z.ZodType<FieldDef, z.ZodTypeDef, unknown> = z.lazy(() =>
+  z
+    .object({
+      id: fieldId,
+      key: z.string(),
+      label: z.string(),
+      description: z.string().optional(),
+      type: z.union([baseFieldType, plugin]),
+      options: z.array(fieldOption).optional(),
+      dataSource: dataSourceId.optional(),
+      validation: fieldValidation.optional(),
+      default: z.union([expression, literal]).optional(),
+      fields: z.array(fieldDef).optional(),
+    })
+    .refine((f) => !(f.options && f.dataSource), {
+      message: "options and dataSource are mutually exclusive",
+      path: ["options"],
+    }),
+);
+
+// ============================================================
+// Data sources: plugin, never inlined, referenced by id.
+// ============================================================
+
+export const dataSourceDef = plugin.extend({ id: dataSourceId, key: z.string() });
+export type DataSourceDef = z.infer<typeof dataSourceDef>;
+
+// ============================================================
+// Action: declarative handler reference + execution metadata.
+// output is keyed by target FieldId, value CEL over `result` (same shape as
+// SubprocessSpec.outputMapping). The handler returns; the engine writes back.
+// ============================================================
+
+export const retryPolicy = z.object({
+  maxAttempts: z.number(),
+  backoff: z.enum(["none", "fixed", "exponential"]),
+  baseDelay: duration.optional(),
+});
+export type RetryPolicy = z.infer<typeof retryPolicy>;
+
+export const action = plugin.extend({
+  id: actionId,
+  idempotencyKey: z.string().nullable().optional(),
+  output: z.record(fieldId, expression).optional(),
+  execution: execution.optional(),
+  retry: retryPolicy.optional(),
+  timeout: duration.optional(),
+});
+export type Action = z.infer<typeof action>;
+
+// ============================================================
+// Timer: first-class on the step; fire time computed at entry and persisted.
+// A timer-forced transition bypasses its target path's guard.
+// ============================================================
+
+export const timerAction = z.object({
+  actions: z.array(action).optional(),
+  targetPath: pathId.optional(),
+});
+export type TimerAction = z.infer<typeof timerAction>;
+
+export const timer = z
+  .object({
+    id: timerId,
+    description: z.string().optional(),
+    duration: duration.optional(),
+    deadline: expression.optional(),
+    onFire: timerAction,
+  })
+  .refine((t) => !!t.duration !== !!t.deadline, {
+    message: "exactly one of duration or deadline",
+    path: ["duration"],
+  });
+export type Timer = z.infer<typeof timer>;
+
+// ============================================================
+// Path: manual or automatic. A step's paths are all-manual or all-automatic.
+// ============================================================
+
+export const path = z.object({
+  id: pathId,
+  key: z.string(),
+  label: z.string().optional(),
+  description: z.string().optional(),
+  to: stepId,
+  trigger: pathTrigger,
+  guard: expression.optional(),
+  priority: z.number().optional(),
+  onPath: z.array(action).optional(),
+});
+export type Path = z.infer<typeof path>;
+
+// ============================================================
+// View (flat) + Assignment.
+// ============================================================
+
+export const viewField = z.object({
+  ref: fieldId,
+  visible: z.union([z.boolean(), expression]).optional(),
+  required: z.union([z.boolean(), expression]).optional(),
+  readonly: z.union([z.boolean(), expression]).optional(),
+  group: z.string().optional(),
+});
+export type ViewField = z.infer<typeof viewField>;
+
+export const view = z.object({
+  fields: z.array(viewField),
+  renderer: plugin.optional(),
+});
+export type View = z.infer<typeof view>;
+
+export const assignment = z.object({ strategy: plugin });
+export type Assignment = z.infer<typeof assignment>;
+
+// ============================================================
+// Subprocess: call-and-return; the parent step is a wait state.
+// latest-at-spawn is pinned by contractRef (the child contract signature).
+// ============================================================
+
+export const subprocessSpec = z
+  .object({
+    processId,
+    versionBinding: z.enum(["latest-at-spawn", "pinned"]),
+    pinnedVersion: z.number().optional(),
+    contractRef: z.string().optional(),
+    inputMapping: z.record(fieldId, expression),
+    outputMapping: z.record(fieldId, expression),
+  })
+  .refine((s) => (s.versionBinding === "pinned") === (s.pinnedVersion !== undefined), {
+    message: "pinnedVersion is present iff versionBinding is 'pinned'",
+    path: ["pinnedVersion"],
+  })
+  .refine((s) => s.versionBinding !== "latest-at-spawn" || s.contractRef !== undefined, {
+    message: "contractRef is required for latest-at-spawn",
+    path: ["contractRef"],
+  });
+export type SubprocessSpec = z.infer<typeof subprocessSpec>;
+
+// ============================================================
+// Step. Local invariants (self-contained) live here as a superRefine.
+// ============================================================
+
+export const step = z
+  .object({
+    id: stepId,
+    key: z.string(),
+    label: z.string(),
+    description: z.string().optional(),
+    type: stepType,
+    terminal: z.boolean().optional(),
+    outcome: z.string().optional(),
+    subprocess: subprocessSpec.optional(),
+    view: view.optional(),
+    assignment: assignment.optional(),
+    onEntry: z.array(action).optional(),
+    onExit: z.array(action).optional(),
+    timers: z.array(timer).optional(),
+    paths: z.array(path).optional(),
+  })
+  .superRefine((s, ctx) => {
+    const paths = s.paths ?? [];
+    const add = (message: string, path: (string | number)[] = ["paths"]) =>
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message, path });
+
+    if (s.outcome !== undefined && !s.terminal) add("outcome may only be set on a terminal step", ["outcome"]);
+    if (s.terminal && paths.length > 0) add("a terminal step has no outgoing paths");
+
+    const hasTimerExit = (s.timers ?? []).some((t) => t.onFire.targetPath !== undefined);
+    if (!s.terminal && paths.length === 0 && !hasTimerExit)
+      add("a non-terminal step needs an exit (a path or a timer targetPath)");
+
+    const triggers = new Set(paths.map((p) => p.trigger));
+    if (triggers.has("manual") && triggers.has("automatic"))
+      add("a step's paths must be all-manual or all-automatic, not mixed");
+
+    const autos = paths.filter((p) => p.trigger === "automatic");
+    const guarded = autos.filter((p) => p.guard !== undefined);
+    const guardless = autos.filter((p) => p.guard === undefined);
+
+    if (autos.length >= 2) {
+      const prios = autos.map((p) => p.priority);
+      if (prios.some((x) => x === undefined)) add("automatic paths need a priority when a step has two or more");
+      else if (new Set(prios).size !== prios.length) add("automatic path priorities must be unique");
+    }
+    if (guardless.length > 1) add("at most one default (guardless) automatic path per step");
+    if (guardless.length === 1 && guarded.length > 0) {
+      const gd = guardless[0].priority;
+      const maxGuarded = Math.max(...guarded.map((p) => p.priority ?? -Infinity));
+      if (gd === undefined || gd <= maxGuarded) add("the default (guardless) automatic path must have the highest priority");
+    }
+  });
+export type Step = z.infer<typeof step>;
+
+// ============================================================
+// Workflow + Contract + Body (with process-wide invariants) + Version.
+// ============================================================
+
+export const workflow = z.object({
+  initialStep: stepId,
+  steps: z.array(step),
+});
+export type Workflow = z.infer<typeof workflow>;
+
+export const processContract = z.object({
+  inputFields: z.array(fieldId).optional(),
+  outputFields: z.array(fieldId).optional(),
+  outcomes: z.array(z.string()).optional(),
+});
+export type ProcessContract = z.infer<typeof processContract>;
+
+export const processBody = z
+  .object({
+    key: z.string(),
+    label: z.string(),
+    description: z.string().optional(),
+    contract: processContract.optional(),
+    fields: z.array(fieldDef),
+    dataSources: z.array(dataSourceDef).optional(),
+    workflow,
+  })
+  .superRefine((b, ctx) => {
+    const add = (message: string, path: (string | number)[]) =>
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message, path });
+
+    const steps = b.workflow.steps;
+    const stepIds = new Set(steps.map((s) => s.id));
+    const fieldIds = new Set(b.fields.map((f) => f.id));
+    const outcomes = new Set(b.contract?.outcomes ?? []);
+
+    if (!stepIds.has(b.workflow.initialStep))
+      add(`initialStep does not resolve: ${b.workflow.initialStep}`, ["workflow", "initialStep"]);
+    if (stepIds.size !== steps.length) add("duplicate step ids", ["workflow", "steps"]);
+    if (fieldIds.size !== b.fields.length) add("duplicate field ids", ["fields"]);
+
+    steps.forEach((s, i) => {
+      (s.paths ?? []).forEach((p, j) => {
+        if (!stepIds.has(p.to)) add(`path target does not resolve: ${p.to}`, ["workflow", "steps", i, "paths", j, "to"]);
+      });
+      (s.view?.fields ?? []).forEach((vf, j) => {
+        if (!fieldIds.has(vf.ref)) add(`view ref does not resolve: ${vf.ref}`, ["workflow", "steps", i, "view", "fields", j, "ref"]);
+      });
+      (s.timers ?? []).forEach((t, j) => {
+        const tp = t.onFire.targetPath;
+        if (tp !== undefined && !(s.paths ?? []).some((p) => p.id === tp))
+          add(`timer targetPath is not an outgoing path of this step: ${tp}`, ["workflow", "steps", i, "timers", j]);
+      });
+      [...(s.onEntry ?? []), ...(s.onExit ?? [])].forEach((a) => {
+        Object.keys(a.output ?? {}).forEach((fid) => {
+          if (!fieldIds.has(fid as FieldId)) add(`action output targets unknown field: ${fid}`, ["workflow", "steps", i]);
+        });
+      });
+      if (b.contract && s.terminal) {
+        if (s.outcome === undefined) add(`contracted process: terminal step '${s.key}' needs an outcome`, ["workflow", "steps", i, "outcome"]);
+        else if (!outcomes.has(s.outcome)) add(`terminal outcome '${s.outcome}' is not in contract.outcomes`, ["workflow", "steps", i, "outcome"]);
+      }
+    });
+
+    if (b.contract) {
+      const reached = new Set(steps.filter((s) => s.terminal).map((s) => s.outcome).filter(Boolean) as string[]);
+      outcomes.forEach((o) => {
+        if (!reached.has(o)) add(`declared outcome '${o}' has no terminal step`, ["contract", "outcomes"]);
+      });
+    }
+  });
+export type ProcessBody = z.infer<typeof processBody>;
+
+export const migrationSpec = z
+  .object({
+    fromVersion: z.number(),
+    stepMap: z.record(stepId, stepId).optional(),
+    fieldMap: z.record(fieldId, fieldId).optional(),
+    transforms: z.record(fieldId, expression).optional(),
+    onUnmappable: z.enum(["reject-and-pin", "route-to-step"]).optional(),
+    unmappableStep: stepId.optional(),
+  })
+  .refine((m) => (m.onUnmappable === "route-to-step") === (m.unmappableStep !== undefined), {
+    message: "unmappableStep is present iff onUnmappable is 'route-to-step'",
+    path: ["unmappableStep"],
+  });
+export type MigrationSpec = z.infer<typeof migrationSpec>;
+
+/** The published, versioned wrapper. Not part of the hashed body. */
+export const processVersion = z.object({
+  processId,
+  version: z.number(),
+  definitionHash: z.string(),
+  status: definitionStatus,
+  compatibility: compatibility.optional(),
+  migration: migrationSpec.optional(),
+  publishedAt: timestamp.optional(),
+  definition: processBody,
+});
+export type ProcessVersion = z.infer<typeof processVersion>;
+
+// ============================================================
+// Runtime: instance + history (the audit backbone).
+// ============================================================
+
+export const assignmentState = z.object({
+  candidates: z.array(z.string()),
+  claimedBy: z.string().optional(),
+  claimedAt: timestamp.optional(),
+});
+export type AssignmentState = z.infer<typeof assignmentState>;
+
+export const timerState = z.object({
+  timerId,
+  fireAt: timestamp,
+  fired: z.boolean().optional(),
+});
+export type TimerState = z.infer<typeof timerState>;
+
+export const actionOutcome = z.object({
+  actionId,
+  resolvedHandler: z.string(),
+  idempotencyKey: z.string(),
+  status: z.enum(["succeeded", "failed", "dead-letter"]),
+  attempts: z.number(),
+  at: timestamp,
+});
+export type ActionOutcome = z.infer<typeof actionOutcome>;
+
+export const historyEntry = z.object({
+  id: historyEntryId,
+  instanceId,
+  transitionSeq: z.number(),
+  version: z.number(),
+  pathId: pathId.nullable(),
+  fromStepId: stepId.nullable(),
+  toStepId: stepId,
+  cause: z.enum(["user", "timer", "automatic", "migration"]),
+  actorId: z.string().optional(),
+  at: timestamp,
+  actions: z.array(actionOutcome).optional(),
+});
+export type HistoryEntry = z.infer<typeof historyEntry>;
+
+export const instance = z.object({
+  instanceId,
+  processId,
+  version: z.number(),
+  definitionHash: z.string(),
+  currentStepId: stepId,
+  transitionSeq: z.number(),
+  data: z.record(fieldId, literal),
+  assignment: assignmentState.optional(),
+  timers: z.array(timerState).optional(),
+  parent: z.object({ instanceId, stepId }).optional(),
+  status: instanceStatus,
+  startedAt: timestamp,
+  startedBy: z.string().optional(),
+});
+export type Instance = z.infer<typeof instance>;

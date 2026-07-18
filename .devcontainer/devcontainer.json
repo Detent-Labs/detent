@@ -1,0 +1,30 @@
+{
+  "name": "workflow-engine",
+
+  // Compose-based: the `app` service is the dev container, `db` is PostgreSQL 16.
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "remoteUser": "node",
+
+  // Installs Claude Code inside the container. The :1.0 tag pins the feature's
+  // install script, not the CLI; the CLI installs latest and auto-updates.
+  "features": {
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+  },
+
+  // Persist Claude Code auth, settings, and session history across rebuilds.
+  // Per-project volume (the devcontainerId keeps it separate from other repos).
+  "mounts": [
+    "source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume"
+  ],
+
+  // Bun (installed in the image) is the package manager.
+  "postCreateCommand": "bun install",
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"]
+    }
+  }
+}

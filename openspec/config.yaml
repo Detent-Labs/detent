@@ -1,0 +1,37 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+context: |
+  Headless, API-first workflow/BPM engine in TypeScript. Paradigm: state-based
+  finite-state machine — Steps (states) joined by explicit Paths (transitions),
+  NOT BPMN token flow. v1: one active step per instance (no parallelism);
+  subprocesses are synchronous call-and-return.
+
+  The contract is one artifact: the serialized JSON process definition.
+  src/schema/definition.ts IS the contract — Zod schemas with TS types via
+  z.infer, so validation and types cannot drift. Identity is an opaque,
+  type-prefixed, immutable `id` (the sole reference anchor); `key` is a mutable
+  slug that references nothing; `label` is display text. All conditions are CEL
+  ({ lang: "cel", src }): pure, total, no now(). Authoring-time invariants are Zod
+  refinements, each shipping with a test that rejects a violating definition.
+  Change the schema deliberately, never as a side effect of another task.
+
+  Stack: TypeScript strict, ESM. Bun is the runtime, package manager (`bun
+  install`), and test runner (`bun test`); typecheck via `tsc --noEmit`. Datastore
+  is PostgreSQL, accessed via Bun's native `Bun.sql`. Tooling runs in the
+  devcontainer (Node 22 base + Bun, plus a Postgres 16 service).
+
+  Process: spec-driven via OpenSpec. Every non-trivial change goes through an
+  OpenSpec change (propose -> specs/tasks -> implement -> verify -> archive),
+  never a direct edit.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours

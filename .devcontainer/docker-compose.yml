@@ -1,0 +1,30 @@
+# Devcontainer services: the `app` container (Node 22 base + Bun) and a PostgreSQL
+# 16 datastore. The engine reaches Postgres via DATABASE_URL (see openspec/specs
+# persistence). pgdata persists the database across rebuilds.
+name: workflow-engine
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ..:/workspace:cached
+    command: sleep infinity
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/workflow_engine
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: workflow_engine
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
