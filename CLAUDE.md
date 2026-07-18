@@ -169,6 +169,9 @@ each with a test that rejects a violating definition.
   `child` only in subprocess steps); `now()`/`timestamp()`/`duration()` are blocked.
   `test/cel.test.ts` covers each rule. Known papercut: `number`->CEL `double`, so
   `data.count == 5` needs `== 5.0`.
+- `README.md`: public-facing overview (paradigm, the JSON/Zod contract, a status
+  table, dev commands). Points here for the full invariant rules rather than
+  duplicating them.
 - No engine and no editor exist yet.
 
 ## Roadmap
