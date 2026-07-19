@@ -182,6 +182,21 @@ test.skipIf(!DB)("a false guard refuses the transition and leaves the instance p
   expect(await histCount(inst.instanceId)).toBe(0);
 });
 
+test.skipIf(!DB)("a transition does not overwrite instance data (clobber-proof)", async () => {
+  const body = bodyWith();
+  const inst = await createInstance(body, { processId: "proc_1" as Instance["processId"], version: 1 });
+  // Simulate a post-commit action writeback landing a value in data.
+  await sql`UPDATE instances SET body = jsonb_set(body, '{data,field_x}', '42'::jsonb, true)
+    WHERE instance_id = ${inst.instanceId}`;
+
+  await executeManualTransition(inst, "path_ab", body, actor); // path-scoped commit
+
+  const r = (await sql`SELECT body FROM instances WHERE instance_id = ${inst.instanceId}`) as { body: unknown }[];
+  const b = (typeof r[0].body === "string" ? JSON.parse(r[0].body as string) : r[0].body) as Instance;
+  expect((b.data as Record<string, unknown>).field_x).toBe(42); // survived the transition
+  expect(b.currentStepId as string).toBe("step_b"); // and the transition still committed
+});
+
 test.skipIf(!DB)("two commits from the same seq: first wins, second conflicts, no partial write", async () => {
   const body = bodyWith();
   const inst = await createInstance(body, { processId: "proc_1" as Instance["processId"], version: 1 });

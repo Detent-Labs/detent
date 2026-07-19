@@ -39,6 +39,10 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     created_at timestamptz NOT NULL DEFAULT now(),
     delivered_at timestamptz
   )`;
+  // Claim/deliver/mark split: a claimed row carries a lease (claimed_at). status
+  // is free text, so the 'claimed' state needs no constraint change. Idempotent
+  // add so an existing outbox table gains the column.
+  await db`ALTER TABLE outbox ADD COLUMN IF NOT EXISTS claimed_at timestamptz`;
   await db`CREATE INDEX IF NOT EXISTS outbox_claim_idx ON outbox (status, next_attempt_at)`;
 }
 
@@ -65,8 +69,11 @@ export async function createInstance(
     status: "running",
     startedAt: new Date().toISOString(),
   });
+  // Bind the object directly: Bun.sql encodes it as a jsonb object. A
+  // JSON.stringify(...)::jsonb param would store a jsonb *scalar string* that
+  // jsonb_set (used by the transition/writeback) cannot traverse.
   await db`INSERT INTO instances (instance_id, transition_seq, body)
-    VALUES (${inst.instanceId}, ${inst.transitionSeq}, ${JSON.stringify(inst)}::jsonb)`;
+    VALUES (${inst.instanceId}, ${inst.transitionSeq}, ${inst})`;
   return inst;
 }
 

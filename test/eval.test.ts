@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { projectInstance, buildGuardContext, evalGuard, type Actor } from "../src/cel/eval.js";
+import { projectInstance, buildGuardContext, evalGuard, evalOutput, type Actor } from "../src/cel/eval.js";
 import { INSTANCE_SCHEMA } from "../src/cel/check.js";
 import type { Instance, ProcessBody, Expression } from "../src/schema/definition.js";
 
@@ -64,4 +64,23 @@ test("a guardless path is always taken", () => {
 test("a guard cannot resolve the Action.output-only result namespace", () => {
   const ctx = buildGuardContext(body([]), inst(), { id: "u", roles: [] });
   expect(() => evalGuard(cel("result.x == 1"), ctx)).toThrow();
+});
+
+// --- Action.output evaluation ----------------------------------------------
+
+test("evalOutput evaluates output expressions over result into a field->value patch", () => {
+  const patch = evalOutput({ field_status: cel("result.status") }, { status: "booked" });
+  expect(patch).toEqual({ field_status: "booked" });
+});
+
+test("evalOutput coerces a cel-js int (bigint) to a JSON-safe number", () => {
+  const patch = evalOutput({ field_n: cel("1 + 1") }, {});
+  expect(patch.field_n).toBe(2);
+  expect(typeof patch.field_n).toBe("number");
+});
+
+test("an output expression cannot resolve data / instance / actor (result-only scope)", () => {
+  expect(() => evalOutput({ f: cel("data.x") }, {})).toThrow();
+  expect(() => evalOutput({ f: cel("instance.id") }, {})).toThrow();
+  expect(() => evalOutput({ f: cel("actor.id") }, {})).toThrow();
 });

@@ -78,16 +78,25 @@ export async function executeManualTransition(
   };
 
   await db.begin(async (tx) => {
+    // Path-scoped commit: write only {currentStepId, transitionSeq, status}, never
+    // {data}. A post-commit action writeback jsonb_sets a disjoint {data,<fieldId>}
+    // path, so the row lock serializes the two writers with no lost write. Each
+    // scalar is wrapped as [v] and read back with ->0 so Bun.sql binds a proper
+    // jsonb value (a bare string param would land as a jsonb scalar string).
     const updated = (await tx`UPDATE instances
-      SET body = ${JSON.stringify(next)}::jsonb, transition_seq = ${nextSeq}
+      SET body = jsonb_set(jsonb_set(jsonb_set(body,
+            '{currentStepId}', (${[next.currentStepId]}::jsonb) -> 0),
+            '{transitionSeq}', (${[nextSeq]}::jsonb) -> 0),
+            '{status}', (${[next.status]}::jsonb) -> 0),
+          transition_seq = ${nextSeq}
       WHERE instance_id = ${instance.instanceId} AND transition_seq = ${instance.transitionSeq}
       RETURNING instance_id`) as unknown[];
     if (updated.length === 0) throw new ConcurrencyConflict(instance.instanceId, instance.transitionSeq);
     await tx`INSERT INTO history_entries (id, instance_id, transition_seq, entry)
-      VALUES (${entry.id}, ${entry.instanceId}, ${entry.transitionSeq}, ${JSON.stringify(entry)}::jsonb)`;
+      VALUES (${entry.id}, ${entry.instanceId}, ${entry.transitionSeq}, ${entry})`;
     for (const a of actions) {
       await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
-        VALUES (${idempotencyKey(instance.instanceId, nextSeq, a.id)}, ${instance.instanceId}, ${nextSeq}, ${a.id}, ${JSON.stringify(a)}::jsonb)`;
+        VALUES (${idempotencyKey(instance.instanceId, nextSeq, a.id)}, ${instance.instanceId}, ${nextSeq}, ${a.id}, ${a})`;
     }
   });
 

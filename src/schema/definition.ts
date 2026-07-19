@@ -376,6 +376,19 @@ export const processBody = z
     const stepIds = new Set(steps.map((s) => s.id));
     const fieldIds = new Set(b.fields.map((f) => f.id));
     const outcomes = new Set(b.contract?.outcomes ?? []);
+    const sink = steps.find((s) => s.id === CANCEL_SINK_STEP_ID);
+
+    // Within one transition the Action.output target FieldIds across all its
+    // actions must be disjoint — two actions writing one field is a silent
+    // last-writer race. Checked per transition below.
+    const disjointOutputs = (actions: Action[], loc: (string | number)[]) => {
+      const seen = new Set<string>();
+      for (const a of actions)
+        for (const fid of Object.keys(a.output ?? {})) {
+          if (seen.has(fid)) { add(`two actions on one transition write the same output field: ${fid}`, loc); return; }
+          seen.add(fid);
+        }
+    };
 
     if (!stepIds.has(b.workflow.initialStep))
       add(`initialStep does not resolve: ${b.workflow.initialStep}`, ["workflow", "initialStep"]);
@@ -385,7 +398,12 @@ export const processBody = z
     steps.forEach((s, i) => {
       (s.paths ?? []).forEach((p, j) => {
         if (!stepIds.has(p.to)) add(`path target does not resolve: ${p.to}`, ["workflow", "steps", i, "paths", j, "to"]);
+        const target = steps.find((st) => st.id === p.to);
+        disjointOutputs([...(s.onExit ?? []), ...(p.onPath ?? []), ...(target?.onEntry ?? [])], ["workflow", "steps", i, "paths", j]);
       });
+      // Cancel transition: [source.onCancel, cancel-sink.onEntry]. The injected
+      // sink has no onEntry, so this reduces to disjointness among onCancel.
+      disjointOutputs([...(s.onCancel ?? []), ...(sink?.onEntry ?? [])], ["workflow", "steps", i, "onCancel"]);
       (s.view?.fields ?? []).forEach((vf, j) => {
         if (!fieldIds.has(vf.ref)) add(`view ref does not resolve: ${vf.ref}`, ["workflow", "steps", i, "view", "fields", j, "ref"]);
       });
@@ -500,6 +518,9 @@ export const actionOutcome = z.object({
   status: z.enum(["succeeded", "failed", "dead-letter"]),
   attempts: z.number(),
   at: timestamp,
+  // Set when a terminal instance suppressed the writeback: the handler ran
+  // (status still reflects its outcome) but no value was written into data.
+  suppressed: z.boolean().optional(),
 });
 export type ActionOutcome = z.infer<typeof actionOutcome>;
 

@@ -71,3 +71,49 @@ export function evalGuard(guard: Expression | undefined, ctx: Record<string, unk
   if (!guard) return true;
   return evaluate(guard.src, ctx) === true;
 }
+
+/**
+ * Build the Action.output context: `result` only. data/instance/actor are
+ * absent, so an output expression referencing them is unresolvable — matching
+ * the authoring scope where `result` is the sole namespace for Action.output.
+ */
+export function buildOutputContext(result: unknown): Record<string, unknown> {
+  return { result };
+}
+
+/**
+ * cel-js models CEL `int` as bigint; coerce to a safe-integer number before a
+ * value lands in JSON-typed `data` (the runtime twin of the authoring
+ * number->double papercut). Recurses so nested list/map results are covered.
+ */
+function coerceJson(v: unknown): unknown {
+  if (typeof v === "bigint") {
+    if (v < BigInt(Number.MIN_SAFE_INTEGER) || v > BigInt(Number.MAX_SAFE_INTEGER))
+      throw new RangeError(`output value out of safe-integer range: ${v}`);
+    return Number(v);
+  }
+  if (Array.isArray(v)) return v.map(coerceJson);
+  if (v && typeof v === "object") {
+    const o: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(v)) o[k] = coerceJson(val);
+    return o;
+  }
+  return v;
+}
+
+/**
+ * Evaluate an Action.output map (target FieldId -> CEL over `result`) against a
+ * handler's `result`, returning a fieldId -> JSON value patch. Values are
+ * coerced JSON-safe (bigint -> number).
+ */
+export function evalOutput(
+  outputMap: Partial<Record<string, Expression>> | undefined,
+  result: unknown,
+): Record<string, unknown> {
+  const ctx = buildOutputContext(result);
+  const patch: Record<string, unknown> = {};
+  for (const [fid, expr] of Object.entries(outputMap ?? {})) {
+    if (expr) patch[fid] = coerceJson(evaluate(expr.src, ctx));
+  }
+  return patch;
+}

@@ -72,4 +72,39 @@ describe("expense-approval definition", () => {
     rename.definition.workflow.steps[1].label = "Erste Pruefung";
     expect(processVersion.safeParse(rename).success).toBe(true);
   });
+
+  // A second action reachable by the booking transition (step_book.onEntry
+  // already maps field ...0004) mapping the same field is the last-writer hazard.
+  const dupOutputAction = (field: string) => ({
+    id: "action_dddddddd-0000-4a1c-8e2f-000000000009",
+    type: "noop",
+    config: {},
+    output: { [field]: { lang: "cel", src: "result.status" } },
+  });
+
+  it("rejects two actions on one transition writing the same output field", () => {
+    expect(rejects((d) => {
+      d.definition.workflow.steps[2].onEntry.push(
+        dupOutputAction("field_1a2b3c4d-0004-4a1c-8e2f-000000000004"),
+      );
+    })).toBe(true);
+  });
+
+  it("accepts two actions on one transition writing disjoint fields", () => {
+    const ok = structuredClone(raw);
+    ok.definition.workflow.steps[2].onEntry.push(
+      dupOutputAction("field_1a2b3c4d-0001-4a1c-8e2f-000000000001"),
+    );
+    expect(processVersion.safeParse(ok).success).toBe(true);
+  });
+
+  it("rejects two onCancel actions writing the same output field", () => {
+    expect(rejects((d) => {
+      const f = "field_1a2b3c4d-0001-4a1c-8e2f-000000000001";
+      d.definition.workflow.steps[0].onCancel = [
+        { id: "action_c1000000-0000-4a1c-8e2f-000000000001", type: "noop", config: {}, output: { [f]: { lang: "cel", src: "result.x" } } },
+        { id: "action_c2000000-0000-4a1c-8e2f-000000000002", type: "noop", config: {}, output: { [f]: { lang: "cel", src: "result.y" } } },
+      ];
+    })).toBe(true);
+  });
 });
