@@ -5,9 +5,7 @@
 Defines the CEL language binding for the engine: the chosen library, the formal
 expression context (namespaces and their shapes), the scoping of `result`, and
 authoring-time parse + type-checking of every Expression against the field catalog.
-
 ## Requirements
-
 ### Requirement: Single CEL implementation for parse and evaluate
 
 The system SHALL use exactly one CEL library, shared by the editor (parse) and
@@ -111,6 +109,12 @@ semantics at runtime. Evaluation SHALL be against the instance's frozen context
 same scoping rules as the authoring check (`result` is never visible to a guard;
 `child` only inside a subprocess step).
 
+Guard evaluation SHALL be total: a guard that raises a runtime error — most
+commonly a reference to a field not yet written into `data` — evaluates to `false`
+and MUST NOT throw. The path is therefore not taken, and an instance on an
+all-automatic step whose guards all evaluate false waits (the wait-state idiom:
+`data.booking_status == 'booked'` is false until the writeback lands, then true).
+
 #### Scenario: A guard that type-checks evaluates under the same semantics
 - **WHEN** a guard expression passes authoring-time type-checking and is later evaluated for a transition
 - **THEN** it is evaluated by the same library with no separate dialect or grammar, producing a boolean over the frozen context
@@ -118,6 +122,14 @@ same scoping rules as the authoring check (`result` is never visible to a guard;
 #### Scenario: Guard evaluation cannot see the Action.output-only namespace
 - **WHEN** a guard expression is evaluated
 - **THEN** the `result` namespace is not registered, so referencing it is not resolvable
+
+#### Scenario: A guard on a field not yet written evaluates false
+- **WHEN** a guard references a `data` field that has no value in the instance payload (e.g. a wait-state guard before its action's writeback)
+- **THEN** evaluation returns `false` rather than raising, so the path is not taken and the instance waits
+
+#### Scenario: A runtime-unresolvable reference evaluates false, not an error
+- **WHEN** a guard is evaluated and references a name that does not resolve in the guard context
+- **THEN** evaluation returns `false` (totality), while authoring-time type-checking remains the layer that rejects such a reference outright
 
 ### Requirement: Runtime instance is projected onto INSTANCE_SCHEMA from one source of truth
 
@@ -140,3 +152,4 @@ authoring context and the runtime projection cannot drift.
 #### Scenario: Authoring context and runtime projection share one field set
 - **WHEN** the whitelisted field set is changed in `INSTANCE_SCHEMA`
 - **THEN** both the authoring check and the runtime projection reflect the change with no second field list to update
+

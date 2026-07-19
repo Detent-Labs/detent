@@ -61,9 +61,20 @@ test("a guardless path is always taken", () => {
   expect(evalGuard(undefined, {})).toBe(true);
 });
 
-test("a guard cannot resolve the Action.output-only result namespace", () => {
+test("a guard referencing the out-of-scope result namespace is false, not an error (total)", () => {
   const ctx = buildGuardContext(body([]), inst(), { id: "u", roles: [] });
-  expect(() => evalGuard(cel("result.x == 1"), ctx)).toThrow();
+  // `result` is unresolvable in guard scope (enforced at authoring time by
+  // check.ts). At runtime guards are total, so an unresolvable reference is
+  // simply false — it can never make the path match.
+  expect(evalGuard(cel("result.x == 1"), ctx)).toBe(false);
+});
+
+test("a guard on a field not yet written is false (total), the wait-state idiom", () => {
+  const b = body([{ id: "field_status", key: "status", type: "text" }]);
+  const ctx = buildGuardContext(b, inst({ data: {} }), { id: "u", roles: [] });
+  // `data.status` is absent until an action writes it back; a wait-state guard on
+  // it evaluates false rather than throwing, so the instance waits.
+  expect(evalGuard(cel('data.status == "booked"'), ctx)).toBe(false);
 });
 
 // --- Action.output evaluation ----------------------------------------------

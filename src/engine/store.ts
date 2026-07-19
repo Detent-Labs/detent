@@ -9,6 +9,7 @@
 import { SQL } from "bun";
 import { instance as instanceSchema, type Instance, type ProcessBody, type ProcessId } from "../schema/definition.js";
 import { definitionHash } from "../schema/hash.js";
+import { armStepTimers, minFireAt } from "./duration.js";
 
 /** Shared client. Constructed lazily-ish; a query throws if DATABASE_URL is unset. */
 export const sql = new SQL(process.env.DATABASE_URL ?? "");
@@ -44,6 +45,18 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // add so an existing outbox table gains the column.
   await db`ALTER TABLE outbox ADD COLUMN IF NOT EXISTS claimed_at timestamptz`;
   await db`CREATE INDEX IF NOT EXISTS outbox_claim_idx ON outbox (status, next_attempt_at)`;
+  // Re-resolution flag: a data-affecting writeback sets this to 'pending' so the
+  // resolution worker re-drives automatic evaluation for a parked wait-state.
+  // Idempotent add + index for the worker's claim scan.
+  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS resolve_state text NOT NULL DEFAULT 'idle'`;
+  // Lease stamp for the resolution worker's claim: a 'claimed' row past its lease
+  // is an abandoned (crashed) claim and is reclaimed by a later drain.
+  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS resolve_claimed_at timestamptz`;
+  await db`CREATE INDEX IF NOT EXISTS instances_resolve_idx ON instances (resolve_state)`;
+  // Timer scheduling: the min unfired fireAt of the current step's armed timers,
+  // maintained at every arm/disarm. The scheduler polls WHERE next_timer_at <= now().
+  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS next_timer_at timestamptz`;
+  await db`CREATE INDEX IF NOT EXISTS instances_timer_idx ON instances (next_timer_at)`;
 }
 
 /**
@@ -58,6 +71,18 @@ export async function createInstance(
   opts: { processId: ProcessId; version: number },
   db: SQL = sql,
 ): Promise<Instance> {
+  // Arm the initial step's timers here, atomically with the INSERT — creation is a
+  // step entry, and a resting initial wait-state needs its bound. Doing it in a
+  // separate post-INSERT UPDATE would leave a crash window that permanently strands
+  // the timer (no worker re-arms a next_timer_at=NULL running instance). If
+  // resolveAutomatic later transitions off the initial step, the first commit
+  // replaces these timers (disarming). Arming is deterministic (no guard, no
+  // actor), so it stays within createInstance's persistence-only remit.
+  const startedAt = new Date().toISOString();
+  const timers = armStepTimers(
+    body.workflow.steps.find((s) => s.id === body.workflow.initialStep),
+    startedAt,
+  );
   const inst: Instance = instanceSchema.parse({
     instanceId: `inst_${crypto.randomUUID()}`,
     processId: opts.processId,
@@ -66,14 +91,15 @@ export async function createInstance(
     currentStepId: body.workflow.initialStep,
     transitionSeq: 0,
     data: {},
+    timers,
     status: "running",
-    startedAt: new Date().toISOString(),
+    startedAt,
   });
   // Bind the object directly: Bun.sql encodes it as a jsonb object. A
   // JSON.stringify(...)::jsonb param would store a jsonb *scalar string* that
   // jsonb_set (used by the transition/writeback) cannot traverse.
-  await db`INSERT INTO instances (instance_id, transition_seq, body)
-    VALUES (${inst.instanceId}, ${inst.transitionSeq}, ${inst})`;
+  await db`INSERT INTO instances (instance_id, transition_seq, body, next_timer_at)
+    VALUES (${inst.instanceId}, ${inst.transitionSeq}, ${inst}, ${minFireAt(timers)})`;
   return inst;
 }
 

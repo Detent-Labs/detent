@@ -135,16 +135,24 @@ export async function drainOutbox(
           RETURNING idempotency_key`) as unknown[];
         if (cas.length === 0) return; // already delivered by a peer
 
-        // Writeback, gated on non-terminal in the same UPDATE (no TOCTOU). fieldId
-        // is a validated field_<uuid>, so the path array literal is injection-safe.
+        // Writeback, gated on running in the same UPDATE (no TOCTOU). Only a
+        // running instance accepts a write; completed/cancelled/faulted are
+        // data-immutable and suppress. fieldId is a validated field_<uuid>, so the
+        // path array literal is injection-safe.
         let affected = 0;
         for (const [fid, val] of Object.entries(patch)) {
           // [val]->0 wraps any JSON value as a proper jsonb value (a bare param
           // would land as a jsonb scalar string). fieldId is a validated
           // field_<uuid>, so the path array literal is injection-safe.
+          // Also flag the instance for re-resolution: a changed `data` may now
+          // satisfy an automatic path the instance is parked on. Set in the same
+          // UPDATE so it is flagged iff a running row is affected — a suppressed
+          // writeback (0 rows) flags nothing. 'pending' overwrites any in-flight
+          // 'claimed', so a re-flag mid-pass is never lost.
           const r = (await tx`UPDATE instances
-            SET body = jsonb_set(body, ${`{data,${fid}}`}::text[], (${[val]}::jsonb) -> 0, true)
-            WHERE instance_id = ${row.instance_id} AND (body->>'status') NOT IN ('completed', 'cancelled')
+            SET body = jsonb_set(body, ${`{data,${fid}}`}::text[], (${[val]}::jsonb) -> 0, true),
+                resolve_state = 'pending'
+            WHERE instance_id = ${row.instance_id} AND (body->>'status') = 'running'
             RETURNING instance_id`) as unknown[];
           affected += r.length;
         }

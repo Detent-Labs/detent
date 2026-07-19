@@ -345,6 +345,20 @@ test.skipIf(!DB)("a writeback to a completed instance is suppressed (no data, ou
   expect(o[0]).toMatchObject({ status: "succeeded", suppressed: true });
 });
 
+test.skipIf(!DB)("a writeback to a faulted instance is suppressed (no data, outcome marked)", async () => {
+  const body = outputBody(false); // step_b non-terminal -> running, setter enqueued on entry
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+  // Instance faults (e.g. an automatic cascade loop) before the action is delivered.
+  await sql`UPDATE instances SET body = jsonb_set(body, '{status}', '"faulted"'::jsonb) WHERE instance_id = ${inst.instanceId}`;
+
+  expect(await drainOutbox(sql, reg)).toBe(1);
+  expect((await instData(inst.instanceId)).field_val).toBeUndefined(); // suppressed: not running
+  const o = await outcomes(inst.instanceId);
+  expect(o).toHaveLength(1);
+  expect(o[0]).toMatchObject({ status: "succeeded", suppressed: true });
+});
+
 test.skipIf(!DB)("double invocation is tolerated: a reclaimed row is delivered exactly once", async () => {
   const body = outputBody(false);
   const inst = await createFrom(body);

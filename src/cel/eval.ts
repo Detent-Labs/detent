@@ -14,6 +14,15 @@ export interface Actor {
   roles: string[];
 }
 
+/**
+ * System identity for engine-driven evaluation with no acting user (automatic
+ * re-resolution after a writeback, timer-forced transitions). Automatic guards
+ * should not read `actor`; a wait-state guard that does is a latent authoring
+ * question. Homed here (with the Actor type) so the engine's transition and
+ * resolution modules share one constant without a dependency cycle.
+ */
+export const SYSTEM_ACTOR: Actor = { id: "system", roles: [] };
+
 // The only field whose CEL name differs from the runtime Instance field.
 // Every other INSTANCE_SCHEMA key names an identical Instance property.
 const RENAME: Record<string, keyof Instance> = { id: "instanceId" };
@@ -66,10 +75,20 @@ export function buildGuardContext(body: ProcessBody, instance: Instance, actor: 
   return { data, instance: projectInstance(instance), actor: { id: actor.id, roles: actor.roles } };
 }
 
-/** Evaluate a path guard to a boolean. A guardless path is always taken. */
+/**
+ * Evaluate a path guard to a boolean. A guardless path is always taken. Guards
+ * are total (per the CEL contract): a runtime error — most commonly a field not
+ * yet written into `data` — is not a match, so the path is not taken. This is the
+ * wait-state idiom: `data.booking_status == 'booked'` is false while unset and
+ * becomes true only once the writeback lands.
+ */
 export function evalGuard(guard: Expression | undefined, ctx: Record<string, unknown>): boolean {
   if (!guard) return true;
-  return evaluate(guard.src, ctx) === true;
+  try {
+    return evaluate(guard.src, ctx) === true;
+  } catch {
+    return false;
+  }
 }
 
 /**

@@ -14,7 +14,8 @@
 import type { SQL } from "bun";
 import { sql, createInstance } from "./store.js";
 import { idempotencyKey } from "./idempotency.js";
-import { buildGuardContext, evalGuard, type Actor } from "../cel/eval.js";
+import { armStepTimers, minFireAt } from "./duration.js";
+import { buildGuardContext, evalGuard, SYSTEM_ACTOR, type Actor } from "../cel/eval.js";
 import type { ProcessBody, Instance, HistoryEntry, Action, Step, Path } from "../schema/definition.js";
 
 export class GuardRefused extends Error {
@@ -49,6 +50,7 @@ export function orderedTriggerActions(source: Step, path: Path, target: Step): A
   return [...(source.onExit ?? []), ...(path.onPath ?? []), ...(target.onEntry ?? [])];
 }
 
+
 /**
  * Commit one transition atomically: advance {currentStepId, transitionSeq,
  * status}, append its HistoryEntry, enqueue its ordered actions. Shared by the
@@ -65,11 +67,17 @@ async function commitTransition(
   db: SQL,
 ): Promise<Instance> {
   const nextSeq = instance.transitionSeq + 1;
+  const at = new Date().toISOString();
+  // Arm the target step's timers at entry (replacing the source step's, disarming
+  // them); next_timer_at is the earliest fireAt for the scheduler's poll.
+  const armed = armStepTimers(target, at);
+  const nextTimerAt = minFireAt(armed);
   const next: Instance = {
     ...instance,
     currentStepId: path.to,
     transitionSeq: nextSeq,
     status: target.terminal ? "completed" : instance.status,
+    timers: armed,
   };
   const entry: HistoryEntry = {
     id: `hist_${crypto.randomUUID()}` as HistoryEntry["id"],
@@ -81,21 +89,24 @@ async function commitTransition(
     toStepId: path.to,
     cause,
     ...(actorId !== undefined ? { actorId } : {}),
-    at: new Date().toISOString(),
+    at,
   };
 
   await db.begin(async (tx) => {
-    // Path-scoped commit: write only {currentStepId, transitionSeq, status}, never
-    // {data}. A post-commit action writeback jsonb_sets a disjoint {data,<fieldId>}
-    // path, so the row lock serializes the two writers with no lost write. Each
-    // scalar is wrapped as [v] and read back with ->0 so Bun.sql binds a proper
-    // jsonb value (a bare string param would land as a jsonb scalar string).
+    // Path-scoped commit: write {currentStepId, transitionSeq, status, timers} and
+    // the next_timer_at column, never {data}. A post-commit action writeback
+    // jsonb_sets a disjoint {data,<fieldId>} path, so the row lock serializes the
+    // two writers with no lost write. Each scalar/array is wrapped as [v] and read
+    // back with ->0 so Bun.sql binds a proper jsonb value (a bare param would land
+    // as a jsonb scalar string).
     const updated = (await tx`UPDATE instances
-      SET body = jsonb_set(jsonb_set(jsonb_set(body,
+      SET body = jsonb_set(jsonb_set(jsonb_set(jsonb_set(body,
             '{currentStepId}', (${[next.currentStepId]}::jsonb) -> 0),
             '{transitionSeq}', (${[nextSeq]}::jsonb) -> 0),
             '{status}', (${[next.status]}::jsonb) -> 0),
-          transition_seq = ${nextSeq}
+            '{timers}', (${[armed]}::jsonb) -> 0),
+          transition_seq = ${nextSeq},
+          next_timer_at = ${nextTimerAt}
       WHERE instance_id = ${instance.instanceId} AND transition_seq = ${instance.transitionSeq}
       RETURNING instance_id`) as unknown[];
     if (updated.length === 0) throw new ConcurrencyConflict(instance.instanceId, instance.transitionSeq);
@@ -152,6 +163,9 @@ export async function startInstance(
   actor: Actor,
   db: SQL = sql,
 ): Promise<Instance> {
+  // The initial step's timers are armed atomically inside createInstance (a crash
+  // between INSERT and a separate arming UPDATE would strand them). If resolveAutomatic
+  // transitions off the initial step, the first commit re-arms the resting step.
   const created = await createInstance(body, opts, db);
   return resolveAutomatic(created, body, actor, db);
 }
@@ -231,4 +245,61 @@ export async function resolveAutomatic(
     }
     seen.add(current.currentStepId);
   }
+}
+
+/**
+ * Fire a due timer on the instance's current step. A transition timer
+ * (`onFire.targetPath`) forces a transition down that path, bypassing its guard,
+ * with `cause: "timer"` and `onFire.actions` ordered ahead of the path's own
+ * triggers; the instance is then run to rest. A reminder timer (`onFire.actions`,
+ * no `targetPath`) enqueues its actions and marks itself fired without moving — a
+ * side effect only. Both are idempotent under a redundant fire (two schedulers, a
+ * re-scan): the transition via the OCC token, the reminder via a seq + fired guard.
+ */
+export async function fireTimer(
+  instance: Instance,
+  timerId: string,
+  body: ProcessBody,
+  db: SQL = sql,
+): Promise<Instance> {
+  const source = body.workflow.steps.find((s) => s.id === instance.currentStepId);
+  if (!source) throw new Error(`current step not in body: ${instance.currentStepId}`);
+  const timer = (source.timers ?? []).find((t) => t.id === timerId);
+  if (!timer) return instance; // not on the current step (instance moved): no-op
+
+  // Transition timer: forced transition down onFire.targetPath, guard bypassed.
+  // onFire.actions lead the path's own triggers. commitTransition's OCC predicate
+  // makes a redundant fire lose with ConcurrencyConflict.
+  if (timer.onFire.targetPath) {
+    const path = (source.paths ?? []).find((p) => p.id === timer.onFire.targetPath);
+    if (!path) throw new Error(`timer targetPath not on current step: ${timer.onFire.targetPath}`);
+    const target = body.workflow.steps.find((s) => s.id === path.to);
+    if (!target) throw new Error(`timer targetPath target not in body: ${path.to}`);
+    const actions = [...(timer.onFire.actions ?? []), ...orderedTriggerActions(source, path, target)];
+    const committed = await commitTransition(instance, path, target, actions, "timer", undefined, db);
+    return resolveAutomatic(committed, body, SYSTEM_ACTOR, db);
+  }
+
+  // Reminder timer: enqueue onFire.actions and mark fired, no transition, no seq
+  // bump. The UPDATE is guarded on the observed seq (a moved-off instance whose
+  // timers[] was replaced is a no-op) and on this timer not already fired (a later
+  // poll does not re-enqueue). next_timer_at drops to the next unfired timer.
+  const idx = (instance.timers ?? []).findIndex((t) => t.timerId === timerId);
+  if (idx < 0) return instance;
+  const nextTimerAt = minFireAt((instance.timers ?? []).filter((t) => t.timerId !== timerId));
+
+  await db.begin(async (tx) => {
+    const upd = (await tx`UPDATE instances
+      SET body = jsonb_set(body, ${`{timers,${idx},fired}`}::text[], 'true'::jsonb),
+          next_timer_at = ${nextTimerAt}
+      WHERE instance_id = ${instance.instanceId} AND transition_seq = ${instance.transitionSeq}
+        AND (body->'timers'->${idx}->>'fired') IS DISTINCT FROM 'true'
+      RETURNING instance_id`) as unknown[];
+    if (upd.length === 0) return; // moved off the step, or already fired
+    for (const a of timer.onFire.actions ?? []) {
+      await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
+        VALUES (${idempotencyKey(instance.instanceId, instance.transitionSeq, a.id)}, ${instance.instanceId}, ${instance.transitionSeq}, ${a.id}, ${a})`;
+    }
+  });
+  return instance;
 }
