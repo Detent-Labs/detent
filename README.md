@@ -50,7 +50,7 @@ dev container (`.devcontainer/`), never on the host.
 
 ```bash
 bun install
-bun test              # vitest-style suites
+bun test              # bun:test suites
 bun run typecheck     # tsc --noEmit (Bun does not typecheck)
 ```
 

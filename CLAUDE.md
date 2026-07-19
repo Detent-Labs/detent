@@ -37,9 +37,9 @@ project context OpenSpec shows the AI when generating artifacts lives in
 package.json               Bun-managed; scripts and deps
 tsconfig.json              strict; NodeNext ESM; covers src + test
 src/schema/definition.ts   Zod schemas = the contract; TS types via z.infer; invariants included
-src/engine/                executor: instance store, outbox, transitions, timers (later)
+src/engine/                executor: instance store, outbox, transitions, timers, subprocess
 examples/                  serialized example definitions
-test/                      validate.test.ts (vitest); tests run inside the container
+test/                      bun:test suites; tests run inside the container
 ```
 
 ## The contract: load-bearing rules
@@ -240,7 +240,7 @@ each with a test that rejects a violating definition.
 ## Roadmap
 1. Validation layer (Zod-first): DONE. definition.ts is Zod-sourced with TS types
    via z.infer and the structural invariants as refinements / superRefine; the
-   vitest suite test/validate.test.ts exercises them. The cross-process invariants
+   bun:test suite test/validate.test.ts exercises them. The cross-process invariants
    that need the child definition are now enforced at publish
    (`definitions.ts::validateCrossProcess`, `test/cross-process.test.ts`): a
    subprocess step's `inputMapping` targets must lie within the referenced child's
