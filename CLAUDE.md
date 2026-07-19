@@ -240,11 +240,20 @@ each with a test that rejects a violating definition.
 ## Roadmap
 1. Validation layer (Zod-first): DONE. definition.ts is Zod-sourced with TS types
    via z.infer and the structural invariants as refinements / superRefine; the
-   vitest suite test/validate.test.ts exercises them. Remaining: add the
-   cross-process invariants that need the child definition (a subprocess
-   inputMapping's keys must be in the child contract's inputFields; a callable
-   child must not require fields outside its inputFields) once a process registry
-   exists to resolve the child.
+   vitest suite test/validate.test.ts exercises them. The cross-process invariants
+   that need the child definition are now enforced at publish
+   (`definitions.ts::validateCrossProcess`, `test/cross-process.test.ts`): a
+   subprocess step's `inputMapping` targets must lie within the referenced child's
+   `contract.inputFields`, and the child reference must resolve to a *contracted*
+   published child (`pinned` → the version exists; `latest-at-spawn` → a published
+   version's compiled-contract hash equals `contractRef`). This enforces child-first
+   publish ordering. The originally-scoped "callable child requires no non-input
+   field" invariant was dropped as unsound: a `required` view flag is satisfied by
+   an interactive step's user, not the caller, so it does not encode "the caller
+   must supply this field" (the expense-approval example legitimately requires a
+   non-input field at its manual review step). Deferred: checking that
+   `outputMapping` expressions read only child field keys / `contract.outputFields`
+   (needs CEL identifier extraction).
 2. CEL wiring: DONE. Authoring-time (`src/cel/check.ts`) and engine-side evaluation
    (`src/cel/eval.ts`): guards evaluated at runtime (total — a runtime error is
    `false`) and Action.output result-writeback. Remaining: CEL checks for migration
@@ -262,9 +271,10 @@ each with a test that rejects a violating definition.
    advance, idempotent spawn) together with downward cancel propagation
    (`cancelInstance` cascades to active children by the `parent` link). Remaining:
    `deadline` timers (schema + authoring-validated, engine evaluator deferred);
-   migration; publish-time cross-process validation (inputMapping keys ⊂ child
-   contract inputFields); a subprocess step as the initial step does not spawn
-   (must be entered via a transition). The production `resolveBody` backing
+   migration; a subprocess step as the initial step does not spawn (must be entered
+   via a transition). Publish-time cross-process validation (inputMapping ⊆ child
+   inputFields, child reference resolvable → child-first ordering) is DONE
+   (`definitions.ts`, roadmap #1). The production `resolveBody` backing
    (definition/version store) is DONE (`definitions.ts` + `host.ts`), so the
    resolution and timer workers are live.
 4. Editor (likely a separate package; promote the repo to workspaces here).

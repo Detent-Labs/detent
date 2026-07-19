@@ -27,8 +27,58 @@ export type ResolveLatestByContract = (
   contractRef: string,
 ) => Promise<{ version: number; body: ProcessBody } | undefined>;
 
+/** A subprocess step's wiring is invalid against the child it references. */
+export class CrossProcessValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CrossProcessValidationError";
+  }
+}
+
 function parseBody(raw: unknown): ProcessBody {
   return processBody.parse(typeof raw === "string" ? JSON.parse(raw) : raw);
+}
+
+/**
+ * Publish-time cross-process check: every subprocess step must reference a
+ * resolvable, contracted child and map only into that child's declared inputs.
+ * Throws before any persist; child-first ordering falls out of resolvability.
+ */
+async function validateCrossProcess(
+  body: ProcessBody,
+  resolvers: { resolveBody: ResolveBody; resolveLatestByContract: ResolveLatestByContract },
+): Promise<void> {
+  for (const s of body.workflow.steps) {
+    const spec = s.subprocess;
+    if (!spec) continue;
+
+    let child: ProcessBody | undefined;
+    if (spec.versionBinding === "pinned") {
+      child = await resolvers.resolveBody(spec.processId, spec.pinnedVersion!);
+    } else {
+      const r = await resolvers.resolveLatestByContract(spec.processId, spec.contractRef!);
+      child = r?.body;
+    }
+    if (!child) {
+      const ref = spec.versionBinding === "pinned" ? `version ${spec.pinnedVersion}` : `contractRef ${spec.contractRef}`;
+      throw new CrossProcessValidationError(
+        `subprocess step '${s.key}' references child '${spec.processId}' (${ref}) which is not published`,
+      );
+    }
+    if (!child.contract) {
+      throw new CrossProcessValidationError(
+        `subprocess step '${s.key}' references child '${spec.processId}' which declares no contract`,
+      );
+    }
+    const inputs = new Set<string>(child.contract.inputFields ?? []);
+    for (const target of Object.keys(spec.inputMapping)) {
+      if (!inputs.has(target)) {
+        throw new CrossProcessValidationError(
+          `subprocess step '${s.key}' maps into child field '${target}', not in child '${spec.processId}' contract.inputFields`,
+        );
+      }
+    }
+  }
 }
 
 /**
@@ -63,6 +113,10 @@ export async function publishBody(
       definition: parseBody(row.body),
     };
   }
+
+  // New version about to be inserted: validate subprocess wiring against the
+  // (immutable, already-validated) published children before any persist.
+  await validateCrossProcess(body, createDefinitionStore(db));
 
   const max = (await db`SELECT COALESCE(MAX(version), 0) AS m FROM definitions
     WHERE process_id = ${processId}`) as { m: number }[];
