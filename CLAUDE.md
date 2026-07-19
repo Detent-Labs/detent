@@ -187,7 +187,23 @@ each with a test that rejects a violating definition.
   HistoryEntry; outbox + transitionSeq; downward-only subprocess propagation) are
   specified but belong to the engine (#3). Subprocess propagation is downward
   only in v1; no independent upward child cancel.
-- No engine and no editor exist yet.
+- Engine (`src/engine/`, PostgreSQL via `Bun.sql`, connection `DATABASE_URL`):
+  executes definitions. `store.ts` (instance store + rehydrate, pinned to
+  `{processId, version, definitionHash}`; arms the initial step's timers atomically
+  in the INSERT). `transition.ts` (manual, automatic, and timer transitions with
+  onExit→onPath→onEntry ordering, run-to-rest cascade, OCC on `transitionSeq`;
+  `fireTimer` forces a guard-bypassing timer transition or a side-effect-only
+  reminder). `outbox.ts` (transactional outbox: at-least-once delivery, result
+  writeback, retry/dead-letter, stale-claim reclaim; a writeback applies only to a
+  running instance). `resolution.ts` (re-resolves automatic paths after an async
+  writeback, so a parked wait-state takes its result-driven path; claim/CAS with a
+  lease). `timers.ts` + `duration.ts` (first-class timers: arm `duration` timers at
+  entry, `next_timer_at` poll scheduler, fire-once via OCC). `registry.ts`,
+  `idempotency.ts`. `src/cel/eval.ts` evaluates guards at runtime (total: a runtime
+  error such as an unwritten field is `false`, the wait-state idiom) and
+  Action.output writeback. The resolution and timer workers take an injected
+  `resolveBody` (`(processId, version) -> ProcessBody`); with no definition store
+  yet they are inert in production until one is wired. No editor exists yet.
 
 ## Roadmap
 1. Validation layer (Zod-first): DONE. definition.ts is Zod-sourced with TS types
@@ -197,23 +213,28 @@ each with a test that rejects a violating definition.
    inputMapping's keys must be in the child contract's inputFields; a callable
    child must not require fields outside its inputFields) once a process registry
    exists to resolve the child.
-2. CEL wiring: DONE (authoring-time). Library `@marcbachmann/cel-js`, formal
-   expression context defined, every Expression parse- and type-checked against
-   the field catalog (`src/cel/check.ts`). Remaining: engine-side evaluation of
-   guards/paths and Action.output result-writeback (belongs to #3), and CEL checks
-   for migration `transforms` once migration lands (they need the from-version
-   catalog).
-3. Engine skeleton: instance store, transactional outbox, transition executor
-   (onExit/onPath/onEntry ordering), timer scheduler, crash recovery. Persists to
-   PostgreSQL via Bun's native `Bun.sql` (no client dependency); connection via
-   `DATABASE_URL`. Includes the runtime half of cancellation (contract half is
-   done): the cancel transition, its HistoryEntry, and downward subprocess
-   propagation, all specified in the `cancel-semantics` change.
+2. CEL wiring: DONE. Authoring-time (`src/cel/check.ts`) and engine-side evaluation
+   (`src/cel/eval.ts`): guards evaluated at runtime (total — a runtime error is
+   `false`) and Action.output result-writeback. Remaining: CEL checks for migration
+   `transforms` once migration lands (they need the from-version catalog).
+3. Engine skeleton: largely DONE. Instance store, transactional outbox (delivery +
+   writeback + retry/dead-letter + reclaim), transition executor (manual/automatic/
+   timer, onExit→onPath→onEntry ordering, run-to-rest), async re-resolution of
+   wait-states after a writeback, timer arming + scheduler, and crash recovery
+   (outbox/resolution reclaim, persisted `next_timer_at`). Persists to PostgreSQL
+   via Bun's native `Bun.sql`; connection via `DATABASE_URL`. Remaining: the runtime
+   half of cancellation (contract half done — cancel transition, its HistoryEntry,
+   downward subprocess propagation, specified in `cancel-semantics`); `deadline`
+   timers (schema + authoring-validated, engine evaluator deferred); a production
+   `resolveBody` backing (a definition/version store), without which the resolution
+   and timer workers are inert; migration.
 4. Editor (likely a separate package; promote the repo to workspaces here).
 
 ## Open questions (still need a decision before building the relevant part)
-- A dedicated audit event type for version migrations (the transition-shaped
-  HistoryEntry fits step changes, not a pure version change).
+- A dedicated audit event type for non-transition events — a version migration and
+  a reminder-timer fire both lack a step change, so the transition-shaped
+  HistoryEntry does not fit. Today a reminder fire records only the timer's `fired`
+  flag plus the delivered action's `ActionOutcome`.
 - The formal expression context is pinned (`src/cel/check.ts`): `instance`
   `{id, status, transitionSeq, currentStepId}`, `actor` `{id, roles}`. Both are
   deliberately minimal; widen when the engine surfaces a concrete need.

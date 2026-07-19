@@ -24,19 +24,22 @@ All conditions are CEL (`{ lang: "cel", src }`) — pure, total, no `now()`.
 
 ## Status
 
-Schema + validation only. No engine or editor yet.
+Schema, validation, and a working engine. No editor yet.
 
 | Piece | State |
 |-------|-------|
 | `src/schema/definition.ts` | Full definition + runtime model as Zod; structural invariants as refinements / `superRefine`. |
 | `src/cel/check.ts` | Authoring-time CEL parse/type-check against the field catalog (`@marcbachmann/cel-js`). |
+| `src/cel/eval.ts` | Runtime CEL: guards (total — a runtime error is `false`) and Action.output writeback. |
 | `src/schema/compile.ts` | Publish-time pass: injects the cancel-sink (+ reserved outcome for a contracted process) before hashing, deterministic and idempotent. |
+| `src/engine/` | Instance store, transactional outbox (delivery + writeback + retry/dead-letter + reclaim), transition executor (manual/automatic/timer), async wait-state re-resolution, timer arming + scheduler, crash recovery. PostgreSQL via `Bun.sql`. |
 | `examples/expense-approval.json` | Complete Capture → Review → Book example. |
 | `test/` | `bun:test` suites; each invariant ships a test that rejects a violating definition. |
 
-Roadmap: validation (done) → CEL wiring (authoring-time done) → engine skeleton
-(instance store, transactional outbox, transition executor, timers, crash
-recovery; PostgreSQL via `Bun.sql`) → editor.
+Roadmap: validation (done) → CEL wiring (done) → engine skeleton (mostly done) →
+editor. Remaining engine work: runtime cancellation, `deadline` timers, and a
+definition/version store (the resolution and timer workers stay inert until one
+provides their `resolveBody`).
 
 ## Develop
 
