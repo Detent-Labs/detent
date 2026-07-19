@@ -19,7 +19,10 @@ import type { ProcessBody, FieldDef, BaseFieldType, Expression } from "../schema
 
 // The formal expression context. instance/actor shapes are pinned here.
 // ponytail: minimal shapes, widen when a real guard needs more.
-const INSTANCE_SCHEMA = { id: "string", status: "string", transitionSeq: "int", currentStepId: "string" } as const;
+// Exported as the single source of truth: the engine's runtime projection
+// (src/cel/eval.ts) derives its whitelist from these keys, so the authoring
+// context and the runtime instance namespace cannot drift.
+export const INSTANCE_SCHEMA = { id: "string", status: "string", transitionSeq: "int", currentStepId: "string" } as const;
 const ACTOR_SCHEMA = { id: "string", roles: "list<string>" } as const;
 const CHILD_SCHEMA = { outcome: "string", data: "dyn" } as const; // child.data is plugin-shaped
 
