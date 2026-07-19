@@ -31,7 +31,10 @@ export const CLAIM_LEASE_MS = 30_000;
  * this is injected. A resolver returning `undefined` leaves the instance flagged
  * for a later pass (the worker is inert in production until one is wired).
  */
-export type ResolveBody = (processId: string, version: number) => ProcessBody | undefined;
+export type ResolveBody = (
+  processId: string,
+  version: number,
+) => ProcessBody | undefined | Promise<ProcessBody | undefined>;
 
 function parseInstance(raw: unknown): Instance {
   return instanceSchema.parse(typeof raw === "string" ? JSON.parse(raw) : raw);
@@ -73,7 +76,7 @@ export async function drainResolutions(
   let processed = 0;
   for (const row of claimed) {
     const inst = parseInstance(row.body);
-    const body = resolveBody(inst.processId, inst.version);
+    const body = await resolveBody(inst.processId, inst.version);
     if (!body) {
       await requeue(row.instance_id);
       continue;

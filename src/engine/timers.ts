@@ -35,8 +35,8 @@ export async function drainTimers(db: SQL = sql, resolveBody: ResolveBody = () =
   let fired = 0;
   for (const row of dueRows) {
     const inst = parseInstance(row.body);
-    const body = resolveBody(inst.processId, inst.version);
-    if (!body) continue; // no definition store wired: leave for a later pass
+    const body = await resolveBody(inst.processId, inst.version);
+    if (!body) continue; // resolver miss: leave for a later pass
     const dueTimer = (inst.timers ?? [])
       .filter((t) => !t.fired && new Date(t.fireAt).getTime() <= nowMs)
       .sort((a, b) => ((a.fireAt as string) < (b.fireAt as string) ? -1 : 1))[0];

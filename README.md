@@ -32,14 +32,14 @@ Schema, validation, and a working engine. No editor yet.
 | `src/cel/check.ts` | Authoring-time CEL parse/type-check against the field catalog (`@marcbachmann/cel-js`). |
 | `src/cel/eval.ts` | Runtime CEL: guards (total — a runtime error is `false`) and Action.output writeback. |
 | `src/schema/compile.ts` | Publish-time pass: injects the cancel-sink (+ reserved outcome for a contracted process) before hashing, deterministic and idempotent. |
-| `src/engine/` | Instance store, transactional outbox (delivery + writeback + retry/dead-letter + reclaim), transition executor (manual/automatic/timer), async wait-state re-resolution, timer arming + scheduler, crash recovery. PostgreSQL via `Bun.sql`. |
+| `src/engine/` | Instance store, transactional outbox (delivery + writeback + retry/dead-letter + reclaim), transition executor (manual/automatic/timer), async wait-state re-resolution, timer arming + scheduler, crash recovery, definition/version store (`definitions.ts`) + `startEngine` host. PostgreSQL via `Bun.sql`. |
 | `examples/expense-approval.json` | Complete Capture → Review → Book example. |
 | `test/` | `bun:test` suites; each invariant ships a test that rejects a violating definition. |
 
 Roadmap: validation (done) → CEL wiring (done) → engine skeleton (mostly done) →
-editor. Remaining engine work: runtime cancellation, `deadline` timers, and a
-definition/version store (the resolution and timer workers stay inert until one
-provides their `resolveBody`).
+editor. The definition/version store is done — `startEngine` wires its
+`resolveBody` into the workers, so re-resolution, timers, and delivery run live.
+Remaining engine work: runtime cancellation, `deadline` timers, and migration.
 
 ## Develop
 

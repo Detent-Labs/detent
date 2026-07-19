@@ -202,8 +202,16 @@ each with a test that rejects a violating definition.
   `idempotency.ts`. `src/cel/eval.ts` evaluates guards at runtime (total: a runtime
   error such as an unwritten field is `false`, the wait-state idiom) and
   Action.output writeback. The resolution and timer workers take an injected
-  `resolveBody` (`(processId, version) -> ProcessBody`); with no definition store
-  yet they are inert in production until one is wired. No editor exists yet.
+  `resolveBody` (`(processId, version) -> ProcessBody`, may be async). `definitions.ts`
+  is the production backing: `publishBody` compiles + hashes + persists an
+  immutable, monotonically-versioned row into a `definitions` table (identical
+  re-publish is a hash-matched no-op); `createDefinitionStore` returns a DB-backed
+  `resolveBody` with a process-local cache (immutable versions, so never stale).
+  `host.ts` `startEngine(db, registry)` wires the store's resolver into all three
+  workers, so re-resolution, timers, and outbox delivery are live, not inert. An
+  instance MUST be created from the compiled body the store returns (its
+  `definitionHash` matches the pin); an authored-body instance hash-mismatches and
+  is requeued forever. No editor exists yet.
 
 ## Roadmap
 1. Validation layer (Zod-first): DONE. definition.ts is Zod-sourced with TS types
@@ -225,9 +233,9 @@ each with a test that rejects a violating definition.
    via Bun's native `Bun.sql`; connection via `DATABASE_URL`. Remaining: the runtime
    half of cancellation (contract half done — cancel transition, its HistoryEntry,
    downward subprocess propagation, specified in `cancel-semantics`); `deadline`
-   timers (schema + authoring-validated, engine evaluator deferred); a production
-   `resolveBody` backing (a definition/version store), without which the resolution
-   and timer workers are inert; migration.
+   timers (schema + authoring-validated, engine evaluator deferred); migration. The
+   production `resolveBody` backing (definition/version store) is DONE
+   (`definitions.ts` + `host.ts`), so the resolution and timer workers are live.
 4. Editor (likely a separate package; promote the repo to workspaces here).
 
 ## Open questions (still need a decision before building the relevant part)

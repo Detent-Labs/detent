@@ -57,6 +57,21 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // maintained at every arm/disarm. The scheduler polls WHERE next_timer_at <= now().
   await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS next_timer_at timestamptz`;
   await db`CREATE INDEX IF NOT EXISTS instances_timer_idx ON instances (next_timer_at)`;
+  // Definition store: one row per published version, keyed by (process_id, version).
+  // Holds the frozen compiled body plus its pin metadata; the resolution/timer
+  // workers resolve an instance's body from here. Immutable — the PK forbids a
+  // body overwrite at an existing (process_id, version).
+  await db`CREATE TABLE IF NOT EXISTS definitions (
+    process_id text NOT NULL,
+    version integer NOT NULL,
+    definition_hash text NOT NULL,
+    status text NOT NULL,
+    published_at timestamptz NOT NULL DEFAULT now(),
+    body jsonb NOT NULL,
+    PRIMARY KEY (process_id, version)
+  )`;
+  // Idempotent-publish lookup: an identical re-publish matches by (process_id, hash).
+  await db`CREATE INDEX IF NOT EXISTS definitions_hash_idx ON definitions (process_id, definition_hash)`;
 }
 
 /**
