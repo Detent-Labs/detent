@@ -129,9 +129,25 @@ export function evalOutput(
   outputMap: Partial<Record<string, Expression>> | undefined,
   result: unknown,
 ): Record<string, unknown> {
-  const ctx = buildOutputContext(result);
+  return evalFieldMap(outputMap, buildOutputContext(result));
+}
+
+/**
+ * Evaluate a target-FieldId -> CEL map against a supplied context, returning a
+ * fieldId -> JSON-safe value patch (bigint -> number). The caller builds the
+ * context, so this serves both the subprocess `inputMapping` (evaluated over the
+ * parent's data/instance/actor, targets keyed by child fieldId) and
+ * `outputMapping` (evaluated over the parent context plus the `child` namespace,
+ * targets keyed by parent fieldId). Unlike a guard, a mapping is not total: an
+ * unresolved reference throws, surfacing an authoring error rather than silently
+ * dropping the field.
+ */
+export function evalFieldMap(
+  map: Partial<Record<string, Expression>> | undefined,
+  ctx: Record<string, unknown>,
+): Record<string, unknown> {
   const patch: Record<string, unknown> = {};
-  for (const [fid, expr] of Object.entries(outputMap ?? {})) {
+  for (const [fid, expr] of Object.entries(map ?? {})) {
     if (expr) patch[fid] = coerceJson(evaluate(expr.src, ctx));
   }
   return patch;

@@ -7,7 +7,7 @@
  */
 
 import { SQL } from "bun";
-import { instance as instanceSchema, type Instance, type ProcessBody, type ProcessId } from "../schema/definition.js";
+import { instance as instanceSchema, type Instance, type ProcessBody, type ProcessId, type StepId } from "../schema/definition.js";
 import { definitionHash } from "../schema/hash.js";
 import { armStepTimers, minFireAt } from "./duration.js";
 
@@ -83,7 +83,16 @@ export async function initSchema(db: SQL = sql): Promise<void> {
  */
 export async function createInstance(
   body: ProcessBody,
-  opts: { processId: ProcessId; version: number },
+  opts: {
+    processId: ProcessId;
+    version: number;
+    // Subprocess spawn: a deterministic child id (idempotent spawn), seed data
+    // (from the parent's inputMapping), and the parent link. Omitted for a
+    // top-level instance (random id, empty data, no parent).
+    instanceId?: string;
+    data?: Instance["data"];
+    parent?: { instanceId: string; stepId: StepId };
+  },
   db: SQL = sql,
 ): Promise<Instance> {
   // Arm the initial step's timers here, atomically with the INSERT — creation is a
@@ -99,22 +108,26 @@ export async function createInstance(
     startedAt,
   );
   const inst: Instance = instanceSchema.parse({
-    instanceId: `inst_${crypto.randomUUID()}`,
+    instanceId: opts.instanceId ?? `inst_${crypto.randomUUID()}`,
     processId: opts.processId,
     version: opts.version,
     definitionHash: definitionHash(body),
     currentStepId: body.workflow.initialStep,
     transitionSeq: 0,
-    data: {},
+    data: opts.data ?? {},
     timers,
+    ...(opts.parent ? { parent: opts.parent } : {}),
     status: "running",
     startedAt,
   });
   // Bind the object directly: Bun.sql encodes it as a jsonb object. A
   // JSON.stringify(...)::jsonb param would store a jsonb *scalar string* that
   // jsonb_set (used by the transition/writeback) cannot traverse.
+  // ON CONFLICT DO NOTHING: a redelivered subprocess spawn (deterministic id)
+  // is a no-op; the spawn handler checks prior existence to skip re-driving it.
   await db`INSERT INTO instances (instance_id, transition_seq, body, next_timer_at)
-    VALUES (${inst.instanceId}, ${inst.transitionSeq}, ${inst}, ${minFireAt(timers)})`;
+    VALUES (${inst.instanceId}, ${inst.transitionSeq}, ${inst}, ${minFireAt(timers)})
+    ON CONFLICT (instance_id) DO NOTHING`;
   return inst;
 }
 

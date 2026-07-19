@@ -114,6 +114,11 @@ export const CANCEL_SINK_STEP_ID: StepId = stepId.parse("step_cancel_sink");
 export const CANCEL_SINK_KEY = "cancel_sink";
 export const RESERVED_CANCEL_OUTCOME = "cancelled";
 
+// Engine-owned action types (e.g. the subprocess spawn/return handlers) live
+// under this prefix. An authored definition may not use it, so the engine can
+// enqueue internal actions without colliding with a plugin handler type.
+export const RESERVED_ACTION_PREFIX = "core.";
+
 // ============================================================
 // Fields: central catalog, referenced by steps.
 // ============================================================
@@ -444,6 +449,16 @@ export const authoredProcessBody = processBody.superRefine((b, ctx) => {
     if (s.id === CANCEL_SINK_STEP_ID) add("reserved cancel-sink step id may not be authored", ["workflow", "steps", i, "id"]);
     if (s.key === CANCEL_SINK_KEY) add("reserved cancel-sink step key may not be authored", ["workflow", "steps", i, "key"]);
     if (s.outcome === RESERVED_CANCEL_OUTCOME) add(`outcome '${RESERVED_CANCEL_OUTCOME}' is reserved for cancellation`, ["workflow", "steps", i, "outcome"]);
+    // No authored action may use the engine-reserved type prefix.
+    const stepActions = [
+      ...(s.onEntry ?? []), ...(s.onExit ?? []), ...(s.onCancel ?? []),
+      ...(s.paths ?? []).flatMap((p) => p.onPath ?? []),
+      ...(s.timers ?? []).flatMap((t) => t.onFire.actions ?? []),
+    ];
+    stepActions.forEach((a) => {
+      if (a.type.startsWith(RESERVED_ACTION_PREFIX))
+        add(`action type '${a.type}' uses the reserved '${RESERVED_ACTION_PREFIX}' prefix`, ["workflow", "steps", i]);
+    });
   });
   if (b.contract?.outcomes?.includes(RESERVED_CANCEL_OUTCOME))
     add(`outcome '${RESERVED_CANCEL_OUTCOME}' is reserved for cancellation`, ["contract", "outcomes"]);

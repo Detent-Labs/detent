@@ -28,3 +28,14 @@ function uuidv5(name: string, namespace: string): string {
 export function idempotencyKey(instanceId: string, transitionSeq: number, actionId: string): string {
   return uuidv5(`${instanceId}|${transitionSeq}|${actionId}`, NAMESPACE);
 }
+
+/**
+ * Deterministic child instance id for a subprocess spawn: UUIDv5 of the parent
+ * coordinates (parent instanceId, the transitionSeq at which it entered the
+ * subprocess step, and the step id). At-least-once spawn dispatch resolves to the
+ * same child id, so a redelivered spawn conflicts on the instance PK — never a
+ * second child.
+ */
+export function subprocessChildId(parentInstanceId: string, transitionSeq: number, subprocessStepId: string): string {
+  return `inst_${uuidv5(`${parentInstanceId}|${transitionSeq}|${subprocessStepId}`, NAMESPACE)}`;
+}

@@ -1,0 +1,30 @@
+{
+  "key": "credit_check",
+  "label": "Credit Check",
+  "description": "A subprocess-callable process: takes an amount, returns an approved/rejected outcome. Contracted so a caller pins its interface via contractRef.",
+  "contract": {
+    "inputFields": ["field_cc_amount"],
+    "outputFields": ["field_cc_amount"],
+    "outcomes": ["approved", "rejected"]
+  },
+  "fields": [
+    { "id": "field_cc_amount", "key": "amount", "label": "Amount", "type": "number" }
+  ],
+  "workflow": {
+    "initialStep": "step_cc_decide",
+    "steps": [
+      {
+        "id": "step_cc_decide",
+        "key": "decide",
+        "label": "Decide",
+        "type": "task",
+        "paths": [
+          { "id": "path_cc_reject", "key": "reject", "to": "step_cc_rejected", "trigger": "automatic", "priority": 1, "guard": { "lang": "cel", "src": "data.amount > 1000.0" } },
+          { "id": "path_cc_approve", "key": "approve", "to": "step_cc_approved", "trigger": "automatic", "priority": 2 }
+        ]
+      },
+      { "id": "step_cc_approved", "key": "approved", "label": "Approved", "type": "task", "terminal": true, "outcome": "approved" },
+      { "id": "step_cc_rejected", "key": "rejected", "label": "Rejected", "type": "task", "terminal": true, "outcome": "rejected" }
+    ]
+  }
+}

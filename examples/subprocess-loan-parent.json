@@ -1,0 +1,46 @@
+{
+  "key": "loan_application",
+  "label": "Loan Application",
+  "description": "Calls the credit_check subprocess (pinned to v1), then routes on child.outcome. The subprocess step is a wait-state reached via a transition (never the initial step), so entering it enqueues the child spawn.",
+  "fields": [
+    { "id": "field_l_amount", "key": "amount", "label": "Requested amount", "type": "number" },
+    { "id": "field_l_result", "key": "result", "label": "Credit decision", "type": "string" },
+    { "id": "field_l_checked", "key": "checked_amount", "label": "Amount the child saw", "type": "number" }
+  ],
+  "workflow": {
+    "initialStep": "step_l_submit",
+    "steps": [
+      {
+        "id": "step_l_submit",
+        "key": "submit",
+        "label": "Submit",
+        "type": "task",
+        "paths": [
+          { "id": "path_l_check", "key": "check", "to": "step_l_check", "trigger": "automatic" }
+        ]
+      },
+      {
+        "id": "step_l_check",
+        "key": "check",
+        "label": "Credit check",
+        "type": "subprocess",
+        "subprocess": {
+          "processId": "proc_credit_check",
+          "versionBinding": "pinned",
+          "pinnedVersion": 1,
+          "inputMapping": { "field_cc_amount": { "lang": "cel", "src": "data.amount" } },
+          "outputMapping": {
+            "field_l_result": { "lang": "cel", "src": "child.outcome" },
+            "field_l_checked": { "lang": "cel", "src": "child.data.amount" }
+          }
+        },
+        "paths": [
+          { "id": "path_l_approved", "key": "approved", "to": "step_l_approved", "trigger": "automatic", "priority": 1, "guard": { "lang": "cel", "src": "child.outcome == \"approved\"" } },
+          { "id": "path_l_rejected", "key": "rejected", "to": "step_l_rejected", "trigger": "automatic", "priority": 2, "guard": { "lang": "cel", "src": "child.outcome == \"rejected\"" } }
+        ]
+      },
+      { "id": "step_l_approved", "key": "approved", "label": "Approved", "type": "task", "terminal": true },
+      { "id": "step_l_rejected", "key": "rejected", "label": "Rejected", "type": "task", "terminal": true }
+    ]
+  }
+}

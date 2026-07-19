@@ -7,7 +7,7 @@
  */
 
 import { createHash } from "node:crypto";
-import type { ProcessBody } from "./definition.js";
+import type { ProcessBody, ProcessContract } from "./definition.js";
 
 /**
  * Canonical JSON per RFC 8785 (JCS): object keys sorted lexicographically,
@@ -28,4 +28,14 @@ function canonicalize(v: unknown): string {
 /** sha256 (hex) of the canonical JSON of a ProcessBody. */
 export function definitionHash(body: ProcessBody): string {
   return createHash("sha256").update(canonicalize(body)).digest("hex");
+}
+
+/**
+ * sha256 (hex) of the canonical JSON of a ProcessContract — the child contract
+ * signature a subprocess step pins via `contractRef`. latest-at-spawn resolves
+ * the newest child version whose contract hashes to this value, so a contract
+ * change starts a new signature and existing callers keep the matching child.
+ */
+export function contractHash(contract: ProcessContract): string {
+  return createHash("sha256").update(canonicalize(contract)).digest("hex");
 }

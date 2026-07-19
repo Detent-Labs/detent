@@ -190,10 +190,27 @@ each with a test that rejects a violating definition.
   `cancelled`, and advances `transitionSeq` (OCC — a cancel racing a normal
   transition from the same seq resolves to one winner). It takes an
   already-rehydrated instance (like the other transition entry points) and no-ops
-  on a non-running instance. Downward-only subprocess propagation stays DEFERRED:
-  the engine does not spawn subprocess children yet (no parent/child links), so
-  there is nothing to cascade to — it lands with subprocess execution. Propagation
-  is downward only in v1; no independent upward child cancel.
+  on a non-running instance. Downward-only subprocess propagation is DONE (lands
+  with subprocess execution below): passing `resolveBody` to `cancelInstance`
+  recursively cancels active children by the `parent` link, depth-first for nested
+  chains. Propagation is downward only in v1; no independent upward child cancel.
+- Subprocess execution (`src/engine/subprocess.ts`, `test/subprocess.test.ts`):
+  makes a `subprocess` step live via two engine-internal outbox handlers (reserved
+  `core.` type prefix, rejected in authored bodies). Entering a subprocess step
+  (via a transition — not as the initial step) enqueues `core.spawnSubprocess`,
+  which resolves the child body by `versionBinding` (`pinned` → `pinnedVersion`;
+  `latest-at-spawn` → newest version whose `contractHash` equals `contractRef`, via
+  `createDefinitionStore.resolveLatestByContract`), seeds it from `inputMapping`,
+  and creates the linked child (idempotent on the deterministic `subprocessChildId`;
+  no-op if the parent is not running, with a post-insert re-check that self-cancels
+  a child orphaned by a racing parent cancel). A child reaching a terminal step
+  enqueues `core.returnSubprocess`, which evaluates the parent step's `outputMapping`
+  over `child.outcome`/`child.data`, writes it into the parent's data, and drives
+  the parent off the wait-state — selecting the first hop with the `child` namespace
+  in context (the standard guard context omits `child`), then running to rest. Only
+  a parent still parked at the subprocess step is advanced. `child.data` exposes the
+  child's full data (re-keyed fieldId→key); filtering to `contract.outputFields` is
+  deferred. Downward subprocess cancel propagation is DONE (see above).
 - Engine (`src/engine/`, PostgreSQL via `Bun.sql`, connection `DATABASE_URL`):
   executes definitions. `store.ts` (instance store + rehydrate, pinned to
   `{processId, version, definitionHash}`; arms the initial step's timers atomically
@@ -239,12 +256,17 @@ each with a test that rejects a violating definition.
    (outbox/resolution reclaim, persisted `next_timer_at`). Persists to PostgreSQL
    via Bun's native `Bun.sql`; connection via `DATABASE_URL`. Single-instance runtime
    cancellation is DONE (`cancelInstance`: skip onExit, `[onCancel, sink.onEntry]`,
-   cancel HistoryEntry, OCC, no-op on non-running). Remaining: downward subprocess
-   cancel propagation (deferred — no subprocess spawning yet, so no children to
-   cascade to; lands with subprocess execution); `deadline` timers (schema +
-   authoring-validated, engine evaluator deferred); migration. The
-   production `resolveBody` backing (definition/version store) is DONE
-   (`definitions.ts` + `host.ts`), so the resolution and timer workers are live.
+   cancel HistoryEntry, OCC, no-op on non-running). Subprocess execution is DONE
+   (`subprocess.ts`: spawn on subprocess-step entry, child-body resolution by
+   `versionBinding`, `inputMapping` seed, return via `outputMapping` + direct parent
+   advance, idempotent spawn) together with downward cancel propagation
+   (`cancelInstance` cascades to active children by the `parent` link). Remaining:
+   `deadline` timers (schema + authoring-validated, engine evaluator deferred);
+   migration; publish-time cross-process validation (inputMapping keys ⊂ child
+   contract inputFields); a subprocess step as the initial step does not spawn
+   (must be entered via a transition). The production `resolveBody` backing
+   (definition/version store) is DONE (`definitions.ts` + `host.ts`), so the
+   resolution and timer workers are live.
 4. Editor (likely a separate package; promote the repo to workspaces here).
 
 ## Open questions (still need a decision before building the relevant part)

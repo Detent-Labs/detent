@@ -17,9 +17,15 @@ import {
   type ProcessVersion,
 } from "../schema/definition.js";
 import { compileProcessBody } from "../schema/compile.js";
-import { definitionHash } from "../schema/hash.js";
+import { definitionHash, contractHash } from "../schema/hash.js";
 import { sql } from "./store.js";
 import type { ResolveBody } from "./resolution.js";
+
+/** Resolve the newest child version whose contract signature equals `contractRef`. */
+export type ResolveLatestByContract = (
+  processId: ProcessId,
+  contractRef: string,
+) => Promise<{ version: number; body: ProcessBody } | undefined>;
 
 function parseBody(raw: unknown): ProcessBody {
   return processBody.parse(typeof raw === "string" ? JSON.parse(raw) : raw);
@@ -81,7 +87,9 @@ export async function publishBody(
  * A DB-backed `resolveBody` with a process-local cache. Published versions are
  * immutable, so a cached body is never stale and the cache only grows.
  */
-export function createDefinitionStore(db: SQL = sql): { resolveBody: ResolveBody } {
+export function createDefinitionStore(
+  db: SQL = sql,
+): { resolveBody: ResolveBody; resolveLatestByContract: ResolveLatestByContract } {
   const cache = new Map<string, ProcessBody>();
   const resolveBody: ResolveBody = async (processId, version) => {
     const key = `${processId}:${version}`;
@@ -94,5 +102,20 @@ export function createDefinitionStore(db: SQL = sql): { resolveBody: ResolveBody
     cache.set(key, body);
     return body;
   };
-  return { resolveBody };
+  // ponytail: hash each candidate's contract on read (newest-first, stop at the
+  // first match) rather than storing a contract-hash column — no migration, and
+  // v1 has few versions per process. Add a persisted column if this ever scans hot.
+  const resolveLatestByContract: ResolveLatestByContract = async (processId, contractRef) => {
+    const rows = (await db`SELECT version, body FROM definitions
+      WHERE process_id = ${processId} ORDER BY version DESC`) as { version: number; body: unknown }[];
+    for (const row of rows) {
+      const body = parseBody(row.body);
+      if (body.contract && contractHash(body.contract) === contractRef) {
+        cache.set(`${processId}:${row.version}`, body);
+        return { version: Number(row.version), body };
+      }
+    }
+    return undefined;
+  };
+  return { resolveBody, resolveLatestByContract };
 }

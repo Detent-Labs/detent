@@ -16,8 +16,20 @@ import { sql, createInstance } from "./store.js";
 import { idempotencyKey } from "./idempotency.js";
 import { armStepTimers, minFireAt } from "./duration.js";
 import { buildGuardContext, evalGuard, SYSTEM_ACTOR, type Actor } from "../cel/eval.js";
-import { CANCEL_SINK_STEP_ID } from "../schema/definition.js";
+import { CANCEL_SINK_STEP_ID, instance as instanceSchema } from "../schema/definition.js";
 import type { ProcessBody, Instance, HistoryEntry, Action, Step, Path } from "../schema/definition.js";
+
+/**
+ * Engine-owned action types (reserved `core.` prefix, rejected in authored
+ * bodies). Enqueued by commitTransition and handled by the registered internal
+ * handlers in subprocess.ts. Homed here so subprocess.ts (which imports
+ * resolveAutomatic from this module) reuses them without a circular import.
+ */
+export const SPAWN_ACTION_TYPE = "core.spawnSubprocess";
+export const RETURN_ACTION_TYPE = "core.returnSubprocess";
+
+/** Resolve an instance's frozen body from its pin. Injected (see resolution.ts ResolveBody). */
+type ResolveBodyFn = (processId: string, version: number) => Promise<ProcessBody | undefined> | ProcessBody | undefined;
 
 export class GuardRefused extends Error {
   constructor(pathId: string) {
@@ -120,6 +132,26 @@ async function commitTransition(
       await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
         VALUES (${idempotencyKey(instance.instanceId, nextSeq, a.id)}, ${instance.instanceId}, ${nextSeq}, ${a.id}, ${a})`;
     }
+    // Subprocess spawn: entering a subprocess step enqueues a spawn action,
+    // dispatched post-commit by the internal handler (child-body resolution +
+    // inputMapping + linked child creation). Idempotent via the deterministic
+    // child id the handler derives from (instance, nextSeq, step).
+    if (target.type === "subprocess") {
+      const spawn = { id: `action_spawn_${target.id}`, type: SPAWN_ACTION_TYPE, config: { subprocessStepId: target.id, parentSeq: nextSeq } };
+      await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
+        VALUES (${idempotencyKey(instance.instanceId, nextSeq, spawn.id)}, ${instance.instanceId}, ${nextSeq}, ${spawn.id}, ${spawn})`;
+    }
+    // Subprocess return: a child reaching a terminal step enqueues a return
+    // action that wakes the parked parent (outputMapping writeback + advance).
+    if (target.terminal && instance.parent) {
+      const ret = {
+        id: `action_return_${instance.instanceId}`,
+        type: RETURN_ACTION_TYPE,
+        config: { parentInstanceId: instance.parent.instanceId, parentStepId: instance.parent.stepId, childOutcome: target.outcome ?? null },
+      };
+      await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
+        VALUES (${idempotencyKey(instance.instanceId, nextSeq, ret.id)}, ${instance.instanceId}, ${nextSeq}, ${ret.id}, ${ret})`;
+    }
   });
 
   return next;
@@ -165,14 +197,17 @@ export async function executeManualTransition(
  * transitionSeq (the OCC token, so a cancel racing a normal transition from the
  * same seq resolves to exactly one winner — the loser gets ConcurrencyConflict).
  * A no-op — no HistoryEntry, no seq bump — on an instance that is not `running`.
- * v1 cancels only this instance; downward subprocess propagation is deferred
- * until subprocess spawning exists.
+ * Downward-only subprocess propagation: when `resolveBody` is supplied, after the
+ * parent commits its cancel this recursively cancels its active (running) children
+ * (found by the `parent` link), depth-first for nested chains. Omit `resolveBody`
+ * to cancel only this instance.
  */
 export async function cancelInstance(
   instance: Instance,
   body: ProcessBody,
   actor: Actor = SYSTEM_ACTOR,
   db: SQL = sql,
+  resolveBody?: ResolveBodyFn,
 ): Promise<Instance> {
   if (instance.status !== "running") return instance;
 
@@ -182,7 +217,18 @@ export async function cancelInstance(
   if (!sink) throw new Error("cancel-sink not in body (uncompiled definition?)");
 
   const actions = [...(source.onCancel ?? []), ...(sink.onEntry ?? [])];
-  return commitTransition(instance, sink, null, actions, "cancel", "cancelled", actor.id, db);
+  const cancelled = await commitTransition(instance, sink, null, actions, "cancel", "cancelled", actor.id, db);
+
+  if (resolveBody) {
+    const rows = (await db`SELECT body FROM instances
+      WHERE body->'parent'->>'instanceId' = ${instance.instanceId} AND body->>'status' = 'running'`) as { body: unknown }[];
+    for (const row of rows) {
+      const child = instanceSchema.parse(typeof row.body === "string" ? JSON.parse(row.body) : row.body);
+      const childBody = await resolveBody(child.processId, child.version);
+      if (childBody) await cancelInstance(child, childBody, actor, db, resolveBody);
+    }
+  }
+  return cancelled;
 }
 
 /**

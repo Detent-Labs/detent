@@ -11,10 +11,14 @@ import { createDefinitionStore } from "./definitions.js";
 import { startOutboxWorker } from "./outbox.js";
 import { startResolutionWorker } from "./resolution.js";
 import { startTimerScheduler } from "./timers.js";
+import { registerSubprocessHandlers } from "./subprocess.js";
 import type { Registry } from "./registry.js";
 
 export function startEngine(db: SQL = sql, registry: Registry = new Map()): { stop: () => void } {
-  const { resolveBody } = createDefinitionStore(db);
+  const { resolveBody, resolveLatestByContract } = createDefinitionStore(db);
+  // Register the engine-internal subprocess handlers so the outbox worker can
+  // dispatch core.spawnSubprocess / core.returnSubprocess like any other action.
+  registerSubprocessHandlers(registry, db, resolveBody, resolveLatestByContract);
   const workers = [
     startOutboxWorker(db, registry),
     startResolutionWorker(db, resolveBody),
