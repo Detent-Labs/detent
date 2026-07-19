@@ -2,7 +2,7 @@
  * Store + transition, against a real Postgres. Skipped (not passed) when
  * DATABASE_URL is unset — a skip is visible, a false green is not.
  */
-import { test, expect, beforeAll, afterAll } from "bun:test";
+import { test, expect, beforeAll } from "bun:test";
 import { sql, initSchema, createInstance, rehydrate, PinMismatch } from "../src/engine/store.js";
 import {
   executeManualTransition,
@@ -108,9 +108,9 @@ const chainBody = (): ProcessBody =>
 beforeAll(async () => {
   if (DB) await initSchema();
 });
-afterAll(async () => {
-  if (DB) await sql.end();
-});
+// The shared `sql` singleton is not closed per-file: with more than one DB-backed
+// test file sharing it, an early end() would break the others. bun's process exit
+// reclaims the pool.
 
 test.skipIf(!DB)("create then rehydrate round-trips against the pinned body", async () => {
   const body = bodyWith();

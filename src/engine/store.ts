@@ -25,6 +25,21 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     transition_seq integer NOT NULL,
     entry jsonb NOT NULL
   )`;
+  // Outbox: one row per enqueued trigger action. idempotency_key (PK) makes
+  // re-enqueuing a replayed transition conflict instead of duplicating.
+  await db`CREATE TABLE IF NOT EXISTS outbox (
+    idempotency_key text PRIMARY KEY,
+    instance_id text NOT NULL,
+    transition_seq integer NOT NULL,
+    action_id text NOT NULL,
+    action jsonb NOT NULL,
+    status text NOT NULL DEFAULT 'pending',
+    attempts integer NOT NULL DEFAULT 0,
+    next_attempt_at timestamptz NOT NULL DEFAULT now(),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    delivered_at timestamptz
+  )`;
+  await db`CREATE INDEX IF NOT EXISTS outbox_claim_idx ON outbox (status, next_attempt_at)`;
 }
 
 /**

@@ -1,13 +1,14 @@
 /**
  * Transition executor: take one manual path. onExit(source) -> onPath ->
  * onEntry(target) ordering, transitionSeq as the optimistic-concurrency token,
- * one HistoryEntry appended per committed transition. Action dispatch is
- * deferred to the transactional-outbox change; the ordered visit exists here so
- * that change is a pure addition.
+ * one HistoryEntry appended per committed transition. Each ordered trigger
+ * action is enqueued into the outbox within the same commit transaction, so an
+ * action exists iff its transition committed; the outbox worker delivers them.
  */
 
 import type { SQL } from "bun";
 import { sql } from "./store.js";
+import { idempotencyKey } from "./idempotency.js";
 import { buildGuardContext, evalGuard, type Actor } from "../cel/eval.js";
 import type { ProcessBody, Instance, HistoryEntry, Action, Step, Path } from "../schema/definition.js";
 
@@ -29,9 +30,6 @@ export class ConcurrencyConflict extends Error {
 export function orderedTriggerActions(source: Step, path: Path, target: Step): Action[] {
   return [...(source.onExit ?? []), ...(path.onPath ?? []), ...(target.onEntry ?? [])];
 }
-
-// ponytail: no-op until the transactional-outbox change fills it in.
-function dispatch(_action: Action): void {}
 
 /**
  * Execute a single manual transition and commit it atomically. Rejects if the
@@ -57,7 +55,7 @@ export async function executeManualTransition(
   const target = body.workflow.steps.find((s) => s.id === path.to);
   if (!target) throw new Error(`path target not in body: ${path.to}`);
 
-  for (const a of orderedTriggerActions(source, path, target)) dispatch(a);
+  const actions = orderedTriggerActions(source, path, target);
 
   const nextSeq = instance.transitionSeq + 1;
   const next: Instance = {
@@ -87,6 +85,10 @@ export async function executeManualTransition(
     if (updated.length === 0) throw new ConcurrencyConflict(instance.instanceId, instance.transitionSeq);
     await tx`INSERT INTO history_entries (id, instance_id, transition_seq, entry)
       VALUES (${entry.id}, ${entry.instanceId}, ${entry.transitionSeq}, ${JSON.stringify(entry)}::jsonb)`;
+    for (const a of actions) {
+      await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
+        VALUES (${idempotencyKey(instance.instanceId, nextSeq, a.id)}, ${instance.instanceId}, ${nextSeq}, ${a.id}, ${JSON.stringify(a)}::jsonb)`;
+    }
   });
 
   return next;
