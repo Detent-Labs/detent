@@ -16,6 +16,7 @@ import { sql, createInstance } from "./store.js";
 import { idempotencyKey } from "./idempotency.js";
 import { armStepTimers, minFireAt } from "./duration.js";
 import { buildGuardContext, evalGuard, SYSTEM_ACTOR, type Actor } from "../cel/eval.js";
+import { CANCEL_SINK_STEP_ID } from "../schema/definition.js";
 import type { ProcessBody, Instance, HistoryEntry, Action, Step, Path } from "../schema/definition.js";
 
 export class GuardRefused extends Error {
@@ -54,15 +55,18 @@ export function orderedTriggerActions(source: Step, path: Path, target: Step): A
 /**
  * Commit one transition atomically: advance {currentStepId, transitionSeq,
  * status}, append its HistoryEntry, enqueue its ordered actions. Shared by the
- * manual and automatic paths — the only differences are `cause` and whether an
- * `actorId` is recorded (automatic transitions have no acting user).
+ * authored (manual/automatic/timer) paths and the synthesized cancel path. The
+ * caller supplies `target` (the step entered — its timers are armed), the
+ * HistoryEntry `pathId` (null for a synthesized transition with no authored
+ * path), the resulting `status`, the `cause`, and an optional `actorId`.
  */
 async function commitTransition(
   instance: Instance,
-  path: Path,
   target: Step,
+  pathId: HistoryEntry["pathId"],
   actions: Action[],
   cause: HistoryEntry["cause"],
+  status: Instance["status"],
   actorId: string | undefined,
   db: SQL,
 ): Promise<Instance> {
@@ -74,9 +78,9 @@ async function commitTransition(
   const nextTimerAt = minFireAt(armed);
   const next: Instance = {
     ...instance,
-    currentStepId: path.to,
+    currentStepId: target.id,
     transitionSeq: nextSeq,
-    status: target.terminal ? "completed" : instance.status,
+    status,
     timers: armed,
   };
   const entry: HistoryEntry = {
@@ -84,9 +88,9 @@ async function commitTransition(
     instanceId: instance.instanceId,
     transitionSeq: nextSeq,
     version: instance.version,
-    pathId: path.id,
+    pathId,
     fromStepId: instance.currentStepId,
-    toStepId: path.to,
+    toStepId: target.id,
     cause,
     ...(actorId !== undefined ? { actorId } : {}),
     at,
@@ -146,8 +150,39 @@ export async function executeManualTransition(
   if (!target) throw new Error(`path target not in body: ${path.to}`);
 
   const actions = orderedTriggerActions(source, path, target);
-  const committed = await commitTransition(instance, path, target, actions, "user", actor.id, db);
+  const status = target.terminal ? "completed" : instance.status;
+  const committed = await commitTransition(instance, target, path.id, actions, "user", status, actor.id, db);
   return resolveAutomatic(committed, body, actor, db);
+}
+
+/**
+ * Cancel a running instance: a synthesized hidden-path transition to the
+ * publish-injected cancel-sink. Takes an already-rehydrated instance (the caller
+ * loads + pin-checks it, as with executeManualTransition/fireTimer). The source
+ * step's `onExit` is NOT run; the ordered actions are `[source.onCancel,
+ * sink.onEntry]`. Records one HistoryEntry with `cause: "cancel"`, `pathId: null`,
+ * `toStepId: CANCEL_SINK_STEP_ID`, flips status to `cancelled`, and advances
+ * transitionSeq (the OCC token, so a cancel racing a normal transition from the
+ * same seq resolves to exactly one winner — the loser gets ConcurrencyConflict).
+ * A no-op — no HistoryEntry, no seq bump — on an instance that is not `running`.
+ * v1 cancels only this instance; downward subprocess propagation is deferred
+ * until subprocess spawning exists.
+ */
+export async function cancelInstance(
+  instance: Instance,
+  body: ProcessBody,
+  actor: Actor = SYSTEM_ACTOR,
+  db: SQL = sql,
+): Promise<Instance> {
+  if (instance.status !== "running") return instance;
+
+  const source = body.workflow.steps.find((s) => s.id === instance.currentStepId);
+  if (!source) throw new Error(`current step not in body: ${instance.currentStepId}`);
+  const sink = body.workflow.steps.find((s) => s.id === CANCEL_SINK_STEP_ID);
+  if (!sink) throw new Error("cancel-sink not in body (uncompiled definition?)");
+
+  const actions = [...(source.onCancel ?? []), ...(sink.onEntry ?? [])];
+  return commitTransition(instance, sink, null, actions, "cancel", "cancelled", actor.id, db);
 }
 
 /**
@@ -197,7 +232,8 @@ export async function executeAutomaticTransition(
   const target = body.workflow.steps.find((s) => s.id === path.to);
   if (!target) throw new Error(`path target not in body: ${path.to}`);
   const actions = orderedTriggerActions(source, path, target);
-  return commitTransition(instance, path, target, actions, "automatic", undefined, db);
+  const status = target.terminal ? "completed" : instance.status;
+  return commitTransition(instance, target, path.id, actions, "automatic", status, undefined, db);
 }
 
 /**
@@ -276,7 +312,8 @@ export async function fireTimer(
     const target = body.workflow.steps.find((s) => s.id === path.to);
     if (!target) throw new Error(`timer targetPath target not in body: ${path.to}`);
     const actions = [...(timer.onFire.actions ?? []), ...orderedTriggerActions(source, path, target)];
-    const committed = await commitTransition(instance, path, target, actions, "timer", undefined, db);
+    const status = target.terminal ? "completed" : instance.status;
+    const committed = await commitTransition(instance, target, path.id, actions, "timer", status, undefined, db);
     return resolveAutomatic(committed, body, SYSTEM_ACTOR, db);
   }
 

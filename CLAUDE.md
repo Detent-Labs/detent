@@ -183,10 +183,17 @@ each with a test that rejects a violating definition.
   one cancel-sink). `src/schema/compile.ts` is the publish-time pass that injects
   the sink — plus the reserved outcome on a contracted process — before the hash,
   deterministically and idempotently. `test/cancel.test.ts` covers each rule.
-  Runtime cancel semantics (skip onExit; onCancel→onEntry(sink); the cancel
-  HistoryEntry; outbox + transitionSeq; downward-only subprocess propagation) are
-  specified but belong to the engine (#3). Subprocess propagation is downward
-  only in v1; no independent upward child cancel.
+  Runtime cancel is built for a single instance (`cancelInstance` in
+  `transition.ts`, `test/cancel.runtime.test.ts`): a synthesized hidden-path
+  transition to the sink that skips onExit, enqueues `[onCancel, sink.onEntry]`,
+  records one HistoryEntry (`cause: "cancel"`, `pathId: null`), flips status to
+  `cancelled`, and advances `transitionSeq` (OCC — a cancel racing a normal
+  transition from the same seq resolves to one winner). It takes an
+  already-rehydrated instance (like the other transition entry points) and no-ops
+  on a non-running instance. Downward-only subprocess propagation stays DEFERRED:
+  the engine does not spawn subprocess children yet (no parent/child links), so
+  there is nothing to cascade to — it lands with subprocess execution. Propagation
+  is downward only in v1; no independent upward child cancel.
 - Engine (`src/engine/`, PostgreSQL via `Bun.sql`, connection `DATABASE_URL`):
   executes definitions. `store.ts` (instance store + rehydrate, pinned to
   `{processId, version, definitionHash}`; arms the initial step's timers atomically
@@ -230,10 +237,12 @@ each with a test that rejects a violating definition.
    timer, onExit→onPath→onEntry ordering, run-to-rest), async re-resolution of
    wait-states after a writeback, timer arming + scheduler, and crash recovery
    (outbox/resolution reclaim, persisted `next_timer_at`). Persists to PostgreSQL
-   via Bun's native `Bun.sql`; connection via `DATABASE_URL`. Remaining: the runtime
-   half of cancellation (contract half done — cancel transition, its HistoryEntry,
-   downward subprocess propagation, specified in `cancel-semantics`); `deadline`
-   timers (schema + authoring-validated, engine evaluator deferred); migration. The
+   via Bun's native `Bun.sql`; connection via `DATABASE_URL`. Single-instance runtime
+   cancellation is DONE (`cancelInstance`: skip onExit, `[onCancel, sink.onEntry]`,
+   cancel HistoryEntry, OCC, no-op on non-running). Remaining: downward subprocess
+   cancel propagation (deferred — no subprocess spawning yet, so no children to
+   cascade to; lands with subprocess execution); `deadline` timers (schema +
+   authoring-validated, engine evaluator deferred); migration. The
    production `resolveBody` backing (definition/version store) is DONE
    (`definitions.ts` + `host.ts`), so the resolution and timer workers are live.
 4. Editor (likely a separate package; promote the repo to workspaces here).
