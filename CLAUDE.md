@@ -172,6 +172,21 @@ each with a test that rejects a violating definition.
 - `README.md`: public-facing overview (paradigm, the JSON/Zod contract, a status
   table, dev commands). Points here for the full invariant rules rather than
   duplicating them.
+- Cancellation (contract layer, "Design A"): cancel is modeled as an
+  engine-synthesized hidden path to a synthesized terminal cancel-sink, so it
+  reuses the transition/history machinery instead of a nullable `toStepId`.
+  `src/schema/definition.ts` adds an optional `onCancel: Action[]` step field
+  (validated like onEntry/onExit outputs), the `cause` value `"cancel"`, the
+  reserved cancellation identity (`CANCEL_SINK_STEP_ID`/`_KEY`/
+  `RESERVED_CANCEL_OUTCOME`), and two derived bodies: `authoredProcessBody`
+  (rejects a hand-authored reserved identity) and `publishedProcessBody` (exactly
+  one cancel-sink). `src/schema/compile.ts` is the publish-time pass that injects
+  the sink — plus the reserved outcome on a contracted process — before the hash,
+  deterministically and idempotently. `test/cancel.test.ts` covers each rule.
+  Runtime cancel semantics (skip onExit; onCancel→onEntry(sink); the cancel
+  HistoryEntry; outbox + transitionSeq; downward-only subprocess propagation) are
+  specified but belong to the engine (#3). Subprocess propagation is downward
+  only in v1; no independent upward child cancel.
 - No engine and no editor exist yet.
 
 ## Roadmap
@@ -191,12 +206,12 @@ each with a test that rejects a violating definition.
 3. Engine skeleton: instance store, transactional outbox, transition executor
    (onExit/onPath/onEntry ordering), timer scheduler, crash recovery. Persists to
    PostgreSQL via Bun's native `Bun.sql` (no client dependency); connection via
-   `DATABASE_URL`.
+   `DATABASE_URL`. Includes the runtime half of cancellation (contract half is
+   done): the cancel transition, its HistoryEntry, and downward subprocess
+   propagation, all specified in the `cancel-semantics` change.
 4. Editor (likely a separate package; promote the repo to workspaces here).
 
 ## Open questions (still need a decision before building the relevant part)
-- `onCancel` trigger and cancellation semantics, including subprocess
-  cancellation propagation.
 - A dedicated audit event type for version migrations (the transition-shaped
   HistoryEntry fits step changes, not a pure version change).
 - The formal expression context is pinned (`src/cel/check.ts`): `instance`

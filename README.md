@@ -30,6 +30,7 @@ Schema + validation only. No engine or editor yet.
 |-------|-------|
 | `src/schema/definition.ts` | Full definition + runtime model as Zod; structural invariants as refinements / `superRefine`. |
 | `src/cel/check.ts` | Authoring-time CEL parse/type-check against the field catalog (`@marcbachmann/cel-js`). |
+| `src/schema/compile.ts` | Publish-time pass: injects the cancel-sink (+ reserved outcome for a contracted process) before hashing, deterministic and idempotent. |
 | `examples/expense-approval.json` | Complete Capture → Review → Book example. |
 | `test/` | `bun:test` suites; each invariant ships a test that rejects a violating definition. |
 

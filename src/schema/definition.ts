@@ -104,6 +104,17 @@ export type InstanceStatus = z.infer<typeof instanceStatus>;
 export type BaseFieldType = z.infer<typeof baseFieldType>;
 
 // ============================================================
+// Reserved cancellation identity. Owned by the publish-time compile pass
+// (src/schema/compile.ts), never hand-authored. The compile pass injects one
+// terminal cancel-sink step per body — plus the reserved outcome on a
+// contracted process — before definitionHash = JCS(ProcessBody) is taken.
+// ============================================================
+
+export const CANCEL_SINK_STEP_ID: StepId = stepId.parse("step_cancel_sink");
+export const CANCEL_SINK_KEY = "cancel_sink";
+export const RESERVED_CANCEL_OUTCOME = "cancelled";
+
+// ============================================================
 // Fields: central catalog, referenced by steps.
 // ============================================================
 
@@ -290,6 +301,9 @@ export const step = z
     assignment: assignment.optional(),
     onEntry: z.array(action).optional(),
     onExit: z.array(action).optional(),
+    // Cleanup on cancellation. Become the onPath actions of the step's
+    // engine-synthesized cancel path; do NOT run the normal onExit.
+    onCancel: z.array(action).optional(),
     timers: z.array(timer).optional(),
     paths: z.array(path).optional(),
   })
@@ -380,7 +394,7 @@ export const processBody = z
         if (tp !== undefined && !(s.paths ?? []).some((p) => p.id === tp))
           add(`timer targetPath is not an outgoing path of this step: ${tp}`, ["workflow", "steps", i, "timers", j]);
       });
-      [...(s.onEntry ?? []), ...(s.onExit ?? [])].forEach((a) => {
+      [...(s.onEntry ?? []), ...(s.onExit ?? []), ...(s.onCancel ?? [])].forEach((a) => {
         Object.keys(a.output ?? {}).forEach((fid) => {
           if (!fieldIds.has(fid as FieldId)) add(`action output targets unknown field: ${fid}`, ["workflow", "steps", i]);
         });
@@ -399,6 +413,39 @@ export const processBody = z
     }
   });
 export type ProcessBody = z.infer<typeof processBody>;
+
+/**
+ * Hand-authored body: the reserved cancellation identity is engine-owned, so an
+ * author may not use the cancel-sink id/key or the reserved outcome. The
+ * compile pass validates input against this before injecting the sink.
+ */
+export const authoredProcessBody = processBody.superRefine((b, ctx) => {
+  const add = (message: string, path: (string | number)[]) =>
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message, path });
+  b.workflow.steps.forEach((s, i) => {
+    if (s.id === CANCEL_SINK_STEP_ID) add("reserved cancel-sink step id may not be authored", ["workflow", "steps", i, "id"]);
+    if (s.key === CANCEL_SINK_KEY) add("reserved cancel-sink step key may not be authored", ["workflow", "steps", i, "key"]);
+    if (s.outcome === RESERVED_CANCEL_OUTCOME) add(`outcome '${RESERVED_CANCEL_OUTCOME}' is reserved for cancellation`, ["workflow", "steps", i, "outcome"]);
+  });
+  if (b.contract?.outcomes?.includes(RESERVED_CANCEL_OUTCOME))
+    add(`outcome '${RESERVED_CANCEL_OUTCOME}' is reserved for cancellation`, ["contract", "outcomes"]);
+});
+export type AuthoredProcessBody = z.infer<typeof authoredProcessBody>;
+
+/**
+ * Compiled, publishable body: exactly one engine-injected cancel-sink. Rejects a
+ * body that was never compiled (zero) or double-compiled (more than one).
+ */
+export const publishedProcessBody = processBody.superRefine((b, ctx) => {
+  const sinks = b.workflow.steps.filter((s) => s.id === CANCEL_SINK_STEP_ID).length;
+  if (sinks !== 1)
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `a published body has exactly one cancel-sink (found ${sinks})`,
+      path: ["workflow", "steps"],
+    });
+});
+export type PublishedProcessBody = z.infer<typeof publishedProcessBody>;
 
 export const migrationSpec = z
   .object({
@@ -464,7 +511,7 @@ export const historyEntry = z.object({
   pathId: pathId.nullable(),
   fromStepId: stepId.nullable(),
   toStepId: stepId,
-  cause: z.enum(["user", "timer", "automatic", "migration"]),
+  cause: z.enum(["user", "timer", "automatic", "migration", "cancel"]),
   actorId: z.string().optional(),
   at: timestamp,
   actions: z.array(actionOutcome).optional(),
