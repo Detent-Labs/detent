@@ -238,16 +238,38 @@ each with a test that rejects a violating definition.
   over `child.outcome`/`child.data`, writes it into the parent's data, and drives
   the parent off the wait-state — selecting the first hop with the `child` namespace
   in context (the standard guard context omits `child`), then running to rest. Only
-  a parent still parked at the subprocess step is advanced. `child.data` exposes the
-  child's full data (re-keyed fieldId→key); filtering to `contract.outputFields` is
-  deferred. Downward subprocess cancel propagation is DONE (see above).
+  a parent still parked at the subprocess step is advanced. *Which* step that is
+  comes from the child's own `parent` link read at delivery, never from a step id
+  frozen into the action config; the parked check, the writeback, and the advance
+  are one transaction holding the parent row (`SELECT … FOR UPDATE`). Both are
+  required: a frozen id is a snapshot of another instance read an unbounded interval
+  later, and an unlocked re-check leaves a residual race — either one resolves to a
+  silent success that marks the row delivered and parks the parent forever. The
+  child row is read under that lock but not itself locked, which holds only because
+  a link is repaired inside the migrating parent's own locked transaction.
+  `child.data` exposes the child's full data (re-keyed fieldId→key); filtering to
+  `contract.outputFields` is deferred. Downward subprocess cancel propagation is
+  DONE (see above).
 - Engine (`src/engine/`, PostgreSQL via `Bun.sql`, connection `DATABASE_URL`):
   executes definitions. `store.ts` (instance store + rehydrate, pinned to
   `{processId, version, definitionHash}`; arms the initial step's timers atomically
   in the INSERT). `transition.ts` (manual, automatic, and timer transitions with
   onExit→onPath→onEntry ordering, run-to-rest cascade, OCC on `transitionSeq`;
   `fireTimer` forces a guard-bypassing timer transition or a side-effect-only
-  reminder). `outbox.ts` (transactional outbox: at-least-once delivery, result
+  reminder). The commit itself is a plan/apply seam: `planStepEntry` (pure,
+  no I/O — derives the next `Instance`, its `HistoryEntry`, events, and outbox
+  rows from the target step alone) and `applyStepEntry` (writes a plan inside a
+  caller-supplied transaction, plus an optional field patch merged under the same
+  OCC predicate). `commitTransition` composes the two, opening its own
+  transaction, and stays the ordinary entry point. A caller whose commit is not
+  an authored hop (`cancelInstance` today) extends this seam — overriding
+  `status`, the armed timer set, the recorded version, spawn suppression, or
+  supplying extra events — rather than forking the commit, because forking
+  silently drops whichever consequence it does not reproduce (the status
+  derivation, the subprocess spawn, the subprocess return, the `HistoryEntry`).
+  `createInstance` remains a separate step-entry path that does not route
+  through here and does not inherit these consequences. `outbox.ts`
+  (transactional outbox: at-least-once delivery, result
   writeback, retry/dead-letter, stale-claim reclaim; a writeback applies only to a
   running instance). `resolution.ts` (re-resolves automatic paths after an async
   writeback, so a parked wait-state takes its result-driven path; claim/CAS with a
