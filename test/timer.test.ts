@@ -260,6 +260,46 @@ test.skipIf(!DB)("a deadline and a duration timer on one step both arm; next_tim
   expect(await nextTimerIso(inst.instanceId)).toBe("2020-01-01T00:00:00.000Z");
 });
 
+// The one form both branches must produce: a four-digit year, milliseconds, `Z`,
+// 24 characters. minFireAt sorts armed fireAt values lexically, so a value in the
+// expanded-year form (`+029405-01-26T...`) would win that sort on its leading `+`
+// (0x2B, below every digit) regardless of the instant it denotes, suppressing every
+// other timer on the step.
+const FIXED_WIDTH = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+test.skipIf(!DB)("a duration and a deadline timer arm the same fixed-width form; the earlier is selected", async () => {
+  // Each case declares the LATER timer first, so picking the first-armed timer is
+  // wrong in both; the deadline sits on the opposite side of the duration in each,
+  // so a fixed preference for either branch is wrong in one. Only true
+  // chronological order passes both.
+  const cases: { due: string; timers: unknown[]; earlier: string }[] = [
+    { due: "2020-01-01T00:00:00Z", timers: [reminderTimer, dueTimer], earlier: "timer_d1" },
+    { due: "2030-01-01T00:00:00Z", timers: [dueTimer, reminderTimer], earlier: "timer_r1" },
+  ];
+  for (const c of cases) {
+    const later = c.earlier === "timer_d1" ? "timer_r1" : "timer_d1";
+    expect((c.timers[0] as { id: string }).id).toBe(later); // the case discriminates
+
+    const body = deadlineBody(c.timers);
+    const inst = await seeded(body, { field_due: c.due });
+    await executeManualTransition(inst, "path_ab", body, actor);
+
+    const row = await readInst(inst.instanceId);
+    const byId = Object.fromEntries(
+      row.timers.map((t: { timerId: string; fireAt: string }) => [t.timerId, t.fireAt]),
+    ) as Record<string, string>;
+    expect(Object.keys(byId).sort()).toEqual(["timer_d1", "timer_r1"]);
+    expect(byId.timer_d1).toMatch(FIXED_WIDTH); // deadline branch
+    expect(byId.timer_r1).toMatch(FIXED_WIDTH); // duration branch
+
+    // Compared as epoch ms, not as strings: the assertion states the chronology the
+    // selection must reflect rather than restating minFireAt's lexical comparison.
+    const earlyAt = byId[c.earlier] as string;
+    expect(new Date(earlyAt).getTime()).toBeLessThan(new Date(byId[later] as string).getTime());
+    expect(await nextTimerIso(inst.instanceId)).toBe(earlyAt);
+  }
+});
+
 test.skipIf(!DB)("a deadline reading an unwritten field commits the entry and arms only the other timer", async () => {
   const body = deadlineBody([dueTimer, reminderTimer]);
   const inst = await createFrom(body); // no seed: `due` is absent from data

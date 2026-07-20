@@ -41,7 +41,86 @@ export type HistoryEntryId = z.infer<typeof historyEntryId>;
 /** Human-readable slug. References nothing; may change. */
 export type Key = string;
 
-/** ISO 8601 duration, e.g. "P7D", "PT30S". */
+// ============================================================
+// ISO 8601 duration. Fixed-length units only: weeks, days, hours, minutes,
+// seconds. Calendar units (years, months) are ambiguous without a date library
+// and are rejected. This is the single source for the grammar — the engine's
+// durationMs (src/engine/duration.ts) parses through it rather than keeping its
+// own copy, so validation and arming cannot accept different sets.
+// ============================================================
+
+// Module-private: `parseIsoDuration` is the only reachable entry point, so no
+// caller can check the grammar with weaker teeth than the parser applies. The
+// `T` group carries a lookahead because every unit inside it is optional — a
+// bare trailing `T` ("P1DT") would otherwise match, and it is not ISO 8601.
+const ISO_DURATION = /^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?=\d)(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/;
+
+// The latest entry instant the magnitude bound is derived against. A fixed
+// constant, never wall-clock: publishing the same body twice must give the same
+// verdict, and a clock-relative bound would make a stored definition's validity
+// drift with time.
+const ENTRY_INSTANT_CEILING = "9000-01-01T00:00:00.000Z";
+
+/**
+ * The largest `Timer.duration`, in milliseconds. GUARANTEE: a duration within
+ * this bound cannot overflow the four-digit-year window when armed from any
+ * entry instant before year 9000.
+ *
+ * Derivation: `fireAt = entryInstant + duration`, and `toISOString()` renders
+ * years 0001-9999 as the 24-char form and everything outside it as the
+ * expanded-year form (`+029405-01-26T...`), whose leading `+` (0x2B) sorts
+ * before every digit — one such fireAt would win the scheduler's lexical
+ * earliest-timer sort and suppress every other timer on its step. So the bound
+ * is the span from the stated entry ceiling to the last representable
+ * millisecond: 9999-12-31T23:59:59.999Z - 9000-01-01T00:00:00.000Z, just under
+ * a thousand years.
+ *
+ * Bounding by the window's *full* span instead would be necessary but not
+ * sufficient: "P3000000D" (~8214 years) fits inside 0001-9999 yet overflows
+ * from an ordinary 2026 entry, which is exactly the arming failure this bound
+ * exists to make unreachable.
+ *
+ * This is a representation bound, not a policy about how far ahead a timer may
+ * be scheduled.
+ */
+export const MAX_TIMER_DURATION_MS =
+  Date.parse("9999-12-31T23:59:59.999Z") - Date.parse(ENTRY_INSTANT_CEILING);
+
+/**
+ * ISO 8601 duration -> milliseconds, or null if it is outside the supported
+ * grammar. Total. "P" and "PT" are rejected: they match the grammar but carry no
+ * component, so they denote nothing. The magnitude bound is not applied here —
+ * it applies only to `Timer.duration`, while the grammar applies to every
+ * duration-typed field, and the two report distinct errors.
+ *
+ * The single source for the grammar: the engine's `durationMs`
+ * (src/engine/duration.ts) and the publish-time `validateDurations`
+ * (src/schema/compile.ts) both parse through this, so validation and arming
+ * cannot accept different sets.
+ */
+export function parseIsoDuration(d: string): number | null {
+  const m = ISO_DURATION.exec(d);
+  if (!m) return null;
+  const [, w, days, h, min, s] = m;
+  if (w === undefined && days === undefined && h === undefined && min === undefined && s === undefined) return null;
+  const secs =
+    Number(w ?? 0) * 604800 +
+    Number(days ?? 0) * 86400 +
+    Number(h ?? 0) * 3600 +
+    Number(min ?? 0) * 60 +
+    Number(s ?? 0);
+  return secs * 1000;
+}
+
+/**
+ * ISO 8601 duration, e.g. "P7D", "PT30S". Deliberately a bare string: this
+ * schema is also the deserializer for stored, immutable bodies
+ * (`processBody.parse` on every `resolveBody` cache miss), so a refinement here
+ * would retroactively make an already-published definition unreadable — and its
+ * pinned instances unrehydratable, migration not being built. The grammar and
+ * the magnitude bound are enforced on the write path instead, by
+ * `validateDurations` in src/schema/compile.ts.
+ */
 export const duration = z.string();
 export type Duration = z.infer<typeof duration>;
 
