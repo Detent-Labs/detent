@@ -166,7 +166,14 @@ each with a test that rejects a violating definition.
   Kept out of definition.ts so the contract has no CEL dependency. CEL references
   fields by `key` (a `field_<uuid>` id is not a valid CEL identifier); scopes are
   enforced by which namespaces are registered (`result` only in Action.output,
-  `child` only in subprocess steps); `now()`/`timestamp()`/`duration()` are blocked.
+  `child` only in subprocess steps, data sources everywhere except a timer
+  `deadline`); `now()`/`timestamp()`/`duration()` are blocked. A `Site` may also
+  declare an expected result type: the `deadline` site requires `string` (`dyn`
+  passes, being unknowable), because a deadline yielding a non-instant is dropped
+  at arming and an omitted timer is indistinguishable from an undeclared one. A
+  deadline sees neither `child` (no child exists at entry) nor a data source
+  (`buildGuardContext` does not resolve them, so it would throw at every arming) —
+  both are publish errors rather than a wait-state that silently loses its bound.
   `test/cel.test.ts` covers each rule. Known papercut: `number`->CEL `double`, so
   `data.count == 5` needs `== 5.0`.
 - `README.md`: public-facing overview (paradigm, the JSON/Zod contract, a status
@@ -221,8 +228,15 @@ each with a test that rejects a violating definition.
   writeback, retry/dead-letter, stale-claim reclaim; a writeback applies only to a
   running instance). `resolution.ts` (re-resolves automatic paths after an async
   writeback, so a parked wait-state takes its result-driven path; claim/CAS with a
-  lease). `timers.ts` + `duration.ts` (first-class timers: arm `duration` timers at
-  entry, `next_timer_at` poll scheduler, fire-once via OCC). `registry.ts`,
+  lease). `timers.ts` + `duration.ts` (first-class timers: arm both `duration` and
+  `deadline` timers at entry, `next_timer_at` poll scheduler, fire-once via OCC. A
+  `deadline` is evaluated once at entry over the guard context with `SYSTEM_ACTOR`
+  and parsed by `instantFromValue`, which accepts a strict ISO-8601 whitelist only —
+  `new Date()` must never see anything else, since its legacy parser reads non-ISO
+  forms host-locally and accepts strings denoting no date. The 4-digit year and the
+  24-char output check keep `fireAt` lexically sortable, which `minFireAt` relies on.
+  The deadline branch is total, the `duration` branch is not — see open questions).
+  `registry.ts`,
   `idempotency.ts`. `src/cel/eval.ts` evaluates guards at runtime (total: a runtime
   error such as an unwritten field is `false`, the wait-state idiom) and
   Action.output writeback. The resolution and timer workers take an injected
@@ -269,10 +283,10 @@ each with a test that rejects a violating definition.
    (`subprocess.ts`: spawn on subprocess-step entry, child-body resolution by
    `versionBinding`, `inputMapping` seed, return via `outputMapping` + direct parent
    advance, idempotent spawn) together with downward cancel propagation
-   (`cancelInstance` cascades to active children by the `parent` link). Remaining:
-   `deadline` timers (schema + authoring-validated, engine evaluator deferred);
-   migration; a subprocess step as the initial step does not spawn (must be entered
-   via a transition). Publish-time cross-process validation (inputMapping ⊆ child
+   (`cancelInstance` cascades to active children by the `parent` link). `deadline`
+   timers are DONE (`duration.ts`: `instantFromValue` + the deadline branch of
+   `armStepTimers`; see the timers entry above). Remaining: migration; a subprocess
+   step as the initial step does not spawn (must be entered via a transition). Publish-time cross-process validation (inputMapping ⊆ child
    inputFields, child reference resolvable → child-first ordering) is DONE
    (`definitions.ts`, roadmap #1). The production `resolveBody` backing
    (definition/version store) is DONE (`definitions.ts` + `host.ts`), so the
@@ -284,6 +298,31 @@ each with a test that rejects a violating definition.
   a reminder-timer fire both lack a step change, so the transition-shaped
   HistoryEntry does not fit. Today a reminder fire records only the timer's `fired`
   flag plus the delivered action's `ActionOutcome`.
+
+## Decided, not yet built (each needs its own OpenSpec change)
+- **Record an unarmed deadline.** A deadline that yields no instant at entry is
+  dropped from the armed set. Arming must stay total (it runs inside the transition
+  commit), but the omission is currently invisible: `next_timer_at` stays NULL, so
+  the scheduler never selects the row, and there is no history entry, dead-letter,
+  or log. On an all-automatic wait-state whose only bound is that timer, the
+  instance hangs until someone cancels it, and nothing signals that anyone should.
+  Two reachable causes survive the publish-time checks: a correctly-typed field not
+  yet written at entry (the documented intended case — note the asymmetry with a
+  guard, which the resolution worker re-evaluates on every pass, while an omitted
+  timer is never retried), and a `date`/`datetime`/`string` field holding a
+  non-instant value (`""` from a form, a locale date), which nothing validates.
+  Decision: mark the omission on the persisted `TimerState` (e.g. `unarmed:
+  "unresolved" | "not-an-instant"`) so it is queryable, without arming or firing.
+  This touches the runtime record in `definition.ts`, hence its own change.
+- **Bound and validate `Timer.duration`.** `duration` is `z.string()` with no format
+  refinement, so `durationMs` throws inside the transition commit for a malformed
+  value (the `duration` branch of `armStepTimers` is therefore not total, unlike the
+  deadline branch), and an absurd value such as `P9999999D` produces an
+  expanded-year `fireAt` whose leading `+` sorts before every digit — winning
+  `minFireAt`'s lexical sort and suppressing every other timer on the step. The
+  deadline branch is already guarded against both by `instantFromValue`'s strict
+  whitelist and 24-char output check; the duration branch needs a schema refinement
+  plus the same width bound.
 - The formal expression context is pinned (`src/cel/check.ts`): `instance`
   `{id, status, transitionSeq, currentStepId}`, `actor` `{id, roles}`. Both are
   deliberately minimal; widen when the engine surfaces a concrete need.

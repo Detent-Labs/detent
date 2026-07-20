@@ -40,8 +40,9 @@ Schema, validation, and a working engine. No editor yet.
 Roadmap: validation (done) → CEL wiring (done) → engine skeleton (mostly done) →
 editor. The definition/version store is done — `startEngine` wires its
 `resolveBody` into the workers, so re-resolution, timers, and delivery run live.
-Runtime cancellation and subprocess execution (spawn/return + downward cancel
-propagation) are done. Remaining engine work: `deadline` timers and migration.
+Runtime cancellation, subprocess execution (spawn/return + downward cancel
+propagation), and both timer kinds (`duration` and `deadline`) are done. Remaining
+engine work: migration.
 
 ## Develop
 
