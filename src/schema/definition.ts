@@ -27,6 +27,7 @@ export const timerId = z.string().regex(/^timer_/).brand<"TimerId">();
 export const dataSourceId = z.string().regex(/^ds_/).brand<"DataSourceId">();
 export const instanceId = z.string().regex(/^inst_/).brand<"InstanceId">();
 export const historyEntryId = z.string().regex(/^hist_/).brand<"HistoryEntryId">();
+export const instanceEventId = z.string().regex(/^evt_/).brand<"InstanceEventId">();
 
 export type ProcessId = z.infer<typeof processId>;
 export type StepId = z.infer<typeof stepId>;
@@ -37,6 +38,7 @@ export type TimerId = z.infer<typeof timerId>;
 export type DataSourceId = z.infer<typeof dataSourceId>;
 export type InstanceId = z.infer<typeof instanceId>;
 export type HistoryEntryId = z.infer<typeof historyEntryId>;
+export type InstanceEventId = z.infer<typeof instanceEventId>;
 
 /** Human-readable slug. References nothing; may change. */
 export type Key = string;
@@ -588,7 +590,7 @@ export const processVersion = z.object({
 export type ProcessVersion = z.infer<typeof processVersion>;
 
 // ============================================================
-// Runtime: instance + history (the audit backbone).
+// Runtime: instance + history + events (the audit backbone).
 // ============================================================
 
 export const assignmentState = z.object({
@@ -632,6 +634,61 @@ export const historyEntry = z.object({
   actions: z.array(actionOutcome).optional(),
 });
 export type HistoryEntry = z.infer<typeof historyEntry>;
+
+/**
+ * Append-only runtime record for facts that carry no step change and so cannot
+ * be a HistoryEntry (whose `toStepId` is non-nullable and load-bearing).
+ *
+ * An event never advances `transitionSeq`; it records the seq in force. Several
+ * events may share one seq, and may share it with a transition — expected, not a
+ * collision. Ordering within a seq is by `at`, then insertion. `version` is
+ * carried for the same reason HistoryEntry carries it: an id in a payload
+ * resolves against the definition that produced it.
+ *
+ * A discriminated union over `kind`, so a payload cannot be attached to the
+ * wrong kind. Payloads are strict: an extra or missing key is a parse error
+ * rather than a silently mismatched record.
+ */
+const instanceEventEnvelope = {
+  id: instanceEventId,
+  instanceId,
+  transitionSeq: z.number(),
+  version: z.number(),
+  at: timestamp,
+};
+
+/**
+ * Why a declared timer produced no `fireAt` at entry. Distinguished at the point
+ * that knows it: evaluation raising, versus a resolved value that is not a
+ * parseable instant.
+ */
+export const timerUnarmedReason = z.enum(["expression-raised", "not-an-instant"]);
+export type TimerUnarmedReason = z.infer<typeof timerUnarmedReason>;
+
+export const instanceEvent = z.discriminatedUnion("kind", [
+  // A reminder timer (onFire actions, no targetPath) fired: actions enqueued,
+  // no transition.
+  z.object({
+    ...instanceEventEnvelope,
+    kind: z.literal("timer.fired"),
+    payload: z.object({ timerId }).strict(),
+    // Outcomes of the actions this fire enqueued — they attach here, not to the
+    // HistoryEntry that happens to share the seq. Only this kind carries them:
+    // an unarmed timer enqueues nothing, so the field would be permanently null
+    // on that arm and would invite a reader to expect outcomes that cannot exist.
+    actions: z.array(actionOutcome).optional(),
+  }),
+  // A declared timer was omitted from the armed set. Arming is total, so the
+  // entry committed regardless; TimerState stays "armed timers" and carries no
+  // fire time for a timer that never armed.
+  z.object({
+    ...instanceEventEnvelope,
+    kind: z.literal("timer.unarmed"),
+    payload: z.object({ timerId, reason: timerUnarmedReason }).strict(),
+  }),
+]);
+export type InstanceEvent = z.infer<typeof instanceEvent>;
+export type InstanceEventKind = InstanceEvent["kind"];
 
 export const instance = z.object({
   instanceId,

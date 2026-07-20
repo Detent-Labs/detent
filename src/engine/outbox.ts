@@ -27,13 +27,19 @@ const BACKOFF_BASE_MS = 1000;
 // raise only if a real handler legitimately runs longer.
 export const CLAIM_LEASE_MS = 30_000;
 
-/** A row a delivery worker has claimed: the frozen action plus its coordinates. */
+/**
+ * A row a delivery worker has claimed: the frozen action plus its coordinates.
+ * `event_id` names the InstanceEvent that enqueued the action when one did (a
+ * reminder fire); null when a transition did, whose record is found by
+ * (instance_id, transition_seq).
+ */
 export type ClaimedRow = {
   idempotency_key: string;
   instance_id: string;
   transition_seq: number;
   action: Action;
   attempts: number;
+  event_id: string | null;
 };
 
 /** A permanent (non-retryable) delivery failure — dead-letters without consuming retries. */
@@ -66,7 +72,17 @@ export const deliver: DeliverFn = async (row, registry) => {
 
 const parseAction = (a: unknown): Action => (typeof a === "string" ? JSON.parse(a) : a) as Action;
 
-/** Append one ActionOutcome to the originating transition's HistoryEntry (located by instance + seq). */
+/**
+ * Append one ActionOutcome to the runtime record that enqueued the action.
+ *
+ * The record is carried on the row, not derived. (instance_id, transition_seq)
+ * identifies a transition exactly — the seq is the OCC token and advances once per
+ * hop — but an event does not advance it, so deriving from the pair misfiles a
+ * reminder's outcome onto whichever transition entered the step, and on a step an
+ * instance was created on (seq 0, no HistoryEntry) matches no row at all and
+ * discards the outcome silently. With `event_id` set the outcome goes to that
+ * event; otherwise the transition path is unchanged.
+ */
 async function appendOutcome(
   tx: SQL,
   row: ClaimedRow,
@@ -81,6 +97,12 @@ async function appendOutcome(
     at: new Date().toISOString(),
     ...(o.suppressed ? { suppressed: true } : {}),
   };
+  if (row.event_id !== null && row.event_id !== undefined) {
+    await tx`UPDATE instance_events
+      SET event = jsonb_set(event, '{actions}', coalesce(event->'actions', '[]'::jsonb) || ${[outcome]}::jsonb)
+      WHERE id = ${row.event_id}`;
+    return;
+  }
   await tx`UPDATE history_entries
     SET entry = jsonb_set(entry, '{actions}', coalesce(entry->'actions', '[]'::jsonb) || ${[outcome]}::jsonb)
     WHERE instance_id = ${row.instance_id} AND transition_seq = ${row.transition_seq}`;
@@ -109,7 +131,7 @@ export async function drainOutbox(
       FOR UPDATE SKIP LOCKED
       LIMIT 100
     )
-    RETURNING idempotency_key, instance_id, transition_seq, action, attempts`) as ClaimedRow[];
+    RETURNING idempotency_key, instance_id, transition_seq, action, attempts, event_id`) as ClaimedRow[];
 
   let delivered = 0;
   for (const raw of claimed) {
