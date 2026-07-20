@@ -355,6 +355,23 @@ real call chains exist.
 - PostgreSQL is the datastore. The engine reaches it via Bun's native `Bun.sql`
   (no client dependency); `DATABASE_URL` is the connection convention, set by the
   devcontainer compose.
+- **Run `bun test` with `DATABASE_URL` set, always.** The DB-backed suites are
+  `test.skipIf(!DB)`, so without it roughly 80 of the ~230 tests skip *silently* and
+  the run reports a green that proves almost nothing. A green claimed without the
+  variable is not evidence. Outside the devcontainer, point it at a Postgres 16 with
+  the compose credentials.
+- **A full-suite run is the reliable signal; a single-file rerun is not.** The DB
+  suites share one database and truncate in `beforeEach`, so back-to-back runs of one
+  file contend and fail spuriously. Observed, not fully characterised: full runs have
+  been stable across many consecutive passes while single-file reruns were not. Read
+  a verdict off a *named* test failure, never off a pass count alone.
+- **Never mutate, stash, or check out the shared working tree to test something.**
+  Mutation testing (revert a line, confirm a named test fails) is the right technique
+  and must happen on a copy — the tree usually holds uncommitted work, and a
+  concurrent agent that stashes or leaves a mutation behind corrupts everyone else's
+  results. This has happened twice: once as a vanishing stash mid-run, once as a
+  `// MUTATION` marker left in `transition.ts` that three separate reviewers then
+  reported as a critical defect.
 - Comments state facts, not process history. Concise and technically precise.
 - The JSON contract is the foundation. Change the schema (definition.ts / the
   Zod source) deliberately, never as a casual side effect of another task.
