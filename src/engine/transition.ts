@@ -1,20 +1,29 @@
 /**
  * Transition executor. A transition — manual or automatic — runs its triggers
  * onExit(source) -> onPath -> onEntry(target), commits {currentStepId,
- * transitionSeq, status} atomically with transitionSeq as the optimistic-
- * concurrency token, and appends one HistoryEntry. Each ordered trigger action
- * is enqueued into the outbox in the same commit transaction, so an action
- * exists iff its transition committed; the outbox worker delivers them.
+ * transitionSeq, status, timers} atomically with transitionSeq as the
+ * optimistic-concurrency token, and appends one HistoryEntry. Each ordered
+ * trigger action is enqueued into the outbox in the same commit transaction, so
+ * an action exists iff its transition committed; the outbox worker delivers
+ * them.
  *
  * A manual transition advances one path; the engine then runs the instance to
  * rest via resolveAutomatic (automatic-path evaluation), so a returned instance
  * always sits on a manual step, an automatic wait-state, or a terminal step.
+ *
+ * The commit itself is split into a plan/apply seam (planStepEntry /
+ * applyStepEntry), exported so a caller whose commit is not an authored hop —
+ * cancelInstance today, instance migration next — can extend the transaction
+ * and the written field set instead of forking the commit and silently
+ * dropping whichever consequence it does not reproduce. `commitTransition`
+ * composes the two and remains the ordinary entry point, unchanged in
+ * behaviour when nothing is overridden.
  */
 
 import type { SQL } from "bun";
-import { sql, createInstance, appendInstanceEvent, appendInstanceEvents, newInstanceEventId } from "./store.js";
+import { sql, createInstance, appendInstanceEvent, appendInstanceEvents, newInstanceEventId, withTransaction } from "./store.js";
 import { idempotencyKey } from "./idempotency.js";
-import { armStepTimers, minFireAt } from "./duration.js";
+import { armStepTimers, minFireAt, type TimerDrop } from "./duration.js";
 import { buildGuardContext, evalGuard, SYSTEM_ACTOR, type Actor } from "../cel/eval.js";
 import { CANCEL_SINK_STEP_ID, instance as instanceSchema } from "../schema/definition.js";
 import type { ProcessBody, Instance, HistoryEntry, InstanceEvent, Action, Step, Path } from "../schema/definition.js";
@@ -64,27 +73,83 @@ export function orderedTriggerActions(source: Step, path: Path, target: Step): A
 }
 
 
+/** One outbox row a step entry implies, in the shape `applyStepEntry` inserts. */
+export type OutboxRow = {
+  idempotencyKey: string;
+  instanceId: string;
+  transitionSeq: number;
+  actionId: string;
+  action: { id: string; type: string; config: unknown };
+};
+
 /**
- * Commit one transition atomically: advance {currentStepId, transitionSeq,
- * status}, append its HistoryEntry, enqueue its ordered actions. Shared by the
- * authored (manual/automatic/timer) paths and the synthesized cancel path. The
- * caller supplies `target` (the step entered — its timers are armed against
- * `body`), the HistoryEntry `pathId` (null for a synthesized transition with no
- * authored path), the resulting `status`, the `cause`, and an optional `actorId`.
+ * Inputs a step entry cannot be planned without, plus the overrides a
+ * synthesized caller may supply. `pathId`, `cause`, `actorId` and `actions` are
+ * not optional extras — without them the HistoryEntry and the enqueued action
+ * rows are unconstructible. The rest default to today's behaviour:
+ *
+ * - `status`: derived (`target.terminal ? "completed" : instance.status`) unless
+ *   overridden. Only a cancellation overrides it.
+ * - `timers`: a pre-computed armed set, replacing the `armStepTimers` call
+ *   against the target step. A supplied set produces no drops of the planner's
+ *   own — see `events`.
+ * - `entryVersion`: the version recorded on the HistoryEntry and on any
+ *   `timer.unarmed` events, defaulting to the instance's version.
+ * - `suppressSpawn`: omit the `core.spawnSubprocess` enqueue, for a commit
+ *   re-entering the step the instance is already parked on (an unsuppressed
+ *   re-entry advances the sequence and derives a *different* deterministic
+ *   child id, creating a duplicate child). Never inferred from
+ *   `target.id === instance.currentStepId`: a genuine self-loop must spawn, and
+ *   only the caller knows which this is.
+ * - `events`: additional events appended to the plan's event list, so a caller
+ *   supplying its own timer set can still record what it dropped while
+ *   deriving that set.
  */
-async function commitTransition(
-  instance: Instance,
-  target: Step,
-  body: ProcessBody,
-  pathId: HistoryEntry["pathId"],
-  actions: Action[],
-  cause: HistoryEntry["cause"],
-  status: Instance["status"],
-  actorId: string | undefined,
-  db: SQL,
-): Promise<Instance> {
+export type StepEntryOpts = {
+  pathId: HistoryEntry["pathId"];
+  cause: HistoryEntry["cause"];
+  actorId: string | undefined;
+  actions: Action[];
+  status?: Instance["status"];
+  timers?: Instance["timers"];
+  entryVersion?: number;
+  suppressSpawn?: boolean;
+  events?: InstanceEvent[];
+};
+
+/**
+ * What a step entry implies: the resulting Instance, its HistoryEntry, the
+ * events to append, the outbox rows to insert, and the derived scheduling
+ * column. `applyStepEntry` writes exactly this and nothing else.
+ */
+export type StepEntryPlan = {
+  instance: Instance;
+  entry: HistoryEntry;
+  events: InstanceEvent[];
+  outbox: OutboxRow[];
+  nextTimerAt: string | null;
+};
+
+/**
+ * Plan one step entry: no I/O. Not pure — it mints the HistoryEntry id and any
+ * event ids via `crypto.randomUUID()`, and reads the clock once for `at` — so
+ * plans are not comparable by value without masking `entry.id`, `events[].id`
+ * and `at`. Not total either: arming the target step's timers (when `opts.timers`
+ * is not supplied) can raise on the duration-width assertion in
+ * `armStepTimers`; a caller supplying its own timer set inherits that raise
+ * outside the planner instead.
+ *
+ * Every consequence of entering `target` is derived here from `target` alone
+ * (status, the armed set, the subprocess spawn, the subprocess return) — never
+ * re-implemented by a caller — except the four explicit overrides above, which
+ * exist because a synthesized caller sometimes has to vary exactly one of them.
+ */
+export function planStepEntry(instance: Instance, target: Step, body: ProcessBody, opts: StepEntryOpts): StepEntryPlan {
   const nextSeq = instance.transitionSeq + 1;
   const at = new Date().toISOString();
+  const version = opts.entryVersion ?? instance.version;
+  const status = opts.status ?? (target.terminal ? "completed" : instance.status);
+
   // Arm the target step's timers at entry (replacing the source step's, disarming
   // them); next_timer_at is the earliest fireAt for the scheduler's poll. A
   // deadline timer is armed from the instance as it stands at this entry — the
@@ -97,83 +162,167 @@ async function commitTransition(
     status,
     timers: [],
   };
-  const { armed, drops } = armStepTimers(target, at, body, entering);
+  const { armed, drops }: { armed: NonNullable<Instance["timers"]>; drops: TimerDrop[] } =
+    opts.timers !== undefined ? { armed: opts.timers, drops: [] } : armStepTimers(target, at, body, entering);
   const nextTimerAt = minFireAt(armed);
   const next: Instance = { ...entering, timers: armed };
-  // Timers the target step declared that arming could not compute a fireAt for.
-  // Written in the commit below, so a dropped timer cannot be recorded without
-  // its entry nor an entry land without its drops. Arming stays total: a drop is
-  // recorded, never raised, so it does not fail the entry.
-  const events: InstanceEvent[] = drops.map((d) => ({
+  // Timers the target step declared that arming could not compute a fireAt for
+  // (empty when a caller supplied its own armed set). Written in the commit, so
+  // a dropped timer cannot be recorded without its entry nor an entry land
+  // without its drops. Arming stays total: a drop is recorded, never raised, so
+  // it does not fail the entry.
+  const dropEvents: InstanceEvent[] = drops.map((d) => ({
     id: newInstanceEventId(),
     instanceId: instance.instanceId,
     transitionSeq: nextSeq,
-    version: instance.version,
+    version,
     kind: "timer.unarmed" as const,
     payload: { timerId: d.timerId, reason: d.reason },
     at,
   }));
+  const events: InstanceEvent[] = [...dropEvents, ...(opts.events ?? [])];
   const entry: HistoryEntry = {
     id: `hist_${crypto.randomUUID()}` as HistoryEntry["id"],
     instanceId: instance.instanceId,
     transitionSeq: nextSeq,
-    version: instance.version,
-    pathId,
+    version,
+    pathId: opts.pathId,
     fromStepId: instance.currentStepId,
     toStepId: target.id,
-    cause,
-    ...(actorId !== undefined ? { actorId } : {}),
+    cause: opts.cause,
+    ...(opts.actorId !== undefined ? { actorId: opts.actorId } : {}),
     at,
   };
 
-  await db.begin(async (tx) => {
-    // Path-scoped commit: write {currentStepId, transitionSeq, status, timers} and
-    // the next_timer_at column, never {data}. A post-commit action writeback
-    // jsonb_sets a disjoint {data,<fieldId>} path, so the row lock serializes the
-    // two writers with no lost write. Each scalar/array is wrapped as [v] and read
-    // back with ->0 so Bun.sql binds a proper jsonb value (a bare param would land
-    // as a jsonb scalar string).
-    const updated = (await tx`UPDATE instances
-      SET body = jsonb_set(jsonb_set(jsonb_set(jsonb_set(body,
-            '{currentStepId}', (${[next.currentStepId]}::jsonb) -> 0),
-            '{transitionSeq}', (${[nextSeq]}::jsonb) -> 0),
-            '{status}', (${[next.status]}::jsonb) -> 0),
-            '{timers}', (${[armed]}::jsonb) -> 0),
-          transition_seq = ${nextSeq},
-          next_timer_at = ${nextTimerAt}
-      WHERE instance_id = ${instance.instanceId} AND transition_seq = ${instance.transitionSeq}
-      RETURNING instance_id`) as unknown[];
-    if (updated.length === 0) throw new ConcurrencyConflict(instance.instanceId, instance.transitionSeq);
-    await tx`INSERT INTO history_entries (id, instance_id, transition_seq, entry)
-      VALUES (${entry.id}, ${entry.instanceId}, ${entry.transitionSeq}, ${entry})`;
-    await appendInstanceEvents(tx, events);
-    for (const a of actions) {
-      await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
-        VALUES (${idempotencyKey(instance.instanceId, nextSeq, a.id)}, ${instance.instanceId}, ${nextSeq}, ${a.id}, ${a})`;
-    }
-    // Subprocess spawn: entering a subprocess step enqueues a spawn action,
-    // dispatched post-commit by the internal handler (child-body resolution +
-    // inputMapping + linked child creation). Idempotent via the deterministic
-    // child id the handler derives from (instance, nextSeq, step).
-    if (target.type === "subprocess") {
-      const spawn = { id: `action_spawn_${target.id}`, type: SPAWN_ACTION_TYPE, config: { subprocessStepId: target.id, parentSeq: nextSeq } };
-      await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
-        VALUES (${idempotencyKey(instance.instanceId, nextSeq, spawn.id)}, ${instance.instanceId}, ${nextSeq}, ${spawn.id}, ${spawn})`;
-    }
-    // Subprocess return: a child reaching a terminal step enqueues a return
-    // action that wakes the parked parent (outputMapping writeback + advance).
-    if (target.terminal && instance.parent) {
-      const ret = {
-        id: `action_return_${instance.instanceId}`,
-        type: RETURN_ACTION_TYPE,
-        config: { parentInstanceId: instance.parent.instanceId, parentStepId: instance.parent.stepId, childOutcome: target.outcome ?? null },
-      };
-      await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
-        VALUES (${idempotencyKey(instance.instanceId, nextSeq, ret.id)}, ${instance.instanceId}, ${nextSeq}, ${ret.id}, ${ret})`;
-    }
-  });
+  const outbox: OutboxRow[] = opts.actions.map((a) => ({
+    idempotencyKey: idempotencyKey(instance.instanceId, nextSeq, a.id),
+    instanceId: instance.instanceId,
+    transitionSeq: nextSeq,
+    actionId: a.id,
+    action: a,
+  }));
+  // Subprocess spawn: entering a subprocess step enqueues a spawn action,
+  // dispatched post-commit by the internal handler (child-body resolution +
+  // inputMapping + linked child creation). Idempotent via the deterministic
+  // child id the handler derives from (instance, nextSeq, step) — which is
+  // exactly why a re-entry onto an already-parked subprocess step must suppress
+  // this rather than enqueue a second, differently-keyed spawn.
+  if (target.type === "subprocess" && !opts.suppressSpawn) {
+    const spawn = { id: `action_spawn_${target.id}`, type: SPAWN_ACTION_TYPE, config: { subprocessStepId: target.id, parentSeq: nextSeq } };
+    outbox.push({
+      idempotencyKey: idempotencyKey(instance.instanceId, nextSeq, spawn.id),
+      instanceId: instance.instanceId,
+      transitionSeq: nextSeq,
+      actionId: spawn.id,
+      action: spawn,
+    });
+  }
+  // Subprocess return: a child reaching a terminal step enqueues a return action
+  // that wakes the parked parent (outputMapping writeback + advance). The config
+  // names the parent instance and the outcome, never the parent's step: the
+  // handler reads that from this child's own `parent` link when the row is
+  // delivered. A step id frozen here is a snapshot of another instance's state
+  // read an unbounded interval later — across backoff, a claim lease, or a
+  // worker restart — and a parent that moved in that window is indistinguishable
+  // from one that legitimately moved on, which is a silent, never-retried loss.
+  // Unconditional — not because the idempotency key is sequence-free (it is not,
+  // exactly like the spawn's) but because entering a terminal step derives
+  // `completed` and no path transitions a non-running instance, so an instance
+  // reaches a terminal step at most once. `opts.status` can break that chain
+  // (cancelInstance does), so any future status override must re-examine this.
+  if (target.terminal && instance.parent) {
+    const ret = {
+      id: `action_return_${instance.instanceId}`,
+      type: RETURN_ACTION_TYPE,
+      config: { parentInstanceId: instance.parent.instanceId, childOutcome: target.outcome ?? null },
+    };
+    outbox.push({
+      idempotencyKey: idempotencyKey(instance.instanceId, nextSeq, ret.id),
+      instanceId: instance.instanceId,
+      transitionSeq: nextSeq,
+      actionId: ret.id,
+      action: ret,
+    });
+  }
 
+  return { instance: next, entry, events, outbox, nextTimerAt };
+}
+
+/**
+ * Write a planned step entry inside the caller's transaction — never its own.
+ * `extraFields` is merged into the instance row alongside the plan's own
+ * {currentStepId, transitionSeq, status, timers}, under the same
+ * optimistic-concurrency predicate: applying from a stale sequence writes none
+ * of it. The ordinary path writes only those four fields; a caller that must
+ * also rewrite the instance's pin or payload supplies them here rather than
+ * issuing a second statement.
+ *
+ * A caller patching `data` must hold the instance row locked (`SELECT ... FOR
+ * UPDATE`) across its read and this commit: the predicate does not protect
+ * `data`, since a post-commit action writeback jsonb_sets a disjoint
+ * {data,<fieldId>} path without advancing or checking transitionSeq, and a
+ * wholesale `data` patch computed from an earlier read would erase such a
+ * writeback silently even though the predicate still matches.
+ *
+ * Throws ConcurrencyConflict on a zero-row update, exactly as commitTransition
+ * did before the split.
+ */
+export async function applyStepEntry(tx: SQL, plan: StepEntryPlan, extraFields?: Record<string, unknown>): Promise<Instance> {
+  const { instance: next, entry, events, outbox, nextTimerAt } = plan;
+  const prevSeq = entry.transitionSeq - 1;
+  // extraFields first: the plan's four fields win a key collision. A caller that
+  // patches `transitionSeq` would otherwise write a body sequence disagreeing with
+  // the promoted `transition_seq` column and the OCC predicate below, both of which
+  // take the plan's value — and rehydrate reads the body. The patch is written
+  // *alongside* the plan's fields, never over them.
+  const patch = {
+    ...(extraFields ?? {}),
+    currentStepId: next.currentStepId,
+    transitionSeq: next.transitionSeq,
+    status: next.status,
+    timers: next.timers,
+  };
+  const updated = (await tx`UPDATE instances
+    SET body = body || ${patch}::jsonb,
+        transition_seq = ${next.transitionSeq},
+        next_timer_at = ${nextTimerAt}
+    WHERE instance_id = ${entry.instanceId} AND transition_seq = ${prevSeq}
+    RETURNING instance_id`) as unknown[];
+  if (updated.length === 0) throw new ConcurrencyConflict(entry.instanceId, prevSeq);
+  await tx`INSERT INTO history_entries (id, instance_id, transition_seq, entry)
+    VALUES (${entry.id}, ${entry.instanceId}, ${entry.transitionSeq}, ${entry})`;
+  await appendInstanceEvents(tx, events);
+  for (const row of outbox) {
+    await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
+      VALUES (${row.idempotencyKey}, ${row.instanceId}, ${row.transitionSeq}, ${row.actionId}, ${row.action})`;
+  }
   return next;
+}
+
+/**
+ * Commit one transition atomically: plan the step entry, then apply it —
+ * opening its own transaction unless already inside one (the subprocess return
+ * holds the parent row locked across its advance, so this joins that
+ * transaction rather than independently committing a second one within it).
+ * Shared by the authored (manual/automatic/timer) paths and the synthesized
+ * cancel path. The caller supplies `target` (the step entered — its timers are
+ * armed against `body`), the HistoryEntry `pathId` (null for a synthesized
+ * transition with no authored path), the `cause`, an optional `actorId`, and
+ * any of the `StepEntryOpts` overrides (`cancelInstance` overrides `status`).
+ */
+async function commitTransition(
+  instance: Instance,
+  target: Step,
+  body: ProcessBody,
+  pathId: HistoryEntry["pathId"],
+  actions: Action[],
+  cause: HistoryEntry["cause"],
+  actorId: string | undefined,
+  db: SQL,
+  overrides?: Pick<StepEntryOpts, "status" | "timers" | "entryVersion" | "suppressSpawn" | "events">,
+): Promise<Instance> {
+  const plan = planStepEntry(instance, target, body, { pathId, cause, actorId, actions, ...overrides });
+  return withTransaction(db, (tx) => applyStepEntry(tx, plan));
 }
 
 /**
@@ -201,8 +350,7 @@ export async function executeManualTransition(
   if (!target) throw new Error(`path target not in body: ${path.to}`);
 
   const actions = orderedTriggerActions(source, path, target);
-  const status = target.terminal ? "completed" : instance.status;
-  const committed = await commitTransition(instance, target, body, path.id, actions, "user", status, actor.id, db);
+  const committed = await commitTransition(instance, target, body, path.id, actions, "user", actor.id, db);
   return resolveAutomatic(committed, body, actor, db);
 }
 
@@ -236,7 +384,7 @@ export async function cancelInstance(
   if (!sink) throw new Error("cancel-sink not in body (uncompiled definition?)");
 
   const actions = [...(source.onCancel ?? []), ...(sink.onEntry ?? [])];
-  const cancelled = await commitTransition(instance, sink, body, null, actions, "cancel", "cancelled", actor.id, db);
+  const cancelled = await commitTransition(instance, sink, body, null, actions, "cancel", actor.id, db, { status: "cancelled" });
 
   if (resolveBody) {
     const rows = (await db`SELECT body FROM instances
@@ -297,8 +445,7 @@ export async function executeAutomaticTransition(
   const target = body.workflow.steps.find((s) => s.id === path.to);
   if (!target) throw new Error(`path target not in body: ${path.to}`);
   const actions = orderedTriggerActions(source, path, target);
-  const status = target.terminal ? "completed" : instance.status;
-  return commitTransition(instance, target, body, path.id, actions, "automatic", status, undefined, db);
+  return commitTransition(instance, target, body, path.id, actions, "automatic", undefined, db);
 }
 
 /**
@@ -379,8 +526,7 @@ export async function fireTimer(
     const target = body.workflow.steps.find((s) => s.id === path.to);
     if (!target) throw new Error(`timer targetPath target not in body: ${path.to}`);
     const actions = [...(timer.onFire.actions ?? []), ...orderedTriggerActions(source, path, target)];
-    const status = target.terminal ? "completed" : instance.status;
-    const committed = await commitTransition(instance, target, body, path.id, actions, "timer", status, undefined, db);
+    const committed = await commitTransition(instance, target, body, path.id, actions, "timer", undefined, db);
     return resolveAutomatic(committed, body, SYSTEM_ACTOR, db);
   }
 
@@ -406,7 +552,7 @@ export async function fireTimer(
     at: new Date().toISOString(),
   };
 
-  await db.begin(async (tx) => {
+  await withTransaction(db, async (tx) => {
     const upd = (await tx`UPDATE instances
       SET body = jsonb_set(body, ${`{timers,${idx},fired}`}::text[], 'true'::jsonb),
           next_timer_at = ${nextTimerAt}

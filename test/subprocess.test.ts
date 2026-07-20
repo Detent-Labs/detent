@@ -169,6 +169,42 @@ const parentLatestBody = (childPid: string, contractRef: string): ProcessBody =>
     },
   }) as unknown as ProcessBody;
 
+// Parent with TWO subprocess steps, each writing a distinct field. Lets a test
+// move a parked parent from one to the other and observe which step's
+// outputMapping the return applied — the frozen-config and live-link answers
+// differ, and so do the two mappings.
+const twoSubParentBody = (childVersion: number): ProcessBody =>
+  ({
+    key: "parent2", label: "Parent2",
+    fields: [
+      { id: "field_p_amount", key: "amount", label: "Amount", type: "number" },
+      { id: "field_p_result", key: "result", label: "Result", type: "string" },
+      { id: "field_p_result2", key: "result2", label: "Result2", type: "string" },
+    ],
+    workflow: {
+      initialStep: "step_p_entry",
+      steps: [
+        { id: "step_p_entry", key: "p_entry", label: "Entry", type: "task", paths: [autoPath("path_p_sub", "step_p_sub")] },
+        { id: "step_p_sub", key: "p_sub", label: "Sub", type: "subprocess",
+          subprocess: {
+            processId: CHILD_PID, versionBinding: "pinned", pinnedVersion: childVersion,
+            inputMapping: { field_c_amount: cel("data.amount") },
+            outputMapping: { field_p_result: cel("child.outcome") },
+          },
+          paths: [autoPath("path_p_done", "step_p_done", 1, 'child.outcome != ""')] },
+        { id: "step_p_sub2", key: "p_sub2", label: "Sub2", type: "subprocess",
+          subprocess: {
+            processId: CHILD_PID, versionBinding: "pinned", pinnedVersion: childVersion,
+            inputMapping: {},
+            outputMapping: { field_p_result2: cel("child.outcome") },
+          },
+          paths: [autoPath("path_p_done2", "step_p_done2", 1, 'child.outcome != ""')] },
+        { id: "step_p_done", key: "p_done", label: "Done", type: "task", terminal: true },
+        { id: "step_p_done2", key: "p_done2", label: "Done2", type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
 // Parent that routes on child.outcome == "cancelled": pairs with the waiting child
 // to observe an independently cancelled child surfacing the reserved outcome.
 const cancelAwareParent = (childPid: string, childVersion: number): ProcessBody =>
@@ -214,6 +250,29 @@ const seedField = async (id: string, fieldId: string, value: number): Promise<vo
 };
 const countChildren = async (parentId: string): Promise<number> =>
   Number(((await sql`SELECT count(*) AS n FROM instances WHERE body->'parent'->>'instanceId' = ${parentId}`) as { n: number }[])[0].n);
+
+// The outbox row of the return enqueued for `childId` (action ids are per-child).
+const returnRow = async (childId: string): Promise<{ status: string; attempts: number; action: Record<string, unknown> } | undefined> => {
+  const r = (await sql`SELECT status, attempts, action FROM outbox WHERE action_id = ${"action_return_" + childId}`) as
+    { status: string; attempts: number; action: unknown }[];
+  if (!r.length) return undefined;
+  const a = r[0].action;
+  return { status: r[0].status, attempts: r[0].attempts, action: (typeof a === "string" ? JSON.parse(a) : a) as Record<string, unknown> };
+};
+// Move an instance to another step without a transition, standing in for whatever
+// mechanism relocates a parked parent (migration). Bumps the seq like a real move.
+const moveTo = async (id: string, stepId: string): Promise<void> => {
+  await sql`UPDATE instances
+    SET body = jsonb_set(jsonb_set(body, '{currentStepId}', (${[stepId]}::jsonb) -> 0),
+          '{transitionSeq}', (to_jsonb(transition_seq + 1))),
+        transition_seq = transition_seq + 1
+    WHERE instance_id = ${id}`;
+};
+// Repoint a child's `parent` link at another step of the same parent.
+const relinkChild = async (childId: string, stepId: string): Promise<void> => {
+  await sql`UPDATE instances SET body = jsonb_set(body, '{parent,stepId}', (${[stepId]}::jsonb) -> 0)
+    WHERE instance_id = ${childId}`;
+};
 
 beforeAll(async () => {
   if (DB) await initSchema();
@@ -334,6 +393,161 @@ test.skipIf(!DB)("a child returning to a non-running parent applies no writeback
   const p = await loadInstance(parent.instanceId);
   expect(p!.status).toBe("cancelled");
   expect(dataField(p, "field_p_result")).toBeUndefined(); // no writeback onto a cancelled parent
+});
+
+// --- DB: the return resolves the parent through the child's live link --------
+
+test.skipIf(!DB)("the return carries no parent step id in its config", async () => {
+  const { registry } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody());
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
+  await seedField(parent.instanceId, "field_p_amount", 500);
+  await drainOutbox(sql, registry); // spawn: the child runs to terminal and enqueues its return
+
+  const childId = subprocessChildId(parent.instanceId, 1, "step_p_sub");
+  const row = await returnRow(childId);
+  expect(row).toBeDefined();
+  const config = row!.action.config as Record<string, unknown>;
+  expect(config.parentInstanceId).toBe(parent.instanceId);
+  expect(config.childOutcome).toBe("approved");
+  expect("parentStepId" in config).toBe(false); // the step comes from the child's link, not a snapshot
+});
+
+test.skipIf(!DB)("a parent whose linked step changed after enqueue is still found", async () => {
+  const { registry } = engineRegistry();
+  const P2_PID = "proc_parent_two_sub" as Instance["processId"];
+  const cv = await publishBody(CHILD_PID, childBody());
+  const pv = await publishBody(P2_PID, twoSubParentBody(cv.version));
+  const parent = await startInstance(pv.definition, { processId: P2_PID, version: pv.version }, actor);
+  await seedField(parent.instanceId, "field_p_amount", 500);
+
+  // Order is the whole test: enqueue the return FIRST, then move the parent and
+  // its link, then deliver. Moving before the enqueue would pass without the fix.
+  await drainOutbox(sql, registry); // spawn -> child terminal -> return enqueued
+  const childId = subprocessChildId(parent.instanceId, 1, "step_p_sub");
+  expect(await returnRow(childId)).toBeDefined();
+
+  await moveTo(parent.instanceId, "step_p_sub2");
+  await relinkChild(childId, "step_p_sub2");
+
+  await drainAll(registry);
+  const p = await loadInstance(parent.instanceId);
+  // Resolved through the UPDATED link: sub2's outputMapping ran, sub2's path taken.
+  expect(dataField(p, "field_p_result2")).toBe("approved");
+  expect(p!.currentStepId as string).toBe("step_p_done2");
+  expect(dataField(p, "field_p_result")).toBeUndefined(); // never the step it had left
+});
+
+test.skipIf(!DB)("a parent transition racing the return cannot split the decision", async () => {
+  const { registry } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody());
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+
+  // The split the lock rules out: the writeback lands on the strength of a parked
+  // check a concurrent move has already invalidated, and the advance then does not.
+  //
+  // The move is aimed at exactly that window rather than fired blind — it chases
+  // the writeback becoming *observable to another session*, which is the window's
+  // own definition. Its one gated UPDATE moves the parent iff the parent is still
+  // parked at the subprocess step AND the writeback is already visible. Under one
+  // transaction that conjunction is unreachable: nothing is visible until the
+  // advance has committed alongside it, so the chaser only ever sees a parent that
+  // has already left. A writeback committing on its own makes it reachable, and the
+  // advance that follows is then evaluated against a parent that has moved.
+  for (let i = 0; i < 10; i++) {
+    const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
+    await seedField(parent.instanceId, "field_p_amount", 500);
+    await drainOutbox(sql, registry); // spawn -> child terminal -> return enqueued
+
+    let done = false;
+    const drain = drainAll(registry).finally(() => { done = true; });
+    const chase = (async () => {
+      while (!done) {
+        const moved = (await sql`UPDATE instances
+          SET body = jsonb_set(jsonb_set(body, '{currentStepId}', '"step_p_approved"'::jsonb),
+                '{transitionSeq}', to_jsonb(transition_seq + 1)),
+              transition_seq = transition_seq + 1
+          WHERE instance_id = ${parent.instanceId}
+            AND body->>'currentStepId' = 'step_p_sub'
+            AND body->'data' ? 'field_p_result'
+          RETURNING instance_id`) as unknown[];
+        if (moved.length > 0) return;
+      }
+    })();
+    await Promise.all([drain, chase]);
+
+    const p = await loadInstance(parent.instanceId);
+    const wroteBack = dataField(p, "field_p_result") !== undefined;
+    const advanced = p!.status === "completed";
+    // All-or-nothing: the writeback and the advance it justifies stand or fall together.
+    expect({ i, wroteBack, advanced }).toEqual({ i, wroteBack: advanced, advanced });
+  }
+});
+
+test.skipIf(!DB)("a parent that legitimately moved on is a delivered no-op", async () => {
+  const { registry } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody());
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
+  await seedField(parent.instanceId, "field_p_amount", 500);
+  await drainOutbox(sql, registry); // return enqueued
+  const childId = subprocessChildId(parent.instanceId, 1, "step_p_sub");
+
+  await moveTo(parent.instanceId, "step_p_approved"); // left the subprocess step; link untouched
+  await drainAll(registry);
+
+  const p = await loadInstance(parent.instanceId);
+  expect(dataField(p, "field_p_result")).toBeUndefined(); // no writeback
+  expect(p!.currentStepId as string).toBe("step_p_approved"); // not advanced by the return
+  const row = await returnRow(childId);
+  expect(row!.status).toBe("delivered"); // a no-op, not a failure — never dead-lettered
+});
+
+test.skipIf(!DB)("a parent parked at the linked step where that step is not a subprocess step fails", async () => {
+  const { registry } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody());
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
+  await seedField(parent.instanceId, "field_p_amount", 500);
+  await drainOutbox(sql, registry); // return enqueued
+  const childId = subprocessChildId(parent.instanceId, 1, "step_p_sub");
+
+  // Parked at the linked step, and that step is not a subprocess step: a
+  // contradiction, surfaced rather than swallowed.
+  await relinkChild(childId, "step_p_entry");
+  await moveTo(parent.instanceId, "step_p_entry");
+  await drainOutbox(sql, registry);
+
+  const row = await returnRow(childId);
+  expect(row!.status).toBe("pending"); // the throw failed delivery; retried, not delivered
+  expect(row!.attempts).toBe(1);
+  expect(dataField(await loadInstance(parent.instanceId), "field_p_result")).toBeUndefined();
+
+  // This row can never succeed by construction, so every later drain in this file
+  // would retry it until it dead-letters. Drop it: the suite shares one database
+  // and does not truncate, and a permanently-failing row is the test leaking into
+  // its neighbours rather than an artefact worth keeping.
+  await sql`DELETE FROM outbox WHERE action_id = ${"action_return_" + childId}`;
+});
+
+test.skipIf(!DB)("a child with no parent link is a no-op, not a failure", async () => {
+  const { registry } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody());
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
+  await seedField(parent.instanceId, "field_p_amount", 500);
+  await drainOutbox(sql, registry); // return enqueued
+  const childId = subprocessChildId(parent.instanceId, 1, "step_p_sub");
+
+  await sql`UPDATE instances SET body = body - 'parent' WHERE instance_id = ${childId}`;
+  await drainAll(registry);
+
+  const row = await returnRow(childId);
+  expect(row!.status).toBe("delivered"); // no link to resolve: nothing written, nothing thrown
+  const p = await loadInstance(parent.instanceId);
+  expect(dataField(p, "field_p_result")).toBeUndefined();
+  expect(p!.currentStepId as string).toBe("step_p_sub"); // still parked
 });
 
 // --- DB: cancel cascade ------------------------------------------------------
