@@ -10,7 +10,13 @@
 import { evaluate } from "@marcbachmann/cel-js";
 import { buildGuardContext, SYSTEM_ACTOR } from "../cel/eval.js";
 import { parseIsoDuration } from "../schema/definition.js";
-import type { Instance, ProcessBody, Step, TimerState } from "../schema/definition.js";
+import type {
+  Instance,
+  ProcessBody,
+  Step,
+  TimerState,
+  TimerUnarmedReason,
+} from "../schema/definition.js";
 
 /**
  * Unreachable for a body published after the duration check landed:
@@ -71,6 +77,16 @@ export function instantFromValue(v: unknown): string | null {
   return iso.length === ISO_WIDTH ? iso : null;
 }
 
+/** A declared timer that produced no fireAt at entry, with the reason it was dropped. */
+export type TimerDrop = { timerId: TimerState["timerId"]; reason: TimerUnarmedReason };
+
+/**
+ * What arming produced: the timers that will fire, and the ones that will not.
+ * `armed` replaces the previous step's TimerState[]; `drops` is what the caller
+ * persists as `timer.unarmed` events in the same commit as the entry.
+ */
+export type ArmedTimers = { armed: TimerState[]; drops: TimerDrop[] };
+
 /**
  * Arm a step's timers at entry. A `duration` timer's fireAt is the entry instant
  * plus its ISO-8601 duration; a `deadline` timer's is the instant its CEL
@@ -92,13 +108,18 @@ export function instantFromValue(v: unknown): string | null {
  * The deadline branch is total. It runs inside the transition commit, so a deadline
  * that raises (most commonly reading a field not yet written into `data`) or yields
  * a value that is not a parseable instant omits that timer rather than failing the
- * entry — the same stance guard totality takes. A deadline already in the past arms
- * as-is; the scheduler's due-timer poll fires it on its next pass.
+ * entry — the same stance guard totality takes. The omission is reported in `drops`,
+ * with the reason distinguished at the point that knows it: the catch around
+ * evaluation versus a null from `instantFromValue`, which is total and so returns
+ * null for exactly one reason. A deadline already in the past arms as-is; the
+ * scheduler's due-timer poll fires it on its next pass.
  *
- * The duration branch raises rather than omitting the timer, and two things can
- * make it raise. Neither is silent: omitting would reproduce the invisible-drop
- * problem that recording an unarmed timer (CLAUDE.md, "Decided, not yet built")
- * exists to solve, and when that marker lands these raises become it.
+ * Pure: it returns the drops rather than persisting them, since it runs inside the
+ * transition commit and its contract is to compute the armed set. Each call site
+ * writes them as `timer.unarmed` events in that same commit.
+ *
+ * The duration branch raises rather than dropping the timer, and two things can
+ * make it raise. Neither is silent, so neither needs the drop channel.
  *
  * `durationMs` raises only for a body published before `validateDurations` existed,
  * since that check now rejects the grammar violation at publish.
@@ -117,8 +138,9 @@ export function armStepTimers(
   entryInstant: string,
   body: ProcessBody,
   entering: Instance,
-): TimerState[] {
+): ArmedTimers {
   const armed: TimerState[] = [];
+  const drops: TimerDrop[] = [];
   // Built at most once per entry, and only if the step declares a deadline.
   let ctx: Record<string, unknown> | undefined;
   for (const t of step?.timers ?? []) {
@@ -133,15 +155,22 @@ export function armStepTimers(
     }
     if (!t.deadline) continue;
     ctx ??= buildGuardContext(body, entering, SYSTEM_ACTOR);
-    let fireAt: string | null;
+    let value: unknown;
     try {
-      fireAt = instantFromValue(evaluate(t.deadline.src, ctx));
+      value = evaluate(t.deadline.src, ctx);
     } catch {
-      fireAt = null;
+      drops.push({ timerId: t.id, reason: "expression-raised" });
+      continue;
     }
-    if (fireAt !== null) armed.push({ timerId: t.id, fireAt: fireAt as TimerState["fireAt"] });
+    // instantFromValue is total, so null here means exactly one thing.
+    const fireAt = instantFromValue(value);
+    if (fireAt === null) {
+      drops.push({ timerId: t.id, reason: "not-an-instant" });
+      continue;
+    }
+    armed.push({ timerId: t.id, fireAt: fireAt as TimerState["fireAt"] });
   }
-  return armed;
+  return { armed, drops };
 }
 
 /** The earliest fireAt among unfired timers (ISO strings sort chronologically), or null. */

@@ -308,9 +308,10 @@ test("arming raises when a bound-valid duration overflows from an entry past the
 
   // The same timer from an ordinary entry arms normally, so the raise is a property
   // of the entry instant and not of the authored duration.
-  expect(armStepTimers(step, "2026-07-20T12:34:56.789Z", body, entering)).toEqual([
-    { timerId: "timer_t1", fireAt: "2027-07-20T12:34:56.789Z" },
-  ] as ReturnType<typeof armStepTimers>);
+  expect(armStepTimers(step, "2026-07-20T12:34:56.789Z", body, entering)).toEqual({
+    armed: [{ timerId: "timer_t1", fireAt: "2027-07-20T12:34:56.789Z" }],
+    drops: [],
+  } as unknown as ReturnType<typeof armStepTimers>);
 });
 
 test("addDuration adds to the instant and emits UTC ISO", () => {

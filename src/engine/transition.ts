@@ -12,12 +12,12 @@
  */
 
 import type { SQL } from "bun";
-import { sql, createInstance } from "./store.js";
+import { sql, createInstance, appendInstanceEvent, appendInstanceEvents, newInstanceEventId } from "./store.js";
 import { idempotencyKey } from "./idempotency.js";
 import { armStepTimers, minFireAt } from "./duration.js";
 import { buildGuardContext, evalGuard, SYSTEM_ACTOR, type Actor } from "../cel/eval.js";
 import { CANCEL_SINK_STEP_ID, instance as instanceSchema } from "../schema/definition.js";
-import type { ProcessBody, Instance, HistoryEntry, Action, Step, Path } from "../schema/definition.js";
+import type { ProcessBody, Instance, HistoryEntry, InstanceEvent, Action, Step, Path } from "../schema/definition.js";
 
 /**
  * Engine-owned action types (reserved `core.` prefix, rejected in authored
@@ -97,9 +97,22 @@ async function commitTransition(
     status,
     timers: [],
   };
-  const armed = armStepTimers(target, at, body, entering);
+  const { armed, drops } = armStepTimers(target, at, body, entering);
   const nextTimerAt = minFireAt(armed);
   const next: Instance = { ...entering, timers: armed };
+  // Timers the target step declared that arming could not compute a fireAt for.
+  // Written in the commit below, so a dropped timer cannot be recorded without
+  // its entry nor an entry land without its drops. Arming stays total: a drop is
+  // recorded, never raised, so it does not fail the entry.
+  const events: InstanceEvent[] = drops.map((d) => ({
+    id: newInstanceEventId(),
+    instanceId: instance.instanceId,
+    transitionSeq: nextSeq,
+    version: instance.version,
+    kind: "timer.unarmed" as const,
+    payload: { timerId: d.timerId, reason: d.reason },
+    at,
+  }));
   const entry: HistoryEntry = {
     id: `hist_${crypto.randomUUID()}` as HistoryEntry["id"],
     instanceId: instance.instanceId,
@@ -133,6 +146,7 @@ async function commitTransition(
     if (updated.length === 0) throw new ConcurrencyConflict(instance.instanceId, instance.transitionSeq);
     await tx`INSERT INTO history_entries (id, instance_id, transition_seq, entry)
       VALUES (${entry.id}, ${entry.instanceId}, ${entry.transitionSeq}, ${entry})`;
+    await appendInstanceEvents(tx, events);
     for (const a of actions) {
       await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
         VALUES (${idempotencyKey(instance.instanceId, nextSeq, a.id)}, ${instance.instanceId}, ${nextSeq}, ${a.id}, ${a})`;
@@ -340,8 +354,10 @@ export async function resolveAutomatic(
  * with `cause: "timer"` and `onFire.actions` ordered ahead of the path's own
  * triggers; the instance is then run to rest. A reminder timer (`onFire.actions`,
  * no `targetPath`) enqueues its actions and marks itself fired without moving — a
- * side effect only. Both are idempotent under a redundant fire (two schedulers, a
- * re-scan): the transition via the OCC token, the reminder via a seq + fired guard.
+ * side effect only, recorded as a `timer.fired` event in the same commit, since the
+ * fired flag alone says a fire happened without saying when or what it delivered.
+ * Both are idempotent under a redundant fire (two schedulers, a re-scan): the
+ * transition via the OCC token, the reminder via a seq + fired guard.
  */
 export async function fireTimer(
   instance: Instance,
@@ -375,6 +391,20 @@ export async function fireTimer(
   const idx = (instance.timers ?? []).findIndex((t) => t.timerId === timerId);
   if (idx < 0) return instance;
   const nextTimerAt = minFireAt((instance.timers ?? []).filter((t) => t.timerId !== timerId));
+  // The fire's own runtime record. It carries the seq in force without advancing
+  // it, and the actions below name it so their outcomes land here rather than on
+  // whichever HistoryEntry happens to share the seq. Minted outside the
+  // transaction, appended inside it behind the same guard as the fired flag, so a
+  // redundant fire emits no second event.
+  const fired: InstanceEvent = {
+    id: newInstanceEventId(),
+    instanceId: instance.instanceId,
+    transitionSeq: instance.transitionSeq,
+    version: instance.version,
+    kind: "timer.fired",
+    payload: { timerId: timer.id },
+    at: new Date().toISOString(),
+  };
 
   await db.begin(async (tx) => {
     const upd = (await tx`UPDATE instances
@@ -384,9 +414,11 @@ export async function fireTimer(
         AND (body->'timers'->${idx}->>'fired') IS DISTINCT FROM 'true'
       RETURNING instance_id`) as unknown[];
     if (upd.length === 0) return; // moved off the step, or already fired
+    // Behind the guard, so a redundant fire records no second event.
+    await appendInstanceEvent(tx, fired);
     for (const a of timer.onFire.actions ?? []) {
-      await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
-        VALUES (${idempotencyKey(instance.instanceId, instance.transitionSeq, a.id)}, ${instance.instanceId}, ${instance.transitionSeq}, ${a.id}, ${a})`;
+      await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, event_id)
+        VALUES (${idempotencyKey(instance.instanceId, instance.transitionSeq, a.id)}, ${instance.instanceId}, ${instance.transitionSeq}, ${a.id}, ${a}, ${fired.id})`;
     }
   });
   return instance;

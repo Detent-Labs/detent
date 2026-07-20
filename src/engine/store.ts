@@ -1,13 +1,22 @@
 /**
  * Instance store: persist an instance and rehydrate it against its pinned frozen
- * body. Native Bun.sql, connection via DATABASE_URL. Two tables — `instances`
- * (one row per instance, jsonb body + promoted transition_seq for the OCC
- * predicate) and append-only `history_entries` — matching the schema's own
- * separation (Instance carries no history; HistoryEntry carries instanceId).
+ * body. Native Bun.sql, connection via DATABASE_URL. `instances` holds one row
+ * per instance (jsonb body + promoted transition_seq for the OCC predicate);
+ * append-only `history_entries` and `instance_events` hold the runtime record,
+ * matching the schema's own separation (Instance carries neither; both records
+ * carry instanceId).
  */
 
 import { SQL } from "bun";
-import { instance as instanceSchema, type Instance, type ProcessBody, type ProcessId, type StepId } from "../schema/definition.js";
+import {
+  instance as instanceSchema,
+  type Instance,
+  type InstanceEvent,
+  type InstanceEventId,
+  type ProcessBody,
+  type ProcessId,
+  type StepId,
+} from "../schema/definition.js";
 import { definitionHash } from "../schema/hash.js";
 import { armStepTimers, minFireAt } from "./duration.js";
 
@@ -26,6 +35,18 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     transition_seq integer NOT NULL,
     entry jsonb NOT NULL
   )`;
+  // Append-only runtime events that are not transitions, shaped like
+  // history_entries. `kind` is promoted out of the jsonb so the log is queryable
+  // by kind ("which instances dropped a timer, and why") without a jsonb scan.
+  await db`CREATE TABLE IF NOT EXISTS instance_events (
+    id text PRIMARY KEY,
+    instance_id text NOT NULL,
+    transition_seq integer NOT NULL,
+    kind text NOT NULL,
+    event jsonb NOT NULL
+  )`;
+  await db`CREATE INDEX IF NOT EXISTS instance_events_instance_idx ON instance_events (instance_id, transition_seq)`;
+  await db`CREATE INDEX IF NOT EXISTS instance_events_kind_idx ON instance_events (kind)`;
   // Outbox: one row per enqueued trigger action. idempotency_key (PK) makes
   // re-enqueuing a replayed transition conflict instead of duplicating.
   await db`CREATE TABLE IF NOT EXISTS outbox (
@@ -44,6 +65,11 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // is free text, so the 'claimed' state needs no constraint change. Idempotent
   // add so an existing outbox table gains the column.
   await db`ALTER TABLE outbox ADD COLUMN IF NOT EXISTS claimed_at timestamptz`;
+  // Outcome routing: the runtime record that enqueued this action. An
+  // InstanceEvent id when a reminder fire enqueued it, NULL when a transition did
+  // (its outcome is located by (instance_id, transition_seq), which identifies a
+  // transition exactly and an event not at all). Idempotent add.
+  await db`ALTER TABLE outbox ADD COLUMN IF NOT EXISTS event_id text`;
   await db`CREATE INDEX IF NOT EXISTS outbox_claim_idx ON outbox (status, next_attempt_at)`;
   // Re-resolution flag: a data-affecting writeback sets this to 'pending' so the
   // resolution worker re-drives automatic evaluation for a parked wait-state.
@@ -72,6 +98,38 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   )`;
   // Idempotent-publish lookup: an identical re-publish matches by (process_id, hash).
   await db`CREATE INDEX IF NOT EXISTS definitions_hash_idx ON definitions (process_id, definition_hash)`;
+}
+
+/**
+ * Mint an event id. UUIDv4 like the other runtime ids — see createInstance's
+ * note on the v7 deferral; a third convention would be worse than the one gap.
+ */
+export function newInstanceEventId(): InstanceEventId {
+  return `evt_${crypto.randomUUID()}` as InstanceEventId;
+}
+
+/**
+ * Append one runtime event. Takes the transaction handle rather than opening its
+ * own: an event must land in the same commit as the state change that caused it,
+ * so it cannot survive a rollback and the commit cannot land without it.
+ *
+ * Ids are random per call, so `ON CONFLICT (id) DO NOTHING` never fires today; it
+ * is a backstop against a double-append of one event object, not the mechanism
+ * that keeps a replayable emitter honest. Each emitter is guarded by a
+ * rows-affected check on the state change it accompanies — createInstance's
+ * `RETURNING instance_id`, fireTimer's OCC predicate — so a replay that changed
+ * nothing appends nothing. An emitter that ever needs conflict-based idempotency
+ * instead would have to derive its id deterministically.
+ */
+export async function appendInstanceEvent(tx: SQL, event: InstanceEvent): Promise<void> {
+  await tx`INSERT INTO instance_events (id, instance_id, transition_seq, kind, event)
+    VALUES (${event.id}, ${event.instanceId}, ${event.transitionSeq}, ${event.kind}, ${event})
+    ON CONFLICT (id) DO NOTHING`;
+}
+
+/** Append several events in one transaction; an empty list writes nothing. */
+export async function appendInstanceEvents(tx: SQL, events: readonly InstanceEvent[]): Promise<void> {
+  for (const e of events) await appendInstanceEvent(tx, e);
 }
 
 /**
@@ -119,21 +177,42 @@ export async function createInstance(
     status: "running",
     startedAt,
   });
-  const timers = armStepTimers(
+  const { armed: timers, drops } = armStepTimers(
     body.workflow.steps.find((s) => s.id === body.workflow.initialStep),
     startedAt,
     body,
     seed,
   );
   const inst: Instance = { ...seed, timers };
+  // A timer the initial step declared but arming could not compute a fireAt for.
+  // Recorded at seq 0 — creation advances no sequence, and an event records the
+  // seq in force rather than advancing it.
+  const events: InstanceEvent[] = drops.map((d) => ({
+    id: newInstanceEventId(),
+    instanceId: inst.instanceId,
+    transitionSeq: inst.transitionSeq,
+    version: inst.version,
+    kind: "timer.unarmed" as const,
+    payload: { timerId: d.timerId, reason: d.reason },
+    at: startedAt,
+  }));
   // Bind the object directly: Bun.sql encodes it as a jsonb object. A
   // JSON.stringify(...)::jsonb param would store a jsonb *scalar string* that
   // jsonb_set (used by the transition/writeback) cannot traverse.
   // ON CONFLICT DO NOTHING: a redelivered subprocess spawn (deterministic id)
   // is a no-op; the spawn handler checks prior existence to skip re-driving it.
-  await db`INSERT INTO instances (instance_id, transition_seq, body, next_timer_at)
-    VALUES (${inst.instanceId}, ${inst.transitionSeq}, ${inst}, ${minFireAt(timers)})
-    ON CONFLICT (instance_id) DO NOTHING`;
+  // RETURNING is what reconciles the events with that no-op: they are appended
+  // only inside the transaction whose INSERT actually created the row, so a spawn
+  // that inserted nothing records nothing and a replay cannot double them. The
+  // conflicting attempt sees zero rows and returns before appending.
+  await db.begin(async (tx) => {
+    const inserted = (await tx`INSERT INTO instances (instance_id, transition_seq, body, next_timer_at)
+      VALUES (${inst.instanceId}, ${inst.transitionSeq}, ${inst}, ${minFireAt(timers)})
+      ON CONFLICT (instance_id) DO NOTHING
+      RETURNING instance_id`) as unknown[];
+    if (inserted.length === 0) return;
+    await appendInstanceEvents(tx, events);
+  });
   return inst;
 }
 

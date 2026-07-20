@@ -7,7 +7,7 @@
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
-import { executeManualTransition, ConcurrencyConflict } from "../src/engine/transition.js";
+import { executeManualTransition, fireTimer, ConcurrencyConflict } from "../src/engine/transition.js";
 import { drainOutbox, MAX_ATTEMPTS, type DeliverFn } from "../src/engine/outbox.js";
 import { createRegistry, register } from "../src/engine/registry.js";
 import { idempotencyKey } from "../src/engine/idempotency.js";
@@ -89,6 +89,42 @@ const ghostBody = (): ProcessBody =>
     },
   }) as unknown as ProcessBody;
 
+// A reminder timer (actions, no targetPath): fires without advancing transitionSeq,
+// so its actions share the seq of whatever record the instance last rested at.
+const reminder = { id: "timer_r1", duration: "PT1H", onFire: { actions: [act("rem")] } };
+
+// step_a --path_ab(manual)--> step_wait (onEntry e1, reminder timer, manual exit).
+// The transition's own action and the reminder's both sit at seq 1, against two
+// different records: the HistoryEntry and the timer.fired event.
+const sharedSeqBody = (): ProcessBody =>
+  ({
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: "A", type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
+        { id: "step_wait", key: "wait", label: "Wait", type: "task", onEntry: [act("e1")], timers: [reminder],
+          paths: [{ id: "path_wd", key: "wd", to: "step_done", trigger: "manual" }] },
+        { id: "step_done", key: "done", label: "Done", type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+// The reminder sits on the initial step, so the instance rests at seq 0 with no
+// HistoryEntry at all — creation writes none.
+const initialReminderBody = (): ProcessBody =>
+  ({
+    fields: [],
+    workflow: {
+      initialStep: "step_wait",
+      steps: [
+        { id: "step_wait", key: "wait", label: "Wait", type: "task", timers: [reminder],
+          paths: [{ id: "path_wd", key: "wd", to: "step_done", trigger: "manual" }] },
+        { id: "step_done", key: "done", label: "Done", type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
 const createFrom = (body: ProcessBody) => createInstance(body, { processId: "proc_1" as Instance["processId"], version: 1 });
 const create = () => createFrom(threeActionBody());
 
@@ -111,6 +147,16 @@ const outcomes = async (id: string): Promise<Record<string, unknown>[]> => {
     return e.actions ?? [];
   });
 };
+type EventRow = { kind: string; actions: Record<string, unknown>[] };
+const events = async (id: string): Promise<EventRow[]> => {
+  const r = (await sql`SELECT kind, event FROM instance_events WHERE instance_id = ${id} ORDER BY id`) as { kind: string; event: unknown }[];
+  return r.map((row) => {
+    const e = (typeof row.event === "string" ? JSON.parse(row.event as string) : row.event) as { actions?: Record<string, unknown>[] };
+    return { kind: row.kind, actions: e.actions ?? [] };
+  });
+};
+const historyCount = async (id: string): Promise<number> =>
+  ((await sql`SELECT count(*)::int AS n FROM history_entries WHERE instance_id = ${id}`) as { n: number }[])[0].n;
 
 // --- pure: idempotency key (no DB) ---
 
@@ -357,6 +403,65 @@ test.skipIf(!DB)("a writeback to a faulted instance is suppressed (no data, outc
   const o = await outcomes(inst.instanceId);
   expect(o).toHaveLength(1);
   expect(o[0]).toMatchObject({ status: "succeeded", suppressed: true });
+});
+
+// --- outcome routing: the enqueuing record, carried on the row ----------------
+
+test.skipIf(!DB)("a reminder and a transition sharing one seq each record onto their own record", async () => {
+  const body = sharedSeqBody();
+  const inst = await createFrom(body);
+  const parked = await executeManualTransition(inst, "path_ab", body, actor); // seq 1: entry action + HistoryEntry
+  await fireTimer(parked, "timer_r1", body); // same seq 1, no bump: reminder action + timer.fired event
+
+  const r = await rows(inst.instanceId);
+  expect(r.map((x) => x.action_id)).toEqual(["action_e1", "action_rem"]);
+  expect(r.every((x) => x.transition_seq === 1)).toBe(true); // one seq, two enqueuing records
+  expect(r.find((x) => x.action_id === "action_e1")!.event_id).toBeNull(); // transition: located by (instance, seq)
+  expect(r.find((x) => x.action_id === "action_rem")!.event_id).not.toBeNull(); // reminder: names its event
+
+  expect(await drainOutbox(sql, reg, okDeliver)).toBe(2);
+
+  // Deriving the target from (instance_id, transition_seq) would put both here.
+  const h = await outcomes(inst.instanceId);
+  expect(h).toHaveLength(1);
+  expect(h[0]).toMatchObject({ actionId: "action_e1", status: "succeeded" });
+
+  const ev = await events(inst.instanceId);
+  expect(ev).toHaveLength(1);
+  expect(ev[0].kind).toBe("timer.fired");
+  expect(ev[0].actions).toHaveLength(1);
+  expect(ev[0].actions[0]).toMatchObject({ actionId: "action_rem", status: "succeeded", attempts: 1 });
+});
+
+test.skipIf(!DB)("a reminder on the step an instance was created on records its outcome (seq 0, no entry)", async () => {
+  const body = initialReminderBody();
+  const inst = await createFrom(body); // rests at seq 0; createInstance writes no HistoryEntry
+  expect(inst.transitionSeq).toBe(0);
+  await fireTimer(inst, "timer_r1", body);
+  expect(await historyCount(inst.instanceId)).toBe(0); // nothing for the pair to match
+
+  expect(await drainOutbox(sql, reg, okDeliver)).toBe(1);
+
+  // The pre-routing derivation updated zero rows, raised nothing, and dropped the
+  // outcome: a delivery that succeeded left no audit trace at all.
+  const ev = await events(inst.instanceId);
+  expect(ev).toHaveLength(1);
+  expect(ev[0].kind).toBe("timer.fired");
+  expect(ev[0].actions).toHaveLength(1);
+  expect(ev[0].actions[0]).toMatchObject({ actionId: "action_rem", status: "succeeded", attempts: 1 });
+});
+
+test.skipIf(!DB)("a reclaimed reminder row routes to the same event and appends once", async () => {
+  const body = initialReminderBody();
+  const inst = await createFrom(body);
+  await fireTimer(inst, "timer_r1", body);
+  // Crashed worker mid-delivery: the row sits claimed with an expired lease.
+  await sql`UPDATE outbox SET status = 'claimed', claimed_at = now() - interval '1 hour' WHERE instance_id = ${inst.instanceId}`;
+
+  expect(await drainOutbox(sql, reg, okDeliver)).toBe(1); // reclaimed + delivered
+  expect(await drainOutbox(sql, reg, okDeliver)).toBe(0); // redelivery attempt: no-op
+  const ev = await events(inst.instanceId);
+  expect(ev[0].actions).toHaveLength(1); // recorded once, on the event
 });
 
 test.skipIf(!DB)("double invocation is tolerated: a reclaimed row is delivered exactly once", async () => {

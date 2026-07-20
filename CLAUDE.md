@@ -120,6 +120,21 @@ migration), the cause (user / timer / automatic / migration), and per-action
 `ActionOutcome` including the actually-resolved handler build. These runtime
 facts are not reconstructable later, so they are recorded from v1.
 
+A HistoryEntry is transition-shaped — `toStepId` is required — so events that carry
+no step change get a sibling record, `InstanceEvent` (append-only, `evt_` ids): a
+discriminated union over `kind` with a kind-specific payload, carrying the instance,
+the `version` and the `transitionSeq` **in force**. An event never advances the
+sequence, so several may share one and share it with a transition; they order by
+`at`. Two kinds exist — `timer.fired` (a reminder fired: actions enqueued, no
+transition) and `timer.unarmed` (a declared timer produced no `fireAt` at entry, with
+the reason). Migration adds its kind additively; the record shape is settled.
+
+An `ActionOutcome` attaches to the record that **enqueued** the action, carried on the
+outbox row rather than derived from `(instanceId, transitionSeq)`. That derivation is
+exact for a transition and wrong for an event: a reminder's outcomes would join the
+preceding transition's entry, and on a step an instance was created on — sequence 0,
+no entry exists — the update would match no row and discard the outcome silently.
+
 ## Authoring-time invariants (the validation layer must enforce these)
 The TS types cannot express these; they must be Zod refinements or a lint pass,
 each with a test that rejects a violating definition.
@@ -295,8 +310,12 @@ each with a test that rejects a violating definition.
    advance, idempotent spawn) together with downward cancel propagation
    (`cancelInstance` cascades to active children by the `parent` link). `deadline`
    timers are DONE (`duration.ts`: `instantFromValue` + the deadline branch of
-   `armStepTimers`; see the timers entry above). Remaining: migration; a subprocess
-   step as the initial step does not spawn (must be entered via a transition). Publish-time cross-process validation (inputMapping ⊆ child
+   `armStepTimers`; see the timers entry above). The runtime event log is DONE
+   (`InstanceEvent`: a reminder fire and an unarmed timer are recorded, and an
+   `ActionOutcome` now attaches to the record that enqueued it) — so migration's
+   audit event is a `kind` to add, not a mechanism to design. Remaining: migration;
+   a subprocess step as the initial step does not spawn (must be entered via a
+   transition). Publish-time cross-process validation (inputMapping ⊆ child
    inputFields, child reference resolvable → child-first ordering) is DONE
    (`definitions.ts`, roadmap #1). The production `resolveBody` backing
    (definition/version store) is DONE (`definitions.ts` + `host.ts`), so the
@@ -304,26 +323,11 @@ each with a test that rejects a violating definition.
 4. Editor (likely a separate package; promote the repo to workspaces here).
 
 ## Open questions (still need a decision before building the relevant part)
-- A dedicated audit event type for non-transition events — a version migration and
-  a reminder-timer fire both lack a step change, so the transition-shaped
-  HistoryEntry does not fit. Today a reminder fire records only the timer's `fired`
-  flag plus the delivered action's `ActionOutcome`.
+- The formal expression context is pinned (`src/cel/check.ts`): `instance`
+  `{id, status, transitionSeq, currentStepId}`, `actor` `{id, roles}`. Both are
+  deliberately minimal; widen when the engine surfaces a concrete need.
 
 ## Decided, not yet built (each needs its own OpenSpec change)
-- **Record an unarmed deadline.** A deadline that yields no instant at entry is
-  dropped from the armed set. Arming must stay total (it runs inside the transition
-  commit), but the omission is currently invisible: `next_timer_at` stays NULL, so
-  the scheduler never selects the row, and there is no history entry, dead-letter,
-  or log. On an all-automatic wait-state whose only bound is that timer, the
-  instance hangs until someone cancels it, and nothing signals that anyone should.
-  Two reachable causes survive the publish-time checks: a correctly-typed field not
-  yet written at entry (the documented intended case — note the asymmetry with a
-  guard, which the resolution worker re-evaluates on every pass, while an omitted
-  timer is never retried), and a `date`/`datetime`/`string` field holding a
-  non-instant value (`""` from a form, a locale date), which nothing validates.
-  Decision: mark the omission on the persisted `TimerState` (e.g. `unarmed:
-  "unresolved" | "not-an-instant"`) so it is queryable, without arming or firing.
-  This touches the runtime record in `definition.ts`, hence its own change.
 - **Move `resolveBody` inside the per-instance try in the workers.** In
   `src/engine/timers.ts` the `resolveBody` call sits above `drainTimers`' per-instance
   `try`, and `src/engine/resolution.ts` has the same shape, so any read-path parse
@@ -331,9 +335,6 @@ each with a test that rejects a violating definition.
   anywhere in ProcessBody — throws out of the whole pass and starves every other due
   instance in the batch. `harden-duration-timers` removed one trigger for this; the
   amplifier is still there and makes the next trigger just as damaging.
-- The formal expression context is pinned (`src/cel/check.ts`): `instance`
-  `{id, status, transitionSeq, currentStepId}`, `actor` `{id, roles}`. Both are
-  deliberately minimal; widen when the engine surfaces a concrete need.
 
 ## Codebase memory (knowledge graph)
 The repo is indexed into codebase-memory-mcp. Resolve the `project` arg via

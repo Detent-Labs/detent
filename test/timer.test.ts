@@ -55,9 +55,17 @@ const historyCauses = async (id: string): Promise<string[]> => {
   const r = (await sql`SELECT entry FROM history_entries WHERE instance_id = ${id} ORDER BY transition_seq`) as { entry: unknown }[];
   return r.map((row) => (typeof row.entry === "string" ? JSON.parse(row.entry as string) : (row.entry as { cause: string })).cause);
 };
+// The instance's runtime events, ordered as the record defines: by `at`, then
+// insertion (the id tiebreak is stable, not chronological — several events written
+// in one commit share an `at`).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const eventsOf = async (id: string): Promise<any[]> => {
+  const r = (await sql`SELECT event FROM instance_events WHERE instance_id = ${id} ORDER BY event->>'at', id`) as { event: unknown }[];
+  return r.map((row) => (typeof row.event === "string" ? JSON.parse(row.event as string) : row.event));
+};
 
 beforeAll(async () => { if (DB) await initSchema(); });
-beforeEach(async () => { if (DB) await sql`TRUNCATE outbox, instances, history_entries`; });
+beforeEach(async () => { if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events`; });
 
 // --- 6.1 arm on entry ---------------------------------------------------------
 
@@ -144,6 +152,59 @@ test.skipIf(!DB)("a reminder timer enqueues actions and marks fired without movi
 
   await fireTimer(parked, "timer_r1", body); // second poll
   expect(await outboxActionIds(inst.instanceId)).toEqual(["action_rem"]); // not re-enqueued
+});
+
+test.skipIf(!DB)("a reminder fire records a timer.fired event carrying the seq in force", async () => {
+  // The fired flag says a fire happened without saying when or what it delivered;
+  // the event is the fire's own runtime record.
+  const body = waitTimerBody(reminderTimer);
+  const inst = await createFrom(body);
+  const parked = await executeManualTransition(inst, "path_ab", body, actor);
+
+  await fireTimer(parked, "timer_r1", body);
+  const events = await eventsOf(inst.instanceId);
+  expect(events).toHaveLength(1);
+  expect(events[0].kind).toBe("timer.fired");
+  expect(events[0].payload).toEqual({ timerId: "timer_r1" });
+  expect(events[0].version).toBe(1); // resolves the timer id against the definition in force
+  // Carried, not advanced: the event names the seq the instance was at, and the
+  // instance is still at it. A reminder is not a hop.
+  expect(events[0].transitionSeq).toBe(parked.transitionSeq);
+  expect((await readInst(inst.instanceId)).transitionSeq).toBe(parked.transitionSeq);
+  // No HistoryEntry: the only history is the manual hop that entered step_wait.
+  expect(await historyCauses(inst.instanceId)).toEqual(["user"]);
+});
+
+test.skipIf(!DB)("a second reminder poll re-emits no timer.fired event", async () => {
+  // The event is appended behind the same guard as the fired flag, so the existing
+  // no-op covers it: a redundant fire enqueues nothing AND records nothing.
+  const body = waitTimerBody(reminderTimer);
+  const inst = await createFrom(body);
+  const parked = await executeManualTransition(inst, "path_ab", body, actor);
+
+  await fireTimer(parked, "timer_r1", body);
+  expect(await eventsOf(inst.instanceId)).toHaveLength(1);
+
+  await fireTimer(parked, "timer_r1", body); // already fired
+  expect(await eventsOf(inst.instanceId)).toHaveLength(1); // not a second record
+  expect(await outboxActionIds(inst.instanceId)).toEqual(["action_rem"]);
+});
+
+test.skipIf(!DB)("a reminder fire against a moved-off instance records no event", async () => {
+  // The other no-op guard: the UPDATE is gated on the observed seq, so a scheduler
+  // holding a stale instance that has since transitioned writes nothing at all.
+  const body = waitTimerBody(reminderTimer);
+  const inst = await createFrom(body);
+  const parked = await executeManualTransition(inst, "path_ab", body, actor);
+
+  await sql`UPDATE instances SET body = jsonb_set(body, '{data,field_go}', '"yes"'::jsonb) WHERE instance_id = ${inst.instanceId}`;
+  const withGo = await readInst(inst.instanceId);
+  await resolveAutomatic(withGo as Instance, body, actor); // leaves step_wait, seq bumps
+  expect((await readInst(inst.instanceId)).currentStepId).toBe("step_done");
+
+  await fireTimer(parked, "timer_r1", body); // stale instance, stale seq
+  expect(await eventsOf(inst.instanceId)).toHaveLength(0);
+  expect(await outboxActionIds(inst.instanceId)).toHaveLength(0);
 });
 
 // --- 6.4 disarm on a normal exit ----------------------------------------------
@@ -319,6 +380,101 @@ test.skipIf(!DB)("a deadline yielding a non-instant string commits the entry and
 
   expect((await readInst(inst.instanceId)).timers ?? []).toHaveLength(0);
   expect(await nextTimerAt(inst.instanceId)).toBeNull();
+});
+
+// --- an omitted timer is recorded rather than dropped silently ------------------
+
+// A second deadline reading the same field, so a step can drop every timer it
+// declares and the entry still has to commit.
+const dueTimer2 = { id: "timer_d2", deadline: cel("data.due"), onFire: { targetPath: "path_go", actions: [act("action_esc2", "notify")] } };
+
+test.skipIf(!DB)("a deadline that raises records timer.unarmed with reason expression-raised", async () => {
+  const body = deadlineBody([dueTimer]);
+  const inst = await createFrom(body); // no seed: `due` is absent, so evaluation raises
+  const parked = await executeManualTransition(inst, "path_ab", body, actor);
+
+  const events = await eventsOf(inst.instanceId);
+  expect(events).toHaveLength(1);
+  expect(events[0].kind).toBe("timer.unarmed");
+  expect(events[0].payload).toEqual({ timerId: "timer_d1", reason: "expression-raised" });
+  // The entry's own seq, and the version the dropped timer id resolves against.
+  expect(events[0].transitionSeq).toBe(parked.transitionSeq);
+  expect(events[0].version).toBe(1);
+});
+
+test.skipIf(!DB)("a deadline yielding a non-instant records timer.unarmed with reason not-an-instant", async () => {
+  const body = deadlineBody([dueTimer]);
+  const inst = await seeded(body, { field_due: "next tuesday" }); // resolves, does not parse
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  const events = await eventsOf(inst.instanceId);
+  expect(events).toHaveLength(1);
+  expect(events[0].payload.timerId).toBe("timer_d1");
+  // The two causes are distinguished at the point that knows them, so the reason
+  // separates this drop from the raising one above rather than collapsing into it.
+  expect(events[0].payload.reason).toBe("not-an-instant");
+  expect(events[0].payload.reason).not.toBe("expression-raised");
+});
+
+test.skipIf(!DB)("one dropped timer records one event while the other arms and drives next_timer_at", async () => {
+  const body = deadlineBody([dueTimer, reminderTimer]);
+  const inst = await createFrom(body); // `due` unwritten: the deadline drops, the duration arms
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  const row = await readInst(inst.instanceId);
+  expect(row.timers.map((t: { timerId: string }) => t.timerId)).toEqual(["timer_r1"]);
+  // The drop does not suppress the surviving timer's bound: selection reflects it.
+  expect(await nextTimerIso(inst.instanceId)).toBe(row.timers[0].fireAt);
+
+  const events = await eventsOf(inst.instanceId);
+  expect(events).toHaveLength(1); // exactly one — the armed timer records nothing
+  expect(events[0].payload).toEqual({ timerId: "timer_d1", reason: "expression-raised" });
+});
+
+test.skipIf(!DB)("dropping every timer on a step still commits the entry and records each drop", async () => {
+  // Arming is total. It runs inside the transition commit, so a step that loses all
+  // of its bounds must still land the entry — recorded as unarmed, never raised.
+  const body = deadlineBody([dueTimer, dueTimer2]);
+  const inst = await createFrom(body);
+  const parked = await executeManualTransition(inst, "path_ab", body, actor);
+  expect(parked.currentStepId as string).toBe("step_wait"); // the entry committed
+
+  const row = await readInst(inst.instanceId);
+  expect(row.currentStepId).toBe("step_wait");
+  expect(row.timers ?? []).toHaveLength(0);
+  expect(await nextTimerAt(inst.instanceId)).toBeNull();
+  expect(await historyCauses(inst.instanceId)).toEqual(["user"]); // the entry is on the record
+
+  const events = await eventsOf(inst.instanceId);
+  expect(events.map((e) => e.payload.timerId).sort()).toEqual(["timer_d1", "timer_d2"]);
+  // Both carry the entry's seq: several events sharing one sequence is expected.
+  expect(events.every((e) => e.transitionSeq === parked.transitionSeq)).toBe(true);
+});
+
+test.skipIf(!DB)("a deadline dropped on the initial step is recorded at creation", async () => {
+  // The other arming call site: createInstance, which writes no HistoryEntry and
+  // rests at seq 0, so the event is the only record the drop can leave.
+  const body = deadlineBody([dueTimer], "step_wait");
+  const inst = await createFrom(body); // no seed, initial step is the deadline-bearing one
+  expect(inst.currentStepId as string).toBe("step_wait");
+  expect(inst.transitionSeq).toBe(0);
+  expect((await readInst(inst.instanceId)).timers ?? []).toHaveLength(0);
+
+  const events = await eventsOf(inst.instanceId);
+  expect(events).toHaveLength(1);
+  expect(events[0].kind).toBe("timer.unarmed");
+  expect(events[0].payload).toEqual({ timerId: "timer_d1", reason: "expression-raised" });
+  expect(events[0].transitionSeq).toBe(0); // creation advances no sequence
+  expect(await historyCauses(inst.instanceId)).toHaveLength(0);
+});
+
+test.skipIf(!DB)("a step whose timers all arm records no timer.unarmed event", async () => {
+  const body = deadlineBody([dueTimer, reminderTimer]);
+  const inst = await seeded(body, { field_due: "2026-08-01T09:00:00Z" });
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  expect((await readInst(inst.instanceId)).timers).toHaveLength(2);
+  expect(await eventsOf(inst.instanceId)).toHaveLength(0);
 });
 
 test.skipIf(!DB)("a writeback of the field an omitted deadline reads does not re-arm it", async () => {
