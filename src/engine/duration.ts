@@ -7,7 +7,9 @@
  * appears.
  */
 
-import type { Step, TimerState } from "../schema/definition.js";
+import { evaluate } from "@marcbachmann/cel-js";
+import { buildGuardContext, SYSTEM_ACTOR } from "../cel/eval.js";
+import type { Instance, ProcessBody, Step, TimerState } from "../schema/definition.js";
 
 const ISO_DURATION = /^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/;
 
@@ -30,17 +32,100 @@ export function addDuration(instant: string, dur: string): string {
   return new Date(new Date(instant).getTime() + durationMs(dur)).toISOString();
 }
 
+// The accepted instant forms, as a whitelist. `new Date()` must never see a string
+// this does not match: for anything outside strict ISO-8601 it falls back to an
+// implementation-defined legacy parser that reads the value in the HOST's zone
+// ("2026-08-01 10:00:00", "12/25/2026") and that accepts strings denoting no date
+// at all ("5" -> 2001-04-30, "2026" -> 2026-01-01). Either would make a persisted
+// fireAt depend on which machine committed the entry, or arm a garbage value in the
+// past that the scheduler fires immediately.
+//
+// The year is fixed at 4 digits deliberately. `toISOString()` emits the 27-char
+// expanded-year form (`+275760-09-13T...`) outside 0001-9999, and `+` (0x2B) sorts
+// before every digit — one such fireAt would win minFireAt's lexical sort and
+// suppress every other timer on the step.
+const INSTANT = /^(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?)(Z|[+-]\d{2}:?\d{2})?)?$/;
+
+/** The exact width of `toISOString()` for a 4-digit year: YYYY-MM-DDTHH:mm:ss.sssZ. */
+const ISO_WIDTH = 24;
+
 /**
- * Arm a step's timers at entry: each `duration` timer's fireAt is the entry instant
- * plus its ISO-8601 duration. `deadline` timers are deferred (v1) and skipped. The
- * returned set replaces the previous step's timers, disarming them. Homed here (not
- * in transition.ts) so both the transition commit and instance creation can arm
- * without a store<->transition import cycle.
+ * A value denoting an instant -> UTC ISO-8601 (the shape addDuration produces, so
+ * the two sort together in minFireAt), or null if it is not a parseable instant.
+ * Accepts date-only (midnight UTC), `Z`-suffixed, and offset-bearing values
+ * (converted to UTC). A datetime carrying no zone is read as UTC, never host-local,
+ * so the same data arms the same fireAt on every worker. `T` and a space both
+ * separate date from time — the latter is what a Postgres timestamp stringifies to.
+ * Total: a non-string, a form outside the whitelist, or an unparseable value is
+ * null, never a throw.
  */
-export function armStepTimers(step: Step | undefined, entryInstant: string): TimerState[] {
-  return (step?.timers ?? [])
-    .filter((t) => t.duration)
-    .map((t) => ({ timerId: t.id, fireAt: addDuration(entryInstant, t.duration as string) as TimerState["fireAt"] }));
+export function instantFromValue(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const m = INSTANT.exec(v.trim());
+  if (!m) return null;
+  const [, date, time, zone] = m;
+  const d = new Date(time === undefined ? `${date}T00:00:00Z` : `${date}T${time}${zone ?? "Z"}`);
+  if (Number.isNaN(d.getTime())) return null;
+  const iso = d.toISOString();
+  // The fixed width minFireAt's lexical sort rests on. Unreachable given the
+  // 4-digit year above; asserted rather than assumed because a violation is silent.
+  return iso.length === ISO_WIDTH ? iso : null;
+}
+
+/**
+ * Arm a step's timers at entry. A `duration` timer's fireAt is the entry instant
+ * plus its ISO-8601 duration; a `deadline` timer's is the instant its CEL
+ * expression yields, evaluated once here over the guard context and persisted like
+ * any other armed timer — downstream (minFireAt, next_timer_at, fireTimer) cannot
+ * tell the two apart. The returned set replaces the previous step's timers,
+ * disarming them. Homed here (not in transition.ts) so both the transition commit
+ * and instance creation can arm without a store<->transition import cycle.
+ *
+ * `entering` is the instance as of the entry being committed — the target step and
+ * its new transitionSeq for a transition, the seed for a creation — so a deadline
+ * reading `instance.*` sees the step it is armed on. Its `timers` are the ones this
+ * call produces and are not part of the CEL context (INSTANCE_SCHEMA does not
+ * expose them), so passing it pre-arming is not a lie about the evaluated context.
+ * The acting identity is SYSTEM_ACTOR: creation has no acting user, and one
+ * identity keeps arming identical whether a step is entered initially or via a
+ * transition. A deadline reading `actor` is an authoring smell, not a pattern.
+ *
+ * The deadline branch is total. It runs inside the transition commit, so a deadline
+ * that raises (most commonly reading a field not yet written into `data`) or yields
+ * a value that is not a parseable instant omits that timer rather than failing the
+ * entry — the same stance guard totality takes. A deadline already in the past arms
+ * as-is; the scheduler's due-timer poll fires it on its next pass.
+ *
+ * The duration branch is not total: `durationMs` throws on a malformed duration, and
+ * `Timer.duration` is `z.string()` with no format refinement, so nothing rejects one
+ * at publish. Pre-existing and left as-is here; fixing it belongs with a schema
+ * refinement, not with deadline arming.
+ */
+export function armStepTimers(
+  step: Step | undefined,
+  entryInstant: string,
+  body: ProcessBody,
+  entering: Instance,
+): TimerState[] {
+  const armed: TimerState[] = [];
+  // Built at most once per entry, and only if the step declares a deadline.
+  let ctx: Record<string, unknown> | undefined;
+  for (const t of step?.timers ?? []) {
+    if (t.duration) {
+      armed.push({ timerId: t.id, fireAt: addDuration(entryInstant, t.duration) as TimerState["fireAt"] });
+      continue;
+    }
+    if (!t.deadline) continue;
+    ctx ??= buildGuardContext(body, entering, SYSTEM_ACTOR);
+    let fireAt: string | null;
+    try {
+      fireAt = instantFromValue(evaluate(t.deadline.src, ctx));
+    } catch {
+      fireAt = null;
+    }
+    if (fireAt !== null) armed.push({ timerId: t.id, fireAt: fireAt as TimerState["fireAt"] });
+  }
+  return armed;
 }
 
 /** The earliest fireAt among unfired timers (ISO strings sort chronologically), or null. */

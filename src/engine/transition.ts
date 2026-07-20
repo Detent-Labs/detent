@@ -68,13 +68,14 @@ export function orderedTriggerActions(source: Step, path: Path, target: Step): A
  * Commit one transition atomically: advance {currentStepId, transitionSeq,
  * status}, append its HistoryEntry, enqueue its ordered actions. Shared by the
  * authored (manual/automatic/timer) paths and the synthesized cancel path. The
- * caller supplies `target` (the step entered — its timers are armed), the
- * HistoryEntry `pathId` (null for a synthesized transition with no authored
- * path), the resulting `status`, the `cause`, and an optional `actorId`.
+ * caller supplies `target` (the step entered — its timers are armed against
+ * `body`), the HistoryEntry `pathId` (null for a synthesized transition with no
+ * authored path), the resulting `status`, the `cause`, and an optional `actorId`.
  */
 async function commitTransition(
   instance: Instance,
   target: Step,
+  body: ProcessBody,
   pathId: HistoryEntry["pathId"],
   actions: Action[],
   cause: HistoryEntry["cause"],
@@ -85,16 +86,20 @@ async function commitTransition(
   const nextSeq = instance.transitionSeq + 1;
   const at = new Date().toISOString();
   // Arm the target step's timers at entry (replacing the source step's, disarming
-  // them); next_timer_at is the earliest fireAt for the scheduler's poll.
-  const armed = armStepTimers(target, at);
-  const nextTimerAt = minFireAt(armed);
-  const next: Instance = {
+  // them); next_timer_at is the earliest fireAt for the scheduler's poll. A
+  // deadline timer is armed from the instance as it stands at this entry — the
+  // target step and the new seq, over data unchanged by the commit (this path
+  // never writes data; an action writeback is post-commit and asynchronous).
+  const entering: Instance = {
     ...instance,
     currentStepId: target.id,
     transitionSeq: nextSeq,
     status,
-    timers: armed,
+    timers: [],
   };
+  const armed = armStepTimers(target, at, body, entering);
+  const nextTimerAt = minFireAt(armed);
+  const next: Instance = { ...entering, timers: armed };
   const entry: HistoryEntry = {
     id: `hist_${crypto.randomUUID()}` as HistoryEntry["id"],
     instanceId: instance.instanceId,
@@ -183,7 +188,7 @@ export async function executeManualTransition(
 
   const actions = orderedTriggerActions(source, path, target);
   const status = target.terminal ? "completed" : instance.status;
-  const committed = await commitTransition(instance, target, path.id, actions, "user", status, actor.id, db);
+  const committed = await commitTransition(instance, target, body, path.id, actions, "user", status, actor.id, db);
   return resolveAutomatic(committed, body, actor, db);
 }
 
@@ -217,7 +222,7 @@ export async function cancelInstance(
   if (!sink) throw new Error("cancel-sink not in body (uncompiled definition?)");
 
   const actions = [...(source.onCancel ?? []), ...(sink.onEntry ?? [])];
-  const cancelled = await commitTransition(instance, sink, null, actions, "cancel", "cancelled", actor.id, db);
+  const cancelled = await commitTransition(instance, sink, body, null, actions, "cancel", "cancelled", actor.id, db);
 
   if (resolveBody) {
     const rows = (await db`SELECT body FROM instances
@@ -279,7 +284,7 @@ export async function executeAutomaticTransition(
   if (!target) throw new Error(`path target not in body: ${path.to}`);
   const actions = orderedTriggerActions(source, path, target);
   const status = target.terminal ? "completed" : instance.status;
-  return commitTransition(instance, target, path.id, actions, "automatic", status, undefined, db);
+  return commitTransition(instance, target, body, path.id, actions, "automatic", status, undefined, db);
 }
 
 /**
@@ -359,7 +364,7 @@ export async function fireTimer(
     if (!target) throw new Error(`timer targetPath target not in body: ${path.to}`);
     const actions = [...(timer.onFire.actions ?? []), ...orderedTriggerActions(source, path, target)];
     const status = target.terminal ? "completed" : instance.status;
-    const committed = await commitTransition(instance, target, path.id, actions, "timer", status, undefined, db);
+    const committed = await commitTransition(instance, target, body, path.id, actions, "timer", status, undefined, db);
     return resolveAutomatic(committed, body, SYSTEM_ACTOR, db);
   }
 

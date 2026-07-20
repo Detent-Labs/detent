@@ -1,12 +1,14 @@
 /**
- * Timers: arm on entry, disarm on exit, the two firing semantics (transition with
- * guard bypass, reminder as a side effect), fire-once under concurrency, and the
- * scheduler firing an overdue timer. DB-backed; skips when DATABASE_URL is unset.
+ * Timers: arm on entry (duration and deadline), disarm on exit, the two firing
+ * semantics (transition with guard bypass, reminder as a side effect), fire-once
+ * under concurrency, and the scheduler firing an overdue timer. DB-backed; skips
+ * when DATABASE_URL is unset.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
-import { executeManualTransition, fireTimer, resolveAutomatic, startInstance } from "../src/engine/transition.js";
+import { cancelInstance, executeManualTransition, fireTimer, resolveAutomatic, startInstance } from "../src/engine/transition.js";
 import { drainTimers } from "../src/engine/timers.js";
+import { CANCEL_SINK_STEP_ID } from "../src/schema/definition.js";
 import type { ProcessBody, Instance, Action } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
@@ -42,6 +44,11 @@ const readInst = async (id: string): Promise<any> => {
 };
 const nextTimerAt = async (id: string): Promise<string | null> =>
   ((await sql`SELECT next_timer_at FROM instances WHERE instance_id = ${id}`) as { next_timer_at: string | null }[])[0].next_timer_at;
+// timestamptz comes back driver-shaped (Date or string); normalize for an exact compare.
+const nextTimerIso = async (id: string): Promise<string | null> => {
+  const v = await nextTimerAt(id);
+  return v === null ? null : new Date(v).toISOString();
+};
 const outboxActionIds = async (id: string): Promise<string[]> =>
   ((await sql`SELECT action_id FROM outbox WHERE instance_id = ${id} ORDER BY action_id`) as { action_id: string }[]).map((r) => r.action_id);
 const historyCauses = async (id: string): Promise<string[]> => {
@@ -190,4 +197,248 @@ test.skipIf(!DB)("the scheduler fires an overdue timer on its first pass", async
   expect(await drainTimers(sql, () => body)).toBe(1);
   expect((await readInst(inst.instanceId)).currentStepId).toBe("step_done");
   expect(await nextTimerAt(inst.instanceId)).toBeNull();
+});
+
+// --- deadline timers -----------------------------------------------------------
+
+// The waitTimerBody shape plus a `due` field for a deadline expression to read, and
+// an open step list so a step can carry several timers. initialStep is a parameter
+// so the same body serves both arming call sites (transition and creation).
+const deadlineBody = (timers: unknown[], initialStep = "step_a"): ProcessBody =>
+  ({
+    fields: [
+      { id: "field_go", key: "go", label: "Go", type: "text" },
+      { id: "field_due", key: "due", label: "Due", type: "text" },
+    ],
+    workflow: {
+      initialStep,
+      steps: [
+        { id: "step_a", key: "a", label: "A", type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
+        { id: "step_wait", key: "wait", label: "Wait", type: "task", timers,
+          paths: [{ id: "path_go", key: "go", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }] },
+        { id: "step_done", key: "done", label: "Done", type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+const dueTimer = { id: "timer_d1", deadline: cel("data.due"), onFire: { targetPath: "path_go", actions: [act("action_esc", "notify")] } };
+const seeded = (body: ProcessBody, data: Record<string, unknown>) =>
+  createInstance(body, { processId: "proc_1" as Instance["processId"], version: 1, data: data as Instance["data"] });
+
+test.skipIf(!DB)("a deadline timer arms with the instant its expression yields, normalized to UTC", async () => {
+  // One case per accepted instant shape; the deadline reads the seeded field in all three.
+  const cases: [string, string][] = [
+    ["2026-08-01T09:00:00Z", "2026-08-01T09:00:00.000Z"],
+    ["2026-08-01", "2026-08-01T00:00:00.000Z"], // date-only -> midnight UTC
+    ["2026-08-01T10:00:00+02:00", "2026-08-01T08:00:00.000Z"], // offset -> UTC
+  ];
+  const body = deadlineBody([dueTimer]);
+  for (const [due, fireAt] of cases) {
+    const inst = await seeded(body, { field_due: due });
+    await executeManualTransition(inst, "path_ab", body, actor);
+    const row = await readInst(inst.instanceId);
+    expect(row.timers).toHaveLength(1);
+    expect(row.timers[0].timerId).toBe("timer_d1");
+    expect(row.timers[0].fireAt).toBe(fireAt);
+    expect(row.timers[0].fired).toBeUndefined();
+    expect(await nextTimerIso(inst.instanceId)).toBe(fireAt);
+  }
+});
+
+test.skipIf(!DB)("a deadline and a duration timer on one step both arm; next_timer_at is the earlier", async () => {
+  // The deadline is in the past, the duration an hour out — so the earlier fireAt is
+  // the deadline's, and next_timer_at cannot be right by accident of arming order.
+  const body = deadlineBody([dueTimer, reminderTimer]);
+  const inst = await seeded(body, { field_due: "2020-01-01T00:00:00Z" });
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  const row = await readInst(inst.instanceId);
+  expect(row.timers.map((t: { timerId: string }) => t.timerId).sort()).toEqual(["timer_d1", "timer_r1"]);
+  const byId = Object.fromEntries(row.timers.map((t: { timerId: string; fireAt: string }) => [t.timerId, t.fireAt]));
+  expect(byId.timer_d1).toBe("2020-01-01T00:00:00.000Z");
+  expect(new Date(byId.timer_r1).getTime()).toBeGreaterThan(Date.now()); // ~1h out
+  expect(await nextTimerIso(inst.instanceId)).toBe("2020-01-01T00:00:00.000Z");
+});
+
+test.skipIf(!DB)("a deadline reading an unwritten field commits the entry and arms only the other timer", async () => {
+  const body = deadlineBody([dueTimer, reminderTimer]);
+  const inst = await createFrom(body); // no seed: `due` is absent from data
+  const parked = await executeManualTransition(inst, "path_ab", body, actor);
+  expect(parked.currentStepId as string).toBe("step_wait"); // the entry committed
+
+  const row = await readInst(inst.instanceId);
+  expect(row.timers.map((t: { timerId: string }) => t.timerId)).toEqual(["timer_r1"]); // deadline omitted
+  expect(await nextTimerAt(inst.instanceId)).not.toBeNull(); // the duration timer still sets it
+});
+
+test.skipIf(!DB)("a deadline yielding a non-instant string commits the entry and is not armed", async () => {
+  const body = deadlineBody([dueTimer]);
+  const inst = await seeded(body, { field_due: "next tuesday" }); // resolves, does not parse
+  const parked = await executeManualTransition(inst, "path_ab", body, actor);
+  expect(parked.currentStepId as string).toBe("step_wait");
+
+  expect((await readInst(inst.instanceId)).timers ?? []).toHaveLength(0);
+  expect(await nextTimerAt(inst.instanceId)).toBeNull();
+});
+
+test.skipIf(!DB)("a writeback of the field an omitted deadline reads does not re-arm it", async () => {
+  // A deadline is evaluated once, at entry. Writing `due` afterwards (the shape a
+  // post-commit action writeback takes) leaves the timer unarmed forever.
+  const body = deadlineBody([dueTimer]);
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+  expect((await readInst(inst.instanceId)).timers ?? []).toHaveLength(0);
+
+  await sql`UPDATE instances SET body = jsonb_set(body, '{data,field_due}', '"2026-08-01T09:00:00Z"'::jsonb) WHERE instance_id = ${inst.instanceId}`;
+  const withDue = await readInst(inst.instanceId);
+  await resolveAutomatic(withDue as Instance, body, actor); // go still unset -> stays parked
+
+  const row = await readInst(inst.instanceId);
+  expect(row.currentStepId).toBe("step_wait");
+  expect(row.timers ?? []).toHaveLength(0); // still unarmed
+  expect(await nextTimerAt(inst.instanceId)).toBeNull();
+});
+
+test.skipIf(!DB)("a deadline already in the past arms as-is and the scheduler fires it", async () => {
+  const body = deadlineBody([dueTimer]);
+  const inst = await seeded(body, { field_due: "2020-01-01T00:00:00Z" });
+  await executeManualTransition(inst, "path_ab", body, actor);
+  // Armed with the past instant — not clamped to now, not skipped, not fired in the commit.
+  expect((await readInst(inst.instanceId)).timers[0].fireAt).toBe("2020-01-01T00:00:00.000Z");
+  expect((await readInst(inst.instanceId)).currentStepId).toBe("step_wait");
+  expect(await nextTimerIso(inst.instanceId)).toBe("2020-01-01T00:00:00.000Z");
+
+  expect(await drainTimers(sql, () => body)).toBe(1); // due on the first poll
+  expect((await readInst(inst.instanceId)).currentStepId).toBe("step_done");
+  expect(await nextTimerAt(inst.instanceId)).toBeNull();
+  // The whole chain, and the only test that traverses it: the deadline is ARMED,
+  // that armed fireAt drives next_timer_at, the scheduler selects the row, and the
+  // fire is a guard-bypassing forced transition with its onFire action delivered.
+  // Asserting this on the direct-fireTimer test below would not cover arming —
+  // fireTimer resolves the timer from the body, not from instance.timers, so it
+  // fires whether or not the timer was ever armed.
+  expect(await historyCauses(inst.instanceId)).toContain("timer");
+  expect(await outboxActionIds(inst.instanceId)).toContain("action_esc");
+});
+
+test.skipIf(!DB)("an armed deadline timer forces its target path despite a false guard", async () => {
+  // Once armed, a deadline timer is indistinguishable from a duration timer.
+  const body = deadlineBody([dueTimer]);
+  const inst = await seeded(body, { field_due: "2026-08-01T09:00:00Z" });
+  const parked = await executeManualTransition(inst, "path_ab", body, actor); // go unset -> parks
+  expect(parked.currentStepId as string).toBe("step_wait");
+
+  await fireTimer(parked, "timer_d1", body); // guard still false
+  const row = await readInst(inst.instanceId);
+  expect(row.currentStepId).toBe("step_done"); // forced despite the false guard
+  expect(row.status).toBe("completed");
+  expect(await historyCauses(inst.instanceId)).toContain("timer");
+  expect(await outboxActionIds(inst.instanceId)).toContain("action_esc");
+});
+
+test.skipIf(!DB)("a deadline on the initial step is armed over seed data in the INSERT", async () => {
+  const body = deadlineBody([dueTimer], "step_wait");
+  const inst = await seeded(body, { field_due: "2026-08-01T09:00:00Z" });
+  expect(inst.currentStepId as string).toBe("step_wait");
+  expect(inst.transitionSeq).toBe(0); // creation, not a transition
+
+  const row = await readInst(inst.instanceId);
+  expect(row.timers).toHaveLength(1);
+  expect(row.timers[0].timerId).toBe("timer_d1");
+  expect(row.timers[0].fireAt).toBe("2026-08-01T09:00:00.000Z");
+  expect(await nextTimerIso(inst.instanceId)).toBe("2026-08-01T09:00:00.000Z");
+});
+
+// A deadline that reads `actor` — the authoring checker registers `actor` in the
+// deadline scope, and the ternary infers to `string`, so this is publishable. Every
+// other deadline here reads `data.due`, which is actor-independent: arming with a
+// transition's real actor instead of the system identity would leave them all green.
+const actorDeadlineTimer = {
+  id: "timer_d1",
+  deadline: cel('actor.id == "system" ? "2026-08-01T09:00:00Z" : "2030-01-01T00:00:00Z"'),
+  onFire: { targetPath: "path_go", actions: [act("action_esc", "notify")] },
+};
+const SYSTEM_FIRE_AT = "2026-08-01T09:00:00.000Z";
+
+test.skipIf(!DB)("arming uses the system identity, so both call sites arm the same fireAt", async () => {
+  // Same steps and same timer; the two bodies differ only in initialStep, which is
+  // what selects the call site — creation arms step_wait, a transition arms it via
+  // executeManualTransition carrying `actor` (user_1, not the system identity).
+  const created = await createFrom(deadlineBody([actorDeadlineTimer], "step_wait"));
+  expect(created.currentStepId as string).toBe("step_wait");
+  expect(created.transitionSeq).toBe(0); // creation, not a transition
+  const createdRow = await readInst(created.instanceId);
+  expect(createdRow.timers).toHaveLength(1);
+  expect(createdRow.timers[0].timerId).toBe("timer_d1");
+  expect(createdRow.timers[0].fireAt).toBe(SYSTEM_FIRE_AT);
+  expect(await nextTimerIso(created.instanceId)).toBe(SYSTEM_FIRE_AT);
+
+  const transitionBody = deadlineBody([actorDeadlineTimer]);
+  const inst = await createFrom(transitionBody);
+  const parked = await executeManualTransition(inst, "path_ab", transitionBody, actor);
+  expect(parked.currentStepId as string).toBe("step_wait");
+  const movedRow = await readInst(inst.instanceId);
+  expect(movedRow.timers).toHaveLength(1);
+  // The system branch, not the "2030-..." branch the caller's actor would select.
+  expect(movedRow.timers[0].fireAt).toBe(SYSTEM_FIRE_AT);
+  expect(await nextTimerIso(inst.instanceId)).toBe(SYSTEM_FIRE_AT);
+
+  // Deterministic across call sites: the two entries agree.
+  expect(movedRow.timers[0].fireAt).toBe(createdRow.timers[0].fireAt);
+});
+
+// Deadlines that read `instance`. Arming is handed the instance as of the entry being
+// committed — the TARGET step and the NEW seq — not the instance the transition started
+// from. Every other deadline here reads `data.due` or `actor`, neither of which that
+// distinction moves, so arming from the pre-transition instance leaves them all green.
+// Each ternary branch is a different instant, so the wrong instance is a wrong fireAt.
+const enteringStepTimer = {
+  id: "timer_d1",
+  deadline: cel('instance.currentStepId == "step_wait" ? "2026-08-01T09:00:00Z" : "2030-01-01T00:00:00Z"'),
+  onFire: { targetPath: "path_go", actions: [act("action_esc", "notify")] },
+};
+const enteringSeqTimer = {
+  id: "timer_d2",
+  deadline: cel('instance.transitionSeq == 1 ? "2026-08-02T09:00:00Z" : "2030-01-01T00:00:00Z"'),
+  onFire: { targetPath: "path_go", actions: [act("action_esc2", "notify")] },
+};
+
+test.skipIf(!DB)("a deadline armed by a transition sees the target step and the new seq", async () => {
+  const body = deadlineBody([enteringStepTimer, enteringSeqTimer]);
+  const inst = await createFrom(body);
+  // The values the pre-transition instance carries: both select the "2030-..." branch.
+  expect(inst.currentStepId as string).toBe("step_a");
+  expect(inst.transitionSeq).toBe(0);
+
+  const parked = await executeManualTransition(inst, "path_ab", body, actor);
+  expect(parked.currentStepId as string).toBe("step_wait");
+  expect(parked.transitionSeq).toBe(1);
+
+  const row = await readInst(inst.instanceId);
+  const byId = Object.fromEntries(
+    row.timers.map((t: { timerId: string; fireAt: string }) => [t.timerId, t.fireAt]),
+  ) as Record<string, string>;
+  expect(Object.keys(byId).sort()).toEqual(["timer_d1", "timer_d2"]);
+  expect(byId.timer_d1).toBe("2026-08-01T09:00:00.000Z"); // step_wait, not step_a
+  expect(byId.timer_d2).toBe("2026-08-02T09:00:00.000Z"); // seq 1, not seq 0
+  expect(await nextTimerIso(inst.instanceId)).toBe("2026-08-01T09:00:00.000Z");
+});
+
+test.skipIf(!DB)("cancel still commits to the sink from a deadline-armed step, disarming it", async () => {
+  // The cancel path arms through commitTransition with the synthesized sink, which
+  // declares no timers: the source step's armed deadline is disarmed, nothing replaces it.
+  const body = deadlineBody([dueTimer], "step_wait");
+  const withSink = {
+    ...body,
+    workflow: { ...body.workflow, steps: [...body.workflow.steps, { id: CANCEL_SINK_STEP_ID, key: "cancelled", label: "Cancelled", type: "task", terminal: true }] },
+  } as unknown as ProcessBody;
+  const inst = await seeded(withSink, { field_due: "2026-08-01T09:00:00Z" });
+  expect(await nextTimerAt(inst.instanceId)).not.toBeNull(); // armed at creation
+
+  const cancelled = await cancelInstance(inst, withSink, actor);
+  expect(cancelled.currentStepId as string).toBe(CANCEL_SINK_STEP_ID);
+  expect(cancelled.status).toBe("cancelled");
+  expect((await readInst(inst.instanceId)).timers ?? []).toHaveLength(0);
+  expect(await nextTimerAt(inst.instanceId)).toBeNull();
+  expect(await historyCauses(inst.instanceId)).toEqual(["cancel"]);
 });

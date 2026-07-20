@@ -78,6 +78,149 @@ test("accepts child.* inside a subprocess step", () => {
   expect(validateProcessBody(body({ steps: [guardStep("child.outcome == 'ok'", "subprocess")] }))).toEqual([]);
 });
 
+// A deadline is evaluated at step entry, before a child exists, so `child` is out
+// of scope there even on a subprocess step — while the same reference in that
+// step's guard (evaluated when the step is left) stays in scope.
+test("rejects child.* in a deadline but not in the guard of the same subprocess step", () => {
+  const step = {
+    ...guardStep("child.outcome == 'ok'", "subprocess"),
+    timers: [
+      {
+        id: "timer_a",
+        key: "ta",
+        deadline: { lang: "cel", src: "child.data.due_at" },
+        onFire: { actions: [] },
+      },
+    ],
+  };
+  const issues = validateProcessBody(body({ steps: [step] }));
+  expect(issues.length).toBe(1);
+  expect(issues[0]!.loc).toBe("steps[0].timers[0].deadline");
+  expect(msgs(issues).toLowerCase()).toContain("child");
+});
+
+// 5.5b a deadline must infer to a string instant. The engine parses the value and
+// omits a timer it cannot read, and an omitted timer is indistinguishable from an
+// undeclared one at runtime — so a wrong-typed deadline is a publish error.
+const deadlineStep = (src: string) => ({
+  id: "step_a",
+  key: "a",
+  label: "A",
+  type: "task",
+  paths: [{ id: "path_a", key: "pa", to: "step_b", trigger: "manual" }],
+  timers: [{ id: "timer_a", key: "ta", deadline: { lang: "cel", src }, onFire: { actions: [] } }],
+});
+
+const typedFields = [
+  field("amount", "number"),
+  field("approved", "boolean"),
+  field("tags", "multiselect"),
+  field("due_at", "datetime"),
+  field("due_on", "date"),
+  field("note", "string"),
+  field("receipt", "file"),
+];
+
+const deadlineIssues = (src: string) =>
+  validateProcessBody(body({ fields: typedFields, steps: [deadlineStep(src)] }));
+
+test("rejects a deadline that infers to a non-string", () => {
+  for (const [src, actual] of [
+    ["data.amount", "double"],
+    ["data.approved", "bool"],
+    ["data.tags", "list<string>"],
+  ] as const) {
+    const issues = deadlineIssues(src);
+    expect(issues.length).toBe(1);
+    expect(issues[0]!.loc).toBe("steps[0].timers[0].deadline");
+    expect(issues[0]!.message).toContain("string");
+    expect(issues[0]!.message).toContain(actual);
+  }
+});
+
+test("accepts a string-typed deadline (datetime / date / string / ternary)", () => {
+  expect(deadlineIssues("data.due_at")).toEqual([]);
+  expect(deadlineIssues("data.due_on")).toEqual([]);
+  expect(deadlineIssues("data.note")).toEqual([]);
+  expect(deadlineIssues('data.approved ? data.due_at : "2026-01-01T00:00:00Z"')).toEqual([]);
+});
+
+// A field whose CEL type is `dyn` (file, or a plugin field type) is not knowable at
+// authoring time, so the expectation cannot reject it.
+test("accepts a dyn-typed deadline (type not knowable at authoring time)", () => {
+  expect(deadlineIssues("data.receipt")).toEqual([]);
+  const plugin = { id: "field_custom", key: "custom", label: "custom", type: { type: "geo", config: {} } };
+  const fields = [...typedFields, plugin] as unknown as ReturnType<typeof field>[];
+  expect(validateProcessBody(body({ fields, steps: [deadlineStep("data.custom")] }))).toEqual([]);
+});
+
+// buildGuardContext resolves no data sources, so a deadline referencing one throws
+// at every arming — for every instance of the definition, permanently. Withholding
+// the namespace here turns that into a publish error.
+const ds = [{ id: "ds_users", key: "users", type: "http", config: {} }];
+
+test("rejects a deadline referencing a data source", () => {
+  const issues = validateProcessBody(
+    body({ fields: typedFields, dataSources: ds, steps: [deadlineStep("users.due")] }),
+  );
+  expect(issues.length).toBe(1);
+  expect(issues[0]!.loc).toBe("steps[0].timers[0].deadline");
+  // The message must name `users` as unresolved, like the child.* test above. The
+  // count and loc alone do not distinguish this from the deadline's result-type
+  // expectation firing: with the namespace registered, `users.due` infers to `dyn`
+  // and yields one issue at the same loc, so asserting only those two passes while
+  // the scoping is gone.
+  expect(issues[0]!.message.toLowerCase()).toContain("unknown variable: users");
+});
+
+test("a data source stays visible to a guard on the same step", () => {
+  const step = {
+    ...deadlineStep("data.due_at"),
+    paths: [
+      {
+        id: "path_a",
+        key: "pa",
+        to: "step_b",
+        trigger: "automatic",
+        priority: 1,
+        guard: { lang: "cel", src: "users.ok == true" },
+      },
+    ],
+  };
+  expect(validateProcessBody(body({ fields: typedFields, dataSources: ds, steps: [step] }))).toEqual([]);
+});
+
+// The expectation is scoped to the deadline site only: every other site stays
+// unconstrained, so non-string results elsewhere must still pass.
+test("the deadline result-type expectation does not leak into other sites", () => {
+  const step = {
+    id: "step_a",
+    key: "a",
+    label: "A",
+    type: "task",
+    // Action.output writeback: a double, not a string.
+    onEntry: [{ id: "action_a", type: "http", config: {}, output: { field_amount: { lang: "cel", src: "result.total" } } }],
+    // View flags: booleans.
+    view: {
+      fields: [
+        {
+          fieldId: "field_amount",
+          visible: { lang: "cel", src: "data.approved" },
+          required: { lang: "cel", src: "data.amount > 0.0" },
+          readonly: { lang: "cel", src: "data.tags.size() > 0" },
+        },
+      ],
+    },
+    // Path guard: a bool.
+    paths: [
+      { id: "path_a", key: "pa", to: "step_b", trigger: "automatic", priority: 1, guard: { lang: "cel", src: "data.amount > 0.0" } },
+    ],
+    // A well-typed deadline alongside them, to prove the sites are collected together.
+    timers: [{ id: "timer_a", key: "ta", deadline: { lang: "cel", src: "data.due_at" }, onFire: { actions: [] } }],
+  };
+  expect(validateProcessBody(body({ fields: typedFields, steps: [step] }))).toEqual([]);
+});
+
 // 5.6 no wall-clock access: now() and the pure time constructors are all blocked
 test("rejects time constructors (now/timestamp/duration)", () => {
   expect(validateProcessBody(body({ steps: [guardStep("now() > 0")] })).length).toBe(1);

@@ -100,14 +100,13 @@ export async function createInstance(
   // separate post-INSERT UPDATE would leave a crash window that permanently strands
   // the timer (no worker re-arms a next_timer_at=NULL running instance). If
   // resolveAutomatic later transitions off the initial step, the first commit
-  // replaces these timers (disarming). Arming is deterministic (no guard, no
-  // actor), so it stays within createInstance's persistence-only remit.
+  // replaces these timers (disarming). Arming reads only the seed data and the
+  // system actor, so it stays within createInstance's persistence-only remit.
+  // The instance is validated first with no timers and armed against itself, so a
+  // deadline on the initial step evaluates over the real seed data and instance
+  // projection rather than a stand-in.
   const startedAt = new Date().toISOString();
-  const timers = armStepTimers(
-    body.workflow.steps.find((s) => s.id === body.workflow.initialStep),
-    startedAt,
-  );
-  const inst: Instance = instanceSchema.parse({
+  const seed: Instance = instanceSchema.parse({
     instanceId: opts.instanceId ?? `inst_${crypto.randomUUID()}`,
     processId: opts.processId,
     version: opts.version,
@@ -115,11 +114,18 @@ export async function createInstance(
     currentStepId: body.workflow.initialStep,
     transitionSeq: 0,
     data: opts.data ?? {},
-    timers,
+    timers: [],
     ...(opts.parent ? { parent: opts.parent } : {}),
     status: "running",
     startedAt,
   });
+  const timers = armStepTimers(
+    body.workflow.steps.find((s) => s.id === body.workflow.initialStep),
+    startedAt,
+    body,
+    seed,
+  );
+  const inst: Instance = { ...seed, timers };
   // Bind the object directly: Bun.sql encodes it as a jsonb object. A
   // JSON.stringify(...)::jsonb param would store a jsonb *scalar string* that
   // jsonb_set (used by the transition/writeback) cannot traverse.
