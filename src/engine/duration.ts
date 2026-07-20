@@ -9,22 +9,21 @@
 
 import { evaluate } from "@marcbachmann/cel-js";
 import { buildGuardContext, SYSTEM_ACTOR } from "../cel/eval.js";
+import { parseIsoDuration } from "../schema/definition.js";
 import type { Instance, ProcessBody, Step, TimerState } from "../schema/definition.js";
 
-const ISO_DURATION = /^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/;
-
+/**
+ * Unreachable for a body published after the duration check landed:
+ * `validateDurations` (src/schema/compile.ts) runs the same `parseIsoDuration`
+ * at publish, so a malformed value is a publish error. It stays reachable for a
+ * body published before it, which is why the throw is kept — arming a wrong
+ * instant silently is worse than failing loudly.
+ */
 export function durationMs(d: string): number {
-  const m = ISO_DURATION.exec(d);
-  if (!m || d === "P" || d === "PT")
+  const ms = parseIsoDuration(d);
+  if (ms === null)
     throw new Error(`unsupported ISO 8601 duration (v1 supports W/D/H/M/S, no calendar units): ${d}`);
-  const [, w, days, h, min, s] = m;
-  const secs =
-    Number(w ?? 0) * 604800 +
-    Number(days ?? 0) * 86400 +
-    Number(h ?? 0) * 3600 +
-    Number(min ?? 0) * 60 +
-    Number(s ?? 0);
-  return secs * 1000;
+  return ms;
 }
 
 /** entry instant (ISO) + ISO 8601 duration -> ISO fire time (UTC, sortable). */
@@ -96,10 +95,22 @@ export function instantFromValue(v: unknown): string | null {
  * entry — the same stance guard totality takes. A deadline already in the past arms
  * as-is; the scheduler's due-timer poll fires it on its next pass.
  *
- * The duration branch is not total: `durationMs` throws on a malformed duration, and
- * `Timer.duration` is `z.string()` with no format refinement, so nothing rejects one
- * at publish. Pre-existing and left as-is here; fixing it belongs with a schema
- * refinement, not with deadline arming.
+ * The duration branch raises rather than omitting the timer, and two things can
+ * make it raise. Neither is silent: omitting would reproduce the invisible-drop
+ * problem that recording an unarmed timer (CLAUDE.md, "Decided, not yet built")
+ * exists to solve, and when that marker lands these raises become it.
+ *
+ * `durationMs` raises only for a body published before `validateDurations` existed,
+ * since that check now rejects the grammar violation at publish.
+ *
+ * The width assertion covers what the publish-time magnitude bound cannot. That
+ * bound guarantees no overflow from any entry instant before year 9000; it says
+ * nothing about an entry at or after it. So the reachable case is exactly an entry
+ * instant in the last thousand years of the four-digit-year window — not authoring
+ * input, and not reachable while entry instants come from a real clock. The width
+ * is checked rather than inferred because the bound is static while the produced
+ * instant is not; this mirrors the deadline branch, where the whitelist bounds the
+ * input and ISO_WIDTH asserts the output.
  */
 export function armStepTimers(
   step: Step | undefined,
@@ -112,7 +123,12 @@ export function armStepTimers(
   let ctx: Record<string, unknown> | undefined;
   for (const t of step?.timers ?? []) {
     if (t.duration) {
-      armed.push({ timerId: t.id, fireAt: addDuration(entryInstant, t.duration) as TimerState["fireAt"] });
+      const fireAt = addDuration(entryInstant, t.duration);
+      if (fireAt.length !== ISO_WIDTH)
+        throw new Error(
+          `timer ${t.id}: ${entryInstant} + ${t.duration} leaves the four-digit-year range (${fireAt})`,
+        );
+      armed.push({ timerId: t.id, fireAt: fireAt as TimerState["fireAt"] });
       continue;
     }
     if (!t.deadline) continue;

@@ -131,6 +131,14 @@ each with a test that rejects a violating definition.
   `priority` is present and unique; at most one guardless automatic path; if a
   default exists it has the highest priority.
 - Field `options` XOR `dataSource`. Timer `duration` XOR `deadline`.
+- `duration` values are ISO-8601 W/D/H/M/S (no calendar units, at least one
+  component), and a `Timer.duration` is additionally bounded so `entryInstant +
+  duration` stays in the four-digit-year window. Enforced at PUBLISH
+  (`compile.ts::validateDurations`), never as a Zod refinement: `definition.ts` is
+  also the deserializer for stored immutable bodies, so a tightened refinement would
+  make an already-published definition throw on READ and its pinned instances
+  unrehydratable. Validation that may tighten over time belongs on the write path —
+  the same placement CEL checking and plugin-config validation take.
 - `pinnedVersion` present iff `versionBinding === "pinned"`; `contractRef`
   present for a latest-at-spawn subprocess reference.
 - A process referenced as a subprocess has a `contract`. In a contracted
@@ -235,7 +243,9 @@ each with a test that rejects a violating definition.
   `new Date()` must never see anything else, since its legacy parser reads non-ISO
   forms host-locally and accepts strings denoting no date. The 4-digit year and the
   24-char output check keep `fireAt` lexically sortable, which `minFireAt` relies on.
-  The deadline branch is total, the `duration` branch is not — see open questions).
+  The deadline branch is total — an unresolvable or non-instant deadline omits that
+  timer rather than failing the entry. The duration branch cannot fail the entry for a
+  published body, since the grammar and the magnitude bound are enforced at publish).
   `registry.ts`,
   `idempotency.ts`. `src/cel/eval.ts` evaluates guards at runtime (total: a runtime
   error such as an unwritten field is `false`, the wait-state idiom) and
@@ -314,15 +324,13 @@ each with a test that rejects a violating definition.
   Decision: mark the omission on the persisted `TimerState` (e.g. `unarmed:
   "unresolved" | "not-an-instant"`) so it is queryable, without arming or firing.
   This touches the runtime record in `definition.ts`, hence its own change.
-- **Bound and validate `Timer.duration`.** `duration` is `z.string()` with no format
-  refinement, so `durationMs` throws inside the transition commit for a malformed
-  value (the `duration` branch of `armStepTimers` is therefore not total, unlike the
-  deadline branch), and an absurd value such as `P9999999D` produces an
-  expanded-year `fireAt` whose leading `+` sorts before every digit — winning
-  `minFireAt`'s lexical sort and suppressing every other timer on the step. The
-  deadline branch is already guarded against both by `instantFromValue`'s strict
-  whitelist and 24-char output check; the duration branch needs a schema refinement
-  plus the same width bound.
+- **Move `resolveBody` inside the per-instance try in the workers.** In
+  `src/engine/timers.ts` the `resolveBody` call sits above `drainTimers`' per-instance
+  `try`, and `src/engine/resolution.ts` has the same shape, so any read-path parse
+  failure — a corrupt jsonb row, a hand-edited definition, a future schema tightening
+  anywhere in ProcessBody — throws out of the whole pass and starves every other due
+  instance in the batch. `harden-duration-timers` removed one trigger for this; the
+  amplifier is still there and makes the next trigger just as damaging.
 - The formal expression context is pinned (`src/cel/check.ts`): `instance`
   `{id, status, transitionSeq, currentStepId}`, `actor` `{id, roles}`. Both are
   deliberately minimal; widen when the engine surfaces a concrete need.
