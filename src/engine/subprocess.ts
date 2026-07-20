@@ -16,10 +16,14 @@
  *   wait-state. The first hop's guard reads the `child` namespace, so the path is
  *   selected here with child in context and committed directly; the rest runs to
  *   rest normally. Only a parent still parked at the subprocess step is advanced.
+ *   Which step that is comes from the child's own `parent` link read at delivery,
+ *   and the check, the writeback, and the advance are one transaction holding the
+ *   parent row — both are required, and neither alone is sufficient. See the
+ *   handler for why.
  */
 
 import type { SQL } from "bun";
-import { createInstance } from "./store.js";
+import { createInstance, withTransaction } from "./store.js";
 import {
   resolveAutomatic,
   executeAutomaticTransition,
@@ -105,49 +109,84 @@ export function makeSpawnHandler(
 /** core.returnSubprocess handler. */
 export function makeReturnHandler(db: SQL, resolveBody: ResolveBody): (ctx: HandlerContext) => Promise<unknown> {
   return async (ctx) => {
-    const { parentInstanceId, parentStepId, childOutcome } = ctx.config as {
+    // The config names the parent instance and the outcome only. Which step of the
+    // parent is expected to be parked comes from this child's own `parent` link,
+    // read below under the lock; a `parentStepId` left in an older row's config is
+    // ignored, so rows enqueued before this handler changed drain unshimmed.
+    const { parentInstanceId, childOutcome } = ctx.config as {
       parentInstanceId: string;
-      parentStepId: string;
       childOutcome: string | null;
     };
+    const childId = ctx.instanceId;
 
-    const parent = await loadInstance(db, parentInstanceId);
-    if (!parent || parent.status !== "running" || parent.currentStepId !== parentStepId) return {}; // not parked here
+    // Both bodies are resolved inside the transaction, from the locked rows. A pin
+    // is not known before its row is read, so there is nothing to hoist: a warm-up
+    // pre-read would double this handler's row reads on every delivery to shorten a
+    // definition-cache miss that, versions being immutable and cached per process,
+    // happens about once per (process, version) per process lifetime.
+    //
+    // One transaction holding the parent row: the parked check, the outputMapping
+    // writeback, and the advance off the wait-state all refer to a state nothing
+    // else can move between them. A sequence of independent reads cannot give this
+    // — a re-check is not a lock, and its residual race resolves to a silent
+    // success that marks the row delivered and loses the child's result.
+    const advance = await withTransaction(db, async (tx) => {
+      const rows = (await tx`SELECT body FROM instances WHERE instance_id = ${parentInstanceId} LIMIT 1 FOR UPDATE`) as { body: unknown }[];
+      if (rows.length === 0) return null;
+      const parent = parseInstance(rows[0].body);
+      if (parent.status !== "running") return null;
 
-    const parentBody = await resolveBody(parent.processId, parent.version);
-    if (!parentBody) throw new Error(`return: parent body unresolved: ${parent.processId}@${parent.version}`);
-    const step = parentBody.workflow.steps.find((s) => s.id === parentStepId);
-    if (!step?.subprocess) throw new Error(`return: not a subprocess step: ${parentStepId}`);
+      // The child row is the authority on which step spawned it — only the child
+      // knows that. Resolving the parent's current step and assuming it is the
+      // right one answers a different question, and would apply a *different*
+      // subprocess step's outputMapping to this child's result.
+      const childInst = await loadInstance(tx, childId);
+      if (!childInst?.parent) return null; // child gone, or no link: nothing to return to
+      const parentStepId = childInst.parent.stepId;
+      // Under the lock this is a fact, not a possibly-stale reading: the parent
+      // legitimately moved on (an authored path, a cancel). A no-op, not a failure.
+      if (parent.currentStepId !== parentStepId) return null;
 
-    // child namespace: outcome + child data re-keyed fieldId -> key (reuse the
-    // guard-context re-keying against the child's own body).
-    const childInst = await loadInstance(db, ctx.instanceId);
-    if (!childInst) return {};
-    const childBody = await resolveBody(childInst.processId, childInst.version);
-    if (!childBody) throw new Error(`return: child body unresolved: ${childInst.processId}@${childInst.version}`);
-    const child = { outcome: childOutcome, data: buildGuardContext(childBody, childInst, SYSTEM_ACTOR).data };
+      const parentBody = await resolveBody(parent.processId, parent.version);
+      if (!parentBody) throw new Error(`return: parent body unresolved: ${parent.processId}@${parent.version}`);
+      const step = parentBody.workflow.steps.find((s) => s.id === parentStepId);
+      // Parked at the linked step, and that step is not a subprocess step: a
+      // contradiction the engine surfaces rather than swallows.
+      if (!step?.subprocess) throw new Error(`return: not a subprocess step: ${parentStepId}`);
 
-    // outputMapping: parent context + child namespace -> parent data patch.
-    const patch = evalFieldMap(step.subprocess.outputMapping, { ...buildGuardContext(parentBody, parent, SYSTEM_ACTOR), child });
+      // child namespace: outcome + child data re-keyed fieldId -> key (reuse the
+      // guard-context re-keying against the child's own body).
+      const childBody = await resolveBody(childInst.processId, childInst.version);
+      if (!childBody) throw new Error(`return: child body unresolved: ${childInst.processId}@${childInst.version}`);
+      const child = { outcome: childOutcome, data: buildGuardContext(childBody, childInst, SYSTEM_ACTOR).data };
 
-    // Persist the writeback into parent data, gated on the parent still parked
-    // here. ponytail: a separate write from the advance commit; a crash between
-    // is self-healed on retry (still parked, the merge is idempotent).
-    const upd = (await db`UPDATE instances
-      SET body = jsonb_set(body, '{data}', coalesce(body->'data', '{}'::jsonb) || ((${[patch]}::jsonb) -> 0))
-      WHERE instance_id = ${parentInstanceId} AND body->>'status' = 'running' AND body->>'currentStepId' = ${parentStepId}
-      RETURNING instance_id`) as unknown[];
-    if (upd.length === 0) return {}; // parent moved/cancelled between load and write
+      // outputMapping: parent context + child namespace -> parent data patch.
+      const patch = evalFieldMap(step.subprocess.outputMapping, { ...buildGuardContext(parentBody, parent, SYSTEM_ACTOR), child });
 
-    // Advance off the subprocess step. The exit guards read child.outcome, absent
-    // from the standard guard context, so select the first hop here with child in
-    // context and commit it directly; the remaining cascade runs to rest.
-    const parked = await loadInstance(db, parentInstanceId);
-    if (!parked || parked.status !== "running" || parked.currentStepId !== parentStepId) return {};
-    const path = selectAutomaticPath(step, { ...buildGuardContext(parentBody, parked, SYSTEM_ACTOR), child });
-    if (!path) return {}; // no outcome path matched: stay parked (bounded by a step timer)
-    const committed = await executeAutomaticTransition(parked, path, parentBody, db);
-    await resolveAutomatic(committed, parentBody, SYSTEM_ACTOR, db);
+      // Persist the writeback into parent data. The `currentStepId` gate is
+      // redundant under the lock and kept as a belt — it costs nothing.
+      const upd = (await tx`UPDATE instances
+        SET body = jsonb_set(body, '{data}', coalesce(body->'data', '{}'::jsonb) || ((${[patch]}::jsonb) -> 0))
+        WHERE instance_id = ${parentInstanceId} AND body->>'status' = 'running' AND body->>'currentStepId' = ${parentStepId}
+        RETURNING instance_id`) as unknown[];
+      if (upd.length === 0) return null;
+
+      // Advance off the subprocess step. The exit guards read child.outcome, absent
+      // from the standard guard context, so select the first hop here with child in
+      // context and commit it directly. The written-back data is merged in locally
+      // — the same shallow merge the UPDATE applied — so the guards and any deadline
+      // timer armed on entry see it.
+      const parked: Instance = { ...parent, data: { ...parent.data, ...patch } as Instance["data"] };
+      const path = selectAutomaticPath(step, { ...buildGuardContext(parentBody, parked, SYSTEM_ACTOR), child });
+      if (!path) return null; // no outcome path matched: stay parked (bounded by a step timer)
+      const committed = await executeAutomaticTransition(parked, path, parentBody, tx);
+      return { committed, parentBody };
+    });
+
+    // The remaining cascade runs to rest on committed state, off the lock: it is
+    // guard-driven over data no longer in flux, and holding the row across it would
+    // extend the lock for no gain.
+    if (advance) await resolveAutomatic(advance.committed, advance.parentBody, SYSTEM_ACTOR, db);
     return {};
   };
 }

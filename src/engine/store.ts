@@ -101,6 +101,29 @@ export async function initSchema(db: SQL = sql): Promise<void> {
 }
 
 /**
+ * Run `fn` in a transaction, joining one already in progress rather than opening
+ * a second. Bun rejects `begin` on a transaction-scoped client ("cannot call
+ * begin inside a transaction use savepoint() instead") and exposes `savepoint`
+ * only on that client, so its presence is the discriminator.
+ *
+ * A throw inside a savepoint propagates out of the enclosing `begin` and rolls
+ * the whole outer transaction back, so joining never silently contains an inner
+ * failure — the caller's all-or-nothing still holds.
+ *
+ * Every engine write path that could ever be reached from inside another one uses
+ * this rather than `begin` directly. Nesting is a *runtime* throw, not a type
+ * error, so a direct `begin` is a trap that only fires in production once some
+ * caller wraps it. `drainOutbox`'s post-delivery transaction is the exception and
+ * stays on `begin`: it is the outermost writer by construction, since the outbox
+ * worker runs handlers outside any transaction.
+ */
+export function withTransaction<T>(db: SQL, fn: (tx: SQL) => Promise<T>): Promise<T> {
+  const joinable = db as SQL & { savepoint?: (fn: (tx: SQL) => Promise<T>) => Promise<T> };
+  if (typeof joinable.savepoint === "function") return joinable.savepoint(fn);
+  return db.begin(fn) as Promise<T>;
+}
+
+/**
  * Mint an event id. UUIDv4 like the other runtime ids — see createInstance's
  * note on the v7 deferral; a third convention would be worse than the one gap.
  */
@@ -205,7 +228,7 @@ export async function createInstance(
   // only inside the transaction whose INSERT actually created the row, so a spawn
   // that inserted nothing records nothing and a replay cannot double them. The
   // conflicting attempt sees zero rows and returns before appending.
-  await db.begin(async (tx) => {
+  await withTransaction(db, async (tx) => {
     const inserted = (await tx`INSERT INTO instances (instance_id, transition_seq, body, next_timer_at)
       VALUES (${inst.instanceId}, ${inst.transitionSeq}, ${inst}, ${minFireAt(timers)})
       ON CONFLICT (instance_id) DO NOTHING
