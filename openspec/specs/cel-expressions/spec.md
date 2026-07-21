@@ -26,11 +26,19 @@ a parse entry point that does not require an evaluation context.
 ### Requirement: Formal expression context
 
 The system SHALL define a single, explicit expression context that enumerates
-every namespace a guard may read: `data`, `instance`, `actor`, each named
-data-source result, and — only inside a subprocess step — `child.outcome` and
-`child.data`. The exact field shapes of `instance` and `actor` MUST be pinned as
-types. CEL expressions are pure and total and MUST NOT reference wall-clock time;
-there is no `now()`.
+every namespace a guard may read: `data`, `instance`, `actor`, and — only inside a
+subprocess step — `child.outcome` and `child.data`. The exact field shapes of
+`instance` and `actor` MUST be pinned as types. CEL expressions are pure and total
+and MUST NOT reference wall-clock time; there is no `now()`.
+
+A declared data source is NOT a readable namespace in any CEL scope. The engine
+resolves data sources nowhere — no guard, mapping, view flag, deadline, or transform
+context carries one — so an expression referencing a data-source `key` could only
+park a wait-state permanently (a guard, which is total and evaluates to `false`) or
+throw in delivery (a mapping). Authoring-time validation SHALL therefore reject a CEL
+reference to a declared data-source result as an unknown reference, in every site, at
+publish. (This forbids only the CEL-reference path; the `field.dataSource`
+options-binding declaration is a separate concern and is unaffected.)
 
 Within an expression, `data` SHALL be addressed by field **`key`**, not by
 `fieldId`: a `field_<uuid>` id is not a valid CEL identifier, so it could not be
@@ -50,8 +58,13 @@ Authoring-time validation SHALL therefore reject a `child` reference in a
 
 #### Scenario: Guard reads a permitted namespace
 
-- **WHEN** a guard expression references `data.<fieldKey>`, `instance.<field>`, `actor.<field>`, or a declared data-source result
+- **WHEN** a guard expression references `data.<fieldKey>`, `instance.<field>`, or `actor.<field>`
 - **THEN** the expression type-checks against the defined context
+
+#### Scenario: Guard referencing a data source is rejected
+
+- **WHEN** a guard (or any other CEL site) references a declared data-source result
+- **THEN** authoring-time validation rejects it as an unknown reference at publish, naming the data-source key as an unknown variable
 
 #### Scenario: A field id is not a valid data reference
 
@@ -168,9 +181,10 @@ The engine SHALL evaluate a path guard at runtime using the same
 `@marcbachmann/cel-js` library used for authoring-time parse and type-checking, so
 that an expression that type-checks at authoring evaluates with identical
 semantics at runtime. Evaluation SHALL be against the instance's frozen context
-(`data`, `instance`, `actor`, and named data-source results), and MUST honor the
-same scoping rules as the authoring check (`result` is never visible to a guard;
-`child` only inside a subprocess step).
+(`data`, `instance`, and `actor`), and MUST honor the same scoping rules as the
+authoring check (`result` is never visible to a guard; `child` only inside a
+subprocess step; a data source is not a readable namespace, the engine resolving
+none).
 
 Guard evaluation SHALL be total: a guard that raises a runtime error — most
 commonly a reference to a field not yet written into `data` — evaluates to `false`
@@ -193,6 +207,10 @@ all-automatic step whose guards all evaluate false waits (the wait-state idiom:
 #### Scenario: A runtime-unresolvable reference evaluates false, not an error
 - **WHEN** a guard is evaluated and references a name that does not resolve in the guard context
 - **THEN** evaluation returns `false` (totality), while authoring-time type-checking remains the layer that rejects such a reference outright
+
+#### Scenario: A guard referencing a data source is not resolvable at runtime
+- **WHEN** the engine evaluates a guard that references a declared data-source result (a body that predates this rule)
+- **THEN** the reference is unresolvable, the guard is total and evaluates to `false`, and the instance waits — which is why such a reference is a publish error going forward
 
 ### Requirement: Runtime instance is projected onto INSTANCE_SCHEMA from one source of truth
 
@@ -224,10 +242,11 @@ therefore withhold from a `deadline` site every namespace that context does not
 carry, so that an expression the engine cannot honour is a publish error rather than
 a timer that never arms.
 
-Data sources SHALL be withheld: they are registered for every other site but are not
-resolved at evaluation, so a deadline referencing one raises at every arming, for
-every instance of the definition, permanently. They remain visible to guards and to
-every other expression site.
+The `child` namespace SHALL be withheld: a deadline is evaluated at entry, before any
+child instance exists. Data sources SHALL be withheld — but as everywhere, not as a
+deadline-specific exception: no CEL site registers a data source, because none is
+resolved at evaluation. A deadline referencing either raises at every arming, for
+every instance of the definition, permanently, so each is a publish error instead.
 
 A `deadline` SHALL additionally be required to infer to `string`. A deadline is
 parsed into an instant, and a value that is not one is dropped at arming — at which
@@ -240,10 +259,10 @@ knowable at authoring time.
 - **WHEN** a timer `deadline` expression references a declared data-source result
 - **THEN** authoring-time validation rejects it as an unknown reference
 
-#### Scenario: the same data source stays visible to a guard
+#### Scenario: a data source is not visible to a guard either
 
 - **WHEN** a path guard on that same step references that data-source result
-- **THEN** it type-checks, because only the deadline site withholds the namespace
+- **THEN** authoring-time validation rejects it as an unknown reference — data sources are withheld from every site, not the deadline alone
 
 #### Scenario: non-string deadline is rejected
 
@@ -369,3 +388,4 @@ every instance in the population.
 - **WHEN** a process body is validated after the migration entry point exists
 - **THEN** every guard, view, and mapping site still resolves `actor` exactly as
   before
+

@@ -10,9 +10,7 @@ successive automatic steps until it reaches a manual step, an automatic step wit
 no matching path (a wait-state), or a terminal step. A cascade that re-enters a
 step is a non-terminating loop; the instance is parked `faulted` and the loop is
 surfaced.
-
 ## Requirements
-
 ### Requirement: Automatic paths are evaluated on step entry in priority order
 
 When an instance enters a step whose paths are `automatic`, the engine SHALL
@@ -180,10 +178,11 @@ before detection SHALL remain as appended history.
 ### Requirement: Guards evaluate against the frozen instance context
 
 Automatic-path guards SHALL be evaluated with the same CEL library and formal
-context used at authoring time: `data`, `instance`, `actor`, and named
-data-source results, with fields referenced by `key`. The `result` namespace
-(Action.output only) and the `child` namespace (subprocess steps only) SHALL NOT
-be visible to a guard. Because guards are type-checked at publish time, evaluation
+context used at authoring time: `data`, `instance`, and `actor`, with fields
+referenced by `key`. The `result` namespace (Action.output only) and the `child`
+namespace (subprocess steps only) SHALL NOT be visible to a guard, and a data
+source is not a readable namespace (the engine resolves none, so a CEL reference to
+one is a publish error). Because guards are type-checked at publish time, evaluation
 SHALL be total and SHALL NOT throw for a definition that passed publish.
 
 #### Scenario: A guard reads instance data by field key
@@ -193,3 +192,8 @@ SHALL be total and SHALL NOT throw for a definition that passed publish.
 #### Scenario: Guard context excludes result and child
 - **WHEN** an automatic-path guard is evaluated on a non-subprocess step
 - **THEN** neither the `result` namespace nor the `child` namespace is available to the expression
+
+#### Scenario: Guard context excludes data sources
+- **WHEN** an automatic-path guard references a declared data-source result
+- **THEN** the reference is not a readable namespace; such a guard cannot have passed publish (it is a publish error), so no published definition reaches evaluation with one
+

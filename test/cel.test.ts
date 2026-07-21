@@ -222,9 +222,9 @@ test("accepts a dyn-typed deadline (type not knowable at authoring time)", () =>
   expect(validateProcessBody(body({ fields, steps: [deadlineStep("data.custom")] }))).toEqual([]);
 });
 
-// buildGuardContext resolves no data sources, so a deadline referencing one throws
-// at every arming — for every instance of the definition, permanently. Withholding
-// the namespace here turns that into a publish error.
+// The engine resolves no data sources, so a CEL reference to one can only park a
+// wait-state or throw in delivery. No site registers a data source; a reference is an
+// `unknown variable` publish error. The deadline is one such site, a guard another.
 const ds = [{ id: "ds_users", key: "users", type: "http", config: {} }];
 
 test("rejects a deadline referencing a data source", () => {
@@ -233,15 +233,14 @@ test("rejects a deadline referencing a data source", () => {
   );
   expect(issues.length).toBe(1);
   expect(issues[0]!.loc).toBe("steps[0].timers[0].deadline");
-  // The message must name `users` as unresolved, like the child.* test above. The
-  // count and loc alone do not distinguish this from the deadline's result-type
-  // expectation firing: with the namespace registered, `users.due` infers to `dyn`
-  // and yields one issue at the same loc, so asserting only those two passes while
-  // the scoping is gone.
+  // Assert the message, not just count+loc: if a data source were registered again
+  // (the regression this guards), `users.due` would infer to `dyn` and yield no issue,
+  // or a different issue at the same loc — the `unknown variable: users` message is
+  // what pins the withholding.
   expect(issues[0]!.message.toLowerCase()).toContain("unknown variable: users");
 });
 
-test("a data source stays visible to a guard on the same step", () => {
+test("a data source is not visible to a guard either (withheld from every site)", () => {
   const step = {
     ...deadlineStep("data.due_at"),
     paths: [
@@ -255,7 +254,10 @@ test("a data source stays visible to a guard on the same step", () => {
       },
     ],
   };
-  expect(validateProcessBody(body({ fields: typedFields, dataSources: ds, steps: [step] }))).toEqual([]);
+  const issues = validateProcessBody(body({ fields: typedFields, dataSources: ds, steps: [step] }));
+  expect(issues.length).toBe(1);
+  expect(issues[0]!.loc).toBe("steps[0].paths[0].guard");
+  expect(issues[0]!.message.toLowerCase()).toContain("unknown variable: users");
 });
 
 // The expectation is scoped to the deadline site only: every other site stays
