@@ -328,7 +328,9 @@ async function commitTransition(
  * Execute a single manual transition, then run the instance to rest. Rejects if
  * the path is not on the current step, is not manual, or its guard is false. A
  * concurrent transition that already advanced the instance makes this one lose
- * (ConcurrencyConflict), leaving no partial write.
+ * (ConcurrencyConflict), leaving no partial write. A no-op — no commit, no
+ * resolveAutomatic — on an instance that is not `running` (e.g. `faulted`),
+ * matching cancelInstance's non-running no-op.
  */
 export async function executeManualTransition(
   instance: Instance,
@@ -337,6 +339,8 @@ export async function executeManualTransition(
   actor: Actor,
   db: SQL = sql,
 ): Promise<Instance> {
+  if (instance.status !== "running") return instance;
+
   const source = body.workflow.steps.find((s) => s.id === instance.currentStepId);
   if (!source) throw new Error(`current step not in body: ${instance.currentStepId}`);
   const path = (source.paths ?? []).find((p) => p.id === pathId);
@@ -503,7 +507,9 @@ export async function resolveAutomatic(
  * side effect only, recorded as a `timer.fired` event in the same commit, since the
  * fired flag alone says a fire happened without saying when or what it delivered.
  * Both are idempotent under a redundant fire (two schedulers, a re-scan): the
- * transition via the OCC token, the reminder via a seq + fired guard.
+ * transition via the OCC token, the reminder via a seq + fired guard. A no-op —
+ * neither branch runs — on an instance that is not `running` (e.g. `faulted`),
+ * matching cancelInstance's non-running no-op.
  */
 export async function fireTimer(
   instance: Instance,
@@ -511,6 +517,8 @@ export async function fireTimer(
   body: ProcessBody,
   db: SQL = sql,
 ): Promise<Instance> {
+  if (instance.status !== "running") return instance;
+
   const source = body.workflow.steps.find((s) => s.id === instance.currentStepId);
   if (!source) throw new Error(`current step not in body: ${instance.currentStepId}`);
   const timer = (source.timers ?? []).find((t) => t.id === timerId);
