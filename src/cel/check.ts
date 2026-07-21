@@ -71,9 +71,16 @@ function dataSchema(fields: FieldDef[]): Record<string, string> {
 /**
  * Build the type environment for a scope. Scope is expressed by which namespaces
  * are registered: `result` exists only in an Action.output mapping, `child` only
- * inside a subprocess step, data sources everywhere except a timer deadline.
- * Unregistered references are check-time errors (unlistedVariablesAreDyn: false),
- * so guard-forbidden `result`/`child`/`now()` fail for free.
+ * inside a subprocess step. Unregistered references are check-time errors
+ * (unlistedVariablesAreDyn: false), so guard-forbidden `result`/`child`/`now()`
+ * fail for free.
+ *
+ * A declared data source is registered at no site: the engine resolves data sources
+ * nowhere (no guard/output/transform context carries one), so a CEL reference to one
+ * could only park a wait-state forever (a total guard is `false`) or throw in
+ * delivery (a mapping). Withholding it makes the reference an `unknown variable`
+ * publish error instead. The `field.dataSource` options-binding is a separate path,
+ * untouched here.
  *
  * Output scope is `result` and NOTHING else — not `data`, `instance`, `actor`,
  * `child`, or a data source. The writeback is dispatched post-commit and
@@ -85,7 +92,7 @@ function dataSchema(fields: FieldDef[]): Record<string, string> {
  */
 function buildEnv(
   body: ProcessBody,
-  opts: { result: boolean; child: boolean; dataSources: boolean; actor: boolean },
+  opts: { result: boolean; child: boolean; actor: boolean },
 ): Environment {
   const env = new Environment({ unlistedVariablesAreDyn: false });
   if (opts.result) {
@@ -99,7 +106,6 @@ function buildEnv(
   // migration is one operator action over a whole population, so admitting `actor`
   // would let a rule meant to be uniform produce different data per instance.
   if (opts.actor) env.registerVariable({ name: "actor", schema: { ...ACTOR_SCHEMA } });
-  if (opts.dataSources) for (const ds of body.dataSources ?? []) env.registerVariable(ds.key, "dyn");
   if (opts.child) env.registerVariable({ name: "child", schema: { ...CHILD_SCHEMA } });
   return env;
 }
@@ -135,7 +141,6 @@ interface Site {
   loc: string;
   result: boolean; // Action.output mapping context (result visible)
   child: boolean; // inside a subprocess step (child.* visible)
-  dataSources: boolean; // declared data-source results visible
   expect?: string; // required inferred result type; unconstrained when absent
 }
 
@@ -145,9 +150,8 @@ const asExpr = (v: unknown): Expression | undefined =>
 /** Collect every Expression in the body with its scope and a locating path. */
 function collect(body: ProcessBody): Site[] {
   const sites: Site[] = [];
-  // Every site sees data sources except a timer deadline, which passes its own flag.
-  const push = (e: Expression | undefined, loc: string, result: boolean, child: boolean, expect?: string, dataSources = true) => {
-    if (e) sites.push({ src: e.src, loc, result, child, dataSources, ...(expect ? { expect } : {}) });
+  const push = (e: Expression | undefined, loc: string, result: boolean, child: boolean, expect?: string) => {
+    if (e) sites.push({ src: e.src, loc, result, child, ...(expect ? { expect } : {}) });
   };
   // Action.output values are result scope, which registers `result` alone — so an
   // output site takes no `child` flag: the enclosing step's type cannot widen it.
@@ -181,17 +185,14 @@ function collect(body: ProcessBody): Site[] {
     });
     (s.timers ?? []).forEach((t, ti) => {
       // A deadline is evaluated at step entry over the engine's guard context, which
-      // is `{data, instance, actor}` and nothing else. Two namespaces are therefore
-      // withheld here that other sites get:
-      //   `child` — a child instance does not exist until the step is left;
-      //   data sources — buildGuardContext does not resolve them, so a deadline
-      //     referencing one throws at EVERY arming, for every instance of the
-      //     definition, and the timer never fires.
-      // It must also yield a string instant: the engine parses the value and omits
-      // the timer when it is not one, and an omitted timer is indistinguishable from
-      // an undeclared one at runtime. Each of these is a publish error rather than a
-      // wait-state that silently loses its only bound.
-      push(t.deadline, `${sloc}.timers[${ti}].deadline`, false, false, "string", false);
+      // is `{data, instance, actor}` and nothing else. `child` is therefore withheld
+      // here that a subprocess step's guards get — a child instance does not exist
+      // until the step is left (data sources are withheld at every site, not just
+      // this one). It must also yield a string instant: the engine parses the value
+      // and omits the timer when it is not one, and an omitted timer is
+      // indistinguishable from an undeclared one at runtime. Each of these is a
+      // publish error rather than a wait-state that silently loses its only bound.
+      push(t.deadline, `${sloc}.timers[${ti}].deadline`, false, false, "string");
       outputs(t.onFire.actions, `${sloc}.timers[${ti}].onFire`);
     });
     (s.view?.fields ?? []).forEach((vf, vi) => {
@@ -222,14 +223,14 @@ export interface CelIssue {
 export function validateProcessBody(body: ProcessBody): CelIssue[] {
   const issues: CelIssue[] = [];
   const cache = new Map<string, Environment>();
-  const envFor = (result: boolean, child: boolean, dataSources: boolean) => {
-    const k = `${result}:${child}:${dataSources}`;
+  const envFor = (result: boolean, child: boolean) => {
+    const k = `${result}:${child}`;
     let e = cache.get(k);
     if (!e) {
       // Every ordinary site resolves `actor`; only the migration entry point,
       // which builds its own environment, withholds it — so the cache key stays
-      // three-dimensional and no cached environment changes meaning.
-      e = buildEnv(body, { result, child, dataSources, actor: true });
+      // two-dimensional and no cached environment changes meaning.
+      e = buildEnv(body, { result, child, actor: true });
       cache.set(k, e);
     }
     return e;
@@ -248,11 +249,11 @@ export function validateProcessBody(body: ProcessBody): CelIssue[] {
     let valid: boolean;
     let message: string | undefined;
     try {
-      const r = envFor(site.result, site.child, site.dataSources).check(site.src);
+      const r = envFor(site.result, site.child).check(site.src);
       valid = r.valid;
       message = r.error?.message ?? (r.valid ? undefined : "type error");
       // A site declaring an expected result type is satisfied by that type or by
-      // `dyn` (a plugin field or data source, whose type is not knowable here).
+      // `dyn` (a plugin field, whose type is not knowable here).
       if (valid && site.expect && r.type !== site.expect && r.type !== "dyn") {
         valid = false;
         message = `expected ${site.expect}, got ${r.type}`;
@@ -292,7 +293,7 @@ function fieldTypeById(fields: FieldDef[], id: string): BaseFieldType | object |
  */
 export function validateMigrationSpec(spec: MigrationSpec, fromBody: ProcessBody, toBody: ProcessBody): CelIssue[] {
   const issues: CelIssue[] = [];
-  const env = buildEnv(fromBody, { result: false, child: false, dataSources: false, actor: false });
+  const env = buildEnv(fromBody, { result: false, child: false, actor: false });
   for (const [fid, expr] of Object.entries(spec.transforms ?? {})) {
     if (!expr) continue;
     const loc = `migration.transforms.${fid}`;

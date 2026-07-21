@@ -72,8 +72,9 @@ all instances on a version, never per-instance editing.
 
 **Expressions.** All conditions are CEL, carried as `{ lang: "cel", src }`. CEL
 is pure, total, and has no `now()`; time lives only in timers. Guards read the
-frozen context: `data`, `instance`, `actor`, named data-source results, plus
-`child.outcome`/`child.data` inside a subprocess step. One extra namespace,
+frozen context: `data`, `instance`, `actor`, plus `child.outcome`/`child.data`
+inside a subprocess step. A declared data source is not a readable CEL namespace —
+a CEL reference to one is a publish error (the engine resolves none). One extra namespace,
 `result` (a handler's structured return), is scoped ONLY to an Action.output
 mapping and is never visible to guards. Use ONE CEL library for both the editor
 (parse) and the engine (evaluate) so there is no semantic drift.
@@ -224,20 +225,22 @@ each with a test that rejects a violating definition.
   evaluated post-commit an unbounded interval after the action was enqueued, so
   instance state there is a different state than the one that enqueued it. Every
   action position is covered, `onCancel` included. `child` is registered only in
-  subprocess-step guards; data sources everywhere except a timer `deadline`;
-  `now()`/`timestamp()`/`duration()` are blocked. A `Site` may also
+  subprocess-step guards; a declared data source is registered at NO site, so a CEL
+  reference to one is a publish error (`unknown variable: <key>`) — the engine
+  resolves data sources nowhere, so a reference could only park a wait-state forever
+  (a total guard) or throw in delivery (a mapping); `field.dataSource`
+  options-binding is a separate, untouched path. `now()`/`timestamp()`/`duration()`
+  are blocked. A `Site` may also
   declare an expected result type: the `deadline` site requires `string` (`dyn`
   passes, being unknowable), because a deadline yielding a non-instant is dropped
   at arming and an omitted timer is indistinguishable from an undeclared one. A
-  deadline sees neither `child` (no child exists at entry) nor a data source
-  (`buildGuardContext` does not resolve them, so it would throw at every arming) —
-  both are publish errors rather than a wait-state that silently loses its bound.
+  deadline uniquely withholds `child` (no child exists at entry); data sources are
+  withheld everywhere, not just here. Each is a publish error rather than a
+  wait-state that silently loses its bound.
   `test/cel.test.ts` covers each rule (including all three `examples/`), and
   `test/definitions.test.ts` covers publish rejection. Known papercut:
   `number`->CEL `double`, so `data.count == 5` needs `== 5.0` — now a publish
-  error rather than a guard that is silently `false` at runtime. NOT enforced: a
-  data source is registered at check time but resolved nowhere in the engine, so
-  a guard reading one still parks silently — see the deferred item below.
+  error rather than a guard that is silently `false` at runtime.
 - `README.md`: public-facing overview (paradigm, the JSON/Zod contract, a status
   table, dev commands). Points here for the full invariant rules rather than
   duplicating them.
@@ -464,15 +467,15 @@ each with a test that rejects a violating definition.
   deliberately minimal; widen when the engine surfaces a concrete need.
 
 ## Decided, not yet built (each needs its own OpenSpec change)
-- **Data sources are checked but never resolved.** `check.ts` registers each declared
-  data source as a `dyn` variable, so an expression reading one type-checks and
-  publishes; the engine resolves them nowhere (no reference in `src/engine/`). At
-  runtime a guard reading a data source is therefore total-`false` forever (a silently
-  parked wait-state) and a mapping reading one throws. Two ways out — make a
-  data-source reference a publish error until they exist, or build resolution — and
-  the choice is about the unbuilt feature, not about the check. Deliberately left
-  open when `validateProcessBody` was wired into publish; it is the last remaining
-  check/eval scope drift.
+- **Data-source resolution is unbuilt; references are a publish error until it exists.**
+  The engine resolves data sources nowhere (no reference in `src/engine/`), so a CEL
+  reference to one is now rejected at publish (`check.ts` registers a data source at no
+  site — an `unknown variable` error), closing what was the last check/eval scope
+  drift. The `field.dataSource` options-binding declaration still publishes but its
+  runtime option resolution is likewise unbuilt (a visible presentation gap, not a
+  silent FSM park). Building resolution — CEL-readable data-source results and/or
+  runtime option lists — is the remaining feature; when it lands it re-introduces
+  registration deliberately with its own site scoping.
 - **Move `resolveBody` inside the per-instance try in the workers.** In
   `src/engine/timers.ts` the `resolveBody` call sits above `drainTimers`' per-instance
   `try`, and `src/engine/resolution.ts` has the same shape, so any read-path parse

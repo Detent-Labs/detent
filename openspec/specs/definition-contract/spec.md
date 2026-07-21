@@ -10,9 +10,7 @@ nested inside `group` fields). These invariants make a statically detectable
 authoring error fail to parse — at authoring time and on every later read,
 since `definition.ts` is also the deserializer for stored bodies — rather than
 surfacing only at runtime as an instance parked forever with no diagnostic.
-
 ## Requirements
-
 ### Requirement: A step's `type` and its `subprocess` spec presence agree
 
 A step SHALL declare a `subprocess` spec if and only if its `type` is
@@ -97,9 +95,10 @@ nested at any depth inside `group` fields), since CEL addresses fields by
 ambiguity, not merely redundant metadata. Data source `key`s SHALL be
 unique among themselves, and SHALL NOT equal any of the reserved top-level
 CEL namespace names (`data`, `instance`, `actor`, `child`, `result`): a data
-source is registered as its own top-level CEL variable named by its `key`,
-so a collision with a reserved namespace name silently rewires expression
-scoping wherever that data source is visible.
+source key is reserved as a top-level CEL identifier (registered only once
+data-source resolution exists), so a collision with a reserved namespace name
+would silently rewire expression scoping. The reservation holds now even though a
+CEL reference to a data source is currently a publish error.
 
 #### Scenario: Duplicate field keys are rejected
 - **WHEN** two fields anywhere in the tree, including one nested inside a `group`, share one `key`
@@ -128,3 +127,4 @@ naming no field at any depth SHALL fail to parse.
 #### Scenario: A view reference to an unknown field id is still rejected
 - **WHEN** a step's `view.fields` includes an entry whose `ref` names no field id at any depth
 - **THEN** the process body fails to parse
+
