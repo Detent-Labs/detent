@@ -482,3 +482,20 @@ test.skipIf(!DB)("the nothing-supplied path (via executeManualTransition) writes
     .map((r) => r.action_id);
   expect(outboxIds).toEqual(["entry1", "exit1"]);
 });
+
+// --- faulted-status gate: executeManualTransition no-ops on a non-running instance -
+
+test.skipIf(!DB)("a manual transition is ignored on a faulted instance", async () => {
+  const body = simpleBody();
+  const created = await createInstance(body, { processId: pid, version: 1 });
+  await sql`UPDATE instances SET body = jsonb_set(body, '{status}', '"faulted"'::jsonb) WHERE instance_id = ${created.instanceId}`;
+  const faulted = { ...created, status: "faulted" } as Instance;
+
+  const result = await executeManualTransition(faulted, "path_ab", body, actor as never);
+
+  expect(result).toBe(faulted); // same reference back: no commit attempted
+  const row = (await sql`SELECT transition_seq FROM instances WHERE instance_id = ${created.instanceId}`) as { transition_seq: number }[];
+  expect(row[0]!.transition_seq).toBe(0); // unchanged
+  const hist = (await sql`SELECT entry FROM history_entries WHERE instance_id = ${created.instanceId}`) as unknown[];
+  expect(hist).toHaveLength(0); // no HistoryEntry appended
+});

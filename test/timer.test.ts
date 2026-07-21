@@ -207,6 +207,35 @@ test.skipIf(!DB)("a reminder fire against a moved-off instance records no event"
   expect(await outboxActionIds(inst.instanceId)).toHaveLength(0);
 });
 
+// --- faulted-status gate: fireTimer no-ops on a non-running instance -----------
+
+test.skipIf(!DB)("a transition timer is ignored on a faulted instance", async () => {
+  const body = waitTimerBody(transitionTimer);
+  const inst = await createFrom(body);
+  const parked = await executeManualTransition(inst, "path_ab", body, actor);
+  await sql`UPDATE instances SET body = jsonb_set(body, '{status}', '"faulted"'::jsonb) WHERE instance_id = ${inst.instanceId}`;
+
+  await fireTimer({ ...parked, status: "faulted" } as Instance, "timer_t1", body);
+  const row = await readInst(inst.instanceId);
+  expect(row.currentStepId).toBe("step_wait"); // did not move
+  expect(row.transitionSeq).toBe(parked.transitionSeq); // no seq bump
+  expect(await historyCauses(inst.instanceId)).toEqual(["user"]); // only the manual hop that parked it
+  expect(await outboxActionIds(inst.instanceId)).toHaveLength(0); // onFire action not enqueued
+});
+
+test.skipIf(!DB)("a reminder timer is ignored on a faulted instance", async () => {
+  const body = waitTimerBody(reminderTimer);
+  const inst = await createFrom(body);
+  const parked = await executeManualTransition(inst, "path_ab", body, actor);
+  await sql`UPDATE instances SET body = jsonb_set(body, '{status}', '"faulted"'::jsonb) WHERE instance_id = ${inst.instanceId}`;
+
+  await fireTimer({ ...parked, status: "faulted" } as Instance, "timer_r1", body);
+  const row = await readInst(inst.instanceId);
+  expect(row.timers[0].fired).toBeUndefined(); // fired flag unchanged (never set)
+  expect(await eventsOf(inst.instanceId)).toHaveLength(0); // no timer.fired event
+  expect(await outboxActionIds(inst.instanceId)).toHaveLength(0); // no action enqueued
+});
+
 // --- 6.4 disarm on a normal exit ----------------------------------------------
 
 test.skipIf(!DB)("taking a normal transition off a timer-bearing step disarms its timer", async () => {
