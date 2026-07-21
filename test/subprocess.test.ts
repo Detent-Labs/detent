@@ -6,7 +6,7 @@
  * deterministic ids, contract hash) always run.
  */
 import { test, expect, beforeAll } from "bun:test";
-import { sql, initSchema } from "../src/engine/store.js";
+import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { startInstance, cancelInstance } from "../src/engine/transition.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { registerSubprocessHandlers } from "../src/engine/subprocess.js";
@@ -227,6 +227,59 @@ const cancelAwareParent = (childPid: string, childVersion: number): ProcessBody 
     },
   }) as unknown as ProcessBody;
 
+// Parent whose `initialStep` IS the subprocess step, so the spawn has no
+// transition to ride: creation must enqueue it. Same child and mappings as
+// parentBody, minus the entry step.
+const subInitialParentBody = (childVersion: number): ProcessBody =>
+  ({
+    key: "parent_si", label: "Parent SI",
+    fields: [
+      { id: "field_p_amount", key: "amount", label: "Amount", type: "number" },
+      { id: "field_p_result", key: "result", label: "Result", type: "string" },
+      { id: "field_p_back", key: "back_amount", label: "Back", type: "number" },
+    ],
+    workflow: {
+      initialStep: "step_p_sub",
+      steps: [
+        { id: "step_p_sub", key: "p_sub", label: "Sub", type: "subprocess",
+          subprocess: {
+            processId: CHILD_PID, versionBinding: "pinned", pinnedVersion: childVersion,
+            inputMapping: { field_c_amount: cel("data.amount") },
+            outputMapping: { field_p_result: cel("child.outcome"), field_p_back: cel("child.data.amount") },
+          },
+          paths: [
+            autoPath("path_p_app", "step_p_approved", 1, 'child.outcome == "approved"'),
+            autoPath("path_p_rej", "step_p_rejected", 2, 'child.outcome == "rejected"'),
+          ] },
+        { id: "step_p_approved", key: "p_approved", label: "PApproved", type: "task", terminal: true },
+        { id: "step_p_rejected", key: "p_rejected", label: "PRejected", type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+// callerBody's shape with the subprocess step as the initial step: a contracted
+// thin wrapper that delegates immediately. Chaining two of these over a leaf
+// child is the nested initial-step case.
+const subInitialCallerBody = (key: string, childPid: string, childVersion: number): ProcessBody =>
+  ({
+    key, label: key,
+    contract: { outcomes: ["approved", "rejected"] },
+    fields: [],
+    workflow: {
+      initialStep: "step_sub",
+      steps: [
+        { id: "step_sub", key: "sub", label: "Sub", type: "subprocess",
+          subprocess: { processId: childPid, versionBinding: "pinned", pinnedVersion: childVersion, inputMapping: {}, outputMapping: {} },
+          paths: [
+            autoPath("path_app", "step_approved", 1, 'child.outcome == "approved"'),
+            autoPath("path_rej", "step_rejected", 2, 'child.outcome == "rejected"'),
+          ] },
+        { id: "step_approved", key: "approved", label: "Approved", type: "task", terminal: true, outcome: "approved" },
+        { id: "step_rejected", key: "rejected", label: "Rejected", type: "task", terminal: true, outcome: "rejected" },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
 function engineRegistry(): { registry: Reg; resolveBody: ReturnType<typeof createDefinitionStore>["resolveBody"] } {
   const store = createDefinitionStore(sql);
   const registry: Reg = new Map();
@@ -272,6 +325,25 @@ const moveTo = async (id: string, stepId: string): Promise<void> => {
 const relinkChild = async (childId: string, stepId: string): Promise<void> => {
   await sql`UPDATE instances SET body = jsonb_set(body, '{parent,stepId}', (${[stepId]}::jsonb) -> 0)
     WHERE instance_id = ${childId}`;
+};
+
+// The subprocess.spawn-enqueued events of one instance, newest-seq last.
+const spawnEvents = async (instanceId: string): Promise<{ transitionSeq: number; event: Record<string, unknown> }[]> => {
+  const r = (await sql`SELECT transition_seq, event FROM instance_events
+    WHERE instance_id = ${instanceId} AND kind = 'subprocess.spawn-enqueued'
+    ORDER BY transition_seq`) as { transition_seq: number; event: unknown }[];
+  return r.map((x) => ({
+    transitionSeq: Number(x.transition_seq),
+    event: (typeof x.event === "string" ? JSON.parse(x.event) : x.event) as Record<string, unknown>,
+  }));
+};
+const outboxAt = async (instanceId: string, seq: number): Promise<{ action_id: string; event_id: string | null }[]> =>
+  (await sql`SELECT action_id, event_id FROM outbox WHERE instance_id = ${instanceId} AND transition_seq = ${seq}`) as
+    { action_id: string; event_id: string | null }[];
+const historyAt = async (instanceId: string, seq: number): Promise<Record<string, unknown>[]> => {
+  const r = (await sql`SELECT entry FROM history_entries WHERE instance_id = ${instanceId} AND transition_seq = ${seq}`) as
+    { entry: unknown }[];
+  return r.map((x) => (typeof x.entry === "string" ? JSON.parse(x.entry) : x.entry) as Record<string, unknown>);
 };
 
 beforeAll(async () => {
@@ -631,4 +703,164 @@ test.skipIf(!DB)("an independently cancelled child returns child.outcome == canc
   const p = await loadInstance(parent.instanceId);
   expect(p!.currentStepId as string).toBe("step_ca_cancelled"); // parent guarded on child.outcome == "cancelled"
   expect(dataField(p, "field_ca_seen")).toBe("cancelled"); // reserved outcome written back via outputMapping
+});
+
+// --- DB: creation at a subprocess initial step -------------------------------
+
+const SI_PID = "proc_parent_sub_initial" as Instance["processId"];
+
+test.skipIf(!DB)("creating an instance on a subprocess initial step spawns a linked child", async () => {
+  const { registry } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody());
+  const pv = await publishBody(SI_PID, subInitialParentBody(cv.version));
+  const parent = await startInstance(pv.definition, { processId: SI_PID, version: pv.version }, actor);
+  // Creation is not a transition: the wait-state is where the instance rests, at seq 0.
+  expect(parent.currentStepId as string).toBe("step_p_sub");
+  expect(parent.transitionSeq).toBe(0);
+  await seedField(parent.instanceId, "field_p_amount", 500);
+
+  await drainOutbox(sql, registry); // spawn only
+  // The coordinates are the ordinary ones with the sequence being 0.
+  const child = await loadInstance(subprocessChildId(parent.instanceId, 0, "step_p_sub"));
+  expect(child).toBeDefined();
+  expect(child!.parent).toEqual({ instanceId: parent.instanceId, stepId: "step_p_sub" as Instance["currentStepId"] });
+  expect(dataField(child, "field_c_amount")).toBe(500); // seeded from the step's inputMapping
+  expect((await loadInstance(parent.instanceId))!.transitionSeq).toBe(0); // still parked where it was created
+});
+
+test.skipIf(!DB)("the child's return drives a parent parked at its initial step", async () => {
+  const { registry } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody());
+  const pv = await publishBody(SI_PID, subInitialParentBody(cv.version));
+  const parent = await startInstance(pv.definition, { processId: SI_PID, version: pv.version }, actor);
+  await seedField(parent.instanceId, "field_p_amount", 500);
+
+  await drainAll(registry); // spawn -> child terminal -> return -> parent advance from seq 0
+  const p = await loadInstance(parent.instanceId);
+  expect(p!.currentStepId as string).toBe("step_p_approved"); // guarded on child.outcome
+  expect(p!.status).toBe("completed");
+  expect(dataField(p, "field_p_result")).toBe("approved"); // outputMapping writeback landed
+  expect(dataField(p, "field_p_back")).toBe(500);
+});
+
+test.skipIf(!DB)("the creation-enqueued spawn's outcome attaches to its event, not to a HistoryEntry", async () => {
+  const { registry } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody());
+  const pv = await publishBody(SI_PID, subInitialParentBody(cv.version));
+  const parent = await startInstance(pv.definition, { processId: SI_PID, version: pv.version }, actor);
+  await seedField(parent.instanceId, "field_p_amount", 500);
+
+  // The event exists at creation, before any delivery, and names the step.
+  const [before] = await spawnEvents(parent.instanceId);
+  expect(before.transitionSeq).toBe(0);
+  expect(before.event.payload).toEqual({ stepId: "step_p_sub" });
+  expect(before.event.version).toBe(pv.version);
+  // The outbox row is named by that event, which is what routes the outcome.
+  const rows = await outboxAt(parent.instanceId, 0);
+  expect(rows).toHaveLength(1);
+  expect(rows[0].action_id).toBe("action_spawn_step_p_sub");
+  expect(rows[0].event_id).toBe(before.event.id as string);
+
+  await drainOutbox(sql, registry);
+  const [after] = await spawnEvents(parent.instanceId);
+  const outcomes = after.event.actions as Record<string, unknown>[];
+  expect(outcomes).toHaveLength(1);
+  expect(outcomes[0].actionId).toBe("action_spawn_step_p_sub");
+  expect(outcomes[0].resolvedHandler).toBe("core.spawnSubprocess");
+  expect(outcomes[0].status).toBe("succeeded");
+  // Creation writes no transition record, so there is nothing at seq 0 the
+  // outcome could have been misfiled onto (and none is created by the delivery).
+  expect(await historyAt(parent.instanceId, 0)).toHaveLength(0);
+});
+
+test.skipIf(!DB)("a transition-entered spawn keeps attaching its outcome to the HistoryEntry", async () => {
+  const { registry } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody());
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
+  await seedField(parent.instanceId, "field_p_amount", 500);
+  await drainOutbox(sql, registry); // spawn (enqueued by the seq-1 transition)
+
+  const [entry] = await historyAt(parent.instanceId, 1);
+  const outcomes = entry.actions as Record<string, unknown>[];
+  expect(outcomes.map((o) => o.actionId)).toContain("action_spawn_step_p_sub");
+  expect(await spawnEvents(parent.instanceId)).toHaveLength(0); // the event is creation-only
+});
+
+test.skipIf(!DB)("a creation that inserted no row enqueues nothing and records nothing", async () => {
+  const cv = await publishBody(CHILD_PID, childBody());
+  const pv = await publishBody(SI_PID, subInitialParentBody(cv.version));
+  // Re-running createInstance for an existing id is what a redelivered spawn of
+  // this instance does; the RETURNING guard must cover the spawn row and the
+  // event exactly as it covers the timer events.
+  const id = subprocessChildId("inst_redeliver_probe", 0, "step_p_sub");
+  const opts = { processId: SI_PID, version: pv.version, instanceId: id };
+  await createInstance(pv.definition, opts);
+  await createInstance(pv.definition, opts);
+
+  expect(await spawnEvents(id)).toHaveLength(1);
+  expect(await outboxAt(id, 0)).toHaveLength(1);
+});
+
+test.skipIf(!DB)("a redelivered creation-enqueued spawn creates no second child", async () => {
+  const { registry } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody());
+  const pv = await publishBody(SI_PID, subInitialParentBody(cv.version));
+  const parent = await startInstance(pv.definition, { processId: SI_PID, version: pv.version }, actor);
+  await seedField(parent.instanceId, "field_p_amount", 500);
+  await drainAll(registry);
+  // Mimic at-least-once redelivery: the same action under a fresh key.
+  await sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
+    VALUES (${"redeliver_si_" + parent.instanceId}, ${parent.instanceId}, 0, ${"action_spawn_step_p_sub"},
+      ${{ id: "action_spawn_step_p_sub", type: "core.spawnSubprocess", config: { subprocessStepId: "step_p_sub", parentSeq: 0 } }})`;
+  await drainAll(registry);
+  expect(await countChildren(parent.instanceId)).toBe(1);
+});
+
+test.skipIf(!DB)("a nested initial-step chain spawns a grandchild and returns upward", async () => {
+  const { registry } = engineRegistry();
+  const MID_PID = "proc_si_mid" as Instance["processId"];
+  const TOP_PID = "proc_si_top" as Instance["processId"];
+  const lv = await publishBody(CHILD_PID, childBody());
+  const mv = await publishBody(MID_PID, subInitialCallerBody("si_mid", CHILD_PID, lv.version));
+  const tv = await publishBody(TOP_PID, subInitialCallerBody("si_top", MID_PID, mv.version));
+
+  const top = await startInstance(tv.definition, { processId: TOP_PID, version: tv.version }, actor);
+  expect(top.currentStepId as string).toBe("step_sub");
+  await drainAll(registry); // top's spawn -> mid created at ITS subprocess initial step -> mid's spawn -> ...
+
+  const midId = subprocessChildId(top.instanceId, 0, "step_sub");
+  const leafId = subprocessChildId(midId, 0, "step_sub");
+  const [mid, leaf] = [await loadInstance(midId), await loadInstance(leafId)];
+  expect(leaf).toBeDefined(); // the grandchild the mid's own creation enqueued
+  expect(leaf!.parent?.instanceId as string).toBe(midId);
+  // Each return propagates upward through the ordinary return path.
+  expect(mid!.currentStepId as string).toBe("step_approved");
+  expect(mid!.status).toBe("completed");
+  const t = await loadInstance(top.instanceId);
+  expect(t!.currentStepId as string).toBe("step_approved");
+  expect(t!.status).toBe("completed");
+});
+
+test.skipIf(!DB)("a creation-enqueued spawn whose parent was cancelled creates no child", async () => {
+  const { registry, resolveBody } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody());
+  const pv = await publishBody(SI_PID, subInitialParentBody(cv.version));
+  const parent = await startInstance(pv.definition, { processId: SI_PID, version: pv.version }, actor);
+  await cancelInstance(parent, pv.definition, actor, sql, resolveBody);
+
+  await drainAll(registry);
+  expect(await countChildren(parent.instanceId)).toBe(0);
+  expect((await loadInstance(parent.instanceId))!.status).toBe("cancelled");
+});
+
+test.skipIf(!DB)("an ordinary creation enqueues nothing and records no spawn event", async () => {
+  const cv = await publishBody(CHILD_PID, childBody());
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  // createInstance rather than startInstance: the run-to-rest cascade legitimately
+  // enqueues a spawn at seq 1, which would mask what this asserts about creation.
+  const inst = await createInstance(pv.definition, { processId: PARENT_PID, version: pv.version });
+  expect(inst.currentStepId as string).toBe("step_p_entry"); // not a subprocess step
+  expect(await spawnEvents(inst.instanceId)).toHaveLength(0);
+  expect(await outboxAt(inst.instanceId, 0)).toHaveLength(0);
 });

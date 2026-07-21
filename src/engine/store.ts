@@ -19,6 +19,8 @@ import {
 } from "../schema/definition.js";
 import { definitionHash } from "../schema/hash.js";
 import { armStepTimers, minFireAt } from "./duration.js";
+import { idempotencyKey } from "./idempotency.js";
+import { SPAWN_ACTION_TYPE } from "./registry.js";
 
 /** Shared client. Constructed lazily-ish; a query throws if DATABASE_URL is unset. */
 export const sql = new SQL(process.env.DATABASE_URL ?? "");
@@ -175,7 +177,11 @@ export async function appendInstanceEvents(tx: SQL, events: readonly InstanceEve
 
 /**
  * Create an instance pinned to { processId, version, definitionHash }, at the
- * definition's initialStep, transitionSeq 0, and persist it.
+ * definition's initialStep, transitionSeq 0, and persist it. Creation is not a
+ * transition — no HistoryEntry, no trigger actions — but it is a step entry, so
+ * it carries the entry consequences the initial step declares: its timers are
+ * armed, and if it is a subprocess step its spawn is enqueued (both inside the
+ * INSERT transaction; see below).
  * ponytail: instanceId is UUIDv4; the contract calls for UUIDv7 (time-sortable).
  * transitionSeq already orders history per instance, so upgrade to v7 only when
  * cross-instance time ordering is needed.
@@ -218,12 +224,8 @@ export async function createInstance(
     status: "running",
     startedAt,
   });
-  const { armed: timers, drops } = armStepTimers(
-    body.workflow.steps.find((s) => s.id === body.workflow.initialStep),
-    startedAt,
-    body,
-    seed,
-  );
+  const initial = body.workflow.steps.find((s) => s.id === body.workflow.initialStep);
+  const { armed: timers, drops } = armStepTimers(initial, startedAt, body, seed);
   const inst: Instance = { ...seed, timers };
   // A timer the initial step declared but arming could not compute a fireAt for.
   // Recorded at seq 0 — creation advances no sequence, and an event records the
@@ -237,15 +239,52 @@ export async function createInstance(
     payload: { timerId: d.timerId, reason: d.reason },
     at: startedAt,
   }));
+  // Creation at a subprocess initial step is a step entry like any other and
+  // carries the same consequence: the child is spawned. planStepEntry enqueues
+  // this on a transition; creation is not a transition and does not route
+  // through the seam, so it restates the one row here rather than teaching the
+  // seam a seq-0/no-HistoryEntry mode. Enqueuing inside the INSERT transaction
+  // is load-bearing: a post-create enqueue leaves a crash window that strands
+  // the instance forever on a wait-state nothing re-enqueues — the same argument
+  // that put timer arming here. The coordinates are the ordinary ones with the
+  // sequence being 0, so the handler (which derives the deterministic child id
+  // from them) needs no special case and nesting composes through the outbox.
+  //
+  // The accompanying event is what the spawn's ActionOutcome attaches to.
+  // Creation writes no HistoryEntry, so an event_id-less row would fall back to
+  // the transition record at (instanceId, 0), match nothing, and discard the
+  // outcome silently — precisely the failure event_id exists to close.
+  //
+  // This stays within the store's persistence-only remit: nothing is evaluated,
+  // the row is a static function of the initial step and the instance id.
+  const subStep = initial?.type === "subprocess" ? initial : undefined;
+  const spawn = subStep && {
+    id: `action_spawn_${subStep.id}`,
+    type: SPAWN_ACTION_TYPE,
+    config: { subprocessStepId: subStep.id, parentSeq: 0 },
+  };
+  const spawnEvent: InstanceEvent | undefined = subStep && {
+    id: newInstanceEventId(),
+    instanceId: inst.instanceId,
+    transitionSeq: inst.transitionSeq,
+    version: inst.version,
+    kind: "subprocess.spawn-enqueued" as const,
+    payload: { stepId: subStep.id },
+    at: startedAt,
+  };
+  if (spawnEvent) events.push(spawnEvent);
   // Bind the object directly: Bun.sql encodes it as a jsonb object. A
   // JSON.stringify(...)::jsonb param would store a jsonb *scalar string* that
   // jsonb_set (used by the transition/writeback) cannot traverse.
   // ON CONFLICT DO NOTHING: a redelivered subprocess spawn (deterministic id)
   // is a no-op; the spawn handler checks prior existence to skip re-driving it.
-  // RETURNING is what reconciles the events with that no-op: they are appended
-  // only inside the transaction whose INSERT actually created the row, so a spawn
-  // that inserted nothing records nothing and a replay cannot double them. The
-  // conflicting attempt sees zero rows and returns before appending.
+  // RETURNING is what reconciles the events and the spawn row with that no-op:
+  // they are written only inside the transaction whose INSERT actually created
+  // the row, so a spawn that inserted nothing records nothing and enqueues
+  // nothing, and a replay cannot double them. The conflicting attempt sees zero
+  // rows and returns before writing either. That is also why the outbox insert
+  // needs no ON CONFLICT: outside the guard, a redelivered child creation would
+  // collide on the deterministic outbox key and fail the handler.
   await withTransaction(db, async (tx) => {
     const inserted = (await tx`INSERT INTO instances (instance_id, transition_seq, body, next_timer_at)
       VALUES (${inst.instanceId}, ${inst.transitionSeq}, ${inst}, ${minFireAt(timers)})
@@ -253,6 +292,10 @@ export async function createInstance(
       RETURNING instance_id`) as unknown[];
     if (inserted.length === 0) return;
     await appendInstanceEvents(tx, events);
+    if (spawn && spawnEvent) {
+      await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, event_id)
+        VALUES (${idempotencyKey(inst.instanceId, inst.transitionSeq, spawn.id)}, ${inst.instanceId}, ${inst.transitionSeq}, ${spawn.id}, ${spawn}, ${spawnEvent.id})`;
+    }
   });
   return inst;
 }

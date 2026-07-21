@@ -694,9 +694,10 @@ export const instanceEvent = z.discriminatedUnion("kind", [
     kind: z.literal("timer.fired"),
     payload: z.object({ timerId }).strict(),
     // Outcomes of the actions this fire enqueued — they attach here, not to the
-    // HistoryEntry that happens to share the seq. Only this kind carries them:
-    // an unarmed timer enqueues nothing, so the field would be permanently null
-    // on that arm and would invite a reader to expect outcomes that cannot exist.
+    // HistoryEntry that happens to share the seq. Only a kind that enqueues
+    // actions carries them: an unarmed timer enqueues nothing, so the field
+    // would be permanently null on that arm and would invite a reader to expect
+    // outcomes that cannot exist.
     actions: z.array(actionOutcome).optional(),
   }),
   // A declared timer was omitted from the armed set. Arming is total, so the
@@ -714,6 +715,21 @@ export const instanceEvent = z.discriminatedUnion("kind", [
     ...instanceEventEnvelope,
     kind: z.literal("migration.skipped"),
     payload: z.object({ fromVersion: z.number(), toVersion: z.number(), reason: migrationSkipReason }).strict(),
+  }),
+  // An instance created on a definition whose initialStep is a subprocess step
+  // enqueued its spawn in the creation transaction: actions enqueued, no
+  // transition (the `timer.fired` shape). Recorded at seq 0, which creation does
+  // not advance. It exists to carry the spawn's outcome: creation writes no
+  // HistoryEntry, so the outcome's fallback target — the transition record at
+  // (instanceId, 0) — matches nothing and the outcome would be discarded
+  // silently, and a dead-lettered initial spawn is exactly the "parked forever,
+  // why?" diagnostic. A transition-entered subprocess step records no such
+  // event; its outcome attaches to that transition's HistoryEntry.
+  z.object({
+    ...instanceEventEnvelope,
+    kind: z.literal("subprocess.spawn-enqueued"),
+    payload: z.object({ stepId }).strict(),
+    actions: z.array(actionOutcome).optional(),
   }),
 ]);
 export type InstanceEvent = z.infer<typeof instanceEvent>;

@@ -125,9 +125,14 @@ no step change get a sibling record, `InstanceEvent` (append-only, `evt_` ids): 
 discriminated union over `kind` with a kind-specific payload, carrying the instance,
 the `version` and the `transitionSeq` **in force**. An event never advances the
 sequence, so several may share one and share it with a transition; they order by
-`at`. Two kinds exist — `timer.fired` (a reminder fired: actions enqueued, no
-transition) and `timer.unarmed` (a declared timer produced no `fireAt` at entry, with
-the reason). Migration adds its kind additively; the record shape is settled.
+`at`. Four kinds exist — `timer.fired` (a reminder fired: actions enqueued, no
+transition), `timer.unarmed` (a declared timer produced no `fireAt` at entry, with
+the reason), `migration.skipped` (an instance left on its source version, with the
+reason), and `subprocess.spawn-enqueued` (creation at a subprocess initial step
+enqueued its spawn: actions enqueued, no transition). Kinds are added additively;
+the record shape is settled. A kind that enqueues actions carries their
+`ActionOutcome`s — `timer.fired` and `subprocess.spawn-enqueued` do, the other two
+enqueue nothing and so must not invite a reader to expect outcomes.
 
 An `ActionOutcome` attaches to the record that **enqueued** the action, carried on the
 outbox row rather than derived from `(instanceId, transitionSeq)`. That derivation is
@@ -226,8 +231,10 @@ each with a test that rejects a violating definition.
   chains. Propagation is downward only in v1; no independent upward child cancel.
 - Subprocess execution (`src/engine/subprocess.ts`, `test/subprocess.test.ts`):
   makes a `subprocess` step live via two engine-internal outbox handlers (reserved
-  `core.` type prefix, rejected in authored bodies). Entering a subprocess step
-  (via a transition — not as the initial step) enqueues `core.spawnSubprocess`,
+  `core.` type prefix, rejected in authored bodies; the two type constants are homed
+  in `registry.ts`, a leaf both `store.ts` and `transition.ts` can import, and
+  re-exported from `transition.ts`). Entering a subprocess step enqueues
+  `core.spawnSubprocess`,
   which resolves the child body by `versionBinding` (`pinned` → `pinnedVersion`;
   `latest-at-spawn` → newest version whose `contractHash` equals `contractRef`, via
   `createDefinitionStore.resolveLatestByContract`), seeds it from `inputMapping`,
@@ -249,7 +256,15 @@ each with a test that rejects a violating definition.
   a link is repaired inside the migrating parent's own locked transaction.
   `child.data` exposes the child's full data (re-keyed fieldId→key); filtering to
   `contract.outputFields` is deferred. Downward subprocess cancel propagation is
-  DONE (see above).
+  DONE (see above). A `subprocess` step is also live as the *initial* step:
+  `createInstance` enqueues the spawn at seq 0 inside the INSERT transaction,
+  behind the same `RETURNING` guard as the seq-0 events (so a redelivered child
+  creation enqueues nothing), and appends a `subprocess.spawn-enqueued`
+  `InstanceEvent` whose id the outbox row carries as `event_id` — creation writes
+  no `HistoryEntry`, so without that carrier the spawn's `ActionOutcome` would
+  fall back to the transition record at `(instanceId, 0)`, match nothing, and be
+  discarded. Nested initial-step chains compose through the outbox with no
+  special casing.
 - Engine (`src/engine/`, PostgreSQL via `Bun.sql`, connection `DATABASE_URL`):
   executes definitions. `store.ts` (instance store + rehydrate, pinned to
   `{processId, version, definitionHash}`; arms the initial step's timers atomically
@@ -330,13 +345,15 @@ each with a test that rejects a violating definition.
    via Bun's native `Bun.sql`; connection via `DATABASE_URL`. Single-instance runtime
    cancellation is DONE (`cancelInstance`: skip onExit, `[onCancel, sink.onEntry]`,
    cancel HistoryEntry, OCC, no-op on non-running). Subprocess execution is DONE
-   (`subprocess.ts`: spawn on subprocess-step entry, child-body resolution by
+   (`subprocess.ts`: spawn on subprocess-step entry — by transition or at creation on
+   an initial subprocess step — child-body resolution by
    `versionBinding`, `inputMapping` seed, return via `outputMapping` + direct parent
    advance, idempotent spawn) together with downward cancel propagation
    (`cancelInstance` cascades to active children by the `parent` link). `deadline`
    timers are DONE (`duration.ts`: `instantFromValue` + the deadline branch of
    `armStepTimers`; see the timers entry above). The runtime event log is DONE
-   (`InstanceEvent`: a reminder fire and an unarmed timer are recorded, and an
+   (`InstanceEvent`: a reminder fire, an unarmed timer, a skipped migration and a
+   creation-enqueued subprocess spawn are recorded, and an
    `ActionOutcome` now attaches to the record that enqueued it). Instance migration is
    DONE (`src/engine/migration.ts`): a migration plan is a row keyed
    `(processId, fromVersion, toVersion)` in `migration_plans`, registered by
@@ -359,8 +376,9 @@ each with a test that rejects a violating definition.
    `step-unmappable`; both are recorded as a `migration.skipped` `InstanceEvent`. The
    migrating parent repairs every child's `parent.stepId` (terminal children included).
    The operation is per-instance fault-isolated and reports instance ids grouped
-   migrated/skipped/conflicted/failed. Remaining: a subprocess step as the initial step
-   does not spawn (must be entered via a transition). Publish-time cross-process
+   migrated/skipped/conflicted/failed. A subprocess step as the *initial* step spawns
+   too (`createInstance` enqueues at seq 0 inside the INSERT transaction, carried by a
+   `subprocess.spawn-enqueued` event). Publish-time cross-process
    validation (inputMapping ⊆ child inputFields, child reference resolvable → child-first
    ordering) is DONE (`definitions.ts`, roadmap #1). The production `resolveBody` backing
    (definition/version store) is DONE (`definitions.ts` + `host.ts`), so the

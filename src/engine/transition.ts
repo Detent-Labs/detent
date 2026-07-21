@@ -23,19 +23,18 @@
 import type { SQL } from "bun";
 import { sql, createInstance, appendInstanceEvent, appendInstanceEvents, newInstanceEventId, withTransaction } from "./store.js";
 import { idempotencyKey } from "./idempotency.js";
+import { SPAWN_ACTION_TYPE, RETURN_ACTION_TYPE } from "./registry.js";
 import { armStepTimers, minFireAt, type TimerDrop } from "./duration.js";
 import { buildGuardContext, evalGuard, SYSTEM_ACTOR, type Actor } from "../cel/eval.js";
 import { CANCEL_SINK_STEP_ID, instance as instanceSchema } from "../schema/definition.js";
 import type { ProcessBody, Instance, HistoryEntry, InstanceEvent, Action, Step, Path } from "../schema/definition.js";
 
 /**
- * Engine-owned action types (reserved `core.` prefix, rejected in authored
- * bodies). Enqueued by commitTransition and handled by the registered internal
- * handlers in subprocess.ts. Homed here so subprocess.ts (which imports
- * resolveAutomatic from this module) reuses them without a circular import.
+ * Re-exported from registry.ts, their home (a leaf module store.ts can import
+ * too — this module imports store.ts, so homing them here would cycle). Existing
+ * importers name them from here unchanged.
  */
-export const SPAWN_ACTION_TYPE = "core.spawnSubprocess";
-export const RETURN_ACTION_TYPE = "core.returnSubprocess";
+export { SPAWN_ACTION_TYPE, RETURN_ACTION_TYPE } from "./registry.js";
 
 /** Resolve an instance's frozen body from its pin. Injected (see resolution.ts ResolveBody). */
 type ResolveBodyFn = (processId: string, version: number) => Promise<ProcessBody | undefined> | ProcessBody | undefined;
