@@ -34,19 +34,24 @@ export async function drainTimers(db: SQL = sql, resolveBody: ResolveBody = () =
   const nowMs = Date.now();
   let fired = 0;
   for (const row of dueRows) {
-    const inst = parseInstance(row.body);
-    const body = await resolveBody(inst.processId, inst.version);
-    if (!body) continue; // resolver miss: leave for a later pass
-    const dueTimer = (inst.timers ?? [])
-      .filter((t) => !t.fired && new Date(t.fireAt).getTime() <= nowMs)
-      .sort((a, b) => ((a.fireAt as string) < (b.fireAt as string) ? -1 : 1))[0];
-    if (!dueTimer) continue;
+    // The whole per-instance body — parse, resolve, due-timer selection, and the
+    // fire — is inside the boundary. The scan is ORDER BY next_timer_at, so a
+    // corrupt row with the earliest due time would otherwise re-throw at the head
+    // of every pass and block every instance behind it. A skip leaves
+    // next_timer_at due, so a later pass retries — as for a lost firing race.
     try {
+      const inst = parseInstance(row.body);
+      const body = await resolveBody(inst.processId, inst.version);
+      if (!body) continue; // resolver miss: leave for a later pass
+      const dueTimer = (inst.timers ?? [])
+        .filter((t) => !t.fired && new Date(t.fireAt).getTime() <= nowMs)
+        .sort((a, b) => ((a.fireAt as string) < (b.fireAt as string) ? -1 : 1))[0];
+      if (!dueTimer) continue;
       await fireTimer(inst, dueTimer.timerId, body, db);
       fired++;
     } catch {
-      // A lost OCC race (ConcurrencyConflict) or any per-instance error: skip and
-      // continue; next_timer_at stays due, so a later pass retries.
+      // A lost OCC race (ConcurrencyConflict), a parse/resolve failure, or any
+      // per-instance error: skip and continue; next_timer_at stays due.
     }
   }
   return fired;

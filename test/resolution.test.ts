@@ -208,3 +208,27 @@ test.skipIf(!DB)("a commit onto a terminal step does not flag resolve_state, and
   expect(await resolveState(inst.instanceId)).toBe("pending");
   expect((await readInst(inst.instanceId)).currentStepId as string).toBe("step_end");
 });
+
+// --- poison-row isolation: one unparseable claimed row does not starve the batch --
+
+test.skipIf(!DB)("an unparseable claimed instance is requeued and does not starve the batch", async () => {
+  const body = waitBody("sayYes");
+  // Two good parked instances, both flagged 'pending' with go="yes" written.
+  const g1 = await createFrom(body);
+  const g2 = await createFrom(body);
+  await executeManualTransition(g1, "path_ab", body, actor);
+  await executeManualTransition(g2, "path_ab", body, actor);
+  expect(await drainOutbox(sql, reg)).toBe(2); // both flagged 'pending'
+
+  // A poison row: status 'running' so it is claimed, but no other Instance fields,
+  // so instanceSchema.parse throws before the resolver is consulted.
+  await sql`INSERT INTO instances (instance_id, transition_seq, body, resolve_state)
+    VALUES (${"inst_poison"}, ${0}, ${{ status: "running" }}, 'pending')`;
+
+  // Both good instances are processed and the poison is requeued, instead of the
+  // parse throw aborting the pass and stranding the rest of the batch.
+  expect(await drainResolutions(sql, () => body)).toBe(2);
+  expect((await readInst(g1.instanceId)).currentStepId as string).toBe("step_done");
+  expect((await readInst(g2.instanceId)).currentStepId as string).toBe("step_done");
+  expect(await resolveState("inst_poison")).toBe("pending"); // requeued, not lost
+});
