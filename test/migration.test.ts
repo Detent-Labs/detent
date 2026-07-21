@@ -694,6 +694,37 @@ function parentSubBody(childPid: string, childVersion: number): ProcessBody {
   } as unknown as ProcessBody;
 }
 
+// A parent parked at a subprocess step with a *running* child, under a guard the
+// child's "done" outcome never matches — so a delivered return leaves the parent
+// parked (subprocess.outcome-unmatched) rather than advancing it. v2 relocates the
+// subprocess step via stepMap. `settle()` drives the child to terminal and drains
+// its return, turning the child settled while the parent stays parked.
+async function parkedParentRunningChild() {
+  const cpid = CHILD_PID();
+  const p = pid();
+  const { registry } = engineRegistry();
+  const cv = await publishBody(cpid, childWaitBody());
+  const v1 = parentSubBody(cpid, cv.version);
+  (v1.workflow.steps as any[])[1].paths[0].guard = { lang: "cel", src: 'child.outcome == "never"' };
+  const v2raw = parentSubBody(cpid, cv.version);
+  (v2raw.workflow.steps as any[])[1].id = "step_p_sub2";
+  (v2raw.workflow.steps as any[])[0].paths[0].to = "step_p_sub2";
+  (v2raw.workflow.steps as any[])[1].paths[0].id = "path_p_done2";
+  (v2raw.workflow.steps as any[])[1].paths[0].guard = { lang: "cel", src: 'child.outcome == "never"' };
+  await publishBody(p, v1);
+  await publishBody(p, v2raw);
+  await registerMigrationPlan(p as Instance["processId"], 1, 2, { stepMap: { step_p_sub: "step_p_sub2" } } as unknown as MigrationSpec);
+  const parent = await startInstance((await createDefinitionStore(sql).resolveBody(p as Instance["processId"], 1))!, { processId: p as Instance["processId"], version: 1 }, actor);
+  await drainOutbox(sql, registry); // spawn child, running at step_c_wait, linked at step_p_sub
+  const childId = subprocessChildId(parent.instanceId, parent.transitionSeq, "step_p_sub");
+  const settle = async () => {
+    const childBody = (await createDefinitionStore(sql).resolveBody(cpid, cv.version))!;
+    await executeManualTransition((await loadInstance(childId))!, "path_c_done", childBody, actor);
+    await drainAll(registry);
+  };
+  return { p, parentId: parent.instanceId, childId, settle };
+}
+
 test.skipIf(!DB)("6.2 an identity migration of a parked parent spawns no second child", async () => {
   const cpid = CHILD_PID();
   const p = pid();
@@ -715,54 +746,29 @@ test.skipIf(!DB)("6.2 an identity migration of a parked parent spawns no second 
   expect(kids).toBe(1);
 });
 
-test.skipIf(!DB)("subprocess: an active child's parent link is repaired through a relocating stepMap", async () => {
-  const cpid = CHILD_PID();
-  const p = pid();
-  const { registry } = engineRegistry();
-  const cv = await publishBody(cpid, childWaitBody());
-  const v1 = parentSubBody(cpid, cv.version);
-  // v2 renames the subprocess step id; stepMap relocates the parent onto it.
-  const v2raw = parentSubBody(cpid, cv.version);
-  (v2raw.workflow.steps as any[])[1].id = "step_p_sub2";
-  (v2raw.workflow.steps as any[])[0].paths[0].to = "step_p_sub2";
-  (v2raw.workflow.steps as any[])[1].paths[0].id = "path_p_done2";
-  await publishBody(p, v1);
-  await publishBody(p, v2raw);
-  await registerMigrationPlan(p as Instance["processId"], 1, 2, { stepMap: { step_p_sub: "step_p_sub2" } } as unknown as MigrationSpec);
-  const parent = await startInstance((await createDefinitionStore(sql).resolveBody(p as Instance["processId"], 1))!, { processId: p as Instance["processId"], version: 1 }, actor);
-  await drainOutbox(sql, registry); // spawn child, linked at step_p_sub
-  const childId = subprocessChildId(parent.instanceId, parent.transitionSeq, "step_p_sub");
-  await migrateInstances(p as Instance["processId"], 1, 2, sql);
-  const child = await loadInstance(childId);
-  expect(child!.parent?.stepId as string).toBe("step_p_sub2"); // link repaired
-  const parentAfter = await loadInstance(parent.instanceId);
-  expect(parentAfter!.currentStepId as string).toBe("step_p_sub2");
+test.skipIf(!DB)("subprocess: a running child blocks the parent's relocation (child-in-flight)", async () => {
+  const { p, parentId, childId } = await parkedParentRunningChild();
+  // Relocating off a subprocess step with a live child is deferred, not committed.
+  const res = await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  expect(res.skipped).toEqual([parentId]);
+  const skipEv = (await eventsOf(parentId)).find((e) => e.kind === "migration.skipped");
+  expect(skipEv && skipEv.payload.reason).toBe("child-in-flight");
+  // Parent keeps its pin and step; the child's link is untouched.
+  const parentAfter = await loadInstance(parentId);
+  expect(parentAfter!.version).toBe(1);
+  expect(parentAfter!.currentStepId as string).toBe("step_p_sub");
+  expect((await loadInstance(childId))!.parent?.stepId as string).toBe("step_p_sub");
 });
 
-test.skipIf(!DB)("6.13 a terminal child's parent link is repaired too, so its return finds the parent", async () => {
-  const cpid = CHILD_PID();
-  const p = pid();
-  const { registry } = engineRegistry();
-  const cv = await publishBody(cpid, childWaitBody());
-  const v1 = parentSubBody(cpid, cv.version);
-  const v2raw = parentSubBody(cpid, cv.version);
-  (v2raw.workflow.steps as any[])[1].id = "step_p_sub2";
-  (v2raw.workflow.steps as any[])[0].paths[0].to = "step_p_sub2";
-  (v2raw.workflow.steps as any[])[1].paths[0].id = "path_p_done2";
-  await publishBody(p, v1);
-  await publishBody(p, v2raw);
-  await registerMigrationPlan(p as Instance["processId"], 1, 2, { stepMap: { step_p_sub: "step_p_sub2" } } as unknown as MigrationSpec);
-  const parent = await startInstance((await createDefinitionStore(sql).resolveBody(p as Instance["processId"], 1))!, { processId: p as Instance["processId"], version: 1 }, actor);
-  await drainOutbox(sql, registry); // spawn child, linked at step_p_sub
-  const childId = subprocessChildId(parent.instanceId, parent.transitionSeq, "step_p_sub");
-  // Drive the (manual) child to its terminal step so its return is enqueued but not yet
-  // delivered: it is precisely the terminal child whose link must still be repaired.
-  await sql`UPDATE instances SET body = body || ${{ status: "completed", currentStepId: "step_c_done" }}::jsonb WHERE instance_id = ${childId}`;
-  // The parent migrates while the terminal child's link still names the old step id.
-  await migrateInstances(p as Instance["processId"], 1, 2, sql);
-  const child = await loadInstance(childId);
-  expect(child!.parent?.stepId as string).toBe("step_p_sub2"); // terminal child repaired
-  expect(child!.status).toBe("completed"); // otherwise untouched by the parent's migration
+test.skipIf(!DB)("subprocess: a settled child does not block the relocation and is not repointed", async () => {
+  const { p, parentId, childId, settle } = await parkedParentRunningChild();
+  await settle(); // child terminal + return drained; parent stayed parked (outcome unmatched)
+  expect((await loadInstance(parentId))!.currentStepId as string).toBe("step_p_sub");
+  const res = await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  expect(res.migrated).toEqual([parentId]);
+  expect((await loadInstance(parentId))!.currentStepId as string).toBe("step_p_sub2");
+  // A settled child's parent.stepId is inert, so migration leaves it as-is.
+  expect((await loadInstance(childId))!.parent?.stepId as string).toBe("step_p_sub");
 });
 
 // =============================================================================
@@ -940,24 +946,13 @@ test.skipIf(!DB)("one invocation migrates a mappable instance and skips an unmap
 
 // --- subprocess: relocation spawns; identity leaves links; terminal return wakes -
 
-test.skipIf(!DB)("a relocation onto a subprocess step enqueues a fresh spawn", async () => {
-  const cpid = CHILD_PID();
-  const p = pid();
-  const { registry } = engineRegistry();
-  const cv = await publishBody(cpid, childWaitBody());
-  const v1 = parentSubBody(cpid, cv.version);
-  const v2raw = parentSubBody(cpid, cv.version);
-  (v2raw.workflow.steps as any[])[1].id = "step_p_sub2";
-  (v2raw.workflow.steps as any[])[0].paths[0].to = "step_p_sub2";
-  (v2raw.workflow.steps as any[])[1].paths[0].id = "path_p_done2";
-  await publishBody(p, v1);
-  await publishBody(p, v2raw);
-  await registerMigrationPlan(p as Instance["processId"], 1, 2, { stepMap: { step_p_sub: "step_p_sub2" } } as unknown as MigrationSpec);
-  const parent = await startInstance((await createDefinitionStore(sql).resolveBody(p as Instance["processId"], 1))!, { processId: p as Instance["processId"], version: 1 }, actor);
-  await drainOutbox(sql, registry);
-  await migrateInstances(p as Instance["processId"], 1, 2, sql);
+test.skipIf(!DB)("a relocation onto a subprocess step enqueues a fresh spawn once the source child has settled", async () => {
+  const { p, parentId, settle } = await parkedParentRunningChild();
+  await settle(); // no live child left to block the relocation
+  const res = await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  expect(res.migrated).toEqual([parentId]);
   // stepChanged -> suppressSpawn false -> a spawn for the new subprocess step is enqueued.
-  expect(await outboxActionIds(parent.instanceId)).toContain("action_spawn_step_p_sub2");
+  expect(await outboxActionIds(parentId)).toContain("action_spawn_step_p_sub2");
 });
 
 test.skipIf(!DB)("an identity migration leaves a child's parent link untouched", async () => {
@@ -976,12 +971,12 @@ test.skipIf(!DB)("an identity migration leaves a child's parent link untouched",
   expect((await loadInstance(childId))!.parent?.stepId as string).toBe("step_p_sub"); // unchanged
 });
 
-test.skipIf(!DB)("6.13 the repaired terminal child's return drives the parked parent off the wait-state", async () => {
+test.skipIf(!DB)("subprocess: a terminal child's undelivered return blocks the relocation; the unmigrated parent still completes on the source version", async () => {
   const cpid = CHILD_PID();
   const p = pid();
   const { registry } = engineRegistry();
   const cv = await publishBody(cpid, childWaitBody());
-  const v1 = parentSubBody(cpid, cv.version);
+  const v1 = parentSubBody(cpid, cv.version); // matching guard: a delivered "done" completes the parent
   const v2raw = parentSubBody(cpid, cv.version);
   (v2raw.workflow.steps as any[])[1].id = "step_p_sub2";
   (v2raw.workflow.steps as any[])[0].paths[0].to = "step_p_sub2";
@@ -992,17 +987,31 @@ test.skipIf(!DB)("6.13 the repaired terminal child's return drives the parked pa
   const parent = await startInstance((await createDefinitionStore(sql).resolveBody(p as Instance["processId"], 1))!, { processId: p as Instance["processId"], version: 1 }, actor);
   await drainOutbox(sql, registry); // spawn child, linked at step_p_sub
   const childId = subprocessChildId(parent.instanceId, parent.transitionSeq, "step_p_sub");
-  // Drive the child to terminal via the real path so a genuine return row is enqueued
-  // (pending, not yet delivered).
+  // Drive the child to terminal via the real path so a genuine return row is enqueued,
+  // pending (not yet delivered) — the terminal child stays live until its return drains.
   const childBody = (await createDefinitionStore(sql).resolveBody(cpid, cv.version))!;
   await executeManualTransition((await loadInstance(childId))!, "path_c_done", childBody, actor);
-  // The parent migrates before the return is delivered; the terminal child's link is repaired.
-  await migrateInstances(p as Instance["processId"], 1, 2, sql);
-  // Deliver: the return reads the child's repaired link and drives the parent off step_p_sub2.
+  // The undelivered return blocks the relocation.
+  const res = await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  expect(res.skipped).toEqual([parent.instanceId]);
+  const skipEv = (await eventsOf(parent.instanceId)).find((e) => e.kind === "migration.skipped");
+  expect(skipEv && skipEv.payload.reason).toBe("child-in-flight");
+  // Left on the source version, the return now drains and completes the parent normally.
   await drainAll(registry);
   const parentAfter = await loadInstance(parent.instanceId);
+  expect(parentAfter!.version).toBe(1);
   expect(parentAfter!.currentStepId as string).toBe("step_p_done");
   expect(parentAfter!.status).toBe("completed");
+});
+
+test.skipIf(!DB)("subprocess: an instance skipped child-in-flight migrates on a later invocation once the child settles", async () => {
+  const { p, parentId, settle } = await parkedParentRunningChild();
+  const res1 = await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  expect(res1.skipped).toEqual([parentId]);
+  await settle();
+  const res2 = await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  expect(res2.migrated).toEqual([parentId]);
+  expect((await loadInstance(parentId))!.currentStepId as string).toBe("step_p_sub2");
 });
 
 // --- persistence: publish carries no rule; schema init is idempotent ----------
