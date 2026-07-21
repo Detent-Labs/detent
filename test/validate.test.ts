@@ -338,6 +338,63 @@ describe("definition-contract: view-ref resolution over the full field tree", ()
   });
 });
 
+// Mirrors the "duration reaches every action position" coverage below: each of
+// the five action positions was independently deletable from the check with the
+// suite green before this change, since none had a test. Grow the blocks rather
+// than asserting over a shared one.
+describe("definition-contract: Action.output targets resolve to a real field, from every action position", () => {
+  const okField = "field_amount";
+  const bogusField = "field_does_not_exist";
+  const nestedField = "field_nested";
+
+  const outputAction = (fid: string) => ({
+    id: "action_a", type: "noop", config: {}, output: { [fid]: { lang: "cel", src: "result.x" } },
+  });
+
+  type Position = "onEntry" | "onExit" | "onCancel" | "onPath" | "onFire";
+
+  const bodyWith = (position: Position, fid: string) => ({
+    key: "p", label: "P",
+    fields: [
+      { id: "field_amount", key: "amount", label: "Amount", type: "number" },
+      { id: "field_g", key: "grp", label: "G", type: "group", fields: [
+        { id: "field_nested", key: "nested", label: "N", type: "string" },
+      ] },
+    ],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a", key: "a", label: "A", type: "task",
+          ...(position === "onEntry" ? { onEntry: [outputAction(fid)] } : {}),
+          ...(position === "onExit" ? { onExit: [outputAction(fid)] } : {}),
+          ...(position === "onCancel" ? { onCancel: [outputAction(fid)] } : {}),
+          ...(position === "onFire" ? { timers: [{ id: "timer_a", duration: "P1D", onFire: { actions: [outputAction(fid)] } }] } : {}),
+          paths: [{
+            id: "path_ab", key: "ab", to: "step_b", trigger: "automatic", priority: 1,
+            ...(position === "onPath" ? { onPath: [outputAction(fid)] } : {}),
+          }],
+        },
+        { id: "step_b", key: "b", label: "B", type: "task", terminal: true },
+      ],
+    },
+  });
+
+  for (const position of ["onEntry", "onExit", "onCancel", "onPath", "onFire"] as const) {
+    it(`rejects an unknown output field target in ${position}`, () => {
+      expect(processBody.safeParse(bodyWith(position, bogusField)).success).toBe(false);
+    });
+
+    it(`accepts a resolvable output field target in ${position}`, () => {
+      expect(processBody.safeParse(bodyWith(position, okField)).success).toBe(true);
+    });
+  }
+
+  it("accepts an output target resolving to a field nested inside a group", () => {
+    expect(processBody.safeParse(bodyWith("onPath", nestedField)).success).toBe(true);
+  });
+});
+
 // A duration is armed inside the transition commit, on the TARGET step, so an
 // unvalidated one does not fail a single instance: it makes the step unreachable
 // for every instance of the definition. It is checked on the WRITE path — see

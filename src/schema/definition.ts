@@ -559,7 +559,10 @@ export const processBody = z
         if (tp !== undefined && !(s.paths ?? []).some((p) => p.id === tp))
           add(`timer targetPath is not an outgoing path of this step: ${tp}`, ["workflow", "steps", i, "timers", j]);
       });
-      [...(s.onEntry ?? []), ...(s.onExit ?? []), ...(s.onCancel ?? [])].forEach((a) => {
+      const stepActions = [...(s.onEntry ?? []), ...(s.onExit ?? []), ...(s.onCancel ?? [])];
+      (s.paths ?? []).forEach((p) => stepActions.push(...(p.onPath ?? [])));
+      (s.timers ?? []).forEach((t) => stepActions.push(...(t.onFire.actions ?? [])));
+      stepActions.forEach((a) => {
         Object.keys(a.output ?? {}).forEach((fid) => {
           if (!fieldIds.has(fid as FieldId)) add(`action output targets unknown field: ${fid}`, ["workflow", "steps", i]);
         });
