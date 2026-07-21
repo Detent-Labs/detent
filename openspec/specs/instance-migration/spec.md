@@ -53,10 +53,14 @@ Registering a plan for an existing key SHALL replace the stored spec only while 
 plan has not been applied, and SHALL be refused once it has. The check and the
 replacement SHALL be one atomic operation, not a read followed by a write.
 
-An invocation SHALL read the plan once, before processing any instance, and SHALL
-mark it applied before the first instance is processed — not on the first successful
-one. All instances in that invocation SHALL be migrated under the spec read at the
-start.
+An invocation SHALL read the plan and mark it applied — before processing any
+instance, not on the first successful one — as one atomic operation, not a read
+followed by a separate write. All instances in that invocation SHALL be migrated
+under the spec that operation reads back. A read followed by a separate freeze
+statement leaves the same window a non-atomic registration would: a registration
+landing between the two can commit its spec after the read but before the freeze,
+so the invocation migrates instances under the spec it already read while the row
+is left frozen on a different, never-applied spec.
 
 A rule that has moved instances describes history: the `HistoryEntry` of every
 instance migrated under it is only interpretable against the rule that produced it,
@@ -85,14 +89,15 @@ the only alternative when the rule belongs to an immutable version.
 #### Scenario: A registration racing an invocation does not slip through
 
 - **WHEN** a registration and an invocation of the same plan run concurrently
-- **THEN** either the registration is refused, or it commits before the invocation
-  marks the plan applied — never a state in which instances migrated under one spec
-  while a different spec is stored
+- **THEN** either the registration is refused, or it commits before the invocation's
+  atomic read-and-freeze observes it — never a state in which instances migrated
+  under one spec while a different spec is left stored and frozen
 
 #### Scenario: One invocation uses one spec throughout
 
 - **WHEN** an invocation spans several batches
-- **THEN** every instance it migrates is migrated under the spec read at the start
+- **THEN** every instance it migrates is migrated under the spec its atomic
+  read-and-freeze returned
 
 #### Scenario: An invocation that migrates nothing still freezes the plan
 
@@ -103,6 +108,14 @@ the only alternative when the rule belongs to an immutable version.
 
 - **WHEN** `(1→4)` has been applied and `(2→4)` has not
 - **THEN** `(2→4)` is still replaceable
+
+#### Scenario: The frozen spec is always the one actually used
+
+- **WHEN** a registration for the same key is attempted while an invocation's
+  atomic read-and-freeze is in flight
+- **THEN** the spec left permanently stored on the row is the same spec every
+  instance in that invocation was migrated under, never a spec registered but
+  applied to nothing
 
 ### Requirement: A plan is validated against both bodies at registration
 

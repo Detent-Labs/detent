@@ -218,6 +218,77 @@ test.skipIf(!DB)("freezing is per key", async () => {
   await registerMigrationPlan(p as Instance["processId"], 2, 4, { transforms: {} } as MigrationSpec);
 });
 
+test.skipIf(!DB)("a registration racing an invocation cannot leave the frozen spec disagreeing with what was applied", async () => {
+  const p = pid();
+  const v1 = waitBody({ key: "a", fields: [f("x", "string"), f("marker", "string")] });
+  const v2 = waitBody({ key: "a", fields: [f("x", "string"), f("marker", "string")] });
+  await publishV(p, v1, "1");
+  await publishV(p, v2, "2");
+  const specA = { transforms: { field_marker: cel('"A"') } } as unknown as MigrationSpec;
+  const specB = { transforms: { field_marker: cel('"B"') } } as unknown as MigrationSpec;
+  await registerMigrationPlan(p as Instance["processId"], 1, 2, specA);
+  const inst = await mkInstance(p, 1, { field_x: "hi" });
+
+  // Hold the migration_plans row, start migrateInstances (its read-and-freeze UPDATE
+  // blocks on the lock, on its own connection), then queue a racing registration for
+  // a different spec (also on its own connection) before releasing. Neither call is
+  // awaited while the lock is held -- awaiting either here, on a different
+  // connection than the one holding the lock, would deadlock the test itself, not
+  // just exercise the race. Whichever statement actually commits first once the
+  // lock is released governs both what gets frozen and what the instance is
+  // migrated under -- the atomic UPDATE closes the old gap in which those two could
+  // disagree.
+  // Each racing call gets its outcome captured via .then's two callbacks right at
+  // creation time, on the same microtask turn -- not via a later try/await, which
+  // would leave the promise's rejection unobserved (and bun:test failing the test
+  // for it) for the whole stretch between creation and that later await.
+  type Settled<T> = { ok: true; v: T } | { ok: false; e: unknown };
+  let migP: Promise<Settled<MigrationResult>>;
+  let regP: Promise<Settled<void>>;
+  await sql.begin(async (tx) => {
+    await tx`SELECT 1 FROM migration_plans
+      WHERE process_id = ${p} AND from_version = 1 AND to_version = 2 FOR UPDATE`;
+    migP = migrateInstances(p as Instance["processId"], 1, 2, sql).then(
+      (v) => ({ ok: true, v }) as Settled<MigrationResult>,
+      (e) => ({ ok: false, e }) as Settled<MigrationResult>,
+    );
+    await new Promise((r) => setTimeout(r, 150)); // let migrateInstances reach its UPDATE and block
+    regP = registerMigrationPlan(p as Instance["processId"], 1, 2, specB).then(
+      () => ({ ok: true, v: undefined }) as Settled<void>,
+      (e) => ({ ok: false, e }) as Settled<void>,
+    );
+    await new Promise((r) => setTimeout(r, 150)); // let it reach its own upsert and block too
+    // Neither is awaited here -- awaiting either while still holding the lock (this
+    // callback hasn't returned, so the transaction hasn't committed) would deadlock
+    // the test, not just exercise the race. The .then above still attaches a handler
+    // synchronously at creation, so neither settling later is ever "unhandled."
+  });
+  // The lock is released now (the transaction above committed); await both to their
+  // conclusion, which the lock release unblocks.
+  const migSettled = await migP!;
+  const regSettled = await regP!;
+  if (!migSettled.ok) throw migSettled.e;
+  let registerRefused = false;
+  if (!regSettled.ok) {
+    expect(regSettled.e).toBeInstanceOf(MigrationPlanError);
+    registerRefused = true;
+  }
+
+  const frozen = await resolveMigrationPlan(p as Instance["processId"], 1, 2);
+  const after = await loadInstance(inst.instanceId);
+  const frozenMarker = (frozen!.spec.transforms as Record<string, unknown> | undefined)?.field_marker
+    ? ((frozen!.spec.transforms as Record<string, { src: string }>).field_marker.src === '"A"' ? "A" : "B")
+    : undefined;
+  // The instance was migrated under whichever spec ends up frozen -- never the
+  // other one. registerMigrationPlan's request for the row lock is issued only
+  // after it has already validated specB against both bodies, well after
+  // migrateInstances's read-and-freeze UPDATE (the very first thing it does) has
+  // started waiting on the same lock, so it loses the race deterministically.
+  expect(registerRefused).toBe(true);
+  expect(frozenMarker).toBe("A");
+  expect(dataField(after, "field_marker")).toBe("A");
+});
+
 test.skipIf(!DB)("structural validation rejects out-of-body maps and the cancel-sink", async () => {
   const p = pid();
   await publishN(p, 2);

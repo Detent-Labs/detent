@@ -389,13 +389,15 @@ async function migrateOne(
 
 /**
  * Migrate every running instance on `fromVersion` onto `toVersion` under the
- * registered plan. Refuses when no plan exists. The plan is read once and stamped
- * applied before the first instance, so one invocation uses one spec throughout and a
- * concurrent registration can no longer change it. Instances are selected by keyset
- * pagination on `instance_id` (a bare LIMIT over the running/source-version predicate
- * would return a batch of skipped/conflicted instances forever), and each is migrated
- * in its own transaction inside its own error boundary. Returns instance ids grouped
- * by outcome.
+ * registered plan. Refuses when no plan exists. The plan is read and stamped applied
+ * in one atomic statement, before any instance — not a read followed by a separate
+ * write, which would leave a window for a concurrent registration to store a spec
+ * between the two and freeze a row that disagrees with what was actually applied —
+ * so one invocation uses one spec throughout, and that spec is guaranteed to be the
+ * one left frozen on the row. Instances are selected by keyset pagination on
+ * `instance_id` (a bare LIMIT over the running/source-version predicate would return
+ * a batch of skipped/conflicted instances forever), and each is migrated in its own
+ * transaction inside its own error boundary. Returns instance ids grouped by outcome.
  */
 export async function migrateInstances(
   processId: ProcessId,
@@ -404,19 +406,23 @@ export async function migrateInstances(
   db: SQL = sql,
   resolvers: { resolveBody: ResolveBody } = createDefinitionStore(db),
 ): Promise<MigrationResult> {
-  const plan = await resolveMigrationPlan(processId, fromVersion, toVersion, db);
-  if (!plan) throw new MigrationPlanError(`no plan registered for ${processId} ${fromVersion}->${toVersion}`);
-  const spec = plan.spec;
+  // Read-and-freeze as one statement — not on the first success, or an invocation
+  // that skips everything leaves the plan editable while it runs. A concurrent
+  // registerMigrationPlan racing this UPDATE resolves through ordinary row-level
+  // locking: whichever commits first is what the other observes, so the spec
+  // returned here is always the spec left permanently stored on the row.
+  const rows = (await db`UPDATE migration_plans SET applied_at = COALESCE(applied_at, now())
+    WHERE process_id = ${processId} AND from_version = ${fromVersion} AND to_version = ${toVersion}
+    RETURNING spec`) as { spec: unknown }[];
+  if (rows.length === 0)
+    throw new MigrationPlanError(`no plan registered for ${processId} ${fromVersion}->${toVersion}`);
+  const rawSpec = rows[0].spec;
+  const spec = migrationSpec.parse(typeof rawSpec === "string" ? JSON.parse(rawSpec) : rawSpec);
 
   const fromBody = await resolvers.resolveBody(processId, fromVersion);
   const toBody = await resolvers.resolveBody(processId, toVersion);
   if (!fromBody) throw new MigrationPlanError(`source version ${fromVersion} is not published`);
   if (!toBody) throw new MigrationPlanError(`target version ${toVersion} is not published`);
-
-  // Stamp applied BEFORE any instance — not on the first success, or an invocation
-  // that skips everything leaves the plan editable while it runs.
-  await db`UPDATE migration_plans SET applied_at = COALESCE(applied_at, now())
-    WHERE process_id = ${processId} AND from_version = ${fromVersion} AND to_version = ${toVersion}`;
 
   const result: MigrationResult = { migrated: [], skipped: [], conflicted: [], failed: [] };
   let last = "";
