@@ -17,6 +17,7 @@ import {
   registerMigrationPlan,
   resolveMigrationPlan,
   migrateInstances,
+  findOrphanKeys,
   MigrationPlanError,
   type MigrationResult,
 } from "../src/engine/migration.js";
@@ -1038,4 +1039,61 @@ test.skipIf(!DB)("schema init is idempotent and leaves the definitions relation 
   // definitions gained no migration column.
   const cols = (await sql`SELECT column_name FROM information_schema.columns WHERE table_name = 'definitions'`) as { column_name: string }[];
   expect(cols.map((c) => c.column_name).sort()).toEqual(["body", "definition_hash", "process_id", "published_at", "status", "version"]);
+});
+
+// =============================================================================
+// 7. Orphan-key inspection: findOrphanKeys.
+// =============================================================================
+
+test.skipIf(!DB)("7.1 reports an instance holding a data key absent from the catalog, group ids included", async () => {
+  const p = pid();
+  const group = { id: "field_grp", key: "grp", label: "grp", type: "group", fields: [f("a", "string")] } as unknown as Field;
+  await publishV(p, waitBody({ key: "a", fields: [group] }), "1");
+  // field_grp is the group container's own id — never a valid data key even though
+  // it is "declared" — and field_ghost is declared nowhere.
+  const inst = await mkInstance(p, 1, { field_a: "kept", field_ghost: "orphan", field_grp: "also orphan" });
+  const scan = await findOrphanKeys(p as Instance["processId"], 1, sql);
+  expect(scan.unreadable).toEqual([]);
+  expect(scan.orphans).toHaveLength(1);
+  expect(scan.orphans[0]!.instanceId).toBe(inst.instanceId);
+  expect(scan.orphans[0]!.keys.sort()).toEqual(["field_ghost", "field_grp"]);
+});
+
+test.skipIf(!DB)("7.2 an instance whose data keys all match the catalog reports no orphans", async () => {
+  const p = pid();
+  await publishV(p, waitBody({ key: "a", fields: [f("a", "string")] }), "1");
+  await mkInstance(p, 1, { field_a: "kept" });
+  const scan = await findOrphanKeys(p as Instance["processId"], 1, sql);
+  expect(scan.orphans).toEqual([]);
+  expect(scan.unreadable).toEqual([]);
+});
+
+test.skipIf(!DB)("7.3 a terminal instance's orphan key is still reported", async () => {
+  const p = pid();
+  await publishV(p, waitBody({ key: "a", fields: [f("a", "string")], waitTerminal: true }), "1");
+  const inst = await mkInstance(p, 1, { field_a: "kept", field_ghost: "orphan" });
+  expect((await loadInstance(inst.instanceId))!.status).toBe("completed");
+  const scan = await findOrphanKeys(p as Instance["processId"], 1, sql);
+  expect(scan.orphans).toEqual([{ instanceId: inst.instanceId, keys: ["field_ghost"] }]);
+});
+
+test.skipIf(!DB)("7.4 an unreadable row is isolated and does not abort the scan", async () => {
+  const p = pid();
+  await publishV(p, waitBody({ key: "a", fields: [f("a", "string")] }), "1");
+  const good = await mkInstance(p, 1, { field_a: "kept", field_ghost: "orphan" });
+  // Same shape as the resolution/timers poison-row tests: a row whose body is
+  // missing required Instance fields fails instanceSchema.parse, but still carries
+  // processId/version so it is selected by the scan's WHERE clause.
+  await sql`INSERT INTO instances (instance_id, transition_seq, body)
+    VALUES (${"inst_poison"}, ${0}, ${{ processId: p, version: 1, status: "running" }})`;
+  const scan = await findOrphanKeys(p as Instance["processId"], 1, sql);
+  expect(scan.unreadable).toEqual(["inst_poison"]);
+  expect(scan.orphans).toEqual([{ instanceId: good.instanceId, keys: ["field_ghost"] }]);
+});
+
+test.skipIf(!DB)("7.5 an unresolvable version throws and scans nothing", async () => {
+  const p = pid();
+  await publishV(p, waitBody({ key: "a", fields: [f("a", "string")] }), "1");
+  await mkInstance(p, 1, { field_ghost: "orphan" });
+  await expectReject(findOrphanKeys(p as Instance["processId"], 99, sql), /not published/);
 });
