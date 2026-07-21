@@ -26,11 +26,20 @@ a parse entry point that does not require an evaluation context.
 ### Requirement: Formal expression context
 
 The system SHALL define a single, explicit expression context that enumerates
-every namespace a guard may read: `data` (the flat instance payload keyed by
-`fieldId`), `instance`, `actor`, each named data-source result, and — only inside
-a subprocess step — `child.outcome` and `child.data`. The exact field shapes of
-`instance` and `actor` MUST be pinned as types. CEL expressions are pure and
-total and MUST NOT reference wall-clock time; there is no `now()`.
+every namespace a guard may read: `data`, `instance`, `actor`, each named
+data-source result, and — only inside a subprocess step — `child.outcome` and
+`child.data`. The exact field shapes of `instance` and `actor` MUST be pinned as
+types. CEL expressions are pure and total and MUST NOT reference wall-clock time;
+there is no `now()`.
+
+Within an expression, `data` SHALL be addressed by field **`key`**, not by
+`fieldId`: a `field_<uuid>` id is not a valid CEL identifier, so it could not be
+written as a member reference at all. The persisted instance payload remains keyed
+by `fieldId` — the id stays the sole reference anchor for storage and
+cross-references — and both the authoring-time checker and the engine's evaluator
+re-key that payload to `key` when they build the context, so the two cannot drift.
+A consequence: field keys must be unique within a process, since two fields sharing
+a key would shadow each other in every expression.
 
 The `child` namespace is scoped to a subprocess step's *guards* — the expressions
 evaluated when the step is left, once a child has returned. A timer `deadline` on
@@ -41,8 +50,13 @@ Authoring-time validation SHALL therefore reject a `child` reference in a
 
 #### Scenario: Guard reads a permitted namespace
 
-- **WHEN** a guard expression references `data.<fieldId>`, `instance.<field>`, `actor.<field>`, or a declared data-source result
+- **WHEN** a guard expression references `data.<fieldKey>`, `instance.<field>`, `actor.<field>`, or a declared data-source result
 - **THEN** the expression type-checks against the defined context
+
+#### Scenario: A field id is not a valid data reference
+
+- **WHEN** a guard expression attempts to reference a field by its `field_<uuid>` id
+- **THEN** it does not parse as a member reference, and authoring-time validation rejects it
 
 #### Scenario: child namespace only inside a subprocess step
 

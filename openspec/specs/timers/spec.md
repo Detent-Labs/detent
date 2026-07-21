@@ -1,7 +1,28 @@
 # timers Specification
 
 ## Purpose
-TBD - created by archiving change timer-scheduler. Update Purpose after archive.
+
+Defines timers as a first-class property of a step: how they are armed, fired,
+disarmed and reconciled, and where the values they depend on are validated.
+
+A timer's `fireAt` is computed once when the step is entered and persisted with the
+commit that records the entry, so it survives restart and does not drift — time
+enters the engine here and nowhere else (CEL has no `now()`). A timer declares
+either a fixed `duration` or a CEL `deadline`, never both. Arming is total: a
+deadline that cannot be resolved to an instant omits that timer rather than failing
+the step entry, and the omission is recorded as a `timer.unarmed` event. A
+`duration`, by contrast, is validated on the **publish** path — grammar and
+magnitude both — because `definition.ts` is also the deserializer for stored
+immutable bodies, so a tightened read-path refinement would make an
+already-published definition unreadable and its pinned instances unrehydratable.
+
+Firing is at-most-once per armed timer, enforced by the same optimistic-concurrency
+token transitions use. A timer whose `onFire` names a `targetPath` forces a
+transition and bypasses that path's guard; one that names only actions is a reminder
+and changes no step. Migration reconciles a carried timer set against the target
+step's declarations instead of re-arming from scratch, so a surviving timer keeps
+its original `fireAt`.
+
 ## Requirements
 ### Requirement: Arm timers on step entry
 

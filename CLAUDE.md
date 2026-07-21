@@ -51,7 +51,16 @@ uphold, not open questions.
 `step_...`, lowercase, immutable) which is the SOLE reference anchor. `key` is a
 human-readable slug that references nothing and may change. `label` is display
 text. Cross-references and persisted instance state use `id` only. Ids are unique
-per entity kind per process. Runtime ids (instance, history) use UUIDv7.
+per entity kind per process. Runtime ids (instance `inst_`, history `hist_`, event
+`evt_`) are minted by the engine via `crypto.randomUUID()` — UUIDv4, not v7. The
+id schemas enforce the prefix only, not the UUID form. UUIDv7 was the original
+intent (lexically time-sortable ids would let history and events order without
+reading `at`); nothing depends on that ordering today, so it stays v4 until
+something does. Do not restate v7 as a current fact. Because only the prefix is
+enforced, the two subprocess examples deliberately use readable ids
+(`proc_credit_check`, `step_...`) for legibility — that is a documentation
+convenience, not the authoring convention; `expense-approval.json` shows the real
+one.
 
 **Hashing / versioning.** `definitionHash` is the JCS (canonical JSON) hash of
 `ProcessBody` only; the versioned wrapper is not hashed, so identical bodies get
@@ -108,10 +117,16 @@ floats.
 **Extensibility.** Custom actions, guards, data sources, assignment strategies,
 and field types are plugins behind a uniform envelope `{ type, config }`. The
 core validates only the envelope; each plugin ships its own JSON Schema. The
-registry maps `type -> { config schema, output schema }` and validates at
-PUBLISH time (unknown type or invalid config is a publish error, not a runtime
-error). Data sources are never inlined; fields bind to them by id and options
-resolve at runtime.
+registry is intended to map `type -> { config schema, output schema }` and to
+validate at PUBLISH time (unknown type or invalid config a publish error, not a
+runtime one). NOT BUILT: `registry.ts` declares an optional `configSchema` that
+nothing reads, and `publishBody` never consults the registry at all — an unknown
+action `type` or a malformed `config` publishes cleanly and first fails at
+delivery. The one type check that *is* enforced at publish is the reserved
+`core.` prefix, rejected by a Zod refinement in `authoredProcessBody`. Treat
+registry-backed publish validation as a decided-but-unbuilt item, not a fact.
+Data sources are never inlined; fields bind to them by id and options resolve at
+runtime.
 
 **Runtime record (the audit backbone).** The instance carries assignment/claim
 state and persisted timer firings. Each HistoryEntry is append-only and records
@@ -125,13 +140,15 @@ no step change get a sibling record, `InstanceEvent` (append-only, `evt_` ids): 
 discriminated union over `kind` with a kind-specific payload, carrying the instance,
 the `version` and the `transitionSeq` **in force**. An event never advances the
 sequence, so several may share one and share it with a transition; they order by
-`at`. Four kinds exist — `timer.fired` (a reminder fired: actions enqueued, no
+`at`. Five kinds exist — `timer.fired` (a reminder fired: actions enqueued, no
 transition), `timer.unarmed` (a declared timer produced no `fireAt` at entry, with
 the reason), `migration.skipped` (an instance left on its source version, with the
-reason), and `subprocess.spawn-enqueued` (creation at a subprocess initial step
-enqueued its spawn: actions enqueued, no transition). Kinds are added additively;
+reason), `subprocess.spawn-enqueued` (creation at a subprocess initial step
+enqueued its spawn: actions enqueued, no transition), and
+`subprocess.outcome-unmatched` (a child returned an outcome no path on the parent's
+subprocess step matched, so the parent stays parked). Kinds are added additively;
 the record shape is settled. A kind that enqueues actions carries their
-`ActionOutcome`s — `timer.fired` and `subprocess.spawn-enqueued` do, the other two
+`ActionOutcome`s — `timer.fired` and `subprocess.spawn-enqueued` do, the other three
 enqueue nothing and so must not invite a reader to expect outcomes.
 
 An `ActionOutcome` attaches to the record that **enqueued** the action, carried on the
@@ -246,6 +263,15 @@ each with a test that rejects a violating definition.
   with subprocess execution below): passing `resolveBody` to `cancelInstance`
   recursively cancels active children by the `parent` link, depth-first for nested
   chains. Propagation is downward only in v1; no independent upward child cancel.
+  The child sweep is fault-isolated and **repairable**: it is tracked by a
+  `cancel_sweep_state` column (`pending` → `done`), so one child's OCC loss,
+  resolver miss or crash does not stop its siblings and does not strand the rest.
+  Re-invoking `cancelInstance` on an already-`cancelled` instance re-attempts a
+  sweep still `pending` instead of no-opping outright — the one case where the
+  non-running early return is not a plain no-op. That resume never re-commits the
+  instance's own cancel transition (no HistoryEntry, no `transitionSeq` change);
+  only the cascade resumes. A first call that omitted `resolveBody` therefore
+  leaves a `pending` sweep a later call can finish.
 - Subprocess execution (`src/engine/subprocess.ts`, `test/subprocess.test.ts`):
   makes a `subprocess` step live via two engine-internal outbox handlers (reserved
   `core.` type prefix, rejected in authored bodies; the two type constants are homed
@@ -257,7 +283,13 @@ each with a test that rejects a violating definition.
   `createDefinitionStore.resolveLatestByContract`), seeds it from `inputMapping`,
   and creates the linked child (idempotent on the deterministic `subprocessChildId`;
   no-op if the parent is not running, with a post-insert re-check that self-cancels
-  a child orphaned by a racing parent cancel). A child reaching a terminal step
+  a child orphaned by a racing parent cancel). Redelivery skips **only** the
+  creation: the drive-to-rest and the cancel-orphan backstop run on every delivery,
+  including one that finds the child already there. Gating them behind "did I
+  create the row" would make redelivery skip precisely the repairs redelivery
+  exists for — a crash between creation and either one would park the child on its
+  automatic initial step forever, or leave it running under a cancelled parent.
+  A child reaching a terminal step
   enqueues `core.returnSubprocess`, which evaluates the parent step's `outputMapping`
   over `child.outcome`/`child.data`, writes it into the parent's data, and drives
   the parent off the wait-state — selecting the first hop with the `child` namespace
@@ -271,6 +303,13 @@ each with a test that rejects a violating definition.
   silent success that marks the row delivered and parks the parent forever. The
   child row is read under that lock but not itself locked, which holds only because
   a link is repaired inside the migrating parent's own locked transaction.
+  If no automatic path's guard matches `child.outcome`, the writeback stays
+  committed and the delivery stays total, but the parent remains parked — the
+  `child` namespace lives only for that one delivery, so no later re-resolution can
+  ever recompute it and retry the match. That dead end is recorded as a
+  `subprocess.outcome-unmatched` event rather than lost silently. Reachable in
+  practice: an independently cancelled child returns the reserved `"cancelled"`
+  outcome, which a parent is not obliged to guard.
   `child.data` exposes the child's full data (re-keyed fieldId→key); filtering to
   `contract.outputFields` is deferred. Downward subprocess cancel propagation is
   DONE (see above). A `subprocess` step is also live as the *initial* step:
@@ -300,7 +339,13 @@ each with a test that rejects a violating definition.
   silently drops whichever consequence it does not reproduce (the status
   derivation, the subprocess spawn, the subprocess return, the `HistoryEntry`).
   `createInstance` remains a separate step-entry path that does not route
-  through here and does not inherit these consequences. `outbox.ts`
+  through here and so inherits nothing generically — each consequence it needs is
+  reproduced there deliberately (the subprocess spawn is; the `HistoryEntry` and a
+  `transitionSeq` advance are intrinsically absent from a creation). Run-to-rest is
+  crash-safe: a commit that leaves a `running` instance sets `resolve_state =
+  'pending'` in the *same statement* as the commit, so a crash between the commit
+  and its cascade leaves a durable marker the resolution worker picks up, rather
+  than an instance silently at rest on an all-automatic step. `outbox.ts`
   (transactional outbox: at-least-once delivery, result
   writeback, retry/dead-letter, stale-claim reclaim; a writeback applies only to a
   running instance). `resolution.ts` (re-resolves automatic paths after an async
@@ -328,7 +373,14 @@ each with a test that rejects a violating definition.
   workers, so re-resolution, timers, and outbox delivery are live, not inert. An
   instance MUST be created from the compiled body the store returns (its
   `definitionHash` matches the pin); an authored-body instance hash-mismatches and
-  is requeued forever. No editor exists yet.
+  is requeued forever. `publishBody` also parses through `authoredProcessBody`
+  before compiling, so undeclared keys are stripped *before* hashing — returning
+  the raw input instead would hash a key every read then strips back out, making
+  the pin unreproducible and every instance on that version permanently
+  unrehydratable. A `faulted` instance is a dead-end park: `executeManualTransition`
+  and `fireTimer` both gate on `status !== "running"`, so it can be neither
+  advanced manually nor moved by a timer (it also cannot be cancelled — the same
+  gate). No editor exists yet.
 
 ## Roadmap
 1. Validation layer (Zod-first): DONE. definition.ts is Zod-sourced with TS types
@@ -472,10 +524,12 @@ real call chains exist.
   (no client dependency); `DATABASE_URL` is the connection convention, set by the
   devcontainer compose.
 - **Run `bun test` with `DATABASE_URL` set, always.** The DB-backed suites are
-  `test.skipIf(!DB)`, so without it roughly 80 of the ~230 tests skip *silently* and
-  the run reports a green that proves almost nothing. A green claimed without the
-  variable is not evidence. Outside the devcontainer, point it at a Postgres 16 with
-  the compose credentials.
+  `test.skipIf(!DB)`, and they are the majority of the suite — well over half the
+  declared tests. Without the variable they skip *silently* and the run reports a
+  green that proves almost nothing. A green claimed without the variable is not
+  evidence; check the skip count, not just the pass count. Outside the devcontainer,
+  point it at a Postgres 16 with the compose credentials. (Exact counts are
+  deliberately not recorded here — they went stale twice.)
 - **A full-suite run is the reliable signal; a single-file rerun is not.** The DB
   suites share one database and truncate in `beforeEach`, so back-to-back runs of one
   file contend and fail spuriously. Observed, not fully characterised: full runs have

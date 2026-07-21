@@ -94,9 +94,15 @@ supplied actions, the appended `HistoryEntry`, the armed timer set, and the
 scheduling column.
 
 This is scoped to transitions. Instance creation is a separate step-entry path that
-does not route through the shared commit and does not inherit these consequences —
-notably it does not spawn for a subprocess `initialStep`. That divergence is
-pre-existing and is not addressed here.
+does not route through the shared commit and therefore does not inherit these
+consequences generically; each one creation needs is reproduced there deliberately.
+The subprocess spawn is reproduced: an instance created on a definition whose
+`initialStep` is a `subprocess` step SHALL have its spawn enqueued inside the
+creation transaction, carried by a `subprocess.spawn-enqueued` event rather than by
+a `HistoryEntry` (creation writes none). See the `subprocess-execution` and
+`runtime-events` specs, which own that requirement. The remaining divergence —
+creation appends no `HistoryEntry` and advances no `transitionSeq` — is intrinsic to
+creation, not a gap.
 
 No caller SHALL re-implement the commit in order to vary one of these. A
 re-implementation silently forgoes every consequence it does not reproduce, and each

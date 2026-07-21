@@ -46,6 +46,17 @@ test("rejects an unknown field reference", () => {
   expect(msgs(issues).toLowerCase()).toContain("nope");
 });
 
+// A field is addressed by `key`, never by `fieldId`: a `field_<uuid>` id is not a
+// valid CEL identifier, so it cannot even be written as a member reference — the
+// hyphens make it parse as arithmetic. Guards the contract rule that the payload is
+// stored by fieldId but re-keyed to `key` when the context is built.
+test("rejects a field referenced by its fieldId instead of its key", () => {
+  const issues = validateProcessBody(
+    body({ steps: [guardStep("data.field_1a2b3c4d-0004-4a1c-8e2f-000000000004 == 1")] }),
+  );
+  expect(issues.length).toBe(1);
+});
+
 // 5.3 type mismatch is rejected
 test("rejects a type mismatch (number vs string)", () => {
   const issues = validateProcessBody(body({ steps: [guardStep('data.amount > "x"')] }));
