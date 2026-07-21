@@ -667,3 +667,23 @@ test.skipIf(!DB)("cancel still commits to the sink from a deadline-armed step, d
   expect(await nextTimerAt(inst.instanceId)).toBeNull();
   expect(await historyCauses(inst.instanceId)).toEqual(["cancel"]);
 });
+
+// --- poison-row isolation: a corrupt row at the scan head does not block ------
+
+test.skipIf(!DB)("an unparseable row at the head of the timer scan does not block due timers", async () => {
+  const body = waitTimerBody(reminderTimer);
+  const good = await createFrom(body);
+  await executeManualTransition(good, "path_ab", body, actor); // arms timer_r1
+  // Force the good instance's reminder overdue.
+  await sql`UPDATE instances SET
+    body = jsonb_set(body, '{timers,0,fireAt}', '"2020-01-01T00:00:00.000Z"'::jsonb),
+    next_timer_at = '2020-01-01T00:00:00.000Z'
+    WHERE instance_id = ${good.instanceId}`;
+  // A poison row ordered ahead of it (earlier next_timer_at): status 'running' so it
+  // is selected, but no other Instance fields, so parseInstance throws at the head.
+  await sql`INSERT INTO instances (instance_id, transition_seq, body, next_timer_at)
+    VALUES (${"inst_poison"}, ${0}, ${{ status: "running" }}, '2019-01-01T00:00:00.000Z')`;
+
+  // The poison sits at the head of ORDER BY next_timer_at; the good timer still fires.
+  expect(await drainTimers(sql, () => body)).toBe(1);
+});

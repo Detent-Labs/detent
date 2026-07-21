@@ -477,3 +477,26 @@ test.skipIf(!DB)("double invocation is tolerated: a reclaimed row is delivered e
   expect((await instData(inst.instanceId)).field_val).toBe(7); // written once
   expect(await outcomes(inst.instanceId)).toHaveLength(1); // recorded once
 });
+
+// --- poison-row isolation: one row's mark transaction throwing does not starve ----
+
+test.skipIf(!DB)("a row whose mark transaction throws does not starve the batch", async () => {
+  const body = outputBody(false); // step_b non-terminal, instance stays running
+  const mk = () => createInstance(body, { processId: "proc_1" as Instance["processId"], version: 1 });
+  const good = await mk();
+  const bad = await mk();
+  await executeManualTransition(good, "path_ab", body, actor); // enqueues action_set, parks running
+  await executeManualTransition(bad, "path_ab", body, actor);
+
+  // The bad row returns a patch whose fieldId makes the tx2 jsonb path literal
+  // malformed ({data,x}} — a bad array literal), so its mark transaction throws;
+  // the good row returns an empty patch and marks cleanly.
+  const seam: DeliverFn = async (row) => (row.instance_id === bad.instanceId ? { "x}": 1 } : {});
+
+  // The poison row's tx2 throw is isolated: the good row still delivers.
+  expect(await drainOutbox(sql, reg, seam)).toBe(1);
+  const rows = (await sql`SELECT instance_id, status FROM outbox`) as { instance_id: string; status: string }[];
+  const byInst = Object.fromEntries(rows.map((r) => [r.instance_id, r.status]));
+  expect(byInst[good.instanceId]).toBe("delivered");
+  expect(byInst[bad.instanceId]).toBe("claimed"); // left for lease reclaim, not lost
+});

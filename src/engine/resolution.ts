@@ -75,13 +75,16 @@ export async function drainResolutions(
 
   let processed = 0;
   for (const row of claimed) {
-    const inst = parseInstance(row.body);
-    const body = await resolveBody(inst.processId, inst.version);
-    if (!body) {
-      await requeue(row.instance_id);
-      continue;
-    }
     try {
+      // Body parse and body resolution are inside the boundary: a corrupt jsonb
+      // row or a resolver that throws requeues this one instance rather than
+      // aborting the pass and stranding every other claimed instance for a lease.
+      const inst = parseInstance(row.body);
+      const body = await resolveBody(inst.processId, inst.version);
+      if (!body) {
+        await requeue(row.instance_id);
+        continue;
+      }
       // Verify the resolver returned the body the instance is pinned to, same
       // check rehydrate() makes. A mismatch is a resolver misconfiguration;
       // requeue rather than run against the wrong definition.

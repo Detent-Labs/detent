@@ -135,6 +135,13 @@ export async function drainOutbox(
 
   let delivered = 0;
   for (const raw of claimed) {
+   // Per-row error boundary: a corrupt action row or a throw from the tx2 mark
+   // transaction (a transient error in the CAS / writeback / outcome append)
+   // leaves this row claimed for lease-reclaim and lets the loop continue,
+   // rather than aborting the pass and stranding the rest of the batch. It must
+   // not itself mark the row — lease reclaim is the recovery, and a second write
+   // here could race the aborted tx2.
+   try {
     const row: ClaimedRow = { ...raw, action: parseAction(raw.action) };
     const attempts = row.attempts + 1;
 
@@ -195,6 +202,10 @@ export async function drainOutbox(
           WHERE idempotency_key = ${row.idempotency_key} AND status = 'claimed'`;
       }
     });
+   } catch {
+     // Corrupt row or a failed mark transaction: leave it claimed (reclaimed
+     // after its lease) and move on to the rest of the batch.
+   }
   }
   return delivered;
 }
