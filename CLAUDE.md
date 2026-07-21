@@ -313,8 +313,10 @@ each with a test that rejects a violating definition.
   `subprocess.outcome-unmatched` event rather than lost silently. Reachable in
   practice: an independently cancelled child returns the reserved `"cancelled"`
   outcome, which a parent is not obliged to guard.
-  `child.data` exposes the child's full data (re-keyed fieldId→key); filtering to
-  `contract.outputFields` is deferred. Downward subprocess cancel propagation is
+  `child.data` exposes the child's full data (re-keyed fieldId→key) at runtime, not
+  filtered to `contract.outputFields` — deliberately: only the CEL *surface* is
+  confined to declared outputs (`checkSubprocessChildRefs`, roadmap #1), not the
+  runtime value; see the `cross-process-validation` capability. Downward subprocess cancel propagation is
   DONE (see above). A `subprocess` step is also live as the *initial* step:
   `createInstance` enqueues the spawn at seq 0 inside the INSERT transaction,
   behind the same `RETURNING` guard as the seq-0 events (so a redelivered child
@@ -399,9 +401,16 @@ each with a test that rejects a violating definition.
    field" invariant was dropped as unsound: a `required` view flag is satisfied by
    an interactive step's user, not the caller, so it does not encode "the caller
    must supply this field" (the expense-approval example legitimately requires a
-   non-input field at its manual review step). Deferred: checking that
-   `outputMapping` expressions read only child field keys / `contract.outputFields`
-   (needs CEL identifier extraction).
+   non-input field at its manual review step). A subprocess step's `outputMapping`
+   values and automatic-path guards are now also checked at publish
+   (`src/cel/check.ts::checkSubprocessChildRefs`, invoked from
+   `validateCrossProcess`): `child.data.<key>` type-checks only for a `<key>` in
+   the referenced child's `contract.outputFields` (resolved to the child's own
+   field `key`), instead of the generic `dyn` every other CEL site sees for
+   `child.data`. A violation throws `CelValidationError`, not
+   `CrossProcessValidationError` — it is a CEL reference defect, not a wiring one.
+   Runtime `child.data` stays the child's full data object; only the CEL surface
+   is confined to the contract (see `cross-process-validation` spec).
 2. CEL wiring: DONE. Authoring-time (`src/cel/check.ts`) and engine-side evaluation
    (`src/cel/eval.ts`): guards evaluated at runtime (total — a runtime error is
    `false`) and Action.output result-writeback. Migration `transforms` are the last
@@ -484,13 +493,6 @@ each with a test that rejects a violating definition.
   silent FSM park). Building resolution — CEL-readable data-source results and/or
   runtime option lists — is the remaining feature; when it lands it re-introduces
   registration deliberately with its own site scoping.
-- **Move `resolveBody` inside the per-instance try in the workers.** In
-  `src/engine/timers.ts` the `resolveBody` call sits above `drainTimers`' per-instance
-  `try`, and `src/engine/resolution.ts` has the same shape, so any read-path parse
-  failure — a corrupt jsonb row, a hand-edited definition, a future schema tightening
-  anywhere in ProcessBody — throws out of the whole pass and starves every other due
-  instance in the batch. `harden-duration-timers` removed one trigger for this; the
-  amplifier is still there and makes the next trigger just as damaging.
 - **Reconcile in-flight action writebacks across a migration** (instead of skipping).
   Migration declines an instance with any undelivered outbox row (`pending-actions`),
   because `Action.output` is keyed by the enqueuing version's field ids and delivering

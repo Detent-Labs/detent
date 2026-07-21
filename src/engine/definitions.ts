@@ -23,7 +23,7 @@ import {
 } from "../schema/definition.js";
 import { compileProcessBody } from "../schema/compile.js";
 import { definitionHash, contractHash } from "../schema/hash.js";
-import { validateProcessBody, type CelIssue } from "../cel/check.js";
+import { validateProcessBody, checkSubprocessChildRefs, type CelIssue } from "../cel/check.js";
 import { sql } from "./store.js";
 import type { ResolveBody } from "./resolution.js";
 
@@ -66,7 +66,14 @@ async function validateCrossProcess(
   body: ProcessBody,
   resolvers: { resolveBody: ResolveBody; resolveLatestByContract: ResolveLatestByContract },
 ): Promise<void> {
-  for (const s of body.workflow.steps) {
+  // Collected across every subprocess step, then thrown once: matches
+  // CelValidationError's contract of surfacing every located issue, not just the
+  // first. The inputMapping/resolvability checks above keep their existing
+  // early-throw behavior — an unresolvable child makes its output schema
+  // unknowable anyway, so that error should surface first regardless.
+  const celIssues: CelIssue[] = [];
+
+  for (const [stepIndex, s] of body.workflow.steps.entries()) {
     const spec = s.subprocess;
     if (!spec) continue;
 
@@ -96,7 +103,11 @@ async function validateCrossProcess(
         );
       }
     }
+
+    celIssues.push(...checkSubprocessChildRefs(body, stepIndex, child));
   }
+
+  if (celIssues.length > 0) throw new CelValidationError(celIssues);
 }
 
 /**

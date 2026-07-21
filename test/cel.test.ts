@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { readFileSync } from "node:fs";
-import { validateProcessBody, validateMigrationSpec, parseExpression, celType, type CelIssue } from "../src/cel/check.js";
+import { validateProcessBody, validateMigrationSpec, checkSubprocessChildRefs, parseExpression, celType, type CelIssue } from "../src/cel/check.js";
 import { evalTransforms } from "../src/cel/eval.js";
 import { compileProcessBody } from "../src/schema/compile.js";
 import { instance as instanceSchema, baseFieldType, type ProcessBody, type MigrationSpec, type Instance } from "../src/schema/definition.js";
@@ -422,4 +422,62 @@ test("an integer-valued transform survives a round-trip", () => {
   expect(patch.field_total).toBe(3);
   // The migrated instance parses on its next read (a bigint would throw here).
   expect(() => instanceSchema.parse({ ...snapshot, data: { field_total: patch.field_total } })).not.toThrow();
+});
+
+// ---- checkSubprocessChildRefs (cross-process-validation delta) ---------------
+// child.data is `dyn` (any key accepted) in the single-body validateProcessBody
+// check, since there is no child body there to type it against.
+// checkSubprocessChildRefs re-checks one subprocess step's outputMapping values
+// and automatic-path guards against the ACTUAL resolved child's
+// contract.outputFields, invoked from validateCrossProcess once the child body
+// is resolved.
+
+const subprocessStep = (outputMapping: Record<string, ReturnType<typeof cel>>, guardSrc = "child.outcome == 'ok'") =>
+  ({
+    id: "step_a", key: "a", label: "A", type: "subprocess",
+    subprocess: { processId: "proc_child", versionBinding: "pinned", pinnedVersion: 1, inputMapping: {}, outputMapping },
+    paths: [{ id: "path_a", key: "pa", to: "step_b", trigger: "automatic", priority: 1, guard: cel(guardSrc) }],
+  }) as unknown;
+
+const childBodyWithOutputs = (outputFieldIds?: string[]): ProcessBody =>
+  ({
+    key: "child", label: "Child",
+    contract: { outputFields: outputFieldIds },
+    fields: [field("amount", "number"), field("internal_note", "string")],
+    workflow: { initialStep: "step_c", steps: [] },
+  }) as unknown as ProcessBody;
+
+test("accepts a child.data reference within the child's declared outputFields", () => {
+  const b = body({ steps: [subprocessStep({ field_p_amt: cel("child.data.amount") })] });
+  expect(checkSubprocessChildRefs(b, 0, childBodyWithOutputs(["field_amount"]))).toEqual([]);
+});
+
+test("rejects an outputMapping reference to a child field outside contract.outputFields", () => {
+  const b = body({ steps: [subprocessStep({ field_p_note: cel("child.data.internal_note") })] });
+  const issues = checkSubprocessChildRefs(b, 0, childBodyWithOutputs(["field_amount"]));
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe("steps[0].subprocess.outputMapping.field_p_note");
+});
+
+test("rejects a guard reference to a child field outside contract.outputFields", () => {
+  const b = body({ steps: [subprocessStep({}, "child.data.internal_note == 'x'")] });
+  const issues = checkSubprocessChildRefs(b, 0, childBodyWithOutputs(["field_amount"]));
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe("steps[0].paths[0].guard");
+});
+
+test("child.outcome is unaffected by the child's declared outputFields", () => {
+  const b = body({ steps: [subprocessStep({}, "child.outcome == 'approved'")] });
+  expect(checkSubprocessChildRefs(b, 0, childBodyWithOutputs([]))).toEqual([]);
+  expect(checkSubprocessChildRefs(b, 0, childBodyWithOutputs(undefined))).toEqual([]);
+});
+
+test("a child with no declared outputFields rejects every child.data reference", () => {
+  const b = body({ steps: [subprocessStep({ field_p_amt: cel("child.data.amount") })] });
+  expect(checkSubprocessChildRefs(b, 0, childBodyWithOutputs(undefined)).length).toBe(1);
+});
+
+test("validateProcessBody's single-body check is unchanged: it still accepts any child.data key", () => {
+  const b = body({ steps: [subprocessStep({ field_p_note: cel("child.data.internal_note") })] });
+  expect(validateProcessBody(b)).toEqual([]);
 });
