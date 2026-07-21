@@ -3,11 +3,23 @@
 ## Purpose
 
 Defines `InstanceEvent`, the append-only record for runtime facts about an instance
-that carry no step change: a reminder-timer fire, a timer that could not be armed,
-and — when migration lands — a version migration. `HistoryEntry` is transition-shaped
-(`toStepId` is required), so these have nowhere to go in it. Together the two records
-are the audit backbone: they interleave by instant and correlate by `transitionSeq`,
-which an event records but never advances.
+that carry no step change. `HistoryEntry` is transition-shaped (`toStepId` is
+required), so these have nowhere to go in it. Together the two records are the audit
+backbone: they interleave by instant and correlate by `transitionSeq`, which an event
+records but never advances.
+
+Five kinds are defined, added additively while the record shape stays settled:
+
+| kind | fact recorded | enqueues actions |
+| --- | --- | --- |
+| `timer.fired` | a reminder timer fired without transitioning | yes |
+| `timer.unarmed` | a declared timer produced no `fireAt` at entry, with the reason | no |
+| `migration.skipped` | an instance was left on its source version, with the reason | no |
+| `subprocess.spawn-enqueued` | creation at a subprocess `initialStep` enqueued its spawn | yes |
+| `subprocess.outcome-unmatched` | a child returned an outcome no path on the parent's subprocess step matched | no |
+
+A kind that enqueues actions carries their `ActionOutcome`s; a kind that enqueues
+none MUST NOT invite a reader to expect them.
 
 ## Requirements
 

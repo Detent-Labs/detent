@@ -1,7 +1,27 @@
 # writeback-reresolution Specification
 
 ## Purpose
-TBD - created by archiving change reresolve-after-writeback. Update Purpose after archive.
+
+Closes the loop between asynchronous action results and automatic transitions.
+
+Actions are dispatched post-commit, so an instance that transitions into a
+wait-state comes to rest *before* the action whose result its exit guards read has
+run. Nothing in the transition path re-examines that instance afterwards: the guards
+were already evaluated, found no match, and left it parked. Without a mechanism
+here, a result-driven wait-state — the engine's idiom for a gated side effect —
+would never advance.
+
+An `Action.output` writeback that changes a non-terminal instance's `data` therefore
+marks that instance for re-resolution, durably and in the same transaction as the
+data patch, and a worker re-evaluates the parked step's automatic paths against the
+new data. The marking must be transactional for the same reason the outbox is: a
+flag written separately from the data it describes can be lost by a crash between
+the two, leaving an instance parked on a guard that would now match.
+
+Re-resolution is idempotent and race-safe — delivery is at-least-once, so the same
+writeback may mark an instance more than once, and the worker may run concurrently
+with a transition moving that instance off the step.
+
 ## Requirements
 ### Requirement: A data-affecting writeback marks the instance for re-resolution
 
