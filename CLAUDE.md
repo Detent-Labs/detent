@@ -317,8 +317,11 @@ each with a test that rejects a violating definition.
    (needs CEL identifier extraction).
 2. CEL wiring: DONE. Authoring-time (`src/cel/check.ts`) and engine-side evaluation
    (`src/cel/eval.ts`): guards evaluated at runtime (total — a runtime error is
-   `false`) and Action.output result-writeback. Remaining: CEL checks for migration
-   `transforms` once migration lands (they need the from-version catalog).
+   `false`) and Action.output result-writeback. Migration `transforms` are the last
+   wired site: `validateMigrationSpec` parse/type-checks them against the source
+   catalog with the result type checked against the target field (`buildEnv` gained an
+   `actor` flag so this one site can withhold it), and `evalTransforms` evaluates them
+   at migration, total per entry, reusing `coerceJson`.
 3. Engine skeleton: largely DONE. Instance store, transactional outbox (delivery +
    writeback + retry/dead-letter + reclaim), transition executor (manual/automatic/
    timer, onExit→onPath→onEntry ordering, run-to-rest), async re-resolution of
@@ -334,12 +337,32 @@ each with a test that rejects a violating definition.
    timers are DONE (`duration.ts`: `instantFromValue` + the deadline branch of
    `armStepTimers`; see the timers entry above). The runtime event log is DONE
    (`InstanceEvent`: a reminder fire and an unarmed timer are recorded, and an
-   `ActionOutcome` now attaches to the record that enqueued it) — so migration's
-   audit event is a `kind` to add, not a mechanism to design. Remaining: migration;
-   a subprocess step as the initial step does not spawn (must be entered via a
-   transition). Publish-time cross-process validation (inputMapping ⊆ child
-   inputFields, child reference resolvable → child-first ordering) is DONE
-   (`definitions.ts`, roadmap #1). The production `resolveBody` backing
+   `ActionOutcome` now attaches to the record that enqueued it). Instance migration is
+   DONE (`src/engine/migration.ts`): a migration plan is a row keyed
+   `(processId, fromVersion, toVersion)` in `migration_plans`, registered by
+   `registerMigrationPlan` independently of publish, validated against both bodies
+   (structural, type-compatibility incl. the identity-carried case, and the transform
+   CEL check) and frozen by an atomic `WHERE applied_at IS NULL` upsert once the first
+   instance migrates under it. `migrateInstances` reads the plan once, stamps it applied
+   before the first instance, then keyset-paginates the running/source-version
+   population selecting ids only and migrates each in its own row-locked transaction
+   (`SELECT … FOR UPDATE`, since the OCC token does not cover `data`): remap step via
+   `stepMap`/identity/`onUnmappable`, remap `data` losslessly from the locked snapshot
+   (`fieldMap` + `transforms`, orphans retained), reconcile timers four-ways
+   (carried+declared kept with `fireAt`, fired kept fired, newly-declared armed against
+   the target body/post-remap data/new seq, withdrawn dropped), then commit through the
+   shared `planStepEntry`/`applyStepEntry` seam with `entryVersion`, `suppressSpawn` on
+   an identity step, the reconciled timer set and the pin/payload field patch — so
+   status, the subprocess spawn/return and the `HistoryEntry` (`cause: "migration"`,
+   `pathId: null`) are inherited, not reimplemented. An instance with undelivered outbox
+   rows is skipped `pending-actions`; an unmappable one under `reject-and-pin` is skipped
+   `step-unmappable`; both are recorded as a `migration.skipped` `InstanceEvent`. The
+   migrating parent repairs every child's `parent.stepId` (terminal children included).
+   The operation is per-instance fault-isolated and reports instance ids grouped
+   migrated/skipped/conflicted/failed. Remaining: a subprocess step as the initial step
+   does not spawn (must be entered via a transition). Publish-time cross-process
+   validation (inputMapping ⊆ child inputFields, child reference resolvable → child-first
+   ordering) is DONE (`definitions.ts`, roadmap #1). The production `resolveBody` backing
    (definition/version store) is DONE (`definitions.ts` + `host.ts`), so the
    resolution and timer workers are live.
 4. Editor (likely a separate package; promote the repo to workspaces here).
@@ -357,6 +380,29 @@ each with a test that rejects a violating definition.
   anywhere in ProcessBody — throws out of the whole pass and starves every other due
   instance in the batch. `harden-duration-timers` removed one trigger for this; the
   amplifier is still there and makes the next trigger just as damaging.
+- **Reconcile in-flight action writebacks across a migration** (instead of skipping).
+  Migration declines an instance with any undelivered outbox row (`pending-actions`),
+  because `Action.output` is keyed by the enqueuing version's field ids and delivering
+  it after a rename writes a vacated key. Reconciling would need six mechanisms all
+  correct at once — a precise pending/claimed status partition (claimed means both "in
+  flight" and "possibly abandoned"), snapshot semantics for key swaps, a stamp rule so a
+  row that missed one migration is not laundered past the next, the version check folded
+  into the writeback's existing predicate to avoid a TOCTOU, a new outbox index, and a
+  defined lock order against the delivery transaction — to preserve a result a later
+  invocation delivers anyway. Revisit only if `pending-actions` skips prove common.
+- **A `migration.transform-dropped` event kind.** A `transforms` expression that raises
+  leaves its target unwritten silently (total, like a guard). The `timer.unarmed`
+  precedent says an omission should be queryable; deferred to keep the migration event
+  surface to one new kind.
+- **`TimerState` provenance.** Timer reconciliation keys on timer id alone, so a target
+  step that redeclares a surviving id with a different duration, or flips it between
+  `duration` and `deadline`, is indistinguishable from one that left it unchanged and the
+  old `fireAt` is kept. Closing this needs a provenance field (declared duration /
+  deadline source / arming instant) on `TimerState`.
+- **Orphan-key inspection tooling.** Migration retains a value whose field the target
+  catalog no longer declares (dropping it would destroy data; guard-context re-keying
+  makes it unobservable and collision-free). Nothing surfaces accumulated orphans for an
+  operator to prune.
 
 ## Codebase memory (knowledge graph)
 The repo is indexed into codebase-memory-mcp. Resolve the `project` arg via

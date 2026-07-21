@@ -7,7 +7,7 @@
 
 import { evaluate } from "@marcbachmann/cel-js";
 import { INSTANCE_SCHEMA } from "./check.js";
-import type { ProcessBody, Instance, FieldDef, Expression } from "../schema/definition.js";
+import type { ProcessBody, Instance, FieldDef, Expression, MigrationSpec } from "../schema/definition.js";
 
 export interface Actor {
   id: string;
@@ -73,6 +73,51 @@ export function buildGuardContext(body: ProcessBody, instance: Instance, actor: 
     if (key !== undefined) data[key] = val;
   }
   return { data, instance: projectInstance(instance), actor: { id: actor.id, roles: actor.roles } };
+}
+
+/**
+ * Build the context a migration `transforms` expression is evaluated against:
+ * `data` re-keyed fieldId→key against the **source** catalog (the version the
+ * instance is leaving, where the transform's identifiers resolve) and the
+ * projected `instance`. Nothing else — no `actor` (migration is uniform over the
+ * population), no `child`, no data sources — matching the authoring scope
+ * `validateMigrationSpec` checks against.
+ */
+export function buildTransformContext(fromBody: ProcessBody, snapshot: Instance): Record<string, unknown> {
+  const byId = fieldKeyById(fromBody.fields);
+  const data: Record<string, unknown> = {};
+  for (const [fid, val] of Object.entries(snapshot.data)) {
+    const key = byId.get(fid);
+    if (key !== undefined) data[key] = val;
+  }
+  return { data, instance: projectInstance(snapshot) };
+}
+
+/**
+ * Evaluate a migration spec's `transforms` over a pre-migration snapshot, returning
+ * a target-FieldId → JSON-safe value patch. Total per entry (unlike evalFieldMap):
+ * a transform that raises — most often reading a field the mid-flight instance never
+ * wrote — leaves its target unwritten and does not fail the migration, matching guard
+ * totality. Values pass through `coerceJson`, so a CEL `int` (bigint) becomes a
+ * number; a bigint left in the payload would make the instance fail `instance.parse`
+ * on its next read.
+ */
+export function evalTransforms(
+  spec: MigrationSpec,
+  fromBody: ProcessBody,
+  snapshot: Instance,
+): Record<string, unknown> {
+  const ctx = buildTransformContext(fromBody, snapshot);
+  const patch: Record<string, unknown> = {};
+  for (const [fid, expr] of Object.entries(spec.transforms ?? {})) {
+    if (!expr) continue;
+    try {
+      patch[fid] = coerceJson(evaluate(expr.src, ctx));
+    } catch {
+      // total: unwritten target, no failure (an out-of-range int also drops here).
+    }
+  }
+  return patch;
 }
 
 /**

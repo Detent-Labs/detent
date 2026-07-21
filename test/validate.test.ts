@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "bun:test";
-import { processVersion, publishedProcessBody, MAX_TIMER_DURATION_MS, type ProcessBody } from "../src/schema/definition.js";
+import { processVersion, publishedProcessBody, instanceEvent, migrationSpec, MAX_TIMER_DURATION_MS, type ProcessBody } from "../src/schema/definition.js";
 import { compileProcessBody, validateDurations, DurationValidationError } from "../src/schema/compile.js";
+import { definitionHash } from "../src/schema/hash.js";
 
 const raw = JSON.parse(
   readFileSync(new URL("../examples/expense-approval.json", import.meta.url), "utf8"),
@@ -289,5 +290,54 @@ describe("timer duration", () => {
     const republished = structuredClone(compiled) as any;
     republished.workflow.steps[1].timers[0].duration = "P1Y";
     expect(() => compileProcessBody(republished as ProcessBody)).toThrow(DurationValidationError);
+  });
+});
+
+describe("migration schema additions", () => {
+  const evtEnvelope = {
+    id: "evt_11111111-1111-4a1c-8e2f-000000000001",
+    instanceId: "inst_22222222-2222-4a1c-8e2f-000000000002",
+    transitionSeq: 3,
+    version: 1,
+    at: "2026-07-20T00:00:00.000Z",
+  };
+
+  it("accepts both migration.skipped reasons", () => {
+    for (const reason of ["step-unmappable", "pending-actions"]) {
+      const ev = { ...evtEnvelope, kind: "migration.skipped", payload: { fromVersion: 1, toVersion: 2, reason } };
+      expect(instanceEvent.safeParse(ev).success).toBe(true);
+    }
+  });
+
+  it("rejects a malformed migration.skipped payload", () => {
+    // Missing toVersion.
+    expect(instanceEvent.safeParse({
+      ...evtEnvelope, kind: "migration.skipped", payload: { fromVersion: 1, reason: "step-unmappable" },
+    }).success).toBe(false);
+    // Unknown reason (strict enum).
+    expect(instanceEvent.safeParse({
+      ...evtEnvelope, kind: "migration.skipped", payload: { fromVersion: 1, toVersion: 2, reason: "whatever" },
+    }).success).toBe(false);
+    // Extra key (strict payload).
+    expect(instanceEvent.safeParse({
+      ...evtEnvelope, kind: "migration.skipped", payload: { fromVersion: 1, toVersion: 2, reason: "pending-actions", extra: 1 },
+    }).success).toBe(false);
+  });
+
+  it("rejects a non-injective fieldMap", () => {
+    const a = "field_1a2b3c4d-0001-4a1c-8e2f-000000000001";
+    const b = "field_1a2b3c4d-0002-4a1c-8e2f-000000000002";
+    const t = "field_1a2b3c4d-0003-4a1c-8e2f-000000000003";
+    expect(migrationSpec.safeParse({ fieldMap: { [a]: t, [b]: t } }).success).toBe(false);
+    expect(migrationSpec.safeParse({ fieldMap: { [a]: t, [b]: a } }).success).toBe(true);
+  });
+
+  it("leaves the body hash unchanged when the wrapper carries no migration", () => {
+    // migration lived on the unhashed wrapper; the hash covers only definition.
+    const body = structuredClone(raw).definition as ProcessBody;
+    const before = definitionHash(body);
+    const withWrapperNoise = structuredClone(raw);
+    delete (withWrapperNoise as any).migration;
+    expect(definitionHash(withWrapperNoise.definition as ProcessBody)).toBe(before);
   });
 });

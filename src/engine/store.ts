@@ -98,6 +98,24 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   )`;
   // Idempotent-publish lookup: an identical re-publish matches by (process_id, hash).
   await db`CREATE INDEX IF NOT EXISTS definitions_hash_idx ON definitions (process_id, definition_hash)`;
+  // Migration plans: the rule moving instances from one version to another, keyed by
+  // its version pair and independent of `definitions` (a published body stays
+  // immutable while its plan is corrected before use, and several source versions may
+  // target one target). `applied_at` is NULL until the first instance migrates under
+  // it; registration upserts under `WHERE applied_at IS NULL` to freeze it atomically.
+  await db`CREATE TABLE IF NOT EXISTS migration_plans (
+    process_id text NOT NULL,
+    from_version integer NOT NULL,
+    to_version integer NOT NULL,
+    spec jsonb NOT NULL,
+    applied_at timestamptz,
+    PRIMARY KEY (process_id, from_version, to_version)
+  )`;
+  // The migration population scan selects {processId, version, status} once per
+  // batch across every instance. Those fields live inside the jsonb body, so without
+  // an index each batch sequentially scans the whole instances relation.
+  await db`CREATE INDEX IF NOT EXISTS instances_selection_idx
+    ON instances ((body->>'processId'), (body->>'version'), (body->>'status'))`;
 }
 
 /**

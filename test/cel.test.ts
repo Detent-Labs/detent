@@ -1,7 +1,8 @@
 import { test, expect } from "bun:test";
 import { readFileSync } from "node:fs";
-import { validateProcessBody, parseExpression, celType, type CelIssue } from "../src/cel/check.js";
-import { baseFieldType, type ProcessBody } from "../src/schema/definition.js";
+import { validateProcessBody, validateMigrationSpec, parseExpression, celType, type CelIssue } from "../src/cel/check.js";
+import { evalTransforms } from "../src/cel/eval.js";
+import { instance as instanceSchema, baseFieldType, type ProcessBody, type MigrationSpec, type Instance } from "../src/schema/definition.js";
 
 // Minimal ProcessBody builders. validateProcessBody reads only fields /
 // dataSources / workflow.steps, so these cast loosely on purpose — the full
@@ -252,4 +253,96 @@ test("every base field type has a CEL-type mapping", () => {
 test("parseExpression flags syntax but not unknown vars", () => {
   expect(parseExpression("data.x == 1").ok).toBe(true);
   expect(parseExpression("data.x >").ok).toBe(false);
+});
+
+// ---- migration transforms (cel-expressions delta) ----------------------------
+// A transform's identifiers resolve against the SOURCE catalog; its result type is
+// checked against the TARGET field it writes. cel(...) shortens an expression.
+const cel = (src: string) => ({ lang: "cel", src });
+const migBody = (fields: { key: string; type: string | object }[], dataSources?: any[]): ProcessBody =>
+  ({
+    key: "p", label: "P",
+    fields: fields.map((f) => ({ id: `field_${f.key}`, key: f.key, label: f.key, type: f.type })),
+    dataSources,
+    workflow: { initialStep: "step_a", steps: [] },
+  }) as unknown as ProcessBody;
+const spec = (transforms: Record<string, ReturnType<typeof cel>>): MigrationSpec =>
+  ({ transforms }) as unknown as MigrationSpec;
+
+// source: amount(number), note(string), plus a plugin field; target: total(number), note(string)
+const fromB = migBody([{ key: "amount", type: "number" }, { key: "note", type: "string" }, { key: "blob", type: { type: "custom" } }]);
+const toB = migBody([{ key: "total", type: "number" }, { key: "note", type: "string" }]);
+
+test("transform reading a source field is accepted", () => {
+  expect(validateMigrationSpec(spec({ field_total: cel("data.amount") }), fromB, toB)).toEqual([]);
+});
+
+test("transform reading a field only the target declares is refused", () => {
+  const issues = validateMigrationSpec(spec({ field_note: cel("data.total") }), fromB, toB);
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe("migration.transforms.field_note");
+});
+
+test("transform writing a field the target does not declare is refused", () => {
+  const issues = validateMigrationSpec(spec({ field_missing: cel("data.amount") }), fromB, toB);
+  expect(issues.length).toBe(1);
+  expect(issues[0].message).toContain("not a field in the target catalog");
+});
+
+test("a matching result type is accepted", () => {
+  expect(validateMigrationSpec(spec({ field_note: cel("data.note") }), fromB, toB)).toEqual([]);
+});
+
+test("a mismatched result type is refused", () => {
+  const issues = validateMigrationSpec(spec({ field_total: cel("data.note") }), fromB, toB);
+  expect(issues.length).toBe(1);
+  expect(issues[0].message).toContain("expected double");
+});
+
+test("an unknowable (dyn) result type is accepted", () => {
+  // reading a plugin field infers dyn, which satisfies any target type
+  expect(validateMigrationSpec(spec({ field_total: cel("data.blob") }), fromB, toB)).toEqual([]);
+});
+
+test("a transform referencing actor is refused", () => {
+  expect(validateMigrationSpec(spec({ field_note: cel("actor.id") }), fromB, toB).length).toBe(1);
+});
+
+test("a transform referencing a data source is refused", () => {
+  const src = migBody([{ key: "amount", type: "number" }], [{ id: "ds_p", key: "ds_prices", type: "http", config: {} }]);
+  expect(validateMigrationSpec(spec({ field_note: cel("ds_prices.value") }), src, toB).length).toBe(1);
+});
+
+test("a transform referencing child is refused", () => {
+  expect(validateMigrationSpec(spec({ field_note: cel("child.outcome") }), fromB, toB).length).toBe(1);
+});
+
+test("a transform may read the instance projection", () => {
+  expect(validateMigrationSpec(spec({ field_note: cel("instance.status") }), fromB, toB)).toEqual([]);
+});
+
+test("a transform calling a time function is refused", () => {
+  const issues = validateMigrationSpec(spec({ field_note: cel("string(now())") }), fromB, toB);
+  expect(issues.length).toBe(1);
+  expect(issues[0].message).toContain("now()");
+});
+
+test("ordinary sites still resolve actor after the migration entry point exists", () => {
+  const b = body({ steps: [guardStep("actor.id == 'u1'")] });
+  expect(validateProcessBody(b)).toEqual([]);
+});
+
+test("an integer-valued transform survives a round-trip", () => {
+  const snapshot = instanceSchema.parse({
+    instanceId: "inst_11111111-1111-4a1c-8e2f-000000000001",
+    processId: "proc_x", version: 1, definitionHash: "h",
+    currentStepId: "step_a", transitionSeq: 0, data: {}, status: "running",
+    startedAt: "2026-07-20T00:00:00.000Z",
+  }) as Instance;
+  const patch = evalTransforms(spec({ field_total: cel("1 + 2") }), fromB, snapshot);
+  // cel-js models int as bigint; coerceJson must have made it a number.
+  expect(typeof patch.field_total).toBe("number");
+  expect(patch.field_total).toBe(3);
+  // The migrated instance parses on its next read (a bigint would throw here).
+  expect(() => instanceSchema.parse({ ...snapshot, data: { field_total: patch.field_total } })).not.toThrow();
 });
