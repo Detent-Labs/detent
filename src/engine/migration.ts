@@ -335,6 +335,31 @@ async function migrateOne(
     const targetStep = toBody.workflow.steps.find((s) => (s.id as string) === targetStepId)!;
     const stepChanged = targetStepId !== srcStepId;
 
+    // 5.7b live-child gate: a relocation that vacates a subprocess-typed step must not
+    // commit while that step has a live linked child. A live child's return is keyed to
+    // this step and contract; the migration cannot re-point it soundly (relocating onto
+    // another subprocess step misdirects the return to the wrong child; onto a
+    // non-subprocess step dead-letters it), so the instance is deferred — kept on its
+    // pin, recorded, migrated by a later invocation once the child settles. A settled
+    // child (terminal, outbox drained) is inert: core.returnSubprocess no longer fires
+    // for it and the cancel cascade keys on parent.instanceId + status, never stepId.
+    if (stepChanged) {
+      const srcStep = fromBody.workflow.steps.find((s) => (s.id as string) === srcStepId);
+      if (srcStep?.subprocess) {
+        const liveChild = (await tx`SELECT 1 FROM instances c
+          WHERE c.body->'parent'->>'instanceId' = ${id}
+            AND c.body->'parent'->>'stepId' = ${srcStepId}
+            AND (c.body->>'status' = 'running'
+                 OR EXISTS (SELECT 1 FROM outbox o
+                            WHERE o.instance_id = c.instance_id AND o.status <> 'delivered'))
+          LIMIT 1`) as unknown[];
+        if (liveChild.length > 0) {
+          await appendSkip(tx, inst, fromVersion, toVersion, "child-in-flight");
+          return "skipped";
+        }
+      }
+    }
+
     // 5.8 remap data from the snapshot (the locked read).
     const data = remapData(spec, fromBody, inst);
 
@@ -376,14 +401,9 @@ async function migrateOne(
     // that general rule and needs no separate flag here.
     await applyStepEntry(tx, plan, { version: toVersion, definitionHash: definitionHash(toBody), data });
 
-    // 5.12 repair every child's parent link through the same step remap —
-    // including terminal children, whose return is the one in flight. Same
-    // transaction, so the parent row stays locked throughout.
-    if (stepChanged) {
-      await tx`UPDATE instances
-        SET body = jsonb_set(body, '{parent,stepId}', (${[targetStepId]}::jsonb) -> 0)
-        WHERE body->'parent'->>'instanceId' = ${id} AND body->'parent'->>'stepId' = ${srcStepId}`;
-    }
+    // No child-link repoint: a relocation off a subprocess step with a live child was
+    // already deferred by the 5.7b gate, and a settled child's parent.stepId is inert
+    // (nothing re-reads it), so re-pointing it would be a write with no reader.
     return "migrated";
   });
 }

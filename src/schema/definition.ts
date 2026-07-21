@@ -738,13 +738,15 @@ export type TimerUnarmedReason = z.infer<typeof timerUnarmedReason>;
 
 /**
  * Why a migration left an instance on its source version. `step-unmappable` is a
- * property of the rule and recurs on every re-invocation; `pending-actions` is
- * transient and clears once the instance's outbox drains. There is no
- * unreadable-instance reason: an event envelope needs `instanceId`, `version` and
- * `transitionSeq`, which a row failing `instance.parse` cannot supply — that case
- * is reported as failed by the operation, not as an event.
+ * property of the rule and recurs on every re-invocation; `pending-actions` and
+ * `child-in-flight` are transient and clear on their own — the first once the
+ * instance's outbox drains, the second once the live subprocess child it would
+ * relocate off of settles. There is no unreadable-instance reason: an event
+ * envelope needs `instanceId`, `version` and `transitionSeq`, which a row failing
+ * `instance.parse` cannot supply — that case is reported as failed by the
+ * operation, not as an event.
  */
-export const migrationSkipReason = z.enum(["step-unmappable", "pending-actions"]);
+export const migrationSkipReason = z.enum(["step-unmappable", "pending-actions", "child-in-flight"]);
 export type MigrationSkipReason = z.infer<typeof migrationSkipReason>;
 
 export const instanceEvent = z.discriminatedUnion("kind", [
