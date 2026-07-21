@@ -6,9 +6,13 @@
  *
  * spawn (core.spawnSubprocess), enqueued when a parent enters a subprocess step:
  *   resolve the child body per `versionBinding`, seed it from `inputMapping`, and
- *   create the linked child (idempotent on a deterministic child id). A parent no
- *   longer running is skipped; a child left running under a since-cancelled parent
- *   is self-cancelled (cancel/spawn race backstop).
+ *   create the linked child (idempotent on a deterministic child id — a parent no
+ *   longer running when the child does not yet exist is skipped). Driving the
+ *   child to rest and the cancel/spawn race backstop (self-cancelling a child left
+ *   running under a since-cancelled parent) run on every delivery, not only the
+ *   one that created the row: a redelivery that finds the child already created
+ *   still performs both, so a crash between creation and either one is completed
+ *   by the next delivery instead of stranding the child.
  *
  * return (core.returnSubprocess), enqueued when a child reaches a terminal step:
  *   evaluate the parent subprocess step's `outputMapping` over `child.outcome`/
@@ -57,46 +61,62 @@ export function makeSpawnHandler(
     const parentId = ctx.instanceId;
     const childId = subprocessChildId(parentId, parentSeq, subprocessStepId);
 
-    // Idempotent: a prior delivery already created (and drove) the child.
-    const exists = (await db`SELECT 1 FROM instances WHERE instance_id = ${childId} LIMIT 1`) as unknown[];
-    if (exists.length > 0) return {};
-
-    const parent = await loadInstance(db, parentId);
-    if (!parent || parent.status !== "running") return {}; // parent gone/cancelled while queued
-
-    const parentBody = await resolveBody(parent.processId, parent.version);
-    if (!parentBody) throw new Error(`spawn: parent body unresolved: ${parent.processId}@${parent.version}`);
-    const step = parentBody.workflow.steps.find((s) => s.id === subprocessStepId);
-    if (!step?.subprocess) throw new Error(`spawn: not a subprocess step: ${subprocessStepId}`);
-    const spec = step.subprocess;
-
-    // Resolve the child body + version per versionBinding.
-    let childVersion: number | undefined;
-    let childBody: ProcessBody | undefined;
-    if (spec.versionBinding === "pinned") {
-      childVersion = spec.pinnedVersion;
-      childBody = childVersion !== undefined ? await resolveBody(spec.processId, childVersion) : undefined;
+    // Obtain the child: a redelivery finding it already created skips only
+    // creation, via the same single load that used to just gate an early
+    // return. The repairs below still run on the result either way.
+    let child: Instance;
+    let childBody: ProcessBody;
+    const existing = await loadInstance(db, childId);
+    if (existing) {
+      child = existing;
+      const resolved = await resolveBody(existing.processId, existing.version);
+      if (!resolved) throw new Error(`spawn: child body unresolved: ${existing.processId}@${existing.version}`);
+      childBody = resolved;
     } else {
-      const r = spec.contractRef !== undefined ? await resolveLatestByContract(spec.processId, spec.contractRef) : undefined;
-      if (r) ({ version: childVersion, body: childBody } = r);
+      const parent = await loadInstance(db, parentId);
+      if (!parent || parent.status !== "running") return {}; // parent gone/cancelled while queued
+
+      const parentBody = await resolveBody(parent.processId, parent.version);
+      if (!parentBody) throw new Error(`spawn: parent body unresolved: ${parent.processId}@${parent.version}`);
+      const step = parentBody.workflow.steps.find((s) => s.id === subprocessStepId);
+      if (!step?.subprocess) throw new Error(`spawn: not a subprocess step: ${subprocessStepId}`);
+      const spec = step.subprocess;
+
+      // Resolve the child body + version per versionBinding.
+      let childVersion: number | undefined;
+      let spawnedBody: ProcessBody | undefined;
+      if (spec.versionBinding === "pinned") {
+        childVersion = spec.pinnedVersion;
+        spawnedBody = childVersion !== undefined ? await resolveBody(spec.processId, childVersion) : undefined;
+      } else {
+        const r = spec.contractRef !== undefined ? await resolveLatestByContract(spec.processId, spec.contractRef) : undefined;
+        if (r) ({ version: childVersion, body: spawnedBody } = r);
+      }
+      if (!spawnedBody || childVersion === undefined) throw new Error(`spawn: child body unresolved for ${spec.processId}`);
+      childBody = spawnedBody;
+
+      // Seed the child from inputMapping (parent context; targets keyed by child fieldId).
+      const childData = evalFieldMap(spec.inputMapping, buildGuardContext(parentBody, parent, SYSTEM_ACTOR)) as Instance["data"];
+
+      child = await createInstance(
+        childBody,
+        { processId: spec.processId, version: childVersion, instanceId: childId, data: childData, parent: { instanceId: parentId, stepId: subprocessStepId as StepId } },
+        db,
+      );
     }
-    if (!childBody || childVersion === undefined) throw new Error(`spawn: child body unresolved for ${spec.processId}`);
 
-    // Seed the child from inputMapping (parent context; targets keyed by child fieldId).
-    const childData = evalFieldMap(spec.inputMapping, buildGuardContext(parentBody, parent, SYSTEM_ACTOR)) as Instance["data"];
-
-    const child = await createInstance(
-      childBody,
-      { processId: spec.processId, version: childVersion, instanceId: childId, data: childData, parent: { instanceId: parentId, stepId: subprocessStepId as StepId } },
-      db,
-    );
     // Run the child to rest — it may immediately reach a terminal outcome, which
-    // enqueues its own return action.
+    // enqueues its own return action. Unconditional: a redelivery that finds the
+    // child already created still reaches this, completing a drive-to-rest a
+    // prior delivery started but crashed before finishing. Already-rested state
+    // (terminal, or parked at a non-automatic/wait-state step) makes this a no-op.
     await resolveAutomatic(child, childBody, SYSTEM_ACTOR, db);
 
     // Cancel/spawn race backstop: if the parent was cancelled after our status
-    // check, its cascade may have queried children before this child existed.
-    // Self-cancel the still-running child so nothing is orphaned.
+    // check — or, on redelivery, before an earlier delivery reached this point —
+    // its cascade may have queried children before this child existed or before
+    // this check ran. Self-cancel the still-running child so nothing is orphaned.
+    // Unconditional for the same reason as the drive-to-rest above.
     const parentNow = await loadInstance(db, parentId);
     if (parentNow && parentNow.status !== "running") {
       const childNow = await loadInstance(db, childId);

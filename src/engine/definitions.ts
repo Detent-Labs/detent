@@ -4,9 +4,14 @@
  * resolution/timer workers' injected `resolveBody`.
  *
  * Publish is immutable and idempotent-on-identical: compile -> hash -> if a
- * version with that hash exists for the processId return it (no-op), else assign
- * the next monotonic version and insert. The (process_id, version) PK forbids a
- * body overwrite.
+ * version with that hash exists for the processId return it (no-op), else
+ * validate (expressions, then cross-process wiring), assign the next monotonic
+ * version and insert. The (process_id, version) PK forbids a body overwrite.
+ *
+ * Publish is the enforcement point for every check that may tighten over time.
+ * `definition.ts` is also the deserializer every read goes through, so a check
+ * placed there would make an already-published definition throw on READ and its
+ * pinned instances unrehydratable.
  */
 
 import { SQL } from "bun";
@@ -18,6 +23,7 @@ import {
 } from "../schema/definition.js";
 import { compileProcessBody } from "../schema/compile.js";
 import { definitionHash, contractHash } from "../schema/hash.js";
+import { validateProcessBody, type CelIssue } from "../cel/check.js";
 import { sql } from "./store.js";
 import type { ResolveBody } from "./resolution.js";
 
@@ -32,6 +38,18 @@ export class CrossProcessValidationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "CrossProcessValidationError";
+  }
+}
+
+/**
+ * A body about to be published carries an expression the engine cannot evaluate.
+ * Every located issue is retained, not just the first, so one publish surfaces one
+ * publish's worth of fixes.
+ */
+export class CelValidationError extends Error {
+  constructor(readonly issues: CelIssue[]) {
+    super(issues.map((i) => `${i.loc}: ${i.message} (${JSON.stringify(i.src)})`).join("; "));
+    this.name = "CelValidationError";
   }
 }
 
@@ -85,7 +103,15 @@ async function validateCrossProcess(
  * Publish an authored body: compile it (cancel-sink injection), hash the compiled
  * body, and persist it as an immutable version. An identical body already
  * published for this processId is a no-op returning the existing version;
- * otherwise the next monotonic version is assigned.
+ * otherwise the body's expressions and subprocess wiring are validated and the
+ * next monotonic version is assigned.
+ *
+ * A body carrying an invalid expression is rejected here rather than at runtime,
+ * where the failure is silent and per-instance: a broken guard is total, so it
+ * evaluates false forever and parks the instance on a wait-state nothing reports;
+ * a broken mapping throws inside outbox delivery, re-invoking the external handler
+ * on each retry before dead-lettering and parking the parent. Neither is fixable
+ * without a re-publish the pinned instances will not adopt.
  *
  * ponytail: MAX(version)+1 is check-then-insert; the (process_id, version) PK is
  * the backstop if two publishes race. v1 publish is not concurrent — a per-process
@@ -114,8 +140,21 @@ export async function publishBody(
     };
   }
 
-  // New version about to be inserted: validate subprocess wiring against the
-  // (immutable, already-validated) published children before any persist.
+  // New version about to be inserted. Both remaining checks run on the COMPILED
+  // body, so a step the compile pass injected is held to the same rule as an
+  // authored one, and both sit AFTER the hash-hit return above: a re-publish of a
+  // body that predates a tightening of either check stays a no-op rather than
+  // becoming an error for a version instances are already pinned to. (Duration
+  // validation cannot take this position — it lives inside the compile pass the
+  // hash itself derives from.)
+  //
+  // Expressions first: they are checked in-process, and they are the issues an
+  // author can fix without inspecting another process.
+  const celIssues = validateProcessBody(body);
+  if (celIssues.length > 0) throw new CelValidationError(celIssues);
+
+  // Then subprocess wiring, against the (immutable, already-validated) published
+  // children. Nothing above this point has persisted.
   await validateCrossProcess(body, createDefinitionStore(db));
 
   const max = (await db`SELECT COALESCE(MAX(version), 0) AS m FROM definitions

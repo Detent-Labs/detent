@@ -6,7 +6,7 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { SQL } from "bun";
 import { sql, initSchema, createInstance, rehydrate } from "../src/engine/store.js";
-import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
+import { publishBody, createDefinitionStore, CelValidationError } from "../src/engine/definitions.js";
 import { executeManualTransition } from "../src/engine/transition.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { drainResolutions } from "../src/engine/resolution.js";
@@ -116,6 +116,182 @@ test.skipIf(!DB)("an overwrite of an existing (processId, version) with a differ
   expect(threw).toBe(true);
   const still = (await sql`SELECT definition_hash FROM definitions WHERE process_id = ${PID} AND version = ${v1.version}`) as { definition_hash: string }[];
   expect(still[0].definition_hash).toBe(v1.definitionHash); // unchanged
+});
+
+// --- publish rejects a body carrying an invalid expression --------------------
+
+// waitBody with one expression swapped, at each of the two sites the check covers.
+// steps[1] is step_wait; the compile pass appends the cancel sink AFTER the authored
+// steps, so authored indices are the same in the compiled body the check sees.
+const bodyWithGuard = (src: string): ProcessBody => {
+  const b = waitBody("sayYes") as unknown as Record<string, any>;
+  b.workflow.steps[1].paths[0].guard = cel(src);
+  return b as unknown as ProcessBody;
+};
+const bodyWithOutput = (src: string): ProcessBody => {
+  const b = waitBody("sayYes") as unknown as Record<string, any>;
+  b.workflow.steps[1].onEntry[0].output.field_go = cel(src);
+  return b as unknown as ProcessBody;
+};
+
+const publishFails = async (body: ProcessBody): Promise<CelValidationError> => {
+  let caught: unknown;
+  try {
+    await publishBody(PID, body);
+  } catch (e) {
+    caught = e;
+  }
+  expect(caught).toBeInstanceOf(CelValidationError);
+  return caught as CelValidationError;
+};
+
+const definitionCount = async (): Promise<number> => {
+  const rows = (await sql`SELECT count(*)::int AS n FROM definitions WHERE process_id = ${PID}`) as { n: number }[];
+  return rows[0].n;
+};
+
+test.skipIf(!DB)("publish rejects an unparseable expression and writes no row", async () => {
+  const err = await publishFails(bodyWithGuard("data.go =="));
+  expect(err.issues.length).toBe(1);
+  expect(err.issues[0]!.loc).toBe("steps[1].paths[0].guard");
+  expect(await definitionCount()).toBe(0);
+});
+
+test.skipIf(!DB)("publish rejects an unknown field reference and a type mismatch", async () => {
+  const unknown = await publishFails(bodyWithGuard('data.nope == "x"'));
+  expect(unknown.issues[0]!.loc).toBe("steps[1].paths[0].guard");
+  expect(unknown.message.toLowerCase()).toContain("nope");
+
+  const mismatch = await publishFails(bodyWithGuard("data.go > 5"));
+  expect(mismatch.issues[0]!.loc).toBe("steps[1].paths[0].guard");
+
+  expect(await definitionCount()).toBe(0);
+});
+
+// An Action.output expression is evaluated post-commit against `{result}` alone,
+// so a `data` reference here would type-check and then throw on every delivery,
+// re-invoking the external handler on each retry.
+test.skipIf(!DB)("publish rejects an Action.output expression that reads data", async () => {
+  const err = await publishFails(bodyWithOutput("data.go"));
+  expect(err.issues[0]!.loc).toBe("steps[1].onEntry.actions[0].output.field_go");
+  expect(await definitionCount()).toBe(0);
+});
+
+// One publish surfaces one publish's worth of fixes, not a fix-and-retry loop.
+test.skipIf(!DB)("a rejected publish reports every issue, not only the first", async () => {
+  const b = waitBody("sayYes") as unknown as Record<string, any>;
+  b.workflow.steps[1].paths[0].guard = cel('data.nope == "x"');
+  b.workflow.steps[1].onEntry[0].output.field_go = cel("data.go");
+
+  const err = await publishFails(b as unknown as ProcessBody);
+  expect(err.issues.map((i) => i.loc).sort()).toEqual([
+    "steps[1].onEntry.actions[0].output.field_go",
+    "steps[1].paths[0].guard",
+  ]);
+  expect(await definitionCount()).toBe(0);
+});
+
+test.skipIf(!DB)("a rejected publish consumes no version number", async () => {
+  await publishFails(bodyWithGuard("data.go =="));
+  const v = await publishBody(PID, waitBody("sayYes"));
+  expect(v.version).toBe(1); // not 2 — the rejected publish reserved nothing
+});
+
+// The check runs AFTER the hash-hit lookup, so a version stored before the check
+// existed (or before it tightened) still re-publishes as a no-op. Instances are
+// pinned to that version; making a re-publish throw would strand them. Inserted
+// directly here because publishBody itself would now refuse to create it.
+test.skipIf(!DB)("re-publishing an already-stored body is a no-op, not re-validated", async () => {
+  const legacy = compileProcessBody(bodyWithGuard('data.nope == "x"'));
+  const hash = definitionHash(legacy);
+  await sql`INSERT INTO definitions (process_id, version, definition_hash, status, body)
+    VALUES (${PID}, 1, ${hash}, 'published', ${legacy})`;
+
+  const v = await publishBody(PID, bodyWithGuard('data.nope == "x"'));
+  expect(v.version).toBe(1);
+  expect(v.definitionHash).toBe(hash);
+  expect(await definitionCount()).toBe(1);
+});
+
+// The load-bearing consequence of putting the check on the WRITE path: a version
+// stored before the check existed still READS, and its pinned instances still
+// rehydrate. The same check placed in definition.ts — which is also the
+// deserializer every read goes through — would break exactly this, turning a
+// tightening into an outage for every instance already pinned to that version.
+test.skipIf(!DB)("a body stored before the check still reads and its instances rehydrate", async () => {
+  const legacy = compileProcessBody(bodyWithGuard('data.nope == "x"'));
+  const hash = definitionHash(legacy);
+  await sql`INSERT INTO definitions (process_id, version, definition_hash, status, body)
+    VALUES (${PID}, 1, ${hash}, 'published', ${legacy})`;
+
+  const { resolveBody } = createDefinitionStore();
+  const resolved = (await resolveBody(PID, 1))!; // read path: no CEL involved
+  expect(definitionHash(resolved)).toBe(hash);
+
+  const inst = await createInstance(resolved, { processId: PID, version: 1 });
+  const re = await rehydrate(inst.instanceId, resolved); // throws PinMismatch if the pin disagrees
+  expect(re.instanceId).toBe(inst.instanceId);
+});
+
+// --- publish round-trips through validation -----------------------------------
+
+// An authored body carrying content the contract does not declare. Every read
+// re-parses (strip mode), so anything not stripped BEFORE the hash is content
+// the hash covers and no read can reproduce.
+const dirtyBody = (): ProcessBody => {
+  const b = waitBody("sayYes") as unknown as Record<string, any>;
+  b.uiMeta = { editor: "v1", palette: ["#fff"] };
+  b.workflow.steps[0].editorNote = "drawn at 120,40";
+  return b as unknown as ProcessBody;
+};
+
+test.skipIf(!DB)("unknown authored keys reach neither the hash nor the store", async () => {
+  const v = await publishBody(PID, dirtyBody());
+
+  // The returned body is the validated one.
+  const returned = v.definition as unknown as Record<string, any>;
+  expect(returned.uiMeta).toBeUndefined();
+  expect(returned.workflow.steps[0].editorNote).toBeUndefined();
+
+  // So is the persisted one.
+  const rows = (await sql`SELECT body FROM definitions WHERE process_id = ${PID} AND version = ${v.version}`) as { body: unknown }[];
+  const stored = (typeof rows[0].body === "string" ? JSON.parse(rows[0].body as string) : rows[0].body) as Record<string, any>;
+  expect(stored.uiMeta).toBeUndefined();
+  expect(stored.workflow.steps[0].editorNote).toBeUndefined();
+
+  // The hash is the hash of the stripped body — identical to the clean publish.
+  expect(v.definitionHash).toBe(definitionHash(compileProcessBody(waitBody("sayYes"))));
+});
+
+test.skipIf(!DB)("a publish -> read round trip is hash-stable", async () => {
+  const v = await publishBody(PID, dirtyBody());
+  const { resolveBody } = createDefinitionStore();
+  const resolved = (await resolveBody(PID, v.version))!;
+  // The pin is only meaningful if the body every reader gets recomputes to it.
+  expect(definitionHash(resolved)).toBe(v.definitionHash);
+});
+
+test.skipIf(!DB)("an instance created from the publish return value rehydrates", async () => {
+  const v = await publishBody(PID, dirtyBody());
+  const { resolveBody } = createDefinitionStore();
+  const resolved = (await resolveBody(PID, v.version))!;
+
+  // CLAUDE.md's documented-correct path: create from the body publish returned.
+  const inst = await createInstance(v.definition, { processId: PID, version: v.version });
+  const re = await rehydrate(inst.instanceId, resolved); // throws PinMismatch if the pin disagrees
+  expect(re.instanceId).toBe(inst.instanceId);
+});
+
+test.skipIf(!DB)("re-publishing the read-back body is a hash-matched no-op", async () => {
+  const v = await publishBody(PID, dirtyBody());
+  const { resolveBody } = createDefinitionStore();
+  const resolved = (await resolveBody(PID, v.version))!;
+
+  const again = await publishBody(PID, resolved);
+  expect(again.version).toBe(v.version);
+  expect(again.definitionHash).toBe(v.definitionHash);
+  const rows = (await sql`SELECT count(*)::int AS n FROM definitions WHERE process_id = ${PID}`) as { n: number }[];
+  expect(rows[0].n).toBe(1);
 });
 
 // --- resolve: pin check + absent pin ------------------------------------------

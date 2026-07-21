@@ -2,6 +2,7 @@ import { test, expect } from "bun:test";
 import { readFileSync } from "node:fs";
 import { validateProcessBody, validateMigrationSpec, parseExpression, celType, type CelIssue } from "../src/cel/check.js";
 import { evalTransforms } from "../src/cel/eval.js";
+import { compileProcessBody } from "../src/schema/compile.js";
 import { instance as instanceSchema, baseFieldType, type ProcessBody, type MigrationSpec, type Instance } from "../src/schema/definition.js";
 
 // Minimal ProcessBody builders. validateProcessBody reads only fields /
@@ -67,6 +68,61 @@ test("accepts result in an Action.output mapping", () => {
     paths: [{ id: "path_a", key: "pa", to: "step_b", trigger: "manual" }],
   };
   expect(validateProcessBody(body({ steps: [step] }))).toEqual([]);
+});
+
+// An Action.output mapping sees `result` and NOTHING else. The writeback is
+// evaluated post-commit against a handler return, an unbounded interval after the
+// action was enqueued, so the engine supplies `{result}` alone. A wider namespace
+// admitted here would type-check and then throw on every delivery attempt,
+// re-invoking the external handler on each retry before dead-lettering.
+const outputStep = (
+  src: string,
+  position: "onEntry" | "onCancel" = "onEntry",
+  type: "task" | "subprocess" = "task",
+) => ({
+  id: "step_a",
+  key: "a",
+  label: "A",
+  type,
+  [position]: [{ id: "action_a", type: "http", config: {}, output: { field_booking_status: { lang: "cel", src } } }],
+  paths: [{ id: "path_a", key: "pa", to: "step_b", trigger: "manual" }],
+});
+
+const OUT_LOC = (position: string) => `steps[0].${position}.actions[0].output.field_booking_status`;
+
+test("rejects data.* in an Action.output mapping", () => {
+  const issues = validateProcessBody(body({ steps: [outputStep("result.net + data.amount")] }));
+  expect(issues.length).toBe(1);
+  expect(issues[0]!.loc).toBe(OUT_LOC("onEntry"));
+  expect(msgs(issues).toLowerCase()).toContain("data");
+});
+
+test("rejects instance.* and actor.* in an Action.output mapping", () => {
+  expect(validateProcessBody(body({ steps: [outputStep("instance.id")] })).length).toBe(1);
+  expect(validateProcessBody(body({ steps: [outputStep("actor.id")] })).length).toBe(1);
+});
+
+// The enclosing step's type cannot widen output scope: `child` exists only during
+// the subprocess return delivery, which evaluates outputMapping over the parent
+// context — a different site from Action.output.
+test("rejects child.* in an Action.output mapping on a subprocess step", () => {
+  const issues = validateProcessBody(body({ steps: [outputStep("child.outcome", "onEntry", "subprocess")] }));
+  expect(issues.length).toBe(1);
+  expect(issues[0]!.loc).toBe(OUT_LOC("onEntry"));
+});
+
+// onCancel actions are enqueued by cancelInstance and their outputs run through
+// the same evalOutput path — the one action position collect() used not to visit.
+test("checks onCancel action outputs", () => {
+  const broken = validateProcessBody(body({ steps: [outputStep("result.status >", "onCancel")] }));
+  expect(broken.length).toBe(1);
+  expect(broken[0]!.loc).toBe(OUT_LOC("onCancel"));
+
+  const widened = validateProcessBody(body({ steps: [outputStep("data.amount", "onCancel")] }));
+  expect(widened.length).toBe(1);
+  expect(widened[0]!.loc).toBe(OUT_LOC("onCancel"));
+
+  expect(validateProcessBody(body({ steps: [outputStep("result.status", "onCancel")] }))).toEqual([]);
 });
 
 // 5.5 child: forbidden outside a subprocess step, allowed inside
@@ -236,9 +292,17 @@ test("accepts a well-typed guard", () => {
   expect(validateProcessBody(body({ steps: [guardStep("data.booking_status == 'booked'")] }))).toEqual([]);
 });
 
-test("accepts the real expense-approval example", () => {
-  const json = JSON.parse(readFileSync(new URL("../examples/expense-approval.json", import.meta.url), "utf8"));
-  expect(validateProcessBody(json.definition as ProcessBody)).toEqual([]);
+// Every shipped example must survive the check, since publish now enforces it —
+// an example that cannot be published is not an example. Checked against the
+// COMPILED body, which is what publishBody hands to validateProcessBody.
+test.each([
+  "expense-approval.json",
+  "subprocess-credit-check-child.json",
+  "subprocess-loan-parent.json",
+])("accepts the real %s example", (name) => {
+  const json = JSON.parse(readFileSync(new URL(`../examples/${name}`, import.meta.url), "utf8"));
+  const authored = (json.definition ?? json) as ProcessBody;
+  expect(validateProcessBody(compileProcessBody(authored))).toEqual([]);
 });
 
 // 5.8 mapping coverage: every catalog field type maps to a CEL type

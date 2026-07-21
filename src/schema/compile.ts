@@ -11,6 +11,12 @@
  * Deterministic (same authored body -> identical compiled body) and idempotent
  * (an already-compiled body is returned unchanged). Rejects a body that authors
  * the reserved cancellation identity.
+ *
+ * Returns the VALIDATED PARSE OUTPUT, never the input. The contract schemas
+ * strip undeclared content and are also the deserializer every read goes
+ * through, so compile is where stripping must happen: hashing the input would
+ * cover keys that no read reproduces, and the resulting pin would never
+ * rehydrate.
  */
 
 import {
@@ -99,11 +105,16 @@ export function compileProcessBody(body: ProcessBody): ProcessBody {
   // Idempotent: an already-compiled (published-valid) body is a no-op. A body
   // that merely collides with the reserved identity is NOT published-valid and
   // falls through to authored validation below, which rejects it.
-  if (publishedProcessBody.safeParse(body).success) return body;
+  const compiled = publishedProcessBody.safeParse(body);
+  if (compiled.success) return compiled.data;
 
-  authoredProcessBody.parse(body); // reject reserved-identity collisions
+  // The parse OUTPUT is what gets compiled, hashed and stored: the schemas strip
+  // undeclared content, so returning the input instead would let an unknown key
+  // into definitionHash that every read then strips back out, leaving the pin
+  // unreproducible and its instances unrehydratable.
+  const parsed = authoredProcessBody.parse(body); // also rejects reserved-identity collisions
 
-  const contracted = body.contract !== undefined;
+  const contracted = parsed.contract !== undefined;
 
   const sink: Step = {
     id: CANCEL_SINK_STEP_ID,
@@ -115,12 +126,12 @@ export function compileProcessBody(body: ProcessBody): ProcessBody {
   };
 
   const contract = contracted
-    ? { ...body.contract!, outcomes: [...(body.contract!.outcomes ?? []), RESERVED_CANCEL_OUTCOME] }
-    : body.contract;
+    ? { ...parsed.contract!, outcomes: [...(parsed.contract!.outcomes ?? []), RESERVED_CANCEL_OUTCOME] }
+    : parsed.contract;
 
   return {
-    ...body,
+    ...parsed,
     contract,
-    workflow: { ...body.workflow, steps: [...body.workflow.steps, sink] },
+    workflow: { ...parsed.workflow, steps: [...parsed.workflow.steps, sink] },
   };
 }

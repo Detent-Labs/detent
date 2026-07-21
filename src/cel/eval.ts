@@ -137,9 +137,13 @@ export function evalGuard(guard: Expression | undefined, ctx: Record<string, unk
 }
 
 /**
- * Build the Action.output context: `result` only. data/instance/actor are
- * absent, so an output expression referencing them is unresolvable — matching
- * the authoring scope where `result` is the sole namespace for Action.output.
+ * Build the Action.output context: `result` only. data/instance/actor/child are
+ * absent, so an output expression referencing them is unresolvable — matching the
+ * authoring scope, where `check.ts::buildEnv` registers `result` alone at an
+ * output site and publish rejects anything else. The two must stay in step: an
+ * output expression is evaluated post-commit, so a namespace admitted here but
+ * not there (or the reverse) is an expression that type-checks and then throws on
+ * every delivery, re-invoking the external handler on each retry.
  */
 export function buildOutputContext(result: unknown): Record<string, unknown> {
   return { result };

@@ -191,19 +191,36 @@ each with a test that rejects a violating definition.
   (v8.0.0, the one library for both parse/check and the engine's later evaluate).
   `validateProcessBody(body)` parse- and type-checks every Expression against the
   field catalog and the formal expression context, returning located `CelIssue[]`.
-  Kept out of definition.ts so the contract has no CEL dependency. CEL references
-  fields by `key` (a `field_<uuid>` id is not a valid CEL identifier); scopes are
-  enforced by which namespaces are registered (`result` only in Action.output,
-  `child` only in subprocess steps, data sources everywhere except a timer
-  `deadline`); `now()`/`timestamp()`/`duration()` are blocked. A `Site` may also
+  Kept out of definition.ts so the contract has no CEL dependency. **Invoked at
+  PUBLISH** (`definitions.ts::publishBody`, throwing `CelValidationError` with every
+  located issue), on the compiled body so the injected cancel sink is held to the
+  same rule, and after the hash-hit lookup so an identical re-publish of a body
+  stored before a tightening stays a no-op instead of stranding its pinned
+  instances. Runtime is the wrong place to learn of a bad expression: a broken
+  guard is total, so it is `false` forever and parks the instance on a wait-state
+  nothing reports; a broken mapping throws inside outbox delivery, re-invoking the
+  external handler on each retry before dead-lettering and parking the parent. CEL
+  references fields by `key` (a `field_<uuid>` id is not a valid CEL identifier);
+  scopes are enforced by which namespaces are registered. An **Action.output site
+  registers `result` and nothing else** — not `data`/`instance`/`actor`/`child` —
+  matching `eval.ts::buildOutputContext` exactly, because the writeback is
+  evaluated post-commit an unbounded interval after the action was enqueued, so
+  instance state there is a different state than the one that enqueued it. Every
+  action position is covered, `onCancel` included. `child` is registered only in
+  subprocess-step guards; data sources everywhere except a timer `deadline`;
+  `now()`/`timestamp()`/`duration()` are blocked. A `Site` may also
   declare an expected result type: the `deadline` site requires `string` (`dyn`
   passes, being unknowable), because a deadline yielding a non-instant is dropped
   at arming and an omitted timer is indistinguishable from an undeclared one. A
   deadline sees neither `child` (no child exists at entry) nor a data source
   (`buildGuardContext` does not resolve them, so it would throw at every arming) —
   both are publish errors rather than a wait-state that silently loses its bound.
-  `test/cel.test.ts` covers each rule. Known papercut: `number`->CEL `double`, so
-  `data.count == 5` needs `== 5.0`.
+  `test/cel.test.ts` covers each rule (including all three `examples/`), and
+  `test/definitions.test.ts` covers publish rejection. Known papercut:
+  `number`->CEL `double`, so `data.count == 5` needs `== 5.0` — now a publish
+  error rather than a guard that is silently `false` at runtime. NOT enforced: a
+  data source is registered at check time but resolved nowhere in the engine, so
+  a guard reading one still parks silently — see the deferred item below.
 - `README.md`: public-facing overview (paradigm, the JSON/Zod contract, a status
   table, dev commands). Points here for the full invariant rules rather than
   duplicating them.
@@ -336,7 +353,11 @@ each with a test that rejects a violating definition.
    wired site: `validateMigrationSpec` parse/type-checks them against the source
    catalog with the result type checked against the target field (`buildEnv` gained an
    `actor` flag so this one site can withhold it), and `evalTransforms` evaluates them
-   at migration, total per entry, reusing `coerceJson`.
+   at migration, total per entry, reusing `coerceJson`. `validateProcessBody` is wired
+   into `publishBody` (an invalid expression is a publish error, not a runtime one),
+   and the check/eval scopes were reconciled at the one site where they had drifted:
+   `Action.output` registers `result` alone, and `onCancel` outputs — previously the
+   one action position `collect()` never visited — are checked.
 3. Engine skeleton: largely DONE. Instance store, transactional outbox (delivery +
    writeback + retry/dead-letter + reclaim), transition executor (manual/automatic/
    timer, onExit→onPath→onEntry ordering, run-to-rest), async re-resolution of
@@ -391,6 +412,15 @@ each with a test that rejects a violating definition.
   deliberately minimal; widen when the engine surfaces a concrete need.
 
 ## Decided, not yet built (each needs its own OpenSpec change)
+- **Data sources are checked but never resolved.** `check.ts` registers each declared
+  data source as a `dyn` variable, so an expression reading one type-checks and
+  publishes; the engine resolves them nowhere (no reference in `src/engine/`). At
+  runtime a guard reading a data source is therefore total-`false` forever (a silently
+  parked wait-state) and a mapping reading one throws. Two ways out — make a
+  data-source reference a publish error until they exist, or build resolution — and
+  the choice is about the unbuilt feature, not about the check. Deliberately left
+  open when `validateProcessBody` was wired into publish; it is the last remaining
+  check/eval scope drift.
 - **Move `resolveBody` inside the per-instance try in the workers.** In
   `src/engine/timers.ts` the `resolveBody` call sits above `drainTimers`' per-instance
   `try`, and `src/engine/resolution.ts` has the same shape, so any read-path parse

@@ -54,6 +54,37 @@ describe("compile: cancel-sink injection", () => {
   });
 });
 
+describe("compile: unknown keys are stripped before the hash", () => {
+  // definitionHash is taken over compile's output, and every read re-parses
+  // (strip mode). Compile must therefore return the parse output on BOTH exits,
+  // or the hash covers content no read can reproduce and pinned instances
+  // never rehydrate.
+  it("strips unknown keys on the authored path", () => {
+    const b: any = contractedBody();
+    b.uiMeta = { editor: "v1" };
+    b.workflow.steps[0].editorNote = "note";
+    const out: any = compileProcessBody(b);
+    expect(out.uiMeta).toBeUndefined();
+    expect(out.workflow.steps.find((s: any) => s.id === b.workflow.steps[0].id).editorNote).toBeUndefined();
+  });
+
+  it("strips unknown keys on the already-compiled early return", () => {
+    const compiled: any = compileProcessBody(contractedBody());
+    compiled.uiMeta = { editor: "v1" };
+    compiled.workflow.steps[0].editorNote = "note";
+    const out: any = compileProcessBody(compiled); // published-valid: takes the early return
+    expect(out.uiMeta).toBeUndefined();
+    expect(out.workflow.steps.find((s: any) => s.id === compiled.workflow.steps[0].id).editorNote).toBeUndefined();
+  });
+
+  it("an authored body and its unknown-key variant compile to the same body", () => {
+    const clean = compileProcessBody(contractedBody());
+    const dirty: any = contractedBody();
+    dirty.uiMeta = { editor: "v1" };
+    expect(compileProcessBody(dirty)).toEqual(clean);
+  });
+});
+
 describe("publishedProcessBody invariant", () => {
   it("rejects a body with no cancel-sink (never compiled)", () => {
     expect(publishedProcessBody.safeParse(contractedBody()).success).toBe(false);

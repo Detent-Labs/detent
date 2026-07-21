@@ -438,6 +438,101 @@ test.skipIf(!DB)("spawn is idempotent: redelivery creates no second child", asyn
   expect(await countChildren(parent.instanceId)).toBe(1);
 });
 
+test.skipIf(!DB)("redelivery completes a drive-to-rest a crash interrupted", async () => {
+  const { registry } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody());
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
+  await seedField(parent.instanceId, "field_p_amount", 500);
+
+  // Simulate a first delivery that created the child but crashed before driving
+  // it to rest: create the child directly, exactly as the handler's own
+  // creation branch would, without ever calling resolveAutomatic on it. The
+  // real spawn action enqueued by startInstance is still pending in the outbox.
+  const childId = subprocessChildId(parent.instanceId, 1, "step_p_sub");
+  await createInstance(
+    cv.definition,
+    {
+      processId: CHILD_PID, version: cv.version, instanceId: childId,
+      data: { field_c_amount: 500 } as unknown as Instance["data"],
+      parent: { instanceId: parent.instanceId, stepId: "step_p_sub" as Instance["currentStepId"] },
+    },
+    sql,
+  );
+  expect((await loadInstance(childId))!.currentStepId as string).toBe("step_c_auto"); // parked, not yet driven
+
+  // Draining the still-pending spawn action is, from the handler's point of
+  // view, indistinguishable from a genuine redelivery finding the child
+  // already created.
+  await drainAll(registry);
+
+  const child = await loadInstance(childId);
+  expect(child!.status).toBe("completed"); // driven to rest: 500 <= 1000 -> approved
+  expect(child!.currentStepId as string).toBe("step_c_approved");
+
+  const p = await loadInstance(parent.instanceId);
+  expect(p!.status).toBe("completed"); // the return the drive-to-rest enqueued was also delivered
+  expect(dataField(p, "field_p_result")).toBe("approved");
+});
+
+test.skipIf(!DB)("redelivery completes an interrupted cancel-orphan backstop", async () => {
+  const { registry } = engineRegistry();
+  const W_PID = "proc_waiting_backstop" as Instance["processId"];
+  const P_PID = "proc_caller_backstop" as Instance["processId"];
+  const wv = await publishBody(W_PID, waitingChildBody());
+  const pv = await publishBody(P_PID, callerBody("caller_backstop", W_PID, wv.version));
+  const parent = await startInstance(pv.definition, { processId: P_PID, version: pv.version }, actor);
+  // Parked at step_sub, transitionSeq 1; the spawn is enqueued but not yet delivered.
+
+  // Simulate a first delivery that created the child but crashed before the
+  // backstop check: create the child directly, parked at its own manual step.
+  const childId = subprocessChildId(parent.instanceId, 1, "step_sub");
+  await createInstance(
+    wv.definition,
+    { processId: W_PID, version: wv.version, instanceId: childId, parent: { instanceId: parent.instanceId, stepId: "step_sub" as Instance["currentStepId"] } },
+    sql,
+  );
+
+  // Cancel the parent WITHOUT cascading to children (no resolveBody) — standing
+  // in for the parent's own cancel cascade racing ahead of this child's
+  // existence, which is exactly the race the backstop exists to close.
+  const parked = await loadInstance(parent.instanceId);
+  await cancelInstance(parked!, pv.definition, actor, sql);
+  expect((await loadInstance(childId))!.status).toBe("running"); // orphaned so far
+
+  // Draining the still-pending spawn action finds the child already created —
+  // indistinguishable, from the handler's side, from a genuine redelivery.
+  await drainAll(registry);
+
+  expect((await loadInstance(childId))!.status).toBe("cancelled");
+});
+
+test.skipIf(!DB)("redelivery after both repairs already completed is a no-op", async () => {
+  const { registry } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody());
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
+  await seedField(parent.instanceId, "field_p_amount", 500);
+  await drainAll(registry); // spawn -> child terminal -> return -> parent advance, all the way to rest
+
+  const childId = subprocessChildId(parent.instanceId, 1, "step_p_sub");
+  const before = await loadInstance(childId);
+  expect(before!.status).toBe("completed");
+
+  // Re-enqueue the same spawn action once more (a further redelivery, after
+  // everything already completed) and drain again.
+  await sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
+    VALUES (${"redeliver2_" + parent.instanceId}, ${parent.instanceId}, 1, ${"action_spawn_step_p_sub"},
+      ${{ id: "action_spawn_step_p_sub", type: "core.spawnSubprocess", config: { subprocessStepId: "step_p_sub", parentSeq: 1 } }})`;
+  await drainAll(registry);
+
+  expect(await countChildren(parent.instanceId)).toBe(1);
+  expect(await loadInstance(childId)).toEqual(before); // untouched
+  const p = await loadInstance(parent.instanceId);
+  expect(p!.status).toBe("completed");
+  expect(dataField(p, "field_p_result")).toBe("approved");
+});
+
 test.skipIf(!DB)("a spawn whose parent is no longer running creates no child", async () => {
   const { registry, resolveBody } = engineRegistry();
   const cv = await publishBody(CHILD_PID, childBody());
