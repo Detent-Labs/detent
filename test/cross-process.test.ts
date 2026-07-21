@@ -5,8 +5,9 @@
  * enforce child-first publish ordering.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
+import { readFileSync } from "node:fs";
 import { sql, initSchema } from "../src/engine/store.js";
-import { publishBody, CrossProcessValidationError } from "../src/engine/definitions.js";
+import { publishBody, CrossProcessValidationError, CelValidationError } from "../src/engine/definitions.js";
 import { compileProcessBody } from "../src/schema/compile.js";
 import { contractHash } from "../src/schema/hash.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
@@ -23,6 +24,26 @@ const childBody = (): ProcessBody =>
     key: "child", label: "Child",
     contract: { inputFields: ["field_c_amount"], outputFields: ["field_c_amount"], outcomes: ["approved"] },
     fields: [{ id: "field_c_amount", key: "amount", label: "Amount", type: "number" }],
+    workflow: {
+      initialStep: "step_c",
+      steps: [
+        { id: "step_c", key: "c", label: "C", type: "task", paths: [{ id: "path_c", key: "c", to: "step_done", trigger: "manual" }] },
+        { id: "step_done", key: "done", label: "Done", type: "task", terminal: true, outcome: "approved" },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+// Same contracted child, plus a field its contract does NOT declare as output —
+// used to prove an outputMapping/guard reaching past contract.outputFields is
+// rejected at publish, not silently accepted as `child.data: dyn` would allow.
+const childBodyWithInternalField = (): ProcessBody =>
+  ({
+    key: "child", label: "Child",
+    contract: { inputFields: ["field_c_amount"], outputFields: ["field_c_amount"], outcomes: ["approved"] },
+    fields: [
+      { id: "field_c_amount", key: "amount", label: "Amount", type: "number" },
+      { id: "field_c_internal", key: "internal", label: "Internal", type: "string" },
+    ],
     workflow: {
       initialStep: "step_c",
       steps: [
@@ -133,4 +154,37 @@ test.skipIf(!DB)("publishing the child first lets a pinned and a latest-at-spawn
   const ref = contractHash(compileProcessBody(childBody()).contract!);
   const p2 = await publishBody(PARENT2, parentBody("parent2", latest(ref, "field_c_amount")));
   expect(p2.version).toBe(1);
+});
+
+// --- outputMapping/guard child.data refs ⊆ child contract.outputFields --------
+
+test.skipIf(!DB)("an outputMapping reference to a child field outside contract.outputFields is rejected; no version persisted", async () => {
+  const c = await publishBody(CHILD, childBodyWithInternalField());
+  const sub = { ...pinned(c.version, "field_c_amount"), outputMapping: { field_p_amount: cel("child.data.internal") } };
+  let err: unknown;
+  try {
+    await publishBody(PARENT, parentBody("parent", sub));
+  } catch (e) {
+    err = e;
+  }
+  expect(err).toBeInstanceOf(CelValidationError);
+  expect(await parentCount(PARENT)).toBe(0);
+});
+
+test.skipIf(!DB)("an outputMapping confined to the child's declared outputFields still publishes", async () => {
+  const c = await publishBody(CHILD, childBodyWithInternalField());
+  const sub = { ...pinned(c.version, "field_c_amount"), outputMapping: { field_p_amount: cel("child.data.amount") } };
+  const p = await publishBody(PARENT, parentBody("parent", sub));
+  expect(p.version).toBe(1);
+});
+
+test.skipIf(!DB)("the shipped subprocess examples still publish under the tightened output-ref check", async () => {
+  const child = JSON.parse(readFileSync(new URL("../examples/subprocess-credit-check-child.json", import.meta.url), "utf8"));
+  const parent = JSON.parse(readFileSync(new URL("../examples/subprocess-loan-parent.json", import.meta.url), "utf8"));
+  // The parent's subprocess step pins processId "proc_credit_check" — the child
+  // must be published under exactly that id for the pinned binding to resolve.
+  const c = await publishBody("proc_credit_check" as ProcessId, child);
+  expect(c.version).toBe(1);
+  const p = await publishBody("proc_loan" as ProcessId, parent);
+  expect(p.version).toBe(1);
 });

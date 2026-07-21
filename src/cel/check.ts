@@ -69,6 +69,25 @@ function dataSchema(fields: FieldDef[]): Record<string, string> {
 }
 
 /**
+ * Same flattening as `dataSchema`, filtered to a set of allowed field ids (a
+ * contract's `outputFields`/`inputFields`). An id absent from `fields` is
+ * skipped rather than erroring — resolvability of the id itself is a separate
+ * check. Undefined/empty `ids` yields `{}`, so every reference against that
+ * schema is an unknown-field error: nothing is contracted to read.
+ */
+function contractFieldSchema(fields: FieldDef[], ids: readonly string[] | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!ids || ids.length === 0) return out;
+  const allowed = new Set(ids);
+  for (const f of collectFieldsDeep(fields)) {
+    if (typeof f.type === "string" && f.type === "group") continue;
+    if (!allowed.has(f.id)) continue;
+    out[f.key] = celType(f.type);
+  }
+  return out;
+}
+
+/**
  * Build the type environment for a scope. Scope is expressed by which namespaces
  * are registered: `result` exists only in an Action.output mapping, `child` only
  * inside a subprocess step. Unregistered references are check-time errors
@@ -92,7 +111,7 @@ function dataSchema(fields: FieldDef[]): Record<string, string> {
  */
 function buildEnv(
   body: ProcessBody,
-  opts: { result: boolean; child: boolean; actor: boolean },
+  opts: { result: boolean; child: boolean; actor: boolean; childDataSchema?: Record<string, string> },
 ): Environment {
   const env = new Environment({ unlistedVariablesAreDyn: false });
   if (opts.result) {
@@ -106,7 +125,11 @@ function buildEnv(
   // migration is one operator action over a whole population, so admitting `actor`
   // would let a rule meant to be uniform produce different data per instance.
   if (opts.actor) env.registerVariable({ name: "actor", schema: { ...ACTOR_SCHEMA } });
-  if (opts.child) env.registerVariable({ name: "child", schema: { ...CHILD_SCHEMA } });
+  // `child.data` is `dyn` (any key accepted) by default: the single-body check has
+  // no child body to type it against. `checkSubprocessChildRefs` overrides it with
+  // a schema built from the resolved child's `contract.outputFields`, so a
+  // reference outside that set is an unknown-field error instead of accepted dyn.
+  if (opts.child) env.registerVariable({ name: "child", schema: { outcome: CHILD_SCHEMA.outcome, data: opts.childDataSchema ?? CHILD_SCHEMA.data } });
   return env;
 }
 
@@ -219,6 +242,38 @@ export interface CelIssue {
   message: string;
 }
 
+/**
+ * Parse + type-check one `src` against `env`, located at `loc`. Shared by
+ * `validateProcessBody` (one environment per body-wide scope) and
+ * `checkSubprocessChildRefs` (one environment per resolved-child subprocess
+ * step). `expect`, when given, is an additionally required inferred result type
+ * (satisfied by `dyn` too, since a plugin field's real type is unknowable here).
+ */
+function checkSite(env: Environment, site: { src: string; loc: string; expect?: string }): CelIssue | undefined {
+  // Forbidden time constructors first (env.check would accept the pure ones).
+  try {
+    const bad = forbiddenTimeCall(parse(site.src).ast);
+    if (bad) return { loc: site.loc, src: site.src, message: `time function not allowed: ${bad}() (time lives only in timers)` };
+  } catch {
+    // parse failure is reported by the type-check below
+  }
+  let valid: boolean;
+  let message: string | undefined;
+  try {
+    const r = env.check(site.src);
+    valid = r.valid;
+    message = r.error?.message ?? (r.valid ? undefined : "type error");
+    if (valid && site.expect && r.type !== site.expect && r.type !== "dyn") {
+      valid = false;
+      message = `expected ${site.expect}, got ${r.type}`;
+    }
+  } catch (err) {
+    valid = false;
+    message = (err as Error).message;
+  }
+  return valid ? undefined : { loc: site.loc, src: site.src, message: message ?? "invalid expression" };
+}
+
 /** Parse + type-check every Expression in the body. Returns [] when all are valid. */
 export function validateProcessBody(body: ProcessBody): CelIssue[] {
   const issues: CelIssue[] = [];
@@ -236,34 +291,46 @@ export function validateProcessBody(body: ProcessBody): CelIssue[] {
     return e;
   };
   for (const site of collect(body)) {
-    // Forbidden time constructors first (env.check would accept the pure ones).
-    try {
-      const bad = forbiddenTimeCall(parse(site.src).ast);
-      if (bad) {
-        issues.push({ loc: site.loc, src: site.src, message: `time function not allowed: ${bad}() (time lives only in timers)` });
-        continue;
-      }
-    } catch {
-      // parse failure is reported by the type-check below
-    }
-    let valid: boolean;
-    let message: string | undefined;
-    try {
-      const r = envFor(site.result, site.child).check(site.src);
-      valid = r.valid;
-      message = r.error?.message ?? (r.valid ? undefined : "type error");
-      // A site declaring an expected result type is satisfied by that type or by
-      // `dyn` (a plugin field, whose type is not knowable here).
-      if (valid && site.expect && r.type !== site.expect && r.type !== "dyn") {
-        valid = false;
-        message = `expected ${site.expect}, got ${r.type}`;
-      }
-    } catch (err) {
-      valid = false;
-      message = (err as Error).message;
-    }
-    if (!valid) issues.push({ loc: site.loc, src: site.src, message: message ?? "invalid expression" });
+    const issue = checkSite(envFor(site.result, site.child), site);
+    if (issue) issues.push(issue);
   }
+  return issues;
+}
+
+/**
+ * Re-check a single subprocess step's `outputMapping` values and automatic-path
+ * guards against the *actual resolved child's* declared outputs, instead of the
+ * generic `dyn` `child.data` every other site accepts. Invoked from
+ * `validateCrossProcess` (`src/engine/definitions.ts`), which already resolves
+ * the child body per step for the `inputMapping` check — the same body supplies
+ * the child field catalog here. A `child.data.<key>` reference for a key outside
+ * `childBody.contract.outputFields` is an unknown-field error here, even though
+ * it type-checks fine against the single-body `validateProcessBody` pass (which
+ * has no child body to type it against). `child.outcome` is untouched — it stays
+ * `string` regardless of the child's contract.
+ */
+export function checkSubprocessChildRefs(body: ProcessBody, stepIndex: number, childBody: ProcessBody): CelIssue[] {
+  const step = body.workflow.steps[stepIndex];
+  if (!step?.subprocess) return [];
+
+  const childDataSchema = contractFieldSchema(childBody.fields, childBody.contract?.outputFields);
+  const env = buildEnv(body, { result: false, child: true, actor: true, childDataSchema });
+  const sloc = `steps[${stepIndex}]`;
+  const issues: CelIssue[] = [];
+
+  (step.paths ?? []).forEach((p, pi) => {
+    const g = asExpr(p.guard);
+    if (!g) return;
+    const issue = checkSite(env, { src: g.src, loc: `${sloc}.paths[${pi}].guard` });
+    if (issue) issues.push(issue);
+  });
+  Object.entries(step.subprocess.outputMapping).forEach(([fid, e]) => {
+    const ex = asExpr(e);
+    if (!ex) return;
+    const issue = checkSite(env, { src: ex.src, loc: `${sloc}.subprocess.outputMapping.${fid}` });
+    if (issue) issues.push(issue);
+  });
+
   return issues;
 }
 
