@@ -202,6 +202,12 @@ export type MigrationResult = {
   failed: string[];
 };
 
+/** One instance's `data` keys absent from its pinned version's field catalog. */
+export type OrphanKeyEntry = { instanceId: string; keys: string[] };
+
+/** Result of `findOrphanKeys`: instances carrying orphan keys, and unreadable rows. */
+export type OrphanKeyScan = { orphans: OrphanKeyEntry[]; unreadable: string[] };
+
 /** Keyset page size. Ids only, so a large page is cheap. */
 const BATCH = 100;
 
@@ -469,4 +475,50 @@ export async function migrateInstances(
     }
   }
   return result;
+}
+
+// ============================================================
+// Read-only tooling: find orphan `data` keys on a version's instances.
+// ============================================================
+
+/**
+ * Scan every instance pinned to `{processId, version}` for `data` keys absent from
+ * that version's field catalog (retained by migration; see `remapData`). Read-only —
+ * no instance, plan, or definition is modified. Covers every instance status, not
+ * only running: a terminal instance's `data` is a permanent record and can carry an
+ * orphan same as a running one. Keyset-paginated like `migrateInstances`; a row whose
+ * body fails to parse is reported in `unreadable` instead of aborting the scan.
+ */
+export async function findOrphanKeys(
+  processId: ProcessId,
+  version: number,
+  db: SQL = sql,
+  resolvers: { resolveBody: ResolveBody } = createDefinitionStore(db),
+): Promise<OrphanKeyScan> {
+  const body = await resolvers.resolveBody(processId, version);
+  if (!body) throw new MigrationPlanError(`version ${version} is not published`);
+  const validIds = fieldTypeById(body.fields);
+
+  const orphans: OrphanKeyEntry[] = [];
+  const unreadable: string[] = [];
+  let last = "";
+  for (;;) {
+    const rows = (await db`SELECT instance_id, body FROM instances
+      WHERE instance_id > ${last}
+        AND body->>'processId' = ${processId}
+        AND (body->>'version')::int = ${version}
+      ORDER BY instance_id LIMIT ${BATCH}`) as { instance_id: string; body: unknown }[];
+    if (rows.length === 0) break;
+    for (const row of rows) {
+      last = row.instance_id; // keyset advances regardless of outcome
+      try {
+        const inst = instanceSchema.parse(typeof row.body === "string" ? JSON.parse(row.body) : row.body);
+        const keys = Object.keys(inst.data as Record<string, unknown>).filter((k) => !validIds.has(k));
+        if (keys.length > 0) orphans.push({ instanceId: row.instance_id, keys });
+      } catch {
+        unreadable.push(row.instance_id);
+      }
+    }
+  }
+  return { orphans, unreadable };
 }

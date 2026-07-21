@@ -458,7 +458,15 @@ each with a test that rejects a violating definition.
    validation (inputMapping ⊆ child inputFields, child reference resolvable → child-first
    ordering) is DONE (`definitions.ts`, roadmap #1). The production `resolveBody` backing
    (definition/version store) is DONE (`definitions.ts` + `host.ts`), so the
-   resolution and timer workers are live.
+   resolution and timer workers are live. Orphan-key visibility is DONE
+   (`migration.ts::findOrphanKeys(processId, version, db, resolvers)`): a read-only,
+   keyset-paginated scan reporting which instances pinned to a published version hold
+   a `data` key absent from that version's field catalog (a `group` field's own id is
+   never a valid key regardless of catalog declaration), covering every instance
+   status and isolating an unreadable row into a separate list rather than aborting —
+   the same per-row fault isolation as the three background drains. Read-only: no
+   pruning. A resolver miss throws `MigrationPlanError`, matching
+   `registerMigrationPlan`/`migrateInstances`.
 4. Editor (likely a separate package; promote the repo to workspaces here).
 
 ## Open questions (still need a decision before building the relevant part)
@@ -502,10 +510,6 @@ each with a test that rejects a violating definition.
   `duration` and `deadline`, is indistinguishable from one that left it unchanged and the
   old `fireAt` is kept. Closing this needs a provenance field (declared duration /
   deadline source / arming instant) on `TimerState`.
-- **Orphan-key inspection tooling.** Migration retains a value whose field the target
-  catalog no longer declares (dropping it would destroy data; guard-context re-keying
-  makes it unobservable and collision-free). Nothing surfaces accumulated orphans for an
-  operator to prune.
 
 ## Codebase memory (knowledge graph)
 The repo is indexed into codebase-memory-mcp. Resolve the `project` arg via
