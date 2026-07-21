@@ -74,12 +74,25 @@ function dataSchema(fields: FieldDef[]): Record<string, string> {
  * inside a subprocess step, data sources everywhere except a timer deadline.
  * Unregistered references are check-time errors (unlistedVariablesAreDyn: false),
  * so guard-forbidden `result`/`child`/`now()` fail for free.
+ *
+ * Output scope is `result` and NOTHING else — not `data`, `instance`, `actor`,
+ * `child`, or a data source. The writeback is dispatched post-commit and
+ * delivered an unbounded interval after the action was enqueued, so instance
+ * state at evaluation time is a different state than the one that enqueued it;
+ * the engine accordingly supplies `{ result }` alone (`eval.ts::buildOutputContext`).
+ * Registering more here would type-check an expression that then throws on every
+ * delivery — re-invoking the external handler on each retry before dead-lettering.
  */
 function buildEnv(
   body: ProcessBody,
   opts: { result: boolean; child: boolean; dataSources: boolean; actor: boolean },
 ): Environment {
-  const env = new Environment({ unlistedVariablesAreDyn: false })
+  const env = new Environment({ unlistedVariablesAreDyn: false });
+  if (opts.result) {
+    env.registerVariable("result", "dyn");
+    return env;
+  }
+  env
     .registerVariable({ name: "data", schema: dataSchema(body.fields) })
     .registerVariable({ name: "instance", schema: { ...INSTANCE_SCHEMA } });
   // `actor` is registered everywhere except the migration transform site: a
@@ -88,7 +101,6 @@ function buildEnv(
   if (opts.actor) env.registerVariable({ name: "actor", schema: { ...ACTOR_SCHEMA } });
   if (opts.dataSources) for (const ds of body.dataSources ?? []) env.registerVariable(ds.key, "dyn");
   if (opts.child) env.registerVariable({ name: "child", schema: { ...CHILD_SCHEMA } });
-  if (opts.result) env.registerVariable("result", "dyn");
   return env;
 }
 
@@ -137,10 +149,11 @@ function collect(body: ProcessBody): Site[] {
   const push = (e: Expression | undefined, loc: string, result: boolean, child: boolean, expect?: string, dataSources = true) => {
     if (e) sites.push({ src: e.src, loc, result, child, dataSources, ...(expect ? { expect } : {}) });
   };
-  // Action.output values are result scope.
-  const outputs = (actions: readonly { output?: Record<string, unknown> }[] | undefined, loc: string, child: boolean) => {
+  // Action.output values are result scope, which registers `result` alone — so an
+  // output site takes no `child` flag: the enclosing step's type cannot widen it.
+  const outputs = (actions: readonly { output?: Record<string, unknown> }[] | undefined, loc: string) => {
     (actions ?? []).forEach((a, i) =>
-      Object.entries(a.output ?? {}).forEach(([fid, e]) => push(asExpr(e), `${loc}.actions[${i}].output.${fid}`, true, child)),
+      Object.entries(a.output ?? {}).forEach(([fid, e]) => push(asExpr(e), `${loc}.actions[${i}].output.${fid}`, true, false)),
     );
   };
 
@@ -157,11 +170,14 @@ function collect(body: ProcessBody): Site[] {
   body.workflow.steps.forEach((s, si) => {
     const child = s.type === "subprocess";
     const sloc = `steps[${si}]`;
-    outputs(s.onEntry, `${sloc}.onEntry`, child);
-    outputs(s.onExit, `${sloc}.onExit`, child);
+    outputs(s.onEntry, `${sloc}.onEntry`);
+    outputs(s.onExit, `${sloc}.onExit`);
+    // onCancel actions are enqueued by cancelInstance and their outputs run through
+    // the same evalOutput path, so they are a checked site like any other.
+    outputs(s.onCancel, `${sloc}.onCancel`);
     (s.paths ?? []).forEach((p, pi) => {
       push(p.guard, `${sloc}.paths[${pi}].guard`, false, child);
-      outputs(p.onPath, `${sloc}.paths[${pi}].onPath`, child);
+      outputs(p.onPath, `${sloc}.paths[${pi}].onPath`);
     });
     (s.timers ?? []).forEach((t, ti) => {
       // A deadline is evaluated at step entry over the engine's guard context, which
@@ -176,7 +192,7 @@ function collect(body: ProcessBody): Site[] {
       // an undeclared one at runtime. Each of these is a publish error rather than a
       // wait-state that silently loses its only bound.
       push(t.deadline, `${sloc}.timers[${ti}].deadline`, false, false, "string", false);
-      outputs(t.onFire.actions, `${sloc}.timers[${ti}].onFire`, child);
+      outputs(t.onFire.actions, `${sloc}.timers[${ti}].onFire`);
     });
     (s.view?.fields ?? []).forEach((vf, vi) => {
       push(asExpr(vf.visible), `${sloc}.view.fields[${vi}].visible`, false, child);
