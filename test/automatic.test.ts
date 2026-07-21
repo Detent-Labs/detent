@@ -5,14 +5,18 @@
  * unset — a skip is visible, a false green is not.
  */
 import { test, expect, beforeAll } from "bun:test";
-import { sql, initSchema, createInstance } from "../src/engine/store.js";
+import { sql, initSchema, createInstance, withTransaction } from "../src/engine/store.js";
 import {
   selectAutomaticPath,
   resolveAutomatic,
   executeManualTransition,
   startInstance,
+  planStepEntry,
+  applyStepEntry,
+  orderedTriggerActions,
   AutomaticCascadeLoop,
 } from "../src/engine/transition.js";
+import { drainResolutions } from "../src/engine/resolution.js";
 import type { ProcessBody, Instance, Step, HistoryEntry } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
@@ -114,6 +118,12 @@ const seqOf = async (id: string): Promise<number> => {
   const r = (await sql`SELECT transition_seq AS s FROM instances WHERE instance_id = ${id}`) as { s: number }[];
   return r[0].s;
 };
+const resolveState = async (id: string): Promise<string> =>
+  ((await sql`SELECT resolve_state FROM instances WHERE instance_id = ${id}`) as { resolve_state: string }[])[0].resolve_state;
+const readInst = async (id: string): Promise<Instance> => {
+  const r = (await sql`SELECT body FROM instances WHERE instance_id = ${id}`) as { body: unknown }[];
+  return (typeof r[0].body === "string" ? JSON.parse(r[0].body as string) : r[0].body) as Instance;
+};
 const histEntries = async (id: string): Promise<HistoryEntry[]> => {
   const r = (await sql`SELECT entry FROM history_entries WHERE instance_id = ${id} ORDER BY transition_seq`) as { entry: unknown }[];
   return r.map((row) => (typeof row.entry === "string" ? JSON.parse(row.entry) : row.entry) as HistoryEntry);
@@ -179,4 +189,76 @@ test.skipIf(!DB)("startInstance advances an instance created on an automatic ini
   const entries = await histEntries(rested.instanceId);
   expect(entries).toHaveLength(1);
   expect(entries[0].cause).toBe("automatic");
+});
+
+// --- durable crash recovery: a commit whose in-process cascade never runs -----
+
+test.skipIf(!DB)("a cascade interrupted after its first hop is durably resumed by re-resolution", async () => {
+  // step_a (manual) -> step_g1 (automatic, guardless) -> step_g2 (automatic, guardless) -> step_t (terminal).
+  const body = mkBody([
+    step("step_a", { paths: [manualPath("path_ag", "step_g1")] }),
+    step("step_g1", { paths: [autoPath("path_g1g2", "step_g2")] }),
+    step("step_g2", { paths: [autoPath("path_g2t", "step_t")] }),
+    step("step_t", { terminal: true }),
+  ]);
+  const i = await createInstance(body, { processId: "proc_1" as Instance["processId"], version: 1 });
+
+  // Commit only the first hop (step_a -> step_g1) through the same building
+  // blocks executeManualTransition uses internally, without calling
+  // resolveAutomatic — simulating a crash before the cascade continues.
+  const source = body.workflow.steps.find((s) => s.id === "step_a")!;
+  const path = source.paths![0];
+  const target = body.workflow.steps.find((s) => s.id === path.to)!;
+  const actions = orderedTriggerActions(source, path, target);
+  const plan = planStepEntry(i, target, body, { pathId: path.id, cause: "user", actorId: actor.id, actions });
+  const afterHop1 = await withTransaction(sql, (tx) => applyStepEntry(tx, plan));
+  expect(afterHop1.currentStepId as string).toBe("step_g1");
+  // The commit alone — with no cascade having run — already left the instance
+  // durably marked, before any further hop and before any writeback.
+  expect(await resolveState(i.instanceId)).toBe("pending");
+
+  // The re-resolution worker finishes the whole cascade in this one pass — the
+  // state cascade (currentStepId/status) is what this change exists to
+  // recover, and it fully completes here.
+  expect(await drainResolutions(sql, () => body)).toBe(1);
+  const rested = await readInst(i.instanceId);
+  expect(rested.currentStepId as string).toBe("step_t");
+  expect(rested.status).toBe("completed");
+  // resolve_state itself may or may not settle to 'idle' in this same pass:
+  // the intermediate hop (step_g1 -> step_g2, still running) re-flags
+  // 'pending' as it commits, clobbering this pass's own 'claimed' marker, so
+  // its end-of-pass clear finds nothing to clear. Once the cascade then
+  // reaches the terminal step, status is no longer 'running', so the worker's
+  // claim query (`WHERE status = 'running'`) never revisits the row to settle
+  // the flag — it is left 'pending' permanently. Harmless: nothing else reads
+  // resolve_state, and a terminal instance is never re-resolved regardless of
+  // this column's value. See applyStepEntry's doc comment.
+  expect(await resolveState(i.instanceId)).toBe("pending");
+});
+
+test.skipIf(!DB)("a creation-time cascade interrupted before it runs is durably resumed by re-resolution", async () => {
+  // initialStep is all-automatic across two hops, unlike startInstance's own test.
+  const body = mkBody(
+    [
+      step("step_g1", { paths: [autoPath("path_g1g2", "step_g2")] }),
+      step("step_g2", { paths: [autoPath("path_g2t", "step_t")] }),
+      step("step_t", { terminal: true }),
+    ],
+    "step_g1",
+  );
+  // createInstance alone, bypassing startInstance's follow-up resolveAutomatic —
+  // simulating a crash between the INSERT and the first cascade attempt.
+  const i = await createInstance(body, { processId: "proc_1" as Instance["processId"], version: 1 });
+  expect(i.currentStepId as string).toBe("step_g1");
+  expect(await resolveState(i.instanceId)).toBe("pending");
+
+  // The state cascade completes in this one pass, exactly as the manual-hop
+  // case above; resolve_state is left permanently 'pending' for the same
+  // reason (the intermediate still-running hop re-flags it, and the worker
+  // never revisits the row once it's terminal) — see the comment there.
+  expect(await drainResolutions(sql, () => body)).toBe(1);
+  const rested = await readInst(i.instanceId);
+  expect(rested.currentStepId as string).toBe("step_t");
+  expect(rested.status).toBe("completed");
+  expect(await resolveState(i.instanceId)).toBe("pending");
 });

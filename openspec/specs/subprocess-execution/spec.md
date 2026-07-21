@@ -180,6 +180,14 @@ where that step is not a subprocess step is a contradiction and SHALL fail loudl
 A child carrying no `parent` link SHALL be a no-op rather than a failure, matching
 the treatment of a child that cannot be loaded.
 
+If the `outputMapping` writeback is applied but `child.outcome` matches no
+automatic path's guard, the parent SHALL remain parked at the subprocess step
+(the return still stays delivered and the writeback is not undone) and the
+engine SHALL record this as a `subprocess.outcome-unmatched` `InstanceEvent`
+(see the `runtime-events` capability), so this specific silent outcome is
+queryable rather than indistinguishable from a parent legitimately still
+waiting on its bounding timer.
+
 #### Scenario: Child completion writes back and wakes the parent
 - **WHEN** a subprocess child reaches a terminal step bound to an outcome
 - **THEN** the parent's `outputMapping` is applied to the parent `data` from `child.outcome`/`child.data`, and the parent is re-resolved off the subprocess wait-state along the automatic path whose guard matches `child.outcome`
@@ -226,6 +234,14 @@ the treatment of a child that cannot be loaded.
 - **WHEN** a return action is enqueued
 - **THEN** its configuration names the parent instance and the child outcome, and does
   not carry the parent's step id
+
+#### Scenario: An unmatched outcome writes back but does not advance
+
+- **WHEN** a subprocess child returns with an outcome that matches no
+  automatic path's guard on the parent's subprocess step
+- **THEN** the `outputMapping` writeback is applied to the parent's `data`,
+  the parent remains parked at the subprocess step, no transition is
+  committed, and a `subprocess.outcome-unmatched` event is recorded
 
 ### Requirement: A migrating parent repairs every child's parent link
 

@@ -731,6 +731,16 @@ export const instanceEvent = z.discriminatedUnion("kind", [
     payload: z.object({ stepId }).strict(),
     actions: z.array(actionOutcome).optional(),
   }),
+  // A subprocess return's outputMapping writeback committed, but child.outcome
+  // matched no automatic path on the parent's subprocess step: the return stays
+  // delivered and the writeback is not undone, but the parent stays parked with
+  // nothing else recording why. No transition, no actions enqueued — the
+  // migration.skipped shape, not the timer.fired one.
+  z.object({
+    ...instanceEventEnvelope,
+    kind: z.literal("subprocess.outcome-unmatched"),
+    payload: z.object({ stepId, outcome: z.string().nullable() }).strict(),
+  }),
 ]);
 export type InstanceEvent = z.infer<typeof instanceEvent>;
 export type InstanceEventKind = InstanceEvent["kind"];

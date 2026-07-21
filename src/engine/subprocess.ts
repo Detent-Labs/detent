@@ -36,7 +36,8 @@ import {
 } from "./transition.js";
 import { buildGuardContext, evalFieldMap, SYSTEM_ACTOR } from "../cel/eval.js";
 import { subprocessChildId } from "./idempotency.js";
-import { instance as instanceSchema, type Instance, type ProcessBody, type StepId } from "../schema/definition.js";
+import { instance as instanceSchema, type Instance, type InstanceEvent, type ProcessBody, type StepId } from "../schema/definition.js";
+import { appendInstanceEvent, newInstanceEventId } from "./store.js";
 import type { ResolveLatestByContract } from "./definitions.js";
 import type { ResolveBody } from "./resolution.js";
 import { register, type Registry, type HandlerContext } from "./registry.js";
@@ -198,7 +199,24 @@ export function makeReturnHandler(db: SQL, resolveBody: ResolveBody): (ctx: Hand
       // timer armed on entry see it.
       const parked: Instance = { ...parent, data: { ...parent.data, ...patch } as Instance["data"] };
       const path = selectAutomaticPath(step, { ...buildGuardContext(parentBody, parked, SYSTEM_ACTOR), child });
-      if (!path) return null; // no outcome path matched: stay parked (bounded by a step timer)
+      if (!path) {
+        // No outcome path matched: the writeback above already committed, but
+        // nothing advances the parent off this step. The `child` namespace is
+        // scoped to this one delivery — no later re-resolution can ever
+        // recompute it and retry the match — so record the fact rather than
+        // let it disappear silently (the timer.unarmed precedent).
+        const event: InstanceEvent = {
+          id: newInstanceEventId(),
+          instanceId: parent.instanceId,
+          transitionSeq: parent.transitionSeq,
+          version: parent.version,
+          kind: "subprocess.outcome-unmatched",
+          payload: { stepId: parentStepId, outcome: childOutcome },
+          at: new Date().toISOString(),
+        };
+        await appendInstanceEvent(tx, event);
+        return null; // stay parked (bounded by a step timer, if declared)
+      }
       const committed = await executeAutomaticTransition(parked, path, parentBody, tx);
       return { committed, parentBody };
     });
