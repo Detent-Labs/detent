@@ -33,10 +33,42 @@ const unarmed = () => ({
   },
 });
 
+const spawnEnqueued = () => ({
+  ...fired(),
+  transitionSeq: 0,
+  kind: "subprocess.spawn-enqueued",
+  payload: { stepId: "step_1a2b3c4d-0000-4000-8000-000000000005" },
+});
+
 describe("InstanceEvent", () => {
   it("accepts both declared kinds", () => {
     expect(instanceEvent.safeParse(fired()).success).toBe(true);
     expect(instanceEvent.safeParse(unarmed()).success).toBe(true);
+  });
+
+  it("accepts subprocess.spawn-enqueued with and without outcomes", () => {
+    expect(instanceEvent.safeParse(spawnEnqueued()).success).toBe(true);
+    const withOutcome = {
+      ...spawnEnqueued(),
+      actions: [
+        {
+          actionId: "action_spawn_step_1a2b3c4d-0000-4000-8000-000000000005",
+          resolvedHandler: "core.spawnSubprocess",
+          idempotencyKey: "key-1",
+          status: "succeeded",
+          attempts: 1,
+          at: "2026-07-20T10:00:01.000Z",
+        },
+      ],
+    };
+    expect(instanceEvent.safeParse(withOutcome).success).toBe(true);
+  });
+
+  it("rejects an extra key on the subprocess.spawn-enqueued payload", () => {
+    const e = spawnEnqueued();
+    expect(instanceEvent.safeParse({ ...e, payload: { ...e.payload, parentSeq: 0 } }).success).toBe(false);
+    // And the kind's own payload is required: a sibling kind's does not satisfy it.
+    expect(instanceEvent.safeParse({ ...e, payload: fired().payload }).success).toBe(false);
   });
 
   it("accepts an event carrying action outcomes", () => {

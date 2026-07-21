@@ -22,6 +22,17 @@ export interface HandlerDef {
   outputSchema?: z.ZodTypeAny;
 }
 
+/**
+ * Engine-owned action types (reserved `core.` prefix, rejected in authored
+ * bodies). Enqueued by the step-entry paths (planStepEntry on a transition,
+ * createInstance at a subprocess initial step) and handled by the internal
+ * handlers registered in subprocess.ts. Homed in this leaf module — it imports
+ * only zod types and the schema — so store.ts and transition.ts can both name
+ * them without an import cycle; transition.ts re-exports them.
+ */
+export const SPAWN_ACTION_TYPE = "core.spawnSubprocess";
+export const RETURN_ACTION_TYPE = "core.returnSubprocess";
+
 export type Registry = Map<string, HandlerDef>;
 
 export function createRegistry(): Registry {
