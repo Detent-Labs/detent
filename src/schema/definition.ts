@@ -251,6 +251,30 @@ export const fieldDef: z.ZodType<FieldDef, z.ZodTypeDef, unknown> = z.lazy(() =>
     }),
 );
 
+/**
+ * Depth-first flatten of the field catalog, recursing into a `group` field's
+ * `fields`. Includes group fields themselves (they carry their own id/key,
+ * needed for uniqueness checks and for a view legitimately referencing a
+ * whole group), not only their leaves.
+ *
+ * The one authoritative field set: id/key uniqueness and view-ref resolution
+ * here, and the CEL check/eval layers (src/cel/check.ts, src/cel/eval.ts),
+ * all resolve "every field in the body" through this, so they cannot resolve
+ * different sets. A caller that needs leaves only (CEL's `data` namespace has
+ * no entry for a group container) filters out `f.type === "group"` itself.
+ */
+export function collectFieldsDeep(fields: FieldDef[]): FieldDef[] {
+  const out: FieldDef[] = [];
+  const walk = (fs: FieldDef[]) => {
+    for (const f of fs) {
+      out.push(f);
+      if (f.fields) walk(f.fields);
+    }
+  };
+  walk(fields);
+  return out;
+}
+
 // ============================================================
 // Data sources: plugin, never inlined, referenced by id.
 // ============================================================
@@ -401,9 +425,15 @@ export const step = z
     if (s.outcome !== undefined && !s.terminal) add("outcome may only be set on a terminal step", ["outcome"]);
     if (s.terminal && paths.length > 0) add("a terminal step has no outgoing paths");
 
-    const hasTimerExit = (s.timers ?? []).some((t) => t.onFire.targetPath !== undefined);
-    if (!s.terminal && paths.length === 0 && !hasTimerExit)
-      add("a non-terminal step needs an exit (a path or a timer targetPath)");
+    // A timer's targetPath must resolve to one of this step's own paths (checked
+    // below in the process-level superRefine), so a step with zero paths can never
+    // satisfy an exit through a timer either: the exit rule reduces to "needs a path".
+    if (!s.terminal && paths.length === 0) add("a non-terminal step needs at least one outgoing path");
+
+    if (s.type === "subprocess" && !s.subprocess) add("a subprocess step needs a subprocess spec", ["subprocess"]);
+    if (s.type !== "subprocess" && s.subprocess) add("only a subprocess step may declare a subprocess spec", ["subprocess"]);
+    if (s.type === "subprocess" && paths.some((p) => p.trigger === "manual"))
+      add("a subprocess step is a wait-state: its paths must be all-automatic");
 
     const triggers = new Set(paths.map((p) => p.trigger));
     if (triggers.has("manual") && triggers.has("automatic"))
@@ -460,9 +490,12 @@ export const processBody = z
 
     const steps = b.workflow.steps;
     const stepIds = new Set(steps.map((s) => s.id));
-    const fieldIds = new Set(b.fields.map((f) => f.id));
+    const allFields = collectFieldsDeep(b.fields);
+    const fieldIds = new Set(allFields.map((f) => f.id));
     const outcomes = new Set(b.contract?.outcomes ?? []);
     const sink = steps.find((s) => s.id === CANCEL_SINK_STEP_ID);
+
+    const RESERVED_CEL_NAMESPACES = new Set(["data", "instance", "actor", "child", "result"]);
 
     // Within one transition the Action.output target FieldIds across all its
     // actions must be disjoint — two actions writing one field is a silent
@@ -478,8 +511,36 @@ export const processBody = z
 
     if (!stepIds.has(b.workflow.initialStep))
       add(`initialStep does not resolve: ${b.workflow.initialStep}`, ["workflow", "initialStep"]);
+
     if (stepIds.size !== steps.length) add("duplicate step ids", ["workflow", "steps"]);
-    if (fieldIds.size !== b.fields.length) add("duplicate field ids", ["fields"]);
+    if (fieldIds.size !== allFields.length) add("duplicate field ids", ["fields"]);
+    if (new Set(allFields.map((f) => f.key)).size !== allFields.length) add("duplicate field keys", ["fields"]);
+
+    const allPathIds = steps.flatMap((s) => (s.paths ?? []).map((p) => p.id));
+    if (new Set(allPathIds).size !== allPathIds.length) add("duplicate path ids", ["workflow", "steps"]);
+
+    const allTimerIds = steps.flatMap((s) => (s.timers ?? []).map((t) => t.id));
+    if (new Set(allTimerIds).size !== allTimerIds.length) add("duplicate timer ids", ["workflow", "steps"]);
+
+    const allActionIds: string[] = [];
+    steps.forEach((s) => {
+      allActionIds.push(...(s.onEntry ?? []).map((a) => a.id));
+      allActionIds.push(...(s.onExit ?? []).map((a) => a.id));
+      allActionIds.push(...(s.onCancel ?? []).map((a) => a.id));
+      (s.paths ?? []).forEach((p) => allActionIds.push(...(p.onPath ?? []).map((a) => a.id)));
+      (s.timers ?? []).forEach((t) => allActionIds.push(...(t.onFire.actions ?? []).map((a) => a.id)));
+    });
+    if (new Set(allActionIds).size !== allActionIds.length) add("duplicate action ids", ["workflow", "steps"]);
+
+    const dataSources = b.dataSources ?? [];
+    if (new Set(dataSources.map((d) => d.id)).size !== dataSources.length)
+      add("duplicate data source ids", ["dataSources"]);
+    if (new Set(dataSources.map((d) => d.key)).size !== dataSources.length)
+      add("duplicate data source keys", ["dataSources"]);
+    dataSources.forEach((d, i) => {
+      if (RESERVED_CEL_NAMESPACES.has(d.key))
+        add(`data source key '${d.key}' collides with a reserved CEL namespace`, ["dataSources", i, "key"]);
+    });
 
     steps.forEach((s, i) => {
       (s.paths ?? []).forEach((p, j) => {

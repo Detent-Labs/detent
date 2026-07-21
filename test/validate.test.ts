@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "bun:test";
-import { processVersion, publishedProcessBody, instanceEvent, migrationSpec, MAX_TIMER_DURATION_MS, type ProcessBody } from "../src/schema/definition.js";
+import { processVersion, processBody, publishedProcessBody, instanceEvent, migrationSpec, MAX_TIMER_DURATION_MS, type ProcessBody } from "../src/schema/definition.js";
 import { compileProcessBody, validateDurations, DurationValidationError } from "../src/schema/compile.js";
 import { definitionHash } from "../src/schema/hash.js";
 
@@ -108,6 +108,233 @@ describe("expense-approval definition", () => {
         { id: "action_c2000000-0000-4a1c-8e2f-000000000002", type: "noop", config: {}, output: { [f]: { lang: "cel", src: "result.y" } } },
       ];
     })).toBe(true);
+  });
+});
+
+// definition-contract capability: structural/identity invariants exercised
+// against fresh minimal bodies (the expense-approval example has no
+// subprocess step, group field, or data source to mutate).
+describe("definition-contract: subprocess step coupling and wait-state", () => {
+  const subprocessSpec = {
+    processId: "proc_child",
+    versionBinding: "pinned",
+    pinnedVersion: 1,
+    inputMapping: {},
+    outputMapping: {},
+  };
+
+  const subprocessBody = (opts: { spec?: boolean; type?: string; manualPath?: boolean } = {}): unknown => ({
+    key: "p",
+    label: "P",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: "A",
+          type: opts.type ?? "subprocess",
+          ...(opts.spec !== false ? { subprocess: subprocessSpec } : {}),
+          paths: [
+            opts.manualPath
+              ? { id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }
+              : { id: "path_ab", key: "ab", to: "step_b", trigger: "automatic", priority: 1 },
+          ],
+        },
+        { id: "step_b", key: "b", label: "B", type: "task", terminal: true },
+      ],
+    },
+  });
+
+  it("accepts a well-formed subprocess step (control)", () => {
+    expect(processBody.safeParse(subprocessBody()).success).toBe(true);
+  });
+
+  it("rejects a subprocess-typed step with no subprocess spec", () => {
+    expect(processBody.safeParse(subprocessBody({ spec: false })).success).toBe(false);
+  });
+
+  it("rejects a non-subprocess step carrying a subprocess spec", () => {
+    expect(processBody.safeParse(subprocessBody({ type: "task" })).success).toBe(false);
+  });
+
+  it("rejects a manual path on a subprocess step", () => {
+    expect(processBody.safeParse(subprocessBody({ manualPath: true })).success).toBe(false);
+  });
+
+  it("rejects a non-terminal step with zero outgoing paths", () => {
+    const body = {
+      key: "p",
+      label: "P",
+      fields: [],
+      workflow: {
+        initialStep: "step_a",
+        steps: [{ id: "step_a", key: "a", label: "A", type: "task" }],
+      },
+    };
+    expect(processBody.safeParse(body).success).toBe(false);
+  });
+});
+
+describe("definition-contract: full-depth id and key uniqueness", () => {
+  const terminalStep = (id: string, key: string) => ({ id, key, label: key, type: "task", terminal: true });
+
+  it("rejects duplicate path ids across different steps", () => {
+    const body = {
+      key: "p", label: "P", fields: [],
+      workflow: {
+        initialStep: "step_a",
+        steps: [
+          { id: "step_a", key: "a", label: "A", type: "task", paths: [{ id: "path_x", key: "x", to: "step_b", trigger: "automatic", priority: 1 }] },
+          { id: "step_b", key: "b", label: "B", type: "task", paths: [{ id: "path_x", key: "y", to: "step_c", trigger: "automatic", priority: 1 }] },
+          terminalStep("step_c", "c"),
+        ],
+      },
+    };
+    expect(processBody.safeParse(body).success).toBe(false);
+  });
+
+  it("rejects duplicate action ids across unrelated positions", () => {
+    const body = {
+      key: "p", label: "P", fields: [],
+      workflow: {
+        initialStep: "step_a",
+        steps: [
+          {
+            id: "step_a", key: "a", label: "A", type: "task",
+            onEntry: [{ id: "action_x", type: "noop", config: {} }],
+            paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "automatic", priority: 1 }],
+          },
+          { ...terminalStep("step_b", "b"), onEntry: [{ id: "action_x", type: "noop", config: {} }] },
+        ],
+      },
+    };
+    expect(processBody.safeParse(body).success).toBe(false);
+  });
+
+  it("rejects duplicate timer ids across different steps", () => {
+    const body = {
+      key: "p", label: "P", fields: [],
+      workflow: {
+        initialStep: "step_a",
+        steps: [
+          {
+            id: "step_a", key: "a", label: "A", type: "task",
+            timers: [{ id: "timer_x", duration: "P1D", onFire: { actions: [] } }],
+            paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "automatic", priority: 1 }],
+          },
+          {
+            id: "step_b", key: "b", label: "B", type: "task",
+            timers: [{ id: "timer_x", duration: "P1D", onFire: { actions: [] } }],
+            paths: [{ id: "path_bc", key: "bc", to: "step_c", trigger: "automatic", priority: 1 }],
+          },
+          terminalStep("step_c", "c"),
+        ],
+      },
+    };
+    expect(processBody.safeParse(body).success).toBe(false);
+  });
+
+  it("rejects duplicate data source ids", () => {
+    const body = {
+      key: "p", label: "P", fields: [],
+      dataSources: [
+        { id: "ds_x", key: "one", type: "http", config: {} },
+        { id: "ds_x", key: "two", type: "http", config: {} },
+      ],
+      workflow: { initialStep: "step_a", steps: [terminalStep("step_a", "a")] },
+    };
+    expect(processBody.safeParse(body).success).toBe(false);
+  });
+
+  it("rejects a field id nested inside a group colliding with a top-level field id", () => {
+    const body = {
+      key: "p", label: "P",
+      fields: [
+        { id: "field_x", key: "toplevel", label: "T", type: "string" },
+        { id: "field_g", key: "grp", label: "G", type: "group", fields: [
+          { id: "field_x", key: "nested", label: "N", type: "string" },
+        ] },
+      ],
+      workflow: { initialStep: "step_a", steps: [terminalStep("step_a", "a")] },
+    };
+    expect(processBody.safeParse(body).success).toBe(false);
+  });
+
+  it("rejects two fields nested inside different groups sharing an id", () => {
+    const body = {
+      key: "p", label: "P",
+      fields: [
+        { id: "field_g1", key: "g1", label: "G1", type: "group", fields: [{ id: "field_dup", key: "a", label: "A", type: "string" }] },
+        { id: "field_g2", key: "g2", label: "G2", type: "group", fields: [{ id: "field_dup", key: "b", label: "B", type: "string" }] },
+      ],
+      workflow: { initialStep: "step_a", steps: [terminalStep("step_a", "a")] },
+    };
+    expect(processBody.safeParse(body).success).toBe(false);
+  });
+
+  it("rejects a duplicate field key, including one nested inside a group", () => {
+    const body = {
+      key: "p", label: "P",
+      fields: [
+        { id: "field_x", key: "dupkey", label: "T", type: "string" },
+        { id: "field_g", key: "grp", label: "G", type: "group", fields: [
+          { id: "field_y", key: "dupkey", label: "N", type: "string" },
+        ] },
+      ],
+      workflow: { initialStep: "step_a", steps: [terminalStep("step_a", "a")] },
+    };
+    expect(processBody.safeParse(body).success).toBe(false);
+  });
+
+  it("rejects duplicate data source keys", () => {
+    const body = {
+      key: "p", label: "P", fields: [],
+      dataSources: [
+        { id: "ds_a", key: "same", type: "http", config: {} },
+        { id: "ds_b", key: "same", type: "http", config: {} },
+      ],
+      workflow: { initialStep: "step_a", steps: [terminalStep("step_a", "a")] },
+    };
+    expect(processBody.safeParse(body).success).toBe(false);
+  });
+
+  it("rejects a data source keyed as a reserved CEL namespace name", () => {
+    for (const reserved of ["data", "instance", "actor", "child", "result"]) {
+      const body = {
+        key: "p", label: "P", fields: [],
+        dataSources: [{ id: "ds_a", key: reserved, type: "http", config: {} }],
+        workflow: { initialStep: "step_a", steps: [terminalStep("step_a", "a")] },
+      };
+      expect(processBody.safeParse(body).success).toBe(false);
+    }
+  });
+});
+
+describe("definition-contract: view-ref resolution over the full field tree", () => {
+  const groupViewBody = (ref: string) => ({
+    key: "p", label: "P",
+    fields: [
+      { id: "field_g", key: "grp", label: "G", type: "group", fields: [
+        { id: "field_n", key: "nested", label: "N", type: "string" },
+      ] },
+    ],
+    workflow: {
+      initialStep: "step_a",
+      steps: [{
+        id: "step_a", key: "a", label: "A", type: "task", terminal: true,
+        view: { fields: [{ ref, visible: true }] },
+      }],
+    },
+  });
+
+  it("accepts a view referencing a field nested inside a group", () => {
+    expect(processBody.safeParse(groupViewBody("field_n")).success).toBe(true);
+  });
+
+  it("still rejects a view reference to a genuinely unknown field id", () => {
+    expect(processBody.safeParse(groupViewBody("field_does_not_exist")).success).toBe(false);
   });
 });
 
@@ -330,6 +557,16 @@ describe("migration schema additions", () => {
     const t = "field_1a2b3c4d-0003-4a1c-8e2f-000000000003";
     expect(migrationSpec.safeParse({ fieldMap: { [a]: t, [b]: t } }).success).toBe(false);
     expect(migrationSpec.safeParse({ fieldMap: { [a]: t, [b]: a } }).success).toBe(true);
+  });
+
+  it("carries the definitionHash publishing it would store", () => {
+    // The example declares status "published", so its wrapper hash must be the one
+    // publishBody persists: the hash of the COMPILED body (cancel-sink injected),
+    // not of the authored body next to it. Pinning this keeps the example honest —
+    // it previously carried a `jcs-sha256:`-prefixed sha256 of the empty string,
+    // a format definitionHash() never produces, and nothing caught it.
+    expect(raw.definitionHash).toBe(definitionHash(compileProcessBody(raw.definition)));
+    expect(raw.definitionHash).toMatch(/^[0-9a-f]{64}$/); // bare hex, no prefix
   });
 
   it("leaves the body hash unchanged when the wrapper carries no migration", () => {

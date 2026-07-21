@@ -15,6 +15,7 @@
  */
 
 import { Environment, parse } from "@marcbachmann/cel-js";
+import { collectFieldsDeep } from "../schema/definition.js";
 import type { ProcessBody, FieldDef, BaseFieldType, Expression, MigrationSpec } from "../schema/definition.js";
 
 // The formal expression context. instance/actor shapes are pinned here.
@@ -52,19 +53,18 @@ export function celType(t: BaseFieldType | object): string {
   }
 }
 
-/** Flatten the catalog to key -> CEL type. `data` is flat, so recurse groups into leaves. */
+/**
+ * Flatten the catalog to key -> CEL type. `data` is flat, so a `group` field
+ * (a container, not a leaf value) contributes nothing itself; only its
+ * (possibly nested) leaves do. Built over `collectFieldsDeep`, the one
+ * authoritative field-tree walk shared with `definition.ts` and `eval.ts`.
+ */
 function dataSchema(fields: FieldDef[]): Record<string, string> {
   const out: Record<string, string> = {};
-  const walk = (fs: FieldDef[]) => {
-    for (const f of fs) {
-      if (typeof f.type === "string" && f.type === "group") {
-        if (f.fields) walk(f.fields);
-      } else {
-        out[f.key] = celType(f.type);
-      }
-    }
-  };
-  walk(fields);
+  for (const f of collectFieldsDeep(fields)) {
+    if (typeof f.type === "string" && f.type === "group") continue;
+    out[f.key] = celType(f.type);
+  }
   return out;
 }
 
