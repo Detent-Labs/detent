@@ -252,9 +252,37 @@ export function planStepEntry(instance: Instance, target: Step, body: ProcessBod
  * `extraFields` is merged into the instance row alongside the plan's own
  * {currentStepId, transitionSeq, status, timers}, under the same
  * optimistic-concurrency predicate: applying from a stale sequence writes none
- * of it. The ordinary path writes only those four fields; a caller that must
- * also rewrite the instance's pin or payload supplies them here rather than
- * issuing a second statement.
+ * of it. The ordinary path writes only those four fields plus `resolve_state`;
+ * a caller that must also rewrite the instance's pin or payload supplies them
+ * here rather than issuing a second statement.
+ *
+ * Every commit landing the instance on a `running` step also durably marks it
+ * `resolve_state = 'pending'`, in the same statement as the commit. The
+ * caller's own cascade (resolveAutomatic, run inline by every current caller)
+ * may complete before anything else observes the mark, in which case the
+ * re-resolution worker's next pass finds nothing left to do and clears it — a
+ * cheap no-op. But if the caller's process ends between this commit and
+ * completing that cascade, the mark survives and the worker finishes the
+ * cascade instead of the instance resting on an intermediate step with
+ * nothing to re-drive it. This generalizes the pattern migration already used
+ * for its own commit (flag and defer, rather than cascade inline) to every
+ * step entry.
+ *
+ * Conditioned on the *resulting* status being `running` — not unconditional —
+ * for two reasons. First, a commit onto a terminal step, or a `cancelled`
+ * override, would otherwise flag an instance the re-resolution worker's own
+ * claim query (`WHERE body->>'status' = 'running'`) never selects again: the
+ * mark would sit `'pending'` forever, dead weight with no reader. Second, and
+ * more subtly, the re-resolution worker's own resolveAutomatic call commits
+ * its cascade hops through this same function while the row is `'claimed'`;
+ * an unconditional write would stomp that claim back to `'pending'` on every
+ * such hop, so the worker's own end-of-pass `WHERE resolve_state = 'claimed'`
+ * clear would match nothing and the row would need a second, purely
+ * confirmatory pass to settle at `'idle'`. A cascade whose last hop lands on
+ * a terminal step (the common case) now converges in the same pass that did
+ * the work; one whose last hop lands on a non-terminal wait-state still takes
+ * one extra pass to settle, which is safe — the mark is never lost, only
+ * revisited once more than strictly necessary.
  *
  * A caller patching `data` must hold the instance row locked (`SELECT ... FOR
  * UPDATE`) across its read and this commit: the predicate does not protect
@@ -262,6 +290,16 @@ export function planStepEntry(instance: Instance, target: Step, body: ProcessBod
  * {data,<fieldId>} path without advancing or checking transitionSeq, and a
  * wholesale `data` patch computed from an earlier read would erase such a
  * writeback silently even though the predicate still matches.
+ *
+ * A commit whose resulting status is `cancelled` also durably marks
+ * `cancel_sweep_state = 'pending'`, in the same statement, for the same
+ * reason `resolve_state` is flagged here rather than by the caller:
+ * `cancelInstance` is the only caller that ever overrides `status` to
+ * `"cancelled"`, so this flags exactly a cancel commit. Unlike
+ * `resolve_state`, this column has no worker scanning it — `cancelInstance`
+ * itself reads it, by instance id, when re-invoked on an instance it finds is
+ * already `cancelled`, to decide whether an incomplete child-cancellation
+ * sweep needs resuming (see `cancelInstance`/`sweepCancelledChildren` below).
  *
  * Throws ConcurrencyConflict on a zero-row update, exactly as commitTransition
  * did before the split.
@@ -284,7 +322,9 @@ export async function applyStepEntry(tx: SQL, plan: StepEntryPlan, extraFields?:
   const updated = (await tx`UPDATE instances
     SET body = body || ${patch}::jsonb,
         transition_seq = ${next.transitionSeq},
-        next_timer_at = ${nextTimerAt}
+        next_timer_at = ${nextTimerAt},
+        resolve_state = CASE WHEN ${next.status} = 'running' THEN 'pending' ELSE resolve_state END,
+        cancel_sweep_state = CASE WHEN ${next.status} = 'cancelled' THEN 'pending' ELSE cancel_sweep_state END
     WHERE instance_id = ${entry.instanceId} AND transition_seq = ${prevSeq}
     RETURNING instance_id`) as unknown[];
   if (updated.length === 0) throw new ConcurrencyConflict(entry.instanceId, prevSeq);
@@ -357,6 +397,60 @@ export async function executeManualTransition(
   return resolveAutomatic(committed, body, actor, db);
 }
 
+/** Outcome of one direct-child cancellation sweep pass (see `sweepCancelledChildren`). */
+export type CancelSweepResult = {
+  cancelled: string[];
+  conflicted: string[];
+  failed: string[];
+};
+
+/**
+ * Attempt to cancel every currently active (running) direct child of
+ * `parentInstanceId`, isolating each child's failure from its siblings —
+ * mirroring `migrateInstances`' per-instance fault isolation, at the scale of
+ * one parent's direct children. A child whose own cancel commit loses a
+ * concurrency race is bucketed `conflicted`, not `failed`: that means a
+ * concurrent commit (a racing sweep, the child's own independent progress)
+ * already moved it, not that its cancellation is broken — and it drops out of
+ * this same query on a later pass once it does. Sets the parent's
+ * `cancel_sweep_state = 'done'` only when this pass finds zero
+ * conflicted/failed children; otherwise leaves it `'pending'` (as
+ * `applyStepEntry` set it on the parent's own cancel commit) so a later call
+ * to `cancelInstance` resumes it. Both a fresh cancel and `cancelInstance`'s
+ * resume branch below call this same helper, so there is exactly one sweep
+ * implementation whether this is the first attempt or a retry.
+ */
+async function sweepCancelledChildren(
+  parentInstanceId: string,
+  actor: Actor,
+  db: SQL,
+  resolveBody: ResolveBodyFn,
+): Promise<CancelSweepResult> {
+  const rows = (await db`SELECT instance_id, body FROM instances
+    WHERE body->'parent'->>'instanceId' = ${parentInstanceId} AND body->>'status' = 'running'`) as
+    { instance_id: string; body: unknown }[];
+  const result: CancelSweepResult = { cancelled: [], conflicted: [], failed: [] };
+  for (const row of rows) {
+    try {
+      const child = instanceSchema.parse(typeof row.body === "string" ? JSON.parse(row.body) : row.body);
+      const childBody = await resolveBody(child.processId, child.version);
+      if (!childBody) {
+        result.failed.push(child.instanceId);
+        continue;
+      }
+      await cancelInstance(child, childBody, actor, db, resolveBody);
+      result.cancelled.push(child.instanceId);
+    } catch (e) {
+      if (e instanceof ConcurrencyConflict) result.conflicted.push(row.instance_id);
+      else result.failed.push(row.instance_id);
+    }
+  }
+  if (result.conflicted.length === 0 && result.failed.length === 0) {
+    await db`UPDATE instances SET cancel_sweep_state = 'done' WHERE instance_id = ${parentInstanceId}`;
+  }
+  return result;
+}
+
 /**
  * Cancel a running instance: a synthesized hidden-path transition to the
  * publish-injected cancel-sink. Takes an already-rehydrated instance (the caller
@@ -367,10 +461,24 @@ export async function executeManualTransition(
  * transitionSeq (the OCC token, so a cancel racing a normal transition from the
  * same seq resolves to exactly one winner — the loser gets ConcurrencyConflict).
  * A no-op — no HistoryEntry, no seq bump — on an instance that is not `running`.
+ *
  * Downward-only subprocess propagation: when `resolveBody` is supplied, after the
- * parent commits its cancel this recursively cancels its active (running) children
- * (found by the `parent` link), depth-first for nested chains. Omit `resolveBody`
- * to cancel only this instance.
+ * parent commits its cancel this sweeps its active (running) children via
+ * `sweepCancelledChildren` (recursively for nested chains — each child's own
+ * cancellation runs through this same function). Omit `resolveBody` to cancel
+ * only this instance; its `cancel_sweep_state` is still flagged `'pending'` by
+ * the commit (see `applyStepEntry`), so a later call that does supply
+ * `resolveBody` still attempts the sweep.
+ *
+ * The child sweep is fault-isolated (one child's failure does not stop its
+ * siblings) and resumable: if a prior sweep left `cancel_sweep_state`
+ * `'pending'` (a conflicted or failed child, a crash mid-sweep, or a first
+ * call that omitted `resolveBody`), re-invoking this function on the
+ * already-`cancelled` instance — the `instance.status !== "running"` branch
+ * below — re-attempts the sweep instead of no-opping outright. That resume
+ * never re-commits the instance's own cancel transition: no `HistoryEntry` is
+ * appended and `transitionSeq` does not change, exactly as for any other
+ * non-running instance; only the child cascade is resumed.
  */
 export async function cancelInstance(
   instance: Instance,
@@ -379,7 +487,14 @@ export async function cancelInstance(
   db: SQL = sql,
   resolveBody?: ResolveBodyFn,
 ): Promise<Instance> {
-  if (instance.status !== "running") return instance;
+  if (instance.status !== "running") {
+    if (instance.status === "cancelled" && resolveBody) {
+      const rows = (await db`SELECT cancel_sweep_state FROM instances WHERE instance_id = ${instance.instanceId}`) as
+        { cancel_sweep_state: string }[];
+      if (rows[0]?.cancel_sweep_state === "pending") await sweepCancelledChildren(instance.instanceId, actor, db, resolveBody);
+    }
+    return instance;
+  }
 
   const source = body.workflow.steps.find((s) => s.id === instance.currentStepId);
   if (!source) throw new Error(`current step not in body: ${instance.currentStepId}`);
@@ -389,15 +504,7 @@ export async function cancelInstance(
   const actions = [...(source.onCancel ?? []), ...(sink.onEntry ?? [])];
   const cancelled = await commitTransition(instance, sink, body, null, actions, "cancel", actor.id, db, { status: "cancelled" });
 
-  if (resolveBody) {
-    const rows = (await db`SELECT body FROM instances
-      WHERE body->'parent'->>'instanceId' = ${instance.instanceId} AND body->>'status' = 'running'`) as { body: unknown }[];
-    for (const row of rows) {
-      const child = instanceSchema.parse(typeof row.body === "string" ? JSON.parse(row.body) : row.body);
-      const childBody = await resolveBody(child.processId, child.version);
-      if (childBody) await cancelInstance(child, childBody, actor, db, resolveBody);
-    }
-  }
+  if (resolveBody) await sweepCancelledChildren(instance.instanceId, actor, db, resolveBody);
   return cancelled;
 }
 

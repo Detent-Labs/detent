@@ -371,13 +371,14 @@ async function migrateOne(
       suppressSpawn: !stepChanged,
       events: dropEvents,
     });
+    // applyStepEntry itself flags resolve_state = 'pending' on every commit, so
+    // migration's cascade deferral (rather than nesting commits) falls out of
+    // that general rule and needs no separate flag here.
     await applyStepEntry(tx, plan, { version: toVersion, definitionHash: definitionHash(toBody), data });
 
-    // 5.12 flag for automatic re-resolution (migration defers the cascade to the
-    // worker rather than nesting commits), and repair every child's parent link
-    // through the same step remap — including terminal children, whose return is the
-    // one in flight. Same transaction, so the parent row stays locked throughout.
-    await tx`UPDATE instances SET resolve_state = 'pending' WHERE instance_id = ${id}`;
+    // 5.12 repair every child's parent link through the same step remap —
+    // including terminal children, whose return is the one in flight. Same
+    // transaction, so the parent row stays locked throughout.
     if (stepChanged) {
       await tx`UPDATE instances
         SET body = jsonb_set(body, '{parent,stepId}', (${[targetStepId]}::jsonb) -> 0)
