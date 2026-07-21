@@ -177,8 +177,14 @@ cannot supply.
   handler, which takes the same lock.
 - **Migration defers the cascade to the resolution worker** → An instance reaches rest a
   moment later than after a manual transition.
-- **Two concurrent invocations** → Safe (OCC gives one winner per instance) but the
-  loser reports most of the population as conflicted.
+- **Two concurrent invocations** → Safe (one winner per instance). The row lock held
+  across each instance's read and commit means the winner always completes its own OCC
+  commit; the loser blocks, then reads the already-migrated row and returns `none` (in
+  no result category), rather than reporting it as conflicted. The `conflicted` category
+  is therefore defensive: a migration cannot lose its own OCC race under the lock, so it
+  is populated only if that invariant is ever broken. A racing *authored* transition is
+  the one that loses (on its side, as `ConcurrencyConflict`) — covered by the
+  same-sequence one-winner scenario.
 - **A surviving timer id with a changed declaration keeps the old fire time** →
   `TimerState` carries no provenance, so "unchanged" and "silently redeclared" are
   indistinguishable by construction.

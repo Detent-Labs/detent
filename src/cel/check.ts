@@ -15,7 +15,7 @@
  */
 
 import { Environment, parse } from "@marcbachmann/cel-js";
-import type { ProcessBody, FieldDef, BaseFieldType, Expression } from "../schema/definition.js";
+import type { ProcessBody, FieldDef, BaseFieldType, Expression, MigrationSpec } from "../schema/definition.js";
 
 // The formal expression context. instance/actor shapes are pinned here.
 // ponytail: minimal shapes, widen when a real guard needs more.
@@ -75,11 +75,17 @@ function dataSchema(fields: FieldDef[]): Record<string, string> {
  * Unregistered references are check-time errors (unlistedVariablesAreDyn: false),
  * so guard-forbidden `result`/`child`/`now()` fail for free.
  */
-function buildEnv(body: ProcessBody, opts: { result: boolean; child: boolean; dataSources: boolean }): Environment {
+function buildEnv(
+  body: ProcessBody,
+  opts: { result: boolean; child: boolean; dataSources: boolean; actor: boolean },
+): Environment {
   const env = new Environment({ unlistedVariablesAreDyn: false })
     .registerVariable({ name: "data", schema: dataSchema(body.fields) })
-    .registerVariable({ name: "instance", schema: { ...INSTANCE_SCHEMA } })
-    .registerVariable({ name: "actor", schema: { ...ACTOR_SCHEMA } });
+    .registerVariable({ name: "instance", schema: { ...INSTANCE_SCHEMA } });
+  // `actor` is registered everywhere except the migration transform site: a
+  // migration is one operator action over a whole population, so admitting `actor`
+  // would let a rule meant to be uniform produce different data per instance.
+  if (opts.actor) env.registerVariable({ name: "actor", schema: { ...ACTOR_SCHEMA } });
   if (opts.dataSources) for (const ds of body.dataSources ?? []) env.registerVariable(ds.key, "dyn");
   if (opts.child) env.registerVariable({ name: "child", schema: { ...CHILD_SCHEMA } });
   if (opts.result) env.registerVariable("result", "dyn");
@@ -204,7 +210,10 @@ export function validateProcessBody(body: ProcessBody): CelIssue[] {
     const k = `${result}:${child}:${dataSources}`;
     let e = cache.get(k);
     if (!e) {
-      e = buildEnv(body, { result, child, dataSources });
+      // Every ordinary site resolves `actor`; only the migration entry point,
+      // which builds its own environment, withholds it — so the cache key stays
+      // three-dimensional and no cached environment changes meaning.
+      e = buildEnv(body, { result, child, dataSources, actor: true });
       cache.set(k, e);
     }
     return e;
@@ -237,6 +246,75 @@ export function validateProcessBody(body: ProcessBody): CelIssue[] {
       message = (err as Error).message;
     }
     if (!valid) issues.push({ loc: site.loc, src: site.src, message: message ?? "invalid expression" });
+  }
+  return issues;
+}
+
+/** Find a field's declared type by id, recursing groups. `undefined` = not declared. */
+function fieldTypeById(fields: FieldDef[], id: string): BaseFieldType | object | undefined {
+  for (const f of fields) {
+    if (typeof f.type === "string" && f.type === "group") {
+      if (f.fields) {
+        const t = fieldTypeById(f.fields, id);
+        if (t !== undefined) return t;
+      }
+    } else if (f.id === id) {
+      return f.type;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Parse- and type-check a migration spec's `transforms`. Unlike every other CEL
+ * site the check spans two bodies: a transform reads the instance's pre-migration
+ * data, so its identifiers resolve against the **source** catalog, but it writes a
+ * **target** field, so its result type is checked against the target's declaration.
+ * The environment withholds `result`, `child`, data sources and `actor` — a
+ * transform sees `data` (source catalog) and `instance` only. Issues are located
+ * `migration.transforms.<fieldId>`.
+ */
+export function validateMigrationSpec(spec: MigrationSpec, fromBody: ProcessBody, toBody: ProcessBody): CelIssue[] {
+  const issues: CelIssue[] = [];
+  const env = buildEnv(fromBody, { result: false, child: false, dataSources: false, actor: false });
+  for (const [fid, expr] of Object.entries(spec.transforms ?? {})) {
+    if (!expr) continue;
+    const loc = `migration.transforms.${fid}`;
+    // The written field must exist in the target catalog; its declared type is the
+    // expected result type (dyn — a plugin field — passes, as at the deadline site).
+    const targetType = fieldTypeById(toBody.fields, fid);
+    if (targetType === undefined) {
+      issues.push({ loc, src: expr.src, message: `transforms target ${fid} is not a field in the target catalog` });
+      continue;
+    }
+    const expect = celType(targetType);
+    try {
+      const bad = forbiddenTimeCall(parse(expr.src).ast);
+      if (bad) {
+        issues.push({ loc, src: expr.src, message: `time function not allowed: ${bad}() (time lives only in timers)` });
+        continue;
+      }
+    } catch {
+      // parse failure is reported by the type-check below
+    }
+    let valid: boolean;
+    let message: string | undefined;
+    try {
+      const r = env.check(expr.src);
+      valid = r.valid;
+      message = r.error?.message ?? (r.valid ? undefined : "type error");
+      // Accept when the target field's type is unknowable (a plugin field infers as
+      // `dyn`, so `expect` is dyn) or when the result type is (a plugin source). Only
+      // two concrete types that disagree are a mismatch.
+      if (valid && expect !== "dyn" && r.type !== expect && r.type !== "dyn") {
+        valid = false;
+        message = `expected ${expect}, got ${r.type}`;
+      }
+    } catch (err) {
+      valid = false;
+      message = (err as Error).message;
+    }
+    if (!valid) issues.push({ loc, src: expr.src, message: message ?? "invalid expression" });
   }
   return issues;
 }

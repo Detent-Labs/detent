@@ -193,7 +193,7 @@ test.skipIf(!DB)("several events at one sequence are all retained and ordered by
   expect(evts).toHaveLength(3); // all retained — sharing a seq is not a collision
   expect(evts.map((e) => e.transitionSeq)).toEqual([1, 1, 1]);
   expect(evts.map((e) => e.kind)).toEqual(["timer.unarmed", "timer.fired", "timer.fired"]);
-  expect(evts.map((e) => e.payload.timerId as string)).toEqual(["timer_d1", "timer_r1", "timer_r2"]);
+  expect(evts.map((e) => ("timerId" in e.payload ? (e.payload.timerId as string) : undefined))).toEqual(["timer_d1", "timer_r1", "timer_r2"]);
   // Ordering by `at` is the causal order, not an accident of the id sort above.
   const at = evts.map((e) => new Date(e.at as string).getTime());
   expect(at[0]).toBeLessThan(at[1]);
@@ -220,7 +220,8 @@ test.skipIf(!DB)("an event carries the definition version in force", async () =>
   // The payload's timer id resolves against that version's body — the reason the
   // version is carried at all.
   const step = body.workflow.steps.find((s) => (s.id as string) === "step_wait");
-  expect((step?.timers ?? []).some((t) => (t.id as string) === atEntry[0].payload.timerId)).toBe(true);
+  const entryPayload = atEntry[0].payload;
+  expect((step?.timers ?? []).some((t) => "timerId" in entryPayload && (t.id as string) === entryPayload.timerId)).toBe(true);
 });
 
 // --- 6.2 atomicity -------------------------------------------------------------

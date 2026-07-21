@@ -561,9 +561,16 @@ export const publishedProcessBody = processBody.superRefine((b, ctx) => {
 });
 export type PublishedProcessBody = z.infer<typeof publishedProcessBody>;
 
+/**
+ * A migration rule. `fromVersion` lives on the plan key `(processId, fromVersion,
+ * toVersion)`, not here — the spec is the same object whether registered for one
+ * version pair or read back for another. `fieldMap` is injective: two sources
+ * targeting one field would collapse under the snapshot remap (the last write in an
+ * unspecified order wins), so it is a registration error rather than a silent
+ * data-dependent result.
+ */
 export const migrationSpec = z
   .object({
-    fromVersion: z.number(),
     stepMap: z.record(stepId, stepId).optional(),
     fieldMap: z.record(fieldId, fieldId).optional(),
     transforms: z.record(fieldId, expression).optional(),
@@ -573,6 +580,10 @@ export const migrationSpec = z
   .refine((m) => (m.onUnmappable === "route-to-step") === (m.unmappableStep !== undefined), {
     message: "unmappableStep is present iff onUnmappable is 'route-to-step'",
     path: ["unmappableStep"],
+  })
+  .refine((m) => new Set(Object.values(m.fieldMap ?? {})).size === Object.keys(m.fieldMap ?? {}).length, {
+    message: "fieldMap is injective: no two sources may target one field",
+    path: ["fieldMap"],
   });
 export type MigrationSpec = z.infer<typeof migrationSpec>;
 
@@ -583,7 +594,6 @@ export const processVersion = z.object({
   definitionHash: z.string(),
   status: definitionStatus,
   compatibility: compatibility.optional(),
-  migration: migrationSpec.optional(),
   publishedAt: timestamp.optional(),
   definition: processBody,
 });
@@ -665,6 +675,17 @@ const instanceEventEnvelope = {
 export const timerUnarmedReason = z.enum(["expression-raised", "not-an-instant"]);
 export type TimerUnarmedReason = z.infer<typeof timerUnarmedReason>;
 
+/**
+ * Why a migration left an instance on its source version. `step-unmappable` is a
+ * property of the rule and recurs on every re-invocation; `pending-actions` is
+ * transient and clears once the instance's outbox drains. There is no
+ * unreadable-instance reason: an event envelope needs `instanceId`, `version` and
+ * `transitionSeq`, which a row failing `instance.parse` cannot supply — that case
+ * is reported as failed by the operation, not as an event.
+ */
+export const migrationSkipReason = z.enum(["step-unmappable", "pending-actions"]);
+export type MigrationSkipReason = z.infer<typeof migrationSkipReason>;
+
 export const instanceEvent = z.discriminatedUnion("kind", [
   // A reminder timer (onFire actions, no targetPath) fired: actions enqueued,
   // no transition.
@@ -685,6 +706,14 @@ export const instanceEvent = z.discriminatedUnion("kind", [
     ...instanceEventEnvelope,
     kind: z.literal("timer.unarmed"),
     payload: z.object({ timerId, reason: timerUnarmedReason }).strict(),
+  }),
+  // A migration left this instance on its source version. The envelope's `version`
+  // is the source version (the instance did not move, so ids resolve there); the
+  // payload names both versions and the reason. No seq advance, no HistoryEntry.
+  z.object({
+    ...instanceEventEnvelope,
+    kind: z.literal("migration.skipped"),
+    payload: z.object({ fromVersion: z.number(), toVersion: z.number(), reason: migrationSkipReason }).strict(),
   }),
 ]);
 export type InstanceEvent = z.infer<typeof instanceEvent>;
