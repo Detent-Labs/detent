@@ -217,6 +217,12 @@ export async function createInstance(
   // deadline on the initial step evaluates over the real seed data and instance
   // projection rather than a stand-in.
   const startedAt = new Date().toISOString();
+  const initial = body.workflow.steps.find((s) => s.id === body.workflow.initialStep);
+  // Mirrors planStepEntry's derivation (target.terminal ? "completed" :
+  // instance.status): a process whose initialStep is terminal — a legitimate
+  // shape (e.g. a migration target instances relocate onto, never created
+  // from directly) — must not create a permanently-"running" instance that
+  // can never complete.
   const seed: Instance = instanceSchema.parse({
     instanceId: opts.instanceId ?? `inst_${crypto.randomUUID()}`,
     processId: opts.processId,
@@ -227,10 +233,9 @@ export async function createInstance(
     data: opts.data ?? {},
     timers: [],
     ...(opts.parent ? { parent: opts.parent } : {}),
-    status: "running",
+    status: initial?.terminal ? "completed" : "running",
     startedAt,
   });
-  const initial = body.workflow.steps.find((s) => s.id === body.workflow.initialStep);
   const { armed: timers, drops } = armStepTimers(initial, startedAt, body, seed);
   const inst: Instance = { ...seed, timers };
   // A timer the initial step declared but arming could not compute a fireAt for.

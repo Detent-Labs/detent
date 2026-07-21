@@ -7,6 +7,7 @@
 
 import { evaluate } from "@marcbachmann/cel-js";
 import { INSTANCE_SCHEMA } from "./check.js";
+import { collectFieldsDeep } from "../schema/definition.js";
 import type { ProcessBody, Instance, FieldDef, Expression, MigrationSpec } from "../schema/definition.js";
 
 export interface Actor {
@@ -43,19 +44,18 @@ export function projectInstance(instance: Instance): Record<string, unknown> {
   return out;
 }
 
-/** Flatten the catalog to fieldId -> key (data is keyed by id; CEL by key). */
+/**
+ * Flatten the catalog to fieldId -> key (data is keyed by id; CEL by key). A
+ * `group` field is a container, not a leaf value, so it contributes no entry
+ * itself. Built over `collectFieldsDeep`, the one authoritative field-tree
+ * walk shared with `definition.ts` and `check.ts`.
+ */
 function fieldKeyById(fields: FieldDef[]): Map<string, string> {
   const m = new Map<string, string>();
-  const walk = (fs: FieldDef[]) => {
-    for (const f of fs) {
-      if (typeof f.type === "string" && f.type === "group") {
-        if (f.fields) walk(f.fields);
-      } else {
-        m.set(f.id, f.key);
-      }
-    }
-  };
-  walk(fields);
+  for (const f of collectFieldsDeep(fields)) {
+    if (typeof f.type === "string" && f.type === "group") continue;
+    m.set(f.id, f.key);
+  }
   return m;
 }
 

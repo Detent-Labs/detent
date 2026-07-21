@@ -123,6 +123,30 @@ test.skipIf(!DB)("create then rehydrate round-trips against the pinned body", as
   expect(loaded.definitionHash).toBe(inst.definitionHash);
 });
 
+// A process whose initialStep is terminal is a legitimate shape (e.g. a
+// migration target instances relocate onto — see test/migration.test.ts "6.2").
+// Creating directly against one must not leave the instance permanently
+// "running": createInstance derives status from the initial step exactly as
+// planStepEntry derives it for a transition target.
+const terminalInitialBody = (): ProcessBody =>
+  ({
+    fields: [],
+    workflow: {
+      initialStep: "step_done",
+      steps: [{ id: "step_done", key: "done", label: "Done", type: "task", terminal: true }],
+    },
+  }) as unknown as ProcessBody;
+
+test.skipIf(!DB)("creating an instance whose initialStep is terminal completes immediately", async () => {
+  const body = terminalInitialBody();
+  const inst = await createInstance(body, { processId: "proc_1" as Instance["processId"], version: 1 });
+  expect(inst.currentStepId as string).toBe("step_done");
+  expect(inst.status).toBe("completed");
+
+  const loaded = await rehydrate(inst.instanceId, body);
+  expect(loaded.status).toBe("completed");
+});
+
 test.skipIf(!DB)("rehydration against a mismatched body is rejected", async () => {
   const inst = await createInstance(bodyWith(), { processId: "proc_1" as Instance["processId"], version: 1 });
   const otherBody = bodyWith("1 > 0"); // different body -> different hash
