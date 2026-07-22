@@ -290,6 +290,17 @@ function durationStepFixture(duration: string): { step: Step; body: ProcessBody;
   };
 }
 
+test("an armed duration timer records provenance matching its declared source", () => {
+  const { step, body, entering } = durationStepFixture("PT1H");
+  const { armed, drops } = armStepTimers(step, "2026-07-20T12:34:56.789Z", body, entering);
+  expect(drops).toEqual([]);
+  expect(armed).toEqual([{
+    timerId: "timer_t1",
+    fireAt: "2026-07-20T13:34:56.789Z",
+    provenance: { kind: "duration", duration: "PT1H", armedAt: "2026-07-20T12:34:56.789Z" },
+  }] as unknown as typeof armed);
+});
+
 test("arming raises when a bound-valid duration overflows from an entry past the ceiling", () => {
   // The residue the width assertion exists for. The publish-time bound guarantees no
   // overflow from an entry before year 9000 and says nothing at or after it, so the
@@ -309,7 +320,11 @@ test("arming raises when a bound-valid duration overflows from an entry past the
   // The same timer from an ordinary entry arms normally, so the raise is a property
   // of the entry instant and not of the authored duration.
   expect(armStepTimers(step, "2026-07-20T12:34:56.789Z", body, entering)).toEqual({
-    armed: [{ timerId: "timer_t1", fireAt: "2027-07-20T12:34:56.789Z" }],
+    armed: [{
+      timerId: "timer_t1",
+      fireAt: "2027-07-20T12:34:56.789Z",
+      provenance: { kind: "duration", duration: "P365D", armedAt: "2026-07-20T12:34:56.789Z" },
+    }],
     drops: [],
   } as unknown as ReturnType<typeof armStepTimers>);
 });

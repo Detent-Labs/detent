@@ -20,8 +20,9 @@ Firing is at-most-once per armed timer, enforced by the same optimistic-concurre
 token transitions use. A timer whose `onFire` names a `targetPath` forces a
 transition and bypasses that path's guard; one that names only actions is a reminder
 and changes no step. Migration reconciles a carried timer set against the target
-step's declarations instead of re-arming from scratch, so a surviving timer keeps
-its original `fireAt`.
+step's declarations instead of re-arming from scratch: a surviving timer whose
+declaration is unchanged (or whose provenance predates the field) keeps its
+original `fireAt`; one whose declaration actually changed is re-armed.
 
 ## Requirements
 ### Requirement: Arm timers on step entry
@@ -33,6 +34,14 @@ is the entry instant plus the ISO-8601 duration. A `deadline` timer's `fireAt` i
 the instant its CEL expression yields, evaluated at entry (see the deadline
 requirements below). The armed set SHALL replace any timers carried from the
 previous step.
+
+Each armed `TimerState` SHALL also record its `provenance`: the declared source
+it was armed from (`{ kind: "duration", duration }` for a duration timer, or
+`{ kind: "deadline", src }` for a deadline timer — the expression's source, not
+its evaluated value) and the `armedAt` instant. Provenance is written by the
+same arming step that computes `fireAt`; a caller does not derive or supply it
+separately. It exists to let migration's reconciliation (below) detect that a
+surviving timer id's declaration changed, rather than to be read at arming time.
 
 Where a caller supplies a pre-computed armed set to the shared commit path, that set
 SHALL be persisted in place of one computed from the target step, and the scheduling
@@ -72,6 +81,12 @@ override directly, since a supplied set may deliberately carry a timer forward.
 - **WHEN** a commit supplies an armed set omitting a timer the instance carried
 - **THEN** that timer is absent afterwards
 
+#### Scenario: An armed timer records what it was armed from
+
+- **WHEN** an instance enters a step carrying a `duration` timer
+- **THEN** the resulting `TimerState.provenance` records `{ kind: "duration",
+  duration }` matching the step's declared value, plus the `armedAt` instant
+
 ### Requirement: Disarm timers on step exit
 
 When an instance leaves a step, timers armed for that step SHALL no longer be
@@ -110,8 +125,13 @@ Migration SHALL NOT arm the target step's timers wholesale. It SHALL reconcile t
 instance's carried timers against the target step's declarations, partitioning them
 exhaustively:
 
-- carried, unfired, still declared → keep the persisted `fireAt`;
-- carried, **fired**, still declared → keep as fired: neither re-armed nor dropped;
+- carried, unfired, still declared, provenance absent or matching the target's
+  current declaration → keep the persisted `fireAt`;
+- carried, unfired, still declared, provenance present and **not** matching the
+  target's current declaration → re-armed at the migration instant, exactly as a
+  newly-declared timer;
+- carried, **fired**, still declared → keep as fired: neither re-armed nor dropped,
+  regardless of provenance;
 - declared but not carried → armed at the migration instant under the ordinary
   arming rules;
 - carried but no longer declared → dropped, whether fired or not.
@@ -132,17 +152,19 @@ records `timer.unarmed` rather than failing the migration. Such an event SHALL c
 the committed sequence and the **target** version, because the dropped timer is
 declared by the target step and its id resolves only there.
 
-Reconciliation keys on timer id alone. `TimerState` carries no provenance — no
-declared duration, no deadline source, no arming instant — so a target step that
-redeclares a surviving id with a different duration, or flips it between `duration`
-and `deadline`, is indistinguishable from one that left it unchanged, and the old
-fire time is kept. This is a limitation of the record shape, not a judgement about
-what is desirable; closing it requires a provenance field on `TimerState`.
+Provenance match is structural equality on the declared source alone (`kind` plus
+`duration` or `src`) — the `armedAt` instant is excluded from the comparison, since
+re-entering an unchanged timer at a different instant must still count as
+unchanged. A carried `TimerState` with no `provenance` (armed before this field
+existed) SHALL be treated as matching — reconciliation has no signal to compare
+against, so it keeps today's keyed-by-id-only behavior for exactly that timer,
+until it is next armed (at which point it gains provenance and is compared on
+every subsequent migration).
 
 #### Scenario: A surviving timer keeps its fire time
 
 - **WHEN** an instance with an armed, unfired timer migrates onto a step still
-  declaring that timer id
+  declaring that timer id with an unchanged declaration
 - **THEN** the timer's `fireAt` is unchanged and the scheduling column still
   reflects it
 
@@ -178,6 +200,36 @@ what is desirable; closing it requires a provenance field on `TimerState`.
 - **THEN** the migration commits, that timer is absent from the armed set, and a
   `timer.unarmed` event carrying the committed sequence and the target version is
   recorded in the same transaction
+
+#### Scenario: A redeclared duration is detected and re-armed
+
+- **WHEN** an instance carries a `duration` timer armed with provenance
+  `{ kind: "duration", duration: "PT1H" }`, and the target step declares the same
+  timer id with `duration: "PT2H"`
+- **THEN** the timer is re-armed at the migration instant using the target's
+  `PT2H` duration, not kept at its original `fireAt`
+
+#### Scenario: A duration-to-deadline flip is detected and re-armed
+
+- **WHEN** an instance carries a timer armed with provenance
+  `{ kind: "duration", ... }`, and the target step redeclares the same timer id
+  as a `deadline`
+- **THEN** the timer is re-armed at the migration instant by evaluating the
+  target's deadline expression, not kept at its original `fireAt`
+
+#### Scenario: A fired timer is kept even if its declaration changed
+
+- **WHEN** an instance carries a fired timer whose provenance no longer matches
+  the target step's current declaration for that timer id
+- **THEN** it remains carried and marked fired, and is not re-armed
+
+#### Scenario: A carried timer with no provenance is trusted and kept
+
+- **WHEN** an instance carries an unfired, still-declared timer with no
+  `provenance` on record (armed before this field existed), and the target
+  step's declaration for that timer id has changed
+- **THEN** the timer keeps its persisted `fireAt` — reconciliation has no
+  provenance to compare and does not re-arm it
 
 ### Requirement: Fire a transition timer as a guard-bypassing forced transition
 

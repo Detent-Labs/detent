@@ -450,7 +450,15 @@ each with a test that rejects a violating definition.
    advance, idempotent spawn) together with downward cancel propagation
    (`cancelInstance` cascades to active children by the `parent` link). `deadline`
    timers are DONE (`duration.ts`: `instantFromValue` + the deadline branch of
-   `armStepTimers`; see the timers entry above). The runtime event log is DONE
+   `armStepTimers`; see the timers entry above). `TimerState` provenance is DONE
+   (`armStepTimers` records what each timer was armed from — `{kind: "duration",
+   duration}` or `{kind: "deadline", src}`, plus `armedAt` — on every armed
+   `TimerState`; `migration.ts::reconcileTimers` compares a carried, unfired,
+   still-declared timer's provenance against the target step's current
+   declaration and re-arms on a mismatch instead of blindly keeping the old
+   `fireAt`; a carried timer with no provenance — armed before this field
+   existed — is trusted as unchanged, since reconciliation has no signal to
+   compare it against). The runtime event log is DONE
    (`InstanceEvent`: a reminder fire, an unarmed timer, a skipped migration and a
    creation-enqueued subprocess spawn are recorded, and an
    `ActionOutcome` now attaches to the record that enqueued it). Instance migration is
@@ -521,11 +529,6 @@ each with a test that rejects a violating definition.
   leaves its target unwritten silently (total, like a guard). The `timer.unarmed`
   precedent says an omission should be queryable; deferred to keep the migration event
   surface to one new kind.
-- **`TimerState` provenance.** Timer reconciliation keys on timer id alone, so a target
-  step that redeclares a surviving id with a different duration, or flips it between
-  `duration` and `deadline`, is indistinguishable from one that left it unchanged and the
-  old `fireAt` is kept. Closing this needs a provenance field (declared duration /
-  deadline source / arming instant) on `TimerState`.
 
 ## Codebase memory (knowledge graph)
 The repo is indexed into codebase-memory-mcp. Resolve the `project` arg via

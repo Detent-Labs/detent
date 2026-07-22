@@ -560,6 +560,123 @@ test.skipIf(!DB)("6.8 a fired timer that survives is neither resurrected nor dro
   expect((after!.timers ?? []).filter((x) => (x.timerId as string) === "timer_r")).toHaveLength(1);
 });
 
+test.skipIf(!DB)("6.8 a redeclared duration is detected and re-armed at the migration instant", async () => {
+  const p = pid();
+  const timerT1 = { id: "timer_t", key: "t", duration: "PT1H", onFire: { actions: [] } };
+  const timerT2 = { id: "timer_t", key: "t", duration: "PT2H", onFire: { actions: [] } };
+  const v1 = waitBody({ key: "a", fields: [f("x", "string")], waitTimers: [timerT1] });
+  const v2 = waitBody({ key: "a", fields: [f("x", "string")], waitTimers: [timerT2] });
+  await twoVersions(p, v1, v2, {} as MigrationSpec);
+  const inst = await mkInstance(p, 1);
+  const before = await loadInstance(inst.instanceId);
+  const beforeFireAt = (before!.timers ?? []).find((t) => (t.timerId as string) === "timer_t")!.fireAt as string;
+  await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  const after = await loadInstance(inst.instanceId);
+  const t = (after!.timers ?? []).find((x) => (x.timerId as string) === "timer_t")! as unknown as {
+    fireAt: string;
+    provenance: { kind: string; duration: string; armedAt: string };
+  };
+  // Re-armed relative to the migration instant (now), which is later than the
+  // original entry instant + PT1H, whereas the new PT2H fireAt is even later still —
+  // so "later than the old fireAt" is a robust signal a re-arm happened, not a flaky one.
+  expect(new Date(t.fireAt).getTime()).toBeGreaterThan(new Date(beforeFireAt).getTime());
+  expect(t.provenance).toEqual({ kind: "duration", duration: "PT2H", armedAt: expect.any(String) });
+});
+
+test.skipIf(!DB)("6.8 a duration-to-deadline flip is detected and re-armed via deadline evaluation", async () => {
+  const p = pid();
+  const timerAsDuration = { id: "timer_t", key: "t", duration: "PT1H", onFire: { actions: [] } };
+  const timerAsDeadline = { id: "timer_t", key: "t", deadline: cel("data.due"), onFire: { actions: [] } };
+  const v1 = waitBody({ key: "a", fields: [f("x", "string"), f("due", "string")], waitTimers: [timerAsDuration] });
+  const v2 = waitBody({ key: "a", fields: [f("x", "string"), f("due", "string")], waitTimers: [timerAsDeadline] });
+  await twoVersions(p, v1, v2, {} as MigrationSpec);
+  const inst = await mkInstance(p, 1, { field_due: "2030-01-01T00:00:00Z" });
+  await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  const after = await loadInstance(inst.instanceId);
+  const t = (after!.timers ?? []).find((x) => (x.timerId as string) === "timer_t")! as unknown as {
+    fireAt: string;
+    provenance: { kind: string; src: string; armedAt: string };
+  };
+  expect(t.fireAt).toBe("2030-01-01T00:00:00.000Z"); // evaluated, not kept from the old duration arm
+  expect(t.provenance).toEqual({ kind: "deadline", src: "data.due", armedAt: expect.any(String) });
+});
+
+test.skipIf(!DB)("6.8 a deadline-to-duration flip is detected and re-armed relative to the migration instant", async () => {
+  const p = pid();
+  const timerAsDeadline = { id: "timer_t", key: "t", deadline: cel("data.due"), onFire: { actions: [] } };
+  const timerAsDuration = { id: "timer_t", key: "t", duration: "PT1H", onFire: { actions: [] } };
+  const v1 = waitBody({ key: "a", fields: [f("x", "string"), f("due", "string")], waitTimers: [timerAsDeadline] });
+  const v2 = waitBody({ key: "a", fields: [f("x", "string"), f("due", "string")], waitTimers: [timerAsDuration] });
+  await twoVersions(p, v1, v2, {} as MigrationSpec);
+  const inst = await mkInstance(p, 1, { field_due: "2030-01-01T00:00:00Z" });
+  const before = await loadInstance(inst.instanceId);
+  const beforeFireAt = (before!.timers ?? []).find((t) => (t.timerId as string) === "timer_t")!.fireAt;
+  expect(beforeFireAt).toBe("2030-01-01T00:00:00.000Z");
+  await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  const after = await loadInstance(inst.instanceId);
+  const t = (after!.timers ?? []).find((x) => (x.timerId as string) === "timer_t")! as unknown as {
+    fireAt: string;
+    provenance: { kind: string; duration: string; armedAt: string };
+  };
+  expect(t.fireAt).not.toBe(beforeFireAt); // no longer the far-future deadline instant
+  expect(t.provenance).toEqual({ kind: "duration", duration: "PT1H", armedAt: expect.any(String) });
+});
+
+test.skipIf(!DB)("6.8 a changed deadline source is detected and re-armed", async () => {
+  const p = pid();
+  const timerV1 = { id: "timer_t", key: "t", deadline: cel("data.due"), onFire: { actions: [] } };
+  const timerV2 = { id: "timer_t", key: "t", deadline: cel("data.due2"), onFire: { actions: [] } };
+  const v1 = waitBody({ key: "a", fields: [f("x", "string"), f("due", "string"), f("due2", "string")], waitTimers: [timerV1] });
+  const v2 = waitBody({ key: "a", fields: [f("x", "string"), f("due", "string"), f("due2", "string")], waitTimers: [timerV2] });
+  await twoVersions(p, v1, v2, {} as MigrationSpec);
+  const inst = await mkInstance(p, 1, { field_due: "2030-01-01T00:00:00Z", field_due2: "2031-06-15T00:00:00Z" });
+  await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  const after = await loadInstance(inst.instanceId);
+  const t = (after!.timers ?? []).find((x) => (x.timerId as string) === "timer_t")! as unknown as {
+    fireAt: string;
+    provenance: { kind: string; src: string; armedAt: string };
+  };
+  expect(t.fireAt).toBe("2031-06-15T00:00:00.000Z"); // re-evaluated against the new source
+  expect(t.provenance).toEqual({ kind: "deadline", src: "data.due2", armedAt: expect.any(String) });
+});
+
+test.skipIf(!DB)("6.8 a fired timer is kept even if its declaration changed", async () => {
+  const p = pid();
+  const timerR1 = { id: "timer_r", key: "r", duration: "PT1H", onFire: { actions: [] } };
+  const timerR2 = { id: "timer_r", key: "r", duration: "PT2H", onFire: { actions: [] } };
+  const v1 = waitBody({ key: "a", fields: [f("x", "string")], waitTimers: [timerR1] });
+  const v2 = waitBody({ key: "a", fields: [f("x", "string")], waitTimers: [timerR2] });
+  await twoVersions(p, v1, v2, {} as MigrationSpec);
+  const inst = await mkInstance(p, 1);
+  const before = await loadInstance(inst.instanceId);
+  const originalFireAt = (before!.timers ?? []).find((t) => (t.timerId as string) === "timer_r")!.fireAt;
+  await sql`UPDATE instances SET body = jsonb_set(body, '{timers,0,fired}', 'true'::jsonb) WHERE instance_id = ${inst.instanceId}`;
+  await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  const after = await loadInstance(inst.instanceId);
+  const t = (after!.timers ?? []).find((x) => (x.timerId as string) === "timer_r")!;
+  expect(t.fired).toBe(true);
+  expect(t.fireAt).toBe(originalFireAt); // not re-armed despite the changed declaration
+});
+
+test.skipIf(!DB)("6.8 a carried timer with no provenance is trusted and kept even if the declaration changed", async () => {
+  const p = pid();
+  const timerL1 = { id: "timer_l", key: "l", duration: "PT1H", onFire: { actions: [] } };
+  const timerL2 = { id: "timer_l", key: "l", duration: "PT9H", onFire: { actions: [] } };
+  const v1 = waitBody({ key: "a", fields: [f("x", "string")], waitTimers: [timerL1] });
+  const v2 = waitBody({ key: "a", fields: [f("x", "string")], waitTimers: [timerL2] });
+  await twoVersions(p, v1, v2, {} as MigrationSpec);
+  const inst = await mkInstance(p, 1);
+  const before = await loadInstance(inst.instanceId);
+  const originalFireAt = (before!.timers ?? []).find((t) => (t.timerId as string) === "timer_l")!.fireAt;
+  // Simulate a pre-change instance whose TimerState predates the provenance field.
+  await sql`UPDATE instances SET body = jsonb_set(body, '{timers,0}', (body->'timers'->0) - 'provenance')
+    WHERE instance_id = ${inst.instanceId}`;
+  await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  const after = await loadInstance(inst.instanceId);
+  const t = (after!.timers ?? []).find((x) => (x.timerId as string) === "timer_l")!;
+  expect(t.fireAt).toBe(originalFireAt); // no provenance to compare against -> trusted, kept
+});
+
 test.skipIf(!DB)("6.9 a full batch of skipped instances does not stall the scan", async () => {
   const p = pid();
   const v1 = waitBody({ key: "a", fields: [f("x", "string")] });
