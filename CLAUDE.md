@@ -118,16 +118,29 @@ floats.
 **Extensibility.** Custom actions, guards, data sources, assignment strategies,
 and field types are plugins behind a uniform envelope `{ type, config }`. The
 core validates only the envelope; each plugin ships its own JSON Schema. The
-registry is intended to map `type -> { config schema, output schema }` and to
-validate at PUBLISH time (unknown type or invalid config a publish error, not a
-runtime one). NOT BUILT: `registry.ts` declares an optional `configSchema` that
-nothing reads, and `publishBody` never consults the registry at all — an unknown
-action `type` or a malformed `config` publishes cleanly and first fails at
-delivery. The one type check that *is* enforced at publish is the reserved
-`core.` prefix, rejected by a Zod refinement in `authoredProcessBody`. Treat
-registry-backed publish validation as a decided-but-unbuilt item, not a fact.
-Data sources are never inlined; fields bind to them by id and options resolve at
-runtime.
+registry maps `type -> { config schema, output schema }` (`registry.ts`,
+`HandlerDef.configSchema`/`outputSchema`) and is validated at PUBLISH time:
+`checkActionRegistry` (`src/engine/registry-check.ts`) resolves every action's
+`type` against the injected `Registry` and, when the handler declares a
+`configSchema`, parses the action's `config` against it — an unknown type or a
+schema-violating config is a publish error (`RegistryValidationError`, carrying
+every located issue), never a runtime one. Every action position is covered —
+`onEntry`, `onExit`, `onCancel`, each path's `onPath`, each timer's
+`onFire.actions` — the same five positions the CEL check visits. `publishBody`
+now takes the process's `Registry` as a required argument; it is invoked
+**before** CEL and cross-process validation, on the compiled body, after the
+hash-hit no-op return — same placement rule as the other publish-time checks,
+so a body published before a handler was registered (or before its
+`configSchema` tightened) is not retroactively rejected on identical
+re-publish. A handler with no declared `configSchema` accepts any `config`
+(opt-in strictness). The reserved `core.` prefix (`SPAWN_ACTION_TYPE`/
+`RETURN_ACTION_TYPE`) is exempt from the registry-resolution check — those
+types are dispatched internally by `subprocess.ts`, never through this
+author-facing registry, and are separately rejected in *authored* bodies by
+the existing Zod refinement in `authoredProcessBody`. `outputSchema` is still
+unread by anything (no consumer exists yet — there is no runtime result to
+check it against at publish time). Data sources are never inlined; fields bind
+to them by id and options resolve at runtime.
 
 **Runtime record (the audit backbone).** The instance carries assignment/claim
 state and persisted timer firings. Each HistoryEntry is append-only and records
@@ -365,7 +378,8 @@ each with a test that rejects a violating definition.
   The deadline branch is total — an unresolvable or non-instant deadline omits that
   timer rather than failing the entry. The duration branch cannot fail the entry for a
   published body, since the grammar and the magnitude bound are enforced at publish).
-  `registry.ts`,
+  `registry.ts`, `registry-check.ts` (publish-time action-registry validation —
+  see "Extensibility" above),
   `idempotency.ts`. `src/cel/eval.ts` evaluates guards at runtime (total: a runtime
   error such as an unwritten field is `false`, the wait-state idiom) and
   Action.output writeback. The resolution and timer workers take an injected

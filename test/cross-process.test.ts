@@ -8,11 +8,15 @@ import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { readFileSync } from "node:fs";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody, CrossProcessValidationError, CelValidationError } from "../src/engine/definitions.js";
+import { createRegistry } from "../src/engine/registry.js";
 import { compileProcessBody } from "../src/schema/compile.js";
 import { contractHash } from "../src/schema/hash.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 
 const DB = !!process.env.DATABASE_URL;
+// Fixture bodies in this file declare no actions, so an empty registry is
+// sufficient for every publishBody call here.
+const reg = createRegistry();
 const CHILD = "proc_cpv_child" as ProcessId;
 const PARENT = "proc_cpv_parent" as ProcessId;
 const PARENT2 = "proc_cpv_parent2" as ProcessId;
@@ -119,51 +123,51 @@ beforeEach(async () => {
 // --- inputMapping ⊆ child inputFields -----------------------------------------
 
 test.skipIf(!DB)("an inputMapping target outside the child's inputFields is rejected; no version persisted", async () => {
-  const c = await publishBody(CHILD, childBody());
-  await expectCrossProcessReject(publishBody(PARENT, parentBody("parent", pinned(c.version, "field_c_bogus"))));
+  const c = await publishBody(CHILD, childBody(), reg);
+  await expectCrossProcessReject(publishBody(PARENT, parentBody("parent", pinned(c.version, "field_c_bogus")), reg));
   expect(await parentCount(PARENT)).toBe(0);
 });
 
 // --- reference must resolve to a contracted child (child-first) ---------------
 
 test.skipIf(!DB)("a pinned reference to an unpublished child version is rejected", async () => {
-  await expectCrossProcessReject(publishBody(PARENT, parentBody("parent", pinned(99, "field_c_amount"))));
+  await expectCrossProcessReject(publishBody(PARENT, parentBody("parent", pinned(99, "field_c_amount")), reg));
   expect(await parentCount(PARENT)).toBe(0);
 });
 
 test.skipIf(!DB)("a latest-at-spawn contractRef matching no published child is rejected", async () => {
-  await publishBody(CHILD, childBody());
-  await expectCrossProcessReject(publishBody(PARENT, parentBody("parent", latest("sha256:nomatch", "field_c_amount"))));
+  await publishBody(CHILD, childBody(), reg);
+  await expectCrossProcessReject(publishBody(PARENT, parentBody("parent", latest("sha256:nomatch", "field_c_amount")), reg));
 });
 
 test.skipIf(!DB)("a reference to a resolvable child that declares no contract is rejected", async () => {
-  const nc = await publishBody(CHILD, noContractChildBody());
-  await expectCrossProcessReject(publishBody(PARENT, parentBody("parent", pinned(nc.version, "field_c_amount"))));
+  const nc = await publishBody(CHILD, noContractChildBody(), reg);
+  await expectCrossProcessReject(publishBody(PARENT, parentBody("parent", pinned(nc.version, "field_c_amount")), reg));
 });
 
 // --- child-first round-trip: both bindings validate and publish ---------------
 
 test.skipIf(!DB)("publishing the child first lets a pinned and a latest-at-spawn parent validate", async () => {
-  const c = await publishBody(CHILD, childBody());
+  const c = await publishBody(CHILD, childBody(), reg);
 
-  const p1 = await publishBody(PARENT, parentBody("parent", pinned(c.version, "field_c_amount")));
+  const p1 = await publishBody(PARENT, parentBody("parent", pinned(c.version, "field_c_amount")), reg);
   expect(p1.version).toBe(1);
 
   // contractRef is the hash of the *compiled* child contract (what the store holds),
   // as spawn-time resolution computes it.
   const ref = contractHash(compileProcessBody(childBody()).contract!);
-  const p2 = await publishBody(PARENT2, parentBody("parent2", latest(ref, "field_c_amount")));
+  const p2 = await publishBody(PARENT2, parentBody("parent2", latest(ref, "field_c_amount")), reg);
   expect(p2.version).toBe(1);
 });
 
 // --- outputMapping/guard child.data refs ⊆ child contract.outputFields --------
 
 test.skipIf(!DB)("an outputMapping reference to a child field outside contract.outputFields is rejected; no version persisted", async () => {
-  const c = await publishBody(CHILD, childBodyWithInternalField());
+  const c = await publishBody(CHILD, childBodyWithInternalField(), reg);
   const sub = { ...pinned(c.version, "field_c_amount"), outputMapping: { field_p_amount: cel("child.data.internal") } };
   let err: unknown;
   try {
-    await publishBody(PARENT, parentBody("parent", sub));
+    await publishBody(PARENT, parentBody("parent", sub), reg);
   } catch (e) {
     err = e;
   }
@@ -172,9 +176,9 @@ test.skipIf(!DB)("an outputMapping reference to a child field outside contract.o
 });
 
 test.skipIf(!DB)("an outputMapping confined to the child's declared outputFields still publishes", async () => {
-  const c = await publishBody(CHILD, childBodyWithInternalField());
+  const c = await publishBody(CHILD, childBodyWithInternalField(), reg);
   const sub = { ...pinned(c.version, "field_c_amount"), outputMapping: { field_p_amount: cel("child.data.amount") } };
-  const p = await publishBody(PARENT, parentBody("parent", sub));
+  const p = await publishBody(PARENT, parentBody("parent", sub), reg);
   expect(p.version).toBe(1);
 });
 
@@ -183,8 +187,8 @@ test.skipIf(!DB)("the shipped subprocess examples still publish under the tighte
   const parent = JSON.parse(readFileSync(new URL("../examples/subprocess-loan-parent.json", import.meta.url), "utf8"));
   // The parent's subprocess step pins processId "proc_credit_check" — the child
   // must be published under exactly that id for the pinned binding to resolve.
-  const c = await publishBody("proc_credit_check" as ProcessId, child);
+  const c = await publishBody("proc_credit_check" as ProcessId, child, reg);
   expect(c.version).toBe(1);
-  const p = await publishBody("proc_loan" as ProcessId, parent);
+  const p = await publishBody("proc_loan" as ProcessId, parent, reg);
   expect(p.version).toBe(1);
 });
