@@ -331,6 +331,7 @@ test.skipIf(!DB)("a deadline timer arms with the instant its expression yields, 
     expect(row.timers[0].timerId).toBe("timer_d1");
     expect(row.timers[0].fireAt).toBe(fireAt);
     expect(row.timers[0].fired).toBeUndefined();
+    expect(row.timers[0].provenance).toEqual({ kind: "deadline", src: "data.due", armedAt: expect.any(String) });
     expect(await nextTimerIso(inst.instanceId)).toBe(fireAt);
   }
 });

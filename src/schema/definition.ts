@@ -674,10 +674,25 @@ export const assignmentState = z.object({
 });
 export type AssignmentState = z.infer<typeof assignmentState>;
 
+/**
+ * What a timer was armed from: its declared source (so migration can detect a
+ * redeclaration of a surviving timer id) and the instant it was armed. Optional
+ * on TimerState so a body/instance persisted before this field existed keeps
+ * deserializing — reconciliation has nothing to compare an absent provenance
+ * against, so it trusts the carried record as unchanged rather than treating
+ * the absence as a validation failure.
+ */
+export const timerProvenance = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("duration"), duration, armedAt: timestamp }),
+  z.object({ kind: z.literal("deadline"), src: z.string(), armedAt: timestamp }),
+]);
+export type TimerProvenance = z.infer<typeof timerProvenance>;
+
 export const timerState = z.object({
   timerId,
   fireAt: timestamp,
   fired: z.boolean().optional(),
+  provenance: timerProvenance.optional(),
 });
 export type TimerState = z.infer<typeof timerState>;
 

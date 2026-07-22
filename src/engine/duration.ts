@@ -150,7 +150,11 @@ export function armStepTimers(
         throw new Error(
           `timer ${t.id}: ${entryInstant} + ${t.duration} leaves the four-digit-year range (${fireAt})`,
         );
-      armed.push({ timerId: t.id, fireAt: fireAt as TimerState["fireAt"] });
+      armed.push({
+        timerId: t.id,
+        fireAt: fireAt as TimerState["fireAt"],
+        provenance: { kind: "duration", duration: t.duration, armedAt: entryInstant as TimerState["fireAt"] },
+      });
       continue;
     }
     if (!t.deadline) continue;
@@ -168,7 +172,11 @@ export function armStepTimers(
       drops.push({ timerId: t.id, reason: "not-an-instant" });
       continue;
     }
-    armed.push({ timerId: t.id, fireAt: fireAt as TimerState["fireAt"] });
+    armed.push({
+      timerId: t.id,
+      fireAt: fireAt as TimerState["fireAt"],
+      provenance: { kind: "deadline", src: t.deadline.src, armedAt: entryInstant as TimerState["fireAt"] },
+    });
   }
   return { armed, drops };
 }

@@ -23,7 +23,9 @@ import {
   type Instance,
   type InstanceEvent,
   type Step,
+  type Timer,
   type TimerState,
+  type TimerProvenance,
 } from "../schema/definition.js";
 import { celType, validateMigrationSpec } from "../cel/check.js";
 import { evalTransforms } from "../cel/eval.js";
@@ -240,13 +242,31 @@ function remapData(spec: MigrationSpec, fromBody: ProcessBody, snapshot: Instanc
 }
 
 /**
+ * Does a carried timer's recorded provenance still match what the target step
+ * currently declares for that same id? `undefined` provenance (armed before
+ * this field existed) is trusted as matching — reconciliation has no signal to
+ * compare against, so it keeps today's id-only behavior for exactly that timer
+ * until it is next armed. `armedAt` is excluded from the comparison: re-entering
+ * an unchanged declaration at a different instant must still count as unchanged.
+ */
+function timerProvenanceMatches(carried: TimerProvenance | undefined, declared: Timer): boolean {
+  if (!carried) return true;
+  if (declared.duration !== undefined) return carried.kind === "duration" && carried.duration === declared.duration;
+  return carried.kind === "deadline" && carried.src === declared.deadline!.src;
+}
+
+/**
  * Reconcile the instance's carried timers against the target step's declarations,
  * exhaustively (the fired-and-still-declared case is the one a three-way reading
  * omits, resurrecting a fired timer):
- *   carried + still declared (fired or not) -> kept with its persisted state;
- *   carried + no longer declared            -> dropped;
- *   declared + not carried                  -> armed at the migration instant, against
- *                                              the target body, post-remap data, new seq.
+ *   carried + fired + still declared             -> kept as fired, regardless of provenance;
+ *   carried + unfired + still declared + matching
+ *     provenance (or none recorded)               -> kept with its persisted fireAt;
+ *   carried + unfired + still declared + mismatched
+ *     provenance                                   -> re-armed, as if newly declared;
+ *   carried + no longer declared                  -> dropped;
+ *   declared + not carried                        -> armed at the migration instant, against
+ *                                                     the target body, post-remap data, new seq.
  * Newly-armed deadline drops are returned for the caller to record as `timer.unarmed`.
  */
 function reconcileTimers(
@@ -257,13 +277,21 @@ function reconcileTimers(
   at: string,
 ): { timers: TimerState[]; drops: TimerDrop[] } {
   const carried = snapshot.timers ?? [];
-  const declaredIds = new Set((targetStep.timers ?? []).map((t) => t.id as string));
+  const declaredById = new Map((targetStep.timers ?? []).map((t) => [t.id as string, t]));
+  const kept: TimerState[] = [];
+  const rearmIds = new Set<string>();
+  for (const t of carried) {
+    const declared = declaredById.get(t.timerId as string);
+    if (!declared) continue; // no longer declared -> dropped
+    if (t.fired || timerProvenanceMatches(t.provenance, declared)) kept.push(t);
+    else rearmIds.add(t.timerId as string); // unfired, still declared, provenance mismatch -> re-arm
+  }
   const carriedIds = new Set(carried.map((t) => t.timerId as string));
-  const kept: TimerState[] = carried.filter((t) => declaredIds.has(t.timerId as string));
-  // Arm only the newly-declared timers (not already carried) — a clone of the step
-  // with just those, so armStepTimers keeps the surviving ones untouched.
-  const newlyDeclared = (targetStep.timers ?? []).filter((t) => !carriedIds.has(t.id as string));
-  const { armed, drops } = armStepTimers({ ...targetStep, timers: newlyDeclared }, at, toBody, entering);
+  // Arm every timer this instance doesn't already carry unchanged: genuinely
+  // newly-declared ones, plus any surviving id whose declaration drifted (rearmIds)
+  // — a clone of the step with just those, so armStepTimers leaves `kept` untouched.
+  const toArm = (targetStep.timers ?? []).filter((t) => !carriedIds.has(t.id as string) || rearmIds.has(t.id as string));
+  const { armed, drops } = armStepTimers({ ...targetStep, timers: toArm }, at, toBody, entering);
   return { timers: [...kept, ...armed], drops };
 }
 
