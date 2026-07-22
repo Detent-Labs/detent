@@ -355,32 +355,151 @@
 
 ## 6. Draft file I/O and export
 
-- [ ] 6.1 Implement save: File System Access API `showSaveFilePicker`
+- [x] 6.1 Implement save: File System Access API `showSaveFilePicker`
       writing the current Draft as `.draft.json`.
-- [ ] 6.2 Implement load: File System Access API `showOpenFilePicker`
+      `draft/file-io.ts::saveDraft` (via `writeViaPicker`), wired into
+      `panels/FileToolbar.tsx`'s "Save draft" button. Verified live
+      (Playwright + a stubbed `showSaveFilePicker` returning a recording
+      fake handle — a real OS save dialog can't be driven by browser
+      automation): the stub is called once with `suggestedName:
+      "process.draft.json"` and the `.draft.json` accept type, and the
+      written text is the current Draft as-is (not gated on validation —
+      that's export's job).
+- [x] 6.2 Implement load: File System Access API `showOpenFilePicker`
       reading a `.draft.json` file and checking it with the task 2.3
       `load-guard`; reject and report a clear error on a failed check.
-- [ ] 6.3 Implement the `<input type=file>` / download-link fallback for
+      `draft/file-io.ts::loadDraftViaPicker`, routed through the existing
+      `parseDraftJson` (`draft/io.ts`, unchanged) so the picker path gets
+      no shortcut around the load-guard. Verified live: a stubbed
+      `showOpenFilePicker` returning a well-formed draft file replaces the
+      editor's Draft (process key/label update, Export re-enables); a
+      stubbed picker returning `{"workflow": "not-an-object"}` surfaces
+      `draft failed the load guard: workflow: 'workflow' must be an
+      object if present` in the toolbar and leaves the previously loaded
+      Draft in place (not silently accepted).
+- [x] 6.3 Implement the `<input type=file>` / download-link fallback for
       browsers without File System Access API support.
-- [ ] 6.4 Implement export: available only when validation (task 4) shows
+      `draft/file-io.ts` feature-detects once
+      (`hasFileSystemAccess = typeof window.showSaveFilePicker ===
+      "function"`) and falls back to `downloadText` (Blob + a
+      programmatically clicked `<a download>`) for save/export, and
+      `panels/FileToolbar.tsx` renders a hidden `<input type="file">`
+      (same `file.text()`-based pattern task 4.7's child-process loader
+      already uses) whose change handler calls the new
+      `loadDraftFromFile(file)`, exercised only when
+      `hasFileSystemAccess` is false. The real Chromium instance used for
+      live verification has the API, so the `<input>` branch itself
+      couldn't be driven end-to-end without reloading the page with the
+      API deleted pre-module-load (not reachable through the CLI's
+      command set); `loadDraftFromFile` — the exact function the fallback
+      `<input>` handler calls — is covered directly instead (see 6.6),
+      and the branch is otherwise identical in shape to the already
+      live-verified StepsPanel child-loader.
+- [x] 6.4 Implement export: available only when validation (task 4) shows
       no outstanding issues besides "not checked" ones; produce JSON and
       parse it through `authoredProcessBody` before offering it for
       download, failing loudly if that parse does not succeed.
-- [ ] 6.5 Confirm export performs no network call and does not invoke
+      `draft/file-io.ts::exportProcessBody` (a direct
+      `authoredProcessBody.parse`, throwing `ZodError` on failure — never
+      a silent fallback) + `exportDraft`. Gate is
+      `validation.zodValid && validation.issues.length === 0` in
+      `FileToolbar`: `ValidationResult.issues` already excludes the
+      "not checked" registry/subprocess dimensions (those are separate
+      `registryChecked`/`subprocessStepStatus` flags, never pushed as
+      issues), so no extra filtering is needed. Verified live: the Export
+      button is `disabled` on the empty draft's Zod-required issues,
+      re-enables once the draft becomes structurally valid (key, label,
+      an empty `fields` array, one terminal step), and a stubbed picker
+      capture shows the written payload is the *compiled/parsed*
+      `ProcessBody` (e.g. carries the added field), not the raw Draft.
+- [x] 6.5 Confirm export performs no network call and does not invoke
       `publishBody`.
-- [ ] 6.6 Add a save-then-load round-trip test asserting structural
+      `draft/file-io.ts` imports only `workflow-engine/schema` (the Zod
+      contract) plus DOM file-handle/Blob/anchor APIs — no `fetch`, no
+      `workflow-engine/engine/*` (where `publishBody` lives, and which
+      the task-2.2 lint rule blocks reaching by relative import anyway).
+      Verified live via Playwright's `requests` log across the whole
+      Save/Load/Export sequence: the only non-extension, non-dev-server
+      request for the entire session is the initial page load itself.
+- [x] 6.6 Add a save-then-load round-trip test asserting structural
       equivalence, including entity ids (per the editor-draft-io spec).
+      `test/file-io.test.ts`: a hand-built Draft (minted step id via
+      `mintId`) round-trips through `stringifyDraft` -> `parseDraftJson`
+      with a deep-equal assertion plus an explicit id check
+      (`workflow.initialStep`, the step's own `id`), complementing the
+      existing `test/draft-roundtrip.test.ts` (which covers the three
+      `examples/` files but not a hand-built multi-entity id case). Also
+      covers `exportProcessBody`: succeeds and returns the parsed
+      `ProcessBody` for a valid draft, throws for a structurally
+      incomplete one. `saveDraft`/`loadDraftViaPicker`/`exportDraft`
+      themselves are thin file-handle wrappers with no browser-API-free
+      way to unit test in `bun:test`; that plumbing was verified live
+      instead (6.1/6.2/6.4). **Added during `opsx:verify`**: a fourth
+      case asserting `parseDraftJson` throws `DraftLoadError` with the
+      exact located issue for a malformed file — the round-trip test
+      above only exercised the well-formed path, leaving the
+      editor-draft-io spec's "Loading an invalid Draft file is rejected
+      with a clear error" scenario checked live but not by an automated
+      regression test.
+
+      **Group-level verification**: `bun run typecheck`, `eslint .`, and
+      `vite build` all clean (same >500kB `elkjs`+`@xyflow/react` chunk
+      warning as Group 5, not a new regression). `bun test` from the repo
+      root with `DATABASE_URL` set against a local Postgres 16 container
+      (`docker start pg-test`) — 464 pass, 0 fail, 0 skipped (460 baseline
+      + 4 new `file-io.test.ts` cases). Live-verified in-browser via
+      Playwright across the full Save/Load/Export flow: built a minimal
+      valid process through the existing panels, saved it (stubbed
+      picker capture confirms the written bytes and suggested filename),
+      loaded a different valid draft back in (fields update, Export
+      re-enables), loaded a malformed file and got the load-guard error
+      message without losing the current Draft, confirmed a
+      cancelled (`AbortError`) picker shows no spurious error, and
+      confirmed zero network requests fired during the whole sequence.
 
 ## 7. Verification
 
-- [ ] 7.1 Run `bun test` (with `DATABASE_URL` set) and `bun run
+- [x] 7.1 Run `bun test` (with `DATABASE_URL` set) and `bun run
       typecheck` from the repo root; confirm both the engine package and
       `packages/editor` are green.
-- [ ] 7.2 Manually author a process in the editor reproducing
+      `bun install` was needed first (a fresh checkout had no
+      `packages/editor/node_modules` and a root `node_modules` missing
+      `vite`/`react`/etc. — not a Group 6 regression, just an
+      uninitialized workspace). After that: `bun run typecheck` — both
+      `typecheck:engine` and the `packages/editor` filter script exit 0.
+      `bun test` with `DATABASE_URL` pointed at the `pg-test` container
+      (`docker start pg-test`, started Docker Desktop first since it
+      wasn't running) — 463 pass, 0 fail, 0 skipped, then 464/0/0 after
+      the `opsx:verify` addition noted under 6.6.
+- [x] 7.2 Manually author a process in the editor reproducing
       `examples/expense-approval.json`'s shape (or close to it) end to
       end: create fields, steps, paths, a timer, actions, and a
       contract; validate; export; confirm the exported JSON parses
       against `authoredProcessBody`.
-- [ ] 7.3 Confirm the six named follow-up changes (HTTP API, canvas
+      Built live in-browser via Playwright: 2 catalog fields (`amount`
+      number, `approved` boolean); 3 steps — `capture` (initial, an
+      onEntry `notify.email` action, a 24h reminder timer, a manual path
+      to `review`), `review` (an automatic path to `book` guarded on
+      `data.approved == true`), `book` (terminal, an onEntry `http.call`
+      action); contract enabled (`amount` as input, `approved` as
+      output, one outcome `booked` bound to `book`'s `outcome`). The
+      top-level "Draft is not yet structurally valid" banner cleared, the
+      graph view showed all three nodes/two edges with no warning
+      badges, and Export was enabled. Captured the exported payload via
+      a stubbed `showSaveFilePicker` and re-parsed it standalone through
+      the real `authoredProcessBody.safeParse` (outside the browser,
+      directly against `src/schema/definition.ts`) — `success: true`.
+- [x] 7.3 Confirm the six named follow-up changes (HTTP API, canvas
       editing, non-technical CEL abstraction) remain out of scope and are
       not accidentally implemented.
+      Grepped `packages/editor/src` for signs of scope creep (`fetch(`,
+      `publishBody` calls, draggable/connectable graph props flipped to
+      `true`, `/api/`, migration or simulation UI) — the only
+      `publishBody` hits are comments explaining why the editor
+      deliberately does *not* call it. Group 5's own verification
+      already fixed the graph as read-only
+      (`nodesDraggable={false}`/`nodesConnectable={false}`/no
+      `onConnect` handler); Group 6 confirmed export makes no network
+      call (7.1/6.5). No HTTP API, canvas editing, condition-builder,
+      migration-plan authoring, or simulation surface exists anywhere in
+      `packages/editor`.
