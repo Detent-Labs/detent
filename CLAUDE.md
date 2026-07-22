@@ -154,16 +154,20 @@ no step change get a sibling record, `InstanceEvent` (append-only, `evt_` ids): 
 discriminated union over `kind` with a kind-specific payload, carrying the instance,
 the `version` and the `transitionSeq` **in force**. An event never advances the
 sequence, so several may share one and share it with a transition; they order by
-`at`. Five kinds exist — `timer.fired` (a reminder fired: actions enqueued, no
+`at`. Six kinds exist — `timer.fired` (a reminder fired: actions enqueued, no
 transition), `timer.unarmed` (a declared timer produced no `fireAt` at entry, with
 the reason), `migration.skipped` (an instance left on its source version, with the
 reason), `subprocess.spawn-enqueued` (creation at a subprocess initial step
-enqueued its spawn: actions enqueued, no transition), and
+enqueued its spawn: actions enqueued, no transition),
 `subprocess.outcome-unmatched` (a child returned an outcome no path on the parent's
-subprocess step matched, so the parent stays parked). Kinds are added additively;
-the record shape is settled. A kind that enqueues actions carries their
-`ActionOutcome`s — `timer.fired` and `subprocess.spawn-enqueued` do, the other three
-enqueue nothing and so must not invite a reader to expect outcomes.
+subprocess step matched, so the parent stays parked), and
+`migration.transform-dropped` (a migration `transforms` entry raised, or its result
+could not be made JSON-safe, so its target field went unwritten; the `version` it
+carries is the TARGET version, since the `fieldId` it names is declared there).
+Kinds are added additively; the record shape is settled. A kind that enqueues
+actions carries their `ActionOutcome`s — `timer.fired` and
+`subprocess.spawn-enqueued` do, the other four enqueue nothing and so must not
+invite a reader to expect outcomes.
 
 An `ActionOutcome` attaches to the record that **enqueued** the action, carried on the
 outbox row rather than derived from `(instanceId, transitionSeq)`. That derivation is
@@ -525,10 +529,6 @@ each with a test that rejects a violating definition.
   into the writeback's existing predicate to avoid a TOCTOU, a new outbox index, and a
   defined lock order against the delivery transaction — to preserve a result a later
   invocation delivers anyway. Revisit only if `pending-actions` skips prove common.
-- **A `migration.transform-dropped` event kind.** A `transforms` expression that raises
-  leaves its target unwritten silently (total, like a guard). The `timer.unarmed`
-  precedent says an omission should be queryable; deferred to keep the migration event
-  surface to one new kind.
 
 ## Codebase memory (knowledge graph)
 The repo is indexed into codebase-memory-mcp. Resolve the `project` arg via

@@ -755,6 +755,14 @@ export const timerUnarmedReason = z.enum(["expression-raised", "not-an-instant"]
 export type TimerUnarmedReason = z.infer<typeof timerUnarmedReason>;
 
 /**
+ * Why a migration `transforms` entry produced no value for its target field.
+ * Distinguished at the point that knows it: the CEL evaluation itself raising,
+ * versus a resolved value that cannot be made JSON-safe (an out-of-range bigint).
+ */
+export const migrationTransformDroppedReason = z.enum(["expression-raised", "value-out-of-range"]);
+export type MigrationTransformDroppedReason = z.infer<typeof migrationTransformDroppedReason>;
+
+/**
  * Why a migration left an instance on its source version. `step-unmappable` is a
  * property of the rule and recurs on every re-invocation; `pending-actions` and
  * `child-in-flight` are transient and clear on their own — the first once the
@@ -821,6 +829,17 @@ export const instanceEvent = z.discriminatedUnion("kind", [
     ...instanceEventEnvelope,
     kind: z.literal("subprocess.outcome-unmatched"),
     payload: z.object({ stepId, outcome: z.string().nullable() }).strict(),
+  }),
+  // A migration's `transforms` entry raised, or its result could not be made
+  // JSON-safe: evaluation is total, so the entry left its target field
+  // unwritten rather than failing the migration. No transition, no actions
+  // enqueued — the migration.skipped shape, not the timer.fired one. The
+  // `version` an event carries is the version in force; for this kind that is
+  // the TARGET version, since the fieldId it names is declared there.
+  z.object({
+    ...instanceEventEnvelope,
+    kind: z.literal("migration.transform-dropped"),
+    payload: z.object({ fieldId, reason: migrationTransformDroppedReason }).strict(),
   }),
 ]);
 export type InstanceEvent = z.infer<typeof instanceEvent>;

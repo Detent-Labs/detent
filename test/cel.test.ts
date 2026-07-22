@@ -416,12 +416,38 @@ test("an integer-valued transform survives a round-trip", () => {
     currentStepId: "step_a", transitionSeq: 0, data: {}, status: "running",
     startedAt: "2026-07-20T00:00:00.000Z",
   }) as Instance;
-  const patch = evalTransforms(spec({ field_total: cel("1 + 2") }), fromB, snapshot);
+  const { patch, drops } = evalTransforms(spec({ field_total: cel("1 + 2") }), fromB, snapshot);
+  expect(drops).toEqual([]);
   // cel-js models int as bigint; coerceJson must have made it a number.
   expect(typeof patch.field_total).toBe("number");
   expect(patch.field_total).toBe(3);
   // The migrated instance parses on its next read (a bigint would throw here).
   expect(() => instanceSchema.parse({ ...snapshot, data: { field_total: patch.field_total } })).not.toThrow();
+});
+
+test("evalTransforms reports a raising expression as an expression-raised drop", () => {
+  const snapshot = instanceSchema.parse({
+    instanceId: "inst_11111111-1111-4a1c-8e2f-000000000002",
+    processId: "proc_x", version: 1, definitionHash: "h",
+    currentStepId: "step_a", transitionSeq: 0, data: {}, status: "running",
+    startedAt: "2026-07-20T00:00:00.000Z",
+  }) as Instance;
+  const { patch, drops } = evalTransforms(spec({ field_total: cel("data.nope") }), fromB, snapshot);
+  expect(patch.field_total).toBeUndefined();
+  expect(drops).toEqual([{ fieldId: "field_total", reason: "expression-raised" }] as unknown as typeof drops);
+});
+
+test("evalTransforms reports an out-of-range result as a value-out-of-range drop", () => {
+  const snapshot = instanceSchema.parse({
+    instanceId: "inst_11111111-1111-4a1c-8e2f-000000000003",
+    processId: "proc_x", version: 1, definitionHash: "h",
+    currentStepId: "step_a", transitionSeq: 0, data: {}, status: "running",
+    startedAt: "2026-07-20T00:00:00.000Z",
+  }) as Instance;
+  // Beyond Number.MAX_SAFE_INTEGER: cel-js models this as a bigint coerceJson refuses.
+  const { patch, drops } = evalTransforms(spec({ field_total: cel("9223372036854775807") }), fromB, snapshot);
+  expect(patch.field_total).toBeUndefined();
+  expect(drops).toEqual([{ fieldId: "field_total", reason: "value-out-of-range" }] as unknown as typeof drops);
 });
 
 // ---- checkSubprocessChildRefs (cross-process-validation delta) ---------------

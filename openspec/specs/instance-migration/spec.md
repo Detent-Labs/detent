@@ -433,6 +433,12 @@ Values written SHALL be JSON-safe. The CEL library models `int` as bigint, and a
 bigint written into the payload makes the instance unparseable on its next read —
 corruption produced by the migration itself.
 
+A dropped transform — whether from a raising expression or a value that cannot
+be made JSON-safe — SHALL be recorded as a `migration.transform-dropped`
+`InstanceEvent` (see `runtime-events`) naming the target field and the reason,
+in the same transaction as the migration. The migration itself is unaffected;
+this only makes the omission queryable.
+
 #### Scenario: A transform writes a computed value
 
 - **WHEN** a transform for target field B reads a populated source field A
@@ -451,7 +457,9 @@ corruption produced by the migration itself.
 #### Scenario: A raising transform leaves its field unwritten
 
 - **WHEN** a transform reads a field the instance never wrote
-- **THEN** the instance still migrates and its target field is absent from `data`
+- **THEN** the instance still migrates, its target field is absent from
+  `data`, and a `migration.transform-dropped` event naming that field and
+  reason `"expression-raised"` is recorded
 
 #### Scenario: An integer-valued transform stays readable
 

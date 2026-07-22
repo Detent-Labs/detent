@@ -28,7 +28,7 @@ import {
   type TimerProvenance,
 } from "../schema/definition.js";
 import { celType, validateMigrationSpec } from "../cel/check.js";
-import { evalTransforms } from "../cel/eval.js";
+import { evalTransforms, type TransformDrop } from "../cel/eval.js";
 import { definitionHash } from "../schema/hash.js";
 import { createDefinitionStore } from "./definitions.js";
 import { planStepEntry, applyStepEntry, ConcurrencyConflict } from "./transition.js";
@@ -222,7 +222,11 @@ const BATCH = 100;
  * (guard-context re-keying skips ids the target does not declare) and dropping it would
  * destroy data.
  */
-function remapData(spec: MigrationSpec, fromBody: ProcessBody, snapshot: Instance): Instance["data"] {
+function remapData(
+  spec: MigrationSpec,
+  fromBody: ProcessBody,
+  snapshot: Instance,
+): { data: Instance["data"]; drops: TransformDrop[] } {
   const src = snapshot.data as Record<string, unknown>;
   const fieldMap = spec.fieldMap ?? {};
   const sources = new Set(Object.keys(fieldMap));
@@ -235,10 +239,13 @@ function remapData(spec: MigrationSpec, fromBody: ProcessBody, snapshot: Instanc
     if (b === undefined) continue;
     if (a in src) out[b] = src[a];
   }
-  // transforms (also over the snapshot) overlay the renames; a raising transform is
-  // omitted from the patch, leaving its target as the rename/retain left it.
-  Object.assign(out, evalTransforms(spec, fromBody, snapshot));
-  return out as Instance["data"];
+  // transforms (also over the snapshot) overlay the renames; a raising or
+  // out-of-range transform is omitted from the patch, leaving its target as the
+  // rename/retain left it — the caller records each drop as a
+  // migration.transform-dropped event.
+  const { patch, drops } = evalTransforms(spec, fromBody, snapshot);
+  Object.assign(out, patch);
+  return { data: out as Instance["data"], drops };
 }
 
 /**
@@ -395,7 +402,7 @@ async function migrateOne(
     }
 
     // 5.8 remap data from the snapshot (the locked read).
-    const data = remapData(spec, fromBody, inst);
+    const { data, drops: transformDrops } = remapData(spec, fromBody, inst);
 
     // 5.9 reconcile timers against the target step; arm newcomers over post-remap data.
     const at = new Date().toISOString();
@@ -414,6 +421,18 @@ async function migrateOne(
       payload: { timerId: d.timerId, reason: d.reason },
       at,
     }));
+    // Dropped transforms -> migration.transform-dropped events, same seq/version
+    // rule as the timer drops above: the target field is declared on the TARGET
+    // catalog, so the event carries toVersion.
+    const transformDropEvents: InstanceEvent[] = transformDrops.map((d) => ({
+      id: newInstanceEventId(),
+      instanceId: inst.instanceId,
+      transitionSeq: nextSeq,
+      version: toVersion,
+      kind: "migration.transform-dropped" as const,
+      payload: { fieldId: d.fieldId, reason: d.reason },
+      at,
+    }));
 
     // 5.10/5.11 compose the shared seam. onExit never runs; onEntry only on a genuine
     // relocation; spawn suppressed on an identity step (else a parked parent gains a
@@ -428,7 +447,7 @@ async function migrateOne(
       timers,
       entryVersion: toVersion,
       suppressSpawn: !stepChanged,
-      events: dropEvents,
+      events: [...dropEvents, ...transformDropEvents],
     });
     // applyStepEntry itself flags resolve_state = 'pending' on every commit, so
     // migration's cascade deferral (rather than nesting commits) falls out of

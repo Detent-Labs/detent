@@ -408,6 +408,8 @@ test.skipIf(!DB)("6.7 data remapping: rename, swap, orphan retention, integer tr
   expect(dataField(after, "field_total")).toBe(3); // CEL int coerced bigint->number
   expect(typeof dataField(after, "field_total")).toBe("number"); // not a bigint
   expect(after!.version).toBe(2);
+  // Every transform succeeded -> no migration.transform-dropped event.
+  expect((await eventsOf(inst.instanceId)).filter((e) => e.kind === "migration.transform-dropped")).toHaveLength(0);
 });
 
 test.skipIf(!DB)("6.7 a raising transform leaves its field unwritten", async () => {
@@ -420,6 +422,34 @@ test.skipIf(!DB)("6.7 a raising transform leaves its field unwritten", async () 
   const after = await loadInstance(inst.instanceId);
   expect("field_y" in (after!.data as object)).toBe(false); // absent, migration still happened
   expect(after!.version).toBe(2);
+  const dropped = (await eventsOf(inst.instanceId)).find((e) => e.kind === "migration.transform-dropped");
+  expect(dropped).toBeDefined();
+  expect((dropped as unknown as { payload: { fieldId: string; reason: string } }).payload).toEqual({
+    fieldId: "field_y",
+    reason: "expression-raised",
+  });
+});
+
+test.skipIf(!DB)("6.7 a transform yielding an out-of-range value leaves its field unwritten", async () => {
+  const p = pid();
+  const v1 = waitBody({ key: "a", fields: [f("x", "string")] });
+  // A plugin-typed (dyn) target field, like "6.7 data remapping" above — a
+  // "number" field is CEL `double` and would reject an int literal at plan
+  // registration, before the migration ever runs.
+  const pluginTotal = { id: "field_total", key: "total", label: "total", type: { type: "counter", config: {} } };
+  const v2 = waitBody({ key: "a", fields: [f("x", "string"), pluginTotal as unknown as Field] });
+  await twoVersions(p, v1, v2, { transforms: { field_total: cel("9223372036854775807") } } as unknown as MigrationSpec);
+  const inst = await mkInstance(p, 1);
+  await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  const after = await loadInstance(inst.instanceId);
+  expect("field_total" in (after!.data as object)).toBe(false); // absent, migration still happened
+  expect(after!.version).toBe(2);
+  const dropped = (await eventsOf(inst.instanceId)).find((e) => e.kind === "migration.transform-dropped");
+  expect(dropped).toBeDefined();
+  expect((dropped as unknown as { payload: { fieldId: string; reason: string } }).payload).toEqual({
+    fieldId: "field_total",
+    reason: "value-out-of-range",
+  });
 });
 
 test.skipIf(!DB)("6.x unmappable: reject-and-pin leaves the instance; route-to-step relocates it", async () => {
