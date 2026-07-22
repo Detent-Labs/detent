@@ -1,6 +1,6 @@
 import { authoredProcessBody, type ProcessBody } from "workflow-engine/schema";
 import type { Draft } from "./types";
-import { parseDraftJson, stringifyDraft } from "./io";
+import { parseDraftJson, parseImportedProcessJson, stringifyDraft } from "./io";
 
 /**
  * Chromium-only as of today (design.md decision 7 / risk) — everything here
@@ -49,6 +49,21 @@ export async function loadDraftViaPicker(draftFileDescription: string): Promise<
 
 export async function loadDraftFromFile(file: File): Promise<Draft> {
   return parseDraftJson(await file.text());
+}
+
+/**
+ * Distinct from Load draft: accepts a `DefinitionVersion` wrapper or a raw
+ * `ProcessBody` (`.json`, not `.draft.json`) and converts it to a Draft via
+ * the strict `parseImportedProcessJson` (editor-draft-io spec, "An existing
+ * process file can be imported as an editable Draft").
+ */
+export async function importProcessViaPicker(importFileDescription: string): Promise<Draft> {
+  const [handle] = await window.showOpenFilePicker!({ types: acceptTypes(importFileDescription, [".json"]) });
+  return parseImportedProcessJson(await (await handle.getFile()).text());
+}
+
+export async function importProcessFromFile(file: File): Promise<Draft> {
+  return parseImportedProcessJson(await file.text());
 }
 
 /** The real gate: parses through the actual contract schema, never a relaxed Draft check. Throws on failure. */

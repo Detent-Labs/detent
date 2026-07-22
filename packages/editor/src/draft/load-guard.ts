@@ -15,12 +15,23 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** The full top-level key set of AuthoredProcessBody (definition.ts's `processBody`). */
+const KNOWN_KEYS = new Set(["key", "label", "description", "baseLocale", "contract", "fields", "dataSources", "workflow"]);
+
 export function checkDraftShape(value: unknown): LoadGuardIssue[] {
   const issues: LoadGuardIssue[] = [];
 
   if (!isPlainObject(value)) {
     issues.push({ path: "", message: "root is not a JSON object" });
     return issues;
+  }
+
+  // A file with no recognized process-body key at all (e.g. a published
+  // DefinitionVersion wrapper, whose real content sits under `.definition`)
+  // is "not shaped like a process body at all" (editor-draft-io spec) — flag
+  // it instead of silently loading an all-undefined Draft.
+  for (const key of Object.keys(value)) {
+    if (!KNOWN_KEYS.has(key)) issues.push({ path: key, message: `unrecognized top-level field '${key}' — this may not be a process body` });
   }
 
   const expectString = (key: string) => {
