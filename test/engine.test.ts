@@ -51,6 +51,7 @@ test("orderedTriggerActions treats absent trigger arrays as empty", () => {
 
 const bodyWith = (guardSrc?: string): ProcessBody =>
   ({
+    baseLocale: "en",
     fields: [],
     workflow: {
       initialStep: "step_a",
@@ -58,7 +59,7 @@ const bodyWith = (guardSrc?: string): ProcessBody =>
         {
           id: "step_a",
           key: "a",
-          label: "A",
+          label: { en: "A" },
           type: "task",
           paths: [
             {
@@ -70,7 +71,7 @@ const bodyWith = (guardSrc?: string): ProcessBody =>
             },
           ],
         },
-        { id: "step_b", key: "b", label: "B", type: "task", terminal: true },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -94,13 +95,14 @@ const histEntries = async (id: string): Promise<HistoryEntry[]> => {
 // A three-step chain S -> M -> T (two manual hops), for multi-transition tests.
 const chainBody = (): ProcessBody =>
   ({
+    baseLocale: "en",
     fields: [],
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: "A", type: "task", paths: [{ id: "path_am", key: "am", to: "step_m", trigger: "manual" }] },
-        { id: "step_m", key: "m", label: "M", type: "task", paths: [{ id: "path_mt", key: "mt", to: "step_t", trigger: "manual" }] },
-        { id: "step_t", key: "t", label: "T", type: "task", terminal: true },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_am", key: "am", to: "step_m", trigger: "manual" }] },
+        { id: "step_m", key: "m", label: { en: "M" }, type: "task", paths: [{ id: "path_mt", key: "mt", to: "step_t", trigger: "manual" }] },
+        { id: "step_t", key: "t", label: { en: "T" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -130,10 +132,11 @@ test.skipIf(!DB)("create then rehydrate round-trips against the pinned body", as
 // planStepEntry derives it for a transition target.
 const terminalInitialBody = (): ProcessBody =>
   ({
+    baseLocale: "en",
     fields: [],
     workflow: {
       initialStep: "step_done",
-      steps: [{ id: "step_done", key: "done", label: "Done", type: "task", terminal: true }],
+      steps: [{ id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true }],
     },
   }) as unknown as ProcessBody;
 

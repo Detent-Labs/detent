@@ -9,6 +9,8 @@ import { ContractPanel } from "./panels/ContractPanel";
 import { RegistryPanel } from "./panels/RegistryPanel";
 import { FileToolbar } from "./panels/FileToolbar";
 import { IssueList } from "./panels/shared/IssueList";
+import { LocalizedTextInput } from "./panels/shared/LocalizedTextInput";
+import { ContentLocaleSwitcher } from "./panels/shared/ContentLocaleSwitcher";
 import { GraphView } from "./graph/GraphView";
 
 function ProcessHeader() {
@@ -23,15 +25,11 @@ function ProcessHeader() {
       </label>
       <label>
         label
-        <input type="text" value={draft.label ?? ""} onChange={(e) => mutate((d) => { d.label = e.target.value; })} />
+        <LocalizedTextInput value={draft.label} onChange={(next) => mutate((d) => { d.label = next; })} />
       </label>
       <label>
         description
-        <input
-          type="text"
-          value={draft.description ?? ""}
-          onChange={(e) => mutate((d) => { d.description = e.target.value; })}
-        />
+        <LocalizedTextInput value={draft.description} onChange={(next) => mutate((d) => { d.description = next; })} />
       </label>
       <IssueList entityId="process" />
     </fieldset>
@@ -49,6 +47,7 @@ function Editor() {
       {!validation.zodValid && <p className="draft-incomplete">{t("app.draftIncomplete")}</p>}
       <FileToolbar />
       <LocaleSwitcher />
+      <ContentLocaleSwitcher />
       <ProcessHeader />
       <RegistryPanel />
       <h3>{t("app.graphHeading")}</h3>

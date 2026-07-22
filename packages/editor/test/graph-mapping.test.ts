@@ -12,13 +12,13 @@ describe("draftToGraph", () => {
       workflow: {
         initialStep: stepA,
         steps: [
-          { id: stepA, key: "start", label: "Start", type: "task", paths: [{ id: pathId, key: "go", to: stepB, trigger: "manual" }] },
-          { id: stepB, key: "end", label: "End", type: "task", terminal: true },
+          { id: stepA, key: "start", label: { en: "Start" }, type: "task", paths: [{ id: pathId, key: "go", to: stepB, trigger: "manual" }] },
+          { id: stepB, key: "end", label: { en: "End" }, type: "task", terminal: true },
         ],
       },
     };
 
-    const graph = draftToGraph(draft);
+    const graph = draftToGraph(draft, "en", "en");
 
     expect(graph.nodes.map((n) => n.id).sort()).toEqual([stepA, stepB].sort());
     expect(graph.nodes.find((n) => n.id === stepA)?.isInitial).toBe(true);
@@ -35,7 +35,7 @@ describe("draftToGraph", () => {
           {
             id: stepA,
             key: "start",
-            label: "Start",
+            label: { en: "Start" },
             type: "task",
             paths: [{ id: pathId, key: "go", to: "step_does_not_exist" as never, trigger: "manual" }],
           },
@@ -43,14 +43,27 @@ describe("draftToGraph", () => {
       },
     };
 
-    const graph = draftToGraph(draft);
+    const graph = draftToGraph(draft, "en", "en");
 
     expect(graph.nodes).toHaveLength(1);
     expect(graph.edges).toHaveLength(0);
   });
 
   it("returns an empty graph for an empty draft", () => {
-    const graph = draftToGraph({});
+    const graph = draftToGraph({}, "en", "en");
     expect(graph).toEqual({ nodes: [], edges: [] });
+  });
+
+  it("resolves a node's label through the current content locale, falling back to the base locale", () => {
+    const stepA = mintId("step");
+    const draft: Draft = {
+      workflow: {
+        initialStep: stepA,
+        steps: [{ id: stepA, key: "", label: { en: "Review", de: "Prüfen" }, type: "task", terminal: true }],
+      },
+    };
+
+    expect(draftToGraph(draft, "de", "en").nodes[0].label).toBe("Prüfen");
+    expect(draftToGraph(draft, "fr", "en").nodes[0].label).toBe("Review");
   });
 });

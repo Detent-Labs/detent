@@ -1,4 +1,19 @@
 import type { Draft } from "./types";
+import type { DraftField } from "./fields";
+
+/** Depth-first search by id, mirroring the engine's `collectFieldsDeep` — a
+ * field id is unique process-wide regardless of nesting depth, so a
+ * `["fields", fieldId, ...]` path (used by the authored-content-localization
+ * invariant) resolves to the right field whether it's top-level or nested
+ * inside a `group`, without needing its positional index. */
+function findFieldById(fields: DraftField[] | undefined, id: string): DraftField | undefined {
+  for (const f of fields ?? []) {
+    if (f.id === id) return f;
+    const nested = findFieldById(f.fields, id);
+    if (nested) return nested;
+  }
+  return undefined;
+}
 
 export type IssueSource = "zod" | "cel" | "registry" | "duration";
 export type EntityType = "process" | "field" | "dataSource" | "step" | "path" | "timer" | "action" | "contract";
@@ -55,12 +70,14 @@ export function resolveLoc(
 
   let stepIdx: number | undefined;
   let fieldIdx: number | undefined;
+  let fieldIdRef: string | undefined;
   let dataSourceIdx: number | undefined;
   let pathIdx: number | undefined;
   let timerIdx: number | undefined;
   let actionListKey: "onEntry" | "onExit" | "onCancel" | "onPath" | "onFire" | undefined;
   let actionIdx: number | undefined;
   let sawContract = false;
+  let prevKey: string | undefined;
 
   for (const t of tokens) {
     switch (t.key) {
@@ -70,7 +87,7 @@ export function resolveLoc(
         stepIdx = t.idx;
         break;
       case "fields":
-        if (fieldIdx === undefined) fieldIdx = t.idx;
+        if (fieldIdx === undefined && fieldIdRef === undefined) fieldIdx = t.idx;
         break;
       case "dataSources":
         dataSourceIdx = t.idx;
@@ -98,8 +115,13 @@ export function resolveLoc(
         sawContract = true;
         break;
       default:
+        // A field id appearing right after a "fields" token (e.g. the
+        // authored-content-localization invariant's `["fields", fieldId,
+        // "label"]`), rather than a numeric array index.
+        if (prevKey === "fields" && fieldIdRef === undefined) fieldIdRef = t.key;
         break;
     }
+    prevKey = t.key;
   }
 
   const step = stepIdx !== undefined ? body.workflow?.steps?.[stepIdx] : undefined;
@@ -131,7 +153,7 @@ export function resolveLoc(
 
   if (step?.id) return { entityType: "step", entityId: step.id };
 
-  const field = fieldIdx !== undefined ? body.fields?.[fieldIdx] : undefined;
+  const field = fieldIdRef !== undefined ? findFieldById(body.fields, fieldIdRef) : fieldIdx !== undefined ? body.fields?.[fieldIdx] : undefined;
   if (field?.id) return { entityType: "field", entityId: field.id };
 
   const dataSource = dataSourceIdx !== undefined ? body.dataSources?.[dataSourceIdx] : undefined;

@@ -278,14 +278,14 @@ test("bounding by the full four-digit-year span would not have been sufficient",
 /** A step carrying one duration timer, plus the two arguments the duration branch ignores. */
 function durationStepFixture(duration: string): { step: Step; body: ProcessBody; entering: Instance } {
   const step = {
-    id: "step_wait", key: "wait", label: "Wait", type: "task",
+    id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task",
     timers: [{ id: "timer_t1", duration, onFire: { actions: [] } }],
   } as unknown as Step;
   // The duration branch reads neither `body` nor `entering` — the CEL context is
   // built only when a deadline is present — so a minimal pair reaches the assertion.
   return {
     step,
-    body: { fields: [], workflow: { initialStep: "step_wait", steps: [step] } } as unknown as ProcessBody,
+    body: { baseLocale: "en", fields: [], workflow: { initialStep: "step_wait", steps: [step] } } as unknown as ProcessBody,
     entering: { currentStepId: "step_wait", transitionSeq: 1, data: {} } as unknown as Instance,
   };
 }

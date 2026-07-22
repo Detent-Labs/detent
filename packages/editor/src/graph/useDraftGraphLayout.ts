@@ -13,8 +13,12 @@ import { layoutGraph, type LayoutedNode } from "./layout";
  * Both spec scenarios ("new step appears", "new path appears as an edge")
  * are themselves structural changes, so they still trigger a fresh layout.
  */
-export function useDraftGraphLayout(draft: Draft): { graph: DraftGraph; positions: Record<string, LayoutedNode> } {
-  const graph = draftToGraph(draft);
+export function useDraftGraphLayout(
+  draft: Draft,
+  contentLocale: string,
+  baseLocale: string,
+): { graph: DraftGraph; positions: Record<string, LayoutedNode> } {
+  const graph = draftToGraph(draft, contentLocale, baseLocale);
   const [positions, setPositions] = useState<Record<string, LayoutedNode>>({});
 
   const signature = JSON.stringify({

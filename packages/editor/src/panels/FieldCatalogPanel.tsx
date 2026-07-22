@@ -5,6 +5,8 @@ import { useT } from "../i18n/store";
 import { mintId } from "../draft/ids";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { IssueList } from "./shared/IssueList";
+import { LocalizedTextInput } from "./shared/LocalizedTextInput";
+import { seedLocalizedText } from "../draft/localized-text";
 
 type DraftField = DraftOf<FieldDef>;
 type DraftDataSource = DraftOf<DataSourceDef>;
@@ -28,6 +30,7 @@ interface FieldRowProps {
 
 /** Fields are recursive (a `group` field carries its own sub-fields), so this renders itself for `field.fields`. */
 function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
+  const { contentLocale } = useDraft();
   const t = useT();
   const custom = isCustomType(field.type);
   const typeSelectValue = typeof field.type === "object" && field.type !== null ? "__custom__" : (field.type ?? "string");
@@ -36,12 +39,13 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
 
   const setOptions = (options: DraftOption[]) => onChange({ options, dataSource: options.length > 0 ? undefined : field.dataSource });
 
-  const addOption = () => setOptions([...(field.options ?? []), { value: "", label: "" }]);
+  const addOption = () => setOptions([...(field.options ?? []), { value: "", label: seedLocalizedText(contentLocale) }]);
   const updateOption = (i: number, patch: Partial<DraftOption>) =>
     setOptions((field.options ?? []).map((o, idx) => (idx === i ? { ...o, ...patch } : o)));
   const removeOption = (i: number) => setOptions((field.options ?? []).filter((_, idx) => idx !== i));
 
-  const addSubField = () => onChange({ fields: [...(field.fields ?? []), { id: mintId("field"), key: "", label: "", type: "string" }] });
+  const addSubField = () =>
+    onChange({ fields: [...(field.fields ?? []), { id: mintId("field"), key: "", label: seedLocalizedText(contentLocale), type: "string" }] });
   const updateSubField = (i: number, patch: Partial<DraftField>) =>
     onChange({ fields: (field.fields ?? []).map((f, idx) => (idx === i ? { ...f, ...patch } : f)) });
   const removeSubField = (i: number) => onChange({ fields: (field.fields ?? []).filter((_, idx) => idx !== i) });
@@ -54,11 +58,11 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
       </label>
       <label>
         label
-        <input type="text" value={field.label ?? ""} onChange={(e) => onChange({ label: e.target.value })} />
+        <LocalizedTextInput value={field.label} onChange={(label) => onChange({ label })} />
       </label>
       <label>
         description
-        <input type="text" value={field.description ?? ""} onChange={(e) => onChange({ description: e.target.value })} />
+        <LocalizedTextInput value={field.description} onChange={(description) => onChange({ description })} />
       </label>
       <label>
         type
@@ -113,12 +117,11 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
                 value={opt.value ?? ""}
                 onChange={(e) => updateOption(i, { value: e.target.value })}
               />
-              <input
-                type="text"
+              <LocalizedTextInput
                 placeholder={t("fieldCatalog.optionLabelPlaceholder")}
                 disabled={hasDataSource}
-                value={opt.label ?? ""}
-                onChange={(e) => updateOption(i, { label: e.target.value })}
+                value={opt.label}
+                onChange={(label) => updateOption(i, { label })}
               />
               <button type="button" onClick={() => removeOption(i)}>
                 {t("fieldCatalog.removeOption")}
@@ -159,7 +162,7 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
 }
 
 export function FieldCatalogPanel() {
-  const { draft, mutate } = useDraft();
+  const { draft, mutate, contentLocale } = useDraft();
   const t = useT();
   const fields = draft.fields ?? [];
   const dataSources = draft.dataSources ?? [];
@@ -167,7 +170,7 @@ export function FieldCatalogPanel() {
   const addField = () => {
     mutate((d) => {
       d.fields ??= [];
-      d.fields.push({ id: mintId("field"), key: "", label: "", type: "string" });
+      d.fields.push({ id: mintId("field"), key: "", label: seedLocalizedText(contentLocale), type: "string" });
     });
   };
 

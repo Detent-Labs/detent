@@ -28,18 +28,19 @@ const cel = (src: string) => ({ lang: "cel", src });
 const waitBody = (setterType: string): ProcessBody =>
   ({
     key: "wf",
-    label: "Wait Flow",
-    fields: [{ id: "field_go", key: "go", label: "Go", type: "string" }],
+    label: { en: "Wait Flow" },
+    baseLocale: "en",
+    fields: [{ id: "field_go", key: "go", label: { en: "Go" }, type: "string" }],
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: "A", type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
         {
-          id: "step_wait", key: "wait", label: "Wait", type: "task",
+          id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task",
           onEntry: [{ id: "action_set", type: setterType, config: {}, output: { field_go: cel("result.v") } } as unknown as Action],
           paths: [{ id: "path_go", key: "go", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }],
         },
-        { id: "step_done", key: "done", label: "Done", type: "task", terminal: true },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -48,18 +49,18 @@ const waitBody = (setterType: string): ProcessBody =>
 // takes path_go on fire). No onEntry setter — the timer, not a writeback, drives it.
 const waitTimerBody = (): ProcessBody =>
   ({
-    key: "wf", label: "Wait Flow",
-    fields: [{ id: "field_go", key: "go", label: "Go", type: "string" }],
+    key: "wf", label: { en: "Wait Flow" }, baseLocale: "en",
+    fields: [{ id: "field_go", key: "go", label: { en: "Go" }, type: "string" }],
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: "A", type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
         {
-          id: "step_wait", key: "wait", label: "Wait", type: "task",
+          id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task",
           timers: [{ id: "timer_t1", duration: "PT1H", onFire: { targetPath: "path_go", actions: [] } }],
           paths: [{ id: "path_go", key: "go", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }],
         },
-        { id: "step_done", key: "done", label: "Done", type: "task", terminal: true },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;

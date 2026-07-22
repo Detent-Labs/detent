@@ -21,12 +21,12 @@ const pid = "proc_1" as Instance["processId"];
 const act = (m: string): Action => ({ id: `action_${m}`, type: m, config: {} }) as unknown as Action;
 const manualPath = (id: string, to: string) => ({ id, key: id, to, trigger: "manual" });
 const step = (id: string, over: Record<string, unknown> = {}): Step =>
-  ({ id, key: id, label: id, type: "task", ...over }) as unknown as Step;
+  ({ id, key: id, label: { en: id }, type: "task", ...over }) as unknown as Step;
 // The publish-injected cancel-sink; here added by hand — createInstance/rehydrate
 // hash the same body, so the pin matches without a real publish.
 const sinkStep = (): Step => step(CANCEL_SINK_STEP_ID, { terminal: true });
 const mkBody = (steps: Step[], initialStep = "step_a"): ProcessBody =>
-  ({ fields: [], workflow: { initialStep, steps } }) as unknown as ProcessBody;
+  ({ baseLocale: "en", fields: [], workflow: { initialStep, steps } }) as unknown as ProcessBody;
 const inst = (over: Record<string, unknown> = {}): Instance =>
   ({
     instanceId: "inst_x", processId: pid, version: 1, definitionHash: "x",

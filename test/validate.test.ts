@@ -71,7 +71,7 @@ describe("expense-approval definition", () => {
 
   it("keeps validity after a label rename", () => {
     const rename = structuredClone(raw);
-    rename.definition.workflow.steps[1].label = "Erste Pruefung";
+    rename.definition.workflow.steps[1].label = { en: "Erste Pruefung" };
     expect(processVersion.safeParse(rename).success).toBe(true);
   });
 
@@ -125,7 +125,8 @@ describe("definition-contract: subprocess step coupling and wait-state", () => {
 
   const subprocessBody = (opts: { spec?: boolean; type?: string; manualPath?: boolean } = {}): unknown => ({
     key: "p",
-    label: "P",
+    label: { en: "P" },
+    baseLocale: "en",
     fields: [],
     workflow: {
       initialStep: "step_a",
@@ -133,7 +134,7 @@ describe("definition-contract: subprocess step coupling and wait-state", () => {
         {
           id: "step_a",
           key: "a",
-          label: "A",
+          label: { en: "A" },
           type: opts.type ?? "subprocess",
           ...(opts.spec !== false ? { subprocess: subprocessSpec } : {}),
           paths: [
@@ -142,7 +143,7 @@ describe("definition-contract: subprocess step coupling and wait-state", () => {
               : { id: "path_ab", key: "ab", to: "step_b", trigger: "automatic", priority: 1 },
           ],
         },
-        { id: "step_b", key: "b", label: "B", type: "task", terminal: true },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
     },
   });
@@ -166,11 +167,12 @@ describe("definition-contract: subprocess step coupling and wait-state", () => {
   it("rejects a non-terminal step with zero outgoing paths", () => {
     const body = {
       key: "p",
-      label: "P",
+      label: { en: "P" },
+      baseLocale: "en",
       fields: [],
       workflow: {
         initialStep: "step_a",
-        steps: [{ id: "step_a", key: "a", label: "A", type: "task" }],
+        steps: [{ id: "step_a", key: "a", label: { en: "A" }, type: "task" }],
       },
     };
     expect(processBody.safeParse(body).success).toBe(false);
@@ -178,16 +180,16 @@ describe("definition-contract: subprocess step coupling and wait-state", () => {
 });
 
 describe("definition-contract: full-depth id and key uniqueness", () => {
-  const terminalStep = (id: string, key: string) => ({ id, key, label: key, type: "task", terminal: true });
+  const terminalStep = (id: string, key: string) => ({ id, key, label: { en: key }, type: "task", terminal: true });
 
   it("rejects duplicate path ids across different steps", () => {
     const body = {
-      key: "p", label: "P", fields: [],
+      key: "p", label: { en: "P" }, baseLocale: "en", fields: [],
       workflow: {
         initialStep: "step_a",
         steps: [
-          { id: "step_a", key: "a", label: "A", type: "task", paths: [{ id: "path_x", key: "x", to: "step_b", trigger: "automatic", priority: 1 }] },
-          { id: "step_b", key: "b", label: "B", type: "task", paths: [{ id: "path_x", key: "y", to: "step_c", trigger: "automatic", priority: 1 }] },
+          { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_x", key: "x", to: "step_b", trigger: "automatic", priority: 1 }] },
+          { id: "step_b", key: "b", label: { en: "B" }, type: "task", paths: [{ id: "path_x", key: "y", to: "step_c", trigger: "automatic", priority: 1 }] },
           terminalStep("step_c", "c"),
         ],
       },
@@ -197,12 +199,12 @@ describe("definition-contract: full-depth id and key uniqueness", () => {
 
   it("rejects duplicate action ids across unrelated positions", () => {
     const body = {
-      key: "p", label: "P", fields: [],
+      key: "p", label: { en: "P" }, baseLocale: "en", fields: [],
       workflow: {
         initialStep: "step_a",
         steps: [
           {
-            id: "step_a", key: "a", label: "A", type: "task",
+            id: "step_a", key: "a", label: { en: "A" }, type: "task",
             onEntry: [{ id: "action_x", type: "noop", config: {} }],
             paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "automatic", priority: 1 }],
           },
@@ -215,17 +217,17 @@ describe("definition-contract: full-depth id and key uniqueness", () => {
 
   it("rejects duplicate timer ids across different steps", () => {
     const body = {
-      key: "p", label: "P", fields: [],
+      key: "p", label: { en: "P" }, baseLocale: "en", fields: [],
       workflow: {
         initialStep: "step_a",
         steps: [
           {
-            id: "step_a", key: "a", label: "A", type: "task",
+            id: "step_a", key: "a", label: { en: "A" }, type: "task",
             timers: [{ id: "timer_x", duration: "P1D", onFire: { actions: [] } }],
             paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "automatic", priority: 1 }],
           },
           {
-            id: "step_b", key: "b", label: "B", type: "task",
+            id: "step_b", key: "b", label: { en: "B" }, type: "task",
             timers: [{ id: "timer_x", duration: "P1D", onFire: { actions: [] } }],
             paths: [{ id: "path_bc", key: "bc", to: "step_c", trigger: "automatic", priority: 1 }],
           },
@@ -238,7 +240,7 @@ describe("definition-contract: full-depth id and key uniqueness", () => {
 
   it("rejects duplicate data source ids", () => {
     const body = {
-      key: "p", label: "P", fields: [],
+      key: "p", label: { en: "P" }, baseLocale: "en", fields: [],
       dataSources: [
         { id: "ds_x", key: "one", type: "http", config: {} },
         { id: "ds_x", key: "two", type: "http", config: {} },
@@ -250,11 +252,11 @@ describe("definition-contract: full-depth id and key uniqueness", () => {
 
   it("rejects a field id nested inside a group colliding with a top-level field id", () => {
     const body = {
-      key: "p", label: "P",
+      key: "p", label: { en: "P" }, baseLocale: "en",
       fields: [
-        { id: "field_x", key: "toplevel", label: "T", type: "string" },
-        { id: "field_g", key: "grp", label: "G", type: "group", fields: [
-          { id: "field_x", key: "nested", label: "N", type: "string" },
+        { id: "field_x", key: "toplevel", label: { en: "T" }, type: "string" },
+        { id: "field_g", key: "grp", label: { en: "G" }, type: "group", fields: [
+          { id: "field_x", key: "nested", label: { en: "N" }, type: "string" },
         ] },
       ],
       workflow: { initialStep: "step_a", steps: [terminalStep("step_a", "a")] },
@@ -264,10 +266,10 @@ describe("definition-contract: full-depth id and key uniqueness", () => {
 
   it("rejects two fields nested inside different groups sharing an id", () => {
     const body = {
-      key: "p", label: "P",
+      key: "p", label: { en: "P" }, baseLocale: "en",
       fields: [
-        { id: "field_g1", key: "g1", label: "G1", type: "group", fields: [{ id: "field_dup", key: "a", label: "A", type: "string" }] },
-        { id: "field_g2", key: "g2", label: "G2", type: "group", fields: [{ id: "field_dup", key: "b", label: "B", type: "string" }] },
+        { id: "field_g1", key: "g1", label: { en: "G1" }, type: "group", fields: [{ id: "field_dup", key: "a", label: { en: "A" }, type: "string" }] },
+        { id: "field_g2", key: "g2", label: { en: "G2" }, type: "group", fields: [{ id: "field_dup", key: "b", label: { en: "B" }, type: "string" }] },
       ],
       workflow: { initialStep: "step_a", steps: [terminalStep("step_a", "a")] },
     };
@@ -276,11 +278,11 @@ describe("definition-contract: full-depth id and key uniqueness", () => {
 
   it("rejects a duplicate field key, including one nested inside a group", () => {
     const body = {
-      key: "p", label: "P",
+      key: "p", label: { en: "P" }, baseLocale: "en",
       fields: [
-        { id: "field_x", key: "dupkey", label: "T", type: "string" },
-        { id: "field_g", key: "grp", label: "G", type: "group", fields: [
-          { id: "field_y", key: "dupkey", label: "N", type: "string" },
+        { id: "field_x", key: "dupkey", label: { en: "T" }, type: "string" },
+        { id: "field_g", key: "grp", label: { en: "G" }, type: "group", fields: [
+          { id: "field_y", key: "dupkey", label: { en: "N" }, type: "string" },
         ] },
       ],
       workflow: { initialStep: "step_a", steps: [terminalStep("step_a", "a")] },
@@ -290,7 +292,7 @@ describe("definition-contract: full-depth id and key uniqueness", () => {
 
   it("rejects duplicate data source keys", () => {
     const body = {
-      key: "p", label: "P", fields: [],
+      key: "p", label: { en: "P" }, baseLocale: "en", fields: [],
       dataSources: [
         { id: "ds_a", key: "same", type: "http", config: {} },
         { id: "ds_b", key: "same", type: "http", config: {} },
@@ -303,7 +305,7 @@ describe("definition-contract: full-depth id and key uniqueness", () => {
   it("rejects a data source keyed as a reserved CEL namespace name", () => {
     for (const reserved of ["data", "instance", "actor", "child", "result"]) {
       const body = {
-        key: "p", label: "P", fields: [],
+        key: "p", label: { en: "P" }, baseLocale: "en", fields: [],
         dataSources: [{ id: "ds_a", key: reserved, type: "http", config: {} }],
         workflow: { initialStep: "step_a", steps: [terminalStep("step_a", "a")] },
       };
@@ -314,16 +316,16 @@ describe("definition-contract: full-depth id and key uniqueness", () => {
 
 describe("definition-contract: view-ref resolution over the full field tree", () => {
   const groupViewBody = (ref: string) => ({
-    key: "p", label: "P",
+    key: "p", label: { en: "P" }, baseLocale: "en",
     fields: [
-      { id: "field_g", key: "grp", label: "G", type: "group", fields: [
-        { id: "field_n", key: "nested", label: "N", type: "string" },
+      { id: "field_g", key: "grp", label: { en: "G" }, type: "group", fields: [
+        { id: "field_n", key: "nested", label: { en: "N" }, type: "string" },
       ] },
     ],
     workflow: {
       initialStep: "step_a",
       steps: [{
-        id: "step_a", key: "a", label: "A", type: "task", terminal: true,
+        id: "step_a", key: "a", label: { en: "A" }, type: "task", terminal: true,
         view: { fields: [{ ref, visible: true }] },
       }],
     },
@@ -354,18 +356,18 @@ describe("definition-contract: Action.output targets resolve to a real field, fr
   type Position = "onEntry" | "onExit" | "onCancel" | "onPath" | "onFire";
 
   const bodyWith = (position: Position, fid: string) => ({
-    key: "p", label: "P",
+    key: "p", label: { en: "P" }, baseLocale: "en",
     fields: [
-      { id: "field_amount", key: "amount", label: "Amount", type: "number" },
-      { id: "field_g", key: "grp", label: "G", type: "group", fields: [
-        { id: "field_nested", key: "nested", label: "N", type: "string" },
+      { id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      { id: "field_g", key: "grp", label: { en: "G" }, type: "group", fields: [
+        { id: "field_nested", key: "nested", label: { en: "N" }, type: "string" },
       ] },
     ],
     workflow: {
       initialStep: "step_a",
       steps: [
         {
-          id: "step_a", key: "a", label: "A", type: "task",
+          id: "step_a", key: "a", label: { en: "A" }, type: "task",
           ...(position === "onEntry" ? { onEntry: [outputAction(fid)] } : {}),
           ...(position === "onExit" ? { onExit: [outputAction(fid)] } : {}),
           ...(position === "onCancel" ? { onCancel: [outputAction(fid)] } : {}),
@@ -375,7 +377,7 @@ describe("definition-contract: Action.output targets resolve to a real field, fr
             ...(position === "onPath" ? { onPath: [outputAction(fid)] } : {}),
           }],
         },
-        { id: "step_b", key: "b", label: "B", type: "task", terminal: true },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
     },
   });

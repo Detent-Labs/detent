@@ -15,9 +15,9 @@ import { NODE_WIDTH, NODE_HEIGHT } from "./layout";
  * React Flow does internally can persist past the next render anyway.
  */
 export function GraphView() {
-  const { draft, validation } = useDraft();
+  const { draft, validation, contentLocale } = useDraft();
   const t = useT();
-  const { graph, positions } = useDraftGraphLayout(draft);
+  const { graph, positions } = useDraftGraphLayout(draft, contentLocale, draft.baseLocale ?? "en");
 
   const nodes: Node[] = graph.nodes.map((n) => {
     const pos = positions[n.id];

@@ -12,7 +12,9 @@ import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { PathsPanel } from "./PathsPanel";
 import { TimersPanel } from "./TimersPanel";
 import { IssueList, NotCheckedBadge } from "./shared/IssueList";
+import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { parseChildProcessJson } from "../draft/io";
+import { seedLocalizedText } from "../draft/localized-text";
 
 type DraftStep = DraftOf<Step>;
 
@@ -21,7 +23,7 @@ interface Props {
 }
 
 export function StepsPanel({ fields }: Props) {
-  const { draft, mutate, validation, setChildForStep } = useDraft();
+  const { draft, mutate, validation, setChildForStep, contentLocale } = useDraft();
   const t = useT();
   const steps = draft.workflow?.steps ?? [];
   const [expanded, setExpanded] = useState<string | undefined>(undefined);
@@ -42,7 +44,7 @@ export function StepsPanel({ fields }: Props) {
     mutate((d) => {
       d.workflow ??= {};
       d.workflow.steps ??= [];
-      d.workflow.steps.push({ id, key: "", label: "", type: "task" });
+      d.workflow.steps.push({ id, key: "", label: seedLocalizedText(contentLocale), type: "task" });
       d.workflow.initialStep ??= id;
     });
     setExpanded(id);
@@ -107,14 +109,13 @@ export function StepsPanel({ fields }: Props) {
                 </label>
                 <label>
                   label
-                  <input type="text" value={step.label ?? ""} onChange={(e) => updateStep(index, { label: e.target.value })} />
+                  <LocalizedTextInput value={step.label} onChange={(label) => updateStep(index, { label })} />
                 </label>
                 <label>
                   description
-                  <input
-                    type="text"
-                    value={step.description ?? ""}
-                    onChange={(e) => updateStep(index, { description: e.target.value })}
+                  <LocalizedTextInput
+                    value={step.description}
+                    onChange={(description) => updateStep(index, { description })}
                   />
                 </label>
                 <label>

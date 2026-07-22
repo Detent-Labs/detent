@@ -13,15 +13,16 @@ function baseDraft(): Draft {
 
   return {
     key: "test_process",
-    label: "Test process",
-    fields: [{ id: fieldId, key: "count", label: "Count", type: "number" }],
+    label: { en: "Test process" },
+    baseLocale: "en",
+    fields: [{ id: fieldId, key: "count", label: { en: "Count" }, type: "number" }],
     workflow: {
       initialStep: stepStart,
       steps: [
         {
           id: stepStart,
           key: "start",
-          label: "Start",
+          label: { en: "Start" },
           type: "task",
           timers: [{ id: timerId, duration: "PT1H", onFire: {} }],
           paths: [
@@ -36,7 +37,7 @@ function baseDraft(): Draft {
             },
           ],
         },
-        { id: stepEnd, key: "end", label: "End", type: "task", terminal: true },
+        { id: stepEnd, key: "end", label: { en: "End" }, type: "task", terminal: true },
       ],
     },
   } as Draft;
@@ -93,7 +94,7 @@ describe("runValidation", () => {
     draft.workflow!.steps!.push({
       id: subStep,
       key: "call_child",
-      label: "Call child",
+      label: { en: "Call child" },
       type: "subprocess",
       terminal: true,
       subprocess: {
@@ -106,5 +107,41 @@ describe("runValidation", () => {
     });
     const result = runValidation(draft, undefined, {});
     expect(result.subprocessStepStatus[subStep]).toBe("not-checked");
+  });
+
+  it("locates a missing-baseLocale violation on its owning step", () => {
+    const draft = baseDraft();
+    draft.workflow!.steps![0].label = { de: "Anfang" }; // baseLocale is "en" — no "en" entry
+    const result = runValidation(draft, undefined, {});
+    const stepId = draft.workflow!.steps![0].id!;
+    expect(result.zodValid).toBe(false);
+    const issue = result.issues.find((i) => i.entityType === "step" && i.entityId === stepId);
+    expect(issue).toBeDefined();
+  });
+
+  it("locates a missing-baseLocale violation on its owning field, including a field option", () => {
+    const draft = baseDraft();
+    draft.fields![0].label = { de: "Anzahl" }; // baseLocale is "en" — no "en" entry
+    const result = runValidation(draft, undefined, {});
+    const fieldId = draft.fields![0].id!;
+    expect(result.zodValid).toBe(false);
+    const issue = result.issues.find((i) => i.entityType === "field" && i.entityId === fieldId);
+    expect(issue).toBeDefined();
+  });
+
+  it("locates a missing-baseLocale violation on a field option's owning field", () => {
+    const draft = baseDraft();
+    const selectFieldId = mintId("field");
+    draft.fields!.push({
+      id: selectFieldId,
+      key: "choice",
+      label: { en: "Choice" },
+      type: "select",
+      options: [{ value: "a", label: { de: "A" } }], // baseLocale is "en" — no "en" entry
+    });
+    const result = runValidation(draft, undefined, {});
+    expect(result.zodValid).toBe(false);
+    const issue = result.issues.find((i) => i.entityType === "field" && i.entityId === selectFieldId);
+    expect(issue).toBeDefined();
   });
 });

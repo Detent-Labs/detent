@@ -112,6 +112,11 @@ const en = {
   "subprocess.addInputMapping": "+ Add input mapping",
   "subprocess.addOutputMapping": "+ Add output mapping",
 
+  "contentLocale.legend": "Content locale",
+  "contentLocale.invalid": "invalid locale code",
+  "contentLocale.addPlaceholder": "add locale (e.g. de)",
+  "contentLocale.add": "+ add locale",
+
   "registry.legend": "Action registry",
   "registry.notLoadedOption": "not loaded",
   "registry.exampleOption": "example registry (http.call, notify.email)",

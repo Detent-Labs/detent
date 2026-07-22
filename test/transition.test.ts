@@ -30,9 +30,9 @@ const cel = (src: string) => ({ lang: "cel", src });
 const act = (id: string): Action => ({ id, type: "notify", config: {} }) as unknown as Action;
 const manualPath = (id: string, to: string) => ({ id, key: id, to, trigger: "manual" });
 const step = (id: string, over: Record<string, unknown> = {}): Step =>
-  ({ id, key: id, label: id, type: "task", ...over }) as unknown as Step;
+  ({ id, key: id, label: { en: id }, type: "task", ...over }) as unknown as Step;
 const mkBody = (steps: Step[], initialStep = "step_a"): ProcessBody =>
-  ({ fields: [{ id: "field_due", key: "due", label: "Due", type: "text" }], workflow: { initialStep, steps } }) as unknown as ProcessBody;
+  ({ baseLocale: "en", fields: [{ id: "field_due", key: "due", label: { en: "Due" }, type: "text" }], workflow: { initialStep, steps } }) as unknown as ProcessBody;
 
 // step_a --(manual)--> step_b (terminal). Plain two-step body for the pure tests.
 const simpleBody = (): ProcessBody =>
