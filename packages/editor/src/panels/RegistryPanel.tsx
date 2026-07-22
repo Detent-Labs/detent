@@ -1,4 +1,5 @@
 import { useDraft } from "../draft/store";
+import { useT } from "../i18n/store";
 import { createExampleRegistry } from "../registry/exampleRegistry";
 
 /**
@@ -9,18 +10,19 @@ import { createExampleRegistry } from "../registry/exampleRegistry";
  */
 export function RegistryPanel() {
   const { registry, setRegistry } = useDraft();
+  const t = useT();
 
   return (
     <fieldset className="registry-panel">
-      <legend>Action registry</legend>
+      <legend>{t("registry.legend")}</legend>
       <label>
         registry
         <select
           value={registry ? "example" : "none"}
           onChange={(e) => setRegistry(e.target.value === "example" ? createExampleRegistry() : undefined)}
         >
-          <option value="none">not loaded</option>
-          <option value="example">example registry (http.call, notify.email)</option>
+          <option value="none">{t("registry.notLoadedOption")}</option>
+          <option value="example">{t("registry.exampleOption")}</option>
         </select>
       </label>
     </fieldset>

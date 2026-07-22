@@ -1,6 +1,7 @@
 import type { BaseFieldType, DataSourceDef, FieldDef, FieldOption } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import { useDraft } from "../draft/store";
+import { useT } from "../i18n/store";
 import { mintId } from "../draft/ids";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { IssueList } from "./shared/IssueList";
@@ -27,6 +28,7 @@ interface FieldRowProps {
 
 /** Fields are recursive (a `group` field carries its own sub-fields), so this renders itself for `field.fields`. */
 function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
+  const t = useT();
   const custom = isCustomType(field.type);
   const typeSelectValue = typeof field.type === "object" && field.type !== null ? "__custom__" : (field.type ?? "string");
   const hasOptions = (field.options?.length ?? 0) > 0;
@@ -72,20 +74,20 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
               {t}
             </option>
           ))}
-          <option value="__custom__">custom (plugin)</option>
+          <option value="__custom__">{t("fieldCatalog.customTypeOption")}</option>
         </select>
       </label>
 
       {custom && (
         <PluginEnvelopeEditor
-          label="custom type"
+          label={t("fieldCatalog.customTypeLabel")}
           value={field.type as DraftOf<FieldDef>["type"] & object}
           onChange={(type) => onChange({ type })}
         />
       )}
 
       <fieldset>
-        <legend>options / dataSource (mutually exclusive)</legend>
+        <legend>{t("fieldCatalog.optionsLegend")}</legend>
         <label>
           dataSource
           <select
@@ -93,7 +95,7 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
             disabled={hasOptions}
             onChange={(e) => onChange({ dataSource: e.target.value === "" ? undefined : (e.target.value as DraftField["dataSource"]) })}
           >
-            <option value="">(none)</option>
+            <option value="">{t("fieldCatalog.noneOption")}</option>
             {dataSources.map((ds) => (
               <option key={ds.id} value={ds.id}>
                 {ds.key ?? ds.id}
@@ -106,32 +108,32 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
             <div className="option-row" key={i}>
               <input
                 type="text"
-                placeholder="value"
+                placeholder={t("fieldCatalog.optionValuePlaceholder")}
                 disabled={hasDataSource}
                 value={opt.value ?? ""}
                 onChange={(e) => updateOption(i, { value: e.target.value })}
               />
               <input
                 type="text"
-                placeholder="label"
+                placeholder={t("fieldCatalog.optionLabelPlaceholder")}
                 disabled={hasDataSource}
                 value={opt.label ?? ""}
                 onChange={(e) => updateOption(i, { label: e.target.value })}
               />
               <button type="button" onClick={() => removeOption(i)}>
-                remove
+                {t("fieldCatalog.removeOption")}
               </button>
             </div>
           ))}
           <button type="button" onClick={addOption} disabled={hasDataSource}>
-            + Add option
+            {t("fieldCatalog.addOption")}
           </button>
         </div>
       </fieldset>
 
       {field.type === "group" && (
         <fieldset>
-          <legend>sub-fields</legend>
+          <legend>{t("fieldCatalog.subFieldsLegend")}</legend>
           {(field.fields ?? []).map((sub, i) => (
             <FieldRow
               key={sub.id ?? i}
@@ -142,7 +144,7 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
             />
           ))}
           <button type="button" onClick={addSubField}>
-            + Add sub-field
+            {t("fieldCatalog.addSubField")}
           </button>
         </fieldset>
       )}
@@ -150,7 +152,7 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
       <IssueList entityId={field.id} />
 
       <button type="button" onClick={onRemove}>
-        Remove field
+        {t("fieldCatalog.removeField")}
       </button>
     </div>
   );
@@ -158,6 +160,7 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
 
 export function FieldCatalogPanel() {
   const { draft, mutate } = useDraft();
+  const t = useT();
   const fields = draft.fields ?? [];
   const dataSources = draft.dataSources ?? [];
 
@@ -183,8 +186,8 @@ export function FieldCatalogPanel() {
 
   return (
     <div className="field-catalog-panel">
-      <h3>Field catalog</h3>
-      {fields.length === 0 && <p className="empty">No fields yet.</p>}
+      <h3>{t("fieldCatalog.heading")}</h3>
+      {fields.length === 0 && <p className="empty">{t("fieldCatalog.empty")}</p>}
       {fields.map((field, index) => (
         <FieldRow
           key={field.id ?? index}
@@ -195,7 +198,7 @@ export function FieldCatalogPanel() {
         />
       ))}
       <button type="button" onClick={addField}>
-        + Add field
+        {t("fieldCatalog.addField")}
       </button>
     </div>
   );

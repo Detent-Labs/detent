@@ -1,6 +1,7 @@
 import type { View, ViewField } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
+import { useT } from "../i18n/store";
 import { BooleanOrExpressionInput } from "./shared/BooleanOrExpressionInput";
 
 type DraftView = DraftOf<View>;
@@ -19,6 +20,7 @@ interface Props {
  * sets it.
  */
 export function ViewEditor({ view, fields, onChange }: Props) {
+  const t = useT();
   const rows = view?.fields ?? [];
 
   const setRows = (next: DraftViewField[]) => onChange({ ...view, fields: next });
@@ -48,17 +50,17 @@ export function ViewEditor({ view, fields, onChange }: Props) {
 
   return (
     <fieldset className="view-editor">
-      <legend>view (per-step field overrides)</legend>
-      {rows.length === 0 && <p className="empty">No view overrides — every catalog field uses its default presentation.</p>}
+      <legend>{t("view.legend")}</legend>
+      {rows.length === 0 && <p className="empty">{t("view.empty")}</p>}
       {rows.map((row, index) => {
         const field = fields.find((f) => f.id === row.ref);
         return (
           <div className="view-row" key={row.ref ?? index}>
             <span className="view-row-field">{field?.key ?? row.ref}</span>
-            <button type="button" onClick={() => move(index, -1)} disabled={index === 0} aria-label="move up">
+            <button type="button" onClick={() => move(index, -1)} disabled={index === 0} aria-label={t("view.moveUp")}>
               ↑
             </button>
-            <button type="button" onClick={() => move(index, 1)} disabled={index === rows.length - 1} aria-label="move down">
+            <button type="button" onClick={() => move(index, 1)} disabled={index === rows.length - 1} aria-label={t("view.moveDown")}>
               ↓
             </button>
             <BooleanOrExpressionInput
@@ -81,13 +83,13 @@ export function ViewEditor({ view, fields, onChange }: Props) {
               <input type="text" value={row.group ?? ""} onChange={(e) => updateRow(index, { group: e.target.value })} />
             </label>
             <button type="button" onClick={() => removeRow(index)}>
-              Remove
+              {t("view.remove")}
             </button>
           </div>
         );
       })}
       <button type="button" onClick={addRow} disabled={available.length === 0}>
-        + Add field override
+        {t("view.addFieldOverride")}
       </button>
     </fieldset>
   );

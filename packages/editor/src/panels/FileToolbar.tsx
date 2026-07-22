@@ -1,15 +1,23 @@
 import { useRef, useState } from "react";
 import { useDraft } from "../draft/store";
+import { useT } from "../i18n/store";
 import { saveDraft, loadDraftViaPicker, loadDraftFromFile, exportDraft, hasFileSystemAccess } from "../draft/file-io";
 
-function describeError(e: unknown): string | null {
+/**
+ * `fallback` is the translated "operation failed" text, resolved by the caller — this function
+ * has no hook access (design.md). Exported so its locale-independent branches (a real
+ * `Error`/`DOMException`'s own `.message` passes through unchanged; only a non-`Error` throw
+ * uses the translated `fallback`) are directly testable without rendering anything.
+ */
+export function describeError(e: unknown, fallback: string): string | null {
   if (e instanceof DOMException && e.name === "AbortError") return null; // user cancelled the picker
-  return e instanceof Error ? e.message : "operation failed";
+  return e instanceof Error ? e.message : fallback;
 }
 
 /** Draft save/load and validated export (task group 6) — no server, no `publishBody` call. */
 export function FileToolbar() {
   const { draft, replace, validation } = useDraft();
+  const t = useT();
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canExport = validation.zodValid && validation.issues.length === 0;
@@ -19,14 +27,14 @@ export function FileToolbar() {
       await action();
       setError(null);
     } catch (e) {
-      const message = describeError(e);
+      const message = describeError(e, t("fileToolbar.operationFailed"));
       if (message) setError(message);
     }
   };
 
   const handleLoad = () => {
     if (hasFileSystemAccess) {
-      run(async () => replace(await loadDraftViaPicker()));
+      run(async () => replace(await loadDraftViaPicker(t("fileToolbar.draftFileDescription"))));
     } else {
       fileInputRef.current?.click();
     }
@@ -40,12 +48,12 @@ export function FileToolbar() {
 
   return (
     <fieldset className="file-toolbar">
-      <legend>File</legend>
-      <button type="button" onClick={() => run(() => saveDraft(draft))}>
-        Save draft
+      <legend>{t("fileToolbar.legend")}</legend>
+      <button type="button" onClick={() => run(() => saveDraft(draft, t("fileToolbar.draftFileDescription")))}>
+        {t("fileToolbar.save")}
       </button>
       <button type="button" onClick={handleLoad}>
-        Load draft
+        {t("fileToolbar.load")}
       </button>
       {!hasFileSystemAccess && (
         <input ref={fileInputRef} type="file" accept=".json,.draft.json" style={{ display: "none" }} onChange={handleFileInputChange} />
@@ -53,10 +61,10 @@ export function FileToolbar() {
       <button
         type="button"
         disabled={!canExport}
-        title={canExport ? "" : "resolve all validation issues before exporting"}
-        onClick={() => run(() => exportDraft(draft))}
+        title={canExport ? "" : t("fileToolbar.exportDisabledHint")}
+        onClick={() => run(() => exportDraft(draft, t("fileToolbar.exportFileDescription")))}
       >
-        Export process JSON
+        {t("fileToolbar.export")}
       </button>
       {error && <p className="file-io-error">{error}</p>}
     </fieldset>

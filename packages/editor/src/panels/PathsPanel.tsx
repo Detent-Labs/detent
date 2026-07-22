@@ -2,6 +2,7 @@ import type { Path, PathTrigger, Step, StepId } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { mintId } from "../draft/ids";
+import { useT } from "../i18n/store";
 import { ExpressionInput } from "./shared/ExpressionInput";
 import { IssueList } from "./shared/IssueList";
 import { ActionListEditor } from "./ActionListEditor";
@@ -22,6 +23,7 @@ interface Props {
  * guard-priority concepts").
  */
 export function PathsPanel({ paths, steps, fields, onChange }: Props) {
+  const t = useT();
   const list = paths ?? [];
 
   const addPath = () => {
@@ -40,7 +42,7 @@ export function PathsPanel({ paths, steps, fields, onChange }: Props) {
 
   return (
     <div className="paths-panel">
-      {list.length === 0 && <p className="empty">No paths.</p>}
+      {list.length === 0 && <p className="empty">{t("paths.empty")}</p>}
       {list.map((path, index) => (
         <div className="path-row" key={path.id ?? index}>
           <label>
@@ -72,7 +74,7 @@ export function PathsPanel({ paths, steps, fields, onChange }: Props) {
               onChange={(e) => updatePath(index, { to: e.target.value as StepId })}
             >
               <option value="" disabled>
-                (select target step)
+                {t("paths.selectTargetStep")}
               </option>
               {steps.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -111,12 +113,12 @@ export function PathsPanel({ paths, steps, fields, onChange }: Props) {
           <IssueList entityId={path.id} />
 
           <button type="button" onClick={() => removePath(index)}>
-            Remove path
+            {t("paths.removePath")}
           </button>
         </div>
       ))}
       <button type="button" onClick={addPath} disabled={steps.length === 0}>
-        + Add path
+        {t("paths.addPath")}
       </button>
     </div>
   );

@@ -2,6 +2,7 @@ import type { Path, PathId, Timer } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { mintId } from "../draft/ids";
+import { useT } from "../i18n/store";
 import { ExpressionInput } from "./shared/ExpressionInput";
 import { IssueList } from "./shared/IssueList";
 import { ActionListEditor } from "./ActionListEditor";
@@ -23,6 +24,7 @@ function modeOf(timer: DraftTimer): DurationMode {
 }
 
 export function TimersPanel({ timers, paths, fields, onChange }: Props) {
+  const t = useT();
   const list = timers ?? [];
 
   const addTimer = () => {
@@ -36,7 +38,7 @@ export function TimersPanel({ timers, paths, fields, onChange }: Props) {
 
   return (
     <div className="timers-panel">
-      {list.length === 0 && <p className="empty">No timers.</p>}
+      {list.length === 0 && <p className="empty">{t("timers.empty")}</p>}
       {list.map((timer, index) => {
         const mode = modeOf(timer);
         return (
@@ -59,8 +61,8 @@ export function TimersPanel({ timers, paths, fields, onChange }: Props) {
                   else updateTimer(index, { deadline: { lang: "cel", src: "" }, duration: undefined });
                 }}
               >
-                <option value="duration">duration (ISO-8601)</option>
-                <option value="deadline">deadline (CEL)</option>
+                <option value="duration">{t("timers.durationOption")}</option>
+                <option value="deadline">{t("timers.deadlineOption")}</option>
               </select>
             </label>
 
@@ -69,7 +71,7 @@ export function TimersPanel({ timers, paths, fields, onChange }: Props) {
                 duration
                 <input
                   type="text"
-                  placeholder="e.g. PT1H30M"
+                  placeholder={t("timers.durationPlaceholder")}
                   value={timer.duration ?? ""}
                   onChange={(e) => updateTimer(index, { duration: e.target.value })}
                 />
@@ -94,7 +96,7 @@ export function TimersPanel({ timers, paths, fields, onChange }: Props) {
                   })
                 }
               >
-                <option value="">(reminder — no transition)</option>
+                <option value="">{t("timers.reminderOption")}</option>
                 {paths.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.key ?? p.id}
@@ -113,13 +115,13 @@ export function TimersPanel({ timers, paths, fields, onChange }: Props) {
             <IssueList entityId={timer.id} />
 
             <button type="button" onClick={() => removeTimer(index)}>
-              Remove timer
+              {t("timers.removeTimer")}
             </button>
           </div>
         );
       })}
       <button type="button" onClick={addTimer}>
-        + Add timer
+        {t("timers.addTimer")}
       </button>
     </div>
   );

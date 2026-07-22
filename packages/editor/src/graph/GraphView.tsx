@@ -1,6 +1,7 @@
 import { ReactFlow, Background, type Node, type Edge } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useDraft } from "../draft/store";
+import { useT } from "../i18n/store";
 import { useDraftGraphLayout } from "./useDraftGraphLayout";
 import { NODE_WIDTH, NODE_HEIGHT } from "./layout";
 
@@ -15,6 +16,7 @@ import { NODE_WIDTH, NODE_HEIGHT } from "./layout";
  */
 export function GraphView() {
   const { draft, validation } = useDraft();
+  const t = useT();
   const { graph, positions } = useDraftGraphLayout(draft);
 
   const nodes: Node[] = graph.nodes.map((n) => {
@@ -29,8 +31,8 @@ export function GraphView() {
         label: (
           <div title={issues.map((i) => i.message).join("\n") || undefined}>
             {n.label}
-            {n.isInitial && " (initial)"}
-            {n.terminal && " (terminal)"}
+            {n.isInitial && t("graph.initialSuffix")}
+            {n.terminal && t("graph.terminalSuffix")}
             {issues.length > 0 && <span className="graph-issue-badge"> ⚠ {issues.length}</span>}
           </div>
         ),
