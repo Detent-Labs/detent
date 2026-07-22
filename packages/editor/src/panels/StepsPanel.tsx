@@ -3,6 +3,7 @@ import type { Step, StepType } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { useDraft } from "../draft/store";
+import { useT } from "../i18n/store";
 import { mintId } from "../draft/ids";
 import { ActionListEditor } from "./ActionListEditor";
 import { ViewEditor } from "./ViewEditor";
@@ -21,6 +22,7 @@ interface Props {
 
 export function StepsPanel({ fields }: Props) {
   const { draft, mutate, validation, setChildForStep } = useDraft();
+  const t = useT();
   const steps = draft.workflow?.steps ?? [];
   const [expanded, setExpanded] = useState<string | undefined>(undefined);
   const [childLoadError, setChildLoadError] = useState<string | null>(null);
@@ -31,7 +33,7 @@ export function StepsPanel({ fields }: Props) {
       setChildForStep(stepId, parseChildProcessJson(await file.text()));
       setChildLoadError(null);
     } catch (e) {
-      setChildLoadError(e instanceof Error ? e.message : "failed to load child process JSON");
+      setChildLoadError(e instanceof Error ? e.message : t("steps.loadChildError"));
     }
   };
 
@@ -63,8 +65,8 @@ export function StepsPanel({ fields }: Props) {
 
   return (
     <div className="steps-panel">
-      <h3>Steps</h3>
-      {steps.length === 0 && <p className="empty">No steps yet.</p>}
+      <h3>{t("steps.heading")}</h3>
+      {steps.length === 0 && <p className="empty">{t("steps.empty")}</p>}
       <label>
         initial step
         <select
@@ -77,7 +79,7 @@ export function StepsPanel({ fields }: Props) {
           }
         >
           <option value="" disabled>
-            (select initial step)
+            {t("steps.selectInitialStep")}
           </option>
           {steps.map((s) => (
             <option key={s.id} value={s.id}>
@@ -92,9 +94,9 @@ export function StepsPanel({ fields }: Props) {
         return (
           <div className="step-card" key={step.id ?? index}>
             <div className="step-card-header" onClick={() => setExpanded(isOpen ? undefined : step.id)}>
-              <strong>{step.key || "(unnamed step)"}</strong>
+              <strong>{step.key || t("steps.unnamedStep")}</strong>
               <span>{step.type ?? "task"}</span>
-              {step.terminal && <span className="badge">terminal</span>}
+              {step.terminal && <span className="badge">{t("steps.terminalBadge")}</span>}
             </div>
 
             {isOpen && (
@@ -148,10 +150,13 @@ export function StepsPanel({ fields }: Props) {
                       onChange={(subprocess) => updateStep(index, { subprocess })}
                     />
                     <fieldset>
-                      <legend>cross-process check (checkSubprocessChildRefs)</legend>
+                      <legend>{t("steps.crossProcessLegend")}</legend>
                       {step.id && validation.subprocessStepStatus[step.id] === "checked" ? (
                         <p>
-                          checked against loaded child — <button type="button" onClick={() => setChildForStep(step.id!, undefined)}>unload</button>
+                          {t("steps.crossProcessChecked")}{" "}
+                          <button type="button" onClick={() => setChildForStep(step.id!, undefined)}>
+                            {t("steps.unload")}
+                          </button>
                         </p>
                       ) : (
                         <>
@@ -171,7 +176,7 @@ export function StepsPanel({ fields }: Props) {
                 <ViewEditor view={step.view} fields={fields} onChange={(view) => updateStep(index, { view })} />
 
                 <PluginEnvelopeEditor
-                  label="assignment strategy"
+                  label={t("steps.assignmentStrategyLabel")}
                   value={step.assignment?.strategy}
                   onChange={(strategy) => updateStep(index, { assignment: { strategy } })}
                 />
@@ -195,7 +200,7 @@ export function StepsPanel({ fields }: Props) {
                   onChange={(onCancel) => updateStep(index, { onCancel })}
                 />
 
-                <h4>Paths</h4>
+                <h4>{t("steps.pathsHeading")}</h4>
                 <PathsPanel
                   paths={step.paths}
                   steps={steps}
@@ -203,7 +208,7 @@ export function StepsPanel({ fields }: Props) {
                   onChange={(paths) => updateStep(index, { paths })}
                 />
 
-                <h4>Timers</h4>
+                <h4>{t("steps.timersHeading")}</h4>
                 <TimersPanel
                   timers={step.timers}
                   paths={step.paths ?? []}
@@ -214,7 +219,7 @@ export function StepsPanel({ fields }: Props) {
                 <IssueList entityId={step.id} />
 
                 <button type="button" onClick={() => removeStep(step.id)}>
-                  Remove step
+                  {t("steps.removeStep")}
                 </button>
               </div>
             )}
@@ -222,7 +227,7 @@ export function StepsPanel({ fields }: Props) {
         );
       })}
       <button type="button" onClick={addStep}>
-        + Add step
+        {t("steps.addStep")}
       </button>
     </div>
   );

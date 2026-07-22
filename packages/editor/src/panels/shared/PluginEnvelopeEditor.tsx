@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Plugin } from "workflow-engine/schema";
 import type { DraftOf } from "../../draft/types";
+import { useT } from "../../i18n/store";
 
 type DraftPlugin = DraftOf<Plugin>;
 
@@ -18,6 +19,7 @@ interface Props {
  * (each plugin ships its own JSON Schema, checked at publish, not here).
  */
 export function PluginEnvelopeEditor({ label, value, onChange, typePlaceholder }: Props) {
+  const t = useT();
   const [configText, setConfigText] = useState(() => JSON.stringify(value?.config ?? {}, null, 2));
   const [configError, setConfigError] = useState<string | null>(null);
 
@@ -28,7 +30,7 @@ export function PluginEnvelopeEditor({ label, value, onChange, typePlaceholder }
       setConfigError(null);
       onChange({ ...value, type: value?.type ?? "", config: parsed });
     } catch (e) {
-      setConfigError(e instanceof Error ? e.message : "invalid JSON");
+      setConfigError(e instanceof Error ? e.message : t("common.invalidJson"));
     }
   };
 
@@ -39,7 +41,7 @@ export function PluginEnvelopeEditor({ label, value, onChange, typePlaceholder }
         type
         <input
           type="text"
-          placeholder={typePlaceholder ?? "plugin type identifier"}
+          placeholder={typePlaceholder ?? t("plugin.typePlaceholder")}
           value={value?.type ?? ""}
           onChange={(e) => onChange({ ...value, type: e.target.value, config: value?.config ?? {} })}
         />
@@ -48,7 +50,11 @@ export function PluginEnvelopeEditor({ label, value, onChange, typePlaceholder }
         config (JSON)
         <textarea rows={3} value={configText} onChange={(e) => commitConfig(e.target.value)} />
       </label>
-      {configError && <p className="error">config: {configError}</p>}
+      {configError && (
+        <p className="error">
+          {t("common.configErrorPrefix")} {configError}
+        </p>
+      )}
       <label>
         description
         <input

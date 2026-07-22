@@ -1,4 +1,5 @@
 import { useDraft } from "../../draft/store";
+import { useT } from "../../i18n/store";
 
 /** Renders every `EditorIssue` for one entity — the same issue list every panel and the future graph view read off (editor-live-validation spec). */
 export function IssueList({ entityId }: { entityId: string | undefined }) {
@@ -19,5 +20,10 @@ export function IssueList({ entityId }: { entityId: string | undefined }) {
 }
 
 export function NotCheckedBadge({ label }: { label: string }) {
-  return <span className="badge badge-not-checked">{label}: not checked</span>;
+  const t = useT();
+  return (
+    <span className="badge badge-not-checked">
+      {label}: {t("issues.notChecked")}
+    </span>
+  );
 }

@@ -6,6 +6,7 @@ import type { DraftField } from "../draft/fields";
 import { ExpressionInput } from "./shared/ExpressionInput";
 import { IssueList, NotCheckedBadge } from "./shared/IssueList";
 import { useDraft } from "../draft/store";
+import { useT } from "../i18n/store";
 
 type DraftAction = DraftOf<Action>;
 
@@ -23,6 +24,7 @@ interface Props {
  * caller's own immer recipe stays the single source of the write.
  */
 export function ActionListEditor({ label, actions, onChange, fields }: Props) {
+  const t = useT();
   const list = actions ?? [];
 
   const addAction = () => {
@@ -41,7 +43,7 @@ export function ActionListEditor({ label, actions, onChange, fields }: Props) {
   return (
     <fieldset className="action-list">
       <legend>{label}</legend>
-      {list.length === 0 && <p className="empty">No actions.</p>}
+      {list.length === 0 && <p className="empty">{t("actions.empty")}</p>}
       {list.map((action, index) => (
         <ActionRow
           key={action.id ?? index}
@@ -52,7 +54,7 @@ export function ActionListEditor({ label, actions, onChange, fields }: Props) {
         />
       ))}
       <button type="button" onClick={addAction}>
-        + Add action
+        {t("actions.addAction")}
       </button>
     </fieldset>
   );
@@ -72,6 +74,7 @@ function ActionRow({
   const [configText, setConfigText] = useState(() => JSON.stringify(action.config ?? {}, null, 2));
   const [configError, setConfigError] = useState<string | null>(null);
   const { validation } = useDraft();
+  const t = useT();
 
   const commitConfig = (text: string) => {
     setConfigText(text);
@@ -80,7 +83,7 @@ function ActionRow({
       setConfigError(null);
       onChange({ config: parsed });
     } catch (e) {
-      setConfigError(e instanceof Error ? e.message : "invalid JSON");
+      setConfigError(e instanceof Error ? e.message : t("common.invalidJson"));
     }
   };
 
@@ -105,7 +108,7 @@ function ActionRow({
     <div className="action-row">
       <input
         type="text"
-        placeholder="action type (e.g. http.call)"
+        placeholder={t("actions.typePlaceholder")}
         value={action.type ?? ""}
         onChange={(e) => onChange({ type: e.target.value })}
       />
@@ -115,10 +118,14 @@ function ActionRow({
         onChange={(e) => commitConfig(e.target.value)}
         aria-label="action config JSON"
       />
-      {configError && <p className="error">config: {configError}</p>}
+      {configError && (
+        <p className="error">
+          {t("common.configErrorPrefix")} {configError}
+        </p>
+      )}
 
       <div className="action-output">
-        <span>output mapping</span>
+        <span>{t("actions.outputMappingLabel")}</span>
         {Object.entries(output).map(([fieldId, expr]) => (
           <div key={fieldId} className="action-output-row">
             <select value={fieldId} onChange={(e) => {
@@ -132,14 +139,14 @@ function ActionRow({
                 </option>
               ))}
             </select>
-            <ExpressionInput value={expr} onChange={(v) => setOutputEntry(fieldId, v)} placeholder="result CEL" />
+            <ExpressionInput value={expr} onChange={(v) => setOutputEntry(fieldId, v)} placeholder={t("actions.resultCelPlaceholder")} />
             <button type="button" onClick={() => setOutputEntry(fieldId, undefined)}>
-              remove
+              {t("actions.removeOutputMapping")}
             </button>
           </div>
         ))}
         <button type="button" onClick={addOutputEntry} disabled={fields.length === 0}>
-          + Add output mapping
+          {t("actions.addOutputMapping")}
         </button>
       </div>
 
@@ -147,7 +154,7 @@ function ActionRow({
       <IssueList entityId={action.id} />
 
       <button type="button" onClick={onRemove}>
-        Remove action
+        {t("actions.removeAction")}
       </button>
     </div>
   );

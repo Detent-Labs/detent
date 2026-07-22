@@ -1,12 +1,14 @@
 import { useState } from "react";
 import type { FieldId } from "workflow-engine/schema";
 import { useDraft } from "../draft/store";
+import { useT } from "../i18n/store";
 import { draftFields } from "../draft/fields";
 import { IssueList } from "./shared/IssueList";
 
 /** Input/output fields and outcomes for a process authored as a subprocess-callable child. */
 export function ContractPanel() {
   const { draft, mutate } = useDraft();
+  const t = useT();
   const fields = draftFields(draft);
   const contract = draft.contract;
   const [newOutcome, setNewOutcome] = useState("");
@@ -44,16 +46,16 @@ export function ContractPanel() {
 
   return (
     <div className="contract-panel">
-      <h3>Contract</h3>
+      <h3>{t("contract.heading")}</h3>
       <label>
-        this process is subprocess-callable
+        {t("contract.callableCheckbox")}
         <input type="checkbox" checked={contract !== undefined} onChange={(e) => enableContract(e.target.checked)} />
       </label>
 
       {contract && (
         <>
           <fieldset>
-            <legend>inputFields</legend>
+            <legend>{t("contract.inputFieldsLegend")}</legend>
             {fields.map((f) => (
               <label key={f.id}>
                 <input
@@ -67,7 +69,7 @@ export function ContractPanel() {
           </fieldset>
 
           <fieldset>
-            <legend>outputFields</legend>
+            <legend>{t("contract.outputFieldsLegend")}</legend>
             {fields.map((f) => (
               <label key={f.id}>
                 <input
@@ -81,24 +83,24 @@ export function ContractPanel() {
           </fieldset>
 
           <fieldset>
-            <legend>outcomes</legend>
+            <legend>{t("contract.outcomesLegend")}</legend>
             {(contract.outcomes ?? []).map((o) => (
               <div key={o} className="outcome-row">
                 <span>{o}</span>
                 <button type="button" onClick={() => removeOutcome(o)}>
-                  remove
+                  {t("contract.removeOutcome")}
                 </button>
               </div>
             ))}
             <input
               type="text"
               value={newOutcome}
-              placeholder="new outcome name"
+              placeholder={t("contract.newOutcomePlaceholder")}
               onChange={(e) => setNewOutcome(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addOutcome()}
             />
             <button type="button" onClick={addOutcome}>
-              + Add outcome
+              {t("contract.addOutcome")}
             </button>
           </fieldset>
         </>

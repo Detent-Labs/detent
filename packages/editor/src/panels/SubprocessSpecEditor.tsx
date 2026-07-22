@@ -3,6 +3,7 @@ import type { Expression, FieldId, ProcessId, SubprocessSpec } from "workflow-en
 type VersionBinding = SubprocessSpec["versionBinding"];
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
+import { useT } from "../i18n/store";
 import { ExpressionInput } from "./shared/ExpressionInput";
 
 type DraftSpec = DraftOf<SubprocessSpec>;
@@ -25,6 +26,7 @@ function MappingEditor({
   fields: DraftField[];
   onChange: (next: Partial<Record<FieldId, DraftOf<Expression>>>) => void;
 }) {
+  const t = useT();
   const entries = Object.entries(mapping ?? {});
 
   const setEntry = (fieldId: string, expr: DraftOf<Expression> | undefined) => {
@@ -61,12 +63,12 @@ function MappingEditor({
           </select>
           <ExpressionInput value={expr} onChange={(v) => setEntry(fieldId, v)} />
           <button type="button" onClick={() => setEntry(fieldId, undefined)}>
-            remove
+            {t("subprocess.removeMappingEntry")}
           </button>
         </div>
       ))}
       <button type="button" onClick={addEntry} disabled={fields.length === 0}>
-        + Add {label === "inputMapping" ? "input" : "output"} mapping
+        {label === "inputMapping" ? t("subprocess.addInputMapping") : t("subprocess.addOutputMapping")}
       </button>
     </fieldset>
   );
@@ -74,6 +76,7 @@ function MappingEditor({
 
 /** Call-and-return subprocess wiring on a `subprocess`-type step (design.md/CLAUDE.md "Subprocesses"). */
 export function SubprocessSpecEditor({ value, fields, onChange }: Props) {
+  const t = useT();
   const update = (patch: Partial<DraftSpec>) => onChange({ ...value, ...patch });
   const binding = value?.versionBinding ?? "pinned";
 
@@ -87,7 +90,7 @@ export function SubprocessSpecEditor({ value, fields, onChange }: Props) {
         child processId
         <input
           type="text"
-          placeholder="proc_..."
+          placeholder={t("subprocess.processIdPlaceholder")}
           value={value?.processId ?? ""}
           onChange={(e) => update({ processId: e.target.value as ProcessId })}
         />

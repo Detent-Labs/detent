@@ -9,8 +9,9 @@ import { parseDraftJson, stringifyDraft } from "./io";
  */
 export const hasFileSystemAccess = typeof window !== "undefined" && typeof window.showSaveFilePicker === "function";
 
-const DRAFT_TYPES: FilePickerAcceptType[] = [{ description: "Draft JSON", accept: { "application/json": [".draft.json"] } }];
-const EXPORT_TYPES: FilePickerAcceptType[] = [{ description: "Process JSON", accept: { "application/json": [".json"] } }];
+function acceptTypes(description: string, extensions: string[]): FilePickerAcceptType[] {
+  return [{ description, accept: { "application/json": extensions } }];
+}
 
 async function writeViaPicker(text: string, suggestedName: string, types: FilePickerAcceptType[]): Promise<void> {
   const handle = await window.showSaveFilePicker!({ suggestedName, types });
@@ -28,16 +29,21 @@ function downloadText(text: string, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
-/** Save the in-progress Draft as-is (no validation gate — that's export's job). */
-export async function saveDraft(draft: Draft): Promise<void> {
+/**
+ * Save the in-progress Draft as-is (no validation gate — that's export's job).
+ * `draftFileDescription` is the file-picker type description text — resolved by the
+ * caller (a component, via `useT()`), never looked up here (design.md "Non-component
+ * call sites receive translated strings as parameters").
+ */
+export async function saveDraft(draft: Draft, draftFileDescription: string): Promise<void> {
   const text = stringifyDraft(draft);
-  if (hasFileSystemAccess) return writeViaPicker(text, "process.draft.json", DRAFT_TYPES);
+  if (hasFileSystemAccess) return writeViaPicker(text, "process.draft.json", acceptTypes(draftFileDescription, [".draft.json"]));
   downloadText(text, "process.draft.json");
 }
 
 /** Load-guard-checked via `parseDraftJson` either way — the picker path is not a shortcut around it. */
-export async function loadDraftViaPicker(): Promise<Draft> {
-  const [handle] = await window.showOpenFilePicker!({ types: DRAFT_TYPES });
+export async function loadDraftViaPicker(draftFileDescription: string): Promise<Draft> {
+  const [handle] = await window.showOpenFilePicker!({ types: acceptTypes(draftFileDescription, [".draft.json"]) });
   return parseDraftJson(await (await handle.getFile()).text());
 }
 
@@ -51,9 +57,9 @@ export function exportProcessBody(draft: Draft): ProcessBody {
 }
 
 /** No network call, no `publishBody` — writes a local file only (editor-draft-io spec). */
-export async function exportDraft(draft: Draft): Promise<void> {
+export async function exportDraft(draft: Draft, exportFileDescription: string): Promise<void> {
   const body = exportProcessBody(draft);
   const text = JSON.stringify(body, null, 2);
-  if (hasFileSystemAccess) return writeViaPicker(text, "process.json", EXPORT_TYPES);
+  if (hasFileSystemAccess) return writeViaPicker(text, "process.json", acceptTypes(exportFileDescription, [".json"]));
   downloadText(text, "process.json");
 }

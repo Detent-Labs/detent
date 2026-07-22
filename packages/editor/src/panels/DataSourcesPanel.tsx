@@ -1,6 +1,7 @@
 import type { DataSourceDef } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import { useDraft } from "../draft/store";
+import { useT } from "../i18n/store";
 import { mintId } from "../draft/ids";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { IssueList } from "./shared/IssueList";
@@ -10,6 +11,7 @@ type DraftDataSource = DraftOf<DataSourceDef>;
 /** Process-wide data sources, referenced by id from a field's `dataSource` (never inlined). */
 export function DataSourcesPanel() {
   const { draft, mutate } = useDraft();
+  const t = useT();
   const dataSources = draft.dataSources ?? [];
 
   const addDataSource = () => {
@@ -34,8 +36,8 @@ export function DataSourcesPanel() {
 
   return (
     <div className="data-sources-panel">
-      <h3>Data sources</h3>
-      {dataSources.length === 0 && <p className="empty">No data sources yet.</p>}
+      <h3>{t("dataSources.heading")}</h3>
+      {dataSources.length === 0 && <p className="empty">{t("dataSources.empty")}</p>}
       {dataSources.map((ds, index) => (
         <div className="data-source-row" key={ds.id ?? index}>
           <label>
@@ -45,12 +47,12 @@ export function DataSourcesPanel() {
           <PluginEnvelopeEditor label="plugin" value={ds} onChange={(patch) => updateDataSource(index, patch)} />
           <IssueList entityId={ds.id} />
           <button type="button" onClick={() => removeDataSource(index)}>
-            Remove data source
+            {t("dataSources.removeDataSource")}
           </button>
         </div>
       ))}
       <button type="button" onClick={addDataSource}>
-        + Add data source
+        {t("dataSources.addDataSource")}
       </button>
     </div>
   );
