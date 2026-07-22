@@ -28,7 +28,7 @@ Laufzeit". `registry.ts` deklariert zwar `configSchema`, aber nichts liest es;
 
 ## 2. TimerState-Provenance
 
-- [ ] Erledigt
+- [x] Erledigt (OpenSpec-Change `timer-state-provenance`, archiviert 2026-07-22)
 
 **Problem:** Die Timer-Reconciliation bei Migrationen keyt nur auf der Timer-Id.
 Ein Ziel-Step, der eine überlebende Id mit anderer `duration` redeklariert oder
@@ -48,7 +48,7 @@ nicht unterscheidbar — das alte `fireAt` bleibt stillschweigend stehen.
 
 ## 3. Event-Kind `migration.transform-dropped`
 
-- [ ] Erledigt
+- [x] Erledigt (OpenSpec-Change `migration-transform-dropped-event`, archiviert 2026-07-22)
 
 **Problem:** Ein `transforms`-Ausdruck, der zur Laufzeit wirft, lässt sein
 Zielfeld stillschweigend ungeschrieben (total, wie ein Guard). Der

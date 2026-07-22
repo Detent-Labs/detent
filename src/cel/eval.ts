@@ -8,7 +8,15 @@
 import { evaluate } from "@marcbachmann/cel-js";
 import { INSTANCE_SCHEMA } from "./check.js";
 import { collectFieldsDeep } from "../schema/definition.js";
-import type { ProcessBody, Instance, FieldDef, Expression, MigrationSpec } from "../schema/definition.js";
+import type {
+  ProcessBody,
+  Instance,
+  FieldDef,
+  FieldId,
+  Expression,
+  MigrationSpec,
+  MigrationTransformDroppedReason,
+} from "../schema/definition.js";
 
 export interface Actor {
   id: string;
@@ -93,6 +101,9 @@ export function buildTransformContext(fromBody: ProcessBody, snapshot: Instance)
   return { data, instance: projectInstance(snapshot) };
 }
 
+/** A `transforms` entry that produced no value for its target field, and why. */
+export type TransformDrop = { fieldId: FieldId; reason: MigrationTransformDroppedReason };
+
 /**
  * Evaluate a migration spec's `transforms` over a pre-migration snapshot, returning
  * a target-FieldId → JSON-safe value patch. Total per entry (unlike evalFieldMap):
@@ -101,23 +112,37 @@ export function buildTransformContext(fromBody: ProcessBody, snapshot: Instance)
  * totality. Values pass through `coerceJson`, so a CEL `int` (bigint) becomes a
  * number; a bigint left in the payload would make the instance fail `instance.parse`
  * on its next read.
+ *
+ * The two total-failure points are distinguished in `drops`, mirroring
+ * `armStepTimers`'s `{ armed, drops }`: an `evaluate()` throw is
+ * `"expression-raised"`, a `coerceJson()` throw (a result too large to
+ * represent as a JSON-safe number) is `"value-out-of-range"`. The caller
+ * records each as a `migration.transform-dropped` event.
  */
 export function evalTransforms(
   spec: MigrationSpec,
   fromBody: ProcessBody,
   snapshot: Instance,
-): Record<string, unknown> {
+): { patch: Record<string, unknown>; drops: TransformDrop[] } {
   const ctx = buildTransformContext(fromBody, snapshot);
   const patch: Record<string, unknown> = {};
+  const drops: TransformDrop[] = [];
   for (const [fid, expr] of Object.entries(spec.transforms ?? {})) {
     if (!expr) continue;
+    let value: unknown;
     try {
-      patch[fid] = coerceJson(evaluate(expr.src, ctx));
+      value = evaluate(expr.src, ctx);
     } catch {
-      // total: unwritten target, no failure (an out-of-range int also drops here).
+      drops.push({ fieldId: fid as FieldId, reason: "expression-raised" });
+      continue;
+    }
+    try {
+      patch[fid] = coerceJson(value);
+    } catch {
+      drops.push({ fieldId: fid as FieldId, reason: "value-out-of-range" });
     }
   }
-  return patch;
+  return { patch, drops };
 }
 
 /**
