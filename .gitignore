@@ -19,6 +19,7 @@ yarn-error.log*
 
 # Test / coverage
 coverage/
+.playwright-cli/
 
 # Editor / OS
 .vscode/*
@@ -29,3 +30,6 @@ Thumbs.db
 
 # Claude Code (personal, per-machine)
 .claude/settings.local.json
+
+# Local devcontainer overrides (personal, per-machine)
+.devcontainer/docker-compose.override.yml

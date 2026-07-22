@@ -58,20 +58,36 @@ Root `package.json` (`"name": "workflow-engine"`) adds:
 "exports": {
   "./schema": "./src/schema/definition.ts",
   "./cel/check": "./src/cel/check.ts",
-  "./schema/compile": "./src/schema/compile.ts"
+  "./schema/compile": "./src/schema/compile.ts",
+  "./engine/registry": "./src/engine/registry.ts",
+  "./engine/registry-check": "./src/engine/registry-check.ts"
 }
 ```
-`packages/editor` depends on it as `"workflow-engine": "file:.."` — an
-explicit local-path dependency, not `workspace:*`. The root package is
+**Correction found during task 4.2**: the original three-entry map omitted
+`checkActionRegistry` (`src/engine/registry-check.ts`) and the `Registry`
+type it needs (`src/engine/registry.ts`), even though task 4.2 requires
+wiring it and the editor-live-validation spec's "Registry becomes
+available mid-session" scenario assumes the editor can hold one. Verified
+both modules import only `zod` and `../schema/definition.js` — no
+`Bun.sql`/DB/outbox dependency — so exporting them keeps the "engine
+remains untouched, editor only consumes the contract surface" boundary
+intact; they're pure, in-process validation/type code, not runtime state.
+
+`packages/editor` depends on it as `"workflow-engine": "file:../.."` — an
+explicit local-path dependency, not `workspace:*`. (Two levels: `file:` is
+relative to `packages/editor` itself, so one `..` only reaches `packages`;
+verified empirically in task 1.4 — `file:..` makes `bun install` fail
+outright with `Could not find package.json for "file:packages" dependency`.)
+The root package is
 declared as the workspace *root* (it owns the `workspaces` field) but is
 not itself matched by the `workspaces: ["packages/*"]` glob, so it is not
 a workspace *member* other members can address via the `workspace:`
 protocol; `workspace:*` resolution for a self-referencing root is not a
 guaranteed capability across npm-compatible package managers, so this
-design does not rely on it. `file:..` is a plain relative-path dependency
-that every npm-compatible installer, Bun included, resolves to a local
-symlink with no registry fetch — the same practical outcome (edits to
-`src/` are visible to the editor without reinstalling) reached by a
+design does not rely on it. `file:../..` is a plain relative-path
+dependency that every npm-compatible installer, Bun included, resolves to
+a local symlink with no registry fetch — the same practical outcome (edits
+to `src/` are visible to the editor without reinstalling) reached by a
 guaranteed-to-work mechanism instead of an unverified one.
 `src/engine/*` is not exported, so it is unreachable from the editor at
 the type level, not just by convention. `./schema/compile` is included
