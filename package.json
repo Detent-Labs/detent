@@ -2,8 +2,19 @@
   "name": "workflow-engine",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "exports": {
+    "./schema": "./src/schema/definition.ts",
+    "./cel/check": "./src/cel/check.ts",
+    "./schema/compile": "./src/schema/compile.ts",
+    "./engine/registry": "./src/engine/registry.ts",
+    "./engine/registry-check": "./src/engine/registry-check.ts"
+  },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck:engine": "tsc --noEmit",
+    "typecheck": "bun run typecheck:engine && bun run --filter './packages/*' typecheck",
     "test": "bun test"
   },
   "devDependencies": {
