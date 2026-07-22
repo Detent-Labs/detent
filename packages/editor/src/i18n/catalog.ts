@@ -25,10 +25,12 @@ const en = {
   "fileToolbar.legend": "File",
   "fileToolbar.save": "Save draft",
   "fileToolbar.load": "Load draft",
+  "fileToolbar.import": "Import process",
   "fileToolbar.export": "Export process JSON",
   "fileToolbar.exportDisabledHint": "resolve all validation issues before exporting",
   "fileToolbar.operationFailed": "operation failed",
   "fileToolbar.draftFileDescription": "Draft JSON",
+  "fileToolbar.importFileDescription": "Process JSON",
   "fileToolbar.exportFileDescription": "Process JSON",
 
   "fieldCatalog.heading": "Field catalog",

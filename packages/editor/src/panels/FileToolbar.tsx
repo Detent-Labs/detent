@@ -1,7 +1,15 @@
 import { useRef, useState } from "react";
 import { useDraft } from "../draft/store";
 import { useT } from "../i18n/store";
-import { saveDraft, loadDraftViaPicker, loadDraftFromFile, exportDraft, hasFileSystemAccess } from "../draft/file-io";
+import {
+  saveDraft,
+  loadDraftViaPicker,
+  loadDraftFromFile,
+  importProcessViaPicker,
+  importProcessFromFile,
+  exportDraft,
+  hasFileSystemAccess,
+} from "../draft/file-io";
 
 /**
  * `fallback` is the translated "operation failed" text, resolved by the caller — this function
@@ -20,6 +28,7 @@ export function FileToolbar() {
   const t = useT();
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const canExport = validation.zodValid && validation.issues.length === 0;
 
   const run = async (action: () => Promise<void>) => {
@@ -46,6 +55,20 @@ export function FileToolbar() {
     if (file) run(async () => replace(await loadDraftFromFile(file)));
   };
 
+  const handleImport = () => {
+    if (hasFileSystemAccess) {
+      run(async () => replace(await importProcessViaPicker(t("fileToolbar.importFileDescription"))));
+    } else {
+      importInputRef.current?.click();
+    }
+  };
+
+  const handleImportInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) run(async () => replace(await importProcessFromFile(file)));
+  };
+
   return (
     <fieldset className="file-toolbar">
       <legend>{t("fileToolbar.legend")}</legend>
@@ -57,6 +80,12 @@ export function FileToolbar() {
       </button>
       {!hasFileSystemAccess && (
         <input ref={fileInputRef} type="file" accept=".json,.draft.json" style={{ display: "none" }} onChange={handleFileInputChange} />
+      )}
+      <button type="button" onClick={handleImport}>
+        {t("fileToolbar.import")}
+      </button>
+      {!hasFileSystemAccess && (
+        <input ref={importInputRef} type="file" accept=".json" style={{ display: "none" }} onChange={handleImportInputChange} />
       )}
       <button
         type="button"
