@@ -22,6 +22,11 @@ import type { Actor } from "../src/cel/eval.js";
 
 const DB = !!process.env.DATABASE_URL;
 const actor: Actor = { id: "user_1", roles: [] };
+// Fixture bodies in this file declare no non-core actions (only
+// core.spawnSubprocess/core.returnSubprocess, which the registry check
+// exempts by construction), so an empty registry is sufficient for every
+// publishBody call here.
+const emptyRegistry: Reg = new Map();
 const CHILD_PID = "proc_child" as Instance["processId"];
 const PARENT_PID = "proc_parent" as Instance["processId"];
 
@@ -475,8 +480,8 @@ test("contractHash is stable and changes when the contract changes", () => {
 
 test.skipIf(!DB)("entering a subprocess step spawns a linked child seeded from inputMapping", async () => {
   const { registry } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
   expect(parent.currentStepId as string).toBe("step_p_sub"); // parked at the subprocess wait-state
   await seedField(parent.instanceId, "field_p_amount", 500);
@@ -491,8 +496,8 @@ test.skipIf(!DB)("entering a subprocess step spawns a linked child seeded from i
 
 test.skipIf(!DB)("the child outcome and data return to the parent, driving it off the wait-state", async () => {
   const { registry } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 500);
 
@@ -506,8 +511,8 @@ test.skipIf(!DB)("the child outcome and data return to the parent, driving it of
 
 test.skipIf(!DB)("a rejected child routes the parent down the rejected path", async () => {
   const { registry } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 5000); // > 1000 -> rejected
 
@@ -524,8 +529,8 @@ test.skipIf(!DB)("a return interrupted after its first hop is durably resumed by
   // closes. Reproduced here down to the transactional first hop, using the same
   // exported building blocks the handler itself calls, then stopping short of
   // that trailing resolveAutomatic to simulate a crash right there.
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(PARENT_PID, parentMidCascadeBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(PARENT_PID, parentMidCascadeBody(cv.version), emptyRegistry);
   const { registry } = engineRegistry();
   const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 500); // <= 1000 -> approved
@@ -566,8 +571,8 @@ test.skipIf(!DB)("a return interrupted after its first hop is durably resumed by
 
 test.skipIf(!DB)("spawn is idempotent: redelivery creates no second child", async () => {
   const { registry } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 500);
   await drainAll(registry);
@@ -581,8 +586,8 @@ test.skipIf(!DB)("spawn is idempotent: redelivery creates no second child", asyn
 
 test.skipIf(!DB)("redelivery completes a drive-to-rest a crash interrupted", async () => {
   const { registry } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 500);
 
@@ -620,8 +625,8 @@ test.skipIf(!DB)("redelivery completes an interrupted cancel-orphan backstop", a
   const { registry } = engineRegistry();
   const W_PID = "proc_waiting_backstop" as Instance["processId"];
   const P_PID = "proc_caller_backstop" as Instance["processId"];
-  const wv = await publishBody(W_PID, waitingChildBody());
-  const pv = await publishBody(P_PID, callerBody("caller_backstop", W_PID, wv.version));
+  const wv = await publishBody(W_PID, waitingChildBody(), emptyRegistry);
+  const pv = await publishBody(P_PID, callerBody("caller_backstop", W_PID, wv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: P_PID, version: pv.version }, actor);
   // Parked at step_sub, transitionSeq 1; the spawn is enqueued but not yet delivered.
 
@@ -650,8 +655,8 @@ test.skipIf(!DB)("redelivery completes an interrupted cancel-orphan backstop", a
 
 test.skipIf(!DB)("redelivery after both repairs already completed is a no-op", async () => {
   const { registry } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 500);
   await drainAll(registry); // spawn -> child terminal -> return -> parent advance, all the way to rest
@@ -676,8 +681,8 @@ test.skipIf(!DB)("redelivery after both repairs already completed is a no-op", a
 
 test.skipIf(!DB)("a spawn whose parent is no longer running creates no child", async () => {
   const { registry, resolveBody } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 500);
   // Cancel the parent before the spawn is dispatched.
@@ -689,8 +694,8 @@ test.skipIf(!DB)("a spawn whose parent is no longer running creates no child", a
 
 test.skipIf(!DB)("a child returning to a non-running parent applies no writeback", async () => {
   const { registry, resolveBody } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 500);
   await drainOutbox(sql, registry); // spawn only: child created + terminal, return enqueued
@@ -707,8 +712,8 @@ test.skipIf(!DB)("a child returning to a non-running parent applies no writeback
 
 test.skipIf(!DB)("the return carries no parent step id in its config", async () => {
   const { registry } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 500);
   await drainOutbox(sql, registry); // spawn: the child runs to terminal and enqueues its return
@@ -725,8 +730,8 @@ test.skipIf(!DB)("the return carries no parent step id in its config", async () 
 test.skipIf(!DB)("a parent whose linked step changed after enqueue is still found", async () => {
   const { registry } = engineRegistry();
   const P2_PID = "proc_parent_two_sub" as Instance["processId"];
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(P2_PID, twoSubParentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(P2_PID, twoSubParentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: P2_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 500);
 
@@ -749,8 +754,8 @@ test.skipIf(!DB)("a parent whose linked step changed after enqueue is still foun
 
 test.skipIf(!DB)("a parent transition racing the return cannot split the decision", async () => {
   const { registry } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry);
 
   // The split the lock rules out: the writeback lands on the strength of a parked
   // check a concurrent move has already invalidated, and the advance then does not.
@@ -795,8 +800,8 @@ test.skipIf(!DB)("a parent transition racing the return cannot split the decisio
 
 test.skipIf(!DB)("a parent that legitimately moved on is a delivered no-op", async () => {
   const { registry } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 500);
   await drainOutbox(sql, registry); // return enqueued
@@ -814,8 +819,8 @@ test.skipIf(!DB)("a parent that legitimately moved on is a delivered no-op", asy
 
 test.skipIf(!DB)("a parent parked at the linked step where that step is not a subprocess step fails", async () => {
   const { registry } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 500);
   await drainOutbox(sql, registry); // return enqueued
@@ -841,8 +846,8 @@ test.skipIf(!DB)("a parent parked at the linked step where that step is not a su
 
 test.skipIf(!DB)("a child with no parent link is a no-op, not a failure", async () => {
   const { registry } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 500);
   await drainOutbox(sql, registry); // return enqueued
@@ -865,9 +870,9 @@ test.skipIf(!DB)("parent cancel cascades to an active child and a nested grandch
   const W_PID = "proc_waiting" as Instance["processId"];
   const P_PID = "proc_caller" as Instance["processId"];
   const GP_PID = "proc_gp" as Instance["processId"];
-  const wv = await publishBody(W_PID, waitingChildBody());
-  const pv = await publishBody(P_PID, callerBody("caller", W_PID, wv.version));
-  const gv = await publishBody(GP_PID, callerBody("gp", P_PID, pv.version));
+  const wv = await publishBody(W_PID, waitingChildBody(), emptyRegistry);
+  const pv = await publishBody(P_PID, callerBody("caller", W_PID, wv.version), emptyRegistry);
+  const gv = await publishBody(GP_PID, callerBody("gp", P_PID, pv.version), emptyRegistry);
 
   const gp = await startInstance(gv.definition, { processId: GP_PID, version: gv.version }, actor);
   await drainAll(registry); // spawn P, then spawn W; both stay running (P parked, W at manual step)
@@ -885,8 +890,8 @@ test.skipIf(!DB)("parent cancel cascades to an active child and a nested grandch
 
 test.skipIf(!DB)("cancelling an instance with no children touches only that instance", async () => {
   const { resolveBody } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
   // No spawn drained -> no children exist.
   await cancelInstance(parent, pv.definition, actor, sql, resolveBody);
@@ -901,10 +906,10 @@ test.skipIf(!DB)("one failing child does not block its siblings' cancellation", 
   const C1_PID = "proc_sweep_fault_c1" as Instance["processId"];
   const C2_PID = "proc_sweep_fault_c2" as Instance["processId"];
   const C3_PID = "proc_sweep_fault_c3" as Instance["processId"];
-  const pv = await publishBody(P_PID, waitingChildBody());
-  const c1v = await publishBody(C1_PID, waitingChildBody());
-  const c2v = await publishBody(C2_PID, waitingChildBody());
-  const c3v = await publishBody(C3_PID, waitingChildBody());
+  const pv = await publishBody(P_PID, waitingChildBody(), emptyRegistry);
+  const c1v = await publishBody(C1_PID, waitingChildBody(), emptyRegistry);
+  const c2v = await publishBody(C2_PID, waitingChildBody(), emptyRegistry);
+  const c3v = await publishBody(C3_PID, waitingChildBody(), emptyRegistry);
   const { resolveBody: realResolveBody } = engineRegistry();
 
   const parent = await startInstance(pv.definition, { processId: P_PID, version: pv.version }, actor);
@@ -934,9 +939,9 @@ test.skipIf(!DB)("a malformed child row does not abort the sweep for its sibling
   const P_PID = "proc_sweep_malformed_p" as Instance["processId"];
   const C1_PID = "proc_sweep_malformed_c1" as Instance["processId"];
   const C2_PID = "proc_sweep_malformed_c2" as Instance["processId"];
-  const pv = await publishBody(P_PID, waitingChildBody());
-  const c1v = await publishBody(C1_PID, waitingChildBody());
-  const c2v = await publishBody(C2_PID, waitingChildBody());
+  const pv = await publishBody(P_PID, waitingChildBody(), emptyRegistry);
+  const c1v = await publishBody(C1_PID, waitingChildBody(), emptyRegistry);
+  const c2v = await publishBody(C2_PID, waitingChildBody(), emptyRegistry);
   const { resolveBody } = engineRegistry();
 
   const parent = await startInstance(pv.definition, { processId: P_PID, version: pv.version }, actor);
@@ -963,8 +968,8 @@ test.skipIf(!DB)("concurrent sweeps of an already-cancelled parent converge with
   const { resolveBody } = engineRegistry();
   const P_PID = "proc_sweep_race_p" as Instance["processId"];
   const C_PID = "proc_sweep_race_c" as Instance["processId"];
-  const pv = await publishBody(P_PID, waitingChildBody());
-  const cv = await publishBody(C_PID, waitingChildBody());
+  const pv = await publishBody(P_PID, waitingChildBody(), emptyRegistry);
+  const cv = await publishBody(C_PID, waitingChildBody(), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: P_PID, version: pv.version }, actor);
   const child = await createInstance(
     cv.definition,
@@ -997,8 +1002,8 @@ test.skipIf(!DB)("concurrent sweeps of an already-cancelled parent converge with
 test.skipIf(!DB)("re-invoking cancel resumes a sweep an unresolvable child body left incomplete", async () => {
   const P_PID = "proc_sweep_resume_p" as Instance["processId"];
   const C_PID = "proc_sweep_resume_c" as Instance["processId"];
-  const pv = await publishBody(P_PID, waitingChildBody());
-  const cv = await publishBody(C_PID, waitingChildBody());
+  const pv = await publishBody(P_PID, waitingChildBody(), emptyRegistry);
+  const cv = await publishBody(C_PID, waitingChildBody(), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: P_PID, version: pv.version }, actor);
   const child = await createInstance(
     cv.definition,
@@ -1027,8 +1032,8 @@ test.skipIf(!DB)("re-invoking cancel resumes a sweep an unresolvable child body 
 test.skipIf(!DB)("resuming an incomplete sweep does not re-commit the parent's own cancel", async () => {
   const P_PID = "proc_sweep_resume_noop_p" as Instance["processId"];
   const C_PID = "proc_sweep_resume_noop_c" as Instance["processId"];
-  const pv = await publishBody(P_PID, waitingChildBody());
-  const cv = await publishBody(C_PID, waitingChildBody());
+  const pv = await publishBody(P_PID, waitingChildBody(), emptyRegistry);
+  const cv = await publishBody(C_PID, waitingChildBody(), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: P_PID, version: pv.version }, actor);
   await createInstance(
     cv.definition,
@@ -1056,8 +1061,8 @@ test.skipIf(!DB)("a fully converged sweep attempts no further child cancellation
   const { resolveBody: realResolveBody } = engineRegistry();
   const P_PID = "proc_sweep_done_p" as Instance["processId"];
   const C_PID = "proc_sweep_done_c" as Instance["processId"];
-  const pv = await publishBody(P_PID, waitingChildBody());
-  const cv = await publishBody(C_PID, waitingChildBody());
+  const pv = await publishBody(P_PID, waitingChildBody(), emptyRegistry);
+  const cv = await publishBody(C_PID, waitingChildBody(), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: P_PID, version: pv.version }, actor);
   await createInstance(
     cv.definition,
@@ -1086,9 +1091,9 @@ test.skipIf(!DB)("a grandchild sweep failure is isolated to its own node, not th
   const P_PID = "proc_sweep_nested_p" as Instance["processId"];
   const C_PID = "proc_sweep_nested_c" as Instance["processId"];
   const G_PID = "proc_sweep_nested_g" as Instance["processId"];
-  const pv = await publishBody(P_PID, waitingChildBody());
-  const cv = await publishBody(C_PID, waitingChildBody());
-  const gv = await publishBody(G_PID, waitingChildBody());
+  const pv = await publishBody(P_PID, waitingChildBody(), emptyRegistry);
+  const cv = await publishBody(C_PID, waitingChildBody(), emptyRegistry);
+  const gv = await publishBody(G_PID, waitingChildBody(), emptyRegistry);
   const { resolveBody: realResolveBody } = engineRegistry();
 
   const parent = await startInstance(pv.definition, { processId: P_PID, version: pv.version }, actor);
@@ -1126,13 +1131,13 @@ test.skipIf(!DB)("latest-at-spawn spawns the newest version matching contractRef
   const { registry } = engineRegistry();
   const CHILD_LV_PID = "proc_child_lv" as Instance["processId"];
   const PARENT_LV_PID = "proc_parent_lv" as Instance["processId"];
-  const v1 = await publishBody(CHILD_LV_PID, childBodyV(["field_c_amount"], "A")); // contract A
-  const v2 = await publishBody(CHILD_LV_PID, childBodyV([], "B")); // contract B (different signature)
-  const v3 = await publishBody(CHILD_LV_PID, childBodyV(["field_c_amount"], "C")); // contract A again, newer body
+  const v1 = await publishBody(CHILD_LV_PID, childBodyV(["field_c_amount"], "A"), emptyRegistry); // contract A
+  const v2 = await publishBody(CHILD_LV_PID, childBodyV([], "B"), emptyRegistry); // contract B (different signature)
+  const v3 = await publishBody(CHILD_LV_PID, childBodyV(["field_c_amount"], "C"), emptyRegistry); // contract A again, newer body
   expect([v1.version, v2.version, v3.version]).toEqual([1, 2, 3]);
 
   const contractRef = contractHash(v1.definition.contract!); // hash of the compiled (published) contract A
-  const pv = await publishBody(PARENT_LV_PID, parentLatestBody(CHILD_LV_PID, contractRef));
+  const pv = await publishBody(PARENT_LV_PID, parentLatestBody(CHILD_LV_PID, contractRef), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: PARENT_LV_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 500);
   await drainOutbox(sql, registry); // spawn
@@ -1148,8 +1153,8 @@ test.skipIf(!DB)("an independently cancelled child returns child.outcome == canc
   const { registry } = engineRegistry();
   const W_PID = "proc_waiting2" as Instance["processId"];
   const P_PID = "proc_ca_parent" as Instance["processId"];
-  const wv = await publishBody(W_PID, waitingChildBody());
-  const pv = await publishBody(P_PID, cancelAwareParent(W_PID, wv.version));
+  const wv = await publishBody(W_PID, waitingChildBody(), emptyRegistry);
+  const pv = await publishBody(P_PID, cancelAwareParent(W_PID, wv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: P_PID, version: pv.version }, actor);
   await drainAll(registry); // spawn the waiting child; it parks at its manual step (no return)
 
@@ -1171,8 +1176,8 @@ test.skipIf(!DB)("an independently cancelled child returns child.outcome == canc
 
 test.skipIf(!DB)("an unmatched child.outcome writes back, stays parked, and is recorded", async () => {
   const { registry } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(PARENT_PID, unmatchedParentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(PARENT_PID, unmatchedParentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 5000); // > 1000 -> "rejected", which unmatchedParentBody does not guard
 
@@ -1198,8 +1203,8 @@ test.skipIf(!DB)("an unmatched reserved cancelled outcome is recorded like any o
   const { registry } = engineRegistry();
   const W_PID = "proc_waiting_nc" as Instance["processId"];
   const P_PID = "proc_nc_parent" as Instance["processId"];
-  const wv = await publishBody(W_PID, waitingChildBody());
-  const pv = await publishBody(P_PID, noCancelGuardParent(W_PID, wv.version));
+  const wv = await publishBody(W_PID, waitingChildBody(), emptyRegistry);
+  const pv = await publishBody(P_PID, noCancelGuardParent(W_PID, wv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: P_PID, version: pv.version }, actor);
   await drainAll(registry); // spawn the waiting child; it parks at its manual step (no return)
 
@@ -1220,8 +1225,8 @@ test.skipIf(!DB)("an unmatched reserved cancelled outcome is recorded like any o
 
 test.skipIf(!DB)("a matched outcome records no unmatched event", async () => {
   const { registry } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 500); // <= 1000 -> "approved", guarded by parentBody
 
@@ -1237,8 +1242,8 @@ const SI_PID = "proc_parent_sub_initial" as Instance["processId"];
 
 test.skipIf(!DB)("creating an instance on a subprocess initial step spawns a linked child", async () => {
   const { registry } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(SI_PID, subInitialParentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(SI_PID, subInitialParentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: SI_PID, version: pv.version }, actor);
   // Creation is not a transition: the wait-state is where the instance rests, at seq 0.
   expect(parent.currentStepId as string).toBe("step_p_sub");
@@ -1256,8 +1261,8 @@ test.skipIf(!DB)("creating an instance on a subprocess initial step spawns a lin
 
 test.skipIf(!DB)("the child's return drives a parent parked at its initial step", async () => {
   const { registry } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(SI_PID, subInitialParentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(SI_PID, subInitialParentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: SI_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 500);
 
@@ -1271,8 +1276,8 @@ test.skipIf(!DB)("the child's return drives a parent parked at its initial step"
 
 test.skipIf(!DB)("the creation-enqueued spawn's outcome attaches to its event, not to a HistoryEntry", async () => {
   const { registry } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(SI_PID, subInitialParentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(SI_PID, subInitialParentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: SI_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 500);
 
@@ -1301,8 +1306,8 @@ test.skipIf(!DB)("the creation-enqueued spawn's outcome attaches to its event, n
 
 test.skipIf(!DB)("a transition-entered spawn keeps attaching its outcome to the HistoryEntry", async () => {
   const { registry } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 500);
   await drainOutbox(sql, registry); // spawn (enqueued by the seq-1 transition)
@@ -1314,8 +1319,8 @@ test.skipIf(!DB)("a transition-entered spawn keeps attaching its outcome to the 
 });
 
 test.skipIf(!DB)("a creation that inserted no row enqueues nothing and records nothing", async () => {
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(SI_PID, subInitialParentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(SI_PID, subInitialParentBody(cv.version), emptyRegistry);
   // Re-running createInstance for an existing id is what a redelivered spawn of
   // this instance does; the RETURNING guard must cover the spawn row and the
   // event exactly as it covers the timer events.
@@ -1330,8 +1335,8 @@ test.skipIf(!DB)("a creation that inserted no row enqueues nothing and records n
 
 test.skipIf(!DB)("a redelivered creation-enqueued spawn creates no second child", async () => {
   const { registry } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(SI_PID, subInitialParentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(SI_PID, subInitialParentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: SI_PID, version: pv.version }, actor);
   await seedField(parent.instanceId, "field_p_amount", 500);
   await drainAll(registry);
@@ -1347,9 +1352,9 @@ test.skipIf(!DB)("a nested initial-step chain spawns a grandchild and returns up
   const { registry } = engineRegistry();
   const MID_PID = "proc_si_mid" as Instance["processId"];
   const TOP_PID = "proc_si_top" as Instance["processId"];
-  const lv = await publishBody(CHILD_PID, childBody());
-  const mv = await publishBody(MID_PID, subInitialCallerBody("si_mid", CHILD_PID, lv.version));
-  const tv = await publishBody(TOP_PID, subInitialCallerBody("si_top", MID_PID, mv.version));
+  const lv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const mv = await publishBody(MID_PID, subInitialCallerBody("si_mid", CHILD_PID, lv.version), emptyRegistry);
+  const tv = await publishBody(TOP_PID, subInitialCallerBody("si_top", MID_PID, mv.version), emptyRegistry);
 
   const top = await startInstance(tv.definition, { processId: TOP_PID, version: tv.version }, actor);
   expect(top.currentStepId as string).toBe("step_sub");
@@ -1370,8 +1375,8 @@ test.skipIf(!DB)("a nested initial-step chain spawns a grandchild and returns up
 
 test.skipIf(!DB)("a creation-enqueued spawn whose parent was cancelled creates no child", async () => {
   const { registry, resolveBody } = engineRegistry();
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(SI_PID, subInitialParentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(SI_PID, subInitialParentBody(cv.version), emptyRegistry);
   const parent = await startInstance(pv.definition, { processId: SI_PID, version: pv.version }, actor);
   await cancelInstance(parent, pv.definition, actor, sql, resolveBody);
 
@@ -1381,8 +1386,8 @@ test.skipIf(!DB)("a creation-enqueued spawn whose parent was cancelled creates n
 });
 
 test.skipIf(!DB)("an ordinary creation enqueues nothing and records no spawn event", async () => {
-  const cv = await publishBody(CHILD_PID, childBody());
-  const pv = await publishBody(PARENT_PID, parentBody(cv.version));
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry);
   // createInstance rather than startInstance: the run-to-rest cascade legitimately
   // enqueues a spawn at seq 1, which would mask what this asserts about creation.
   const inst = await createInstance(pv.definition, { processId: PARENT_PID, version: pv.version });

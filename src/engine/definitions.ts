@@ -5,8 +5,9 @@
  *
  * Publish is immutable and idempotent-on-identical: compile -> hash -> if a
  * version with that hash exists for the processId return it (no-op), else
- * validate (expressions, then cross-process wiring), assign the next monotonic
- * version and insert. The (process_id, version) PK forbids a body overwrite.
+ * validate (action registry, then expressions, then cross-process wiring),
+ * assign the next monotonic version and insert. The (process_id, version) PK
+ * forbids a body overwrite.
  *
  * Publish is the enforcement point for every check that may tighten over time.
  * `definition.ts` is also the deserializer every read goes through, so a check
@@ -24,8 +25,10 @@ import {
 import { compileProcessBody } from "../schema/compile.js";
 import { definitionHash, contractHash } from "../schema/hash.js";
 import { validateProcessBody, checkSubprocessChildRefs, type CelIssue } from "../cel/check.js";
+import { checkActionRegistry, type RegistryIssue } from "./registry-check.js";
 import { sql } from "./store.js";
 import type { ResolveBody } from "./resolution.js";
+import type { Registry } from "./registry.js";
 
 /** Resolve the newest child version whose contract signature equals `contractRef`. */
 export type ResolveLatestByContract = (
@@ -50,6 +53,19 @@ export class CelValidationError extends Error {
   constructor(readonly issues: CelIssue[]) {
     super(issues.map((i) => `${i.loc}: ${i.message} (${JSON.stringify(i.src)})`).join("; "));
     this.name = "CelValidationError";
+  }
+}
+
+/**
+ * A body about to be published carries an action whose `type` is not
+ * registered, or whose `config` violates its handler's declared
+ * `configSchema`. Same "every located issue, not just the first" contract as
+ * `CelValidationError`.
+ */
+export class RegistryValidationError extends Error {
+  constructor(readonly issues: RegistryIssue[]) {
+    super(issues.map((i) => `${i.loc}: ${i.message} (type '${i.type}')`).join("; "));
+    this.name = "RegistryValidationError";
   }
 }
 
@@ -131,6 +147,7 @@ async function validateCrossProcess(
 export async function publishBody(
   processId: ProcessId,
   authoredBody: ProcessBody,
+  registry: Registry,
   db: SQL = sql,
 ): Promise<ProcessVersion> {
   const body = compileProcessBody(authoredBody);
@@ -151,16 +168,22 @@ export async function publishBody(
     };
   }
 
-  // New version about to be inserted. Both remaining checks run on the COMPILED
-  // body, so a step the compile pass injected is held to the same rule as an
-  // authored one, and both sit AFTER the hash-hit return above: a re-publish of a
-  // body that predates a tightening of either check stays a no-op rather than
-  // becoming an error for a version instances are already pinned to. (Duration
-  // validation cannot take this position — it lives inside the compile pass the
-  // hash itself derives from.)
+  // New version about to be inserted. All three remaining checks run on the
+  // COMPILED body, so a step the compile pass injected is held to the same rule
+  // as an authored one, and all three sit AFTER the hash-hit return above: a
+  // re-publish of a body that predates a tightening of any of them stays a
+  // no-op rather than becoming an error for a version instances are already
+  // pinned to. (Duration validation cannot take this position — it lives inside
+  // the compile pass the hash itself derives from.)
   //
-  // Expressions first: they are checked in-process, and they are the issues an
-  // author can fix without inspecting another process.
+  // Registry first: an unresolvable action type or an invalid config is a more
+  // fundamental defect than a bad guard, and the check is in-process (no DB
+  // round-trip, unlike cross-process validation below).
+  const registryIssues = checkActionRegistry(body, registry);
+  if (registryIssues.length > 0) throw new RegistryValidationError(registryIssues);
+
+  // Then expressions: also checked in-process, and the issues an author can fix
+  // without inspecting another process.
   const celIssues = validateProcessBody(body);
   if (celIssues.length > 0) throw new CelValidationError(celIssues);
 

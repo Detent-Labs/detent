@@ -12,6 +12,7 @@ import { publishBody, createDefinitionStore } from "../src/engine/definitions.js
 import { startInstance, executeManualTransition } from "../src/engine/transition.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { registerSubprocessHandlers } from "../src/engine/subprocess.js";
+import { createRegistry, register } from "../src/engine/registry.js";
 import { subprocessChildId } from "../src/engine/idempotency.js";
 import {
   registerMigrationPlan,
@@ -27,6 +28,11 @@ import type { Actor } from "../src/cel/eval.js";
 
 const DB = !!process.env.DATABASE_URL;
 const actor: Actor = { id: "user_1", roles: [] };
+// The only non-core action type any fixture in this file declares (via the
+// `action()` helper below) is "noop" — registered once here and threaded
+// into every publishBody call.
+const reg: Reg = createRegistry();
+register(reg, "noop", { handler: async () => ({}) });
 
 const cel = (src: string) => ({ lang: "cel", src });
 const manualPath = (id: string, to: string) => ({ id, key: id, to, trigger: "manual" });
@@ -114,7 +120,7 @@ const mkInstance = async (pid: Instance["processId"], version: number, data?: Re
 const publishV = async (p: Instance["processId"], body: ProcessBody, tag: string): Promise<number> => {
   const b = structuredClone(body) as Record<string, unknown>;
   b.label = `${(b.label ?? b.key) as string} #${tag}`;
-  return (await publishBody(p, b as unknown as ProcessBody)).version;
+  return (await publishBody(p, b as unknown as ProcessBody, reg)).version;
 };
 // Publish `count` distinct trivial versions (1..count).
 const publishN = async (p: Instance["processId"], count: number): Promise<void> => {
@@ -171,21 +177,21 @@ test.skipIf(!DB)("a plan is registered and retrieved by its version pair", async
 
 test.skipIf(!DB)("several source versions target one target version", async () => {
   const p = pid();
-  for (let i = 0; i < 4; i++) await publishBody(p, waitBody({ key: "a", fields: [f("x", "string"), ...(i ? [f(`v${i}`, "string")] : [])] }));
+  for (let i = 0; i < 4; i++) await publishBody(p, waitBody({ key: "a", fields: [f("x", "string"), ...(i ? [f(`v${i}`, "string")] : [])] }), reg);
   for (const from of [1, 2, 3]) await registerMigrationPlan(p as Instance["processId"], from, 4, {} as MigrationSpec);
   for (const from of [1, 2, 3]) expect(await resolveMigrationPlan(p as Instance["processId"], from, 4)).toBeDefined();
 });
 
 test.skipIf(!DB)("a plan naming an unpublished version is refused", async () => {
   const p = pid();
-  await publishBody(p, waitBody({ key: "a", fields: [f("x", "string")] }));
+  await publishBody(p, waitBody({ key: "a", fields: [f("x", "string")] }), reg);
   await expectReject(registerMigrationPlan(p as Instance["processId"], 1, 2, {} as MigrationSpec));
   expect(await resolveMigrationPlan(p as Instance["processId"], 1, 2)).toBeUndefined();
 });
 
 test.skipIf(!DB)("from === to is refused", async () => {
   const p = pid();
-  await publishBody(p, waitBody({ key: "a", fields: [f("x", "string")] }));
+  await publishBody(p, waitBody({ key: "a", fields: [f("x", "string")] }), reg);
   await expectReject(registerMigrationPlan(p as Instance["processId"], 1, 1, {} as MigrationSpec));
 });
 
@@ -308,9 +314,9 @@ test.skipIf(!DB)("structural validation rejects out-of-body maps and the cancel-
 
 test.skipIf(!DB)("type compatibility rejects incompatible fieldMap and identity-carried type changes", async () => {
   const p = pid();
-  await publishBody(p, waitBody({ key: "a", fields: [f("amount", "string"), f("note", "string")] }));
+  await publishBody(p, waitBody({ key: "a", fields: [f("amount", "string"), f("note", "string")] }), reg);
   // v2: field_amount is now a number (identity-carried type change), plus a number target.
-  await publishBody(p, waitBody({ key: "a", fields: [f("amount", "number"), f("note", "string"), f("total", "number")] }));
+  await publishBody(p, waitBody({ key: "a", fields: [f("amount", "number"), f("note", "string"), f("total", "number")] }), reg);
   const P = p as Instance["processId"];
   // fieldMap moving a string into a number field.
   await expectReject(registerMigrationPlan(P, 1, 2, { fieldMap: { field_note: "field_total" } } as unknown as MigrationSpec), /incompatible/);
@@ -704,7 +710,7 @@ async function parkedParentRunningChild() {
   const cpid = CHILD_PID();
   const p = pid();
   const { registry } = engineRegistry();
-  const cv = await publishBody(cpid, childWaitBody());
+  const cv = await publishBody(cpid, childWaitBody(), reg);
   const v1 = parentSubBody(cpid, cv.version);
   (v1.workflow.steps as any[])[1].paths[0].guard = { lang: "cel", src: 'child.outcome == "never"' };
   const v2raw = parentSubBody(cpid, cv.version);
@@ -712,8 +718,8 @@ async function parkedParentRunningChild() {
   (v2raw.workflow.steps as any[])[0].paths[0].to = "step_p_sub2";
   (v2raw.workflow.steps as any[])[1].paths[0].id = "path_p_done2";
   (v2raw.workflow.steps as any[])[1].paths[0].guard = { lang: "cel", src: 'child.outcome == "never"' };
-  await publishBody(p, v1);
-  await publishBody(p, v2raw);
+  await publishBody(p, v1, reg);
+  await publishBody(p, v2raw, reg);
   await registerMigrationPlan(p as Instance["processId"], 1, 2, { stepMap: { step_p_sub: "step_p_sub2" } } as unknown as MigrationSpec);
   const parent = await startInstance((await createDefinitionStore(sql).resolveBody(p as Instance["processId"], 1))!, { processId: p as Instance["processId"], version: 1 }, actor);
   await drainOutbox(sql, registry); // spawn child, running at step_c_wait, linked at step_p_sub
@@ -730,7 +736,7 @@ test.skipIf(!DB)("6.2 an identity migration of a parked parent spawns no second 
   const cpid = CHILD_PID();
   const p = pid();
   const { registry } = engineRegistry();
-  const cv = await publishBody(cpid, childWaitBody());
+  const cv = await publishBody(cpid, childWaitBody(), reg);
   const v1 = parentSubBody(cpid, cv.version);
   await publishV(p, v1, "1");
   await publishV(p, v1, "2"); // distinct label -> version 2, identical structure
@@ -960,7 +966,7 @@ test.skipIf(!DB)("an identity migration leaves a child's parent link untouched",
   const cpid = CHILD_PID();
   const p = pid();
   const { registry } = engineRegistry();
-  const cv = await publishBody(cpid, childWaitBody());
+  const cv = await publishBody(cpid, childWaitBody(), reg);
   const v1 = parentSubBody(cpid, cv.version);
   await publishV(p, v1, "1");
   await publishV(p, v1, "2");
@@ -976,14 +982,14 @@ test.skipIf(!DB)("subprocess: a terminal child's undelivered return blocks the r
   const cpid = CHILD_PID();
   const p = pid();
   const { registry } = engineRegistry();
-  const cv = await publishBody(cpid, childWaitBody());
+  const cv = await publishBody(cpid, childWaitBody(), reg);
   const v1 = parentSubBody(cpid, cv.version); // matching guard: a delivered "done" completes the parent
   const v2raw = parentSubBody(cpid, cv.version);
   (v2raw.workflow.steps as any[])[1].id = "step_p_sub2";
   (v2raw.workflow.steps as any[])[0].paths[0].to = "step_p_sub2";
   (v2raw.workflow.steps as any[])[1].paths[0].id = "path_p_done2";
-  await publishBody(p, v1);
-  await publishBody(p, v2raw);
+  await publishBody(p, v1, reg);
+  await publishBody(p, v2raw, reg);
   await registerMigrationPlan(p as Instance["processId"], 1, 2, { stepMap: { step_p_sub: "step_p_sub2" } } as unknown as MigrationSpec);
   const parent = await startInstance((await createDefinitionStore(sql).resolveBody(p as Instance["processId"], 1))!, { processId: p as Instance["processId"], version: 1 }, actor);
   await drainOutbox(sql, registry); // spawn child, linked at step_p_sub
