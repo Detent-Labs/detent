@@ -22,9 +22,14 @@ change as part of this requirement.
 ### Requirement: Engine package restricts its exports to the contract surface
 The root package.json SHALL declare an `exports` map exposing exactly
 `./schema` (`src/schema/definition.ts`), `./cel/check`
-(`src/cel/check.ts`), and `./schema/compile` (`src/schema/compile.ts`).
-No other module path SHALL be resolvable by an importing workspace member
-through the package's own name.
+(`src/cel/check.ts`), `./schema/compile` (`src/schema/compile.ts`),
+`./engine/registry` (`src/engine/registry.ts`), and `./engine/registry-check`
+(`src/engine/registry-check.ts`). **Correction found during task 4.2** (see
+design.md decision 2): the original three-entry map omitted
+`checkActionRegistry` and the `Registry` type it needs, both pure
+validation/type modules with no `Bun.sql`/DB/outbox dependency. No other
+module path SHALL be resolvable by an importing workspace member through
+the package's own name.
 
 #### Scenario: Editor imports the contract
 - **WHEN** code in `packages/editor` imports from the engine package's

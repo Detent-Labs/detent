@@ -5,6 +5,7 @@ import { DataSourcesPanel } from "./panels/DataSourcesPanel";
 import { StepsPanel } from "./panels/StepsPanel";
 import { ContractPanel } from "./panels/ContractPanel";
 import { RegistryPanel } from "./panels/RegistryPanel";
+import { FileToolbar } from "./panels/FileToolbar";
 import { IssueList } from "./panels/shared/IssueList";
 import { GraphView } from "./graph/GraphView";
 
@@ -47,6 +48,7 @@ function Editor() {
           it is (see the Zod issues below).
         </p>
       )}
+      <FileToolbar />
       <ProcessHeader />
       <RegistryPanel />
       <h3>Graph</h3>
