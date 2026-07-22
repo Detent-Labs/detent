@@ -40,8 +40,8 @@ export function checkDraftShape(value: unknown): LoadGuardIssue[] {
   };
 
   expectString("key");
-  expectString("label");
-  expectString("description");
+  expectObject("label");
+  expectObject("description");
   expectObject("contract");
   expectArray("fields");
   expectArray("dataSources");

@@ -1,14 +1,19 @@
 {
   "processId": "proc_3f8a1c2e-9b4d-4e7a-a1c8-2e5f7b9d0a13",
   "version": 1,
-  "definitionHash": "ef1b3d2631d96e8ec4bc34ebd902d05ba8e14b6dc48812ab12017b0adacefa5e",
+  "definitionHash": "5742ff2b83524d414ec8ad29a55ef2048fe7f9ed7f1ff2ffdd17fc53c315c093",
   "status": "published",
   "compatibility": "compatible",
   "publishedAt": "2026-07-18T09:00:00Z",
   "definition": {
     "key": "expense_approval",
-    "label": "Expense Approval",
-    "description": "Simple approval: Capture, Review, Book. The Book step is a wait-state whose automatic paths branch on the result of the booking action.",
+    "label": {
+      "en": "Expense Approval"
+    },
+    "description": {
+      "en": "Simple approval: Capture, Review, Book. The Book step is a wait-state whose automatic paths branch on the result of the booking action."
+    },
+    "baseLocale": "en",
     "contract": {
       "inputFields": [
         "field_1a2b3c4d-0001-4a1c-8e2f-000000000001",
@@ -17,40 +22,74 @@
       "outputFields": [
         "field_1a2b3c4d-0004-4a1c-8e2f-000000000004"
       ],
-      "outcomes": ["booked", "rejected"]
+      "outcomes": [
+        "booked",
+        "rejected"
+      ]
     },
     "fields": [
       {
         "id": "field_1a2b3c4d-0001-4a1c-8e2f-000000000001",
         "key": "amount",
-        "label": "Amount",
+        "label": {
+          "en": "Amount"
+        },
         "type": "number",
-        "validation": { "min": 0 }
+        "validation": {
+          "min": 0
+        }
       },
       {
         "id": "field_1a2b3c4d-0002-4a1c-8e2f-000000000002",
         "key": "reason",
-        "label": "Reason",
+        "label": {
+          "en": "Reason"
+        },
         "type": "string",
-        "validation": { "maxLength": 500 }
+        "validation": {
+          "maxLength": 500
+        }
       },
       {
         "id": "field_1a2b3c4d-0003-4a1c-8e2f-000000000003",
         "key": "review_note",
-        "label": "Review Note",
+        "label": {
+          "en": "Review Note"
+        },
         "type": "string",
-        "validation": { "maxLength": 500 }
+        "validation": {
+          "maxLength": 500
+        }
       },
       {
         "id": "field_1a2b3c4d-0004-4a1c-8e2f-000000000004",
         "key": "booking_status",
-        "label": "Booking Status",
-        "description": "Internal status, set by the booking action (write-back into the payload). Not part of any editable view.",
+        "label": {
+          "en": "Booking Status"
+        },
+        "description": {
+          "en": "Internal status, set by the booking action (write-back into the payload). Not part of any editable view."
+        },
         "type": "select",
         "options": [
-          { "value": "pending", "label": "Pending" },
-          { "value": "booked", "label": "Booked" },
-          { "value": "failed", "label": "Failed" }
+          {
+            "value": "pending",
+            "label": {
+              "en": "Pending"
+            }
+          },
+          {
+            "value": "booked",
+            "label": {
+              "en": "Booked"
+            }
+          },
+          {
+            "value": "failed",
+            "label": {
+              "en": "Failed"
+            }
+          }
         ],
         "default": "pending"
       }
@@ -62,15 +101,28 @@
         {
           "id": "step_aaaa1111-0001-4a1c-8e2f-000000000001",
           "key": "capture",
-          "label": "Capture",
+          "label": {
+            "en": "Capture"
+          },
           "type": "task",
           "assignment": {
-            "strategy": { "type": "role.static", "config": { "role": "employee" } }
+            "strategy": {
+              "type": "role.static",
+              "config": {
+                "role": "employee"
+              }
+            }
           },
           "view": {
             "fields": [
-              { "ref": "field_1a2b3c4d-0001-4a1c-8e2f-000000000001", "required": true },
-              { "ref": "field_1a2b3c4d-0002-4a1c-8e2f-000000000002", "required": true }
+              {
+                "ref": "field_1a2b3c4d-0001-4a1c-8e2f-000000000001",
+                "required": true
+              },
+              {
+                "ref": "field_1a2b3c4d-0002-4a1c-8e2f-000000000002",
+                "required": true
+              }
             ]
           },
           "paths": [
@@ -86,16 +138,32 @@
         {
           "id": "step_aaaa1111-0002-4a1c-8e2f-000000000002",
           "key": "review",
-          "label": "Review",
+          "label": {
+            "en": "Review"
+          },
           "type": "task",
           "assignment": {
-            "strategy": { "type": "role.static", "config": { "role": "finance-approver" } }
+            "strategy": {
+              "type": "role.static",
+              "config": {
+                "role": "finance-approver"
+              }
+            }
           },
           "view": {
             "fields": [
-              { "ref": "field_1a2b3c4d-0001-4a1c-8e2f-000000000001", "readonly": true },
-              { "ref": "field_1a2b3c4d-0002-4a1c-8e2f-000000000002", "readonly": true },
-              { "ref": "field_1a2b3c4d-0003-4a1c-8e2f-000000000003", "required": true }
+              {
+                "ref": "field_1a2b3c4d-0001-4a1c-8e2f-000000000001",
+                "readonly": true
+              },
+              {
+                "ref": "field_1a2b3c4d-0002-4a1c-8e2f-000000000002",
+                "readonly": true
+              },
+              {
+                "ref": "field_1a2b3c4d-0003-4a1c-8e2f-000000000003",
+                "required": true
+              }
             ]
           },
           "timers": [
@@ -108,9 +176,16 @@
                   {
                     "id": "action_eeee5555-0001-4a1c-8e2f-000000000001",
                     "type": "notify.email",
-                    "config": { "template": "review-reminder", "toRole": "finance-approver" },
+                    "config": {
+                      "template": "review-reminder",
+                      "toRole": "finance-approver"
+                    },
                     "execution": "async",
-                    "retry": { "maxAttempts": 3, "backoff": "exponential", "baseDelay": "PT10S" }
+                    "retry": {
+                      "maxAttempts": 3,
+                      "backoff": "exponential",
+                      "baseDelay": "PT10S"
+                    }
                   }
                 ]
               }
@@ -136,9 +211,13 @@
         {
           "id": "step_aaaa1111-0003-4a1c-8e2f-000000000003",
           "key": "book",
-          "label": "Book",
+          "label": {
+            "en": "Book"
+          },
           "type": "task",
-          "description": "Wait-state. onEntry triggers the booking (async). Two automatic paths branch on booking_status, which the action writes back.",
+          "description": {
+            "en": "Wait-state. onEntry triggers the booking (async). Two automatic paths branch on booking_status, which the action writes back."
+          },
           "onEntry": [
             {
               "id": "action_eeee5555-0002-4a1c-8e2f-000000000002",
@@ -147,11 +226,18 @@
                 "amountField": "field_1a2b3c4d-0001-4a1c-8e2f-000000000001"
               },
               "output": {
-                "field_1a2b3c4d-0004-4a1c-8e2f-000000000004": { "lang": "cel", "src": "result.status" }
+                "field_1a2b3c4d-0004-4a1c-8e2f-000000000004": {
+                  "lang": "cel",
+                  "src": "result.status"
+                }
               },
               "execution": "async",
               "idempotencyKey": null,
-              "retry": { "maxAttempts": 5, "backoff": "exponential", "baseDelay": "PT30S" },
+              "retry": {
+                "maxAttempts": 5,
+                "backoff": "exponential",
+                "baseDelay": "PT30S"
+              },
               "timeout": "PT30S"
             }
           ],
@@ -160,7 +246,9 @@
               "id": "timer_dddd4444-0002-4a1c-8e2f-000000000002",
               "description": "SLA escape hatch if the booking is neither booked nor failed after 1 day.",
               "duration": "P1D",
-              "onFire": { "targetPath": "path_bbbb2222-0005-4a1c-8e2f-000000000005" }
+              "onFire": {
+                "targetPath": "path_bbbb2222-0005-4a1c-8e2f-000000000005"
+              }
             }
           ],
           "paths": [
@@ -171,7 +259,10 @@
               "to": "step_aaaa1111-0004-4a1c-8e2f-000000000004",
               "trigger": "automatic",
               "priority": 1,
-              "guard": { "lang": "cel", "src": "data.booking_status == 'booked'" }
+              "guard": {
+                "lang": "cel",
+                "src": "data.booking_status == 'booked'"
+              }
             },
             {
               "id": "path_bbbb2222-0005-4a1c-8e2f-000000000005",
@@ -180,50 +271,81 @@
               "to": "step_aaaa1111-0006-4a1c-8e2f-000000000006",
               "trigger": "automatic",
               "priority": 2,
-              "guard": { "lang": "cel", "src": "data.booking_status == 'failed'" }
+              "guard": {
+                "lang": "cel",
+                "src": "data.booking_status == 'failed'"
+              }
             }
           ]
         },
         {
           "id": "step_aaaa1111-0004-4a1c-8e2f-000000000004",
           "key": "booked",
-          "label": "Booked",
+          "label": {
+            "en": "Booked"
+          },
           "type": "task",
           "terminal": true,
           "outcome": "booked",
           "view": {
             "fields": [
-              { "ref": "field_1a2b3c4d-0001-4a1c-8e2f-000000000001", "readonly": true },
-              { "ref": "field_1a2b3c4d-0004-4a1c-8e2f-000000000004", "readonly": true }
+              {
+                "ref": "field_1a2b3c4d-0001-4a1c-8e2f-000000000001",
+                "readonly": true
+              },
+              {
+                "ref": "field_1a2b3c4d-0004-4a1c-8e2f-000000000004",
+                "readonly": true
+              }
             ]
           }
         },
         {
           "id": "step_aaaa1111-0005-4a1c-8e2f-000000000005",
           "key": "rejected",
-          "label": "Rejected",
+          "label": {
+            "en": "Rejected"
+          },
           "type": "task",
           "terminal": true,
           "outcome": "rejected",
           "view": {
             "fields": [
-              { "ref": "field_1a2b3c4d-0003-4a1c-8e2f-000000000003", "readonly": true }
+              {
+                "ref": "field_1a2b3c4d-0003-4a1c-8e2f-000000000003",
+                "readonly": true
+              }
             ]
           }
         },
         {
           "id": "step_aaaa1111-0006-4a1c-8e2f-000000000006",
           "key": "booking_error",
-          "label": "Booking Error",
+          "label": {
+            "en": "Booking Error"
+          },
           "type": "task",
-          "description": "Visible fault state instead of a hidden transaction rollback. A human picks the next action.",
+          "description": {
+            "en": "Visible fault state instead of a hidden transaction rollback. A human picks the next action."
+          },
           "assignment": {
-            "strategy": { "type": "role.static", "config": { "role": "finance-approver" } }
+            "strategy": {
+              "type": "role.static",
+              "config": {
+                "role": "finance-approver"
+              }
+            }
           },
           "view": {
             "fields": [
-              { "ref": "field_1a2b3c4d-0001-4a1c-8e2f-000000000001", "readonly": true },
-              { "ref": "field_1a2b3c4d-0004-4a1c-8e2f-000000000004", "readonly": true }
+              {
+                "ref": "field_1a2b3c4d-0001-4a1c-8e2f-000000000001",
+                "readonly": true
+              },
+              {
+                "ref": "field_1a2b3c4d-0004-4a1c-8e2f-000000000004",
+                "readonly": true
+              }
             ]
           },
           "paths": [

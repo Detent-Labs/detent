@@ -4,6 +4,7 @@ import type { ProcessBody } from "workflow-engine/schema";
 import type { Registry } from "workflow-engine/engine/registry";
 import type { Draft } from "./types";
 import { runValidation, type ValidationResult } from "./validation";
+import { collectUsedLocales } from "./localized-text";
 
 const EMPTY_DRAFT: Draft = {};
 
@@ -18,6 +19,13 @@ interface DraftContextValue {
   setRegistry: (registry: Registry | undefined) => void;
   loadedChildren: Record<string, ProcessBody>;
   setChildForStep: (stepId: string, childBody: ProcessBody | undefined) => void;
+  /** Which locale of the *authored process content* (label/description
+   * text) is currently shown/edited — independent of `useLocale()` (the
+   * editor's own UI-chrome language, see editor-i18n). Ephemeral editor
+   * state, not persisted with the Draft. */
+  contentLocale: string;
+  setContentLocale: (locale: string) => void;
+  usedLocales: string[];
 }
 
 const DraftContext = createContext<DraftContextValue | null>(null);
@@ -37,6 +45,13 @@ export function DraftProvider({ children, initial }: { children: ReactNode; init
   const [draft, dispatch] = useReducer(reducer, initial ?? EMPTY_DRAFT);
   const [registry, setRegistry] = useState<Registry | undefined>(undefined);
   const [loadedChildren, setLoadedChildren] = useState<Record<string, ProcessBody>>({});
+  // Seeded from the initially-loaded Draft's own baseLocale (falling back to
+  // "en" for a brand-new Draft) rather than a hardcoded "en" — opening an
+  // already-authored process should default to editing in its own base
+  // locale, not one that may not even exist in it yet.
+  const [contentLocale, setContentLocale] = useState<string>(() => initial?.baseLocale ?? "en");
+
+  const usedLocales = useMemo(() => collectUsedLocales(draft), [draft]);
 
   // A plain, synchronous recompute on every Draft/registry/children change — no
   // setTimeout debounce. Validating a document this size (dozens of entities,
@@ -65,8 +80,11 @@ export function DraftProvider({ children, initial }: { children: ReactNode; init
       setRegistry,
       loadedChildren,
       setChildForStep,
+      contentLocale,
+      setContentLocale,
+      usedLocales,
     }),
-    [draft, validation, registry, loadedChildren],
+    [draft, validation, registry, loadedChildren, contentLocale, usedLocales],
   );
 
   return <DraftContext.Provider value={value}>{children}</DraftContext.Provider>;

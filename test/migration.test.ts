@@ -41,8 +41,8 @@ const autoPath = (id: string, to: string, priority: number, guardSrc?: string) =
 
 // ---- body builders -----------------------------------------------------------
 
-type Field = { id: string; key: string; label: string; type: string };
-const f = (key: string, type: string): Field => ({ id: `field_${key}`, key, label: key, type });
+type Field = { id: string; key: string; label: { en: string }; type: string };
+const f = (key: string, type: string): Field => ({ id: `field_${key}`, key, label: { en: key }, type });
 
 // A one-wait-state body: step_wait (manual -> step_done) then terminal step_done.
 // The wait step's fields/timers and whether it is itself terminal or all-automatic
@@ -59,7 +59,7 @@ function waitBody(opts: {
   const wait: Record<string, unknown> = {
     id: "step_wait",
     key: "wait",
-    label: "Wait",
+    label: { en: "Wait" },
     type: "task",
     ...(opts.waitTimers ? { timers: opts.waitTimers } : {}),
     ...(opts.waitOnEntry ? { onEntry: opts.waitOnEntry } : {}),
@@ -73,8 +73,8 @@ function waitBody(opts: {
     wait.paths = [manualPath("path_done", "step_done")];
   }
   const steps: unknown[] = [wait];
-  if (!opts.waitTerminal) steps.push({ id: "step_done", key: "done", label: "Done", type: "task", terminal: true });
-  return { key: opts.key, label: opts.key, fields: opts.fields, workflow: { initialStep: "step_wait", steps } } as unknown as ProcessBody;
+  if (!opts.waitTerminal) steps.push({ id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true });
+  return { key: opts.key, label: { en: opts.key }, baseLocale: "en", fields: opts.fields, workflow: { initialStep: "step_wait", steps } } as unknown as ProcessBody;
 }
 
 // ---- helpers -----------------------------------------------------------------
@@ -119,7 +119,8 @@ const mkInstance = async (pid: Instance["processId"], version: number, data?: Re
 // mutated. Returns the assigned version.
 const publishV = async (p: Instance["processId"], body: ProcessBody, tag: string): Promise<number> => {
   const b = structuredClone(body) as Record<string, unknown>;
-  b.label = `${(b.label ?? b.key) as string} #${tag}`;
+  const baseLabel = (b.label as { en?: string } | undefined)?.en ?? (b.key as string);
+  b.label = { en: `${baseLabel} #${tag}` };
   return (await publishBody(p, b as unknown as ProcessBody, reg)).version;
 };
 // Publish `count` distinct trivial versions (1..count).
@@ -392,7 +393,7 @@ test.skipIf(!DB)("6.7 data remapping: rename, swap, orphan retention, integer tr
   // v2 declares a, b, and a plugin-typed `total` (dyn) so a CEL int result is accepted
   // there — a `number` field is CEL `double` and would reject an int literal. 'gone' is
   // not declared but its value is retained.
-  const pluginTotal = { id: "field_total", key: "total", label: "total", type: { type: "counter", config: {} } };
+  const pluginTotal = { id: "field_total", key: "total", label: { en: "total" }, type: { type: "counter", config: {} } };
   const v2 = waitBody({ key: "a", fields: [f("a", "string"), f("b", "string"), pluginTotal as unknown as Field] });
   // swap a<->b, and a transform writing a CEL integer into the dyn field.
   await twoVersions(p, v1, v2, {
@@ -436,7 +437,7 @@ test.skipIf(!DB)("6.7 a transform yielding an out-of-range value leaves its fiel
   // A plugin-typed (dyn) target field, like "6.7 data remapping" above — a
   // "number" field is CEL `double` and would reject an int literal at plan
   // registration, before the migration ever runs.
-  const pluginTotal = { id: "field_total", key: "total", label: "total", type: { type: "counter", config: {} } };
+  const pluginTotal = { id: "field_total", key: "total", label: { en: "total" }, type: { type: "counter", config: {} } };
   const v2 = waitBody({ key: "a", fields: [f("x", "string"), pluginTotal as unknown as Field] });
   await twoVersions(p, v1, v2, { transforms: { field_total: cel("9223372036854775807") } } as unknown as MigrationSpec);
   const inst = await mkInstance(p, 1);
@@ -458,12 +459,12 @@ test.skipIf(!DB)("6.x unmappable: reject-and-pin leaves the instance; route-to-s
   // step_wait is unmappable.
   const v1 = waitBody({ key: "a", fields: [f("x", "string")] });
   const v2: ProcessBody = {
-    key: "a", label: "a", fields: [f("x", "string")],
+    key: "a", label: { en: "a" }, baseLocale: "en", fields: [f("x", "string")],
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: "A", type: "task", paths: [manualPath("path_ad", "step_done")] },
-        { id: "step_done", key: "done", label: "Done", type: "task", terminal: true },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [manualPath("path_ad", "step_done")] },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
   } as unknown as ProcessBody;
@@ -483,12 +484,12 @@ test.skipIf(!DB)("6.x route-to-step relocates an unmappable instance", async () 
   const p = pid();
   const v1 = waitBody({ key: "a", fields: [f("x", "string")] });
   const v2: ProcessBody = {
-    key: "a", label: "a", fields: [f("x", "string")],
+    key: "a", label: { en: "a" }, baseLocale: "en", fields: [f("x", "string")],
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: "A", type: "task", paths: [manualPath("path_ad", "step_done")] },
-        { id: "step_done", key: "done", label: "Done", type: "task", terminal: true },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [manualPath("path_ad", "step_done")] },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
   } as unknown as ProcessBody;
@@ -506,10 +507,10 @@ test.skipIf(!DB)("6.4 a skipped instance produces an event and no history entry"
   const p = pid();
   const v1 = waitBody({ key: "a", fields: [f("x", "string")] });
   const v2: ProcessBody = {
-    key: "a", label: "a", fields: [f("x", "string")],
+    key: "a", label: { en: "a" }, baseLocale: "en", fields: [f("x", "string")],
     workflow: { initialStep: "step_a", steps: [
-      { id: "step_a", key: "a", label: "A", type: "task", paths: [manualPath("path_ad", "step_done")] },
-      { id: "step_done", key: "done", label: "Done", type: "task", terminal: true },
+      { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [manualPath("path_ad", "step_done")] },
+      { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
     ] },
   } as unknown as ProcessBody;
   await twoVersions(p, v1, v2, {} as MigrationSpec);
@@ -712,10 +713,10 @@ test.skipIf(!DB)("6.9 a full batch of skipped instances does not stall the scan"
   const v1 = waitBody({ key: "a", fields: [f("x", "string")] });
   // Unmappable v2 (removes step_wait) so every instance is skipped and stays on v1.
   const v2: ProcessBody = {
-    key: "a", label: "a", fields: [f("x", "string")],
+    key: "a", label: { en: "a" }, baseLocale: "en", fields: [f("x", "string")],
     workflow: { initialStep: "step_a", steps: [
-      { id: "step_a", key: "a", label: "A", type: "task", paths: [manualPath("path_ad", "step_done")] },
-      { id: "step_done", key: "done", label: "Done", type: "task", terminal: true },
+      { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [manualPath("path_ad", "step_done")] },
+      { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
     ] },
   } as unknown as ProcessBody;
   await twoVersions(p, v1, v2, {} as MigrationSpec);
@@ -824,26 +825,26 @@ test.skipIf(!DB)("6.3 a concurrent writeback is preserved because the remap read
 const CHILD_PID = () => `proc_child_${n}` as Instance["processId"];
 function childWaitBody(): ProcessBody {
   return {
-    key: "child", label: "Child",
+    key: "child", label: { en: "Child" }, baseLocale: "en",
     contract: { outcomes: ["done"] },
     fields: [],
     workflow: { initialStep: "step_c_wait", steps: [
-      { id: "step_c_wait", key: "c_wait", label: "Wait", type: "task", paths: [manualPath("path_c_done", "step_c_done")] },
-      { id: "step_c_done", key: "c_done", label: "Done", type: "task", terminal: true, outcome: "done" },
+      { id: "step_c_wait", key: "c_wait", label: { en: "Wait" }, type: "task", paths: [manualPath("path_c_done", "step_c_done")] },
+      { id: "step_c_done", key: "c_done", label: { en: "Done" }, type: "task", terminal: true, outcome: "done" },
     ] },
   } as unknown as ProcessBody;
 }
 // Parent whose subprocess step id is stable across v1/v2 (identity migration).
 function parentSubBody(childPid: string, childVersion: number): ProcessBody {
   return {
-    key: "parent", label: "Parent",
+    key: "parent", label: { en: "Parent" }, baseLocale: "en",
     fields: [f("marker", "string")],
     workflow: { initialStep: "step_p_entry", steps: [
-      { id: "step_p_entry", key: "p_entry", label: "Entry", type: "task", paths: [autoPath("path_p_sub", "step_p_sub", 1)] },
-      { id: "step_p_sub", key: "p_sub", label: "Sub", type: "subprocess",
+      { id: "step_p_entry", key: "p_entry", label: { en: "Entry" }, type: "task", paths: [autoPath("path_p_sub", "step_p_sub", 1)] },
+      { id: "step_p_sub", key: "p_sub", label: { en: "Sub" }, type: "subprocess",
         subprocess: { processId: childPid, versionBinding: "pinned", pinnedVersion: childVersion, inputMapping: {}, outputMapping: {} },
         paths: [autoPath("path_p_done", "step_p_done", 1, 'child.outcome == "done"')] },
-      { id: "step_p_done", key: "p_done", label: "Done", type: "task", terminal: true },
+      { id: "step_p_done", key: "p_done", label: { en: "Done" }, type: "task", terminal: true },
     ] },
   } as unknown as ProcessBody;
 }
@@ -947,11 +948,11 @@ test.skipIf(!DB)("a relocation runs the target step's onEntry but never the sour
   const v1 = waitBody({ key: "a", fields: [f("x", "string")], waitOnExit: [action("action_exit")] });
   // v2 keeps step_wait but stepMap relocates onto step_relo, which declares onEntry.
   const v2: ProcessBody = {
-    key: "a", label: "a", fields: [f("x", "string")],
+    key: "a", label: { en: "a" }, baseLocale: "en", fields: [f("x", "string")],
     workflow: { initialStep: "step_wait", steps: [
-      { id: "step_wait", key: "wait", label: "W", type: "task", paths: [manualPath("path_done", "step_done")] },
-      { id: "step_relo", key: "relo", label: "R", type: "task", onEntry: [action("action_entry")], paths: [manualPath("path_rd", "step_done")] },
-      { id: "step_done", key: "done", label: "D", type: "task", terminal: true },
+      { id: "step_wait", key: "wait", label: { en: "W" }, type: "task", paths: [manualPath("path_done", "step_done")] },
+      { id: "step_relo", key: "relo", label: { en: "R" }, type: "task", onEntry: [action("action_entry")], paths: [manualPath("path_rd", "step_done")] },
+      { id: "step_done", key: "done", label: { en: "D" }, type: "task", terminal: true },
     ] },
   } as unknown as ProcessBody;
   await twoVersions(p, v1, v2, { stepMap: { step_wait: "step_relo" } } as unknown as MigrationSpec);
@@ -1073,19 +1074,19 @@ test.skipIf(!DB)("a faulted instance keeps its pin and is in no category", async
 test.skipIf(!DB)("one invocation migrates a mappable instance and skips an unmappable sibling", async () => {
   const p = pid();
   const v1: ProcessBody = {
-    key: "a", label: "a", fields: [f("x", "string")],
+    key: "a", label: { en: "a" }, baseLocale: "en", fields: [f("x", "string")],
     workflow: { initialStep: "step_wait", steps: [
-      { id: "step_wait", key: "wait", label: "W", type: "task", paths: [manualPath("path_wm", "step_mid")] },
-      { id: "step_mid", key: "mid", label: "M", type: "task", paths: [manualPath("path_md", "step_done")] },
-      { id: "step_done", key: "done", label: "D", type: "task", terminal: true },
+      { id: "step_wait", key: "wait", label: { en: "W" }, type: "task", paths: [manualPath("path_wm", "step_mid")] },
+      { id: "step_mid", key: "mid", label: { en: "M" }, type: "task", paths: [manualPath("path_md", "step_done")] },
+      { id: "step_done", key: "done", label: { en: "D" }, type: "task", terminal: true },
     ] },
   } as unknown as ProcessBody;
   // v2 removes step_wait (so an instance parked there is unmappable) but keeps step_mid.
   const v2: ProcessBody = {
-    key: "a", label: "a", fields: [f("x", "string")],
+    key: "a", label: { en: "a" }, baseLocale: "en", fields: [f("x", "string")],
     workflow: { initialStep: "step_mid", steps: [
-      { id: "step_mid", key: "mid", label: "M", type: "task", paths: [manualPath("path_md", "step_done")] },
-      { id: "step_done", key: "done", label: "D", type: "task", terminal: true },
+      { id: "step_mid", key: "mid", label: { en: "M" }, type: "task", paths: [manualPath("path_md", "step_done")] },
+      { id: "step_done", key: "done", label: { en: "D" }, type: "task", terminal: true },
     ] },
   } as unknown as ProcessBody;
   await twoVersions(p, v1, v2, {} as MigrationSpec); // reject-and-pin
@@ -1200,7 +1201,7 @@ test.skipIf(!DB)("schema init is idempotent and leaves the definitions relation 
 
 test.skipIf(!DB)("7.1 reports an instance holding a data key absent from the catalog, group ids included", async () => {
   const p = pid();
-  const group = { id: "field_grp", key: "grp", label: "grp", type: "group", fields: [f("a", "string")] } as unknown as Field;
+  const group = { id: "field_grp", key: "grp", label: { en: "grp" }, type: "group", fields: [f("a", "string")] } as unknown as Field;
   await publishV(p, waitBody({ key: "a", fields: [group] }), "1");
   // field_grp is the group container's own id — never a valid data key even though
   // it is "declared" — and field_ghost is declared nowhere.

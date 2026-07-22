@@ -8,7 +8,7 @@ import { instance as instanceSchema, baseFieldType, type ProcessBody, type Migra
 // Minimal ProcessBody builders. validateProcessBody reads only fields /
 // dataSources / workflow.steps, so these cast loosely on purpose — the full
 // structural invariants are exercised by validate.test.ts, not here.
-const field = (key: string, type: string) => ({ id: `field_${key}`, key, label: key, type });
+const field = (key: string, type: string) => ({ id: `field_${key}`, key, label: { en: key }, type });
 
 const body = (opts: {
   fields?: ReturnType<typeof field>[];
@@ -17,7 +17,8 @@ const body = (opts: {
 }): ProcessBody =>
   ({
     key: "p",
-    label: "P",
+    label: { en: "P" },
+    baseLocale: "en",
     fields: opts.fields ?? [field("booking_status", "select"), field("amount", "number")],
     dataSources: opts.dataSources,
     workflow: { initialStep: "step_a", steps: opts.steps ?? [] },
@@ -26,7 +27,7 @@ const body = (opts: {
 const guardStep = (src: string, type: "task" | "subprocess" = "task") => ({
   id: "step_a",
   key: "a",
-  label: "A",
+  label: { en: "A" },
   type,
   paths: [{ id: "path_a", key: "pa", to: "step_b", trigger: "automatic", priority: 1, guard: { lang: "cel", src } }],
 });
@@ -73,7 +74,7 @@ test("accepts result in an Action.output mapping", () => {
   const step = {
     id: "step_a",
     key: "a",
-    label: "A",
+    label: { en: "A" },
     type: "task",
     onEntry: [{ id: "action_a", type: "http", config: {}, output: { field_booking_status: { lang: "cel", src: "result.status" } } }],
     paths: [{ id: "path_a", key: "pa", to: "step_b", trigger: "manual" }],
@@ -93,7 +94,7 @@ const outputStep = (
 ) => ({
   id: "step_a",
   key: "a",
-  label: "A",
+  label: { en: "A" },
   type,
   [position]: [{ id: "action_a", type: "http", config: {}, output: { field_booking_status: { lang: "cel", src } } }],
   paths: [{ id: "path_a", key: "pa", to: "step_b", trigger: "manual" }],
@@ -173,7 +174,7 @@ test("rejects child.* in a deadline but not in the guard of the same subprocess 
 const deadlineStep = (src: string) => ({
   id: "step_a",
   key: "a",
-  label: "A",
+  label: { en: "A" },
   type: "task",
   paths: [{ id: "path_a", key: "pa", to: "step_b", trigger: "manual" }],
   timers: [{ id: "timer_a", key: "ta", deadline: { lang: "cel", src }, onFire: { actions: [] } }],
@@ -217,7 +218,7 @@ test("accepts a string-typed deadline (datetime / date / string / ternary)", () 
 // authoring time, so the expectation cannot reject it.
 test("accepts a dyn-typed deadline (type not knowable at authoring time)", () => {
   expect(deadlineIssues("data.receipt")).toEqual([]);
-  const plugin = { id: "field_custom", key: "custom", label: "custom", type: { type: "geo", config: {} } };
+  const plugin = { id: "field_custom", key: "custom", label: { en: "custom" }, type: { type: "geo", config: {} } };
   const fields = [...typedFields, plugin] as unknown as ReturnType<typeof field>[];
   expect(validateProcessBody(body({ fields, steps: [deadlineStep("data.custom")] }))).toEqual([]);
 });
@@ -266,7 +267,7 @@ test("the deadline result-type expectation does not leak into other sites", () =
   const step = {
     id: "step_a",
     key: "a",
-    label: "A",
+    label: { en: "A" },
     type: "task",
     // Action.output writeback: a double, not a string.
     onEntry: [{ id: "action_a", type: "http", config: {}, output: { field_amount: { lang: "cel", src: "result.total" } } }],
@@ -338,8 +339,8 @@ test("parseExpression flags syntax but not unknown vars", () => {
 const cel = (src: string) => ({ lang: "cel", src });
 const migBody = (fields: { key: string; type: string | object }[], dataSources?: any[]): ProcessBody =>
   ({
-    key: "p", label: "P",
-    fields: fields.map((f) => ({ id: `field_${f.key}`, key: f.key, label: f.key, type: f.type })),
+    key: "p", label: { en: "P" }, baseLocale: "en",
+    fields: fields.map((f) => ({ id: `field_${f.key}`, key: f.key, label: { en: f.key }, type: f.type })),
     dataSources,
     workflow: { initialStep: "step_a", steps: [] },
   }) as unknown as ProcessBody;
@@ -467,7 +468,7 @@ const subprocessStep = (outputMapping: Record<string, ReturnType<typeof cel>>, g
 
 const childBodyWithOutputs = (outputFieldIds?: string[]): ProcessBody =>
   ({
-    key: "child", label: "Child",
+    key: "child", label: { en: "Child" }, baseLocale: "en",
     contract: { outputFields: outputFieldIds },
     fields: [field("amount", "number"), field("internal_note", "string")],
     workflow: { initialStep: "step_c", steps: [] },

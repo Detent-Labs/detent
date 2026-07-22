@@ -21,14 +21,15 @@ const act = (id: string, type: string) => ({ id, type, config: {} }) as unknown 
 // carries `timer`) --path_go--> step_done (terminal).
 const waitTimerBody = (timer: unknown): ProcessBody =>
   ({
-    fields: [{ id: "field_go", key: "go", label: "Go", type: "text" }],
+    baseLocale: "en",
+    fields: [{ id: "field_go", key: "go", label: { en: "Go" }, type: "text" }],
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: "A", type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
-        { id: "step_wait", key: "wait", label: "Wait", type: "task", timers: [timer],
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
+        { id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task", timers: [timer],
           paths: [{ id: "path_go", key: "go", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }] },
-        { id: "step_done", key: "done", label: "Done", type: "task", terminal: true },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -96,13 +97,14 @@ test.skipIf(!DB)("a step without timers arms nothing", async () => {
 
 const initialWaitBody = (timer: unknown): ProcessBody =>
   ({
-    fields: [{ id: "field_go", key: "go", label: "Go", type: "text" }],
+    baseLocale: "en",
+    fields: [{ id: "field_go", key: "go", label: { en: "Go" }, type: "text" }],
     workflow: {
       initialStep: "step_wait",
       steps: [
-        { id: "step_wait", key: "wait", label: "Wait", type: "task", timers: [timer],
+        { id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task", timers: [timer],
           paths: [{ id: "path_go", key: "go", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }] },
-        { id: "step_done", key: "done", label: "Done", type: "task", terminal: true },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -296,17 +298,18 @@ test.skipIf(!DB)("the scheduler fires an overdue timer on its first pass", async
 // so the same body serves both arming call sites (transition and creation).
 const deadlineBody = (timers: unknown[], initialStep = "step_a"): ProcessBody =>
   ({
+    baseLocale: "en",
     fields: [
-      { id: "field_go", key: "go", label: "Go", type: "text" },
-      { id: "field_due", key: "due", label: "Due", type: "text" },
+      { id: "field_go", key: "go", label: { en: "Go" }, type: "text" },
+      { id: "field_due", key: "due", label: { en: "Due" }, type: "text" },
     ],
     workflow: {
       initialStep,
       steps: [
-        { id: "step_a", key: "a", label: "A", type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
-        { id: "step_wait", key: "wait", label: "Wait", type: "task", timers,
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
+        { id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task", timers,
           paths: [{ id: "path_go", key: "go", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }] },
-        { id: "step_done", key: "done", label: "Done", type: "task", terminal: true },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -656,7 +659,7 @@ test.skipIf(!DB)("cancel still commits to the sink from a deadline-armed step, d
   const body = deadlineBody([dueTimer], "step_wait");
   const withSink = {
     ...body,
-    workflow: { ...body.workflow, steps: [...body.workflow.steps, { id: CANCEL_SINK_STEP_ID, key: "cancelled", label: "Cancelled", type: "task", terminal: true }] },
+    workflow: { ...body.workflow, steps: [...body.workflow.steps, { id: CANCEL_SINK_STEP_ID, key: "cancelled", label: { en: "Cancelled" }, type: "task", terminal: true }] },
   } as unknown as ProcessBody;
   const inst = await seeded(withSink, { field_due: "2026-08-01T09:00:00Z" });
   expect(await nextTimerAt(inst.instanceId)).not.toBeNull(); // armed at creation

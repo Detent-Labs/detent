@@ -44,6 +44,36 @@ export type InstanceEventId = z.infer<typeof instanceEventId>;
 export type Key = string;
 
 // ============================================================
+// LocaleCode / LocalizedText: authored display text (ProcessBody/Step/
+// FieldDef label+description, FieldOption.label) is locale-keyed, with a
+// per-process required base locale. Authoring-facing-only text (Path
+// label/description, Timer.description, Plugin.description) stays a plain
+// string — never rendered to a process participant, no localization need.
+// ============================================================
+
+/** Open, extensible locale-tag format (e.g. "en", "de", "en-US") — not a
+ * fixed enum, since a process's set of content locales is process data, not
+ * a platform constant. */
+export const localeCode = z.string().regex(/^[a-z]{2,3}(-[A-Z]{2})?$/);
+export type LocaleCode = z.infer<typeof localeCode>;
+
+/** A non-empty entry keyed by the owning process's `baseLocale` is required
+ * (enforced by `processBody`'s superRefine, since only there is `baseLocale`
+ * in scope); entries for other locales are optional and resolve via
+ * fallback-to-base-locale, not a parse error. */
+export const localizedText = z.record(localeCode, z.string());
+export type LocalizedText = z.infer<typeof localizedText>;
+
+/**
+ * Fallback-to-base-locale lookup, mirroring the editor UI catalog's
+ * `resolveTranslation()` — but parameterized on `baseLocale` rather than a
+ * hardcoded `en`, since it is process-declared data, not a platform constant.
+ */
+export function resolveLocalizedText(value: LocalizedText, locale: LocaleCode, baseLocale: LocaleCode): string {
+  return value[locale] ?? value[baseLocale];
+}
+
+// ============================================================
 // ISO 8601 duration. Fixed-length units only: weeks, days, hours, minutes,
 // seconds. Calendar units (years, months) are ambiguous without a date library
 // and are rejected. This is the single source for the grammar — the engine's
@@ -204,7 +234,7 @@ export const RESERVED_ACTION_PREFIX = "core.";
 // Fields: central catalog, referenced by steps.
 // ============================================================
 
-export const fieldOption = z.object({ value: z.string(), label: z.string() });
+export const fieldOption = z.object({ value: z.string(), label: localizedText });
 export type FieldOption = z.infer<typeof fieldOption>;
 
 /** Catalog-level validation. Requiredness is per-step and lives in the view. */
@@ -222,8 +252,8 @@ export type FieldValidation = z.infer<typeof fieldValidation>;
 export type FieldDef = {
   id: FieldId;
   key: Key;
-  label: string;
-  description?: string;
+  label: LocalizedText;
+  description?: LocalizedText;
   type: BaseFieldType | Plugin;
   options?: FieldOption[];
   dataSource?: DataSourceId;
@@ -236,8 +266,8 @@ export const fieldDef: z.ZodType<FieldDef, z.ZodTypeDef, unknown> = z.lazy(() =>
     .object({
       id: fieldId,
       key: z.string(),
-      label: z.string(),
-      description: z.string().optional(),
+      label: localizedText,
+      description: localizedText.optional(),
       type: z.union([baseFieldType, plugin]),
       options: z.array(fieldOption).optional(),
       dataSource: dataSourceId.optional(),
@@ -401,8 +431,8 @@ export const step = z
   .object({
     id: stepId,
     key: z.string(),
-    label: z.string(),
-    description: z.string().optional(),
+    label: localizedText,
+    description: localizedText.optional(),
     type: stepType,
     terminal: z.boolean().optional(),
     outcome: z.string().optional(),
@@ -477,8 +507,9 @@ export type ProcessContract = z.infer<typeof processContract>;
 export const processBody = z
   .object({
     key: z.string(),
-    label: z.string(),
-    description: z.string().optional(),
+    label: localizedText,
+    description: localizedText.optional(),
+    baseLocale: localeCode,
     contract: processContract.optional(),
     fields: z.array(fieldDef),
     dataSources: z.array(dataSourceDef).optional(),
@@ -494,6 +525,26 @@ export const processBody = z
     const fieldIds = new Set(allFields.map((f) => f.id));
     const outcomes = new Set(b.contract?.outcomes ?? []);
     const sink = steps.find((s) => s.id === CANCEL_SINK_STEP_ID);
+
+    // Every LocalizedText value in the body must carry a non-empty entry for
+    // the process's own baseLocale (authored-content-localization capability).
+    // Placed on this base schema — not authoredProcessBody — so both
+    // authoredProcessBody and publishedProcessBody inherit it, and the
+    // compile-injected cancel-sink label is checked too.
+    const requireBaseLocale = (value: LocalizedText | undefined, loc: (string | number)[]) => {
+      if (value !== undefined && !value[b.baseLocale]) add(`missing baseLocale ('${b.baseLocale}') entry`, loc);
+    };
+    requireBaseLocale(b.label, ["label"]);
+    requireBaseLocale(b.description, ["description"]);
+    steps.forEach((s, i) => {
+      requireBaseLocale(s.label, ["workflow", "steps", i, "label"]);
+      requireBaseLocale(s.description, ["workflow", "steps", i, "description"]);
+    });
+    allFields.forEach((f) => {
+      requireBaseLocale(f.label, ["fields", f.id, "label"]);
+      requireBaseLocale(f.description, ["fields", f.id, "description"]);
+      (f.options ?? []).forEach((o, j) => requireBaseLocale(o.label, ["fields", f.id, "options", j, "label"]));
+    });
 
     const RESERVED_CEL_NAMESPACES = new Set(["data", "instance", "actor", "child", "result"]);
 

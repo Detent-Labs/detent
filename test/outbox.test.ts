@@ -43,16 +43,17 @@ const boom: DeliverFn = async () => {
 // step_a (onExit x1) --path_ab (onPath p1)--> step_b terminal (onEntry e1): 3 actions.
 const threeActionBody = (): ProcessBody =>
   ({
+    baseLocale: "en",
     fields: [],
     workflow: {
       initialStep: "step_a",
       steps: [
         {
-          id: "step_a", key: "a", label: "A", type: "task",
+          id: "step_a", key: "a", label: { en: "A" }, type: "task",
           onExit: [act("x1")],
           paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual", onPath: [act("p1")] }],
         },
-        { id: "step_b", key: "b", label: "B", type: "task", terminal: true, onEntry: [act("e1")] },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true, onEntry: [act("e1")] },
       ],
     },
   }) as unknown as ProcessBody;
@@ -62,15 +63,16 @@ const threeActionBody = (): ProcessBody =>
 // stays running with an unused exit so the writeback applies.
 const outputBody = (terminal: boolean): ProcessBody =>
   ({
+    baseLocale: "en",
     fields: [],
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: "A", type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }] },
         terminal
-          ? { id: "step_b", key: "b", label: "B", type: "task", terminal: true, onEntry: [actOut("set", "setter", "field_val", "result.val")] }
-          : { id: "step_b", key: "b", label: "B", type: "task", onEntry: [actOut("set", "setter", "field_val", "result.val")], paths: [{ id: "path_bc", key: "bc", to: "step_c", trigger: "manual" }] },
-        ...(terminal ? [] : [{ id: "step_c", key: "c", label: "C", type: "task", terminal: true }]),
+          ? { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true, onEntry: [actOut("set", "setter", "field_val", "result.val")] }
+          : { id: "step_b", key: "b", label: { en: "B" }, type: "task", onEntry: [actOut("set", "setter", "field_val", "result.val")], paths: [{ id: "path_bc", key: "bc", to: "step_c", trigger: "manual" }] },
+        ...(terminal ? [] : [{ id: "step_c", key: "c", label: { en: "C" }, type: "task", terminal: true }]),
       ],
     },
   }) as unknown as ProcessBody;
@@ -78,13 +80,14 @@ const outputBody = (terminal: boolean): ProcessBody =>
 // Non-terminal target whose onEntry action type is not registered -> dead-letter.
 const ghostBody = (): ProcessBody =>
   ({
+    baseLocale: "en",
     fields: [],
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: "A", type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }] },
-        { id: "step_b", key: "b", label: "B", type: "task", onEntry: [actOut("g", "ghost", "field_val", "result.val")], paths: [{ id: "path_bc", key: "bc", to: "step_c", trigger: "manual" }] },
-        { id: "step_c", key: "c", label: "C", type: "task", terminal: true },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", onEntry: [actOut("g", "ghost", "field_val", "result.val")], paths: [{ id: "path_bc", key: "bc", to: "step_c", trigger: "manual" }] },
+        { id: "step_c", key: "c", label: { en: "C" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -98,14 +101,15 @@ const reminder = { id: "timer_r1", duration: "PT1H", onFire: { actions: [act("re
 // different records: the HistoryEntry and the timer.fired event.
 const sharedSeqBody = (): ProcessBody =>
   ({
+    baseLocale: "en",
     fields: [],
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: "A", type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
-        { id: "step_wait", key: "wait", label: "Wait", type: "task", onEntry: [act("e1")], timers: [reminder],
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
+        { id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task", onEntry: [act("e1")], timers: [reminder],
           paths: [{ id: "path_wd", key: "wd", to: "step_done", trigger: "manual" }] },
-        { id: "step_done", key: "done", label: "Done", type: "task", terminal: true },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -114,13 +118,14 @@ const sharedSeqBody = (): ProcessBody =>
 // HistoryEntry at all — creation writes none.
 const initialReminderBody = (): ProcessBody =>
   ({
+    baseLocale: "en",
     fields: [],
     workflow: {
       initialStep: "step_wait",
       steps: [
-        { id: "step_wait", key: "wait", label: "Wait", type: "task", timers: [reminder],
+        { id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task", timers: [reminder],
           paths: [{ id: "path_wd", key: "wd", to: "step_done", trigger: "manual" }] },
-        { id: "step_done", key: "done", label: "Done", type: "task", terminal: true },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;

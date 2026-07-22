@@ -25,14 +25,14 @@ const cel = (src: string) => ({ lang: "cel", src });
 // Contracted child: one input field, single manual step to a terminal outcome.
 const childBody = (): ProcessBody =>
   ({
-    key: "child", label: "Child",
+    key: "child", label: { en: "Child" }, baseLocale: "en",
     contract: { inputFields: ["field_c_amount"], outputFields: ["field_c_amount"], outcomes: ["approved"] },
-    fields: [{ id: "field_c_amount", key: "amount", label: "Amount", type: "number" }],
+    fields: [{ id: "field_c_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
     workflow: {
       initialStep: "step_c",
       steps: [
-        { id: "step_c", key: "c", label: "C", type: "task", paths: [{ id: "path_c", key: "c", to: "step_done", trigger: "manual" }] },
-        { id: "step_done", key: "done", label: "Done", type: "task", terminal: true, outcome: "approved" },
+        { id: "step_c", key: "c", label: { en: "C" }, type: "task", paths: [{ id: "path_c", key: "c", to: "step_done", trigger: "manual" }] },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true, outcome: "approved" },
       ],
     },
   }) as unknown as ProcessBody;
@@ -42,17 +42,17 @@ const childBody = (): ProcessBody =>
 // rejected at publish, not silently accepted as `child.data: dyn` would allow.
 const childBodyWithInternalField = (): ProcessBody =>
   ({
-    key: "child", label: "Child",
+    key: "child", label: { en: "Child" }, baseLocale: "en",
     contract: { inputFields: ["field_c_amount"], outputFields: ["field_c_amount"], outcomes: ["approved"] },
     fields: [
-      { id: "field_c_amount", key: "amount", label: "Amount", type: "number" },
-      { id: "field_c_internal", key: "internal", label: "Internal", type: "string" },
+      { id: "field_c_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      { id: "field_c_internal", key: "internal", label: { en: "Internal" }, type: "string" },
     ],
     workflow: {
       initialStep: "step_c",
       steps: [
-        { id: "step_c", key: "c", label: "C", type: "task", paths: [{ id: "path_c", key: "c", to: "step_done", trigger: "manual" }] },
-        { id: "step_done", key: "done", label: "Done", type: "task", terminal: true, outcome: "approved" },
+        { id: "step_c", key: "c", label: { en: "C" }, type: "task", paths: [{ id: "path_c", key: "c", to: "step_done", trigger: "manual" }] },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true, outcome: "approved" },
       ],
     },
   }) as unknown as ProcessBody;
@@ -60,13 +60,13 @@ const childBodyWithInternalField = (): ProcessBody =>
 // Same shape without a contract — publishable on its own, but not subprocess-callable.
 const noContractChildBody = (): ProcessBody =>
   ({
-    key: "nc", label: "NC",
-    fields: [{ id: "field_c_amount", key: "amount", label: "Amount", type: "number" }],
+    key: "nc", label: { en: "NC" }, baseLocale: "en",
+    fields: [{ id: "field_c_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
     workflow: {
       initialStep: "step_c",
       steps: [
-        { id: "step_c", key: "c", label: "C", type: "task", paths: [{ id: "path_c", key: "c", to: "step_done", trigger: "manual" }] },
-        { id: "step_done", key: "done", label: "Done", type: "task", terminal: true },
+        { id: "step_c", key: "c", label: { en: "C" }, type: "task", paths: [{ id: "path_c", key: "c", to: "step_done", trigger: "manual" }] },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -75,16 +75,16 @@ const noContractChildBody = (): ProcessBody =>
 // `sub` is the subprocess spec (binding + inputMapping) under test.
 const parentBody = (parentKey: string, sub: Record<string, unknown>): ProcessBody =>
   ({
-    key: parentKey, label: parentKey,
-    fields: [{ id: "field_p_amount", key: "amount", label: "Amount", type: "number" }],
+    key: parentKey, label: { en: parentKey }, baseLocale: "en",
+    fields: [{ id: "field_p_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
     workflow: {
       initialStep: "step_p_entry",
       steps: [
-        { id: "step_p_entry", key: "p_entry", label: "Entry", type: "task", paths: [{ id: "path_p_sub", key: "p_sub", to: "step_p_sub", trigger: "automatic" }] },
-        { id: "step_p_sub", key: "p_sub", label: "Sub", type: "subprocess",
+        { id: "step_p_entry", key: "p_entry", label: { en: "Entry" }, type: "task", paths: [{ id: "path_p_sub", key: "p_sub", to: "step_p_sub", trigger: "automatic" }] },
+        { id: "step_p_sub", key: "p_sub", label: { en: "Sub" }, type: "subprocess",
           subprocess: sub,
           paths: [{ id: "path_p_done", key: "p_done", to: "step_p_done", trigger: "automatic", priority: 1, guard: cel('child.outcome == "approved"') }] },
-        { id: "step_p_done", key: "p_done", label: "Done", type: "task", terminal: true },
+        { id: "step_p_done", key: "p_done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;

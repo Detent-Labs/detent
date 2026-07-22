@@ -22,17 +22,18 @@ const cel = (src: string) => ({ lang: "cel", src });
 // No default path, so the instance parks on step_wait until go == "yes".
 const waitBody = (setterType: string): ProcessBody =>
   ({
-    fields: [{ id: "field_go", key: "go", label: "Go", type: "text" }],
+    baseLocale: "en",
+    fields: [{ id: "field_go", key: "go", label: { en: "Go" }, type: "text" }],
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: "A", type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
         {
-          id: "step_wait", key: "wait", label: "Wait", type: "task",
+          id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task",
           onEntry: [{ id: "action_set", type: setterType, config: {}, output: { field_go: cel("result.v") } } as unknown as Action],
           paths: [{ id: "path_go", key: "go", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }],
         },
-        { id: "step_done", key: "done", label: "Done", type: "task", terminal: true },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -41,13 +42,14 @@ const waitBody = (setterType: string): ProcessBody =>
 // step_end completes the instance, so its writeback is suppressed.
 const terminalWriteBody = (): ProcessBody =>
   ({
-    fields: [{ id: "field_go", key: "go", label: "Go", type: "text" }],
+    baseLocale: "en",
+    fields: [{ id: "field_go", key: "go", label: { en: "Go" }, type: "text" }],
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: "A", type: "task", paths: [{ id: "path_ae", key: "ae", to: "step_end", trigger: "manual" }] },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ae", key: "ae", to: "step_end", trigger: "manual" }] },
         {
-          id: "step_end", key: "end", label: "End", type: "task", terminal: true,
+          id: "step_end", key: "end", label: { en: "End" }, type: "task", terminal: true,
           onEntry: [{ id: "action_set", type: "sayYes", config: {}, output: { field_go: cel("result.v") } } as unknown as Action],
         },
       ],

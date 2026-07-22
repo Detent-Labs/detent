@@ -119,7 +119,10 @@ export function compileProcessBody(body: ProcessBody): ProcessBody {
   const sink: Step = {
     id: CANCEL_SINK_STEP_ID,
     key: CANCEL_SINK_KEY,
-    label: "Cancelled",
+    // Known limitation (design.md D4): this synthesized string has no
+    // translation table, so a non-English baseLocale sees the literal
+    // English word under its own base-locale key.
+    label: { en: "Cancelled", [parsed.baseLocale]: "Cancelled" },
     type: "task",
     terminal: true,
     ...(contracted ? { outcome: RESERVED_CANCEL_OUTCOME } : {}),

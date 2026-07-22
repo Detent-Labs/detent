@@ -130,18 +130,19 @@ const waitBody = (
   opts: { initialStep?: string; onEntry?: unknown[] } = {},
 ): ProcessBody =>
   ({
+    baseLocale: "en",
     fields: [
-      { id: "field_go", key: "go", label: "Go", type: "text" },
-      { id: "field_due", key: "due", label: "Due", type: "text" },
+      { id: "field_go", key: "go", label: { en: "Go" }, type: "text" },
+      { id: "field_due", key: "due", label: { en: "Due" }, type: "text" },
     ],
     workflow: {
       initialStep: opts.initialStep ?? "step_a",
       steps: [
-        { id: "step_a", key: "a", label: "A", type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
-        { id: "step_wait", key: "wait", label: "Wait", type: "task", timers,
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
+        { id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task", timers,
           ...(opts.onEntry ? { onEntry: opts.onEntry } : {}),
           paths: [{ id: "path_go", key: "go", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }] },
-        { id: "step_done", key: "done", label: "Done", type: "task", terminal: true },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -338,13 +339,14 @@ test.skipIf(!DB)("a step whose timers all arm records no timer.unarmed event", a
 // The initial step IS the wait-state, so creation arms it and drops the deadline.
 const initialDropBody = (): ProcessBody =>
   ({
-    fields: [{ id: "field_due", key: "due", label: "Due", type: "text" }],
+    baseLocale: "en",
+    fields: [{ id: "field_due", key: "due", label: { en: "Due" }, type: "text" }],
     workflow: {
       initialStep: "step_wait",
       steps: [
-        { id: "step_wait", key: "wait", label: "Wait", type: "task", timers: [dueTimer],
+        { id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task", timers: [dueTimer],
           paths: [{ id: "path_go", key: "go", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }] },
-        { id: "step_done", key: "done", label: "Done", type: "task", terminal: true },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;

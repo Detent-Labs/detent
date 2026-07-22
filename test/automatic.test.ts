@@ -38,9 +38,9 @@ const autoPath = (id: string, to: string, priority?: number, guardSrc?: string) 
   ({ id, key: id, to, trigger: "automatic", ...(priority !== undefined ? { priority } : {}), ...(guardSrc ? { guard: cel(guardSrc) } : {}) });
 const manualPath = (id: string, to: string) => ({ id, key: id, to, trigger: "manual" });
 const step = (id: string, over: Record<string, unknown> = {}): Step =>
-  ({ id, key: id, label: id, type: "task", ...over }) as unknown as Step;
+  ({ id, key: id, label: { en: id }, type: "task", ...over }) as unknown as Step;
 const mkBody = (steps: Step[], initialStep = "step_a"): ProcessBody =>
-  ({ fields: [], workflow: { initialStep, steps } }) as unknown as ProcessBody;
+  ({ baseLocale: "en", fields: [], workflow: { initialStep, steps } }) as unknown as ProcessBody;
 const inst = (over: Record<string, unknown> = {}): Instance =>
   ({
     instanceId: "inst_x",

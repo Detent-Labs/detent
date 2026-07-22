@@ -40,18 +40,18 @@ const manualPath = (id: string, to: string) => ({ id, key: id, to, trigger: "man
 // flows back through outputMapping.
 const childBody = (): ProcessBody =>
   ({
-    key: "child", label: "Child",
+    key: "child", baseLocale: "en", label: { en: "Child" },
     contract: { inputFields: ["field_c_amount"], outputFields: ["field_c_amount"], outcomes: ["approved", "rejected"] },
-    fields: [{ id: "field_c_amount", key: "amount", label: "Amount", type: "number" }],
+    fields: [{ id: "field_c_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
     workflow: {
       initialStep: "step_c_auto",
       steps: [
-        { id: "step_c_auto", key: "c_auto", label: "Auto", type: "task", paths: [
+        { id: "step_c_auto", key: "c_auto", label: { en: "Auto" }, type: "task", paths: [
           autoPath("path_c_rej", "step_c_rejected", 1, "data.amount > 1000.0"),
           autoPath("path_c_app", "step_c_approved", 2),
         ] },
-        { id: "step_c_approved", key: "c_approved", label: "Approved", type: "task", terminal: true, outcome: "approved" },
-        { id: "step_c_rejected", key: "c_rejected", label: "Rejected", type: "task", terminal: true, outcome: "rejected" },
+        { id: "step_c_approved", key: "c_approved", label: { en: "Approved" }, type: "task", terminal: true, outcome: "approved" },
+        { id: "step_c_rejected", key: "c_rejected", label: { en: "Rejected" }, type: "task", terminal: true, outcome: "rejected" },
       ],
     },
   }) as unknown as ProcessBody;
@@ -61,17 +61,17 @@ const childBody = (): ProcessBody =>
 // (not the initial step), so commitTransition enqueues the spawn.
 const parentBody = (childVersion: number): ProcessBody =>
   ({
-    key: "parent", label: "Parent",
+    key: "parent", baseLocale: "en", label: { en: "Parent" },
     fields: [
-      { id: "field_p_amount", key: "amount", label: "Amount", type: "number" },
-      { id: "field_p_result", key: "result", label: "Result", type: "string" },
-      { id: "field_p_back", key: "back_amount", label: "Back", type: "number" },
+      { id: "field_p_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      { id: "field_p_result", key: "result", label: { en: "Result" }, type: "string" },
+      { id: "field_p_back", key: "back_amount", label: { en: "Back" }, type: "number" },
     ],
     workflow: {
       initialStep: "step_p_entry",
       steps: [
-        { id: "step_p_entry", key: "p_entry", label: "Entry", type: "task", paths: [autoPath("path_p_sub", "step_p_sub")] },
-        { id: "step_p_sub", key: "p_sub", label: "Sub", type: "subprocess",
+        { id: "step_p_entry", key: "p_entry", label: { en: "Entry" }, type: "task", paths: [autoPath("path_p_sub", "step_p_sub")] },
+        { id: "step_p_sub", key: "p_sub", label: { en: "Sub" }, type: "subprocess",
           subprocess: {
             processId: CHILD_PID, versionBinding: "pinned", pinnedVersion: childVersion,
             inputMapping: { field_c_amount: cel("data.amount") },
@@ -81,8 +81,8 @@ const parentBody = (childVersion: number): ProcessBody =>
             autoPath("path_p_app", "step_p_approved", 1, 'child.outcome == "approved"'),
             autoPath("path_p_rej", "step_p_rejected", 2, 'child.outcome == "rejected"'),
           ] },
-        { id: "step_p_approved", key: "p_approved", label: "PApproved", type: "task", terminal: true },
-        { id: "step_p_rejected", key: "p_rejected", label: "PRejected", type: "task", terminal: true },
+        { id: "step_p_approved", key: "p_approved", label: { en: "PApproved" }, type: "task", terminal: true },
+        { id: "step_p_rejected", key: "p_rejected", label: { en: "PRejected" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -93,16 +93,16 @@ const parentBody = (childVersion: number): ProcessBody =>
 // to observe.
 const parentMidCascadeBody = (childVersion: number): ProcessBody =>
   ({
-    key: "parent_mid", label: "Parent Mid",
+    key: "parent_mid", baseLocale: "en", label: { en: "Parent Mid" },
     fields: [
-      { id: "field_p_amount", key: "amount", label: "Amount", type: "number" },
-      { id: "field_p_result", key: "result", label: "Result", type: "string" },
+      { id: "field_p_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      { id: "field_p_result", key: "result", label: { en: "Result" }, type: "string" },
     ],
     workflow: {
       initialStep: "step_p_entry",
       steps: [
-        { id: "step_p_entry", key: "p_entry", label: "Entry", type: "task", paths: [autoPath("path_p_sub", "step_p_sub")] },
-        { id: "step_p_sub", key: "p_sub", label: "Sub", type: "subprocess",
+        { id: "step_p_entry", key: "p_entry", label: { en: "Entry" }, type: "task", paths: [autoPath("path_p_sub", "step_p_sub")] },
+        { id: "step_p_sub", key: "p_sub", label: { en: "Sub" }, type: "subprocess",
           subprocess: {
             processId: CHILD_PID, versionBinding: "pinned", pinnedVersion: childVersion,
             inputMapping: { field_c_amount: cel("data.amount") },
@@ -112,9 +112,9 @@ const parentMidCascadeBody = (childVersion: number): ProcessBody =>
             autoPath("path_p_app", "step_p_mid", 1, 'child.outcome == "approved"'),
             autoPath("path_p_rej", "step_p_rejected", 2, 'child.outcome == "rejected"'),
           ] },
-        { id: "step_p_mid", key: "p_mid", label: "Mid", type: "task", paths: [autoPath("path_p_done", "step_p_approved")] },
-        { id: "step_p_approved", key: "p_approved", label: "PApproved", type: "task", terminal: true },
-        { id: "step_p_rejected", key: "p_rejected", label: "PRejected", type: "task", terminal: true },
+        { id: "step_p_mid", key: "p_mid", label: { en: "Mid" }, type: "task", paths: [autoPath("path_p_done", "step_p_approved")] },
+        { id: "step_p_approved", key: "p_approved", label: { en: "PApproved" }, type: "task", terminal: true },
+        { id: "step_p_rejected", key: "p_rejected", label: { en: "PRejected" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -123,14 +123,14 @@ const parentMidCascadeBody = (childVersion: number): ProcessBody =>
 // running until cancelled — used to observe the cancel cascade.
 const waitingChildBody = (): ProcessBody =>
   ({
-    key: "waiting", label: "Waiting",
+    key: "waiting", baseLocale: "en", label: { en: "Waiting" },
     contract: { outcomes: ["done"] },
     fields: [],
     workflow: {
       initialStep: "step_w_wait",
       steps: [
-        { id: "step_w_wait", key: "w_wait", label: "Wait", type: "task", paths: [manualPath("path_w_done", "step_w_done")] },
-        { id: "step_w_done", key: "w_done", label: "Done", type: "task", terminal: true, outcome: "done" },
+        { id: "step_w_wait", key: "w_wait", label: { en: "Wait" }, type: "task", paths: [manualPath("path_w_done", "step_w_done")] },
+        { id: "step_w_done", key: "w_done", label: { en: "Done" }, type: "task", terminal: true, outcome: "done" },
       ],
     },
   }) as unknown as ProcessBody;
@@ -139,21 +139,21 @@ const waitingChildBody = (): ProcessBody =>
 // subprocess wait-state -> terminal outcomes. inputMapping/outputMapping empty.
 const callerBody = (key: string, childPid: string, childVersion: number): ProcessBody =>
   ({
-    key, label: key,
+    key, baseLocale: "en", label: { en: key },
     contract: { outcomes: ["approved", "rejected"] },
     fields: [],
     workflow: {
       initialStep: "step_entry",
       steps: [
-        { id: "step_entry", key: "entry", label: "Entry", type: "task", paths: [autoPath("path_sub", "step_sub")] },
-        { id: "step_sub", key: "sub", label: "Sub", type: "subprocess",
+        { id: "step_entry", key: "entry", label: { en: "Entry" }, type: "task", paths: [autoPath("path_sub", "step_sub")] },
+        { id: "step_sub", key: "sub", label: { en: "Sub" }, type: "subprocess",
           subprocess: { processId: childPid, versionBinding: "pinned", pinnedVersion: childVersion, inputMapping: {}, outputMapping: {} },
           paths: [
             autoPath("path_app", "step_approved", 1, 'child.outcome == "approved"'),
             autoPath("path_rej", "step_rejected", 2, 'child.outcome == "rejected"'),
           ] },
-        { id: "step_approved", key: "approved", label: "Approved", type: "task", terminal: true, outcome: "approved" },
-        { id: "step_rejected", key: "rejected", label: "Rejected", type: "task", terminal: true, outcome: "rejected" },
+        { id: "step_approved", key: "approved", label: { en: "Approved" }, type: "task", terminal: true, outcome: "approved" },
+        { id: "step_rejected", key: "rejected", label: { en: "Rejected" }, type: "task", terminal: true, outcome: "rejected" },
       ],
     },
   }) as unknown as ProcessBody;
@@ -163,18 +163,18 @@ const callerBody = (key: string, childPid: string, childVersion: number): Proces
 // gets a distinct version).
 const childBodyV = (outputFields: string[], labelSuffix: string): ProcessBody =>
   ({
-    key: "child", label: "Child" + labelSuffix,
+    key: "child", baseLocale: "en", label: { en: "Child" + labelSuffix },
     contract: { inputFields: ["field_c_amount"], outputFields, outcomes: ["approved", "rejected"] },
-    fields: [{ id: "field_c_amount", key: "amount", label: "Amount", type: "number" }],
+    fields: [{ id: "field_c_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
     workflow: {
       initialStep: "step_c_auto",
       steps: [
-        { id: "step_c_auto", key: "c_auto", label: "Auto" + labelSuffix, type: "task", paths: [
+        { id: "step_c_auto", key: "c_auto", label: { en: "Auto" + labelSuffix }, type: "task", paths: [
           autoPath("path_c_rej", "step_c_rejected", 1, "data.amount > 1000.0"),
           autoPath("path_c_app", "step_c_approved", 2),
         ] },
-        { id: "step_c_approved", key: "c_approved", label: "Approved", type: "task", terminal: true, outcome: "approved" },
-        { id: "step_c_rejected", key: "c_rejected", label: "Rejected", type: "task", terminal: true, outcome: "rejected" },
+        { id: "step_c_approved", key: "c_approved", label: { en: "Approved" }, type: "task", terminal: true, outcome: "approved" },
+        { id: "step_c_rejected", key: "c_rejected", label: { en: "Rejected" }, type: "task", terminal: true, outcome: "rejected" },
       ],
     },
   }) as unknown as ProcessBody;
@@ -183,16 +183,16 @@ const childBodyV = (outputFields: string[], labelSuffix: string): ProcessBody =>
 // pinned version.
 const parentLatestBody = (childPid: string, contractRef: string): ProcessBody =>
   ({
-    key: "parent_lv", label: "Parent LV",
+    key: "parent_lv", baseLocale: "en", label: { en: "Parent LV" },
     fields: [
-      { id: "field_p_amount", key: "amount", label: "Amount", type: "number" },
-      { id: "field_p_result", key: "result", label: "Result", type: "string" },
+      { id: "field_p_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      { id: "field_p_result", key: "result", label: { en: "Result" }, type: "string" },
     ],
     workflow: {
       initialStep: "step_p_entry",
       steps: [
-        { id: "step_p_entry", key: "p_entry", label: "Entry", type: "task", paths: [autoPath("path_p_sub", "step_p_sub")] },
-        { id: "step_p_sub", key: "p_sub", label: "Sub", type: "subprocess",
+        { id: "step_p_entry", key: "p_entry", label: { en: "Entry" }, type: "task", paths: [autoPath("path_p_sub", "step_p_sub")] },
+        { id: "step_p_sub", key: "p_sub", label: { en: "Sub" }, type: "subprocess",
           subprocess: {
             processId: childPid, versionBinding: "latest-at-spawn", contractRef,
             inputMapping: { field_c_amount: cel("data.amount") },
@@ -202,8 +202,8 @@ const parentLatestBody = (childPid: string, contractRef: string): ProcessBody =>
             autoPath("path_p_app", "step_p_approved", 1, 'child.outcome == "approved"'),
             autoPath("path_p_rej", "step_p_rejected", 2, 'child.outcome == "rejected"'),
           ] },
-        { id: "step_p_approved", key: "p_approved", label: "PApproved", type: "task", terminal: true },
-        { id: "step_p_rejected", key: "p_rejected", label: "PRejected", type: "task", terminal: true },
+        { id: "step_p_approved", key: "p_approved", label: { en: "PApproved" }, type: "task", terminal: true },
+        { id: "step_p_rejected", key: "p_rejected", label: { en: "PRejected" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -214,32 +214,32 @@ const parentLatestBody = (childPid: string, contractRef: string): ProcessBody =>
 // differ, and so do the two mappings.
 const twoSubParentBody = (childVersion: number): ProcessBody =>
   ({
-    key: "parent2", label: "Parent2",
+    key: "parent2", baseLocale: "en", label: { en: "Parent2" },
     fields: [
-      { id: "field_p_amount", key: "amount", label: "Amount", type: "number" },
-      { id: "field_p_result", key: "result", label: "Result", type: "string" },
-      { id: "field_p_result2", key: "result2", label: "Result2", type: "string" },
+      { id: "field_p_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      { id: "field_p_result", key: "result", label: { en: "Result" }, type: "string" },
+      { id: "field_p_result2", key: "result2", label: { en: "Result2" }, type: "string" },
     ],
     workflow: {
       initialStep: "step_p_entry",
       steps: [
-        { id: "step_p_entry", key: "p_entry", label: "Entry", type: "task", paths: [autoPath("path_p_sub", "step_p_sub")] },
-        { id: "step_p_sub", key: "p_sub", label: "Sub", type: "subprocess",
+        { id: "step_p_entry", key: "p_entry", label: { en: "Entry" }, type: "task", paths: [autoPath("path_p_sub", "step_p_sub")] },
+        { id: "step_p_sub", key: "p_sub", label: { en: "Sub" }, type: "subprocess",
           subprocess: {
             processId: CHILD_PID, versionBinding: "pinned", pinnedVersion: childVersion,
             inputMapping: { field_c_amount: cel("data.amount") },
             outputMapping: { field_p_result: cel("child.outcome") },
           },
           paths: [autoPath("path_p_done", "step_p_done", 1, 'child.outcome != ""')] },
-        { id: "step_p_sub2", key: "p_sub2", label: "Sub2", type: "subprocess",
+        { id: "step_p_sub2", key: "p_sub2", label: { en: "Sub2" }, type: "subprocess",
           subprocess: {
             processId: CHILD_PID, versionBinding: "pinned", pinnedVersion: childVersion,
             inputMapping: {},
             outputMapping: { field_p_result2: cel("child.outcome") },
           },
           paths: [autoPath("path_p_done2", "step_p_done2", 1, 'child.outcome != ""')] },
-        { id: "step_p_done", key: "p_done", label: "Done", type: "task", terminal: true },
-        { id: "step_p_done2", key: "p_done2", label: "Done2", type: "task", terminal: true },
+        { id: "step_p_done", key: "p_done", label: { en: "Done" }, type: "task", terminal: true },
+        { id: "step_p_done2", key: "p_done2", label: { en: "Done2" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -248,20 +248,20 @@ const twoSubParentBody = (childVersion: number): ProcessBody =>
 // to observe an independently cancelled child surfacing the reserved outcome.
 const cancelAwareParent = (childPid: string, childVersion: number): ProcessBody =>
   ({
-    key: "ca_parent", label: "CA Parent",
-    fields: [{ id: "field_ca_seen", key: "seen", label: "Seen", type: "string" }],
+    key: "ca_parent", baseLocale: "en", label: { en: "CA Parent" },
+    fields: [{ id: "field_ca_seen", key: "seen", label: { en: "Seen" }, type: "string" }],
     workflow: {
       initialStep: "step_ca_entry",
       steps: [
-        { id: "step_ca_entry", key: "ca_entry", label: "Entry", type: "task", paths: [autoPath("path_ca_sub", "step_ca_sub")] },
-        { id: "step_ca_sub", key: "ca_sub", label: "Sub", type: "subprocess",
+        { id: "step_ca_entry", key: "ca_entry", label: { en: "Entry" }, type: "task", paths: [autoPath("path_ca_sub", "step_ca_sub")] },
+        { id: "step_ca_sub", key: "ca_sub", label: { en: "Sub" }, type: "subprocess",
           subprocess: { processId: childPid, versionBinding: "pinned", pinnedVersion: childVersion, inputMapping: {}, outputMapping: { field_ca_seen: cel("child.outcome") } },
           paths: [
             autoPath("path_ca_cancelled", "step_ca_cancelled", 1, 'child.outcome == "cancelled"'),
             autoPath("path_ca_done", "step_ca_done", 2, 'child.outcome == "done"'),
           ] },
-        { id: "step_ca_cancelled", key: "ca_cancelled", label: "Saw Cancelled", type: "task", terminal: true },
-        { id: "step_ca_done", key: "ca_done", label: "Done", type: "task", terminal: true },
+        { id: "step_ca_cancelled", key: "ca_cancelled", label: { en: "Saw Cancelled" }, type: "task", terminal: true },
+        { id: "step_ca_done", key: "ca_done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -271,16 +271,16 @@ const cancelAwareParent = (childPid: string, childVersion: number): ProcessBody 
 // no path here, reproducing finding #5's "trivially reachable" trigger.
 const noCancelGuardParent = (childPid: string, childVersion: number): ProcessBody =>
   ({
-    key: "nc_parent", label: "NC Parent",
-    fields: [{ id: "field_nc_seen", key: "seen", label: "Seen", type: "string" }],
+    key: "nc_parent", baseLocale: "en", label: { en: "NC Parent" },
+    fields: [{ id: "field_nc_seen", key: "seen", label: { en: "Seen" }, type: "string" }],
     workflow: {
       initialStep: "step_nc_entry",
       steps: [
-        { id: "step_nc_entry", key: "nc_entry", label: "Entry", type: "task", paths: [autoPath("path_nc_sub", "step_nc_sub")] },
-        { id: "step_nc_sub", key: "nc_sub", label: "Sub", type: "subprocess",
+        { id: "step_nc_entry", key: "nc_entry", label: { en: "Entry" }, type: "task", paths: [autoPath("path_nc_sub", "step_nc_sub")] },
+        { id: "step_nc_sub", key: "nc_sub", label: { en: "Sub" }, type: "subprocess",
           subprocess: { processId: childPid, versionBinding: "pinned", pinnedVersion: childVersion, inputMapping: {}, outputMapping: { field_nc_seen: cel("child.outcome") } },
           paths: [autoPath("path_nc_done", "step_nc_done", 1, 'child.outcome == "done"')] },
-        { id: "step_nc_done", key: "nc_done", label: "Done", type: "task", terminal: true },
+        { id: "step_nc_done", key: "nc_done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -289,23 +289,23 @@ const noCancelGuardParent = (childPid: string, childVersion: number): ProcessBod
 // "rejected" child outcome matches no path, for a non-cancel unmatched case.
 const unmatchedParentBody = (childVersion: number): ProcessBody =>
   ({
-    key: "unm_parent", label: "Unmatched Parent",
+    key: "unm_parent", baseLocale: "en", label: { en: "Unmatched Parent" },
     fields: [
-      { id: "field_p_amount", key: "amount", label: "Amount", type: "number" },
-      { id: "field_p_result", key: "result", label: "Result", type: "string" },
+      { id: "field_p_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      { id: "field_p_result", key: "result", label: { en: "Result" }, type: "string" },
     ],
     workflow: {
       initialStep: "step_p_entry",
       steps: [
-        { id: "step_p_entry", key: "p_entry", label: "Entry", type: "task", paths: [autoPath("path_p_sub", "step_p_sub")] },
-        { id: "step_p_sub", key: "p_sub", label: "Sub", type: "subprocess",
+        { id: "step_p_entry", key: "p_entry", label: { en: "Entry" }, type: "task", paths: [autoPath("path_p_sub", "step_p_sub")] },
+        { id: "step_p_sub", key: "p_sub", label: { en: "Sub" }, type: "subprocess",
           subprocess: {
             processId: CHILD_PID, versionBinding: "pinned", pinnedVersion: childVersion,
             inputMapping: { field_c_amount: cel("data.amount") },
             outputMapping: { field_p_result: cel("child.outcome") },
           },
           paths: [autoPath("path_p_app", "step_p_approved", 1, 'child.outcome == "approved"')] },
-        { id: "step_p_approved", key: "p_approved", label: "PApproved", type: "task", terminal: true },
+        { id: "step_p_approved", key: "p_approved", label: { en: "PApproved" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -315,16 +315,16 @@ const unmatchedParentBody = (childVersion: number): ProcessBody =>
 // parentBody, minus the entry step.
 const subInitialParentBody = (childVersion: number): ProcessBody =>
   ({
-    key: "parent_si", label: "Parent SI",
+    key: "parent_si", baseLocale: "en", label: { en: "Parent SI" },
     fields: [
-      { id: "field_p_amount", key: "amount", label: "Amount", type: "number" },
-      { id: "field_p_result", key: "result", label: "Result", type: "string" },
-      { id: "field_p_back", key: "back_amount", label: "Back", type: "number" },
+      { id: "field_p_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      { id: "field_p_result", key: "result", label: { en: "Result" }, type: "string" },
+      { id: "field_p_back", key: "back_amount", label: { en: "Back" }, type: "number" },
     ],
     workflow: {
       initialStep: "step_p_sub",
       steps: [
-        { id: "step_p_sub", key: "p_sub", label: "Sub", type: "subprocess",
+        { id: "step_p_sub", key: "p_sub", label: { en: "Sub" }, type: "subprocess",
           subprocess: {
             processId: CHILD_PID, versionBinding: "pinned", pinnedVersion: childVersion,
             inputMapping: { field_c_amount: cel("data.amount") },
@@ -334,8 +334,8 @@ const subInitialParentBody = (childVersion: number): ProcessBody =>
             autoPath("path_p_app", "step_p_approved", 1, 'child.outcome == "approved"'),
             autoPath("path_p_rej", "step_p_rejected", 2, 'child.outcome == "rejected"'),
           ] },
-        { id: "step_p_approved", key: "p_approved", label: "PApproved", type: "task", terminal: true },
-        { id: "step_p_rejected", key: "p_rejected", label: "PRejected", type: "task", terminal: true },
+        { id: "step_p_approved", key: "p_approved", label: { en: "PApproved" }, type: "task", terminal: true },
+        { id: "step_p_rejected", key: "p_rejected", label: { en: "PRejected" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -345,20 +345,20 @@ const subInitialParentBody = (childVersion: number): ProcessBody =>
 // child is the nested initial-step case.
 const subInitialCallerBody = (key: string, childPid: string, childVersion: number): ProcessBody =>
   ({
-    key, label: key,
+    key, baseLocale: "en", label: { en: key },
     contract: { outcomes: ["approved", "rejected"] },
     fields: [],
     workflow: {
       initialStep: "step_sub",
       steps: [
-        { id: "step_sub", key: "sub", label: "Sub", type: "subprocess",
+        { id: "step_sub", key: "sub", label: { en: "Sub" }, type: "subprocess",
           subprocess: { processId: childPid, versionBinding: "pinned", pinnedVersion: childVersion, inputMapping: {}, outputMapping: {} },
           paths: [
             autoPath("path_app", "step_approved", 1, 'child.outcome == "approved"'),
             autoPath("path_rej", "step_rejected", 2, 'child.outcome == "rejected"'),
           ] },
-        { id: "step_approved", key: "approved", label: "Approved", type: "task", terminal: true, outcome: "approved" },
-        { id: "step_rejected", key: "rejected", label: "Rejected", type: "task", terminal: true, outcome: "rejected" },
+        { id: "step_approved", key: "approved", label: { en: "Approved" }, type: "task", terminal: true, outcome: "approved" },
+        { id: "step_rejected", key: "rejected", label: { en: "Rejected" }, type: "task", terminal: true, outcome: "rejected" },
       ],
     },
   }) as unknown as ProcessBody;
@@ -453,9 +453,9 @@ beforeAll(async () => {
 
 test("an authored action using the reserved core. prefix is rejected", () => {
   const withType = (type: string): ProcessBody =>
-    ({ key: "k", label: "L", fields: [], workflow: { initialStep: "step_a", steps: [
-      { id: "step_a", key: "a", label: "A", type: "task", onEntry: [{ id: "action_x", type, config: {} }], paths: [manualPath("path_ab", "step_b")] },
-      { id: "step_b", key: "b", label: "B", type: "task", terminal: true },
+    ({ key: "k", baseLocale: "en", label: { en: "L" }, fields: [], workflow: { initialStep: "step_a", steps: [
+      { id: "step_a", key: "a", label: { en: "A" }, type: "task", onEntry: [{ id: "action_x", type, config: {} }], paths: [manualPath("path_ab", "step_b")] },
+      { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
     ] } }) as unknown as ProcessBody;
   expect(authoredProcessBody.safeParse(withType("core.spawnSubprocess")).success).toBe(false);
   expect(authoredProcessBody.safeParse(withType("email")).success).toBe(true);

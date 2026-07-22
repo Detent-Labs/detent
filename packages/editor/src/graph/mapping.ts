@@ -1,4 +1,5 @@
 import type { Draft } from "../draft/types";
+import { resolveDraftLocalizedText } from "../draft/localized-text";
 
 export interface GraphNode {
   id: string;
@@ -27,8 +28,13 @@ export interface DraftGraph {
  * path whose `to` doesn't resolve to a node in this same pass, since an
  * unresolved target is a validation issue (`EditorIssue`), not something
  * the graph silently draws as an edge to nowhere.
+ *
+ * `contentLocale`/`baseLocale` resolve a step's `LocalizedText` label for
+ * display (editor-graph-view spec) — this is a plain function with no
+ * React context, so the caller (GraphView) supplies both explicitly rather
+ * than this reading them off a hook itself.
  */
-export function draftToGraph(draft: Draft): DraftGraph {
+export function draftToGraph(draft: Draft, contentLocale: string, baseLocale: string): DraftGraph {
   const steps = draft.workflow?.steps ?? [];
   const nodeIds = new Set<string>();
   for (const s of steps) if (s.id) nodeIds.add(s.id);
@@ -38,7 +44,7 @@ export function draftToGraph(draft: Draft): DraftGraph {
     if (!s.id) continue;
     nodes.push({
       id: s.id,
-      label: s.key || s.label || "(unnamed step)",
+      label: s.key || resolveDraftLocalizedText(s.label, contentLocale, baseLocale) || "(unnamed step)",
       stepKey: s.key ?? "",
       terminal: s.terminal === true,
       isInitial: draft.workflow?.initialStep === s.id,

@@ -12,11 +12,12 @@ function validDraft(): Draft {
   const step = mintId("step");
   return {
     key: "test_process",
-    label: "Test process",
+    label: { en: "Test process" },
+    baseLocale: "en",
     fields: [],
     workflow: {
       initialStep: step,
-      steps: [{ id: step, key: "start", label: "Start", type: "task", terminal: true }],
+      steps: [{ id: step, key: "start", label: { en: "Start" }, type: "task", terminal: true }],
     },
   } as Draft;
 }

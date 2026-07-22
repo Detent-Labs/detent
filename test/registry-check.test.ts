@@ -22,7 +22,8 @@ const bodyWithActions = (opts: {
 }): ProcessBody =>
   ({
     key: "p",
-    label: "P",
+    label: { en: "P" },
+    baseLocale: "en",
     fields: [],
     workflow: {
       initialStep: "step_a",
@@ -30,7 +31,7 @@ const bodyWithActions = (opts: {
         {
           id: "step_a",
           key: "a",
-          label: "A",
+          label: { en: "A" },
           type: "task",
           ...(opts.onEntry ? { onEntry: opts.onEntry } : {}),
           ...(opts.onExit ? { onExit: opts.onExit } : {}),
@@ -38,7 +39,7 @@ const bodyWithActions = (opts: {
           ...(opts.onFire ? { timers: [{ id: "timer_t", duration: "PT1H", onFire: { actions: opts.onFire } }] } : {}),
           paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual", ...(opts.onPath ? { onPath: opts.onPath } : {}) }],
         },
-        { id: "step_b", key: "b", label: "B", type: "task", terminal: true },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
