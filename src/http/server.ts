@@ -12,8 +12,17 @@ import { createRegistry, type Registry } from "../engine/registry.js";
 import { handleCreateInstance, handleGetInstanceView, handleSubmit } from "./routes.js";
 import type { HttpResult } from "./errors.js";
 
+const CORS_ORIGIN_HEADER = { "Access-Control-Allow-Origin": "*" };
+
 function toResponse({ status, body }: HttpResult): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...CORS_ORIGIN_HEADER } });
+}
+
+function preflightResponse(method: string): Response {
+  return new Response(null, {
+    status: 204,
+    headers: { ...CORS_ORIGIN_HEADER, "Access-Control-Allow-Methods": method, "Access-Control-Allow-Headers": "Content-Type" },
+  });
 }
 
 /**
@@ -25,6 +34,17 @@ export function createServer(_registry: Registry, db: SQL = sql): (req: Request)
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     const parts = url.pathname.split("/").filter(Boolean);
+
+    // CORS preflight for each of the three routes below
+    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "processes" && parts[2] === "instances") {
+      return preflightResponse("POST");
+    }
+    if (req.method === "OPTIONS" && parts.length === 2 && parts[0] === "instances") {
+      return preflightResponse("GET");
+    }
+    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "instances" && parts[2] === "submit") {
+      return preflightResponse("POST");
+    }
 
     // POST /processes/:processId/instances
     if (req.method === "POST" && parts.length === 3 && parts[0] === "processes" && parts[2] === "instances") {

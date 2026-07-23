@@ -1,4 +1,7 @@
+import { useState } from "react";
 import { DraftProvider, useDraft } from "./draft/store";
+import { PlayerProvider } from "./player/store";
+import { PlayerView } from "./player/PlayerView";
 import { draftFields } from "./draft/fields";
 import { LocaleProvider, useT } from "./i18n/store";
 import { LocaleSwitcher } from "./i18n/LocaleSwitcher";
@@ -60,12 +63,32 @@ function Editor() {
   );
 }
 
+/** Both subtrees stay mounted once created — the toggle only hides one via
+ * CSS, so switching to Player mode and back never unmounts (and so never
+ * loses) the open Draft's state (editor-player spec: "Switching to Player
+ * mode does not affect the open Draft"). */
 export function App() {
+  const [mode, setMode] = useState<"structure" | "player">("structure");
   return (
     <LocaleProvider>
-      <DraftProvider>
-        <Editor />
-      </DraftProvider>
+      <nav className="app-mode-toggle">
+        <button type="button" aria-pressed={mode === "structure"} onClick={() => setMode("structure")}>
+          Structure
+        </button>
+        <button type="button" aria-pressed={mode === "player"} onClick={() => setMode("player")}>
+          Player
+        </button>
+      </nav>
+      <div hidden={mode !== "structure"}>
+        <DraftProvider>
+          <Editor />
+        </DraftProvider>
+      </div>
+      <div hidden={mode !== "player"}>
+        <PlayerProvider>
+          <PlayerView />
+        </PlayerProvider>
+      </div>
     </LocaleProvider>
   );
 }

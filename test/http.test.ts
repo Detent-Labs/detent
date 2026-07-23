@@ -372,6 +372,48 @@ test.skipIf(!DB)("POST actor is accepted from the JSON body regardless of shape 
 });
 
 // ============================================================
+// CORS
+// ============================================================
+
+test.skipIf(!DB)("a normal response carries the CORS allow-origin header", async () => {
+  const PID = pid("proc_http_cors_normal");
+  await publishBody(PID, simpleBody(), reg);
+
+  const res = await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", { actor: { id: "user_1", roles: [] } }));
+  expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+});
+
+test.skipIf(!DB)("an error response also carries the CORS allow-origin header", async () => {
+  const res = await fetch(new Request("http://x/instances/inst_does_not_exist?actorId=user_1"));
+  expect(res.status).toBe(500);
+  expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+});
+
+test("OPTIONS preflight on the create-instance route returns 204 with CORS headers, without creating an instance", async () => {
+  const res = await fetch(new Request("http://x/processes/proc_x/instances", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type");
+});
+
+test("OPTIONS preflight on the get-instance-view route returns 204 with CORS headers", async () => {
+  const res = await fetch(new Request("http://x/instances/inst_x", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type");
+});
+
+test("OPTIONS preflight on the submit route returns 204 with CORS headers, without submitting", async () => {
+  const res = await fetch(new Request("http://x/instances/inst_x/submit", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type");
+});
+
+// ============================================================
 // Async settle: book step over HTTP against the real expense-approval example
 // ============================================================
 
