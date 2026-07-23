@@ -26,23 +26,35 @@ interface DraftContextValue {
   contentLocale: string;
   setContentLocale: (locale: string) => void;
   usedLocales: string[];
+  /** Increments only on `replace` (Load/Import), never on `mutate` — the
+   * signal `GraphView` uses to re-fit after a load, since a reload of an
+   * unchanged process doesn't otherwise produce any other observable state
+   * change (see editor-graph-edge-routing design.md). */
+  loadGeneration: number;
 }
 
 const DraftContext = createContext<DraftContextValue | null>(null);
 
-type Action = { kind: "mutate"; recipe: (draft: Immer<Draft>) => void } | { kind: "replace"; next: Draft };
+export type Action = { kind: "mutate"; recipe: (draft: Immer<Draft>) => void } | { kind: "replace"; next: Draft };
 
-function reducer(state: Draft, action: Action): Draft {
+export interface ReducerState {
+  draft: Draft;
+  loadGeneration: number;
+}
+
+/** Exported for a direct unit test (`draft-store-reducer.test.ts`) — pure
+ * function, no DOM/React needed to exercise the `loadGeneration` invariant. */
+export function reducer(state: ReducerState, action: Action): ReducerState {
   switch (action.kind) {
     case "mutate":
-      return produce(state, action.recipe);
+      return { ...state, draft: produce(state.draft, action.recipe) };
     case "replace":
-      return action.next;
+      return { draft: action.next, loadGeneration: state.loadGeneration + 1 };
   }
 }
 
 export function DraftProvider({ children, initial }: { children: ReactNode; initial?: Draft }) {
-  const [draft, dispatch] = useReducer(reducer, initial ?? EMPTY_DRAFT);
+  const [{ draft, loadGeneration }, dispatch] = useReducer(reducer, { draft: initial ?? EMPTY_DRAFT, loadGeneration: 0 });
   const [registry, setRegistry] = useState<Registry | undefined>(undefined);
   const [loadedChildren, setLoadedChildren] = useState<Record<string, ProcessBody>>({});
   // Seeded from the initially-loaded Draft's own baseLocale (falling back to
@@ -83,8 +95,9 @@ export function DraftProvider({ children, initial }: { children: ReactNode; init
       contentLocale,
       setContentLocale,
       usedLocales,
+      loadGeneration,
     }),
-    [draft, validation, registry, loadedChildren, contentLocale, usedLocales],
+    [draft, validation, registry, loadedChildren, contentLocale, usedLocales, loadGeneration],
   );
 
   return <DraftContext.Provider value={value}>{children}</DraftContext.Provider>;
