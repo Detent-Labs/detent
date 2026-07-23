@@ -29,6 +29,7 @@ coverage/
 Thumbs.db
 
 # Claude Code (personal, per-machine)
+.claude/settings.json
 .claude/settings.local.json
 
 # Local devcontainer overrides (personal, per-machine)
