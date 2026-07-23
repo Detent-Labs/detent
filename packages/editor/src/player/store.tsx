@@ -1,0 +1,192 @@
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createInstance as apiCreateInstance, getInstanceView as apiGetInstanceView, submit as apiSubmit, PlayerClientError } from "./client";
+import type { Actor, ClientError, InstanceView, ResolvedViewField } from "./types";
+
+export const STORAGE_KEY = "player.connection";
+
+export interface StoredConnection {
+  serverUrl: string;
+  actorId: string;
+  actorRoles: string;
+}
+
+export const DEFAULT_CONNECTION: StoredConnection = { serverUrl: "http://localhost:3000", actorId: "", actorRoles: "" };
+
+interface StorageLike {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+}
+
+function browserStorage(): StorageLike | undefined {
+  return typeof localStorage === "undefined" ? undefined : localStorage;
+}
+
+/** Pure (storage injectable), so persistence round-trips directly without
+ * mounting a Provider — see `player-store.test.ts`. */
+export function loadStoredConnection(storage: StorageLike | undefined = browserStorage()): StoredConnection {
+  if (!storage) return DEFAULT_CONNECTION;
+  try {
+    const raw = storage.getItem(STORAGE_KEY);
+    if (!raw) return DEFAULT_CONNECTION;
+    return { ...DEFAULT_CONNECTION, ...(JSON.parse(raw) as Partial<StoredConnection>) };
+  } catch {
+    return DEFAULT_CONNECTION;
+  }
+}
+
+export function persistConnection(conn: StoredConnection, storage: StorageLike | undefined = browserStorage()): void {
+  storage?.setItem(STORAGE_KEY, JSON.stringify(conn));
+}
+
+function isGroupField(field: ResolvedViewField): boolean {
+  return field.field.type === "group";
+}
+
+/** Visible, non-readonly, non-group-container field ids — the field-set
+ * boundary `submitAndTransition` enforces server-side (editor-player spec:
+ * "Player submits only visible, editable fields"). */
+export function editableFieldIds(view: InstanceView): Set<string> {
+  return new Set(view.fields.filter((f) => !isGroupField(f) && !f.readonly).map((f) => f.field.id));
+}
+
+function filterToEditable(data: Record<string, unknown>, view: InstanceView): Record<string, unknown> {
+  const editable = editableFieldIds(view);
+  const filtered: Record<string, unknown> = {};
+  for (const [fieldId, value] of Object.entries(data)) {
+    if (editable.has(fieldId)) filtered[fieldId] = value;
+  }
+  return filtered;
+}
+
+/** Empty/whitespace-only input means "no seed data", not an error. */
+export function parseSeedData(seedDataJson: string): Record<string, unknown> | undefined {
+  if (!seedDataJson.trim()) return undefined;
+  try {
+    return JSON.parse(seedDataJson) as Record<string, unknown>;
+  } catch {
+    throw new PlayerClientError({ type: "validation", issues: [{ kind: "invalid-json", fieldId: "" }] });
+  }
+}
+
+/** create -> ignore the created Instance body beyond its id -> re-fetch the
+ * view, so the caller has exactly one "instance changed" code path
+ * regardless of which call triggered the change (design.md "Data flow"). */
+export async function createInstanceAndFetchView(
+  serverUrl: string,
+  processId: string,
+  actor: Actor,
+  opts: { version?: number; seedDataJson: string },
+): Promise<{ instanceId: string; view: InstanceView }> {
+  const data = parseSeedData(opts.seedDataJson);
+  const created = await apiCreateInstance(serverUrl, processId, actor, { version: opts.version, data });
+  const view = await apiGetInstanceView(serverUrl, created.instanceId, actor);
+  return { instanceId: created.instanceId, view };
+}
+
+/** submit (its response body ignored, whether an `Instance` or, on the
+ * `AutomaticCascadeLoop` case, an `InstanceView` already) -> always re-fetch
+ * the view via a fresh `GET`. */
+export async function submitAndFetchView(
+  serverUrl: string,
+  instanceId: string,
+  pathId: string,
+  data: Record<string, unknown>,
+  actor: Actor,
+  currentView: InstanceView,
+): Promise<InstanceView> {
+  await apiSubmit(serverUrl, instanceId, pathId, filterToEditable(data, currentView), actor);
+  return apiGetInstanceView(serverUrl, instanceId, actor);
+}
+
+interface PlayerContextValue {
+  serverUrl: string;
+  actorId: string;
+  actorRoles: string;
+  setServerUrl: (url: string) => void;
+  setActor: (actorId: string, actorRoles: string) => void;
+  instanceId: string | undefined;
+  view: InstanceView | undefined;
+  loading: boolean;
+  error: ClientError | undefined;
+  createInstance: (processId: string, version: number | undefined, seedDataJson: string) => Promise<void>;
+  openInstance: (instanceId: string) => Promise<void>;
+  refresh: () => Promise<void>;
+  submit: (pathId: string, data: Record<string, unknown>) => Promise<void>;
+}
+
+const PlayerContext = createContext<PlayerContextValue | null>(null);
+
+export function PlayerProvider({ children }: { children: ReactNode }) {
+  const [connection, setConnection] = useState<StoredConnection>(() => loadStoredConnection());
+  const { serverUrl, actorId, actorRoles } = connection;
+  const [instanceId, setInstanceId] = useState<string | undefined>(undefined);
+  const [view, setView] = useState<InstanceView | undefined>(undefined);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<ClientError | undefined>(undefined);
+
+  useEffect(() => {
+    persistConnection(connection);
+  }, [connection]);
+
+  const actor = (): Actor => ({
+    id: actorId,
+    roles: actorRoles
+      .split(",")
+      .map((r) => r.trim())
+      .filter(Boolean),
+  });
+
+  const run = async (fn: () => Promise<void>) => {
+    setLoading(true);
+    setError(undefined);
+    try {
+      await fn();
+    } catch (err) {
+      setError(err instanceof PlayerClientError ? err.error : { type: "internal", message: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const value: PlayerContextValue = {
+    serverUrl,
+    actorId,
+    actorRoles,
+    setServerUrl: (url) => setConnection((c) => ({ ...c, serverUrl: url })),
+    setActor: (id, roles) => setConnection((c) => ({ ...c, actorId: id, actorRoles: roles })),
+    instanceId,
+    view,
+    loading,
+    error,
+    createInstance: (processId, version, seedDataJson) =>
+      run(async () => {
+        const created = await createInstanceAndFetchView(serverUrl, processId, actor(), { version, seedDataJson });
+        setInstanceId(created.instanceId);
+        setView(created.view);
+      }),
+    openInstance: (id) =>
+      run(async () => {
+        const nextView = await apiGetInstanceView(serverUrl, id, actor());
+        setInstanceId(id);
+        setView(nextView);
+      }),
+    refresh: () =>
+      run(async () => {
+        if (!instanceId) return;
+        setView(await apiGetInstanceView(serverUrl, instanceId, actor()));
+      }),
+    submit: (pathId, data) =>
+      run(async () => {
+        if (!instanceId || !view) return;
+        setView(await submitAndFetchView(serverUrl, instanceId, pathId, data, actor(), view));
+      }),
+  };
+
+  return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;
+}
+
+export function usePlayer(): PlayerContextValue {
+  const ctx = useContext(PlayerContext);
+  if (!ctx) throw new Error("usePlayer must be used within a PlayerProvider");
+  return ctx;
+}
