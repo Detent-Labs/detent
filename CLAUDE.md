@@ -9,7 +9,7 @@ explicit Paths (transitions). This is NOT BPMN token flow.
 
 Three roles share one artifact, the serialized JSON process definition:
 - Engine: executes definitions (the executor).
-- Editor: produces definitions graphically (comes later).
+- Editor: produces definitions graphically (`packages/editor`).
 - Hand-authoring: definitions written directly as JSON (rare).
 
 The serialized JSON definition is the contract between engine and editor.
@@ -34,12 +34,16 @@ project context OpenSpec shows the AI when generating artifacts lives in
 ## Repository layout
 ```
 .devcontainer/             Dockerfile + docker-compose.yml + devcontainer.json (Node 22 + Bun, Postgres 16, Claude Code)
-package.json               Bun-managed; scripts and deps
+package.json               Bun workspace root (workspaces: packages/*); engine package's exports map
+                            (./schema, ./cel/check, ./schema/compile, ./engine/registry, ./engine/registry-check)
 tsconfig.json              strict; NodeNext ESM; covers src + test
 src/schema/definition.ts   Zod schemas = the contract; TS types via z.infer; invariants included
 src/engine/                executor: instance store, outbox, transitions, timers, subprocess
+src/runtime/api.ts         Runtime API Layer: createProcessInstance / getInstanceView / submitAndTransition
 examples/                  serialized example definitions
 test/                      bun:test suites; tests run inside the container
+packages/editor/           structural editor + read-only graph view (React + Vite; workspace package,
+                            reaches the engine only through its exports map)
 ```
 
 ## The contract: load-bearing rules
@@ -203,6 +207,9 @@ each with a test that rejects a violating definition.
   subprocess-callable child requires no fields outside its `inputFields`.
 - `unmappableStep` present iff `onUnmappable === "route-to-step"`; migration
   maps reference valid ids.
+- Every `LocalizedText` value anywhere in the body (process, steps, fields
+  incl. nested `group` fields, field options) has a non-empty entry for
+  `ProcessBody.baseLocale`; other locales are optional per entry.
 - Every CEL Expression parses and type-checks against the field catalog. (This
   one is enforced in the CEL step below, not in definition.ts, since it needs the
   CEL library; all the structural invariants above are already in definition.ts.)
@@ -403,7 +410,78 @@ each with a test that rejects a violating definition.
   unrehydratable. A `faulted` instance is a dead-end park: `executeManualTransition`
   and `fireTimer` both gate on `status !== "running"`, so it can be neither
   advanced manually nor moved by a timer (it also cannot be cancelled — the same
-  gate). No editor exists yet.
+  gate).
+- Runtime API Layer (`src/runtime/api.ts`, `test/runtime-api.test.ts`): the
+  first library boundary a UI can call without touching engine internals —
+  three operations, no HTTP transport, no auth/actor resolution (every
+  function takes an explicit `actor: Actor`, trusted as given), no
+  assignment/claim enforcement (`AssignmentState` is declared in the schema
+  but unenforced everywhere, matching engine behavior). `createProcessInstance`
+  validates seed `data` (skipping the required check — requiredness is a
+  transition-time gate) then runs `store.ts::createInstance` + the
+  create-then-run-to-rest cascade. `getInstanceView` resolves a step's `view`
+  against the field catalog and current data into `ResolvedViewField[]` (a
+  group-container's own field id is never a valid `data` key, so it is
+  reported but excluded from required/readonly resolution) plus
+  `availablePaths` (manual paths whose guard currently holds). `submitAndTransition`
+  is the only write path for arbitrary user-submitted `data` anywhere in the
+  system: it row-locks the instance (`SELECT ... FOR UPDATE`) for exactly one
+  commit — guarding against a concurrent `Action.output` writeback being
+  silently erased by jsonb's shallow top-level merge — validates the submission
+  (field-set boundary, type, option membership, constraints, CEL
+  `validation.rule`, required; every issue collected into one
+  `SubmissionValidationError`, not fail-fast), then commits the merged `data`
+  and the transition atomically via a new `commitManualTransition` split out
+  of `executeManualTransition` (`transition.ts`; unchanged behavior for every
+  existing caller that omits the new optional `dataPatch`). The subsequent
+  automatic-path cascade (`resolveAutomatic`) runs separately, outside the
+  lock, matching every other caller's transactional granularity.
+  `createDefinitionStore` gained `resolveLatest(processId)` (newest published
+  version) alongside `resolveBody`/`resolveLatestByContract`.
+- Editor (`packages/editor`, a Bun workspace package that reaches the engine
+  only through its `exports` map — no file moves, the boundary is `exports`,
+  not directory layout): a structural editor plus an auto-layouted
+  **read-only** graph view (`@xyflow/react` + `elkjs`); canvas editing
+  (drag-to-connect) is out of scope. Panels (`src/panels/`) cover the field
+  catalog, data sources, steps (incl. per-step view), paths, timers, actions,
+  and the subprocess contract, editing an editor-owned **Draft model**
+  (`src/draft/`) — a structural superset of `AuthoredProcessBody` (refs and
+  required parts optional) so a mid-edit process has a representable state;
+  the editor mints prefixed UUIDv4 ids, authors work only with `key`/`label`.
+  Live validation reuses the engine's own publish-time validators unmodified
+  (the `definition.ts` refinements, `validateProcessBody` CEL checks,
+  `checkActionRegistry`, `validateDurations`), mapping located issues onto the
+  owning panel/graph entity; a check needing external state a locally-loaded
+  file can't supply (cross-process validation, registry) renders as "not
+  checked" rather than a false pass. File-based draft I/O
+  (`src/draft/file-io.ts`, `io.ts`) covers load/save of `.draft.json` and
+  export of a validated authored `ProcessBody`, plus **Import**: accepts a
+  published `DefinitionVersion` wrapper or a raw `ProcessBody` and converts it
+  to a Draft (no provenance retained — a subsequent Export is a fresh,
+  unpublished body). No server, no DB, no HTTP API, no `publishBody` call —
+  publishing stays engine-side. UI-chrome i18n (`src/i18n/`) is a hand-rolled
+  locale-state provider + `t()` catalog lookup (no i18next/Lingui), currently
+  shipping one locale (`en`) with the switcher/plumbing built for more; it is
+  deliberately independent of **content locale** — `ProcessBody`/`Step`/
+  `FieldDef`/`FieldOption` `label`/`description` are `LocalizedText`
+  (`Record<LocaleCode, string>`, **BREAKING** schema change from plain
+  `string`), with a required `ProcessBody.baseLocale` and a structural
+  invariant that every `LocalizedText` value has a non-empty base-locale
+  entry; `resolveLocalizedText(value, locale, baseLocale)` is the pure
+  fallback-to-base lookup, used by both `GraphView` node labels and the
+  editor's `LocalizedTextInput` panels. `Path`/`Timer`/`Plugin` `description`
+  stay plain `string` (authoring-facing, not participant-facing). The graph
+  view (`src/graph/GraphView.tsx`, `layout.ts`, `useDraftGraphLayout.ts`)
+  fixes node handles to `Right`/`Left` to match ELK's horizontal layout
+  direction, routes edges as `smoothstep` with a directional `markerEnd`
+  arrowhead (issue-flagged edges tint the marker to match their red stroke —
+  watch for the `{ color: undefined, ...marker }` spread-clobber bug class
+  when touching this: an explicit `color: undefined` key silently overrides
+  `@xyflow/system`'s own fallback and renders the arrowhead invisible), and
+  fits the view once ELK layout resolves (`isLayouted`) — including on a
+  reload/import into an already-mounted session, tracked via a
+  `loadGeneration` counter in `DraftProvider`'s reducer state, not only on
+  first mount.
 
 ## Roadmap
 1. Validation layer (Zod-first): DONE. definition.ts is Zod-sourced with TS types
@@ -502,7 +580,16 @@ each with a test that rejects a violating definition.
    the same per-row fault isolation as the three background drains. Read-only: no
    pruning. A resolver miss throws `MigrationPlanError`, matching
    `registerMigrationPlan`/`migrateInstances`.
-4. Editor (likely a separate package; promote the repo to workspaces here).
+4. Editor: DONE for v1 scope. `packages/editor` — Bun workspace package,
+   structural panels + Draft model + live validation (reusing the engine's
+   unmodified publish-time validators) + read-only auto-layouted graph view +
+   file-based draft I/O (load/save/import/export) + UI-chrome i18n +
+   participant-facing content localization (`LocalizedText`/`baseLocale` on
+   the schema). Out of scope for v1 and not yet built: canvas editing
+   (drag-to-connect), an HTTP transport or server around the Runtime API
+   Layer, auth/actor resolution, and assignment/claim enforcement — see the
+   Runtime API Layer entry above for which of those it already deliberately
+   excludes.
 
 ## Open questions (still need a decision before building the relevant part)
 - The formal expression context is pinned (`src/cel/check.ts`): `instance`
