@@ -544,8 +544,32 @@ real call chains exist.
 - Bun is the runtime, package manager, and test runner. Use `bun`, not npm/pnpm:
   `bun install`, `bun test`. Typechecking stays with `tsc --noEmit` (`bun run
   typecheck`) — Bun does not typecheck. The Bun version is pinned by `BUN_VERSION`
-  in `.devcontainer/Dockerfile`. All tooling (Bun, tsc, tests, and Claude Code
-  itself) runs inside the dev container, never on the host.
+  in `.devcontainer/Dockerfile`. All tooling (Bun, tsc, tests, dev server, lint,
+  and Claude Code itself) runs inside the dev container, never on the host — even
+  when it technically works on the host too, since that's exactly how version
+  drift and stray processes slip in silently (observed: host Bun at a newer
+  version than the Dockerfile pin; a leftover host-side Vite process answering
+  `localhost:5173` in parallel with the container's, making it ambiguous which
+  one a browser check was actually hitting).
+  - Without the `devcontainer` CLI, drive it via `docker compose`: `docker compose
+    -f .devcontainer/docker-compose.yml up -d` (starts `app` + `db`; `app`'s
+    default command is `sleep infinity`), then run every command through
+    `docker compose -f .devcontainer/docker-compose.yml exec -w /workspace app
+    <cmd>` — the `app` service's default container workdir is `/`, not
+    `/workspace`, so `-w /workspace` is required every time.
+  - On Windows Git Bash, prefix such commands with `MSYS_NO_PATHCONV=1` — Git
+    Bash otherwise rewrites the Unix-style `/workspace` path into a Windows path
+    before Docker sees it, producing `Cwd must be an absolute path` errors.
+  - `DATABASE_URL` is already wired into the `app` service's environment
+    (pointing at the `db` service by container name), so DB-backed tests need no
+    extra setup once running through `exec`.
+  - The compose file publishes no ports by default. To view a dev server from
+    the host browser, add a local-only, gitignored
+    `.devcontainer/docker-compose.override.yml` publishing the port (e.g.
+    `5173:5173` under `services.app.ports`), bring services up with both `-f`
+    flags, and bind the dev server to all interfaces (`bun run dev -- --host
+    0.0.0.0`). Never add port publishing to the shared `docker-compose.yml` —
+    that's a personal convenience, not a team-wide default.
 - PostgreSQL is the datastore. The engine reaches it via Bun's native `Bun.sql`
   (no client dependency); `DATABASE_URL` is the connection convention, set by the
   devcontainer compose.
