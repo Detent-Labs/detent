@@ -81,9 +81,17 @@ export function GraphView() {
       // smoothstep (right-angle segments) instead of the default Bezier
       // curve, which loops under fixed Left/Right handles; markerEnd
       // disambiguates counter-edges between the same two nodes (e.g. an
-      // automatic failure path back to a manual retry path).
+      // automatic failure path back to a manual retry path). The `color`
+      // key must be omitted entirely (not passed as `undefined`) for a
+      // non-issue edge: @xyflow/system's createMarkerIds does
+      // `{ color: marker.color || defaultColor, ...marker }` — spreading
+      // `marker` after already sets `color`, so an explicit `color:
+      // undefined` key clobbers the computed fallback back to `undefined`,
+      // making the arrowhead render with `stroke: none; fill: none`
+      // (@xyflow/react's ArrowClosedSymbol defaults `color` to the string
+      // `'none'`, not the theme default).
       type: "smoothstep",
-      markerEnd: { type: MarkerType.ArrowClosed, color: issueColor },
+      markerEnd: issueColor ? { type: MarkerType.ArrowClosed, color: issueColor } : { type: MarkerType.ArrowClosed },
       label: (
         <span title={issues.map((i) => i.message).join("\n") || undefined}>
           {e.label}
