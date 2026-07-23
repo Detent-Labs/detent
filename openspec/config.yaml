@@ -26,12 +26,32 @@ context: |
   OpenSpec change (propose -> specs/tasks -> implement -> verify -> archive),
   never a direct edit.
 
+  Beyond the engine, a Bun workspace (`packages/*`) adds `packages/editor`: a
+  React/Vite structural editor (field/step/path/timer/action/contract panels,
+  an editor-owned Draft model, a read-only auto-layouted graph view,
+  file-based draft I/O, UI-chrome i18n, participant-facing content
+  localization). It reaches the engine only through the engine package's
+  `exports` map and reuses the engine's own publish-time validators for live
+  validation — it authors definitions, it does not run them.
+
+  `src/runtime/api.ts` (the Runtime API Layer) is the in-process boundary
+  that actually runs an instance — `createProcessInstance`,
+  `getInstanceView`, `submitAndTransition` — validating and writing
+  user-submitted data (nothing else in the engine does). Post-v1 roadmap
+  (`CLAUDE.md` #5, "make the engine reachable"): a thin HTTP wrapper over
+  these three ops (proposed as the `http-wrapper` change), then an editor
+  player/preview UI, then real auth/assignment enforcement and real action
+  handlers — each stage builds on the one before it.
+
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+rules:
+  design:
+    - Include "Migration Plan" and "Open Questions" sections in addition to
+      the base Context / Goals-Non-Goals / Decisions / Risks-Trade-offs
+      template — established convention across this repo's design docs.
+  tasks:
+    - End with a "Verification" group whose tasks run `bun run typecheck`
+      and the FULL `bun test` suite with DATABASE_URL set — never rely on a
+      single-file rerun (DB-backed suites share one database and contend
+      when run back-to-back in isolation; see CLAUDE.md).
