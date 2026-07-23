@@ -158,19 +158,24 @@ no step change get a sibling record, `InstanceEvent` (append-only, `evt_` ids): 
 discriminated union over `kind` with a kind-specific payload, carrying the instance,
 the `version` and the `transitionSeq` **in force**. An event never advances the
 sequence, so several may share one and share it with a transition; they order by
-`at`. Six kinds exist — `timer.fired` (a reminder fired: actions enqueued, no
+`at`. Eight kinds exist — `timer.fired` (a reminder fired: actions enqueued, no
 transition), `timer.unarmed` (a declared timer produced no `fireAt` at entry, with
 the reason), `migration.skipped` (an instance left on its source version, with the
 reason), `subprocess.spawn-enqueued` (creation at a subprocess initial step
 enqueued its spawn: actions enqueued, no transition),
 `subprocess.outcome-unmatched` (a child returned an outcome no path on the parent's
-subprocess step matched, so the parent stays parked), and
+subprocess step matched, so the parent stays parked),
 `migration.transform-dropped` (a migration `transforms` entry raised, or its result
 could not be made JSON-safe, so its target field went unwritten; the `version` it
-carries is the TARGET version, since the `fieldId` it names is declared there).
+carries is the TARGET version, since the `fieldId` it names is declared there),
+`assignment.claimed` (an actor claimed an unclaimed, assignment-bearing step;
+payload `{actorId}`), and `assignment.released` (the claimant released their
+claim on the current step; payload `{actorId}`). The latter two are not
+transition-shaped either — no step change, so no HistoryEntry and no
+`transitionSeq` advance, the same reasoning as `migration.skipped`.
 Kinds are added additively; the record shape is settled. A kind that enqueues
 actions carries their `ActionOutcome`s — `timer.fired` and
-`subprocess.spawn-enqueued` do, the other four enqueue nothing and so must not
+`subprocess.spawn-enqueued` do, the other six enqueue nothing and so must not
 invite a reader to expect outcomes.
 
 An `ActionOutcome` attaches to the record that **enqueued** the action, carried on the
@@ -482,139 +487,69 @@ each with a test that rejects a violating definition.
   reload/import into an already-mounted session, tracked via a
   `loadGeneration` counter in `DraftProvider`'s reducer state, not only on
   first mount.
+- HTTP wrapper (`src/http/`, `test/http.test.ts`, roadmap #5b): a thin REST/JSON
+  adapter over the Runtime API Layer via `Bun.serve`. `createServer` returns a
+  plain `fetch(req): Promise<Response>` (testable with `new Request(...)`, no
+  real port); `startHttpServer` wires it to a port plus `startEngine`. Five
+  routes — `POST /processes/:processId/instances`, `GET /instances/:instanceId`,
+  `POST /instances/:instanceId/submit`, `POST /instances/:instanceId/claim`,
+  `POST /instances/:instanceId/release` — each OPTIONS-preflighted with
+  permissive CORS (`Access-Control-Allow-Origin: *`) so the editor's dev server
+  can reach it. `routes.ts` handlers are framework-agnostic (`(parsed request) ->
+  Runtime API call -> {status, body}`, never throwing) and resolve the caller's
+  `Actor` via an injected `ActorResolver` before calling the Runtime API,
+  replacing client-supplied actor trust. `errors.ts::mapError` maps each typed
+  Runtime API error to a status (422 validation, 409 guard-refused/
+  concurrency-conflict, 401 actor-resolution, 403 assignment/claim errors, 500
+  fallback for `PinMismatch` and anything untyped — not-found deliberately stays
+  500, see design.md). `handleSubmit` special-cases `AutomaticCascadeLoop`: the
+  write already committed before it raised, so the route reports the resulting
+  (now-`faulted`) view as a 200 instead of an error.
+- Player/Preview UI (`packages/editor/src/player/`, roadmap #5c): lets a human
+  drive a real process instance end-to-end through the browser, against the
+  HTTP wrapper — a Structure/Player toggle in `App.tsx` switches between the
+  existing read-only graph view and this screen. `client.ts` is a thin HTTP
+  client (create instance / get view / submit) carrying `X-Actor-Id`/
+  `X-Actor-Roles` headers per the dev resolver's convention. `store.tsx`
+  (`PlayerProvider`) holds the connection (server URL + actor, persisted to
+  `localStorage`) and drives the instance lifecycle; `editableFieldIds`/
+  `filterToEditable` enforce client-side the same visible-non-readonly-
+  non-group field-set boundary `submitAndTransition` enforces server-side, so a
+  submission is pre-filtered rather than rejected. `FieldInput.tsx` renders a
+  field by its resolved type; `PlayerView.tsx` composes view + submit +
+  available paths into the screen.
+- Auth/Actor-Resolution + Assignment/Claim-Enforcement (roadmap #5d): activates
+  the previously-declared-but-inert `Step.assignment` field. `src/auth/resolve.ts`
+  defines the `ActorResolver` extension point (`(credential) -> Promise<Actor>`)
+  and ships one concrete, non-production implementation, `devHeaderResolver`
+  (trusts `X-Actor-Id`/`X-Actor-Roles` headers) — no real identity provider
+  (JWT/OIDC/session) ships in core; a deployment supplies its own resolver
+  against the same extension point. Assignment strategies are a registry
+  parallel to the action registry (`registry.ts`: `AssignmentRegistry`,
+  `resolveAssignmentStrategy`, `createDefaultAssignmentRegistry` shipping
+  `staticAssignmentStrategy`) and are validated at PUBLISH
+  (`registry-check.ts::checkAssignmentRegistry`, wired into
+  `definitions.ts::publishBody`, throwing `AssignmentRegistryValidationError`)
+  — an unresolvable strategy type is a publish error, never a runtime one,
+  mirroring the action-registry rule. A target step's declared `assignment`
+  resolves to a fresh `Instance["assignment"]` (candidates, unclaimed) at step
+  entry (`transition.ts::resolveStepAssignment`), except migration
+  (`carryAssignment` carries `instance.assignment` forward byte-for-byte instead
+  of re-resolving fresh candidates). `claimStep`/`releaseClaim`
+  (`transition.ts`, exposed via the Runtime API and the two new HTTP routes) are
+  exclusive-claim operations, not transitions (no step change, no
+  `HistoryEntry`): claiming requires an unclaimed assignment and an eligible
+  candidate (`AlreadyClaimedError`/`NotACandidateError`), releasing requires the
+  caller to be the claimant (`NotClaimedError`/`NotClaimantError`), and each
+  records an `assignment.claimed`/`assignment.released` `InstanceEvent` (see
+  "Runtime record" above). `submitAndTransition` now enforces claimant-only
+  submission before validation: a step with a declared assignment requires the
+  submitting actor to be the current claimant (`NotClaimedError`/
+  `NotClaimantError`); a step with no declared assignment is unaffected —
+  identical to prior behavior.
 
 ## Roadmap
-1. Validation layer (Zod-first): DONE. definition.ts is Zod-sourced with TS types
-   via z.infer and the structural invariants as refinements / superRefine; the
-   bun:test suite test/validate.test.ts exercises them. The cross-process invariants
-   that need the child definition are now enforced at publish
-   (`definitions.ts::validateCrossProcess`, `test/cross-process.test.ts`): a
-   subprocess step's `inputMapping` targets must lie within the referenced child's
-   `contract.inputFields`, and the child reference must resolve to a *contracted*
-   published child (`pinned` → the version exists; `latest-at-spawn` → a published
-   version's compiled-contract hash equals `contractRef`). This enforces child-first
-   publish ordering. The originally-scoped "callable child requires no non-input
-   field" invariant was dropped as unsound: a `required` view flag is satisfied by
-   an interactive step's user, not the caller, so it does not encode "the caller
-   must supply this field" (the expense-approval example legitimately requires a
-   non-input field at its manual review step). A subprocess step's `outputMapping`
-   values and automatic-path guards are now also checked at publish
-   (`src/cel/check.ts::checkSubprocessChildRefs`, invoked from
-   `validateCrossProcess`): `child.data.<key>` type-checks only for a `<key>` in
-   the referenced child's `contract.outputFields` (resolved to the child's own
-   field `key`), instead of the generic `dyn` every other CEL site sees for
-   `child.data`. A violation throws `CelValidationError`, not
-   `CrossProcessValidationError` — it is a CEL reference defect, not a wiring one.
-   Runtime `child.data` stays the child's full data object; only the CEL surface
-   is confined to the contract (see `cross-process-validation` spec).
-2. CEL wiring: DONE. Authoring-time (`src/cel/check.ts`) and engine-side evaluation
-   (`src/cel/eval.ts`): guards evaluated at runtime (total — a runtime error is
-   `false`) and Action.output result-writeback. Migration `transforms` are the last
-   wired site: `validateMigrationSpec` parse/type-checks them against the source
-   catalog with the result type checked against the target field (`buildEnv` gained an
-   `actor` flag so this one site can withhold it), and `evalTransforms` evaluates them
-   at migration, total per entry, reusing `coerceJson`. `validateProcessBody` is wired
-   into `publishBody` (an invalid expression is a publish error, not a runtime one),
-   and the check/eval scopes were reconciled at the one site where they had drifted:
-   `Action.output` registers `result` alone, and `onCancel` outputs — previously the
-   one action position `collect()` never visited — are checked.
-3. Engine skeleton: largely DONE. Instance store, transactional outbox (delivery +
-   writeback + retry/dead-letter + reclaim), transition executor (manual/automatic/
-   timer, onExit→onPath→onEntry ordering, run-to-rest), async re-resolution of
-   wait-states after a writeback, timer arming + scheduler, and crash recovery
-   (outbox/resolution reclaim, persisted `next_timer_at`). Persists to PostgreSQL
-   via Bun's native `Bun.sql`; connection via `DATABASE_URL`. Single-instance runtime
-   cancellation is DONE (`cancelInstance`: skip onExit, `[onCancel, sink.onEntry]`,
-   cancel HistoryEntry, OCC, no-op on non-running). Subprocess execution is DONE
-   (`subprocess.ts`: spawn on subprocess-step entry — by transition or at creation on
-   an initial subprocess step — child-body resolution by
-   `versionBinding`, `inputMapping` seed, return via `outputMapping` + direct parent
-   advance, idempotent spawn) together with downward cancel propagation
-   (`cancelInstance` cascades to active children by the `parent` link). `deadline`
-   timers are DONE (`duration.ts`: `instantFromValue` + the deadline branch of
-   `armStepTimers`; see the timers entry above). `TimerState` provenance is DONE
-   (`armStepTimers` records what each timer was armed from — `{kind: "duration",
-   duration}` or `{kind: "deadline", src}`, plus `armedAt` — on every armed
-   `TimerState`; `migration.ts::reconcileTimers` compares a carried, unfired,
-   still-declared timer's provenance against the target step's current
-   declaration and re-arms on a mismatch instead of blindly keeping the old
-   `fireAt`; a carried timer with no provenance — armed before this field
-   existed — is trusted as unchanged, since reconciliation has no signal to
-   compare it against). The runtime event log is DONE
-   (`InstanceEvent`: a reminder fire, an unarmed timer, a skipped migration and a
-   creation-enqueued subprocess spawn are recorded, and an
-   `ActionOutcome` now attaches to the record that enqueued it). Instance migration is
-   DONE (`src/engine/migration.ts`): a migration plan is a row keyed
-   `(processId, fromVersion, toVersion)` in `migration_plans`, registered by
-   `registerMigrationPlan` independently of publish, validated against both bodies
-   (structural, type-compatibility incl. the identity-carried case, and the transform
-   CEL check) and frozen by an atomic `WHERE applied_at IS NULL` upsert once the first
-   instance migrates under it. `migrateInstances` reads the plan once, stamps it applied
-   before the first instance, then keyset-paginates the running/source-version
-   population selecting ids only and migrates each in its own row-locked transaction
-   (`SELECT … FOR UPDATE`, since the OCC token does not cover `data`): remap step via
-   `stepMap`/identity/`onUnmappable`, remap `data` losslessly from the locked snapshot
-   (`fieldMap` + `transforms`, orphans retained), reconcile timers four-ways
-   (carried+declared kept with `fireAt`, fired kept fired, newly-declared armed against
-   the target body/post-remap data/new seq, withdrawn dropped), then commit through the
-   shared `planStepEntry`/`applyStepEntry` seam with `entryVersion`, `suppressSpawn` on
-   an identity step, the reconciled timer set and the pin/payload field patch — so
-   status, the subprocess spawn/return and the `HistoryEntry` (`cause: "migration"`,
-   `pathId: null`) are inherited, not reimplemented. An instance with undelivered outbox
-   rows is skipped `pending-actions`; an unmappable one under `reject-and-pin` is skipped
-   `step-unmappable`; both are recorded as a `migration.skipped` `InstanceEvent`. The
-   migrating parent repairs every child's `parent.stepId` (terminal children included).
-   The operation is per-instance fault-isolated and reports instance ids grouped
-   migrated/skipped/conflicted/failed. A subprocess step as the *initial* step spawns
-   too (`createInstance` enqueues at seq 0 inside the INSERT transaction, carried by a
-   `subprocess.spawn-enqueued` event). Publish-time cross-process
-   validation (inputMapping ⊆ child inputFields, child reference resolvable → child-first
-   ordering) is DONE (`definitions.ts`, roadmap #1). The production `resolveBody` backing
-   (definition/version store) is DONE (`definitions.ts` + `host.ts`), so the
-   resolution and timer workers are live. Orphan-key visibility is DONE
-   (`migration.ts::findOrphanKeys(processId, version, db, resolvers)`): a read-only,
-   keyset-paginated scan reporting which instances pinned to a published version hold
-   a `data` key absent from that version's field catalog (a `group` field's own id is
-   never a valid key regardless of catalog declaration), covering every instance
-   status and isolating an unreadable row into a separate list rather than aborting —
-   the same per-row fault isolation as the three background drains. Read-only: no
-   pruning. A resolver miss throws `MigrationPlanError`, matching
-   `registerMigrationPlan`/`migrateInstances`.
-4. Editor: DONE for v1 scope. `packages/editor` — Bun workspace package,
-   structural panels + Draft model + live validation (reusing the engine's
-   unmodified publish-time validators) + read-only auto-layouted graph view +
-   file-based draft I/O (load/save/import/export) + UI-chrome i18n +
-   participant-facing content localization (`LocalizedText`/`baseLocale` on
-   the schema). Out of scope for v1 and not yet built: canvas editing
-   (drag-to-connect), an HTTP transport or server around the Runtime API
-   Layer, auth/actor resolution, and assignment/claim enforcement — see the
-   Runtime API Layer entry above for which of those it already deliberately
-   excludes.
-5. Post-v1: make the engine reachable. NOT STARTED. Everything through #4 is
-   done, but the Runtime API Layer (`src/runtime/api.ts`) is an in-process
-   TypeScript boundary only — nothing today lets an external caller or a real
-   UI drive an instance. Planned stages, each depending on the previous one
-   landing first:
-   a. Validate the stack end-to-end with a throwaway script exercising
-      `createProcessInstance` -> `getInstanceView` -> `submitAndTransition`
-      against `examples/expense-approval.json`. Pure validation, no new
-      capability, no OpenSpec change.
-   b. HTTP wrapper around the Runtime API Layer: a thin REST/JSON adapter
-      over the same three operations. Explicit non-goal of the
-      `runtime-api-layer` change; this is where it gets picked back up. The
-      prerequisite for (c) and for any caller outside this process.
-   c. Player/preview UI in `packages/editor`: a form screen that drives a
-      real instance through (b) — distinct from the existing read-only
-      structural graph view, which shows the FSM shape, not a running
-      instance.
-   d. Auth/actor resolution + assignment/claim enforcement. Both are
-      declared-but-unenforced today (`AssignmentState` is in the schema;
-      every runtime function trusts the `actor: Actor` it's given). Needed
-      before more than one person safely tests against a shared engine.
-   e. Real action-handler implementations registered against the handler
-      registry — today only the config envelope is validated at publish
-      (`registry-check.ts`); no handler actually executes anything. Needed
-      for a process to do more than pass data through.
+See `ROADMAP.md` for stage-by-stage status (DONE/NOT STARTED) and what each stage covers.
 
 ## Open questions (still need a decision before building the relevant part)
 - The formal expression context is pinned (`src/cel/check.ts`): `instance`
