@@ -36,6 +36,9 @@ export type ResolveLatestByContract = (
   contractRef: string,
 ) => Promise<{ version: number; body: ProcessBody } | undefined>;
 
+/** Resolve the newest published version for a processId, regardless of contract. */
+export type ResolveLatest = (processId: ProcessId) => Promise<{ version: number; body: ProcessBody } | undefined>;
+
 /** A subprocess step's wiring is invalid against the child it references. */
 export class CrossProcessValidationError extends Error {
   constructor(message: string) {
@@ -216,7 +219,7 @@ export async function publishBody(
  */
 export function createDefinitionStore(
   db: SQL = sql,
-): { resolveBody: ResolveBody; resolveLatestByContract: ResolveLatestByContract } {
+): { resolveBody: ResolveBody; resolveLatestByContract: ResolveLatestByContract; resolveLatest: ResolveLatest } {
   const cache = new Map<string, ProcessBody>();
   const resolveBody: ResolveBody = async (processId, version) => {
     const key = `${processId}:${version}`;
@@ -244,5 +247,15 @@ export function createDefinitionStore(
     }
     return undefined;
   };
-  return { resolveBody, resolveLatestByContract };
+  // Newest published version for a processId, no contract filter. Mirrors
+  // resolveLatestByContract minus the contractHash check.
+  const resolveLatest: ResolveLatest = async (processId) => {
+    const rows = (await db`SELECT version, body FROM definitions
+      WHERE process_id = ${processId} ORDER BY version DESC LIMIT 1`) as { version: number; body: unknown }[];
+    if (rows.length === 0) return undefined;
+    const body = parseBody(rows[0].body);
+    cache.set(`${processId}:${rows[0].version}`, body);
+    return { version: Number(rows[0].version), body };
+  };
+  return { resolveBody, resolveLatestByContract, resolveLatest };
 }

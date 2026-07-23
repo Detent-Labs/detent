@@ -14,7 +14,9 @@ import {
   planStepEntry,
   applyStepEntry,
   executeManualTransition,
+  commitManualTransition,
   ConcurrencyConflict,
+  GuardRefused,
   SPAWN_ACTION_TYPE,
   RETURN_ACTION_TYPE,
   type StepEntryOpts,
@@ -49,6 +51,7 @@ const inst = (over: Record<string, unknown> = {}): Instance =>
   }) as unknown as Instance;
 
 const baseOpts = (): StepEntryOpts => ({ pathId: "path_ab" as HistoryEntry["pathId"], cause: "user", actorId: "user_1", actions: [] });
+const dataOf = (o: Record<string, unknown>): Instance["data"] => o as unknown as Instance["data"];
 
 // A deadline reading an unseeded field: evaluate() raises, so arming drops it
 // with reason "expression-raised" — the planner's own event, distinct from
@@ -498,4 +501,111 @@ test.skipIf(!DB)("a manual transition is ignored on a faulted instance", async (
   expect(row[0]!.transition_seq).toBe(0); // unchanged
   const hist = (await sql`SELECT entry FROM history_entries WHERE instance_id = ${created.instanceId}`) as unknown[];
   expect(hist).toHaveLength(0); // no HistoryEntry appended
+});
+
+// --- dataPatch: commitManualTransition / executeManualTransition -----------------
+// See openspec/changes/runtime-api-layer: dataPatch must (a) merge the FULL data
+// object, not just the patch, so unrelated fields survive the commit; (b) be
+// visible to the manual path's own guard; (c) be visible to target-step timer
+// arming and to the returned in-memory Instance, not just to the persisted row.
+
+test.skipIf(!DB)("commitManualTransition merges a dataPatch and preserves unrelated fields", async () => {
+  const body = mkBody([
+    step("step_a", { paths: [manualPath("path_ab", "step_b")] }),
+    step("step_b", { terminal: true }),
+  ]);
+  const created = await createInstance(body, { processId: pid, version: 1, data: dataOf({ field_other: "kept" }) });
+
+  const result = await commitManualTransition(created, "path_ab", body, actor as never, sql, dataOf({ field_due: "2026-05-01" }));
+
+  expect(result.data).toEqual(dataOf({ field_other: "kept", field_due: "2026-05-01" }));
+
+  const row = (await sql`SELECT body FROM instances WHERE instance_id = ${created.instanceId}`) as { body: unknown }[];
+  const parsed = typeof row[0]!.body === "string" ? JSON.parse(row[0]!.body as string) : row[0]!.body;
+  expect((parsed as { data: Record<string, unknown> }).data).toEqual({ field_other: "kept", field_due: "2026-05-01" });
+});
+
+test.skipIf(!DB)("commitManualTransition's guard sees the merged data, not just the pre-patch data", async () => {
+  const body = {
+    baseLocale: "en",
+    // buildGuardContext re-keys `data` from fieldId to catalog key, so the field
+    // the guard reads must be declared here — mkBody's fixed catalog only has "due".
+    fields: [{ id: "field_decision", key: "decision", label: { en: "Decision" }, type: "text" }],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        step("step_a", {
+          paths: [{ id: "path_ab", key: "path_ab", to: "step_b", trigger: "manual", guard: cel("data.decision == 'approve'") }],
+        }),
+        step("step_b", { terminal: true }),
+      ],
+    },
+  } as unknown as ProcessBody;
+  const created = await createInstance(body, { processId: pid, version: 1 });
+
+  // Without the patch, the guard cannot see the decision and refuses.
+  let raised: unknown;
+  try {
+    await commitManualTransition(created, "path_ab", body, actor as never);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(GuardRefused);
+
+  // With the patch merged in, the same guard passes.
+  const result = await commitManualTransition(created, "path_ab", body, actor as never, sql, dataOf({ field_decision: "approve" }));
+  expect(result.currentStepId as string).toBe("step_b");
+});
+
+test.skipIf(!DB)("a target step's deadline timer is armed against the merged data", async () => {
+  const body = mkBody([
+    step("step_a", { paths: [manualPath("path_ab", "step_b")] }),
+    step("step_b", {
+      timers: [{ id: "timer_due", deadline: cel("data.due"), onFire: { actions: [] } }],
+      paths: [manualPath("path_bc", "step_c")],
+    }),
+    step("step_c", { terminal: true }),
+  ]);
+  const created = await createInstance(body, { processId: pid, version: 1 });
+
+  const result = await commitManualTransition(
+    created,
+    "path_ab",
+    body,
+    actor as never,
+    sql,
+    dataOf({ field_due: "2026-06-01T00:00:00.000Z" }),
+  );
+
+  expect((result.timers ?? []).map((t) => ({ timerId: t.timerId as string, fireAt: t.fireAt }))).toEqual([
+    { timerId: "timer_due", fireAt: "2026-06-01T00:00:00.000Z" },
+  ]);
+});
+
+test.skipIf(!DB)("executeManualTransition with a dataPatch equals commitManualTransition then resolveAutomatic", async () => {
+  const body = mkBody([
+    step("step_a", { paths: [manualPath("path_ab", "step_b")] }),
+    step("step_b", { terminal: true }),
+  ]);
+  const created = await createInstance(body, { processId: pid, version: 1 });
+
+  const result = await executeManualTransition(created, "path_ab", body, actor as never, sql, dataOf({ field_due: "2026-05-01" }));
+
+  expect(result.data).toEqual(dataOf({ field_due: "2026-05-01" }));
+  expect(result.currentStepId as string).toBe("step_b");
+  expect(result.status).toBe("completed");
+});
+
+test.skipIf(!DB)("omitting dataPatch leaves commitManualTransition/executeManualTransition behavior unchanged", async () => {
+  const body = mkBody([
+    step("step_a", { onExit: [act("exit1")], paths: [manualPath("path_ab", "step_b")] }),
+    step("step_b", { terminal: true, onEntry: [act("entry1")] }),
+  ]);
+  const i = await createInstance(body, { processId: pid, version: 1, data: dataOf({ field_other: "kept" }) });
+
+  const result = await executeManualTransition(i, "path_ab", body, actor as never);
+
+  expect(result.data).toEqual(dataOf({ field_other: "kept" })); // untouched, exactly as before this change
+  expect(result.currentStepId as string).toBe("step_b");
+  expect(result.transitionSeq).toBe(1);
 });
