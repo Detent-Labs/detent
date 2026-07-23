@@ -618,13 +618,20 @@ each with a test that rejects a violating definition.
   invocation delivers anyway. Revisit only if `pending-actions` skips prove common.
 
 ## Codebase memory (knowledge graph)
-The repo is indexed into codebase-memory-mcp. Resolve the `project` arg via
-`list_projects` (match on root_path); the slug is machine-specific, never
-hardcode it. Entry points: `search_graph` (find symbols), `get_code_snippet`
-(read a body), `trace_path` (callers/callees). Payoff scales with the codebase:
-it is schema-only today, so
-Read/grep is usually faster now — reach for the graph once the engine lands and
-real call chains exist.
+The repo is indexed into codebase-memory-mcp (`full` mode, covering the engine,
+the Runtime API Layer, and the editor package; `packages/editor/{dist,node_modules}`
+excluded). Resolve the `project` arg via `list_projects` (match on root_path);
+the slug is machine-specific, never hardcode it. Entry points: `search_graph`
+(find symbols), `get_code_snippet` (read a body), `trace_path` (callers/callees,
+`mode=calls|data_flow|cross_service` — useful for tracing across the
+engine↔runtime↔editor boundary, e.g. `packages/editor` -> `workflow-engine`
+exports -> `src/engine/`), `query_graph` (Cypher), `get_architecture`,
+`search_code` (graph-augmented text search). Real call chains exist now — prefer
+the graph over Read/grep for "who calls X" / "what does Y touch" questions that
+span more than a file or two; Read/grep is still fine for a single known file.
+The index goes stale as code changes: `detect_changes` shows impact since a ref;
+re-run `index_repository` (full re-index, not incremental) after a substantial
+change lands.
 
 ## Conventions
 - TypeScript strict, ESM.
