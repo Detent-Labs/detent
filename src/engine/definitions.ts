@@ -25,10 +25,10 @@ import {
 import { compileProcessBody } from "../schema/compile.js";
 import { definitionHash, contractHash } from "../schema/hash.js";
 import { validateProcessBody, checkSubprocessChildRefs, type CelIssue } from "../cel/check.js";
-import { checkActionRegistry, type RegistryIssue } from "./registry-check.js";
+import { checkActionRegistry, checkAssignmentRegistry, type RegistryIssue } from "./registry-check.js";
 import { sql } from "./store.js";
 import type { ResolveBody } from "./resolution.js";
-import type { Registry } from "./registry.js";
+import { createDefaultAssignmentRegistry, type Registry, type AssignmentRegistry } from "./registry.js";
 
 /** Resolve the newest child version whose contract signature equals `contractRef`. */
 export type ResolveLatestByContract = (
@@ -69,6 +69,19 @@ export class RegistryValidationError extends Error {
   constructor(readonly issues: RegistryIssue[]) {
     super(issues.map((i) => `${i.loc}: ${i.message} (type '${i.type}')`).join("; "));
     this.name = "RegistryValidationError";
+  }
+}
+
+/**
+ * A body about to be published carries a step whose `assignment.strategy.type`
+ * is not registered, or whose `config` violates that strategy's declared
+ * `configSchema`. Same "every located issue, not just the first" contract as
+ * `RegistryValidationError`.
+ */
+export class AssignmentRegistryValidationError extends Error {
+  constructor(readonly issues: RegistryIssue[]) {
+    super(issues.map((i) => `${i.loc}: ${i.message} (type '${i.type}')`).join("; "));
+    this.name = "AssignmentRegistryValidationError";
   }
 }
 
@@ -152,6 +165,7 @@ export async function publishBody(
   authoredBody: ProcessBody,
   registry: Registry,
   db: SQL = sql,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<ProcessVersion> {
   const body = compileProcessBody(authoredBody);
   const hash = definitionHash(body);
@@ -184,6 +198,10 @@ export async function publishBody(
   // round-trip, unlike cross-process validation below).
   const registryIssues = checkActionRegistry(body, registry);
   if (registryIssues.length > 0) throw new RegistryValidationError(registryIssues);
+
+  // Same placement as the action registry check, immediately alongside it.
+  const assignmentIssues = checkAssignmentRegistry(body, assignmentRegistry);
+  if (assignmentIssues.length > 0) throw new AssignmentRegistryValidationError(assignmentIssues);
 
   // Then expressions: also checked in-process, and the issues an author can fix
   // without inspecting another process.

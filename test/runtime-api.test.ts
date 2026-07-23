@@ -16,6 +16,7 @@ import {
   createProcessInstance,
   getInstanceView,
   submitAndTransition,
+  claimStep,
   SubmissionValidationError,
   PinMismatch,
 } from "../src/runtime/api.js";
@@ -803,32 +804,38 @@ test.skipIf(!DB)("happy path: create -> view -> submit -> view against expense-a
   const reviewNoteField = "field_1a2b3c4d-0003-4a1c-8e2f-000000000003" as FieldId;
   const submitPath = "path_bbbb2222-0001-4a1c-8e2f-000000000001" as PathId;
   const approvePath = "path_bbbb2222-0002-4a1c-8e2f-000000000002" as PathId;
+  // "capture" and "review" both declare an assignment (employee /
+  // finance-approver respectively) — a dedicated actor holding both roles,
+  // distinct from the file's roleless `actor`, so claimStep is eligible.
+  const demoActor: Actor = { id: "user_demo", roles: ["employee", "finance-approver"] };
 
-  const created = await createProcessInstance(PID, actor);
-  const captureView = await getInstanceView(created.instanceId, actor);
+  const created = await createProcessInstance(PID, demoActor);
+  const captureView = await getInstanceView(created.instanceId, demoActor);
   expect(captureView.step.key).toBe("capture");
   expect(captureView.availablePaths.map((p) => p.id)).toEqual([submitPath]);
 
+  await claimStep(created.instanceId, demoActor);
   const afterCapture = await submitAndTransition(
     created.instanceId,
     submitPath,
     { [amountField]: 42, [reasonField]: "Taxi" } as unknown as Instance["data"],
-    actor,
+    demoActor,
   );
   expect(afterCapture.currentStepId as string).toBe("step_aaaa1111-0002-4a1c-8e2f-000000000002");
 
-  const reviewView = await getInstanceView(afterCapture.instanceId, actor);
+  const reviewView = await getInstanceView(afterCapture.instanceId, demoActor);
   expect(reviewView.step.key).toBe("review");
   const byId = new Map(reviewView.fields.map((f) => [f.field.id as string, f]));
   expect(byId.get(amountField)!.readonly).toBe(true);
   expect(byId.get(amountField)!.value).toBe(42);
   expect(byId.get(reviewNoteField)!.required).toBe(true);
 
+  await claimStep(afterCapture.instanceId, demoActor);
   const afterReview = await submitAndTransition(
     afterCapture.instanceId,
     approvePath,
     { [reviewNoteField]: "Looks fine" } as unknown as Instance["data"],
-    actor,
+    demoActor,
   );
   // "book" is a wait-state driven by an async action's writeback, which is
   // never delivered here (no outbox worker running) — the instance parks
@@ -836,7 +843,7 @@ test.skipIf(!DB)("happy path: create -> view -> submit -> view against expense-a
   expect(afterReview.currentStepId as string).toBe("step_aaaa1111-0003-4a1c-8e2f-000000000003");
   expect(afterReview.status).toBe("running");
 
-  const bookView = await getInstanceView(afterReview.instanceId, actor);
+  const bookView = await getInstanceView(afterReview.instanceId, demoActor);
   expect(bookView.step.key).toBe("book");
   expect(bookView.availablePaths).toEqual([]); // book's paths are automatic
 });

@@ -20,7 +20,13 @@ import {
 import { definitionHash } from "../schema/hash.js";
 import { armStepTimers, minFireAt } from "./duration.js";
 import { idempotencyKey } from "./idempotency.js";
-import { SPAWN_ACTION_TYPE } from "./registry.js";
+import {
+  SPAWN_ACTION_TYPE,
+  resolveAssignmentStrategy,
+  createDefaultAssignmentRegistry,
+  type AssignmentRegistry,
+} from "./registry.js";
+import { buildGuardContext, SYSTEM_ACTOR } from "../cel/eval.js";
 
 /** Shared client. Constructed lazily-ish; a query throws if DATABASE_URL is unset. */
 export const sql = new SQL(process.env.DATABASE_URL ?? "");
@@ -205,6 +211,7 @@ export async function createInstance(
     parent?: { instanceId: string; stepId: StepId };
   },
   db: SQL = sql,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
   // Arm the initial step's timers here, atomically with the INSERT — creation is a
   // step entry, and a resting initial wait-state needs its bound. Doing it in a
@@ -237,7 +244,19 @@ export async function createInstance(
     startedAt,
   });
   const { armed: timers, drops } = armStepTimers(initial, startedAt, body, seed);
-  const inst: Instance = { ...seed, timers };
+  // Creation is a step entry like any other, so an assignment-bearing initial
+  // step gets candidates resolved here too — mirroring timer arming just
+  // above, which planStepEntry also does not cover for creation. No actor is
+  // known at creation (unlike a transition's optional actorId), so the
+  // context uses SYSTEM_ACTOR, matching cel/eval.ts's "no acting user" idiom.
+  let assignment: Instance["assignment"];
+  if (initial?.assignment) {
+    const strategy = initial.assignment.strategy;
+    const def = resolveAssignmentStrategy(assignmentRegistry, strategy.type);
+    const ctx = buildGuardContext(body, { ...seed, timers }, SYSTEM_ACTOR);
+    assignment = { candidates: def ? def.resolve(strategy.config, ctx) : [], claimedBy: undefined, claimedAt: undefined };
+  }
+  const inst: Instance = { ...seed, timers, assignment };
   // A timer the initial step declared but arming could not compute a fireAt for.
   // Recorded at seq 0 — creation advances no sequence, and an event records the
   // seq in force rather than advancing it.

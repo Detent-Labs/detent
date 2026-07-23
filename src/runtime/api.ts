@@ -14,9 +14,16 @@ import { createDefinitionStore } from "../engine/definitions.js";
 import {
   commitManualTransition,
   resolveAutomatic,
+  claimStep as engineClaimStep,
+  releaseClaim as engineReleaseClaim,
   GuardRefused,
   ConcurrencyConflict,
   AutomaticCascadeLoop,
+  NotAssignedError,
+  NotACandidateError,
+  AlreadyClaimedError,
+  NotClaimedError,
+  NotClaimantError,
 } from "../engine/transition.js";
 import { buildGuardContext, evalGuard, type Actor } from "../cel/eval.js";
 import { definitionHash } from "../schema/hash.js";
@@ -37,7 +44,17 @@ import type {
   FieldDef,
 } from "../schema/definition.js";
 
-export { GuardRefused, ConcurrencyConflict, AutomaticCascadeLoop, PinMismatch };
+export {
+  GuardRefused,
+  ConcurrencyConflict,
+  AutomaticCascadeLoop,
+  PinMismatch,
+  NotAssignedError,
+  NotACandidateError,
+  AlreadyClaimedError,
+  NotClaimedError,
+  NotClaimantError,
+};
 
 // ============================================================
 // Public types
@@ -444,6 +461,14 @@ export async function submitAndTransition(
     if (gotHash !== instance.definitionHash) throw new PinMismatch(instance.instanceId, instance.definitionHash, gotHash);
 
     const step = findStep(body, instance.currentStepId as string);
+
+    // Claimant-only enforcement: before any submission validation. A step with
+    // no declared assignment is unaffected — identical to today's behavior.
+    if (instance.assignment) {
+      if (instance.assignment.claimedBy === undefined) throw new NotClaimedError(instanceId);
+      if (instance.assignment.claimedBy !== actor.id) throw new NotClaimantError(instanceId, actor.id);
+    }
+
     validateSubmissionData(body, step, instance, actor, submitted);
 
     return commitManualTransition(instance, pathId, body, actor, tx, data);
@@ -452,4 +477,21 @@ export async function submitAndTransition(
   const body = await store.resolveBody(committed.processId, committed.version);
   if (!body) throw new Error(`no published body for process ${committed.processId} version ${committed.version}`);
   return resolveAutomatic(committed, body, actor, db);
+}
+
+/**
+ * Claim the current step of a running instance. Thin delegation to the engine
+ * implementation — see `engine/transition.ts::claimStep` for the row-lock,
+ * candidate-eligibility, and exclusivity semantics.
+ */
+export async function claimStep(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<Instance> {
+  return engineClaimStep(instanceId, actor, db);
+}
+
+/**
+ * Release a claim on the current step of a running instance. Thin delegation
+ * to the engine implementation — see `engine/transition.ts::releaseClaim`.
+ */
+export async function releaseClaim(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<Instance> {
+  return engineReleaseClaim(instanceId, actor, db);
 }

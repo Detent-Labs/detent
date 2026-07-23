@@ -23,7 +23,13 @@
 import type { SQL } from "bun";
 import { sql, createInstance, appendInstanceEvent, appendInstanceEvents, newInstanceEventId, withTransaction } from "./store.js";
 import { idempotencyKey } from "./idempotency.js";
-import { SPAWN_ACTION_TYPE, RETURN_ACTION_TYPE } from "./registry.js";
+import {
+  SPAWN_ACTION_TYPE,
+  RETURN_ACTION_TYPE,
+  resolveAssignmentStrategy,
+  createDefaultAssignmentRegistry,
+  type AssignmentRegistry,
+} from "./registry.js";
 import { armStepTimers, minFireAt, type TimerDrop } from "./duration.js";
 import { buildGuardContext, evalGuard, SYSTEM_ACTOR, type Actor } from "../cel/eval.js";
 import { CANCEL_SINK_STEP_ID, instance as instanceSchema } from "../schema/definition.js";
@@ -71,6 +77,34 @@ export function orderedTriggerActions(source: Step, path: Path, target: Step): A
   return [...(source.onExit ?? []), ...(path.onPath ?? []), ...(target.onEntry ?? [])];
 }
 
+/** An actor is an eligible candidate if their id, or any of their roles, is listed. */
+export function isEligibleCandidate(actor: Actor, candidates: readonly string[]): boolean {
+  return candidates.includes(actor.id) || actor.roles.some((r) => candidates.includes(r));
+}
+
+/**
+ * Resolve a target step's declared `assignment` into a fresh `AssignmentState`,
+ * synchronous and pure — no I/O, called from `planStepEntry`. `undefined` when
+ * the step declares no `assignment` (unrestricted). An unresolvable strategy
+ * type resolves to zero candidates rather than throwing: publish-time
+ * `checkAssignmentRegistry` already guarantees resolution for a published body,
+ * so this is defensive only, mirroring `resolveFields`' unresolved-ref handling.
+ */
+function resolveStepAssignment(
+  target: Step,
+  body: ProcessBody,
+  entering: Instance,
+  actorId: string | undefined,
+  assignmentRegistry: AssignmentRegistry,
+): Instance["assignment"] {
+  if (!target.assignment) return undefined;
+  const strategy = target.assignment.strategy;
+  const def = resolveAssignmentStrategy(assignmentRegistry, strategy.type);
+  if (!def) return { candidates: [], claimedBy: undefined, claimedAt: undefined };
+  const ctx = buildGuardContext(body, entering, { id: actorId ?? SYSTEM_ACTOR.id, roles: [] });
+  return { candidates: def.resolve(strategy.config, ctx), claimedBy: undefined, claimedAt: undefined };
+}
+
 
 /** One outbox row a step entry implies, in the shape `applyStepEntry` inserts. */
 export type OutboxRow = {
@@ -100,6 +134,14 @@ export type OutboxRow = {
  *   child id, creating a duplicate child). Never inferred from
  *   `target.id === instance.currentStepId`: a genuine self-loop must spawn, and
  *   only the caller knows which this is.
+ * - `carryAssignment`: skip fresh candidate resolution and carry
+ *   `instance.assignment` forward byte-for-byte instead — migration's only use
+ *   (`migration.ts::migrateOne`). An in-flight claim deliberately survives a
+ *   migration untouched: the claim is not re-validated against the target
+ *   step's declaration, joining the existing "reconcile in-flight action
+ *   writebacks across a migration" item as a known, deferred gap. Every
+ *   authored transition path leaves this unset, so it always gets fresh
+ *   resolution.
  * - `events`: additional events appended to the plan's event list, so a caller
  *   supplying its own timer set can still record what it dropped while
  *   deriving that set.
@@ -113,6 +155,7 @@ export type StepEntryOpts = {
   timers?: Instance["timers"];
   entryVersion?: number;
   suppressSpawn?: boolean;
+  carryAssignment?: boolean;
   events?: InstanceEvent[];
 };
 
@@ -143,7 +186,13 @@ export type StepEntryPlan = {
  * re-implemented by a caller — except the four explicit overrides above, which
  * exist because a synthesized caller sometimes has to vary exactly one of them.
  */
-export function planStepEntry(instance: Instance, target: Step, body: ProcessBody, opts: StepEntryOpts): StepEntryPlan {
+export function planStepEntry(
+  instance: Instance,
+  target: Step,
+  body: ProcessBody,
+  opts: StepEntryOpts,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+): StepEntryPlan {
   const nextSeq = instance.transitionSeq + 1;
   const at = new Date().toISOString();
   const version = opts.entryVersion ?? instance.version;
@@ -164,7 +213,14 @@ export function planStepEntry(instance: Instance, target: Step, body: ProcessBod
   const { armed, drops }: { armed: NonNullable<Instance["timers"]>; drops: TimerDrop[] } =
     opts.timers !== undefined ? { armed: opts.timers, drops: [] } : armStepTimers(target, at, body, entering);
   const nextTimerAt = minFireAt(armed);
-  const next: Instance = { ...entering, timers: armed };
+  // Recomputed fresh on every entry, never carried from the source step: a
+  // target with no declared assignment resolves to undefined (unrestricted),
+  // clearing whatever the instance carried before. Except migration
+  // (`opts.carryAssignment`), which deliberately leaves it untouched.
+  const assignment = opts.carryAssignment
+    ? instance.assignment
+    : resolveStepAssignment(target, body, entering, opts.actorId, assignmentRegistry);
+  const next: Instance = { ...entering, timers: armed, assignment };
   // Timers the target step declared that arming could not compute a fireAt for
   // (empty when a caller supplied its own armed set). Written in the commit, so
   // a dropped timer cannot be recorded without its entry nor an entry land
@@ -318,6 +374,11 @@ export async function applyStepEntry(tx: SQL, plan: StepEntryPlan, extraFields?:
     transitionSeq: next.transitionSeq,
     status: next.status,
     timers: next.timers,
+    // Explicit null (not an omitted key) when the target declares no
+    // assignment: the merge below is a shallow `||`, so an omitted key would
+    // leave whatever the source step's assignment carried in place instead of
+    // clearing it.
+    assignment: next.assignment ?? null,
   };
   const updated = (await tx`UPDATE instances
     SET body = body || ${patch}::jsonb,
@@ -360,8 +421,9 @@ async function commitTransition(
   db: SQL,
   overrides?: Pick<StepEntryOpts, "status" | "timers" | "entryVersion" | "suppressSpawn" | "events">,
   extraFields?: Record<string, unknown>,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
-  const plan = planStepEntry(instance, target, body, { pathId, cause, actorId, actions, ...overrides });
+  const plan = planStepEntry(instance, target, body, { pathId, cause, actorId, actions, ...overrides }, assignmentRegistry);
   return withTransaction(db, (tx) => applyStepEntry(tx, plan, extraFields));
 }
 
@@ -391,6 +453,7 @@ export async function commitManualTransition(
   actor: Actor,
   db: SQL = sql,
   dataPatch?: Instance["data"],
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
   if (instance.status !== "running") return instance;
 
@@ -420,6 +483,7 @@ export async function commitManualTransition(
     db,
     undefined,
     dataPatch ? { data: mergedData } : undefined,
+    assignmentRegistry,
   );
 }
 
@@ -436,10 +500,11 @@ export async function executeManualTransition(
   actor: Actor,
   db: SQL = sql,
   dataPatch?: Instance["data"],
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
   if (instance.status !== "running") return instance;
-  const committed = await commitManualTransition(instance, pathId, body, actor, db, dataPatch);
-  return resolveAutomatic(committed, body, actor, db);
+  const committed = await commitManualTransition(instance, pathId, body, actor, db, dataPatch, assignmentRegistry);
+  return resolveAutomatic(committed, body, actor, db, assignmentRegistry);
 }
 
 /** Outcome of one direct-child cancellation sweep pass (see `sweepCancelledChildren`). */
@@ -470,6 +535,7 @@ async function sweepCancelledChildren(
   actor: Actor,
   db: SQL,
   resolveBody: ResolveBodyFn,
+  assignmentRegistry: AssignmentRegistry,
 ): Promise<CancelSweepResult> {
   const rows = (await db`SELECT instance_id, body FROM instances
     WHERE body->'parent'->>'instanceId' = ${parentInstanceId} AND body->>'status' = 'running'`) as
@@ -483,7 +549,7 @@ async function sweepCancelledChildren(
         result.failed.push(child.instanceId);
         continue;
       }
-      await cancelInstance(child, childBody, actor, db, resolveBody);
+      await cancelInstance(child, childBody, actor, db, resolveBody, assignmentRegistry);
       result.cancelled.push(child.instanceId);
     } catch (e) {
       if (e instanceof ConcurrencyConflict) result.conflicted.push(row.instance_id);
@@ -531,12 +597,13 @@ export async function cancelInstance(
   actor: Actor = SYSTEM_ACTOR,
   db: SQL = sql,
   resolveBody?: ResolveBodyFn,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
   if (instance.status !== "running") {
     if (instance.status === "cancelled" && resolveBody) {
       const rows = (await db`SELECT cancel_sweep_state FROM instances WHERE instance_id = ${instance.instanceId}`) as
         { cancel_sweep_state: string }[];
-      if (rows[0]?.cancel_sweep_state === "pending") await sweepCancelledChildren(instance.instanceId, actor, db, resolveBody);
+      if (rows[0]?.cancel_sweep_state === "pending") await sweepCancelledChildren(instance.instanceId, actor, db, resolveBody, assignmentRegistry);
     }
     return instance;
   }
@@ -547,9 +614,9 @@ export async function cancelInstance(
   if (!sink) throw new Error("cancel-sink not in body (uncompiled definition?)");
 
   const actions = [...(source.onCancel ?? []), ...(sink.onEntry ?? [])];
-  const cancelled = await commitTransition(instance, sink, body, null, actions, "cancel", actor.id, db, { status: "cancelled" });
+  const cancelled = await commitTransition(instance, sink, body, null, actions, "cancel", actor.id, db, { status: "cancelled" }, undefined, assignmentRegistry);
 
-  if (resolveBody) await sweepCancelledChildren(instance.instanceId, actor, db, resolveBody);
+  if (resolveBody) await sweepCancelledChildren(instance.instanceId, actor, db, resolveBody, assignmentRegistry);
   return cancelled;
 }
 
@@ -565,12 +632,13 @@ export async function startInstance(
   opts: { processId: Instance["processId"]; version: number },
   actor: Actor,
   db: SQL = sql,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
   // The initial step's timers are armed atomically inside createInstance (a crash
   // between INSERT and a separate arming UPDATE would strand them). If resolveAutomatic
   // transitions off the initial step, the first commit re-arms the resting step.
-  const created = await createInstance(body, opts, db);
-  return resolveAutomatic(created, body, actor, db);
+  const created = await createInstance(body, opts, db, assignmentRegistry);
+  return resolveAutomatic(created, body, actor, db, assignmentRegistry);
 }
 
 /**
@@ -594,13 +662,14 @@ export async function executeAutomaticTransition(
   path: Path,
   body: ProcessBody,
   db: SQL = sql,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
   const source = body.workflow.steps.find((s) => s.id === instance.currentStepId);
   if (!source) throw new Error(`current step not in body: ${instance.currentStepId}`);
   const target = body.workflow.steps.find((s) => s.id === path.to);
   if (!target) throw new Error(`path target not in body: ${path.to}`);
   const actions = orderedTriggerActions(source, path, target);
-  return commitTransition(instance, target, body, path.id, actions, "automatic", undefined, db);
+  return commitTransition(instance, target, body, path.id, actions, "automatic", undefined, db, undefined, undefined, assignmentRegistry);
 }
 
 /**
@@ -628,6 +697,7 @@ export async function resolveAutomatic(
   body: ProcessBody,
   actor: Actor,
   db: SQL = sql,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
   let current = instance;
   const seen = new Set<string>([current.currentStepId]);
@@ -641,7 +711,7 @@ export async function resolveAutomatic(
     const path = selectAutomaticPath(step, buildGuardContext(body, current, actor));
     if (!path) return current; // wait-state: no guard matched
 
-    current = await executeAutomaticTransition(current, path, body, db);
+    current = await executeAutomaticTransition(current, path, body, db, assignmentRegistry);
     if (seen.has(current.currentStepId)) {
       await markFaulted(current, db);
       throw new AutomaticCascadeLoop(current.currentStepId);
@@ -668,6 +738,7 @@ export async function fireTimer(
   timerId: string,
   body: ProcessBody,
   db: SQL = sql,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
   if (instance.status !== "running") return instance;
 
@@ -685,8 +756,8 @@ export async function fireTimer(
     const target = body.workflow.steps.find((s) => s.id === path.to);
     if (!target) throw new Error(`timer targetPath target not in body: ${path.to}`);
     const actions = [...(timer.onFire.actions ?? []), ...orderedTriggerActions(source, path, target)];
-    const committed = await commitTransition(instance, target, body, path.id, actions, "timer", undefined, db);
-    return resolveAutomatic(committed, body, SYSTEM_ACTOR, db);
+    const committed = await commitTransition(instance, target, body, path.id, actions, "timer", undefined, db, undefined, undefined, assignmentRegistry);
+    return resolveAutomatic(committed, body, SYSTEM_ACTOR, db, assignmentRegistry);
   }
 
   // Reminder timer: enqueue onFire.actions and mark fired, no transition, no seq
@@ -727,4 +798,125 @@ export async function fireTimer(
     }
   });
   return instance;
+}
+
+// ============================================================
+// Assignment claim / release: not a transition (no step change), so neither
+// appends a HistoryEntry nor advances transitionSeq. Exclusive claiming on top
+// of the candidates planStepEntry resolves at step entry (above).
+// ============================================================
+
+export class NotAssignedError extends Error {
+  constructor(instanceId: string) {
+    super(`instance ${instanceId} current step has no declared assignment`);
+    this.name = "NotAssignedError";
+  }
+}
+
+export class NotACandidateError extends Error {
+  constructor(instanceId: string, actorId: string) {
+    super(`actor ${actorId} is not an eligible candidate for instance ${instanceId}`);
+    this.name = "NotACandidateError";
+  }
+}
+
+export class AlreadyClaimedError extends Error {
+  constructor(instanceId: string) {
+    super(`instance ${instanceId} current step is already claimed`);
+    this.name = "AlreadyClaimedError";
+  }
+}
+
+export class NotClaimedError extends Error {
+  constructor(instanceId: string) {
+    super(`instance ${instanceId} current step requires a claim, and is unclaimed`);
+    this.name = "NotClaimedError";
+  }
+}
+
+export class NotClaimantError extends Error {
+  constructor(instanceId: string, actorId: string) {
+    super(`actor ${actorId} does not hold the claim on instance ${instanceId}`);
+    this.name = "NotClaimantError";
+  }
+}
+
+async function loadForClaim(tx: SQL, instanceId: string): Promise<Instance> {
+  const rows = (await tx`SELECT body FROM instances WHERE instance_id = ${instanceId} FOR UPDATE`) as { body: unknown }[];
+  if (rows.length === 0) throw new Error(`instance not found: ${instanceId}`);
+  return instanceSchema.parse(typeof rows[0].body === "string" ? JSON.parse(rows[0].body) : rows[0].body);
+}
+
+/**
+ * Claim the current step of a running instance. Row-locks (the same pattern
+ * `submitAndTransition` uses to guard against a concurrent writeback), requires
+ * the current step has a declared assignment and is unclaimed, and requires the
+ * actor is an eligible candidate. Not a transition: `jsonb_set` replaces the
+ * whole `{assignment}` path directly rather than routing through
+ * `applyStepEntry`, so no HistoryEntry is appended and `transitionSeq` is
+ * untouched. A no-op on a non-running instance, matching every other
+ * transition entry point's (`cancelInstance`, `commitManualTransition`, …)
+ * non-running no-op.
+ */
+export async function claimStep(instanceId: string, actor: Actor, db: SQL = sql): Promise<Instance> {
+  return withTransaction(db, async (tx) => {
+    const inst = await loadForClaim(tx, instanceId);
+    if (inst.status !== "running") return inst;
+
+    const assignment = inst.assignment;
+    if (!assignment) throw new NotAssignedError(instanceId);
+    if (assignment.claimedBy !== undefined) throw new AlreadyClaimedError(instanceId);
+    if (!isEligibleCandidate(actor, assignment.candidates)) throw new NotACandidateError(instanceId, actor.id);
+
+    const claimedAt = new Date().toISOString();
+    const next = { candidates: assignment.candidates, claimedBy: actor.id, claimedAt };
+    await tx`UPDATE instances SET body = jsonb_set(body, '{assignment}', (${[next]}::jsonb) -> 0)
+      WHERE instance_id = ${instanceId}`;
+
+    const event: InstanceEvent = {
+      id: newInstanceEventId(),
+      instanceId: inst.instanceId,
+      transitionSeq: inst.transitionSeq,
+      version: inst.version,
+      kind: "assignment.claimed",
+      payload: { actorId: actor.id },
+      at: claimedAt,
+    };
+    await appendInstanceEvent(tx, event);
+
+    return { ...inst, assignment: next };
+  });
+}
+
+/**
+ * Release a claim on the current step of a running instance. Row-locks,
+ * requires the calling actor currently holds the claim. Not a transition —
+ * same shape as `claimStep`. A no-op on a non-running instance.
+ */
+export async function releaseClaim(instanceId: string, actor: Actor, db: SQL = sql): Promise<Instance> {
+  return withTransaction(db, async (tx) => {
+    const inst = await loadForClaim(tx, instanceId);
+    if (inst.status !== "running") return inst;
+
+    const assignment = inst.assignment;
+    if (!assignment || assignment.claimedBy !== actor.id) throw new NotClaimantError(instanceId, actor.id);
+
+    const releasedAt = new Date().toISOString();
+    const next = { candidates: assignment.candidates };
+    await tx`UPDATE instances SET body = jsonb_set(body, '{assignment}', (${[next]}::jsonb) -> 0)
+      WHERE instance_id = ${instanceId}`;
+
+    const event: InstanceEvent = {
+      id: newInstanceEventId(),
+      instanceId: inst.instanceId,
+      transitionSeq: inst.transitionSeq,
+      version: inst.version,
+      kind: "assignment.released",
+      payload: { actorId: actor.id },
+      at: releasedAt,
+    };
+    await appendInstanceEvent(tx, event);
+
+    return { ...inst, assignment: next };
+  });
 }
