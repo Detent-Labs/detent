@@ -1,8 +1,13 @@
 /**
- * HTTP wrapper (src/http/): the three REST/JSON routes over the Runtime API
+ * HTTP wrapper (src/http/): the five REST/JSON routes over the Runtime API
  * Layer. DB-backed (skips when DATABASE_URL is unset), following the same
  * pattern as test/runtime-api.test.ts. Calls the exported `fetch` handler
  * directly with `new Request(...)` — no real port, no network I/O.
+ *
+ * Actor is resolved via the injected ActorResolver (default: the dev
+ * header-based resolver), from `X-Actor-Id`/`X-Actor-Roles` request headers —
+ * not from a client-supplied `actor` field in the body/query anymore, since
+ * this suite now also covers the auth-actor-assignment-claim change.
  */
 import { readFileSync } from "node:fs";
 import { test, expect, beforeAll, beforeEach } from "bun:test";
@@ -14,7 +19,9 @@ import { drainResolutions } from "../src/engine/resolution.js";
 import { ConcurrencyConflict } from "../src/engine/transition.js";
 import { createServer } from "../src/http/server.js";
 import { mapError } from "../src/http/errors.js";
+import type { ActorResolver } from "../src/auth/resolve.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
+import type { Actor } from "../src/cel/eval.js";
 
 const DB = !!process.env.DATABASE_URL;
 const cel = (src: string) => ({ lang: "cel", src });
@@ -128,13 +135,46 @@ const roleGuardedBody = (): ProcessBody =>
     },
   }) as unknown as ProcessBody;
 
+/** step_a (assigned to "approver"/"user_1"), initial --(path_ab, manual, guardless)--> step_b (terminal). */
+const assignedBody = (): ProcessBody =>
+  ({
+    key: "assigned_body",
+    label: { en: "Assigned Body" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a", key: "a", label: { en: "A" }, type: "task",
+          assignment: { strategy: { type: "static", config: { candidates: ["approver", "user_1"] } } },
+          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
 const pid = (n: string) => n as ProcessId;
-const jsonReq = (url: string, method: string, body?: unknown) =>
+
+const authHeaders = (actor: Actor): Record<string, string> => ({
+  "X-Actor-Id": actor.id,
+  ...(actor.roles.length > 0 ? { "X-Actor-Roles": actor.roles.join(",") } : {}),
+});
+
+/** A POST request carrying auth headers plus a JSON body (defaulting to `{}` so route handlers that call req.json() unconditionally never see an empty body). */
+const jsonReq = (url: string, method: string, actor: Actor, body: unknown = {}) =>
   new Request(url, {
     method,
-    headers: body === undefined ? {} : { "content-type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    headers: { ...authHeaders(actor), "content-type": "application/json" },
+    body: JSON.stringify(body),
   });
+
+/** A GET/no-body request carrying only auth headers (view, claim, release). */
+const authedReq = (url: string, method: string, actor: Actor) =>
+  new Request(url, { method, headers: authHeaders(actor) });
+
+const user1: Actor = { id: "user_1", roles: [] };
 
 // ============================================================
 // Happy path per route
@@ -144,7 +184,7 @@ test.skipIf(!DB)("POST /processes/:processId/instances creates an instance and r
   const PID = pid("proc_http_create");
   await publishBody(PID, simpleBody(), reg);
 
-  const res = await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", { actor: { id: "user_1", roles: [] } }));
+  const res = await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1));
   expect(res.status).toBe(201);
   const body = (await res.json()) as { instanceId: string; currentStepId: string };
   expect(body.currentStepId).toBe("step_a");
@@ -155,9 +195,7 @@ test.skipIf(!DB)("POST /processes/:processId/instances with a data seed reflects
   const PID = pid("proc_http_create_seed");
   await publishBody(PID, simpleBody(), reg);
 
-  const res = await fetch(
-    jsonReq(`http://x/processes/${PID}/instances`, "POST", { actor: { id: "user_1", roles: [] }, data: { field_amount: 7 } }),
-  );
+  const res = await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1, { data: { field_amount: 7 } }));
   expect(res.status).toBe(201);
   const body = (await res.json()) as { data: Record<string, unknown> };
   expect(body.data).toEqual({ field_amount: 7 });
@@ -169,9 +207,7 @@ test.skipIf(!DB)("POST /processes/:processId/instances with an explicit version 
   const v2 = await publishBody(PID, guardedBody(), reg); // a distinct body -> assigns v2
   expect(v2.version).toBe(v1.version + 1);
 
-  const res = await fetch(
-    jsonReq(`http://x/processes/${PID}/instances`, "POST", { actor: { id: "user_1", roles: [] }, version: v1.version }),
-  );
+  const res = await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1, { version: v1.version }));
   expect(res.status).toBe(201);
   const body = (await res.json()) as { version: number; currentStepId: string };
   expect(body.version).toBe(v1.version);
@@ -181,11 +217,9 @@ test.skipIf(!DB)("POST /processes/:processId/instances with an explicit version 
 test.skipIf(!DB)("GET /instances/:instanceId resolves a view and returns 200", async () => {
   const PID = pid("proc_http_view");
   await publishBody(PID, simpleBody(), reg);
-  const created = await (
-    await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", { actor: { id: "user_1", roles: [] } }))
-  ).json() as { instanceId: string };
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
 
-  const res = await fetch(new Request(`http://x/instances/${created.instanceId}?actorId=user_1`));
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", user1));
   expect(res.status).toBe(200);
   const view = (await res.json()) as { step: { key: string }; status: string; availablePaths: unknown[] };
   expect(view.step.key).toBe("a");
@@ -196,16 +230,10 @@ test.skipIf(!DB)("GET /instances/:instanceId resolves a view and returns 200", a
 test.skipIf(!DB)("POST /instances/:instanceId/submit commits a transition and returns 200", async () => {
   const PID = pid("proc_http_submit");
   await publishBody(PID, simpleBody(), reg);
-  const created = await (
-    await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", { actor: { id: "user_1", roles: [] } }))
-  ).json() as { instanceId: string };
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
 
   const res = await fetch(
-    jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", {
-      actor: { id: "user_1", roles: [] },
-      pathId: "path_ab",
-      data: { field_amount: 10 },
-    }),
+    jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, { pathId: "path_ab", data: { field_amount: 10 } }),
   );
   expect(res.status).toBe(200);
   const body = (await res.json()) as { currentStepId: string; status: string };
@@ -216,18 +244,10 @@ test.skipIf(!DB)("POST /instances/:instanceId/submit commits a transition and re
 test.skipIf(!DB)("GET /instances/:instanceId on a non-running (completed) instance still resolves, with no available paths", async () => {
   const PID = pid("proc_http_view_completed");
   await publishBody(PID, simpleBody(), reg);
-  const created = await (
-    await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", { actor: { id: "user_1", roles: [] } }))
-  ).json() as { instanceId: string };
-  await fetch(
-    jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", {
-      actor: { id: "user_1", roles: [] },
-      pathId: "path_ab",
-      data: { field_amount: 10 },
-    }),
-  );
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, { pathId: "path_ab", data: { field_amount: 10 } }));
 
-  const res = await fetch(new Request(`http://x/instances/${created.instanceId}?actorId=user_1`));
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", user1));
   expect(res.status).toBe(200);
   const view = (await res.json()) as { status: string; availablePaths: unknown[] };
   expect(view.status).toBe("completed");
@@ -241,16 +261,10 @@ test.skipIf(!DB)("GET /instances/:instanceId on a non-running (completed) instan
 test.skipIf(!DB)("a submission validation failure maps to 422", async () => {
   const PID = pid("proc_http_422");
   await publishBody(PID, simpleBody(), reg);
-  const created = await (
-    await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", { actor: { id: "user_1", roles: [] } }))
-  ).json() as { instanceId: string };
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
 
   const res = await fetch(
-    jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", {
-      actor: { id: "user_1", roles: [] },
-      pathId: "path_ab",
-      data: { field_amount: "not-a-number" },
-    }),
+    jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, { pathId: "path_ab", data: { field_amount: "not-a-number" } }),
   );
   expect(res.status).toBe(422);
   const body = (await res.json()) as { error: { type: string; issues: unknown[] } };
@@ -261,17 +275,9 @@ test.skipIf(!DB)("a submission validation failure maps to 422", async () => {
 test.skipIf(!DB)("a guard refusal maps to 409", async () => {
   const PID = pid("proc_http_409_guard");
   await publishBody(PID, guardedBody(), reg);
-  const created = await (
-    await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", { actor: { id: "user_1", roles: [] } }))
-  ).json() as { instanceId: string };
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
 
-  const res = await fetch(
-    jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", {
-      actor: { id: "user_1", roles: [] },
-      pathId: "path_done",
-      data: {},
-    }),
-  );
+  const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, { pathId: "path_done", data: {} }));
   expect(res.status).toBe(409);
   const body = (await res.json()) as { error: { type: string } };
   expect(body.error.type).toBe("guard-refused");
@@ -291,20 +297,18 @@ test("a concurrency conflict maps to 409", () => {
 test.skipIf(!DB)("a pin mismatch maps to 500 (via GET on a corrupted pin)", async () => {
   const PID = pid("proc_http_500_pin");
   await publishBody(PID, simpleBody(), reg);
-  const created = await (
-    await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", { actor: { id: "user_1", roles: [] } }))
-  ).json() as { instanceId: string };
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
 
   await sql`UPDATE instances SET body = jsonb_set(body, '{definitionHash}', '"deadbeef"'::jsonb) WHERE instance_id = ${created.instanceId}`;
 
-  const res = await fetch(new Request(`http://x/instances/${created.instanceId}?actorId=user_1`));
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", user1));
   expect(res.status).toBe(500);
   const body = (await res.json()) as { error: { type: string } };
   expect(body.error.type).toBe("internal");
 });
 
 test.skipIf(!DB)("an unknown instanceId maps to 500, not 404", async () => {
-  const res = await fetch(new Request("http://x/instances/inst_does_not_exist?actorId=user_1"));
+  const res = await fetch(authedReq("http://x/instances/inst_does_not_exist", "GET", user1));
   expect(res.status).toBe(500);
   const body = (await res.json()) as { error: { type: string; message: string } };
   expect(body.error.type).toBe("internal");
@@ -318,13 +322,10 @@ test.skipIf(!DB)("an unknown instanceId maps to 500, not 404", async () => {
 test.skipIf(!DB)("a post-commit cascade loop surfaces as 200 with a faulted view, not an error", async () => {
   const PID = pid("proc_http_cascade_loop");
   await publishBody(PID, cascadeLoopBody(), reg);
-  const created = await (
-    await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", { actor: { id: "user_1", roles: [] } }))
-  ).json() as { instanceId: string };
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
 
   const res = await fetch(
-    jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", {
-      actor: { id: "user_1", roles: [] },
+    jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, {
       pathId: "path_ag",
       data: { field_marker: "kept-despite-fault" },
     }),
@@ -335,39 +336,75 @@ test.skipIf(!DB)("a post-commit cascade loop surfaces as 200 with a faulted view
 });
 
 // ============================================================
-// Actor-passing mechanism
+// Actor resolution
 // ============================================================
 
-test.skipIf(!DB)("GET roles defaults to [] when omitted", async () => {
+test.skipIf(!DB)("GET with no roles header defaults to []", async () => {
   const PID = pid("proc_http_roles_default");
   await publishBody(PID, roleGuardedBody(), reg);
-  const created = await (
-    await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", { actor: { id: "user_1", roles: [] } }))
-  ).json() as { instanceId: string };
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
 
-  const res = await fetch(new Request(`http://x/instances/${created.instanceId}?actorId=user_1`));
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", user1));
   const view = (await res.json()) as { availablePaths: unknown[] };
   expect(view.availablePaths).toEqual([]); // no roles -> guard 'admin' in actor.roles is false
 });
 
-test.skipIf(!DB)("GET roles parses a comma-separated list", async () => {
+test.skipIf(!DB)("GET roles header parses a comma-separated list", async () => {
   const PID = pid("proc_http_roles_multi");
   await publishBody(PID, roleGuardedBody(), reg);
-  const created = await (
-    await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", { actor: { id: "user_1", roles: [] } }))
-  ).json() as { instanceId: string };
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
 
-  const res = await fetch(new Request(`http://x/instances/${created.instanceId}?actorId=user_1&roles=employee,admin`));
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", { id: "user_1", roles: ["employee", "admin"] }));
   const view = (await res.json()) as { availablePaths: { key: string }[] };
   expect(view.availablePaths.map((p) => p.key)).toEqual(["admin"]);
 });
 
-test.skipIf(!DB)("POST actor is accepted from the JSON body regardless of shape (not an auth check)", async () => {
-  const PID = pid("proc_http_actor_body");
+test.skipIf(!DB)("a request with no X-Actor-Id header maps to 401, not processed", async () => {
+  const PID = pid("proc_http_401");
   await publishBody(PID, simpleBody(), reg);
+
+  const res = await fetch(new Request(`http://x/processes/${PID}/instances`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }));
+  expect(res.status).toBe(401);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("actor-resolution");
+});
+
+test.skipIf(!DB)("an actor field in the request body is ignored; the resolved header-actor is authoritative", async () => {
+  const PID = pid("proc_http_body_actor_ignored");
+  await publishBody(PID, simpleBody(), reg);
+
+  // user1's headers resolve the actor; the body's conflicting `actor` field must be ignored.
   const res = await fetch(
-    jsonReq(`http://x/processes/${PID}/instances`, "POST", { actor: { id: "anyone-at-all", roles: ["made-up-role"] } }),
+    jsonReq(`http://x/processes/${PID}/instances`, "POST", user1, { actor: { id: "someone_else", roles: ["admin"] } }),
   );
+  expect(res.status).toBe(201);
+  const created = (await res.json()) as { instanceId: string };
+
+  const view = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", user1))).json()) as {
+    step: { key: string };
+  };
+  expect(view.step.key).toBe("a"); // created and readable under user1, proving the body's actor was never used
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/claim on a step with no declared assignment maps to 403 not-assigned", async () => {
+  const PID = pid("proc_http_claim_403_unassigned");
+  await publishBody(PID, simpleBody(), reg); // step_a declares no assignment
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("not-assigned");
+});
+
+test.skipIf(!DB)("an injected fake resolver is honored instead of the default dev header resolver", async () => {
+  const PID = pid("proc_http_fake_resolver");
+  await publishBody(PID, simpleBody(), reg);
+  const fakeResolver: ActorResolver = async () => ({ id: "fixed_actor", roles: [] });
+  const fakeFetch = createServer(reg, sql, fakeResolver);
+
+  // No auth headers at all — the fake resolver ignores the credential entirely.
+  const res = await fakeFetch(new Request(`http://x/processes/${PID}/instances`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }));
   expect(res.status).toBe(201);
 });
 
@@ -379,12 +416,12 @@ test.skipIf(!DB)("a normal response carries the CORS allow-origin header", async
   const PID = pid("proc_http_cors_normal");
   await publishBody(PID, simpleBody(), reg);
 
-  const res = await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", { actor: { id: "user_1", roles: [] } }));
+  const res = await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1));
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
 });
 
 test.skipIf(!DB)("an error response also carries the CORS allow-origin header", async () => {
-  const res = await fetch(new Request("http://x/instances/inst_does_not_exist?actorId=user_1"));
+  const res = await fetch(authedReq("http://x/instances/inst_does_not_exist", "GET", user1));
   expect(res.status).toBe(500);
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
 });
@@ -413,6 +450,109 @@ test("OPTIONS preflight on the submit route returns 204 with CORS headers, witho
   expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type");
 });
 
+test("OPTIONS preflight on the claim route returns 204 with CORS headers, without claiming", async () => {
+  const res = await fetch(new Request("http://x/instances/inst_x/claim", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type");
+});
+
+test("OPTIONS preflight on the release route returns 204 with CORS headers, without releasing", async () => {
+  const res = await fetch(new Request("http://x/instances/inst_x/release", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type");
+});
+
+// ============================================================
+// Assignment claim/release routes + enforcement error mappings
+// ============================================================
+
+test.skipIf(!DB)("POST /instances/:instanceId/claim succeeds for an eligible candidate and returns 200", async () => {
+  const PID = pid("proc_http_claim");
+  await publishBody(PID, assignedBody(), reg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { assignment: { claimedBy: string } };
+  expect(body.assignment.claimedBy).toBe("user_1");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/claim by a non-candidate maps to 403 not-a-candidate", async () => {
+  const PID = pid("proc_http_claim_403a");
+  await publishBody(PID, assignedBody(), reg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", { id: "outsider", roles: [] }));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("not-a-candidate");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/claim on an already-claimed step maps to 403 already-claimed", async () => {
+  const PID = pid("proc_http_claim_403b");
+  await publishBody(PID, assignedBody(), reg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", { id: "approver_2", roles: ["approver"] }));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("already-claimed");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/release succeeds for the claimant and returns 200", async () => {
+  const PID = pid("proc_http_release");
+  await publishBody(PID, assignedBody(), reg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/release`, "POST", user1));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { assignment: { claimedBy?: string } };
+  expect(body.assignment.claimedBy).toBeUndefined();
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/release by a non-claimant maps to 403 not-claimant", async () => {
+  const PID = pid("proc_http_release_403");
+  await publishBody(PID, assignedBody(), reg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/release`, "POST", { id: "approver_2", roles: ["approver"] }));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("not-claimant");
+});
+
+test.skipIf(!DB)("submitting an unclaimed assigned step maps to 403 not-claimed", async () => {
+  const PID = pid("proc_http_submit_403a");
+  await publishBody(PID, assignedBody(), reg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, { pathId: "path_ab", data: {} }));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("not-claimed");
+});
+
+test.skipIf(!DB)("submitting a step claimed by a different actor maps to 403 not-claimant", async () => {
+  const PID = pid("proc_http_submit_403b");
+  await publishBody(PID, assignedBody(), reg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+
+  const res = await fetch(
+    jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", { id: "approver_2", roles: ["approver"] }, { pathId: "path_ab", data: {} }),
+  );
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("not-claimant");
+});
+
 // ============================================================
 // Async settle: book step over HTTP against the real expense-approval example
 // ============================================================
@@ -433,39 +573,40 @@ test.skipIf(!DB)("happy path through expense-approval.json settles the async 'bo
   const reviewNoteField = "field_1a2b3c4d-0003-4a1c-8e2f-000000000003";
   const submitPath = "path_bbbb2222-0001-4a1c-8e2f-000000000001";
   const approvePath = "path_bbbb2222-0002-4a1c-8e2f-000000000002";
-  const actor = { id: "user_demo", roles: ["employee", "finance-approver"] };
+  const actor: Actor = { id: "user_demo", roles: ["employee", "finance-approver"] };
 
-  const created = await (
-    await expenseFetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", { actor }))
-  ).json() as { instanceId: string };
+  const created = (await (await expenseFetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", actor))).json()) as { instanceId: string };
 
+  // "capture" and "review" both declare an assignment (employee /
+  // finance-approver respectively); user_demo holds both roles, but each
+  // step still requires its own claim before submitAndTransition accepts it.
+  await expenseFetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", actor));
   await expenseFetch(
-    jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", {
-      actor,
+    jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", actor, {
       pathId: submitPath,
       data: { [amountField]: 42, [reasonField]: "Taxi" },
     }),
   );
-  const afterReview = await (
+  await expenseFetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", actor));
+  const afterReview = (await (
     await expenseFetch(
-      jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", {
-        actor,
+      jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", actor, {
         pathId: approvePath,
         data: { [reviewNoteField]: "Looks fine" },
       }),
     )
-  ).json() as { status: string };
+  ).json()) as { status: string };
   expect(afterReview.status).toBe("running"); // parked at "book" until the async action settles
 
   const definitionStore = createDefinitionStore(sql);
-  let view = (await (await expenseFetch(new Request(`http://x/instances/${created.instanceId}?actorId=user_demo`))).json()) as {
+  let view = (await (await expenseFetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", actor))).json()) as {
     step: { key: string };
     status: string;
   };
   for (let i = 0; i < 5 && view.status === "running" && view.step.key === "book"; i++) {
     await drainOutbox(sql, expenseReg);
     await drainResolutions(sql, definitionStore.resolveBody);
-    view = (await (await expenseFetch(new Request(`http://x/instances/${created.instanceId}?actorId=user_demo`))).json()) as {
+    view = (await (await expenseFetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", actor))).json()) as {
       step: { key: string };
       status: string;
     };

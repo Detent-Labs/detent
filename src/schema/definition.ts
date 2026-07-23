@@ -892,6 +892,20 @@ export const instanceEvent = z.discriminatedUnion("kind", [
     kind: z.literal("migration.transform-dropped"),
     payload: z.object({ fieldId, reason: migrationTransformDroppedReason }).strict(),
   }),
+  // An actor claimed an unclaimed, assignment-bearing step. Not a transition (no
+  // step change), so no HistoryEntry and no transitionSeq advance — the
+  // migration.skipped shape, not the timer.fired one.
+  z.object({
+    ...instanceEventEnvelope,
+    kind: z.literal("assignment.claimed"),
+    payload: z.object({ actorId: z.string() }).strict(),
+  }),
+  // The claimant released their claim on the current step.
+  z.object({
+    ...instanceEventEnvelope,
+    kind: z.literal("assignment.released"),
+    payload: z.object({ actorId: z.string() }).strict(),
+  }),
 ]);
 export type InstanceEvent = z.infer<typeof instanceEvent>;
 export type InstanceEventKind = InstanceEvent["kind"];
@@ -904,7 +918,13 @@ export const instance = z.object({
   currentStepId: stepId,
   transitionSeq: z.number(),
   data: z.record(fieldId, literal),
-  assignment: assignmentState.optional(),
+  // nullable (not just optional): a step entry's commit patch must be able to
+  // explicitly CLEAR a carried-over assignment from the previous step via a
+  // shallow jsonb `||` merge — an omitted key in that merge leaves the prior
+  // value in place, so "no assignment on the target step" is written as JSON
+  // null, not an absent key. `undefined` remains valid for an instance that
+  // predates this field (nothing ever wrote it). Both read as "no assignment".
+  assignment: assignmentState.nullable().optional(),
   timers: z.array(timerState).optional(),
   parent: z.object({ instanceId, stepId }).optional(),
   status: instanceStatus,

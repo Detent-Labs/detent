@@ -33,6 +33,7 @@ import { definitionHash } from "../schema/hash.js";
 import { createDefinitionStore } from "./definitions.js";
 import { planStepEntry, applyStepEntry, ConcurrencyConflict } from "./transition.js";
 import { armStepTimers, type TimerDrop } from "./duration.js";
+import { createDefaultAssignmentRegistry, type AssignmentRegistry } from "./registry.js";
 import type { ResolveBody } from "./resolution.js";
 import { sql, newInstanceEventId, appendInstanceEvent, withTransaction } from "./store.js";
 
@@ -336,6 +337,7 @@ async function migrateOne(
   fromBody: ProcessBody,
   toBody: ProcessBody,
   db: SQL,
+  assignmentRegistry: AssignmentRegistry,
 ): Promise<"migrated" | "skipped" | "none"> {
   return withTransaction(db, async (tx) => {
     // 5.4 lock the row and compute everything from THIS read — the OCC token does not
@@ -439,16 +441,24 @@ async function migrateOne(
     // second child). status, the subprocess spawn/return and the HistoryEntry are all
     // derived by the seam — never reimplemented here.
     const actions = stepChanged ? (targetStep.onEntry ?? []) : [];
-    const plan = planStepEntry(inst, targetStep, toBody, {
-      pathId: null,
-      cause: "migration",
-      actorId: undefined,
-      actions,
-      timers,
-      entryVersion: toVersion,
-      suppressSpawn: !stepChanged,
-      events: [...dropEvents, ...transformDropEvents],
-    });
+    const plan = planStepEntry(
+      inst,
+      targetStep,
+      toBody,
+      {
+        pathId: null,
+        cause: "migration",
+        actorId: undefined,
+        actions,
+        timers,
+        entryVersion: toVersion,
+        suppressSpawn: !stepChanged,
+        // An in-flight claim survives a migration untouched — see StepEntryOpts.
+        carryAssignment: true,
+        events: [...dropEvents, ...transformDropEvents],
+      },
+      assignmentRegistry,
+    );
     // applyStepEntry itself flags resolve_state = 'pending' on every commit, so
     // migration's cascade deferral (rather than nesting commits) falls out of
     // that general rule and needs no separate flag here.
@@ -479,6 +489,7 @@ export async function migrateInstances(
   toVersion: number,
   db: SQL = sql,
   resolvers: { resolveBody: ResolveBody } = createDefinitionStore(db),
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<MigrationResult> {
   // Read-and-freeze as one statement — not on the first success, or an invocation
   // that skips everything leaves the plan editable while it runs. A concurrent
@@ -511,7 +522,7 @@ export async function migrateInstances(
     for (const { instance_id: id } of rows) {
       last = id; // keyset advances regardless of outcome — this is what terminates
       try {
-        const outcome = await migrateOne(id, fromVersion, toVersion, spec, fromBody, toBody, db);
+        const outcome = await migrateOne(id, fromVersion, toVersion, spec, fromBody, toBody, db, assignmentRegistry);
         if (outcome === "migrated") result.migrated.push(id);
         else if (outcome === "skipped") result.skipped.push(id);
         // "none": raced out of eligibility, in no category

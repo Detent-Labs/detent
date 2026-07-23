@@ -4,12 +4,17 @@
 
 Defines the Runtime API Layer: the library boundary a UI (or, later, an HTTP
 server) calls to run an instance without touching engine internals —
-`createProcessInstance`, `getInstanceView`, `submitAndTransition`. It is a
-library boundary, not a transport (`src/runtime/api.ts`): plain async TS
-functions, resolving `ProcessBody` internally so callers only ever touch
-`processId`/`instanceId`. Auth/actor resolution, assignment/claim
-enforcement, and list/history endpoints are explicitly out of scope for this
-capability.
+`createProcessInstance`, `getInstanceView`, `submitAndTransition`,
+`claimStep`, `releaseClaim`. It is a library boundary, not a transport
+(`src/runtime/api.ts`): plain async TS functions, resolving `ProcessBody`
+internally so callers only ever touch `processId`/`instanceId`. Every
+function takes an explicit `actor: Actor`, trusted as given — actor
+resolution from an untrusted credential is the `actor-resolution`
+capability's concern, not this one's. `submitAndTransition` enforces a
+claimant-only check against `instance.assignment` (populated by the
+`assignment-claim-enforcement` capability); `claimStep`/`releaseClaim`
+delegate to that capability's engine implementation. List/history endpoints
+are explicitly out of scope for this capability.
 
 ## Requirements
 
@@ -130,11 +135,18 @@ always present so a caller can distinguish these cases.
 
 `submitAndTransition(instanceId, pathId, data, actor, db?)` SHALL, inside one
 transaction, read the instance row with a row lock (`SELECT ... FOR UPDATE`),
-resolve and hash-verify its pinned `ProcessBody`, validate `data` against the
-current step's resolved view and against `FieldValidation`, and — on success
-— commit the data write and the manual transition on `pathId` atomically via
-`commitManualTransition`. The row lock is held for exactly this one commit,
-not for any subsequent automatic-path cascade.
+resolve and hash-verify its pinned `ProcessBody`, and — if the current step
+has a declared (non-unset) `instance.assignment` — require
+`actor.id === instance.assignment.claimedBy`, throwing `NotClaimedError`
+when `claimedBy` is unset and `NotClaimantError` when it is set to a
+different actor, before any submission validation runs. A step with no
+declared `assignment` is unaffected by this check, identical to today's
+behavior. Once this check passes (or is not applicable), it SHALL validate
+`data` against the current step's resolved view and against
+`FieldValidation`, and — on success — commit the data write and the manual
+transition on `pathId` atomically via `commitManualTransition`. The row lock
+is held for exactly this one commit, not for any subsequent automatic-path
+cascade.
 
 The row lock exists because a wholesale `data` patch is not protected by the
 `transitionSeq` optimistic-concurrency predicate: a concurrent `Action.output`
@@ -240,6 +252,83 @@ left `faulted`.
 - **THEN** it throws the engine's existing `AutomaticCascadeLoop`, the
   submitted data and manual transition remain committed, and the instance's
   status is `faulted`
+
+#### Scenario: A submission to an unclaimed assigned step is rejected before validation
+- **WHEN** the current step has a declared `assignment` with `claimedBy`
+  unset, and any actor calls `submitAndTransition`
+- **THEN** it throws `NotClaimedError` before any field validation runs, and
+  the instance is uncommitted
+
+#### Scenario: A submission by a non-claimant to a claimed step is rejected
+- **WHEN** the current step has a declared `assignment` with `claimedBy`
+  set to a different actor's id, and the calling actor's id does not match
+- **THEN** it throws `NotClaimantError` before any field validation runs,
+  and the instance is uncommitted
+
+#### Scenario: The claimant may submit
+- **WHEN** the current step has a declared `assignment` with `claimedBy`
+  set to the calling actor's id
+- **THEN** the enforcement check passes and submission proceeds to field
+  validation as normal
+
+#### Scenario: A step with no declared assignment is unaffected
+- **WHEN** the current step has no `assignment` field
+- **THEN** `submitAndTransition` performs no claim check, identical to
+  today's behavior
+
+### Requirement: Claim the current step of a running instance
+
+`claimStep(instanceId, actor, db?)` SHALL row-lock the instance, require
+`status === "running"`, require the current step has a declared
+`instance.assignment`, require the actor is an eligible candidate (`actor.id`
+or any of `actor.roles` present in `assignment.candidates`), and require
+`claimedBy` is currently unset. On success it SHALL set `claimedBy =
+actor.id`, `claimedAt` to the current time, append an `assignment.claimed`
+`InstanceEvent`, and return the updated `Instance`. It SHALL throw
+`NotAssignedError` when the current step has no declared `assignment`,
+`NotACandidateError` when the actor is not eligible, and `AlreadyClaimedError`
+when `claimedBy` is already set.
+
+#### Scenario: An eligible candidate claims successfully
+- **WHEN** `claimStep` is called by an eligible candidate on a running
+  instance's unclaimed, assignment-bearing current step
+- **THEN** it returns the updated `Instance` with `assignment.claimedBy`
+  set to the actor's id
+
+#### Scenario: A step with no declared assignment cannot be claimed
+- **WHEN** `claimStep` is called on a running instance whose current step has
+  no declared `assignment`
+- **THEN** it throws `NotAssignedError`
+
+#### Scenario: A non-candidate is rejected
+- **WHEN** `claimStep` is called by an actor who is not an eligible
+  candidate
+- **THEN** it throws `NotACandidateError` and the instance is unchanged
+
+#### Scenario: An already-claimed step is rejected
+- **WHEN** `claimStep` is called on a step whose `assignment.claimedBy` is
+  already set
+- **THEN** it throws `AlreadyClaimedError` and the existing claim is
+  unchanged
+
+### Requirement: Release a claim on the current step of a running instance
+
+`releaseClaim(instanceId, actor, db?)` SHALL row-lock the instance, require
+`assignment.claimedBy === actor.id`, and on success clear `claimedBy` and
+`claimedAt`, append an `assignment.released` `InstanceEvent`, and return the
+updated `Instance`. It SHALL throw `NotClaimantError` when the calling
+actor does not hold the claim.
+
+#### Scenario: The claimant releases successfully
+- **WHEN** `releaseClaim` is called by the actor currently holding the
+  claim
+- **THEN** it returns the updated `Instance` with `assignment.claimedBy`
+  and `assignment.claimedAt` cleared
+
+#### Scenario: A non-claimant is rejected
+- **WHEN** `releaseClaim` is called by an actor who does not hold the
+  current claim
+- **THEN** it throws `NotClaimantError` and the existing claim is unchanged
 
 ### Requirement: Submitted data is validated against field type, options, constraints, and rule
 

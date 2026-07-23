@@ -163,3 +163,30 @@ positions targets a field id absent from the catalog SHALL fail to parse.
 - **WHEN** an `Action.output` in any of the five positions targets a field id declared inside a `group` field's `fields`
 - **THEN** the process body parses successfully (subject to every other invariant)
 
+### Requirement: A step's assignment, when present, follows the plugin-envelope shape
+
+A `Step` MAY declare an optional `assignment: { strategy: { type: string;
+config: unknown; description?: string } }` field. A step with no
+`assignment` field SHALL be unrestricted — every existing published body,
+example, and test that predates enforcement continues to parse and behave
+identically. This field introduces no structural coupling to a step's
+`type`: a step of any type MAY declare `assignment`. (`strategy.type`/
+`strategy.config` resolution against a registry happens at publish, per the
+`assignment-registry-validation` capability, not at parse.)
+
+#### Scenario: A step with no assignment field parses unchanged
+- **WHEN** a step declares no `assignment` field
+- **THEN** the process body parses successfully and the step is
+  unrestricted, identical to pre-existing behavior
+
+#### Scenario: A step with a well-formed assignment envelope parses
+- **WHEN** a step declares `assignment: { strategy: { type: "static",
+  config: { candidates: ["role_a"] } } }`
+- **THEN** the process body parses successfully (subject to every other
+  invariant)
+
+#### Scenario: An assignment envelope missing its strategy type is rejected
+- **WHEN** a step declares an `assignment.strategy` object with no `type`
+  string
+- **THEN** the process body fails to parse
+

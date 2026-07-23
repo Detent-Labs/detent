@@ -636,4 +636,33 @@ describe("migration schema additions", () => {
     delete (withWrapperNoise as any).migration;
     expect(definitionHash(withWrapperNoise.definition as ProcessBody)).toBe(before);
   });
+
+  // Step.assignment: { strategy: { type, config, description? } } — already in the
+  // schema (roadmap #5d activates it, no schema change), and the example's
+  // "capture"/"review" steps already declare it (steps[0]/steps[1]).
+  describe("Step.assignment envelope", () => {
+    it("a step with no assignment field parses unchanged", () => {
+      // "book" (steps[2]) declares no assignment.
+      expect(raw.definition.workflow.steps[2].assignment).toBeUndefined();
+      expect(processVersion.safeParse(raw).success).toBe(true);
+    });
+
+    it("a well-formed assignment envelope parses", () => {
+      expect(raw.definition.workflow.steps[0].assignment).toEqual({
+        strategy: { type: "static", config: { candidates: ["employee"] } },
+      });
+    });
+
+    it("an assignment envelope missing its strategy type is rejected", () => {
+      expect(rejects((d) => {
+        delete d.definition.workflow.steps[0].assignment.strategy.type;
+      })).toBe(true);
+    });
+
+    it("an assignment envelope missing its strategy config is rejected", () => {
+      expect(rejects((d) => {
+        delete d.definition.workflow.steps[0].assignment.strategy.config;
+      })).toBe(true);
+    });
+  });
 });

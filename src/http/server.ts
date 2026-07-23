@@ -9,7 +9,8 @@ import { SQL } from "bun";
 import { sql } from "../engine/store.js";
 import { startEngine } from "../engine/host.js";
 import { createRegistry, type Registry } from "../engine/registry.js";
-import { handleCreateInstance, handleGetInstanceView, handleSubmit } from "./routes.js";
+import { devHeaderResolver, type ActorResolver } from "../auth/resolve.js";
+import { handleCreateInstance, handleGetInstanceView, handleSubmit, handleClaim, handleRelease } from "./routes.js";
 import type { HttpResult } from "./errors.js";
 
 const CORS_ORIGIN_HEADER = { "Access-Control-Allow-Origin": "*" };
@@ -28,14 +29,22 @@ function preflightResponse(method: string): Response {
 /**
  * `registry` is accepted (not just `db`) to match `startHttpServer`'s
  * signature and so a caller constructing a server directly supplies the same
- * two arguments either way — the routes themselves need only `db`.
+ * two arguments either way — the routes themselves need only `db`. `resolver`
+ * defaults to the non-production dev header resolver (`devHeaderResolver`):
+ * documented as unsuitable for a deployment real user data ever reaches, but
+ * it makes the trust boundary explicit and swappable rather than an implicit
+ * "any actor accepted" default.
  */
-export function createServer(_registry: Registry, db: SQL = sql): (req: Request) => Promise<Response> {
+export function createServer(
+  _registry: Registry,
+  db: SQL = sql,
+  resolver: ActorResolver = devHeaderResolver,
+): (req: Request) => Promise<Response> {
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     const parts = url.pathname.split("/").filter(Boolean);
 
-    // CORS preflight for each of the three routes below
+    // CORS preflight for each of the five routes below
     if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "processes" && parts[2] === "instances") {
       return preflightResponse("POST");
     }
@@ -45,26 +54,40 @@ export function createServer(_registry: Registry, db: SQL = sql): (req: Request)
     if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "instances" && parts[2] === "submit") {
       return preflightResponse("POST");
     }
+    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "instances" && parts[2] === "claim") {
+      return preflightResponse("POST");
+    }
+    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "instances" && parts[2] === "release") {
+      return preflightResponse("POST");
+    }
 
     // POST /processes/:processId/instances
     if (req.method === "POST" && parts.length === 3 && parts[0] === "processes" && parts[2] === "instances") {
-      return toResponse(await handleCreateInstance(parts[1]!, req, db));
+      return toResponse(await handleCreateInstance(parts[1]!, req, resolver, db));
     }
     // GET /instances/:instanceId
     if (req.method === "GET" && parts.length === 2 && parts[0] === "instances") {
-      return toResponse(await handleGetInstanceView(parts[1]!, req, db));
+      return toResponse(await handleGetInstanceView(parts[1]!, req, resolver, db));
     }
     // POST /instances/:instanceId/submit
     if (req.method === "POST" && parts.length === 3 && parts[0] === "instances" && parts[2] === "submit") {
-      return toResponse(await handleSubmit(parts[1]!, req, db));
+      return toResponse(await handleSubmit(parts[1]!, req, resolver, db));
+    }
+    // POST /instances/:instanceId/claim
+    if (req.method === "POST" && parts.length === 3 && parts[0] === "instances" && parts[2] === "claim") {
+      return toResponse(await handleClaim(parts[1]!, req, resolver, db));
+    }
+    // POST /instances/:instanceId/release
+    if (req.method === "POST" && parts.length === 3 && parts[0] === "instances" && parts[2] === "release") {
+      return toResponse(await handleRelease(parts[1]!, req, resolver, db));
     }
 
     return toResponse({ status: 404, body: { error: { type: "not-found", message: `no route: ${req.method} ${url.pathname}` } } });
   };
 }
 
-export function startHttpServer(registry: Registry, db: SQL = sql): { stop: () => void } {
-  const fetch = createServer(registry, db);
+export function startHttpServer(registry: Registry, db: SQL = sql, resolver: ActorResolver = devHeaderResolver): { stop: () => void } {
+  const fetch = createServer(registry, db, resolver);
   const port = Number(process.env.PORT ?? 3000);
   const server = Bun.serve({ fetch, port });
   const engine = startEngine(db, registry);

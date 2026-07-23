@@ -9,7 +9,7 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
-import { startInstance, executeManualTransition } from "../src/engine/transition.js";
+import { startInstance, executeManualTransition, claimStep } from "../src/engine/transition.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { registerSubprocessHandlers } from "../src/engine/subprocess.js";
 import { createRegistry, register } from "../src/engine/registry.js";
@@ -353,6 +353,41 @@ test.skipIf(!DB)("6.x an identity migration records one entry and advances the s
   expect(hist[0].pathId).toBeNull();
   expect(hist[0].version).toBe(2);
   expect(hist[0].fromStepId).toBe(hist[0].toStepId); // identity
+});
+
+// A one-wait-state body whose wait step declares a static assignment, for the
+// "migration carries an in-flight claim forward untouched" scenario.
+function assignedWaitBody(key: string): ProcessBody {
+  return {
+    key, label: { en: key }, baseLocale: "en", fields: [f("x", "string")],
+    workflow: { initialStep: "step_wait", steps: [
+      {
+        id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task",
+        assignment: { strategy: { type: "static", config: { candidates: ["user_1"] } } },
+        paths: [manualPath("path_done", "step_done")],
+      },
+      { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
+    ] },
+  } as unknown as ProcessBody;
+}
+
+test.skipIf(!DB)("6.x a migration carries an in-flight claim forward untouched", async () => {
+  const p = pid();
+  // v1 and v2's step_wait both declare the same assignment — an identity migration
+  // that leaves the step id unchanged, so any candidate/claim change is visible as
+  // "not freshly resolved" rather than "recomputed to the same value by chance".
+  await twoVersions(p, assignedWaitBody("a"), assignedWaitBody("a"), {} as MigrationSpec);
+  const inst = await mkInstance(p, 1);
+  expect(inst.assignment?.candidates).toEqual(["user_1"]);
+  const claimed = await claimStep(inst.instanceId, actor);
+  expect(claimed.assignment?.claimedBy).toBe(actor.id);
+
+  await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  const after = await loadInstance(inst.instanceId);
+  expect(after!.version).toBe(2);
+  // Carried untouched, not freshly re-resolved: candidates AND claimedBy/claimedAt
+  // are byte-identical to what claimStep set, not merely equal by coincidence.
+  expect(after!.assignment).toEqual(claimed.assignment);
 });
 
 test.skipIf(!DB)("6.2 migration onto a terminal step yields completed", async () => {
