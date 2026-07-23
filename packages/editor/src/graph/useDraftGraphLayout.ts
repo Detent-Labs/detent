@@ -17,9 +17,10 @@ export function useDraftGraphLayout(
   draft: Draft,
   contentLocale: string,
   baseLocale: string,
-): { graph: DraftGraph; positions: Record<string, LayoutedNode> } {
+): { graph: DraftGraph; positions: Record<string, LayoutedNode>; isLayouted: boolean } {
   const graph = draftToGraph(draft, contentLocale, baseLocale);
   const [positions, setPositions] = useState<Record<string, LayoutedNode>>({});
+  const [layoutedSignature, setLayoutedSignature] = useState<string | null>(null);
 
   const signature = JSON.stringify({
     nodes: graph.nodes.map((n) => n.id),
@@ -35,6 +36,7 @@ export function useDraftGraphLayout(
         next[n.id] = n;
       });
       setPositions(next);
+      setLayoutedSignature(signature);
     });
     return () => {
       cancelled = true;
@@ -43,5 +45,12 @@ export function useDraftGraphLayout(
     // identity (a fresh object every render) or unrelated Draft field.
   }, [signature]);
 
-  return { graph, positions };
+  // True once `positions` reflects the *current* signature, not leftover
+  // placeholder positions from a prior structure — the correct fitView
+  // signal (see editor-graph-edge-routing design.md), since node dimensions
+  // are already static and `useNodesInitialized()` would fire before ELK
+  // layout resolves.
+  const isLayouted = layoutedSignature === signature;
+
+  return { graph, positions, isLayouted };
 }
