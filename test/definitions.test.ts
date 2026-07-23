@@ -388,6 +388,23 @@ test.skipIf(!DB)("resolveBody returns a body that passes rehydrate's pin check; 
   expect(await resolveBody(PID, 999)).toBeUndefined();
 });
 
+// --- resolveLatest: newest version for a processId, no contract filter --------
+// See openspec/changes/runtime-api-layer: backs createProcessInstance's default
+// version resolution.
+
+test.skipIf(!DB)("resolveLatest returns the newest published version, and undefined for an unpublished process", async () => {
+  const v1 = await publishBody(PID, waitBody("sayYes"), reg);
+  const v2 = await publishBody(PID, waitBody("sayNo"), reg); // differing body -> next version
+  expect(v2.version).toBe(v1.version + 1);
+
+  const { resolveLatest } = createDefinitionStore();
+  const latest = await resolveLatest(PID);
+  expect(latest?.version).toBe(v2.version);
+  expect(definitionHash(latest!.body)).toBe(v2.definitionHash);
+
+  expect(await resolveLatest("proc_never_published" as ProcessId)).toBeUndefined();
+});
+
 // --- cache: a second resolve fires no second SELECT ---------------------------
 
 test.skipIf(!DB)("a resolved body is cached and served without re-reading the store", async () => {

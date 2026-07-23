@@ -359,25 +359,38 @@ async function commitTransition(
   actorId: string | undefined,
   db: SQL,
   overrides?: Pick<StepEntryOpts, "status" | "timers" | "entryVersion" | "suppressSpawn" | "events">,
+  extraFields?: Record<string, unknown>,
 ): Promise<Instance> {
   const plan = planStepEntry(instance, target, body, { pathId, cause, actorId, actions, ...overrides });
-  return withTransaction(db, (tx) => applyStepEntry(tx, plan));
+  return withTransaction(db, (tx) => applyStepEntry(tx, plan, extraFields));
 }
 
 /**
- * Execute a single manual transition, then run the instance to rest. Rejects if
- * the path is not on the current step, is not manual, or its guard is false. A
- * concurrent transition that already advanced the instance makes this one lose
- * (ConcurrencyConflict), leaving no partial write. A no-op — no commit, no
- * resolveAutomatic — on an instance that is not `running` (e.g. `faulted`),
- * matching cancelInstance's non-running no-op.
+ * Commit a single manual transition — guard check plus commit — with no
+ * automatic-path cascade. Rejects if the path is not on the current step, is
+ * not manual, or its guard is false. A concurrent transition that already
+ * advanced the instance makes this lose (ConcurrencyConflict), leaving no
+ * partial write. A no-op on an instance that is not `running` (e.g.
+ * `faulted`), matching cancelInstance's non-running no-op.
+ *
+ * `dataPatch`, when supplied, is merged over `instance.data` — the FULL
+ * merged object, not the raw patch — and used consistently in three places:
+ * as the data the guard is evaluated against, as the `instance` handed to
+ * the underlying step-entry plan (so target-step timer arming and the
+ * returned in-memory Instance both reflect the merged data), and as the
+ * field patch threaded to the commit as `extraFields.data`. Passing the raw
+ * `dataPatch` alone as `extraFields.data` would be wrong: `applyStepEntry`'s
+ * merge is a shallow `body || extraFields::jsonb` at the top level of the
+ * persisted row, so a partial `data` value would replace, not extend, the
+ * instance's stored `data`.
  */
-export async function executeManualTransition(
+export async function commitManualTransition(
   instance: Instance,
   pathId: string,
   body: ProcessBody,
   actor: Actor,
   db: SQL = sql,
+  dataPatch?: Instance["data"],
 ): Promise<Instance> {
   if (instance.status !== "running") return instance;
 
@@ -387,13 +400,45 @@ export async function executeManualTransition(
   if (!path) throw new Error(`path not on current step: ${pathId}`);
   if (path.trigger !== "manual") throw new Error(`not a manual path: ${pathId}`);
 
-  if (!evalGuard(path.guard, buildGuardContext(body, instance, actor))) throw new GuardRefused(pathId);
+  const mergedData = dataPatch ? { ...instance.data, ...dataPatch } : instance.data;
+  const evalInstance: Instance = dataPatch ? { ...instance, data: mergedData } : instance;
+
+  if (!evalGuard(path.guard, buildGuardContext(body, evalInstance, actor))) throw new GuardRefused(pathId);
 
   const target = body.workflow.steps.find((s) => s.id === path.to);
   if (!target) throw new Error(`path target not in body: ${path.to}`);
 
   const actions = orderedTriggerActions(source, path, target);
-  const committed = await commitTransition(instance, target, body, path.id, actions, "user", actor.id, db);
+  return commitTransition(
+    evalInstance,
+    target,
+    body,
+    path.id,
+    actions,
+    "user",
+    actor.id,
+    db,
+    undefined,
+    dataPatch ? { data: mergedData } : undefined,
+  );
+}
+
+/**
+ * Execute a single manual transition, then run the instance to rest —
+ * `commitManualTransition` followed by `resolveAutomatic`. Unchanged
+ * signature and behavior for every caller that supplies no `dataPatch`; both
+ * functions now accept the same optional `dataPatch`.
+ */
+export async function executeManualTransition(
+  instance: Instance,
+  pathId: string,
+  body: ProcessBody,
+  actor: Actor,
+  db: SQL = sql,
+  dataPatch?: Instance["data"],
+): Promise<Instance> {
+  if (instance.status !== "running") return instance;
+  const committed = await commitManualTransition(instance, pathId, body, actor, db, dataPatch);
   return resolveAutomatic(committed, body, actor, db);
 }
 
