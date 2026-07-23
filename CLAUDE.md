@@ -590,6 +590,31 @@ each with a test that rejects a violating definition.
    Layer, auth/actor resolution, and assignment/claim enforcement — see the
    Runtime API Layer entry above for which of those it already deliberately
    excludes.
+5. Post-v1: make the engine reachable. NOT STARTED. Everything through #4 is
+   done, but the Runtime API Layer (`src/runtime/api.ts`) is an in-process
+   TypeScript boundary only — nothing today lets an external caller or a real
+   UI drive an instance. Planned stages, each depending on the previous one
+   landing first:
+   a. Validate the stack end-to-end with a throwaway script exercising
+      `createProcessInstance` -> `getInstanceView` -> `submitAndTransition`
+      against `examples/expense-approval.json`. Pure validation, no new
+      capability, no OpenSpec change.
+   b. HTTP wrapper around the Runtime API Layer: a thin REST/JSON adapter
+      over the same three operations. Explicit non-goal of the
+      `runtime-api-layer` change; this is where it gets picked back up. The
+      prerequisite for (c) and for any caller outside this process.
+   c. Player/preview UI in `packages/editor`: a form screen that drives a
+      real instance through (b) — distinct from the existing read-only
+      structural graph view, which shows the FSM shape, not a running
+      instance.
+   d. Auth/actor resolution + assignment/claim enforcement. Both are
+      declared-but-unenforced today (`AssignmentState` is in the schema;
+      every runtime function trusts the `actor: Actor` it's given). Needed
+      before more than one person safely tests against a shared engine.
+   e. Real action-handler implementations registered against the handler
+      registry — today only the config envelope is validated at publish
+      (`registry-check.ts`); no handler actually executes anything. Needed
+      for a process to do more than pass data through.
 
 ## Open questions (still need a decision before building the relevant part)
 - The formal expression context is pinned (`src/cel/check.ts`): `instance`
