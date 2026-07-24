@@ -12,11 +12,28 @@ import { startOutboxWorker } from "./outbox.js";
 import { startResolutionWorker } from "./resolution.js";
 import { startTimerScheduler } from "./timers.js";
 import { registerSubprocessHandlers } from "./subprocess.js";
-import { createDefaultAssignmentRegistry, type Registry, type AssignmentRegistry } from "./registry.js";
+import { createDefaultAssignmentRegistry, createRegistry, register, type Registry, type AssignmentRegistry } from "./registry.js";
+import { HTTP_ACTION_TYPE, httpHandlerDef } from "../handlers/http.js";
+
+/**
+ * A registry pre-populated with the built-in, vendor-neutral `http.request`
+ * handler. Lives here rather than in registry.ts: that handler imports
+ * `PermanentError` from outbox.ts (needed for its permanent/transient
+ * classification to be real — `drainOutbox` checks `e instanceof
+ * PermanentError` against that exact class), and outbox.ts already imports
+ * from registry.ts — so registry.ts importing the handler back would close an
+ * import cycle. host.ts sits downstream of all three, so building the default
+ * registry here is acyclic; registry.ts stays the leaf module it already was.
+ */
+export function createDefaultRegistry(): Registry {
+  const reg = createRegistry();
+  register(reg, HTTP_ACTION_TYPE, httpHandlerDef);
+  return reg;
+}
 
 export function startEngine(
   db: SQL = sql,
-  registry: Registry = new Map(),
+  registry: Registry = createDefaultRegistry(),
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): { stop: () => void } {
   const { resolveBody, resolveLatestByContract } = createDefinitionStore(db);
