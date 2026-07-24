@@ -1,125 +1,116 @@
 import { useEffect, useRef } from "react";
-import { ReactFlow, Background, MarkerType, Position, type Node, type Edge, type ReactFlowInstance } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
+import mermaid from "mermaid";
+import Panzoom, { type PanzoomObject } from "@panzoom/panzoom";
 import { useDraft } from "../draft/store";
-import { t } from "../i18n/catalog";
-import { useDraftGraphLayout } from "./useDraftGraphLayout";
-import { NODE_WIDTH, NODE_HEIGHT } from "./layout";
+import { draftToGraph } from "./mapping";
+import { generateMermaidDsl } from "./mermaid";
+
+// `securityLevel: "strict"` (mermaid's default, set explicitly here) runs
+// every rendered SVG through DOMPurify.sanitize() internally before
+// `mermaid.render()` resolves — confirmed in the installed bundle
+// (mermaid.core.mjs, `svgCode = DOMPurify.sanitize(svgCode, ...)`). That's
+// what makes the `containerRef.current.innerHTML = svg` assignment below
+// safe despite `svg` ultimately being built from author-entered step/path
+// labels (`generateMermaidDsl`) — the string it's set from has already been
+// sanitized, not raw untrusted markup.
+mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
+
+// mermaid.render() takes an id to use for the rendered SVG's element id;
+// unique per call so a rapid succession of renders (e.g. fast typing while
+// editing a label) never collides with an in-flight previous render.
+let renderCounter = 0;
 
 /**
- * Read-only in v1 (editor-graph-view spec): no drag-to-reposition
- * persistence, no drag-to-connect, no in-canvas delete. Interactions that
- * would create/move/delete entities by direct manipulation are disabled
- * outright rather than allowed-then-discarded, and there is no
- * `onNodesChange`/`onEdgesChange`/`onConnect` handler wired to any state —
- * `nodes`/`edges` are re-derived from the Draft on every render, so nothing
- * React Flow does internally can persist past the next render anyway.
+ * Pure fit-to-container math, kept separate from DOM access so it's
+ * directly unit-testable: given the diagram's own natural size (its
+ * `viewBox`, set by Mermaid to its content's bounds) and the container's
+ * rendered size, returns the scale and centering pan that fits the whole
+ * diagram in both dimensions — capped at 1 so a small diagram isn't
+ * blown up to fill the container. `null` for any non-positive input (an
+ * empty graph, or a not-yet-laid-out container) — callers fall back to
+ * the identity transform.
+ */
+export function computeFitTransform(
+  contentWidth: number,
+  contentHeight: number,
+  containerWidth: number,
+  containerHeight: number,
+): { scale: number; x: number; y: number } | null {
+  if (contentWidth <= 0 || contentHeight <= 0 || containerWidth <= 0 || containerHeight <= 0) return null;
+  const scale = Math.min(containerWidth / contentWidth, containerHeight / contentHeight, 1);
+  return { scale, x: (containerWidth - contentWidth * scale) / 2, y: (containerHeight - contentHeight * scale) / 2 };
+}
+
+/**
+ * Read-only in v1 (editor-graph-view spec): Mermaid's rendered SVG carries
+ * no drag-to-reposition/drag-to-connect/delete affordance of its own —
+ * unlike the prior React Flow implementation, there is no interactivity to
+ * explicitly disable.
  */
 export function GraphView() {
   const { draft, validation, contentLocale, loadGeneration } = useDraft();
-  const { graph, positions, isLayouted } = useDraftGraphLayout(draft, contentLocale, draft.baseLocale ?? "en");
+  const graph = draftToGraph(draft, contentLocale, draft.baseLocale ?? "en");
+  const dsl = generateMermaidDsl(graph, validation.issues);
 
-  const instanceRef = useRef<ReactFlowInstance | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const panzoomRef = useRef<PanzoomObject | null>(null);
   const hasFitRef = useRef(false);
 
-  // A load/import (`replace`) may leave the graph's structural signature
-  // unchanged (reloading the same file) — reset the gate here rather than
-  // relying on `isLayouted` to flip, since it wouldn't for a reload.
+  // A load/import (`replace`) may leave the generated DSL unchanged
+  // (reloading the same file) — reset the gate here rather than relying on
+  // `dsl` to change, since it wouldn't for a reload.
   useEffect(() => {
     hasFitRef.current = false;
   }, [loadGeneration]);
 
-  // Depends on both: `isLayouted` catches the ordinary first-load and
-  // structural-change cases; `loadGeneration` catches a reload whose
-  // signature is unchanged, where `isLayouted` never toggles.
+  // Mermaid regenerates a full SVG from `dsl` on every render — there is no
+  // incremental DOM diffing the way React Flow's node/edge arrays had, so
+  // the current pan/zoom transform has to be captured before the old SVG is
+  // discarded and reapplied to the new one (editor-graph-view spec: a
+  // structural edit, and now also a non-structural redraw such as a
+  // content-locale switch, must preserve the viewport). The one exception
+  // is the first render of a given load (`hasFitRef`/`loadGeneration`,
+  // mirroring the previous `useDraftGraphLayout` gating), which fits to the
+  // viewport instead.
   useEffect(() => {
-    if (isLayouted && !hasFitRef.current) {
-      instanceRef.current?.fitView();
-      hasFitRef.current = true;
-    }
-  }, [isLayouted, loadGeneration]);
+    let cancelled = false;
+    (async () => {
+      const id = `graph-diagram-${++renderCounter}`;
+      const { svg } = await mermaid.render(id, dsl || "flowchart LR");
+      if (cancelled || !containerRef.current) return;
 
-  const nodes: Node[] = graph.nodes.map((n) => {
-    const pos = positions[n.id];
-    const issues = validation.issues.filter((i) => i.entityId === n.id);
-    return {
-      id: n.id,
-      position: { x: pos?.x ?? 0, y: pos?.y ?? 0 },
-      width: NODE_WIDTH,
-      height: NODE_HEIGHT,
-      // Matches the ELK horizontal layout direction (layout.ts: elk.direction
-      // RIGHT) so forward edges leave/enter directly instead of Top/Bottom
-      // looping. DefaultNode already reads these two fields off the node
-      // object (@xyflow/react NodeBase), so no custom node type is needed.
-      sourcePosition: Position.Right,
-      targetPosition: Position.Left,
-      data: {
-        label: (
-          <div title={issues.map((i) => i.message).join("\n") || undefined}>
-            {n.label}
-            {n.isInitial && t("graph.initialSuffix")}
-            {n.terminal && t("graph.terminalSuffix")}
-            {issues.length > 0 && <span className="graph-issue-badge"> ⚠ {issues.length}</span>}
-          </div>
-        ),
-      },
-      style: issues.length > 0 ? { border: "2px solid #c00" } : undefined,
-      draggable: false,
-      connectable: false,
-      deletable: false,
+      const prevPan = panzoomRef.current?.getPan();
+      const prevScale = panzoomRef.current?.getScale();
+      panzoomRef.current?.destroy();
+
+      containerRef.current.innerHTML = svg;
+      const svgEl = containerRef.current.querySelector("svg");
+      if (!svgEl) return;
+
+      const panzoom = Panzoom(svgEl);
+      panzoomRef.current = panzoom;
+      svgEl.addEventListener("wheel", panzoom.zoomWithWheel);
+
+      if (!hasFitRef.current) {
+        const vb = svgEl.viewBox.baseVal;
+        const rect = containerRef.current.getBoundingClientRect();
+        const fit = computeFitTransform(vb.width, vb.height, rect.width, rect.height);
+        if (fit) {
+          panzoom.zoom(fit.scale, { animate: false });
+          panzoom.pan(fit.x, fit.y, { animate: false });
+        } else {
+          panzoom.reset({ animate: false });
+        }
+        hasFitRef.current = true;
+      } else if (prevPan && prevScale !== undefined) {
+        panzoom.zoom(prevScale, { animate: false });
+        panzoom.pan(prevPan.x, prevPan.y, { animate: false });
+      }
+    })();
+    return () => {
+      cancelled = true;
     };
-  });
+  }, [dsl, loadGeneration]);
 
-  const edges: Edge[] = graph.edges.map((e) => {
-    const issues = validation.issues.filter((i) => i.entityId === e.id);
-    const issueColor = issues.length > 0 ? "#c00" : undefined;
-    return {
-      id: e.id,
-      source: e.source,
-      target: e.target,
-      // smoothstep (right-angle segments) instead of the default Bezier
-      // curve, which loops under fixed Left/Right handles; markerEnd
-      // disambiguates counter-edges between the same two nodes (e.g. an
-      // automatic failure path back to a manual retry path). The `color`
-      // key must be omitted entirely (not passed as `undefined`) for a
-      // non-issue edge: @xyflow/system's createMarkerIds does
-      // `{ color: marker.color || defaultColor, ...marker }` — spreading
-      // `marker` after already sets `color`, so an explicit `color:
-      // undefined` key clobbers the computed fallback back to `undefined`,
-      // making the arrowhead render with `stroke: none; fill: none`
-      // (@xyflow/react's ArrowClosedSymbol defaults `color` to the string
-      // `'none'`, not the theme default).
-      type: "smoothstep",
-      markerEnd: issueColor ? { type: MarkerType.ArrowClosed, color: issueColor } : { type: MarkerType.ArrowClosed },
-      label: (
-        <span title={issues.map((i) => i.message).join("\n") || undefined}>
-          {e.label}
-          {issues.length > 0 && " ⚠"}
-        </span>
-      ),
-      style: issueColor ? { stroke: issueColor } : undefined,
-      labelStyle: issueColor ? { fill: issueColor } : undefined,
-      deletable: false,
-    };
-  });
-
-  return (
-    <div className="graph-view" style={{ height: 480, border: "1px solid #ccc" }}>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onInit={(instance) => {
-          instanceRef.current = instance;
-        }}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        elementsSelectable
-        deleteKeyCode={null}
-        panOnDrag
-        zoomOnScroll
-      >
-        <Background />
-      </ReactFlow>
-    </div>
-  );
+  return <div className="graph-view" ref={containerRef} style={{ height: 480, border: "1px solid #ccc", overflow: "hidden" }} />;
 }

@@ -77,11 +77,10 @@ rendering a raw string.
   other Draft change
 
 ### Requirement: Graph edges route directly via fixed handle positions
-Nodes SHALL expose a target handle on the left side and a source handle on
-the right side, matching the graph's horizontal auto-layout direction. Edges
-SHALL use a right-angle-segment style rather than a free-form curve, so a
-forward edge between two steps renders as a short, direct connection instead
-of leaving and re-entering a node from the same side.
+Edges SHALL render as short, direct connections between steps laid out by
+the graph's horizontal auto-layout — leaving a source step from its
+trailing side and entering a target step from its leading side — rather
+than as a free-form curve that loops via the opposite side of either node.
 
 #### Scenario: A forward edge is direct, not a loop
 - **WHEN** the graph view renders an edge between two steps laid out
@@ -140,3 +139,11 @@ the session.
 - **THEN** the graph view still fits the graph to the viewport, the same as
   on first load, rather than silently keeping whatever zoom/pan was
   previously in effect
+
+#### Scenario: A non-structural redraw preserves the viewport
+- **WHEN** an author switches the content locale (or triggers any other
+  Draft change that causes the graph to redraw without changing which
+  steps or paths exist)
+- **THEN** the view's current zoom and pan are preserved, the same as for a
+  structural edit — even though the underlying rendering re-generates its
+  visual output from scratch rather than incrementally updating it
