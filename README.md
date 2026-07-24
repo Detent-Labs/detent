@@ -61,3 +61,7 @@ bun run typecheck     # tsc --noEmit (Bun does not typecheck)
 
 Changes go through OpenSpec (`openspec/`) — propose → specs/tasks → implement →
 verify → archive. See `CLAUDE.md` for the full contract rules and invariants.
+
+## License
+
+[GNU AGPLv3](LICENSE) or later.
