@@ -599,6 +599,43 @@ each with a test that rejects a violating definition.
   `InstanceEvent` kind: a field-id remap is a pure, deterministic function of the
   plan's immutable, permanently-retained `fieldMap`, reconstructable from the existing
   `cause: "migration"` `HistoryEntry` plus that plan.
+- Data-source resolution (`src/engine/registry.ts`, `registry-check.ts`,
+  `definitions.ts`, `src/runtime/api.ts`, `src/http/`, `packages/editor/src/player/`):
+  closes the "Decided, not yet built" gap on `field.dataSource` — runtime
+  resolution into an actual `FieldOption[]` list, consumed by both view
+  rendering and submission validation. A new `DataSourceRegistry` (`type ->
+  DataSourceHandlerDef`) mirrors the action `Registry`; `createDefaultDataSourceRegistry`
+  (`host.ts`) ships one built-in `"static"` handler that echoes a configured
+  option list. Publish-time validation mirrors the action-registry pattern:
+  a new structural invariant in `definition.ts` (`FieldDef.dataSource` must
+  resolve to an id in `body.dataSources`, including fields nested inside
+  `group` fields) plus `checkDataSourceRegistry` (`registry-check.ts`,
+  `DataSourceRegistryValidationError`), wired into `publishBody` in the same
+  in-process slot `checkActionRegistry`/`checkAssignmentRegistry` occupy —
+  after the hash-hit no-op return, so an identical re-publish of a body that
+  predates a registered/tightened type stays a no-op. `resolveFields`
+  (`src/runtime/api.ts`) is now async and takes a `registry: DataSourceRegistry`
+  parameter: a `dataSource`-bound field's options are resolved via the
+  registry, memoized by `DataSourceId` within one call (fields on the same
+  step sharing a data source resolve it once). `ResolvedViewField` gained
+  `options?: FieldOption[]` — populated from static `FieldDef.options`
+  unchanged, or the resolved data-source result — the single place
+  downstream code reads options from; `optionValuesValid` now validates
+  against this resolved list instead of `FieldDef.options` directly, so
+  submission validation actually enforces membership for `dataSource`-bound
+  fields (previously any value was accepted). `createProcessInstance`,
+  `getInstanceView`, and `submitAndTransition` each gained a required
+  `registry` parameter, threaded down; a runtime registry-lookup miss
+  despite passing publish-time validation is a plain-`Error` canary, not a
+  typed `SubmissionValidationError` (same style as a `definitionHash` pin
+  mismatch). The HTTP wrapper and the editor Player thread this through
+  unchanged in shape: the Player's forced free-text fallback for
+  `dataSource`-bound fields is gone, rendering a populated `select` from the
+  resolved options like a static-`options` field. Only `"static"` ships in
+  v1; the registry mechanism holds more without a built-in for each.
+  CEL-readable data-source results remain untouched and out of scope — a CEL
+  reference to a data source is still a publish error (see "Decided, not yet
+  built" below).
 
 ## Roadmap
 See `ROADMAP.md` for stage-by-stage status (DONE/NOT STARTED) and what each stage covers.
@@ -609,15 +646,18 @@ See `ROADMAP.md` for stage-by-stage status (DONE/NOT STARTED) and what each stag
   deliberately minimal; widen when the engine surfaces a concrete need.
 
 ## Decided, not yet built (each needs its own OpenSpec change)
-- **Data-source resolution is unbuilt; references are a publish error until it exists.**
-  The engine resolves data sources nowhere (no reference in `src/engine/`), so a CEL
-  reference to one is now rejected at publish (`check.ts` registers a data source at no
-  site — an `unknown variable` error), closing what was the last check/eval scope
-  drift. The `field.dataSource` options-binding declaration still publishes but its
-  runtime option resolution is likewise unbuilt (a visible presentation gap, not a
-  silent FSM park). Building resolution — CEL-readable data-source results and/or
-  runtime option lists — is the remaining feature; when it lands it re-introduces
-  registration deliberately with its own site scoping.
+- **CEL-readable data-source results.** Runtime option-list resolution for
+  `field.dataSource` is DONE (see "Current state" above) — but `src/cel/check.ts`
+  still registers a data source at no site (guards/output/transforms), so a CEL
+  reference to one remains a publish error (`unknown variable`). Widening that is
+  a separate, more consequential decision (an unresolvable reference there could
+  only park a wait-state forever or throw mid-delivery); it stays deliberately
+  out of scope until a concrete need for CEL-visible data-source values exists.
+- **A second (dynamic/I/O-backed) data-source type.** The `DataSourceRegistry`
+  mechanism holds more than one type, but only the built-in `"static"` handler
+  ships. A live type (e.g. an HTTP-backed data source) is deferred until a
+  concrete need exists — its timeout/cache/error semantics are open questions
+  not worth deciding speculatively.
 
 ## Codebase memory (knowledge graph)
 The repo is indexed into codebase-memory-mcp (`full` mode, covering the engine,
