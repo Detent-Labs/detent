@@ -547,6 +547,24 @@ each with a test that rejects a violating definition.
   submitting actor to be the current claimant (`NotClaimedError`/
   `NotClaimantError`); a step with no declared assignment is unaffected —
   identical to prior behavior.
+- Generic `http.request` action handler (`src/handlers/http.ts`, roadmap #5e):
+  the first real handler in the action registry — every action position
+  previously validated only the config envelope at publish time; now one type
+  actually executes. Vendor-neutral: an authored `{url, method, headers?,
+  body?}` config (`GET` cannot carry a body), `PUBLISH`-validated by
+  `httpConfigSchema`. The engine, not the author, sets the `Idempotency-Key`
+  header on every attempt from `ctx.idempotencyKey` — authoring that header in
+  `config.headers` is a publish error, since there's no sound precedence rule
+  between an authored value and the engine's own. `Content-Type` defaults to
+  `application/json` only when a body is present and the author didn't set one.
+  A `429`/`5xx` response throws a plain `Error` (transient, outbox retries); a
+  non-2xx otherwise throws `PermanentError` (dead-letters immediately, no
+  retry) — matching the existing outbox retry semantics, not a new failure
+  taxonomy. `createDefaultRegistry` (`src/engine/host.ts`, not `registry.ts`)
+  registers it as `startEngine`'s new default `registry` argument — homed in
+  `host.ts` specifically to avoid an import cycle, since the handler needs
+  `PermanentError` from `outbox.ts` and `outbox.ts` already imports from
+  `registry.ts`.
 
 ## Roadmap
 See `ROADMAP.md` for stage-by-stage status (DONE/NOT STARTED) and what each stage covers.
