@@ -60,41 +60,49 @@ export class CelValidationError extends Error {
 }
 
 /**
+ * Shared shape for every publish-time registry-validation error: same
+ * "every located issue, not just the first" contract, differing only in
+ * `name`.
+ */
+class RegistryValidationErrorBase extends Error {
+  constructor(
+    readonly issues: RegistryIssue[],
+    name: string,
+  ) {
+    super(issues.map((i) => `${i.loc}: ${i.message} (type '${i.type}')`).join("; "));
+    this.name = name;
+  }
+}
+
+/**
  * A body about to be published carries an action whose `type` is not
  * registered, or whose `config` violates its handler's declared
- * `configSchema`. Same "every located issue, not just the first" contract as
- * `CelValidationError`.
+ * `configSchema`.
  */
-export class RegistryValidationError extends Error {
-  constructor(readonly issues: RegistryIssue[]) {
-    super(issues.map((i) => `${i.loc}: ${i.message} (type '${i.type}')`).join("; "));
-    this.name = "RegistryValidationError";
+export class RegistryValidationError extends RegistryValidationErrorBase {
+  constructor(issues: RegistryIssue[]) {
+    super(issues, "RegistryValidationError");
   }
 }
 
 /**
  * A body about to be published carries a step whose `assignment.strategy.type`
  * is not registered, or whose `config` violates that strategy's declared
- * `configSchema`. Same "every located issue, not just the first" contract as
- * `RegistryValidationError`.
+ * `configSchema`.
  */
-export class AssignmentRegistryValidationError extends Error {
-  constructor(readonly issues: RegistryIssue[]) {
-    super(issues.map((i) => `${i.loc}: ${i.message} (type '${i.type}')`).join("; "));
-    this.name = "AssignmentRegistryValidationError";
+export class AssignmentRegistryValidationError extends RegistryValidationErrorBase {
+  constructor(issues: RegistryIssue[]) {
+    super(issues, "AssignmentRegistryValidationError");
   }
 }
 
 /**
  * A body about to be published carries a data source whose `type` is not
  * registered, or whose `config` violates that type's declared `configSchema`.
- * Same "every located issue, not just the first" contract as
- * `RegistryValidationError`.
  */
-export class DataSourceRegistryValidationError extends Error {
-  constructor(readonly issues: RegistryIssue[]) {
-    super(issues.map((i) => `${i.loc}: ${i.message} (type '${i.type}')`).join("; "));
-    this.name = "DataSourceRegistryValidationError";
+export class DataSourceRegistryValidationError extends RegistryValidationErrorBase {
+  constructor(issues: RegistryIssue[]) {
+    super(issues, "DataSourceRegistryValidationError");
   }
 }
 
