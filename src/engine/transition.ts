@@ -377,8 +377,13 @@ export async function applyStepEntry(tx: SQL, plan: StepEntryPlan, extraFields?:
     VALUES (${entry.id}, ${entry.instanceId}, ${entry.transitionSeq}, ${entry})`;
   await appendInstanceEvents(tx, events);
   for (const row of outbox) {
-    await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
-      VALUES (${row.idempotencyKey}, ${row.instanceId}, ${row.transitionSeq}, ${row.actionId}, ${row.action})`;
+    // field_version: the instance's version at this entry, i.e. entry.version
+    // (opts.entryVersion ?? instance.version) — the same value migration passes as
+    // entryVersion when it enqueues a relocation's onEntry actions, so a row
+    // enqueued by that commit is already stamped with the target version rather
+    // than needing a separate bump.
+    await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, field_version)
+      VALUES (${row.idempotencyKey}, ${row.instanceId}, ${row.transitionSeq}, ${row.actionId}, ${row.action}, ${entry.version})`;
   }
   return next;
 }
@@ -767,8 +772,8 @@ export async function fireTimer(
     // Behind the guard, so a redundant fire records no second event.
     await appendInstanceEvent(tx, fired);
     for (const a of timer.onFire.actions ?? []) {
-      await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, event_id)
-        VALUES (${idempotencyKey(instance.instanceId, instance.transitionSeq, a.id)}, ${instance.instanceId}, ${instance.transitionSeq}, ${a.id}, ${a}, ${fired.id})`;
+      await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, event_id, field_version)
+        VALUES (${idempotencyKey(instance.instanceId, instance.transitionSeq, a.id)}, ${instance.instanceId}, ${instance.transitionSeq}, ${a.id}, ${a}, ${fired.id}, ${instance.version})`;
     }
   });
   return instance;

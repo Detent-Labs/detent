@@ -40,6 +40,12 @@ export type ClaimedRow = {
   action: Action;
   attempts: number;
   event_id: string | null;
+  /**
+   * The instance's version when this row was enqueued (see store.ts/transition.ts's
+   * enqueue sites). Used only to fold the delivery-side version race: see the tx2
+   * writeback predicate below.
+   */
+  field_version: number;
 };
 
 /** A permanent (non-retryable) delivery failure — dead-letters without consuming retries. */
@@ -131,7 +137,7 @@ export async function drainOutbox(
       FOR UPDATE SKIP LOCKED
       LIMIT 100
     )
-    RETURNING idempotency_key, instance_id, transition_seq, action, attempts, event_id`) as ClaimedRow[];
+    RETURNING idempotency_key, instance_id, transition_seq, action, attempts, event_id, field_version`) as ClaimedRow[];
 
   let delivered = 0;
   for (const raw of claimed) {
@@ -178,10 +184,20 @@ export async function drainOutbox(
           // UPDATE so it is flagged iff a running row is affected — a suppressed
           // writeback (0 rows) flags nothing. 'pending' overwrites any in-flight
           // 'claimed', so a re-flag mid-pass is never lost.
+          //
+          // The version-fold: gated on the instance's CURRENT version still matching
+          // this row's field_version, in the same UPDATE (no TOCTOU). Closes the
+          // residual race where a lease-expired-but-not-actually-dead worker's
+          // in-memory patch (computed from the pre-migration field ids) completes
+          // after migrateOne already remapped this row and moved the instance to a
+          // new version — the predicate fails, affected stays 0, and it folds into
+          // the ordinary suppression accounting below rather than writing under a
+          // stale field id.
           const r = (await tx`UPDATE instances
             SET body = jsonb_set(body, ${`{data,${fid}}`}::text[], (${[val]}::jsonb) -> 0, true),
                 resolve_state = 'pending'
             WHERE instance_id = ${row.instance_id} AND (body->>'status') = 'running'
+              AND (body->>'version')::int = ${row.field_version}
             RETURNING instance_id`) as unknown[];
           affected += r.length;
         }

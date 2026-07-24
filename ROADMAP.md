@@ -76,9 +76,15 @@
    shared `planStepEntry`/`applyStepEntry` seam with `entryVersion`, `suppressSpawn` on
    an identity step, the reconciled timer set and the pin/payload field patch — so
    status, the subprocess spawn/return and the `HistoryEntry` (`cause: "migration"`,
-   `pathId: null`) are inherited, not reimplemented. An instance with undelivered outbox
-   rows is skipped `pending-actions`; an unmappable one under `reject-and-pin` is skipped
-   `step-unmappable`; both are recorded as a `migration.skipped` `InstanceEvent`. The
+   `pathId: null`) are inherited, not reimplemented. An instance is skipped
+   `pending-actions` only while it holds a `claimed` outbox row with an active lease
+   (a worker plausibly mid-handler right now); a `pending` row, or a `claimed` row
+   whose lease has expired, is instead remapped in place through the plan's
+   `fieldMap` (with a `field_version` lamination stamp and a delivery-side version
+   fold guarding the residual race — see CLAUDE.md's "Current state") and the
+   instance migrates immediately. An unmappable instance under `reject-and-pin` is
+   skipped `step-unmappable`; both skip reasons are recorded as a `migration.skipped`
+   `InstanceEvent`. The
    migrating parent repairs every child's `parent.stepId` (terminal children included).
    The operation is per-instance fault-isolated and reports instance ids grouped
    migrated/skipped/conflicted/failed. A subprocess step as the *initial* step spawns

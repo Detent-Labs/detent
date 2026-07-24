@@ -73,6 +73,23 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // transition exactly and an event not at all). Idempotent add.
   await db`ALTER TABLE outbox ADD COLUMN IF NOT EXISTS event_id text`;
   await db`CREATE INDEX IF NOT EXISTS outbox_claim_idx ON outbox (status, next_attempt_at)`;
+  // Lamination stamp: the instance's version at enqueue time, kept in lock-step by
+  // migrateOne (which locks and bumps every one of an instance's outbox rows
+  // atomically with the instance's own version bump). Lets a migration remap a
+  // safe row's Action.output field ids in place, and lets delivery detect (and
+  // suppress) a writeback whose instance has since migrated out from under it.
+  await db`ALTER TABLE outbox ADD COLUMN IF NOT EXISTS field_version integer`;
+  // Migration locks an instance's undelivered outbox rows before its instance row
+  // (matching drainOutbox's own lock order); without this index that scan and lock
+  // sequentially scan the whole table.
+  await db`CREATE INDEX IF NOT EXISTS outbox_instance_idx ON outbox (instance_id)`;
+  // Backfill is exact, not best-effort: the pre-existing in-flight-actions check
+  // always skipped migration entirely while any pending/claimed row existed, so
+  // every outbox row present before this column existed still belongs to an
+  // instance sitting on the exact version that enqueued it.
+  await db`UPDATE outbox SET field_version = (
+    SELECT (body->>'version')::int FROM instances WHERE instances.instance_id = outbox.instance_id
+  ) WHERE field_version IS NULL`;
   // Re-resolution flag: a data-affecting writeback sets this to 'pending' so the
   // resolution worker re-drives automatic evaluation for a parked wait-state.
   // Idempotent add + index for the worker's claim scan.
@@ -320,8 +337,8 @@ export async function createInstance(
     if (inserted.length === 0) return;
     await appendInstanceEvents(tx, events);
     if (spawn && spawnEvent) {
-      await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, event_id)
-        VALUES (${idempotencyKey(inst.instanceId, inst.transitionSeq, spawn.id)}, ${inst.instanceId}, ${inst.transitionSeq}, ${spawn.id}, ${spawn}, ${spawnEvent.id})`;
+      await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, event_id, field_version)
+        VALUES (${idempotencyKey(inst.instanceId, inst.transitionSeq, spawn.id)}, ${inst.instanceId}, ${inst.transitionSeq}, ${spawn.id}, ${spawn}, ${spawnEvent.id}, ${inst.version})`;
     }
   });
   return inst;
