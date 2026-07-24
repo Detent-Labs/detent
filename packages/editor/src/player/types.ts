@@ -24,6 +24,7 @@ export interface ResolvedViewField {
   required: boolean;
   readonly: boolean;
   group?: string;
+  options?: FieldOption[];
 }
 
 export interface AvailablePath {

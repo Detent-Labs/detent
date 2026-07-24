@@ -593,6 +593,12 @@ export const processBody = z
         add(`data source key '${d.key}' collides with a reserved CEL namespace`, ["dataSources", i, "key"]);
     });
 
+    const dataSourceIds = new Set(dataSources.map((d) => d.id));
+    allFields.forEach((f) => {
+      if (f.dataSource && !dataSourceIds.has(f.dataSource))
+        add(`field dataSource does not resolve: ${f.dataSource}`, ["fields", f.id, "dataSource"]);
+    });
+
     steps.forEach((s, i) => {
       (s.paths ?? []).forEach((p, j) => {
         if (!stepIds.has(p.to)) add(`path target does not resolve: ${p.to}`, ["workflow", "steps", i, "paths", j, "to"]);

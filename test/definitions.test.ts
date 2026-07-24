@@ -12,7 +12,7 @@ import { executeManualTransition } from "../src/engine/transition.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { drainResolutions } from "../src/engine/resolution.js";
 import { drainTimers } from "../src/engine/timers.js";
-import { createRegistry, register } from "../src/engine/registry.js";
+import { createRegistry, register, createDataSourceRegistry } from "../src/engine/registry.js";
 import { HTTP_ACTION_TYPE, httpHandlerDef } from "../src/handlers/http.js";
 import { compileProcessBody } from "../src/schema/compile.js";
 import { definitionHash } from "../src/schema/hash.js";
@@ -70,6 +70,7 @@ const reg = createRegistry();
 register(reg, "sayYes", { handler: async () => ({ v: "yes" }) });
 register(reg, "sayNo", { handler: async () => ({ v: "no" }) });
 register(reg, "strict", { handler: async () => ({}), configSchema: z.object({ to: z.string() }) });
+const dataSourceReg = createDataSourceRegistry();
 
 beforeAll(async () => {
   if (DB) await initSchema();
@@ -82,12 +83,12 @@ beforeEach(async () => {
 
 test.skipIf(!DB)("publishBody persists a version; an identical re-publish is a no-op", async () => {
   const body = waitBody("sayYes");
-  const v1 = await publishBody(PID, body, reg);
+  const v1 = await publishBody(PID, body, reg, dataSourceReg);
   expect(v1.version).toBe(1);
   expect(v1.status).toBe("published");
   expect(v1.definitionHash).toBe(definitionHash(compileProcessBody(body)));
 
-  const v2 = await publishBody(PID, body, reg); // identical -> no new version
+  const v2 = await publishBody(PID, body, reg, dataSourceReg); // identical -> no new version
   expect(v2.version).toBe(1);
   const rows = (await sql`SELECT count(*)::int AS n FROM definitions WHERE process_id = ${PID}`) as { n: number }[];
   expect(rows[0].n).toBe(1);
@@ -96,15 +97,15 @@ test.skipIf(!DB)("publishBody persists a version; an identical re-publish is a n
 // --- publish: a changed body gets the next version ----------------------------
 
 test.skipIf(!DB)("publishing a changed body assigns version = latest + 1", async () => {
-  await publishBody(PID, waitBody("sayYes"), reg);
-  const v2 = await publishBody(PID, waitBody("sayNo"), reg); // different handler type -> different hash
+  await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
+  const v2 = await publishBody(PID, waitBody("sayNo"), reg, dataSourceReg); // different handler type -> different hash
   expect(v2.version).toBe(2);
 });
 
 // --- immutability: the PK forbids a body overwrite ----------------------------
 
 test.skipIf(!DB)("an overwrite of an existing (processId, version) with a different body is refused", async () => {
-  const v1 = await publishBody(PID, waitBody("sayYes"), reg);
+  const v1 = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
   const other = compileProcessBody(waitBody("sayNo"));
   // The failing INSERT wedges its connection post-error, so run it on a dedicated
   // client and close it — the shared pool stays clean for the next test.
@@ -142,7 +143,7 @@ const bodyWithOutput = (src: string): ProcessBody => {
 const publishFails = async (body: ProcessBody): Promise<CelValidationError> => {
   let caught: unknown;
   try {
-    await publishBody(PID, body, reg);
+    await publishBody(PID, body, reg, dataSourceReg);
   } catch (e) {
     caught = e;
   }
@@ -198,7 +199,7 @@ test.skipIf(!DB)("a rejected publish reports every issue, not only the first", a
 
 test.skipIf(!DB)("a rejected publish consumes no version number", async () => {
   await publishFails(bodyWithGuard("data.go =="));
-  const v = await publishBody(PID, waitBody("sayYes"), reg);
+  const v = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
   expect(v.version).toBe(1); // not 2 — the rejected publish reserved nothing
 });
 
@@ -212,7 +213,7 @@ test.skipIf(!DB)("re-publishing an already-stored body is a no-op, not re-valida
   await sql`INSERT INTO definitions (process_id, version, definition_hash, status, body)
     VALUES (${PID}, 1, ${hash}, 'published', ${legacy})`;
 
-  const v = await publishBody(PID, bodyWithGuard('data.nope == "x"'), reg);
+  const v = await publishBody(PID, bodyWithGuard('data.nope == "x"'), reg, dataSourceReg);
   expect(v.version).toBe(1);
   expect(v.definitionHash).toBe(hash);
   expect(await definitionCount()).toBe(1);
@@ -250,7 +251,7 @@ const bodyWithActionType = (type: string, config: Record<string, unknown> = {}):
 const publishRegistryFails = async (body: ProcessBody, registry = reg): Promise<RegistryValidationError> => {
   let caught: unknown;
   try {
-    await publishBody(PID, body, registry);
+    await publishBody(PID, body, registry, dataSourceReg);
   } catch (e) {
     caught = e;
   }
@@ -275,7 +276,7 @@ test.skipIf(!DB)("publish rejects a config that violates its handler's declared 
 
 test.skipIf(!DB)("a rejected registry publish consumes no version number", async () => {
   await publishRegistryFails(bodyWithActionType("neverRegistered"));
-  const v = await publishBody(PID, waitBody("sayYes"), reg);
+  const v = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
   expect(v.version).toBe(1); // not 2 — the rejected publish reserved nothing
 });
 
@@ -289,7 +290,7 @@ test.skipIf(!DB)("re-publishing an already-stored body is a no-op even against a
     VALUES (${PID}, 1, ${hash}, 'published', ${legacy})`;
 
   const emptyReg = createRegistry(); // "neverRegistered" is not in here either
-  const v = await publishBody(PID, bodyWithActionType("neverRegistered"), emptyReg);
+  const v = await publishBody(PID, bodyWithActionType("neverRegistered"), emptyReg, dataSourceReg);
   expect(v.version).toBe(1);
   expect(v.definitionHash).toBe(hash);
   expect(await definitionCount()).toBe(1);
@@ -303,7 +304,7 @@ test.skipIf(!DB)("re-publishing an already-stored body is a no-op even after its
 
   const tightened = createRegistry();
   register(tightened, "strict", { handler: async () => ({}), configSchema: z.object({ to: z.string() }) });
-  const v = await publishBody(PID, bodyWithActionType("strict", { to: 42 }), tightened);
+  const v = await publishBody(PID, bodyWithActionType("strict", { to: 42 }), tightened, dataSourceReg);
   expect(v.version).toBe(1);
   expect(v.definitionHash).toBe(hash);
   expect(await definitionCount()).toBe(1);
@@ -346,7 +347,7 @@ const dirtyBody = (): ProcessBody => {
 };
 
 test.skipIf(!DB)("unknown authored keys reach neither the hash nor the store", async () => {
-  const v = await publishBody(PID, dirtyBody(), reg);
+  const v = await publishBody(PID, dirtyBody(), reg, dataSourceReg);
 
   // The returned body is the validated one.
   const returned = v.definition as unknown as Record<string, any>;
@@ -364,7 +365,7 @@ test.skipIf(!DB)("unknown authored keys reach neither the hash nor the store", a
 });
 
 test.skipIf(!DB)("a publish -> read round trip is hash-stable", async () => {
-  const v = await publishBody(PID, dirtyBody(), reg);
+  const v = await publishBody(PID, dirtyBody(), reg, dataSourceReg);
   const { resolveBody } = createDefinitionStore();
   const resolved = (await resolveBody(PID, v.version))!;
   // The pin is only meaningful if the body every reader gets recomputes to it.
@@ -372,7 +373,7 @@ test.skipIf(!DB)("a publish -> read round trip is hash-stable", async () => {
 });
 
 test.skipIf(!DB)("an instance created from the publish return value rehydrates", async () => {
-  const v = await publishBody(PID, dirtyBody(), reg);
+  const v = await publishBody(PID, dirtyBody(), reg, dataSourceReg);
   const { resolveBody } = createDefinitionStore();
   const resolved = (await resolveBody(PID, v.version))!;
 
@@ -383,11 +384,11 @@ test.skipIf(!DB)("an instance created from the publish return value rehydrates",
 });
 
 test.skipIf(!DB)("re-publishing the read-back body is a hash-matched no-op", async () => {
-  const v = await publishBody(PID, dirtyBody(), reg);
+  const v = await publishBody(PID, dirtyBody(), reg, dataSourceReg);
   const { resolveBody } = createDefinitionStore();
   const resolved = (await resolveBody(PID, v.version))!;
 
-  const again = await publishBody(PID, resolved, reg);
+  const again = await publishBody(PID, resolved, reg, dataSourceReg);
   expect(again.version).toBe(v.version);
   expect(again.definitionHash).toBe(v.definitionHash);
   const rows = (await sql`SELECT count(*)::int AS n FROM definitions WHERE process_id = ${PID}`) as { n: number }[];
@@ -398,7 +399,7 @@ test.skipIf(!DB)("re-publishing the read-back body is a hash-matched no-op", asy
 
 test.skipIf(!DB)("resolveBody returns a body that passes rehydrate's pin check; absent pin is undefined", async () => {
   const authored = waitBody("sayYes");
-  const v = await publishBody(PID, authored, reg);
+  const v = await publishBody(PID, authored, reg, dataSourceReg);
   const { resolveBody } = createDefinitionStore();
 
   const body = await resolveBody(PID, v.version);
@@ -418,8 +419,8 @@ test.skipIf(!DB)("resolveBody returns a body that passes rehydrate's pin check; 
 // version resolution.
 
 test.skipIf(!DB)("resolveLatest returns the newest published version, and undefined for an unpublished process", async () => {
-  const v1 = await publishBody(PID, waitBody("sayYes"), reg);
-  const v2 = await publishBody(PID, waitBody("sayNo"), reg); // differing body -> next version
+  const v1 = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
+  const v2 = await publishBody(PID, waitBody("sayNo"), reg, dataSourceReg); // differing body -> next version
   expect(v2.version).toBe(v1.version + 1);
 
   const { resolveLatest } = createDefinitionStore();
@@ -433,7 +434,7 @@ test.skipIf(!DB)("resolveLatest returns the newest published version, and undefi
 // --- cache: a second resolve fires no second SELECT ---------------------------
 
 test.skipIf(!DB)("a resolved body is cached and served without re-reading the store", async () => {
-  const v = await publishBody(PID, waitBody("sayYes"), reg);
+  const v = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
   // Count query calls on a proxy over the shared client: a cache hit issues none.
   let queries = 0;
   const counting = new Proxy(sql, {
@@ -452,7 +453,7 @@ test.skipIf(!DB)("a resolved body is cached and served without re-reading the st
 // --- end-to-end: the store-backed worker path is live -------------------------
 
 test.skipIf(!DB)("a parked wait-state re-resolves against the store-resolved body", async () => {
-  const v = await publishBody(PID, waitBody("sayYes"), reg);
+  const v = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
   const { resolveBody } = createDefinitionStore();
   const body = (await resolveBody(PID, v.version))!;
 
@@ -470,7 +471,7 @@ test.skipIf(!DB)("a parked wait-state re-resolves against the store-resolved bod
 // --- end-to-end: a due timer fires against the store-resolved body ------------
 
 test.skipIf(!DB)("a due timer fires against the store-resolved body", async () => {
-  const v = await publishBody(PID, waitTimerBody(), reg);
+  const v = await publishBody(PID, waitTimerBody(), reg, dataSourceReg);
   const { resolveBody } = createDefinitionStore();
   const body = (await resolveBody(PID, v.version))!;
 

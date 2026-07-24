@@ -54,10 +54,11 @@ export function FieldInput({ field, allFields, values, onChange, issuesByField }
     );
   }
 
-  const usesDataSource = !!def.dataSource;
-  // reference / file / a Plugin envelope type / a dataSource-bound field: no
-  // dedicated widget in this preview tool, all fall back to free text.
-  const isFreeTextFallback = usesDataSource || def.type === "reference" || def.type === "file" || typeof def.type !== "string";
+  // reference / file / a Plugin envelope type: no dedicated widget in this
+  // preview tool, all fall back to free text. A dataSource-bound select/
+  // multiselect field is NOT included here — its options are resolved
+  // server-side into `field.options`, same as a static-options field.
+  const isFreeTextFallback = def.type === "reference" || def.type === "file" || typeof def.type !== "string";
 
   const value = values[def.id];
   const disabled = field.readonly;
@@ -84,7 +85,7 @@ export function FieldInput({ field, allFields, values, onChange, issuesByField }
     control = (
       <select disabled={disabled} value={(value as string) ?? ""} onChange={(e) => onChange(def.id, e.target.value)}>
         <option value="" />
-        {(def.options ?? []).map((o) => (
+        {(field.options ?? []).map((o) => (
           <option key={o.value} value={o.value}>
             {firstLocalizedText(o.label) || o.value}
           </option>
@@ -100,7 +101,7 @@ export function FieldInput({ field, allFields, values, onChange, issuesByField }
         value={selected}
         onChange={(e) => onChange(def.id, Array.from(e.target.selectedOptions).map((o) => o.value))}
       >
-        {(def.options ?? []).map((o) => (
+        {(field.options ?? []).map((o) => (
           <option key={o.value} value={o.value}>
             {firstLocalizedText(o.label) || o.value}
           </option>
@@ -122,7 +123,6 @@ export function FieldInput({ field, allFields, values, onChange, issuesByField }
         )}
       </span>
       {control}
-      {usesDataSource && <p className="player-field-note">data source resolution not yet supported — enter a raw value</p>}
       {issues.length > 0 && (
         <ul className="player-field-issues">
           {issues.map((issue, i) => (

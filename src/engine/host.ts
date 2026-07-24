@@ -12,8 +12,17 @@ import { startOutboxWorker } from "./outbox.js";
 import { startResolutionWorker } from "./resolution.js";
 import { startTimerScheduler } from "./timers.js";
 import { registerSubprocessHandlers } from "./subprocess.js";
-import { createRegistry, register, type Registry } from "./registry.js";
+import {
+  createRegistry,
+  register,
+  type Registry,
+  createDataSourceRegistry,
+  registerDataSource,
+  type DataSourceRegistry,
+} from "./registry.js";
 import { HTTP_ACTION_TYPE, httpHandlerDef } from "../handlers/http.js";
+import { z } from "zod";
+import { fieldOption, type FieldOption } from "../schema/definition.js";
 
 /**
  * A registry pre-populated with the built-in, vendor-neutral `http.request`
@@ -28,6 +37,22 @@ import { HTTP_ACTION_TYPE, httpHandlerDef } from "../handlers/http.js";
 export function createDefaultRegistry(): Registry {
   const reg = createRegistry();
   register(reg, HTTP_ACTION_TYPE, httpHandlerDef);
+  return reg;
+}
+
+const staticDataSourceConfigSchema = z.object({ options: z.array(fieldOption) });
+
+/**
+ * A registry pre-populated with the built-in `"static"` data source handler,
+ * which echoes its configured `options` unchanged. Mirrors
+ * `createDefaultRegistry` above; only one data source type ships in v1.
+ */
+export function createDefaultDataSourceRegistry(): DataSourceRegistry {
+  const reg = createDataSourceRegistry();
+  registerDataSource(reg, "static", {
+    configSchema: staticDataSourceConfigSchema,
+    resolve: async (ctx) => (ctx.config as { options: FieldOption[] }).options,
+  });
   return reg;
 }
 

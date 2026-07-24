@@ -9,7 +9,7 @@
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { checkAssignmentRegistry } from "../src/engine/registry-check.js";
-import { createRegistry, STATIC_ASSIGNMENT_STRATEGY_TYPE } from "../src/engine/registry.js";
+import { createRegistry, STATIC_ASSIGNMENT_STRATEGY_TYPE, createDataSourceRegistry } from "../src/engine/registry.js";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody, AssignmentRegistryValidationError } from "../src/engine/definitions.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
@@ -117,6 +117,7 @@ test("the static strategy type constant matches what the check accepts", () => {
 const DB = !!process.env.DATABASE_URL;
 const PID = "proc_assignreg" as ProcessId;
 const actionReg = createRegistry();
+const dataSourceReg = createDataSourceRegistry();
 
 beforeAll(async () => {
   if (DB) await initSchema();
@@ -129,7 +130,7 @@ test.skipIf(!DB)("publish rejects a non-static assignment strategy type and writ
   const body = bodyWithAssignment({ type: "nope", config: {} });
   let caught: unknown;
   try {
-    await publishBody(PID, body, actionReg);
+    await publishBody(PID, body, actionReg, dataSourceReg);
   } catch (e) {
     caught = e;
   }
@@ -142,7 +143,7 @@ test.skipIf(!DB)("a publish with two non-static assignment types throws with eve
   const body = bodyWithTwoBadAssignments();
   let caught: unknown;
   try {
-    await publishBody(PID, body, actionReg);
+    await publishBody(PID, body, actionReg, dataSourceReg);
   } catch (e) {
     caught = e;
   }
@@ -152,20 +153,20 @@ test.skipIf(!DB)("a publish with two non-static assignment types throws with eve
 
 test.skipIf(!DB)("publish accepts a valid static-strategy step", async () => {
   const body = bodyWithAssignment({ type: STATIC_ASSIGNMENT_STRATEGY_TYPE, config: { candidates: ["role_a"] } });
-  const v = await publishBody(PID, body, actionReg);
+  const v = await publishBody(PID, body, actionReg, dataSourceReg);
   expect(v.version).toBe(1);
 });
 
 test.skipIf(!DB)("a body with no assignment anywhere still publishes unchanged", async () => {
   const body = bodyWithAssignment();
-  const v = await publishBody(PID, body, actionReg);
+  const v = await publishBody(PID, body, actionReg, dataSourceReg);
   expect(v.version).toBe(1);
 });
 
 test.skipIf(!DB)("an identical re-publish of an already-stored body stays a no-op without invoking the check", async () => {
   const body = bodyWithAssignment({ type: STATIC_ASSIGNMENT_STRATEGY_TYPE, config: { candidates: ["role_a"] } });
-  const v1 = await publishBody(PID, body, actionReg);
-  const v2 = await publishBody(PID, body, actionReg);
+  const v1 = await publishBody(PID, body, actionReg, dataSourceReg);
+  const v2 = await publishBody(PID, body, actionReg, dataSourceReg);
   expect(v2.version).toBe(v1.version);
   const rows = (await sql`SELECT count(*)::int AS n FROM definitions WHERE process_id = ${PID}`) as { n: number }[];
   expect(rows[0].n).toBe(1);
@@ -174,11 +175,11 @@ test.skipIf(!DB)("an identical re-publish of an already-stored body stays a no-o
 test.skipIf(!DB)("a rejected assignment-strategy publish consumes no version number", async () => {
   const bad = bodyWithAssignment({ type: "nope", config: {} });
   try {
-    await publishBody(PID, bad, actionReg);
+    await publishBody(PID, bad, actionReg, dataSourceReg);
   } catch {
     // expected
   }
   const good = bodyWithAssignment({ type: STATIC_ASSIGNMENT_STRATEGY_TYPE, config: { candidates: [] } });
-  const v = await publishBody(PID, good, actionReg);
+  const v = await publishBody(PID, good, actionReg, dataSourceReg);
   expect(v.version).toBe(1); // not 2 — the rejected publish reserved nothing
 });

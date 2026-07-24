@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
-import { createRegistry } from "../src/engine/registry.js";
+import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { executeManualTransition, cancelInstance, ConcurrencyConflict, GuardRefused, AutomaticCascadeLoop } from "../src/engine/transition.js";
 import {
   createProcessInstance,
@@ -27,6 +27,7 @@ const DB = !!process.env.DATABASE_URL;
 const actor: Actor = { id: "user_1", roles: [] };
 const cel = (src: string) => ({ lang: "cel", src });
 const reg = createRegistry();
+const dataSourceReg = createDataSourceRegistry();
 
 beforeAll(async () => {
   if (DB) await initSchema();
@@ -312,23 +313,23 @@ const pid = (n: string) => n as ProcessId;
 
 test.skipIf(!DB)("createProcessInstance never enforces the required check, even when opts.data is empty", async () => {
   const PID = pid("proc_view_1");
-  await publishBody(PID, viewBody(), reg);
+  await publishBody(PID, viewBody(), reg, dataSourceReg);
 
   // amount/name/category are all required on step_a's view, yet an empty seed
   // is accepted: requiredness is a transition-time gate (submitAndTransition),
   // not an existence-time one — see design.md.
-  const created = await createProcessInstance(PID, actor, { data: {} as Instance["data"] });
+  const created = await createProcessInstance(PID, actor, dataSourceReg, { data: {} as Instance["data"] });
   expect(created.currentStepId as string).toBe("step_a");
   expect(created.data).toEqual({});
 });
 
 test.skipIf(!DB)("createProcessInstance validates opts.data's shape against the initial step's view", async () => {
   const PID = pid("proc_view_1b");
-  await publishBody(PID, viewBody(), reg);
+  await publishBody(PID, viewBody(), reg, dataSourceReg);
 
   let raised: unknown;
   try {
-    await createProcessInstance(PID, actor, { data: { field_amount: "not-a-number" } as unknown as Instance["data"] });
+    await createProcessInstance(PID, actor, dataSourceReg, { data: { field_amount: "not-a-number" } as unknown as Instance["data"] });
   } catch (e) {
     raised = e;
   }
@@ -339,17 +340,17 @@ test.skipIf(!DB)("createProcessInstance validates opts.data's shape against the 
 
 test.skipIf(!DB)("createProcessInstance succeeds with a valid data seed, and getInstanceView resolves it", async () => {
   const PID = pid("proc_view_2");
-  await publishBody(PID, viewBody(), reg);
+  await publishBody(PID, viewBody(), reg, dataSourceReg);
 
   const data = {
     field_amount: 100,
     field_name: "Bob",
     field_category: "a",
   } as unknown as Instance["data"];
-  const created = await createProcessInstance(PID, actor, { data });
+  const created = await createProcessInstance(PID, actor, dataSourceReg, { data });
   expect(created.currentStepId as string).toBe("step_a");
 
-  const view = await getInstanceView(created.instanceId, actor);
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
   expect(view.status).toBe("running");
   expect(view.step.key).toBe("a");
   const byKey = new Map(view.fields.map((f) => [f.field.key, f]));
@@ -360,28 +361,28 @@ test.skipIf(!DB)("createProcessInstance succeeds with a valid data seed, and get
 
 test.skipIf(!DB)("createProcessInstance pins to an explicit older version, not the newest", async () => {
   const PID = pid("proc_version_pin");
-  const v1 = await publishBody(PID, cascadeBody(), reg);
+  const v1 = await publishBody(PID, cascadeBody(), reg, dataSourceReg);
   // twoPathsBody differs from cascadeBody, so this publish assigns v2 — the
   // default (no opts.version) createProcessInstance call would resolve here.
-  const v2 = await publishBody(PID, twoPathsBody(), reg);
+  const v2 = await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
   expect(v2.version).toBe(v1.version + 1);
 
-  const pinnedOld = await createProcessInstance(PID, actor, { version: v1.version });
+  const pinnedOld = await createProcessInstance(PID, actor, dataSourceReg, { version: v1.version });
   expect(pinnedOld.version).toBe(v1.version);
   expect(pinnedOld.currentStepId as string).toBe("step_a"); // cascadeBody's initial step
 
-  const defaultNewest = await createProcessInstance(PID, actor);
+  const defaultNewest = await createProcessInstance(PID, actor, dataSourceReg);
   expect(defaultNewest.version).toBe(v2.version);
 });
 
 test.skipIf(!DB)("a group-container field never reports required, even when the view declares it", async () => {
   const PID = pid("proc_view_group");
-  await publishBody(PID, viewBody(), reg);
-  const created = await createProcessInstance(PID, actor, {
+  await publishBody(PID, viewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, {
     data: { field_amount: 1, field_name: "Bob", field_category: "a" } as unknown as Instance["data"],
   });
 
-  const view = await getInstanceView(created.instanceId, actor);
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
   const groupField = view.fields.find((f) => f.field.key === "grp")!;
   expect(groupField).toBeDefined();
   expect(groupField.required).toBe(false);
@@ -390,14 +391,14 @@ test.skipIf(!DB)("a group-container field never reports required, even when the 
 
 test.skipIf(!DB)("submitting a group-container field's own id is rejected as unknown-field", async () => {
   const PID = pid("proc_view_group2");
-  await publishBody(PID, viewBody(), reg);
-  const created = await createProcessInstance(PID, actor, {
+  await publishBody(PID, viewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, {
     data: { field_amount: 1, field_name: "Bob", field_category: "a" } as unknown as Instance["data"],
   });
 
   let raised: unknown;
   try {
-    await submitAndTransition(created.instanceId, "path_ab" as PathId, { field_group: "x" } as unknown as Instance["data"], actor);
+    await submitAndTransition(created.instanceId, "path_ab" as PathId, { field_group: "x" } as unknown as Instance["data"], actor, dataSourceReg);
   } catch (e) {
     raised = e;
   }
@@ -407,46 +408,46 @@ test.skipIf(!DB)("submitting a group-container field's own id is rejected as unk
 
 test.skipIf(!DB)("getInstanceView on a completed instance still resolves, with no available paths", async () => {
   const PID = pid("proc_view_completed");
-  await publishBody(PID, cascadeBody(), reg);
-  const created = await createProcessInstance(PID, actor);
+  await publishBody(PID, cascadeBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
   const result = await submitAndTransition(
     created.instanceId,
     "path_ab" as PathId,
     { field_decision: "approve" } as unknown as Instance["data"],
-    actor,
+    actor, dataSourceReg,
   );
   expect(result.status).toBe("completed");
   expect(result.currentStepId as string).toBe("step_approved");
 
-  const view = await getInstanceView(result.instanceId, actor);
+  const view = await getInstanceView(result.instanceId, actor, dataSourceReg);
   expect(view.status).toBe("completed");
   expect(view.availablePaths).toEqual([]);
 });
 
 test.skipIf(!DB)("getInstanceView on a cancelled instance still resolves, with no available paths", async () => {
   const PID = pid("proc_view_cancelled");
-  const published = await publishBody(PID, selfLoopBody(), reg);
-  const created = await createProcessInstance(PID, actor);
+  const published = await publishBody(PID, selfLoopBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
 
   const cancelled = await cancelInstance(created, published.definition, actor);
   expect(cancelled.status).toBe("cancelled");
 
-  const view = await getInstanceView(cancelled.instanceId, actor);
+  const view = await getInstanceView(cancelled.instanceId, actor, dataSourceReg);
   expect(view.status).toBe("cancelled");
   expect(view.availablePaths).toEqual([]);
 });
 
 test.skipIf(!DB)("getInstanceView on a running subprocess wait-state has no available paths", async () => {
-  const childVersion = (await publishBody(pid("proc_sub_child_1"), subprocessChildBody(), reg)).version;
+  const childVersion = (await publishBody(pid("proc_sub_child_1"), subprocessChildBody(), reg, dataSourceReg)).version;
   const PID = pid("proc_sub_parent_1");
-  await publishBody(PID, subprocessParentBody("proc_sub_child_1", childVersion), reg);
+  await publishBody(PID, subprocessParentBody("proc_sub_child_1", childVersion), reg, dataSourceReg);
 
-  const created = await createProcessInstance(PID, actor);
-  const result = await submitAndTransition(created.instanceId, "path_p1_sub" as PathId, {} as Instance["data"], actor);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  const result = await submitAndTransition(created.instanceId, "path_p1_sub" as PathId, {} as Instance["data"], actor, dataSourceReg);
   expect(result.currentStepId as string).toBe("step_p_sub");
   expect(result.status).toBe("running"); // parked: the spawn is enqueued but never delivered here
 
-  const view = await getInstanceView(result.instanceId, actor);
+  const view = await getInstanceView(result.instanceId, actor, dataSourceReg);
   expect(view.status).toBe("running");
   expect(view.step.type).toBe("subprocess");
   expect(view.availablePaths).toEqual([]);
@@ -458,8 +459,8 @@ test.skipIf(!DB)("getInstanceView on a running subprocess wait-state has no avai
 
 async function freshInstance(): Promise<InstanceId> {
   const PID = pid(`proc_validate_${crypto.randomUUID()}`);
-  await publishBody(PID, viewBody(), reg);
-  const created = await createProcessInstance(PID, actor, {
+  await publishBody(PID, viewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, {
     data: { field_amount: 1, field_name: "Bob", field_category: "a" } as unknown as Instance["data"],
   });
   return created.instanceId;
@@ -469,7 +470,7 @@ async function expectIssue(data: Record<string, unknown>, expected: Record<strin
   const instanceId = await freshInstance();
   let raised: unknown;
   try {
-    await submitAndTransition(instanceId, "path_ab" as PathId, data as unknown as Instance["data"], actor);
+    await submitAndTransition(instanceId, "path_ab" as PathId, data as unknown as Instance["data"], actor, dataSourceReg);
   } catch (e) {
     raised = e;
   }
@@ -524,10 +525,10 @@ test.skipIf(!DB)("rule-failed: a validation.rule that evaluates false is rejecte
 
 test.skipIf(!DB)("required-missing: submitting without a required field already set is rejected", async () => {
   const PID = pid("proc_required_missing");
-  await publishBody(PID, viewBody(), reg);
+  await publishBody(PID, viewBody(), reg, dataSourceReg);
   // Created empty (legal — see the createProcessInstance tests above); the
   // required check only bites when actually trying to leave the step.
-  const created = await createProcessInstance(PID, actor);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
 
   let raised: unknown;
   try {
@@ -535,7 +536,7 @@ test.skipIf(!DB)("required-missing: submitting without a required field already 
       created.instanceId,
       "path_ab" as PathId,
       { field_name: "Bob", field_category: "a" } as unknown as Instance["data"],
-      actor,
+      actor, dataSourceReg,
     );
   } catch (e) {
     raised = e;
@@ -552,7 +553,7 @@ test.skipIf(!DB)("multiple validation issues are collected together, not fail-fa
       instanceId,
       "path_ab" as PathId,
       { field_amount: -5, field_name: "a" } as unknown as Instance["data"],
-      actor,
+      actor, dataSourceReg,
     );
   } catch (e) {
     raised = e;
@@ -573,7 +574,7 @@ test.skipIf(!DB)("a submission covering only some fields preserves every other p
     instanceId,
     "path_ab" as PathId,
     { field_note: "hello" } as unknown as Instance["data"],
-    actor,
+    actor, dataSourceReg,
   );
   expect(result.data).toMatchObject({ field_amount: 1, field_name: "Bob", field_category: "a", field_note: "hello" });
 
@@ -589,14 +590,14 @@ test.skipIf(!DB)("a submission covering only some fields preserves every other p
 
 test.skipIf(!DB)("a guard on the step a submission transitions into sees the just-submitted data", async () => {
   const PID = pid("proc_cascade_1");
-  await publishBody(PID, cascadeBody(), reg);
-  const created = await createProcessInstance(PID, actor);
+  await publishBody(PID, cascadeBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
 
   const result = await submitAndTransition(
     created.instanceId,
     "path_ab" as PathId,
     { field_decision: "approve" } as unknown as Instance["data"],
-    actor,
+    actor, dataSourceReg,
   );
 
   // Lands directly on step_approved (via the automatic cascade off step_b),
@@ -607,25 +608,25 @@ test.skipIf(!DB)("a guard on the step a submission transitions into sees the jus
 
 test.skipIf(!DB)("availablePaths reflects guard state as data changes across repeated submissions", async () => {
   const PID = pid("proc_selfloop_1");
-  await publishBody(PID, selfLoopBody(), reg);
-  const created = await createProcessInstance(PID, actor);
+  await publishBody(PID, selfLoopBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
 
-  const view1 = await getInstanceView(created.instanceId, actor);
+  const view1 = await getInstanceView(created.instanceId, actor, dataSourceReg);
   expect(view1.availablePaths.map((p) => p.id as string)).toEqual(["path_self"]);
 
-  const afterFirst = await submitAndTransition(created.instanceId, "path_self" as PathId, {} as Instance["data"], actor);
+  const afterFirst = await submitAndTransition(created.instanceId, "path_self" as PathId, {} as Instance["data"], actor, dataSourceReg);
   expect(afterFirst.currentStepId as string).toBe("step_x"); // re-entered itself
-  const view2 = await getInstanceView(afterFirst.instanceId, actor);
+  const view2 = await getInstanceView(afterFirst.instanceId, actor, dataSourceReg);
   expect(view2.availablePaths.map((p) => p.id as string)).toEqual(["path_self"]);
 
   const afterSecond = await submitAndTransition(
     afterFirst.instanceId,
     "path_self" as PathId,
     { field_approved: true } as unknown as Instance["data"],
-    actor,
+    actor, dataSourceReg,
   );
   expect(afterSecond.data).toMatchObject({ field_approved: true });
-  const view3 = await getInstanceView(afterSecond.instanceId, actor);
+  const view3 = await getInstanceView(afterSecond.instanceId, actor, dataSourceReg);
   expect(view3.availablePaths.map((p) => p.id as string).sort()).toEqual(["path_done", "path_self"]);
 });
 
@@ -634,7 +635,7 @@ test.skipIf(!DB)("a concurrent action writeback landing during submitAndTransiti
   const writeback = sql`UPDATE instances
     SET body = jsonb_set(body, '{data,field_readonly}'::text[], '"from-action"'::jsonb, true)
     WHERE instance_id = ${instanceId}`;
-  const submit = submitAndTransition(instanceId, "path_ab" as PathId, { field_note: "hello" } as unknown as Instance["data"], actor);
+  const submit = submitAndTransition(instanceId, "path_ab" as PathId, { field_note: "hello" } as unknown as Instance["data"], actor, dataSourceReg);
 
   await Promise.all([submit, writeback]);
 
@@ -647,8 +648,8 @@ test.skipIf(!DB)("a concurrent action writeback landing during submitAndTransiti
 
 test.skipIf(!DB)("two concurrent submitAndTransition calls serialize instead of both committing", async () => {
   const PID = pid("proc_two_paths_1");
-  await publishBody(PID, twoPathsBody(), reg);
-  const created = await createProcessInstance(PID, actor);
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
 
   // Both resolve (fulfilled): the row lock serializes them, and the loser's
   // own read comes back fresh — by the time it runs, the instance is already
@@ -656,8 +657,8 @@ test.skipIf(!DB)("two concurrent submitAndTransition calls serialize instead of 
   // non-running no-op returns it unchanged rather than throwing. The
   // assertion that matters is that only ONE transition actually committed.
   const results = await Promise.allSettled([
-    submitAndTransition(created.instanceId, "path_x" as PathId, {} as Instance["data"], actor),
-    submitAndTransition(created.instanceId, "path_y" as PathId, {} as Instance["data"], actor),
+    submitAndTransition(created.instanceId, "path_x" as PathId, {} as Instance["data"], actor, dataSourceReg),
+    submitAndTransition(created.instanceId, "path_y" as PathId, {} as Instance["data"], actor, dataSourceReg),
   ]);
   expect(results.every((r) => r.status === "fulfilled")).toBe(true);
 
@@ -673,13 +674,13 @@ test.skipIf(!DB)("two concurrent submitAndTransition calls serialize instead of 
 test.skipIf(!DB)("an unlocked stale executeManualTransition call racing submitAndTransition surfaces ConcurrencyConflict", async () => {
   const PID = pid("proc_two_paths_2");
   const body = twoPathsBody();
-  await publishBody(PID, body, reg);
-  const created = await createProcessInstance(PID, actor);
+  await publishBody(PID, body, reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
 
   // A stale snapshot, as if read before submitAndTransition ran.
   const stale = { ...created };
 
-  await submitAndTransition(created.instanceId, "path_x" as PathId, {} as Instance["data"], actor);
+  await submitAndTransition(created.instanceId, "path_x" as PathId, {} as Instance["data"], actor, dataSourceReg);
 
   let raised: unknown;
   try {
@@ -692,13 +693,13 @@ test.skipIf(!DB)("an unlocked stale executeManualTransition call racing submitAn
 
 test.skipIf(!DB)("a submission whose merged guard fails throws GuardRefused without committing", async () => {
   const PID = pid("proc_guardrefused_1");
-  await publishBody(PID, selfLoopBody(), reg);
-  const created = await createProcessInstance(PID, actor);
+  await publishBody(PID, selfLoopBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
 
   let raised: unknown;
   try {
     // approved is unset -> path_done's guard is false
-    await submitAndTransition(created.instanceId, "path_done" as PathId, {} as Instance["data"], actor);
+    await submitAndTransition(created.instanceId, "path_done" as PathId, {} as Instance["data"], actor, dataSourceReg);
   } catch (e) {
     raised = e;
   }
@@ -709,8 +710,8 @@ test.skipIf(!DB)("a submission whose merged guard fails throws GuardRefused with
 
 test.skipIf(!DB)("a post-commit cascade loop throws AutomaticCascadeLoop but leaves the submission committed", async () => {
   const PID = pid("proc_cascade_loop_1");
-  await publishBody(PID, cascadeLoopBody(), reg);
-  const created = await createProcessInstance(PID, actor);
+  await publishBody(PID, cascadeLoopBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
 
   let raised: unknown;
   try {
@@ -718,7 +719,7 @@ test.skipIf(!DB)("a post-commit cascade loop throws AutomaticCascadeLoop but lea
       created.instanceId,
       "path_ag" as PathId,
       { field_marker: "kept-despite-fault" } as unknown as Instance["data"],
-      actor,
+      actor, dataSourceReg,
     );
   } catch (e) {
     raised = e;
@@ -734,14 +735,14 @@ test.skipIf(!DB)("a post-commit cascade loop throws AutomaticCascadeLoop but lea
   expect((parsed as { data: Record<string, unknown> }).data).toEqual({ field_marker: "kept-despite-fault" });
   expect(row[0]!.transition_seq).toBeGreaterThan(0); // the manual hop (and at least one cascade hop) committed
 
-  const view = await getInstanceView(created.instanceId, actor);
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
   expect(view.status).toBe("faulted");
 });
 
 test.skipIf(!DB)("an unresolvable processId/version surfaces a plain Error", async () => {
   let raised: unknown;
   try {
-    await createProcessInstance(pid("proc_does_not_exist"), actor);
+    await createProcessInstance(pid("proc_does_not_exist"), actor, dataSourceReg);
   } catch (e) {
     raised = e;
   }
@@ -751,15 +752,15 @@ test.skipIf(!DB)("an unresolvable processId/version surfaces a plain Error", asy
 
 test.skipIf(!DB)("a pin mismatch throws PinMismatch (via getInstanceView on a resolver mismatch)", async () => {
   const PID = pid("proc_pin_mismatch");
-  await publishBody(PID, cascadeBody(), reg);
-  const created = await createProcessInstance(PID, actor);
+  await publishBody(PID, cascadeBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
 
   // Corrupt the persisted pin so it no longer matches the published body's hash.
   await sql`UPDATE instances SET body = jsonb_set(body, '{definitionHash}', '"deadbeef"'::jsonb) WHERE instance_id = ${created.instanceId}`;
 
   let raised: unknown;
   try {
-    await getInstanceView(created.instanceId, actor);
+    await getInstanceView(created.instanceId, actor, dataSourceReg);
   } catch (e) {
     raised = e;
   }
@@ -768,8 +769,8 @@ test.skipIf(!DB)("a pin mismatch throws PinMismatch (via getInstanceView on a re
 
 test.skipIf(!DB)("a pin mismatch throws PinMismatch via submitAndTransition's own locked pin check", async () => {
   const PID = pid("proc_pin_mismatch_submit");
-  await publishBody(PID, cascadeBody(), reg);
-  const created = await createProcessInstance(PID, actor);
+  await publishBody(PID, cascadeBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
 
   // submitAndTransition verifies the pin itself (it can't use rehydrate — the
   // row must be locked before the body is known) — this exercises that copy
@@ -778,7 +779,7 @@ test.skipIf(!DB)("a pin mismatch throws PinMismatch via submitAndTransition's ow
 
   let raised: unknown;
   try {
-    await submitAndTransition(created.instanceId, "path_ab" as PathId, {} as Instance["data"], actor);
+    await submitAndTransition(created.instanceId, "path_ab" as PathId, {} as Instance["data"], actor, dataSourceReg);
   } catch (e) {
     raised = e;
   }
@@ -797,7 +798,7 @@ test.skipIf(!DB)("happy path: create -> view -> submit -> view against expense-a
   expenseReg.set("notify.email", { handler: async () => ({}) });
 
   const PID = pid("proc_expense_approval");
-  await publishBody(PID, authored, expenseReg);
+  await publishBody(PID, authored, expenseReg, dataSourceReg);
 
   const amountField = "field_1a2b3c4d-0001-4a1c-8e2f-000000000001" as FieldId;
   const reasonField = "field_1a2b3c4d-0002-4a1c-8e2f-000000000002" as FieldId;
@@ -809,8 +810,8 @@ test.skipIf(!DB)("happy path: create -> view -> submit -> view against expense-a
   // distinct from the file's roleless `actor`, so claimStep is eligible.
   const demoActor: Actor = { id: "user_demo", roles: ["employee", "finance-approver"] };
 
-  const created = await createProcessInstance(PID, demoActor);
-  const captureView = await getInstanceView(created.instanceId, demoActor);
+  const created = await createProcessInstance(PID, demoActor, dataSourceReg);
+  const captureView = await getInstanceView(created.instanceId, demoActor, dataSourceReg);
   expect(captureView.step.key).toBe("capture");
   expect(captureView.availablePaths.map((p) => p.id)).toEqual([submitPath]);
 
@@ -819,11 +820,11 @@ test.skipIf(!DB)("happy path: create -> view -> submit -> view against expense-a
     created.instanceId,
     submitPath,
     { [amountField]: 42, [reasonField]: "Taxi" } as unknown as Instance["data"],
-    demoActor,
+    demoActor, dataSourceReg,
   );
   expect(afterCapture.currentStepId as string).toBe("step_aaaa1111-0002-4a1c-8e2f-000000000002");
 
-  const reviewView = await getInstanceView(afterCapture.instanceId, demoActor);
+  const reviewView = await getInstanceView(afterCapture.instanceId, demoActor, dataSourceReg);
   expect(reviewView.step.key).toBe("review");
   const byId = new Map(reviewView.fields.map((f) => [f.field.id as string, f]));
   expect(byId.get(amountField)!.readonly).toBe(true);
@@ -835,7 +836,7 @@ test.skipIf(!DB)("happy path: create -> view -> submit -> view against expense-a
     afterCapture.instanceId,
     approvePath,
     { [reviewNoteField]: "Looks fine" } as unknown as Instance["data"],
-    demoActor,
+    demoActor, dataSourceReg,
   );
   // "book" is a wait-state driven by an async action's writeback, which is
   // never delivered here (no outbox worker running) — the instance parks
@@ -843,7 +844,7 @@ test.skipIf(!DB)("happy path: create -> view -> submit -> view against expense-a
   expect(afterReview.currentStepId as string).toBe("step_aaaa1111-0003-4a1c-8e2f-000000000003");
   expect(afterReview.status).toBe("running");
 
-  const bookView = await getInstanceView(afterReview.instanceId, demoActor);
+  const bookView = await getInstanceView(afterReview.instanceId, demoActor, dataSourceReg);
   expect(bookView.step.key).toBe("book");
   expect(bookView.availablePaths).toEqual([]); // book's paths are automatic
 });

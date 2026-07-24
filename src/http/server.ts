@@ -7,8 +7,8 @@
  */
 import { SQL } from "bun";
 import { sql } from "../engine/store.js";
-import { startEngine } from "../engine/host.js";
-import { createRegistry, type Registry } from "../engine/registry.js";
+import { startEngine, createDefaultDataSourceRegistry } from "../engine/host.js";
+import { createRegistry, type Registry, type DataSourceRegistry } from "../engine/registry.js";
 import { devHeaderResolver, type ActorResolver } from "../auth/resolve.js";
 import { handleCreateInstance, handleGetInstanceView, handleSubmit, handleClaim, handleRelease } from "./routes.js";
 import type { HttpResult } from "./errors.js";
@@ -37,6 +37,7 @@ function preflightResponse(method: string): Response {
  * rather than an implicit "any actor accepted" default.
  */
 export function createServer(
+  dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
   resolver: ActorResolver = devHeaderResolver,
 ): (req: Request) => Promise<Response> {
@@ -63,15 +64,15 @@ export function createServer(
 
     // POST /processes/:processId/instances
     if (req.method === "POST" && parts.length === 3 && parts[0] === "processes" && parts[2] === "instances") {
-      return toResponse(await handleCreateInstance(parts[1]!, req, resolver, db));
+      return toResponse(await handleCreateInstance(parts[1]!, req, resolver, dataSourceRegistry, db));
     }
     // GET /instances/:instanceId
     if (req.method === "GET" && parts.length === 2 && parts[0] === "instances") {
-      return toResponse(await handleGetInstanceView(parts[1]!, req, resolver, db));
+      return toResponse(await handleGetInstanceView(parts[1]!, req, resolver, dataSourceRegistry, db));
     }
     // POST /instances/:instanceId/submit
     if (req.method === "POST" && parts.length === 3 && parts[0] === "instances" && parts[2] === "submit") {
-      return toResponse(await handleSubmit(parts[1]!, req, resolver, db));
+      return toResponse(await handleSubmit(parts[1]!, req, resolver, dataSourceRegistry, db));
     }
     // POST /instances/:instanceId/claim
     if (req.method === "POST" && parts.length === 3 && parts[0] === "instances" && parts[2] === "claim") {
@@ -86,8 +87,13 @@ export function createServer(
   };
 }
 
-export function startHttpServer(registry: Registry, db: SQL = sql, resolver: ActorResolver = devHeaderResolver): { stop: () => void } {
-  const fetch = createServer(db, resolver);
+export function startHttpServer(
+  registry: Registry,
+  dataSourceRegistry: DataSourceRegistry,
+  db: SQL = sql,
+  resolver: ActorResolver = devHeaderResolver,
+): { stop: () => void } {
+  const fetch = createServer(dataSourceRegistry, db, resolver);
   const port = Number(process.env.PORT ?? 3000);
   const server = Bun.serve({ fetch, port });
   const engine = startEngine(db, registry);
@@ -101,5 +107,5 @@ export function startHttpServer(registry: Registry, db: SQL = sql, resolver: Act
 }
 
 if (import.meta.main) {
-  startHttpServer(createRegistry());
+  startHttpServer(createRegistry(), createDefaultDataSourceRegistry());
 }

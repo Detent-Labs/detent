@@ -5,7 +5,7 @@
  */
 
 import { z } from "zod";
-import type { Action } from "../schema/definition.js";
+import type { Action, FieldOption } from "../schema/definition.js";
 
 /** What a handler is invoked with. It MUST dedupe external effects on `idempotencyKey` (delivery is at-least-once). */
 export interface HandlerContext {
@@ -52,3 +52,34 @@ export function resolve(reg: Registry, type: string): HandlerDef | undefined {
  * `resolveStepAssignment` (transition.ts) and `createInstance` (store.ts).
  */
 export const STATIC_ASSIGNMENT_STRATEGY_TYPE = "static";
+
+/**
+ * Data-source registry: a sibling to the action `Registry` above, deliberately
+ * a plain parallel structure rather than a shared generic abstraction (the
+ * action registry wasn't generic when it was the only one). Resolves a
+ * `FieldDef.dataSource`'s `type` to a handler that produces the field's
+ * runtime option list.
+ */
+export interface DataSourceContext {
+  config: Record<string, unknown>;
+}
+
+/** `resolve` is async even for a pure config-echo handler, so a future I/O-backed type is a drop-in, not an interface change. */
+export interface DataSourceHandlerDef {
+  resolve: (ctx: DataSourceContext) => Promise<FieldOption[]>;
+  configSchema?: z.ZodTypeAny;
+}
+
+export type DataSourceRegistry = Map<string, DataSourceHandlerDef>;
+
+export function createDataSourceRegistry(): DataSourceRegistry {
+  return new Map();
+}
+
+export function registerDataSource(reg: DataSourceRegistry, type: string, def: DataSourceHandlerDef): void {
+  reg.set(type, def);
+}
+
+export function resolveDataSource(reg: DataSourceRegistry, type: string): DataSourceHandlerDef | undefined {
+  return reg.get(type);
+}
