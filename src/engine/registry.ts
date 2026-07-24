@@ -15,11 +15,10 @@ export interface HandlerContext {
   instanceId: string;
 }
 
-/** A registered handler plus its plugin JSON Schemas (config in, result out). */
+/** A registered handler plus its plugin config JSON Schema. */
 export interface HandlerDef {
   handler: (ctx: HandlerContext) => Promise<unknown>;
   configSchema?: z.ZodTypeAny;
-  outputSchema?: z.ZodTypeAny;
 }
 
 /**

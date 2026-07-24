@@ -55,8 +55,13 @@ needed.
 
 **src/engine/transition.ts:677** — `markFaulted` is a bare status flip, no
 HistoryEntry/dedicated audit event. ceiling: no persisted audit trail for a
-fault park. upgrade: **no-trigger** — deferred with no stated condition.
+fault park. upgrade: add a `fault`-kind `InstanceEvent` (mirroring
+`migration.skipped`) once a faulted instance needs to be diagnosed after the
+fact, without re-triggering or re-reading the original `AutomaticCascadeLoop`
+exception — the `InstanceEvent` pattern this would reuse is now proven (8
+kinds already), but nothing has forced this yet.
 
 ## Summary
 
-11 markers, 2 with no trigger.
+11 markers, 1 with no trigger (re-scanned 2026-07-24: 10 markers unchanged and
+still valid; `markFaulted` given a named trigger above instead of no-trigger).
