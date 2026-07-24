@@ -8,6 +8,12 @@ Last scanned: 2026-07-24.
 
 ## Markers
 
+**src/schema/hash.ts:17** — `canonicalize` skips full RFC-8785 number
+canonicalization (exponent/precision), relying on JSON's own number form.
+ceiling: only correct while every number in a `ProcessBody` round-trips
+through JSON as-is. upgrade: add full canonicalization if a non-integer
+number ever enters a `ProcessBody`.
+
 **packages/editor/src/draft/file-system-access.d.ts:1** — hand-declares only
 the two File System Access API entry points `file-io.ts` actually calls, not
 the full spec. ceiling: partial type coverage, silently wrong if a new part
@@ -27,7 +33,7 @@ handler. upgrade: raise only if a real handler legitimately runs longer.
 PK as race backstop. ceiling: assumes v1 publish is never concurrent.
 upgrade: move to a per-process sequence only if that changes.
 
-**src/engine/definitions.ts:253** — `resolveLatestByContract` hashes each
+**src/engine/definitions.ts:252** — `resolveLatestByContract` hashes each
 candidate's contract on read instead of a persisted contract-hash column.
 ceiling: rescans candidates every call. upgrade: add a persisted column if
 this ever scans hot.
@@ -48,20 +54,26 @@ an int/float split in the field catalog — named but not scheduled.
 calendar Y/M). ceiling: no calendar math. upgrade: add only if a real Y/M
 timer appears.
 
-**src/engine/store.ts:197** — `instanceId` minted as UUIDv4 instead of the
+**src/engine/store.ts:208** — `instanceId` minted as UUIDv4 instead of the
 contract's originally-intended UUIDv7. ceiling: not time-sortable across
 instances. upgrade: move to v7 only when cross-instance time ordering is
 needed.
 
-**src/engine/transition.ts:677** — `markFaulted` is a bare status flip, no
+**src/engine/transition.ts:658** — `markFaulted` is a bare status flip, no
 HistoryEntry/dedicated audit event. ceiling: no persisted audit trail for a
-fault park. upgrade: add a `fault`-kind `InstanceEvent` (mirroring
-`migration.skipped`) once a faulted instance needs to be diagnosed after the
-fact, without re-triggering or re-reading the original `AutomaticCascadeLoop`
-exception — the `InstanceEvent` pattern this would reuse is now proven (8
-kinds already), but nothing has forced this yet.
+fault park. upgrade: **no-trigger** — the comment defers a dedicated fault
+event but names no condition for adding one.
 
 ## Summary
 
-11 markers, 1 with no trigger (re-scanned 2026-07-24: 10 markers unchanged and
-still valid; `markFaulted` given a named trigger above instead of no-trigger).
+12 markers, 2 with no trigger.
+
+Changes since the last snapshot (2026-07-24, pre-reconcile-migration-writebacks):
+`store.ts` and `transition.ts` line numbers shifted (208, was 197; 658, was
+677) from that session's edits, content unchanged. `src/schema/hash.ts:17` is
+newly listed — present in the codebase but missed by the prior scan.
+`transition.ts:658` (`markFaulted`) is reclassified **no-trigger**: the prior
+snapshot credited it with a specific trigger condition ("once a faulted
+instance needs to be diagnosed after the fact...") that is not actually
+present in the source comment — this scan pulls strictly from the comment
+text, per the skill's own rule, and the comment names no trigger.
