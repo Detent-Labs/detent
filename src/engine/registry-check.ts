@@ -32,6 +32,14 @@ interface Site {
   loc: string;
 }
 
+/** Map a failed configSchema parse's Zod issues to located RegistryIssues. */
+function mapConfigIssues(loc: string, type: string, zodIssues: z.ZodIssue[]): RegistryIssue[] {
+  return zodIssues.map((issue) => {
+    const path = issue.path.length > 0 ? `.config.${issue.path.join(".")}` : ".config";
+    return { loc: `${loc}${path}`, type, message: issue.message };
+  });
+}
+
 /** Collect every Action in the body with a locating path, mirroring src/cel/check.ts's collect(). */
 function collect(body: ProcessBody): Site[] {
   const sites: Site[] = [];
@@ -77,12 +85,7 @@ export function checkActionRegistry(body: ProcessBody, registry: Registry): Regi
 
     if (def.configSchema) {
       const result = def.configSchema.safeParse(action.config);
-      if (!result.success) {
-        for (const issue of result.error.issues) {
-          const path = issue.path.length > 0 ? `.config.${issue.path.join(".")}` : ".config";
-          issues.push({ loc: `${loc}${path}`, type: action.type, message: issue.message });
-        }
-      }
+      if (!result.success) issues.push(...mapConfigIssues(loc, action.type, result.error.issues));
     }
   }
 
@@ -120,12 +123,7 @@ export function checkAssignmentRegistry(body: ProcessBody): RegistryIssue[] {
     }
 
     const result = staticAssignmentConfigSchema.safeParse(strategy.config);
-    if (!result.success) {
-      for (const issue of result.error.issues) {
-        const path = issue.path.length > 0 ? `.config.${issue.path.join(".")}` : ".config";
-        issues.push({ loc: `${loc}${path}`, type: strategy.type, message: issue.message });
-      }
-    }
+    if (!result.success) issues.push(...mapConfigIssues(loc, strategy.type, result.error.issues));
   }
 
   return issues;
@@ -159,12 +157,7 @@ export function checkDataSourceRegistry(body: ProcessBody, dataSourceRegistry: D
 
     if (def.configSchema) {
       const result = def.configSchema.safeParse(dataSource.config);
-      if (!result.success) {
-        for (const issue of result.error.issues) {
-          const path = issue.path.length > 0 ? `.config.${issue.path.join(".")}` : ".config";
-          issues.push({ loc: `${loc}${path}`, type: dataSource.type, message: issue.message });
-        }
-      }
+      if (!result.success) issues.push(...mapConfigIssues(loc, dataSource.type, result.error.issues));
     }
   }
 
