@@ -3,7 +3,7 @@ import type { Step, StepType } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { useDraft } from "../draft/store";
-import { useT } from "../i18n/store";
+import { t } from "../i18n/catalog";
 import { mintId } from "../draft/ids";
 import { ActionListEditor } from "./ActionListEditor";
 import { ViewEditor } from "./ViewEditor";
@@ -24,7 +24,6 @@ interface Props {
 
 export function StepsPanel({ fields }: Props) {
   const { draft, mutate, validation, setChildForStep, contentLocale } = useDraft();
-  const t = useT();
   const steps = draft.workflow?.steps ?? [];
   const [expanded, setExpanded] = useState<string | undefined>(undefined);
   const [childLoadError, setChildLoadError] = useState<string | null>(null);

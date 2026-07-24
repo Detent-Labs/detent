@@ -1,14 +1,13 @@
 import { useState } from "react";
 import type { FieldId } from "workflow-engine/schema";
 import { useDraft } from "../draft/store";
-import { useT } from "../i18n/store";
+import { t } from "../i18n/catalog";
 import { draftFields } from "../draft/fields";
 import { IssueList } from "./shared/IssueList";
 
 /** Input/output fields and outcomes for a process authored as a subprocess-callable child. */
 export function ContractPanel() {
   const { draft, mutate } = useDraft();
-  const t = useT();
   const fields = draftFields(draft);
   const contract = draft.contract;
   const [newOutcome, setNewOutcome] = useState("");

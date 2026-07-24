@@ -6,7 +6,7 @@ import type { DraftField } from "../draft/fields";
 import { ExpressionInput } from "./shared/ExpressionInput";
 import { IssueList, NotCheckedBadge } from "./shared/IssueList";
 import { useDraft } from "../draft/store";
-import { useT } from "../i18n/store";
+import { t } from "../i18n/catalog";
 
 type DraftAction = DraftOf<Action>;
 
@@ -24,7 +24,6 @@ interface Props {
  * caller's own immer recipe stays the single source of the write.
  */
 export function ActionListEditor({ label, actions, onChange, fields }: Props) {
-  const t = useT();
   const list = actions ?? [];
 
   const addAction = () => {
@@ -74,7 +73,6 @@ function ActionRow({
   const [configText, setConfigText] = useState(() => JSON.stringify(action.config ?? {}, null, 2));
   const [configError, setConfigError] = useState<string | null>(null);
   const { validation } = useDraft();
-  const t = useT();
 
   const commitConfig = (text: string) => {
     setConfigText(text);

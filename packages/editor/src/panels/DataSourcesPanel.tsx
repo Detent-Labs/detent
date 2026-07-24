@@ -1,7 +1,7 @@
 import type { DataSourceDef } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import { useDraft } from "../draft/store";
-import { useT } from "../i18n/store";
+import { t } from "../i18n/catalog";
 import { mintId } from "../draft/ids";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { IssueList } from "./shared/IssueList";
@@ -11,7 +11,6 @@ type DraftDataSource = DraftOf<DataSourceDef>;
 /** Process-wide data sources, referenced by id from a field's `dataSource` (never inlined). */
 export function DataSourcesPanel() {
   const { draft, mutate } = useDraft();
-  const t = useT();
   const dataSources = draft.dataSources ?? [];
 
   const addDataSource = () => {

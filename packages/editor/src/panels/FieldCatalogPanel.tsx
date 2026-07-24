@@ -1,7 +1,7 @@
 import type { BaseFieldType, DataSourceDef, FieldDef, FieldOption } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import { useDraft } from "../draft/store";
-import { useT } from "../i18n/store";
+import { t } from "../i18n/catalog";
 import { mintId } from "../draft/ids";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { IssueList } from "./shared/IssueList";
@@ -31,7 +31,6 @@ interface FieldRowProps {
 /** Fields are recursive (a `group` field carries its own sub-fields), so this renders itself for `field.fields`. */
 function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
   const { contentLocale } = useDraft();
-  const t = useT();
   const custom = isCustomType(field.type);
   const typeSelectValue = typeof field.type === "object" && field.type !== null ? "__custom__" : (field.type ?? "string");
   const hasOptions = (field.options?.length ?? 0) > 0;
@@ -163,7 +162,6 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
 
 export function FieldCatalogPanel() {
   const { draft, mutate, contentLocale } = useDraft();
-  const t = useT();
   const fields = draft.fields ?? [];
   const dataSources = draft.dataSources ?? [];
 

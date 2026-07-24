@@ -464,10 +464,11 @@ each with a test that rejects a violating definition.
   published `DefinitionVersion` wrapper or a raw `ProcessBody` and converts it
   to a Draft (no provenance retained — a subsequent Export is a fresh,
   unpublished body). No server, no DB, no HTTP API, no `publishBody` call —
-  publishing stays engine-side. UI-chrome i18n (`src/i18n/`) is a hand-rolled
-  locale-state provider + `t()` catalog lookup (no i18next/Lingui), currently
-  shipping one locale (`en`) with the switcher/plumbing built for more; it is
-  deliberately independent of **content locale** — `ProcessBody`/`Step`/
+  publishing stays engine-side. UI-chrome i18n (`src/i18n/catalog.ts`) is a
+  plain `t(key)` lookup over a fixed English catalog — no locale state, no
+  switcher, no persistence (collapsed from an earlier locale-provider +
+  switcher design as a ponytail-audit cut: the locale space never grew past
+  one). It is unrelated to **content locale** — `ProcessBody`/`Step`/
   `FieldDef`/`FieldOption` `label`/`description` are `LocalizedText`
   (`Record<LocaleCode, string>`, **BREAKING** schema change from plain
   `string`), with a required `ProcessBody.baseLocale` and a structural

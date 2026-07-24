@@ -3,7 +3,7 @@ import type { Expression, FieldId, ProcessId, SubprocessSpec } from "workflow-en
 type VersionBinding = SubprocessSpec["versionBinding"];
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
-import { useT } from "../i18n/store";
+import { t } from "../i18n/catalog";
 import { ExpressionInput } from "./shared/ExpressionInput";
 
 type DraftSpec = DraftOf<SubprocessSpec>;
@@ -26,7 +26,6 @@ function MappingEditor({
   fields: DraftField[];
   onChange: (next: Partial<Record<FieldId, DraftOf<Expression>>>) => void;
 }) {
-  const t = useT();
   const entries = Object.entries(mapping ?? {});
 
   const setEntry = (fieldId: string, expr: DraftOf<Expression> | undefined) => {
@@ -76,7 +75,6 @@ function MappingEditor({
 
 /** Call-and-return subprocess wiring on a `subprocess`-type step (design.md/CLAUDE.md "Subprocesses"). */
 export function SubprocessSpecEditor({ value, fields, onChange }: Props) {
-  const t = useT();
   const update = (patch: Partial<DraftSpec>) => onChange({ ...value, ...patch });
   const binding = value?.versionBinding ?? "pinned";
 

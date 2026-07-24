@@ -1,7 +1,3 @@
-export type LocaleCode = "en";
-
-export const SUPPORTED_LOCALES: readonly LocaleCode[] = ["en"];
-
 /**
  * UI-chrome only (proposal.md scope): headings, buttons, empty-state prose,
  * badges, explanatory hints. Deliberately NOT translated: raw contract
@@ -131,27 +127,7 @@ const en = {
 
 export type TranslationKey = keyof typeof en;
 
-const catalogs: Record<LocaleCode, Partial<Record<TranslationKey, string>>> = { en };
-
-/**
- * Fallback-to-base-locale rule: a key missing from a non-base catalog renders the `en` entry.
- * `fromCatalogs` defaults to the real catalog map (kept `Record<LocaleCode, ...>` so adding a
- * `LocaleCode` without a matching catalog entry is a compile error, not a silent runtime
- * fallback); tests pass a broader synthetic map to exercise the fallback branch, since this
- * change ships only `en` (design.md "Single-locale scope") and the real map has no non-base
- * catalog to be missing a key from yet.
- */
-export function resolveTranslation(
-  locale: LocaleCode,
-  key: TranslationKey,
-  fromCatalogs: Record<string, Partial<Record<TranslationKey, string>>> = catalogs,
-): string {
-  return fromCatalogs[locale]?.[key] ?? en[key];
-}
-
-export function resolveInitialLocale(
-  stored: string | null | undefined,
-  supported: readonly LocaleCode[] = SUPPORTED_LOCALES,
-): LocaleCode {
-  return stored != null && (supported as readonly string[]).includes(stored) ? (stored as LocaleCode) : "en";
+/** Fixed English catalog lookup — no locale state, no fallback (there is nothing to fall back from). */
+export function t(key: TranslationKey): string {
+  return en[key];
 }

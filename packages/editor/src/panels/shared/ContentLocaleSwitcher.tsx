@@ -1,19 +1,17 @@
 import { useState } from "react";
 import { useDraft } from "../../draft/store";
-import { useT } from "../../i18n/store";
+import { t } from "../../i18n/catalog";
 import { resolveAddLocaleAttempt } from "../../draft/localized-text";
 
 /**
- * Which locale of the *authored process content* is currently shown/edited.
- * Deliberately a separate component from `i18n/LocaleSwitcher` (the
- * editor's own UI-chrome language): its option set is derived per-Draft
- * (every locale already used, plus whichever one is currently selected),
- * not a fixed platform list — design.md "Content locale and UI-chrome
- * locale stay fully independent".
+ * Which locale of the *authored process content* is currently shown/edited —
+ * unrelated to the editor's own fixed-English UI-chrome text (see
+ * editor-i18n). Its option set is derived per-Draft (every locale already
+ * used, plus whichever one is currently selected), not a fixed platform
+ * list.
  */
 export function ContentLocaleSwitcher() {
   const { contentLocale, setContentLocale, usedLocales } = useDraft();
-  const t = useT();
   const [newLocale, setNewLocale] = useState("");
   const [error, setError] = useState<string | undefined>(undefined);
 
