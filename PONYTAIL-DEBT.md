@@ -28,12 +28,12 @@ upgrade: make configurable only if delivery SLAs ever diverge.
 abandoned outbox row is reclaimed. ceiling: one lease duration for every
 handler. upgrade: raise only if a real handler legitimately runs longer.
 
-**src/engine/definitions.ts:159** — publish version assigned via
+**src/engine/definitions.ts:180** — publish version assigned via
 `MAX(version)+1` check-then-insert, relying on the `(process_id, version)`
 PK as race backstop. ceiling: assumes v1 publish is never concurrent.
 upgrade: move to a per-process sequence only if that changes.
 
-**src/engine/definitions.ts:252** — `resolveLatestByContract` hashes each
+**src/engine/definitions.ts:278** — `resolveLatestByContract` hashes each
 candidate's contract on read instead of a persisted contract-hash column.
 ceiling: rescans candidates every call. upgrade: add a persisted column if
 this ever scans hot.
@@ -68,12 +68,10 @@ event but names no condition for adding one.
 
 12 markers, 2 with no trigger.
 
-Changes since the last snapshot (2026-07-24, pre-reconcile-migration-writebacks):
-`store.ts` and `transition.ts` line numbers shifted (208, was 197; 658, was
-677) from that session's edits, content unchanged. `src/schema/hash.ts:17` is
-newly listed — present in the codebase but missed by the prior scan.
-`transition.ts:658` (`markFaulted`) is reclassified **no-trigger**: the prior
-snapshot credited it with a specific trigger condition ("once a faulted
-instance needs to be diagnosed after the fact...") that is not actually
-present in the source comment — this scan pulls strictly from the comment
-text, per the skill's own rule, and the comment names no trigger.
+Changes since the last snapshot (2026-07-24, post-ponytail-audit-cleanup):
+`definitions.ts` line numbers shifted (180, was 159; 278, was 252) from that
+change's edits (the `RegistryValidationErrorBase` merge added lines above
+both markers), content unchanged. No markers added or removed — the
+`ponytail-audit-cleanup` change touched `definitions.ts` and
+`registry-check.ts`, neither of which carries a `ponytail:` marker in the
+code it deleted or restructured.
