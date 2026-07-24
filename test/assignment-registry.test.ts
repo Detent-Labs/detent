@@ -1,21 +1,15 @@
 /**
- * Authoring-time assignment-strategy registry validation: checkAssignmentRegistry
- * resolves every step's assignment.strategy.type against an AssignmentRegistry and
- * checks strategy.config against the strategy's declared configSchema. Pure — no
- * DB — mirrors registry-check.test.ts's style. The bottom section covers
- * checkAssignmentRegistry's wiring into publishBody (DB-backed, skips without
- * DATABASE_URL), mirroring definitions.test.ts's registry section.
+ * Authoring-time assignment-strategy validation: checkAssignmentRegistry checks
+ * every step's assignment.strategy.type is "static" (the only supported type,
+ * no registry to resolve against) and its config against a fixed { candidates:
+ * string[] } schema. Pure — no DB — mirrors registry-check.test.ts's style. The
+ * bottom section covers checkAssignmentRegistry's wiring into publishBody
+ * (DB-backed, skips without DATABASE_URL), mirroring definitions.test.ts's
+ * registry section.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
-import { z } from "zod";
 import { checkAssignmentRegistry } from "../src/engine/registry-check.js";
-import {
-  createAssignmentRegistry,
-  registerAssignmentStrategy,
-  createDefaultAssignmentRegistry,
-  createRegistry,
-  STATIC_ASSIGNMENT_STRATEGY_TYPE,
-} from "../src/engine/registry.js";
+import { createRegistry, STATIC_ASSIGNMENT_STRATEGY_TYPE } from "../src/engine/registry.js";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody, AssignmentRegistryValidationError } from "../src/engine/definitions.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
@@ -41,7 +35,7 @@ const bodyWithAssignment = (assignment?: { type: string; config: Record<string, 
     },
   }) as unknown as ProcessBody;
 
-// Two steps, each with an unregistered assignment type — for the "every located
+// Two steps, each with a non-static assignment type — for the "every located
 // issue, not just the first" scenario.
 const bodyWithTwoBadAssignments = (): ProcessBody =>
   ({
@@ -68,16 +62,13 @@ const bodyWithTwoBadAssignments = (): ProcessBody =>
 
 // --- pure: checkAssignmentRegistry ---------------------------------------------
 
-test("a step with a registered assignment strategy and no config schema passes", () => {
-  const reg = createAssignmentRegistry();
-  registerAssignmentStrategy(reg, "static", { resolve: (c) => (c.candidates as string[]) ?? [] });
-  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "static", config: { candidates: ["role_a"] } }), reg);
+test("a step declaring the static strategy with a valid candidates config passes", () => {
+  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "static", config: { candidates: ["role_a"] } }));
   expect(issues.length).toBe(0);
 });
 
-test("a step with an unregistered assignment strategy type is rejected", () => {
-  const reg = createAssignmentRegistry();
-  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "nope", config: {} }), reg);
+test("a step declaring a non-static strategy type is rejected", () => {
+  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "nope", config: {} }));
   expect(issues.length).toBe(1);
   expect(issues[0]!.loc).toContain("steps[0].assignment");
   expect(issues[0]!.type).toBe("nope");
@@ -85,42 +76,39 @@ test("a step with an unregistered assignment strategy type is rejected", () => {
 });
 
 test("a step with no assignment declared is not checked", () => {
-  const reg = createAssignmentRegistry(); // empty — would reject anything if visited
-  const issues = checkAssignmentRegistry(bodyWithAssignment(), reg);
+  const issues = checkAssignmentRegistry(bodyWithAssignment());
   expect(issues.length).toBe(0);
 });
 
-test("a config violating the strategy's declared schema is rejected", () => {
-  const reg = createAssignmentRegistry();
-  registerAssignmentStrategy(reg, "static", {
-    resolve: (c) => (c.candidates as string[]) ?? [],
-    configSchema: z.object({ candidates: z.array(z.string()) }),
-  });
-  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "static", config: {} }), reg);
+test("a static strategy's config missing candidates is rejected", () => {
+  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "static", config: {} }));
   expect(issues.length).toBe(1);
   expect(issues[0]!.type).toBe("static");
 });
 
-test("an unregistered type is not also checked for a config violation", () => {
-  const reg = createAssignmentRegistry();
-  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "nope", config: { bad: true } }), reg);
+test("a static strategy's config with a non-string candidates entry is rejected", () => {
+  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "static", config: { candidates: ["ok", 42] } }));
+  expect(issues.length).toBe(1);
+  expect(issues[0]!.type).toBe("static");
+});
+
+test("a non-static type is not also checked for a config violation", () => {
+  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "nope", config: { bad: true } }));
   expect(issues.length).toBe(1); // just "not registered", no separate config issue
 });
 
-test("every step's unregistered assignment type is collected, not only the first", () => {
-  const reg = createAssignmentRegistry(); // empty — both steps' types fail to resolve
-  const issues = checkAssignmentRegistry(bodyWithTwoBadAssignments(), reg);
+test("every step's non-static assignment type is collected, not only the first", () => {
+  const issues = checkAssignmentRegistry(bodyWithTwoBadAssignments());
   expect(issues.length).toBe(2);
   expect(issues.map((i) => i.type).sort()).toEqual(["nope_a", "nope_b"]);
   expect(issues.some((i) => i.loc.includes("steps[0]"))).toBe(true);
   expect(issues.some((i) => i.loc.includes("steps[1]"))).toBe(true);
 });
 
-test("the built-in default registry's static strategy accepts a candidates array and rejects its absence", () => {
-  const reg = createDefaultAssignmentRegistry();
-  const ok = checkAssignmentRegistry(bodyWithAssignment({ type: STATIC_ASSIGNMENT_STRATEGY_TYPE, config: { candidates: ["x"] } }), reg);
+test("the static strategy type constant matches what the check accepts", () => {
+  const ok = checkAssignmentRegistry(bodyWithAssignment({ type: STATIC_ASSIGNMENT_STRATEGY_TYPE, config: { candidates: ["x"] } }));
   expect(ok.length).toBe(0);
-  const bad = checkAssignmentRegistry(bodyWithAssignment({ type: STATIC_ASSIGNMENT_STRATEGY_TYPE, config: {} }), reg);
+  const bad = checkAssignmentRegistry(bodyWithAssignment({ type: STATIC_ASSIGNMENT_STRATEGY_TYPE, config: {} }));
   expect(bad.length).toBe(1);
 });
 
@@ -137,11 +125,11 @@ beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, definitions`;
 });
 
-test.skipIf(!DB)("publish rejects an unregistered assignment strategy type and writes no row", async () => {
+test.skipIf(!DB)("publish rejects a non-static assignment strategy type and writes no row", async () => {
   const body = bodyWithAssignment({ type: "nope", config: {} });
   let caught: unknown;
   try {
-    await publishBody(PID, body, actionReg, sql, createAssignmentRegistry());
+    await publishBody(PID, body, actionReg);
   } catch (e) {
     caught = e;
   }
@@ -150,11 +138,11 @@ test.skipIf(!DB)("publish rejects an unregistered assignment strategy type and w
   expect(rows[0].n).toBe(0);
 });
 
-test.skipIf(!DB)("a publish with two unregistered assignment types throws with every located issue", async () => {
+test.skipIf(!DB)("a publish with two non-static assignment types throws with every located issue", async () => {
   const body = bodyWithTwoBadAssignments();
   let caught: unknown;
   try {
-    await publishBody(PID, body, actionReg, sql, createAssignmentRegistry());
+    await publishBody(PID, body, actionReg);
   } catch (e) {
     caught = e;
   }
@@ -162,7 +150,7 @@ test.skipIf(!DB)("a publish with two unregistered assignment types throws with e
   expect((caught as InstanceType<typeof AssignmentRegistryValidationError>).issues.length).toBe(2);
 });
 
-test.skipIf(!DB)("publish accepts a valid static-strategy step, using the default registry", async () => {
+test.skipIf(!DB)("publish accepts a valid static-strategy step", async () => {
   const body = bodyWithAssignment({ type: STATIC_ASSIGNMENT_STRATEGY_TYPE, config: { candidates: ["role_a"] } });
   const v = await publishBody(PID, body, actionReg);
   expect(v.version).toBe(1);
@@ -170,23 +158,23 @@ test.skipIf(!DB)("publish accepts a valid static-strategy step, using the defaul
 
 test.skipIf(!DB)("a body with no assignment anywhere still publishes unchanged", async () => {
   const body = bodyWithAssignment();
-  const v = await publishBody(PID, body, actionReg, sql, createAssignmentRegistry());
+  const v = await publishBody(PID, body, actionReg);
   expect(v.version).toBe(1);
 });
 
-test.skipIf(!DB)("an identical re-publish of an already-stored body stays a no-op, even against an empty assignment registry", async () => {
+test.skipIf(!DB)("an identical re-publish of an already-stored body stays a no-op without invoking the check", async () => {
   const body = bodyWithAssignment({ type: STATIC_ASSIGNMENT_STRATEGY_TYPE, config: { candidates: ["role_a"] } });
-  const v1 = await publishBody(PID, body, actionReg); // default registry accepts it
-  const v2 = await publishBody(PID, body, actionReg, sql, createAssignmentRegistry()); // empty registry: still a no-op
+  const v1 = await publishBody(PID, body, actionReg);
+  const v2 = await publishBody(PID, body, actionReg);
   expect(v2.version).toBe(v1.version);
   const rows = (await sql`SELECT count(*)::int AS n FROM definitions WHERE process_id = ${PID}`) as { n: number }[];
   expect(rows[0].n).toBe(1);
 });
 
-test.skipIf(!DB)("a rejected assignment-registry publish consumes no version number", async () => {
+test.skipIf(!DB)("a rejected assignment-strategy publish consumes no version number", async () => {
   const bad = bodyWithAssignment({ type: "nope", config: {} });
   try {
-    await publishBody(PID, bad, actionReg, sql, createAssignmentRegistry());
+    await publishBody(PID, bad, actionReg);
   } catch {
     // expected
   }

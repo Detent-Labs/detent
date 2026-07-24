@@ -1,14 +1,4 @@
-# assignment-registry-validation
-
-## Purpose
-
-Defines authoring-time validation of a step's `assignment.strategy`:
-`"static"` is the only supported strategy type, checked directly — no
-registry to resolve against — and its `config` is checked against a fixed
-`{ candidates: string[] }` schema, so a non-`"static"` type or an invalid
-config is a publish-time defect, never a runtime one.
-
-## Requirements
+## ADDED Requirements
 
 ### Requirement: Every step's assignment type must be the static strategy
 
@@ -65,6 +55,8 @@ only supported strategy.
 - **THEN** validation produces a located issue for that step's assignment
   config
 
+## MODIFIED Requirements
+
 ### Requirement: checkAssignmentRegistry is invoked at publish, alongside checkActionRegistry
 
 `publishBody` SHALL invoke `checkAssignmentRegistry(body)` at the same
@@ -90,3 +82,27 @@ with no registry to resolve against.
   whose `assignment.strategy.type` is each not `"static"`
 - **THEN** it throws `AssignmentRegistryValidationError` carrying a located
   issue for each of the two steps, not only the first
+
+## REMOVED Requirements
+
+### Requirement: Every step's assignment type resolves in the assignment-strategy registry
+
+**Reason**: There is no longer an `assignmentStrategies` registry to resolve
+against — only `"static"` is a supported strategy type, checked directly.
+
+**Migration**: No author-facing change for a body that already only used
+`"static"`. A body declaring any other `assignment.strategy.type` was already
+a publish error (unregistered type) and remains a publish error (non-static
+type), with the same located-issue shape.
+
+### Requirement: A resolved assignment's config is checked against its strategy's schema
+
+**Reason**: Superseded by "A static assignment's config is checked against a
+candidates schema" — there is no longer a registry of strategies each
+declaring its own `configSchema`; `"static"`'s `{ candidates: string[] }`
+shape is the only schema and is checked directly, not resolved per-type.
+
+**Migration**: No author-facing change — the built-in static strategy's
+config requirement (`candidates: string[]`) is unchanged; only the
+validation mechanism (direct check vs. registry-resolved `configSchema`)
+differs.

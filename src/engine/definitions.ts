@@ -28,7 +28,7 @@ import { validateProcessBody, checkSubprocessChildRefs, type CelIssue } from "..
 import { checkActionRegistry, checkAssignmentRegistry, type RegistryIssue } from "./registry-check.js";
 import { sql } from "./store.js";
 import type { ResolveBody } from "./resolution.js";
-import { createDefaultAssignmentRegistry, type Registry, type AssignmentRegistry } from "./registry.js";
+import type { Registry } from "./registry.js";
 
 /** Resolve the newest child version whose contract signature equals `contractRef`. */
 export type ResolveLatestByContract = (
@@ -165,7 +165,6 @@ export async function publishBody(
   authoredBody: ProcessBody,
   registry: Registry,
   db: SQL = sql,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<ProcessVersion> {
   const body = compileProcessBody(authoredBody);
   const hash = definitionHash(body);
@@ -200,7 +199,7 @@ export async function publishBody(
   if (registryIssues.length > 0) throw new RegistryValidationError(registryIssues);
 
   // Same placement as the action registry check, immediately alongside it.
-  const assignmentIssues = checkAssignmentRegistry(body, assignmentRegistry);
+  const assignmentIssues = checkAssignmentRegistry(body);
   if (assignmentIssues.length > 0) throw new AssignmentRegistryValidationError(assignmentIssues);
 
   // Then expressions: also checked in-process, and the issues an author can fix

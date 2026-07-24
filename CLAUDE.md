@@ -119,9 +119,11 @@ new signature, so existing callers keep the newest matching child and do not
 silently adopt the change. This pins the interface while the implementation
 floats.
 
-**Extensibility.** Custom actions, guards, data sources, assignment strategies,
-and field types are plugins behind a uniform envelope `{ type, config }`. The
-core validates only the envelope; each plugin ships its own JSON Schema. The
+**Extensibility.** Custom actions, guards, data sources, and field types are
+plugins behind a uniform envelope `{ type, config }`. The core validates only
+the envelope; each plugin ships its own JSON Schema. (Assignment strategy is
+not an extension point: `"static"` is the only supported
+`Step.assignment.strategy.type`, checked directly — see "Current state".) The
 registry maps `type -> { config schema }` (`registry.ts`,
 `HandlerDef.configSchema`) and is validated at PUBLISH time:
 `checkActionRegistry` (`src/engine/registry-check.ts`) resolves every action's
@@ -522,14 +524,17 @@ each with a test that rejects a violating definition.
   and ships one concrete, non-production implementation, `devHeaderResolver`
   (trusts `X-Actor-Id`/`X-Actor-Roles` headers) — no real identity provider
   (JWT/OIDC/session) ships in core; a deployment supplies its own resolver
-  against the same extension point. Assignment strategies are a registry
-  parallel to the action registry (`registry.ts`: `AssignmentRegistry`,
-  `resolveAssignmentStrategy`, `createDefaultAssignmentRegistry` shipping
-  `staticAssignmentStrategy`) and are validated at PUBLISH
+  against the same extension point. Assignment strategy is not pluggable:
+  `"static"` (`registry.ts::STATIC_ASSIGNMENT_STRATEGY_TYPE`) is the only
+  supported `Step.assignment.strategy.type`, checked directly at PUBLISH
   (`registry-check.ts::checkAssignmentRegistry`, wired into
   `definitions.ts::publishBody`, throwing `AssignmentRegistryValidationError`)
-  — an unresolvable strategy type is a publish error, never a runtime one,
-  mirroring the action-registry rule. A target step's declared `assignment`
+  — a non-`"static"` type or a `config` failing `{ candidates: string[] }` is
+  a publish error, never a runtime one. (A prior design registered assignment
+  strategies in a `Map`-based registry parallel to the action registry; that
+  was removed as a ponytail-audit cut — the strategy space never grew past
+  one, so the indirection bought nothing. Reintroduce a registry only if a
+  second strategy is ever authored.) A target step's declared `assignment`
   resolves to a fresh `Instance["assignment"]` (candidates, unclaimed) at step
   entry (`transition.ts::resolveStepAssignment`), except migration
   (`carryAssignment` carries `instance.assignment` forward byte-for-byte instead

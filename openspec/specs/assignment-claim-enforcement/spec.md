@@ -14,19 +14,16 @@ claimant-only enforcement check, which builds on this capability's
 
 ### Requirement: Assignment candidates are resolved synchronously at step entry
 
-`planStepEntry` SHALL, for any step carrying a declared `assignment`, call
-the resolved `AssignmentStrategyDef.resolve(config, context)` — pure,
-synchronous, evaluated against the same guard-context shape (`data`,
-`instance`, `actor`) as a guard, plus `child` only inside a subprocess-step
-guard — passing `assignment.strategy.config` as `config`, and set
-`instance.assignment = { candidates, claimedBy: undefined, claimedAt:
-undefined }` as part of the same commit that moves the instance onto that
-step. A step with no `assignment` declared SHALL leave `instance.assignment`
-unset. Instance creation at an initial step carrying a declared `assignment`
-SHALL resolve candidates the same way, inside the same creation transaction
-— creation is a step entry, matching how it already arms the initial step's
-timers and enqueues a subprocess spawn without routing through
-`planStepEntry`.
+`planStepEntry` SHALL, for any step carrying a declared `assignment`, resolve
+its `static` strategy's `config.candidates` directly — pure, synchronous, no
+registry lookup — and set `instance.assignment = { candidates, claimedBy:
+undefined, claimedAt: undefined }` as part of the same commit that moves the
+instance onto that step. A step with no `assignment` declared SHALL leave
+`instance.assignment` unset. Instance creation at an initial step carrying a
+declared `assignment` SHALL resolve candidates the same way, inside the same
+creation transaction — creation is a step entry, matching how it already
+arms the initial step's timers and enqueues a subprocess spawn without
+routing through `planStepEntry`.
 
 #### Scenario: Entering a step with a declared assignment populates candidates atomically
 
@@ -82,10 +79,11 @@ gap (see the `instance-migration` capability).
 
 ### Requirement: The built-in static assignment strategy resolves candidates from a flat config list
 
-The core-registered static strategy (`type: "static"`) SHALL resolve
-`candidates` as exactly `config.candidates` (`config` being
-`assignment.strategy.config`), a flat `string[]` of role names and/or actor
-ids, with no CEL evaluation and no dynamic lookup.
+The built-in static strategy (`type: "static"`, the only supported
+assignment strategy type) SHALL resolve `candidates` as exactly
+`config.candidates` (`config` being `assignment.strategy.config`), a flat
+`string[]` of role names and/or actor ids, with no CEL evaluation and no
+dynamic lookup.
 
 #### Scenario: A static strategy resolves its configured candidate list verbatim
 
