@@ -431,7 +431,7 @@ test("OPTIONS preflight on the create-instance route returns 204 with CORS heade
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
-  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles");
 });
 
 test("OPTIONS preflight on the get-instance-view route returns 204 with CORS headers", async () => {
@@ -439,7 +439,7 @@ test("OPTIONS preflight on the get-instance-view route returns 204 with CORS hea
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
-  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles");
 });
 
 test("OPTIONS preflight on the submit route returns 204 with CORS headers, without submitting", async () => {
@@ -447,7 +447,7 @@ test("OPTIONS preflight on the submit route returns 204 with CORS headers, witho
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
-  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles");
 });
 
 test("OPTIONS preflight on the claim route returns 204 with CORS headers, without claiming", async () => {
@@ -455,7 +455,7 @@ test("OPTIONS preflight on the claim route returns 204 with CORS headers, withou
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
-  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles");
 });
 
 test("OPTIONS preflight on the release route returns 204 with CORS headers, without releasing", async () => {
@@ -463,7 +463,7 @@ test("OPTIONS preflight on the release route returns 204 with CORS headers, with
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
-  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles");
 });
 
 // ============================================================
