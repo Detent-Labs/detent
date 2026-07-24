@@ -196,6 +196,7 @@ test("a retried delivery sends the same Idempotency-Key as the original", async 
         action: action({ url }),
         attempts: 0,
         event_id: null,
+        field_version: 1,
       };
       await deliver(row, reg);
       await deliver({ ...row, attempts: row.attempts + 1 }, reg); // simulated retry

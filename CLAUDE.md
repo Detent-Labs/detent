@@ -569,6 +569,36 @@ each with a test that rejects a violating definition.
   `host.ts` specifically to avoid an import cycle, since the handler needs
   `PermanentError` from `outbox.ts` and `outbox.ts` already imports from
   `registry.ts`.
+- Reconcile in-flight action writebacks across a migration (`src/engine/migration.ts`,
+  `src/engine/outbox.ts`): closes what was previously a "Decided, not yet built" gap.
+  `migrateOne`'s in-flight-actions check now blocks only a `claimed` outbox row with
+  an active lease (`claimed_at >= now() - CLAIM_LEASE_MS`) — a worker plausibly
+  mid-handler right now, whose in-memory `ClaimedRow` snapshot already has the source
+  version's field ids baked in, so nothing done to the stored row can fix it
+  retroactively. A `pending` row, or a `claimed` row whose lease has expired, no
+  longer blocks migration: `migrateOne` locks the instance's undelivered outbox rows
+  before the instance row itself (matching `drainOutbox`'s own lock order, so the two
+  cannot deadlock; new index `outbox_instance_idx`), then rewrites each such row's
+  `Action.output` target field ids through the plan's `fieldMap` snapshot image —
+  computed once from the full map, so an A↔B swap resolves correctly — retaining an
+  unmapped id by identity, including onto a field the target catalog no longer
+  declares (orphan write-through, matching `remapData`'s existing policy). New column
+  `outbox.field_version`, stamped at enqueue to the instance's version at that moment
+  (all three `INSERT INTO outbox` sites: `store.ts`'s creation-time spawn,
+  `transition.ts`'s `applyStepEntry` general insert, and its timer-fire insert), is
+  bumped to the target version whenever `migrateOne` remaps a row; under correct
+  operation a row's `field_version` always equals the instance's own version, so a
+  mismatch is a "should never happen" canary handled like the `definitionHash` pin
+  mismatch — throw, land in `failed`, no event. `ClaimedRow` gains `field_version`,
+  and `drainOutbox`'s writeback `UPDATE instances` predicate now also requires the
+  instance's current version to still equal it — closing the residual race where a
+  lease-expired-but-not-actually-dead worker's in-memory patch (computed from the
+  pre-migration field ids) completes after a migration already moved the instance: the
+  predicate fails, the writeback affects no row, and it folds into the existing
+  suppression accounting rather than writing under a stale field id. No new
+  `InstanceEvent` kind: a field-id remap is a pure, deterministic function of the
+  plan's immutable, permanently-retained `fieldMap`, reconstructable from the existing
+  `cause: "migration"` `HistoryEntry` plus that plan.
 
 ## Roadmap
 See `ROADMAP.md` for stage-by-stage status (DONE/NOT STARTED) and what each stage covers.
@@ -588,16 +618,6 @@ See `ROADMAP.md` for stage-by-stage status (DONE/NOT STARTED) and what each stag
   silent FSM park). Building resolution — CEL-readable data-source results and/or
   runtime option lists — is the remaining feature; when it lands it re-introduces
   registration deliberately with its own site scoping.
-- **Reconcile in-flight action writebacks across a migration** (instead of skipping).
-  Migration declines an instance with any undelivered outbox row (`pending-actions`),
-  because `Action.output` is keyed by the enqueuing version's field ids and delivering
-  it after a rename writes a vacated key. Reconciling would need six mechanisms all
-  correct at once — a precise pending/claimed status partition (claimed means both "in
-  flight" and "possibly abandoned"), snapshot semantics for key swaps, a stamp rule so a
-  row that missed one migration is not laundered past the next, the version check folded
-  into the writeback's existing predicate to avoid a TOCTOU, a new outbox index, and a
-  defined lock order against the delivery transaction — to preserve a result a later
-  invocation delivers anyway. Revisit only if `pending-actions` skips prove common.
 
 ## Codebase memory (knowledge graph)
 The repo is indexed into codebase-memory-mcp (`full` mode, covering the engine,

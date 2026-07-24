@@ -10,6 +10,7 @@ import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { executeManualTransition, fireTimer, ConcurrencyConflict } from "../src/engine/transition.js";
 import { drainOutbox, MAX_ATTEMPTS, type DeliverFn } from "../src/engine/outbox.js";
 import { createRegistry, register } from "../src/engine/registry.js";
+import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { idempotencyKey } from "../src/engine/idempotency.js";
 import type { ProcessBody, Instance, Action } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
@@ -504,4 +505,95 @@ test.skipIf(!DB)("a row whose mark transaction throws does not starve the batch"
   const byInst = Object.fromEntries(rows.map((r) => [r.instance_id, r.status]));
   expect(byInst[good.instanceId]).toBe("delivered");
   expect(byInst[bad.instanceId]).toBe("claimed"); // left for lease reclaim, not lost
+});
+
+// --- field_version lamination stamp (reconcile-migration-writebacks) ----------
+
+test.skipIf(!DB)("a transition-enqueued row is stamped with the instance's version", async () => {
+  const body = threeActionBody();
+  const inst = await create(); // version 1
+  await executeManualTransition(inst, "path_ab", body, actor);
+  const r = await rows(inst.instanceId);
+  expect(r.every((x) => x.field_version === 1)).toBe(true);
+});
+
+test.skipIf(!DB)("a timer-fire-enqueued row is stamped with the instance's version", async () => {
+  const body = sharedSeqBody();
+  const inst = await createFrom(body);
+  const parked = await executeManualTransition(inst, "path_ab", body, actor);
+  await fireTimer(parked, "timer_r1", body);
+  const r = await rows(inst.instanceId);
+  const reminderRow = r.find((x) => x.action_id === "action_rem")!;
+  expect(reminderRow.field_version).toBe(1);
+});
+
+test.skipIf(!DB)("the backfill sets field_version from the instance's current version for a pre-existing row", async () => {
+  const body = threeActionBody();
+  const inst = await create(); // version 1
+  await executeManualTransition(inst, "path_ab", body, actor);
+  // Simulate a row that predates the column: clear field_version directly.
+  await sql`UPDATE outbox SET field_version = NULL WHERE instance_id = ${inst.instanceId}`;
+  await initSchema(); // idempotent; re-runs the backfill
+  const r = await rows(inst.instanceId);
+  expect(r.every((x) => x.field_version === 1)).toBe(true);
+});
+
+test.skipIf(!DB)("a creation-time subprocess-spawn row is stamped with the instance's version", async () => {
+  const childPid = "proc_child_fv" as Instance["processId"];
+  const childBody: ProcessBody = {
+    key: "child", baseLocale: "en", label: { en: "Child" },
+    contract: { outcomes: ["done"] }, fields: [],
+    workflow: { initialStep: "step_c", steps: [
+      { id: "step_c", key: "c", label: { en: "C" }, type: "task", terminal: true, outcome: "done" },
+    ] },
+  } as unknown as ProcessBody;
+  const childVersion = (await publishBody(childPid, childBody, reg)).version;
+
+  const parentPid = "proc_parent_fv" as Instance["processId"];
+  const parentBody: ProcessBody = {
+    key: "parent", baseLocale: "en", label: { en: "Parent" }, fields: [],
+    workflow: { initialStep: "step_p_sub", steps: [
+      { id: "step_p_sub", key: "p_sub", label: { en: "Sub" }, type: "subprocess",
+        subprocess: { processId: childPid, versionBinding: "pinned", pinnedVersion: childVersion, inputMapping: {}, outputMapping: {} },
+        paths: [{ id: "path_done", key: "done", to: "step_done", trigger: "automatic", priority: 1 }] },
+      { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
+    ] },
+  } as unknown as ProcessBody;
+  const pv = await publishBody(parentPid, parentBody, reg);
+  const compiled = (await createDefinitionStore(sql).resolveBody(parentPid, pv.version))!;
+  const inst = await createInstance(compiled, { processId: parentPid, version: pv.version });
+
+  const r = await rows(inst.instanceId);
+  expect(r).toHaveLength(1); // the spawn row
+  expect(r[0].field_version).toBe(pv.version);
+});
+
+// --- delivery-side version fold ------------------------------------------------
+
+test.skipIf(!DB)("a stale writeback (instance migrated after enqueue) is suppressed, not misapplied under the old field id", async () => {
+  const body = outputBody(false);
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor); // enqueues action_set, field_version = 1
+
+  // Simulate a migration having since moved the instance to version 2 without
+  // touching this row (the residual race: a lease-expired-but-not-actually-dead
+  // worker's claim survives past a migration that judged it abandoned).
+  await sql`UPDATE instances SET body = jsonb_set(body, '{version}', '2'::jsonb) WHERE instance_id = ${inst.instanceId}`;
+
+  expect(await drainOutbox(sql, reg)).toBe(1); // the outbox row's own CAS is unaffected
+  expect((await instData(inst.instanceId)).field_val).toBeUndefined(); // not written under the stale field id
+  const o = await outcomes(inst.instanceId);
+  expect(o).toHaveLength(1);
+  expect(o[0]).toMatchObject({ status: "succeeded", suppressed: true });
+});
+
+test.skipIf(!DB)("a writeback whose instance has not migrated still delivers normally (version fold matches)", async () => {
+  const body = outputBody(false);
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+  expect(await drainOutbox(sql, reg)).toBe(1);
+  expect((await instData(inst.instanceId)).field_val).toBe(7);
+  const o = await outcomes(inst.instanceId);
+  expect(o[0]).toMatchObject({ status: "succeeded" });
+  expect(o[0].suppressed).toBeUndefined();
 });

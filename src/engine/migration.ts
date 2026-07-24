@@ -26,6 +26,7 @@ import {
   type Timer,
   type TimerState,
   type TimerProvenance,
+  type Action,
 } from "../schema/definition.js";
 import { celType, validateMigrationSpec } from "../cel/check.js";
 import { evalTransforms, type TransformDrop } from "../cel/eval.js";
@@ -35,6 +36,7 @@ import { planStepEntry, applyStepEntry, ConcurrencyConflict } from "./transition
 import { armStepTimers, type TimerDrop } from "./duration.js";
 import type { ResolveBody } from "./resolution.js";
 import { sql, newInstanceEventId, appendInstanceEvent, withTransaction } from "./store.js";
+import { CLAIM_LEASE_MS } from "./outbox.js";
 
 /** A migration plan is invalid, unresolvable, or already frozen. */
 export class MigrationPlanError extends Error {
@@ -249,6 +251,22 @@ function remapData(
 }
 
 /**
+ * Rewrite a safe outbox row's Action.output target field ids through the plan's
+ * fieldMap image: a target id present as a fieldMap key is replaced by its image;
+ * every other id is retained by identity — including onto a field the target
+ * catalog no longer declares (orphan write-through, matching remapData's own
+ * retained-orphan policy). Computed once from the full map per key, not applied as
+ * sequential renames, so an A<->B swap resolves correctly.
+ */
+function remapActionOutput(spec: MigrationSpec, action: Action): Action {
+  if (!action.output) return action;
+  const fieldMap = (spec.fieldMap ?? {}) as Record<string, string>;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(action.output)) out[fieldMap[k] ?? k] = v;
+  return { ...action, output: out as Action["output"] };
+}
+
+/**
  * Does a carried timer's recorded provenance still match what the target step
  * currently declares for that same id? `undefined` provenance (armed before
  * this field existed) is trusted as matching — reconciliation has no signal to
@@ -338,9 +356,35 @@ async function migrateOne(
   db: SQL,
 ): Promise<"migrated" | "skipped" | "none"> {
   return withTransaction(db, async (tx) => {
-    // 5.4 lock the row and compute everything from THIS read — the OCC token does not
-    // cover `data`, so a payload computed from the batch read would erase a concurrent
-    // action writeback silently.
+    // Lock this instance's undelivered outbox rows FIRST, before the instance row —
+    // matching drainOutbox's own lock order (outbox row, then instance row) within
+    // its delivery transaction, so a concurrent migration and delivery cannot
+    // deadlock. Locked unconditionally: even an instance that turns out to be raced
+    // out of eligibility below has had nothing written from these rows, so locking
+    // this early is harmless.
+    const outboxRows = (await tx`SELECT idempotency_key, action, field_version, status, claimed_at
+      FROM outbox WHERE instance_id = ${id} AND status <> 'delivered'
+      ORDER BY idempotency_key FOR UPDATE`) as {
+      idempotency_key: string;
+      action: unknown;
+      field_version: number | null;
+      status: string;
+      claimed_at: string | Date | null;
+    }[];
+    // Eligibility partition: a live-claimed row (an active lease) may be
+    // mid-handler-execution right now, with the source version's field ids already
+    // baked into its in-memory ClaimedRow snapshot — nothing done to the stored row
+    // can retroactively fix that computation. A `pending` row, or a `claimed` row
+    // whose lease has expired (abandoned/crashed worker; the next drain re-claims and
+    // re-reads the row fresh from the DB), is safe to remap in place below.
+    const now = Date.now();
+    const liveClaimed = outboxRows.some(
+      (r) => r.status === "claimed" && r.claimed_at !== null && now - new Date(r.claimed_at).getTime() < CLAIM_LEASE_MS,
+    );
+
+    // 5.4 lock the instance row and compute everything from THIS read — the OCC
+    // token does not cover `data`, so a payload computed from the batch read would
+    // erase a concurrent action writeback silently.
     const rows = (await tx`SELECT body FROM instances WHERE instance_id = ${id} FOR UPDATE`) as { body: unknown }[];
     if (rows.length === 0) throw new Error(`instance vanished under lock: ${id}`);
     const inst = instanceSchema.parse(typeof rows[0].body === "string" ? JSON.parse(rows[0].body) : rows[0].body);
@@ -351,12 +395,9 @@ async function migrateOne(
     // completed it, or another invocation already migrated it). Not our work.
     if (inst.status !== "running" || inst.version !== fromVersion) return "none";
 
-    // 5.6 in-flight actions: any non-delivered outbox row blocks migration. Its
-    // Action.output is keyed by the source version's field ids; delivering it after a
-    // rename writes the key the migration vacated.
-    const pending = (await tx`SELECT 1 FROM outbox
-      WHERE instance_id = ${id} AND status <> 'delivered' LIMIT 1`) as unknown[];
-    if (pending.length > 0) {
+    // 5.6 in-flight actions: only a live-claimed row still blocks migration (narrower
+    // than "any undelivered row blocks" — see the eligibility partition above).
+    if (liveClaimed) {
       await appendSkip(tx, inst, fromVersion, toVersion, "pending-actions");
       return "skipped";
     }
@@ -399,6 +440,25 @@ async function migrateOne(
           return "skipped";
         }
       }
+    }
+
+    // Remap the safe outbox rows locked above, now that the instance is committed
+    // to migrating (every skip branch above has already returned). field_version
+    // must equal fromVersion under correct operation: this same transaction locks
+    // and bumps every one of this instance's outbox rows atomically with the
+    // instance's own version bump, so a row can never fall out of lock-step. A
+    // mismatch is a "should never happen" canary, handled like the definitionHash
+    // pin mismatch above — throw, land in `failed`, no event — not a case to design
+    // graceful handling for.
+    for (const row of outboxRows) {
+      if (row.field_version !== fromVersion)
+        throw new Error(`field_version mismatch under lock: outbox row ${row.idempotency_key} (instance ${id})`);
+    }
+    for (const row of outboxRows) {
+      const action = typeof row.action === "string" ? (JSON.parse(row.action) as Action) : (row.action as Action);
+      const remapped = remapActionOutput(spec, action);
+      await tx`UPDATE outbox SET action = ${remapped}, field_version = ${toVersion}
+        WHERE idempotency_key = ${row.idempotency_key}`;
     }
 
     // 5.8 remap data from the snapshot (the locked read).

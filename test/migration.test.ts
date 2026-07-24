@@ -559,22 +559,130 @@ test.skipIf(!DB)("6.4 a skipped instance produces an event and no history entry"
   expect(evts[0].transitionSeq).toBe(inst.transitionSeq); // unchanged
 });
 
-test.skipIf(!DB)("6.6 an instance with a pending action is skipped, then migrates once drained", async () => {
+test.skipIf(!DB)("6.6 an instance with a live-claimed action is skipped, then migrates once the claim settles", async () => {
   const p = pid();
   const b = waitBody({ key: "a", fields: [f("x", "string")] });
   await twoVersions(p, b, b, {} as MigrationSpec);
   const inst = await mkInstance(p, 1);
-  // A pending (undelivered) outbox row for this instance.
-  await sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
-    VALUES (${"idem_" + inst.instanceId}, ${inst.instanceId}, ${inst.transitionSeq}, ${"action_x"}, ${{ id: "action_x", type: "noop", config: {} }})`;
+  // A claimed row with an active lease: a worker may be mid-handler right now,
+  // with the source version's field ids already baked into its in-memory
+  // snapshot — only this shape still blocks migration (narrower than "any
+  // undelivered row").
+  await sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, field_version, status, claimed_at)
+    VALUES (${"idem_" + inst.instanceId}, ${inst.instanceId}, ${inst.transitionSeq}, ${"action_x"}, ${{ id: "action_x", type: "noop", config: {} }}, ${1}, 'claimed', now())`;
   const res1 = await migrateInstances(p as Instance["processId"], 1, 2, sql);
   expect(res1.skipped).toEqual([inst.instanceId]);
   const skipEv = (await eventsOf(inst.instanceId)).find((e) => e.kind === "migration.skipped");
   expect(skipEv && skipEv.payload.reason).toBe("pending-actions");
-  // Deliver it, then a later invocation migrates.
+  // Deliver it (simulating the claim settling), then a later invocation migrates.
   await sql`UPDATE outbox SET status = 'delivered' WHERE instance_id = ${inst.instanceId}`;
   const res2 = await migrateInstances(p as Instance["processId"], 1, 2, sql);
   expect(res2.migrated).toEqual([inst.instanceId]);
+});
+
+test.skipIf(!DB)("an instance with only a pending action migrates immediately, not skipped", async () => {
+  const p = pid();
+  const b = waitBody({ key: "a", fields: [f("x", "string")] });
+  await twoVersions(p, b, b, {} as MigrationSpec);
+  const inst = await mkInstance(p, 1);
+  await sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, field_version)
+    VALUES (${"idem_" + inst.instanceId}, ${inst.instanceId}, ${inst.transitionSeq}, ${"action_x"}, ${{ id: "action_x", type: "noop", config: {} }}, ${1})`;
+  const res = await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  expect(res.migrated).toEqual([inst.instanceId]);
+  expect((await eventsOf(inst.instanceId)).filter((e) => e.kind === "migration.skipped")).toHaveLength(0);
+});
+
+test.skipIf(!DB)("an instance with only an abandoned (lease-expired) claimed action migrates immediately", async () => {
+  const p = pid();
+  const b = waitBody({ key: "a", fields: [f("x", "string")] });
+  await twoVersions(p, b, b, {} as MigrationSpec);
+  const inst = await mkInstance(p, 1);
+  await sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, field_version, status, claimed_at)
+    VALUES (${"idem_" + inst.instanceId}, ${inst.instanceId}, ${inst.transitionSeq}, ${"action_x"}, ${{ id: "action_x", type: "noop", config: {} }}, ${1}, 'claimed', now() - interval '1 hour')`;
+  const res = await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  expect(res.migrated).toEqual([inst.instanceId]);
+});
+
+test.skipIf(!DB)("a field_version mismatch on a safe row fails the migration instead of remapping or skipping", async () => {
+  const p = pid();
+  const b = waitBody({ key: "a", fields: [f("x", "string")] });
+  await twoVersions(p, b, b, {} as MigrationSpec);
+  const inst = await mkInstance(p, 1);
+  // A pending row whose field_version disagrees with the instance's actual
+  // version — a "should never happen" lamination canary.
+  await sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, field_version)
+    VALUES (${"idem_" + inst.instanceId}, ${inst.instanceId}, ${inst.transitionSeq}, ${"action_x"}, ${{ id: "action_x", type: "noop", config: {} }}, ${99})`;
+  const res = await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  expect(res.failed).toEqual([inst.instanceId]);
+  expect(res.migrated).toHaveLength(0);
+  expect(res.skipped).toHaveLength(0);
+  expect(await historyOf(inst.instanceId)).toHaveLength(0);
+  expect((await eventsOf(inst.instanceId)).filter((e) => e.kind === "migration.skipped")).toHaveLength(0);
+});
+
+test.skipIf(!DB)("a safe row's Action.output target id is remapped through fieldMap, swap resolves correctly, and delivery writes under the new id", async () => {
+  const p = pid();
+  const v1 = waitBody({ key: "a", fields: [f("a", "string"), f("b", "string")] });
+  const v2 = waitBody({ key: "a", fields: [f("a", "string"), f("b", "string")] });
+  await twoVersions(p, v1, v2, { fieldMap: { field_a: "field_b", field_b: "field_a" } } as unknown as MigrationSpec);
+  const inst = await mkInstance(p, 1, { field_a: "A0", field_b: "B0" });
+  // Two safe (pending) rows, one originally targeting field_a and one field_b —
+  // exercising the swap the same way the data remap's own snapshot image does.
+  await sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, field_version)
+    VALUES (${"idem_seta_" + inst.instanceId}, ${inst.instanceId}, ${inst.transitionSeq}, ${"action_seta"}, ${{ id: "action_seta", type: "setX", config: {}, output: { field_a: cel("result.val") } }}, ${1})`;
+  await sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, field_version)
+    VALUES (${"idem_setb_" + inst.instanceId}, ${inst.instanceId}, ${inst.transitionSeq}, ${"action_setb"}, ${{ id: "action_setb", type: "setY", config: {}, output: { field_b: cel("result.val") } }}, ${1})`;
+  const res = await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  expect(res.migrated).toEqual([inst.instanceId]);
+  const { registry } = engineRegistry();
+  register(registry, "setX", { handler: async () => ({ val: "X" }) });
+  register(registry, "setY", { handler: async () => ({ val: "Y" }) });
+  await drainAll(registry);
+  const after = await loadInstance(inst.instanceId);
+  // action_seta originally targeted field_a -> remapped to field_b, so field_b
+  // gets "X"; action_setb originally targeted field_b -> remapped to field_a, so
+  // field_a gets "Y". Without the swap-safe remap, this would land reversed.
+  expect(dataField(after, "field_b")).toBe("X");
+  expect(dataField(after, "field_a")).toBe("Y");
+});
+
+test.skipIf(!DB)("a safe row targeting a field the target catalog no longer declares still writes through (orphan write-through)", async () => {
+  const p = pid();
+  const v1 = waitBody({ key: "a", fields: [f("x", "string"), f("gone", "string")] });
+  const v2 = waitBody({ key: "a", fields: [f("x", "string")] }); // field_gone removed
+  await twoVersions(p, v1, v2, {} as MigrationSpec);
+  const inst = await mkInstance(p, 1);
+  await sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, field_version)
+    VALUES (${"idem_" + inst.instanceId}, ${inst.instanceId}, ${inst.transitionSeq}, ${"action_setg"}, ${{ id: "action_setg", type: "setter", config: {}, output: { field_gone: cel("result.val") } }}, ${1})`;
+  const res = await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  expect(res.migrated).toEqual([inst.instanceId]);
+  const { registry } = engineRegistry();
+  register(registry, "setter", { handler: async () => ({ val: "orphaned" }) });
+  await drainAll(registry);
+  const after = await loadInstance(inst.instanceId);
+  expect(dataField(after, "field_gone")).toBe("orphaned"); // written through despite removal
+  const rowStatus = (await sql`SELECT status FROM outbox WHERE instance_id = ${inst.instanceId}`) as { status: string }[];
+  expect(rowStatus[0]?.status).toBe("delivered"); // not suppressed, not dead-lettered
+});
+
+test.skipIf(!DB)("a concurrent migration and delivery of the same instance's outbox row do not deadlock", async () => {
+  const p = pid();
+  const b = waitBody({ key: "a", fields: [f("x", "string")] });
+  await twoVersions(p, b, b, {} as MigrationSpec);
+  const inst = await mkInstance(p, 1);
+  await sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, field_version)
+    VALUES (${"idem_" + inst.instanceId}, ${inst.instanceId}, ${inst.transitionSeq}, ${"action_x"}, ${{ id: "action_x", type: "noop", config: {} }}, ${1})`;
+  const { registry } = engineRegistry();
+  // Both migrateOne and drainOutbox's tx2 lock the outbox row before the instance
+  // row, so a concurrent run of both against the same row can only ever block, not
+  // deadlock. A regression in that lock order would surface here as a hang or a
+  // Postgres deadlock error, not as a specific outcome.
+  const [migResult, delivered] = await Promise.all([
+    migrateInstances(p as Instance["processId"], 1, 2, sql),
+    drainOutbox(sql, registry),
+  ]);
+  expect(migResult).toBeDefined();
+  expect(delivered).toBeGreaterThanOrEqual(0);
 });
 
 test.skipIf(!DB)("6.6 an instance with only delivered rows migrates immediately", async () => {
