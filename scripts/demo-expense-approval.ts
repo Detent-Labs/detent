@@ -12,7 +12,7 @@
 import { readFileSync } from "node:fs";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
-import { createRegistry, register } from "../src/engine/registry.js";
+import { createRegistry, register, createDataSourceRegistry } from "../src/engine/registry.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { drainResolutions } from "../src/engine/resolution.js";
 import { createProcessInstance, getInstanceView, submitAndTransition } from "../src/runtime/api.js";
@@ -46,17 +46,18 @@ async function main() {
   const registry = createRegistry();
   register(registry, "notify.email", { handler: async () => ({}) });
   register(registry, "accounting.postInvoice", { handler: async () => ({ status: "booked" }) });
+  const dataSourceReg = createDataSourceRegistry();
 
   const raw = JSON.parse(readFileSync(new URL("../examples/expense-approval.json", import.meta.url), "utf-8"));
   const processId = `proc_${crypto.randomUUID()}` as ProcessId;
-  const published = await publishBody(processId, raw.definition, registry);
+  const published = await publishBody(processId, raw.definition, registry, dataSourceReg);
   console.log(`Published ${processId} as version ${published.version} (hash ${published.definitionHash.slice(0, 12)}...)`);
 
-  let instance = await createProcessInstance(processId, actor);
+  let instance = await createProcessInstance(processId, actor, dataSourceReg);
   console.log(`Created instance ${instance.instanceId} at step ${instance.currentStepId}`);
 
   // --- Capture ---
-  let view = await getInstanceView(instance.instanceId, actor);
+  let view = await getInstanceView(instance.instanceId, actor, dataSourceReg);
   logView("capture", view);
   const submitPath = view.availablePaths.find((p) => p.key === "submit")!;
   instance = await submitAndTransition(
@@ -64,10 +65,11 @@ async function main() {
     submitPath.id,
     { [fieldId(view, "amount")]: 250, [fieldId(view, "reason")]: "Team lunch" },
     actor,
+    dataSourceReg,
   );
 
   // --- Review ---
-  view = await getInstanceView(instance.instanceId, actor);
+  view = await getInstanceView(instance.instanceId, actor, dataSourceReg);
   logView("review", view);
   const approvePath = view.availablePaths.find((p) => p.key === "approve")!;
   instance = await submitAndTransition(
@@ -75,19 +77,20 @@ async function main() {
     approvePath.id,
     { [fieldId(view, "review_note")]: "Looks good, approved." },
     actor,
+    dataSourceReg,
   );
 
   // --- Book: async wait-state. onEntry enqueued postInvoice; drive the
   // outbox delivery + writeback-triggered re-resolution passes by hand,
   // since no background worker is running in this script. ---
-  view = await getInstanceView(instance.instanceId, actor);
+  view = await getInstanceView(instance.instanceId, actor, dataSourceReg);
   logView("book (before async settle)", view);
 
   const definitionStore = createDefinitionStore(sql);
   for (let i = 0; i < 5 && view.status === "running" && view.step.key === "book"; i++) {
     await drainOutbox(sql, registry);
     await drainResolutions(sql, definitionStore.resolveBody);
-    view = await getInstanceView(instance.instanceId, actor);
+    view = await getInstanceView(instance.instanceId, actor, dataSourceReg);
   }
 
   logView("final", view);

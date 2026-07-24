@@ -51,26 +51,28 @@ describe("FieldInput: every BaseFieldType renders its expected input", () => {
     expect(html).toContain('type="datetime-local"');
   });
 
-  it("select -> a <select> built from field.options", () => {
+  it("select -> a <select> built from the resolved options", () => {
     const html = renderFields([
       {
-        field: baseField({ id: "f1", type: "select", options: [{ value: "a", label: { en: "Option A" } }] }),
+        field: baseField({ id: "f1", type: "select" }),
         value: undefined,
         required: false,
         readonly: false,
+        options: [{ value: "a", label: { en: "Option A" } }],
       },
     ]);
     expect(html).toContain("<select");
     expect(html).toContain("Option A");
   });
 
-  it("multiselect -> a multiple <select> built from field.options", () => {
+  it("multiselect -> a multiple <select> built from the resolved options", () => {
     const html = renderFields([
       {
-        field: baseField({ id: "f1", type: "multiselect", options: [{ value: "a", label: { en: "Option A" } }] }),
+        field: baseField({ id: "f1", type: "multiselect" }),
         value: ["a"],
         required: false,
         readonly: false,
+        options: [{ value: "a", label: { en: "Option A" } }],
       },
     ]);
     expect(html).toContain('multiple=""');
@@ -129,11 +131,21 @@ describe("FieldInput: free-text fallback", () => {
     expect(html).toContain('type="text"');
   });
 
-  it("renders a dataSource-bound field as free text with an inline note", () => {
+});
+
+describe("FieldInput: dataSource-bound field", () => {
+  it("renders as a populated <select> from its resolved options, not free text", () => {
     const html = renderFields([
-      { field: baseField({ id: "f1", type: "select", dataSource: "ds_countries" }), value: undefined, required: false, readonly: false },
+      {
+        field: baseField({ id: "f1", type: "select", dataSource: "ds_countries" }),
+        value: undefined,
+        required: false,
+        readonly: false,
+        options: [{ value: "us", label: { en: "United States" } }],
+      },
     ]);
-    expect(html).toContain('type="text"');
-    expect(html).toContain("data source resolution not yet supported");
+    expect(html).toContain("<select");
+    expect(html).toContain("United States");
+    expect(html).not.toContain("data source resolution not yet supported");
   });
 });

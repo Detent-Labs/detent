@@ -25,10 +25,10 @@ import {
 import { compileProcessBody } from "../schema/compile.js";
 import { definitionHash, contractHash } from "../schema/hash.js";
 import { validateProcessBody, checkSubprocessChildRefs, type CelIssue } from "../cel/check.js";
-import { checkActionRegistry, checkAssignmentRegistry, type RegistryIssue } from "./registry-check.js";
+import { checkActionRegistry, checkAssignmentRegistry, checkDataSourceRegistry, type RegistryIssue } from "./registry-check.js";
 import { sql } from "./store.js";
 import type { ResolveBody } from "./resolution.js";
-import type { Registry } from "./registry.js";
+import type { Registry, DataSourceRegistry } from "./registry.js";
 
 /** Resolve the newest child version whose contract signature equals `contractRef`. */
 export type ResolveLatestByContract = (
@@ -82,6 +82,19 @@ export class AssignmentRegistryValidationError extends Error {
   constructor(readonly issues: RegistryIssue[]) {
     super(issues.map((i) => `${i.loc}: ${i.message} (type '${i.type}')`).join("; "));
     this.name = "AssignmentRegistryValidationError";
+  }
+}
+
+/**
+ * A body about to be published carries a data source whose `type` is not
+ * registered, or whose `config` violates that type's declared `configSchema`.
+ * Same "every located issue, not just the first" contract as
+ * `RegistryValidationError`.
+ */
+export class DataSourceRegistryValidationError extends Error {
+  constructor(readonly issues: RegistryIssue[]) {
+    super(issues.map((i) => `${i.loc}: ${i.message} (type '${i.type}')`).join("; "));
+    this.name = "DataSourceRegistryValidationError";
   }
 }
 
@@ -164,6 +177,7 @@ export async function publishBody(
   processId: ProcessId,
   authoredBody: ProcessBody,
   registry: Registry,
+  dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
 ): Promise<ProcessVersion> {
   const body = compileProcessBody(authoredBody);
@@ -201,6 +215,10 @@ export async function publishBody(
   // Same placement as the action registry check, immediately alongside it.
   const assignmentIssues = checkAssignmentRegistry(body);
   if (assignmentIssues.length > 0) throw new AssignmentRegistryValidationError(assignmentIssues);
+
+  // Same placement again: in-process, no DB round-trip.
+  const dataSourceIssues = checkDataSourceRegistry(body, dataSourceRegistry);
+  if (dataSourceIssues.length > 0) throw new DataSourceRegistryValidationError(dataSourceIssues);
 
   // Then expressions: also checked in-process, and the issues an author can fix
   // without inspecting another process.

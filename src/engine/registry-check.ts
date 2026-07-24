@@ -15,9 +15,9 @@
  */
 
 import { z } from "zod";
-import type { Action, ProcessBody, Step } from "../schema/definition.js";
+import type { Action, DataSourceDef, ProcessBody, Step } from "../schema/definition.js";
 import { RESERVED_ACTION_PREFIX } from "../schema/definition.js";
-import { resolve, type Registry, STATIC_ASSIGNMENT_STRATEGY_TYPE } from "./registry.js";
+import { resolve, type Registry, STATIC_ASSIGNMENT_STRATEGY_TYPE, resolveDataSource, type DataSourceRegistry } from "./registry.js";
 
 const staticAssignmentConfigSchema = z.object({ candidates: z.array(z.string()) });
 
@@ -124,6 +124,46 @@ export function checkAssignmentRegistry(body: ProcessBody): RegistryIssue[] {
       for (const issue of result.error.issues) {
         const path = issue.path.length > 0 ? `.config.${issue.path.join(".")}` : ".config";
         issues.push({ loc: `${loc}${path}`, type: strategy.type, message: issue.message });
+      }
+    }
+  }
+
+  return issues;
+}
+
+interface DataSourceSite {
+  dataSource: DataSourceDef;
+  loc: string;
+}
+
+/** Collect every declared data source, with a locating path. */
+function collectDataSources(body: ProcessBody): DataSourceSite[] {
+  return (body.dataSources ?? []).map((dataSource, i) => ({ dataSource, loc: `dataSources[${i}]` }));
+}
+
+/**
+ * Validate every data source in `body` against `dataSourceRegistry`. Returns
+ * every located issue rather than throwing on the first, mirroring
+ * `checkActionRegistry`. Unlike that check, there is one collection point
+ * (`body.dataSources`), not several action positions to visit.
+ */
+export function checkDataSourceRegistry(body: ProcessBody, dataSourceRegistry: DataSourceRegistry): RegistryIssue[] {
+  const issues: RegistryIssue[] = [];
+
+  for (const { dataSource, loc } of collectDataSources(body)) {
+    const def = resolveDataSource(dataSourceRegistry, dataSource.type);
+    if (!def) {
+      issues.push({ loc, type: dataSource.type, message: `data source type '${dataSource.type}' is not registered` });
+      continue;
+    }
+
+    if (def.configSchema) {
+      const result = def.configSchema.safeParse(dataSource.config);
+      if (!result.success) {
+        for (const issue of result.error.issues) {
+          const path = issue.path.length > 0 ? `.config.${issue.path.join(".")}` : ".config";
+          issues.push({ loc: `${loc}${path}`, type: dataSource.type, message: issue.message });
+        }
       }
     }
   }

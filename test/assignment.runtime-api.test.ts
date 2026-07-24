@@ -7,7 +7,7 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
-import { createRegistry } from "../src/engine/registry.js";
+import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { NotAssignedError, NotACandidateError, AlreadyClaimedError, NotClaimedError, NotClaimantError } from "../src/engine/transition.js";
 import { createProcessInstance, claimStep, releaseClaim, submitAndTransition } from "../src/runtime/api.js";
 import type { ProcessBody, ProcessId, PathId } from "../src/schema/definition.js";
@@ -18,6 +18,7 @@ const candidate: Actor = { id: "user_1", roles: [] };
 const roleActor: Actor = { id: "user_2", roles: ["approver"] };
 const outsider: Actor = { id: "user_3", roles: [] };
 const reg = createRegistry();
+const dataSourceReg = createDataSourceRegistry();
 const PID = "proc_assign_rtapi" as ProcessId;
 
 async function rejectsWith(p: Promise<unknown>, ctor: new (...a: never[]) => Error): Promise<void> {
@@ -74,34 +75,34 @@ const unassignedBody = (): ProcessBody =>
   }) as unknown as ProcessBody;
 
 test.skipIf(!DB)("claimStep succeeds for an eligible candidate on an unclaimed step", async () => {
-  await publishBody(PID, assignedBody(), reg);
-  const inst = await createProcessInstance(PID, candidate);
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
   const claimed = await claimStep(inst.instanceId, candidate);
   expect(claimed.assignment?.claimedBy).toBe(candidate.id);
 });
 
 test.skipIf(!DB)("claimStep rejects a step with no declared assignment", async () => {
-  await publishBody(PID, unassignedBody(), reg);
-  const inst = await createProcessInstance(PID, candidate);
+  await publishBody(PID, unassignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
   await rejectsWith(claimStep(inst.instanceId, candidate), NotAssignedError);
 });
 
 test.skipIf(!DB)("claimStep rejects a non-candidate", async () => {
-  await publishBody(PID, assignedBody(), reg);
-  const inst = await createProcessInstance(PID, candidate);
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
   await rejectsWith(claimStep(inst.instanceId, outsider), NotACandidateError);
 });
 
 test.skipIf(!DB)("claimStep rejects claiming an already-claimed step", async () => {
-  await publishBody(PID, assignedBody(), reg);
-  const inst = await createProcessInstance(PID, candidate);
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
   await claimStep(inst.instanceId, candidate);
   await rejectsWith(claimStep(inst.instanceId, roleActor), AlreadyClaimedError);
 });
 
 test.skipIf(!DB)("releaseClaim succeeds for the claimant, rejects a non-claimant", async () => {
-  await publishBody(PID, assignedBody(), reg);
-  const inst = await createProcessInstance(PID, candidate);
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
   await claimStep(inst.instanceId, candidate);
   await rejectsWith(releaseClaim(inst.instanceId, roleActor), NotClaimantError);
   const released = await releaseClaim(inst.instanceId, candidate);
@@ -109,31 +110,31 @@ test.skipIf(!DB)("releaseClaim succeeds for the claimant, rejects a non-claimant
 });
 
 test.skipIf(!DB)("submitAndTransition rejects an unclaimed assigned step", async () => {
-  await publishBody(PID, assignedBody(), reg);
-  const inst = await createProcessInstance(PID, candidate);
-  await rejectsWith(submitAndTransition(inst.instanceId, "path_ab" as PathId, {}, candidate), NotClaimedError);
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+  await rejectsWith(submitAndTransition(inst.instanceId, "path_ab" as PathId, {}, candidate, dataSourceReg), NotClaimedError);
 });
 
 test.skipIf(!DB)("submitAndTransition rejects a claim held by a different actor", async () => {
-  await publishBody(PID, assignedBody(), reg);
-  const inst = await createProcessInstance(PID, candidate);
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
   await claimStep(inst.instanceId, candidate);
-  await rejectsWith(submitAndTransition(inst.instanceId, "path_ab" as PathId, {}, roleActor), NotClaimantError);
+  await rejectsWith(submitAndTransition(inst.instanceId, "path_ab" as PathId, {}, roleActor, dataSourceReg), NotClaimantError);
 });
 
 test.skipIf(!DB)("submitAndTransition succeeds for the claimant", async () => {
-  await publishBody(PID, assignedBody(), reg);
-  const inst = await createProcessInstance(PID, candidate);
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
   await claimStep(inst.instanceId, candidate);
-  const updated = await submitAndTransition(inst.instanceId, "path_ab" as PathId, {}, candidate);
+  const updated = await submitAndTransition(inst.instanceId, "path_ab" as PathId, {}, candidate, dataSourceReg);
   expect(updated.currentStepId as string).toBe("step_b");
   expect(updated.status).toBe("completed");
 });
 
 test.skipIf(!DB)("a step with no assignment is unaffected by claim enforcement (regression guard)", async () => {
-  await publishBody(PID, unassignedBody(), reg);
-  const inst = await createProcessInstance(PID, candidate);
+  await publishBody(PID, unassignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
   // No claim taken at all — succeeds exactly as before this change.
-  const updated = await submitAndTransition(inst.instanceId, "path_ab" as PathId, {}, candidate);
+  const updated = await submitAndTransition(inst.instanceId, "path_ab" as PathId, {}, candidate, dataSourceReg);
   expect(updated.currentStepId as string).toBe("step_b");
 });

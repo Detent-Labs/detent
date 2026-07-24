@@ -17,6 +17,7 @@ import {
 } from "../runtime/api.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver, DevHeaderCredential } from "../auth/resolve.js";
+import type { DataSourceRegistry } from "../engine/registry.js";
 import type { Instance, PathId, ProcessId, InstanceId } from "../schema/definition.js";
 import { mapError, type HttpResult } from "./errors.js";
 
@@ -35,39 +36,57 @@ async function resolveActor(req: Request, resolver: ActorResolver): Promise<Acto
   return resolver(extractCredential(req));
 }
 
-export async function handleCreateInstance(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handleCreateInstance(
+  processId: string,
+  req: Request,
+  resolver: ActorResolver,
+  dataSourceRegistry: DataSourceRegistry,
+  db: SQL = sql,
+): Promise<HttpResult> {
   try {
     const actor = await resolveActor(req, resolver);
     const body = (await req.json()) as { version?: number; data?: Instance["data"] };
-    const created = await createProcessInstance(processId as ProcessId, actor, { version: body.version, data: body.data }, db);
+    const created = await createProcessInstance(processId as ProcessId, actor, dataSourceRegistry, { version: body.version, data: body.data }, db);
     return { status: 201, body: created };
   } catch (err) {
     return mapError(err);
   }
 }
 
-export async function handleGetInstanceView(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handleGetInstanceView(
+  instanceId: string,
+  req: Request,
+  resolver: ActorResolver,
+  dataSourceRegistry: DataSourceRegistry,
+  db: SQL = sql,
+): Promise<HttpResult> {
   try {
     const actor = await resolveActor(req, resolver);
-    const view = await getInstanceView(instanceId as InstanceId, actor, db);
+    const view = await getInstanceView(instanceId as InstanceId, actor, dataSourceRegistry, db);
     return { status: 200, body: view };
   } catch (err) {
     return mapError(err);
   }
 }
 
-export async function handleSubmit(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handleSubmit(
+  instanceId: string,
+  req: Request,
+  resolver: ActorResolver,
+  dataSourceRegistry: DataSourceRegistry,
+  db: SQL = sql,
+): Promise<HttpResult> {
   let actor: Actor | undefined;
   try {
     actor = await resolveActor(req, resolver);
     const body = (await req.json()) as { pathId: string; data: Instance["data"] };
-    const updated = await submitAndTransition(instanceId as InstanceId, body.pathId as PathId, body.data, actor, db);
+    const updated = await submitAndTransition(instanceId as InstanceId, body.pathId as PathId, body.data, actor, dataSourceRegistry, db);
     return { status: 200, body: updated };
   } catch (err) {
     // The write already committed before this raised; report the resulting
     // (now-faulted) view instead of an error response — see design.md.
     if (err instanceof AutomaticCascadeLoop && actor) {
-      const view = await getInstanceView(instanceId as InstanceId, actor, db);
+      const view = await getInstanceView(instanceId as InstanceId, actor, dataSourceRegistry, db);
       return { status: 200, body: view };
     }
     return mapError(err);

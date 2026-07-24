@@ -9,7 +9,7 @@ import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { executeManualTransition, fireTimer, ConcurrencyConflict } from "../src/engine/transition.js";
 import { drainOutbox, MAX_ATTEMPTS, type DeliverFn } from "../src/engine/outbox.js";
-import { createRegistry, register } from "../src/engine/registry.js";
+import { createRegistry, register, createDataSourceRegistry } from "../src/engine/registry.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { idempotencyKey } from "../src/engine/idempotency.js";
 import type { ProcessBody, Instance, Action } from "../src/schema/definition.js";
@@ -35,6 +35,7 @@ const actOut = (id: string, type: string, field: string, src: string): Action =>
 // Registry with one handler; unused by the okDeliver/boom seams.
 const reg = createRegistry();
 register(reg, "setter", { handler: async () => ({ val: 7 }) });
+const dataSourceReg = createDataSourceRegistry();
 
 const okDeliver: DeliverFn = async () => ({});
 const boom: DeliverFn = async () => {
@@ -547,7 +548,7 @@ test.skipIf(!DB)("a creation-time subprocess-spawn row is stamped with the insta
       { id: "step_c", key: "c", label: { en: "C" }, type: "task", terminal: true, outcome: "done" },
     ] },
   } as unknown as ProcessBody;
-  const childVersion = (await publishBody(childPid, childBody, reg)).version;
+  const childVersion = (await publishBody(childPid, childBody, reg, dataSourceReg)).version;
 
   const parentPid = "proc_parent_fv" as Instance["processId"];
   const parentBody: ProcessBody = {
@@ -559,7 +560,7 @@ test.skipIf(!DB)("a creation-time subprocess-spawn row is stamped with the insta
       { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
     ] },
   } as unknown as ProcessBody;
-  const pv = await publishBody(parentPid, parentBody, reg);
+  const pv = await publishBody(parentPid, parentBody, reg, dataSourceReg);
   const compiled = (await createDefinitionStore(sql).resolveBody(parentPid, pv.version))!;
   const inst = await createInstance(compiled, { processId: parentPid, version: pv.version });
 

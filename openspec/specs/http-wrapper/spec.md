@@ -20,9 +20,10 @@ re-resolution) running for the lifetime of the server process.
 
 `POST /processes/:processId/instances` SHALL resolve the actor via the
 injected `ActorResolver`, accept a JSON body `{ version?, data? }`, call
-`createProcessInstance(processId, actor, {version, data})`, and on success
-return `201 Created` with the resulting `Instance` as the JSON body, with no
-response envelope.
+`createProcessInstance(processId, actor, dataSourceRegistry, {version,
+data})` using the `DataSourceRegistry` injected at server startup, and on
+success return `201 Created` with the resulting `Instance` as the JSON body,
+with no response envelope.
 
 #### Scenario: Creating an instance with no data seed
 - **WHEN** a `POST /processes/:processId/instances` request carries a body
@@ -44,9 +45,12 @@ response envelope.
 ### Requirement: Resolve an instance view over HTTP
 
 `GET /instances/:instanceId` SHALL resolve the actor via the injected
-`ActorResolver` and call `getInstanceView(instanceId, actor)`, and on
-success return `200 OK` with the resulting `InstanceView` as the JSON body,
-with no response envelope.
+`ActorResolver` and call `getInstanceView(instanceId, actor,
+dataSourceRegistry)` using the `DataSourceRegistry` injected at server
+startup, and on success return `200 OK` with the resulting `InstanceView` as
+the JSON body, with no response envelope. Any resolved field carrying a
+`dataSource` SHALL have its `options` resolved in the returned view, per the
+`data-source-resolution` capability.
 
 #### Scenario: Viewing an instance with no roles
 - **WHEN** a `GET /instances/:instanceId` request carries `X-Actor-Id` but
@@ -65,11 +69,18 @@ with no response envelope.
 - **THEN** the response is `200` with an `InstanceView` whose `status`
   reflects that state and whose `availablePaths` is empty
 
+#### Scenario: A dataSource-bound field's options are resolved over HTTP
+- **WHEN** `GET /instances/:instanceId` targets an instance whose current
+  step has a visible field bound to a `dataSource`
+- **THEN** the response body's corresponding `ResolvedViewField` carries that
+  data source's resolved `options`
+
 ### Requirement: Submit data and trigger a manual transition over HTTP
 
 `POST /instances/:instanceId/submit` SHALL resolve the actor via the
 injected `ActorResolver`, accept a JSON body `{ pathId, data }`, call
-`submitAndTransition(instanceId, pathId, data, actor)`, and on success
+`submitAndTransition(instanceId, pathId, data, actor, dataSourceRegistry)`
+using the `DataSourceRegistry` injected at server startup, and on success
 return `200 OK` with the resulting `Instance` as the JSON body, with no
 response envelope.
 
@@ -82,8 +93,9 @@ response envelope.
 ### Requirement: The caller supplies the actor directly; this is not an auth mechanism
 
 The HTTP wrapper's server setup SHALL take an `ActorResolver`, injected once
-at startup alongside the existing `Registry`/`resolveBody` injection. For
-every route, middleware SHALL extract a credential from the request (a
+at startup alongside the existing `Registry`/`DataSourceRegistry`/
+`resolveBody` injection. For every route, middleware SHALL extract a
+credential from the request (a
 transport detail: header values, for the shipped dev resolver), call the
 injected resolver, and pass the resulting `Actor` into the underlying
 Runtime API Layer call. A route SHALL NO LONGER accept an `actor` field

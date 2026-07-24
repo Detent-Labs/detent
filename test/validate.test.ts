@@ -312,6 +312,39 @@ describe("definition-contract: full-depth id and key uniqueness", () => {
       expect(processBody.safeParse(body).success).toBe(false);
     }
   });
+
+  it("rejects a field dataSource naming an id absent from dataSources", () => {
+    const body = {
+      key: "p", label: { en: "P" }, baseLocale: "en",
+      fields: [{ id: "field_x", key: "x", label: { en: "X" }, type: "select", dataSource: "ds_missing" }],
+      dataSources: [{ id: "ds_a", key: "a", type: "http", config: {} }],
+      workflow: { initialStep: "step_a", steps: [terminalStep("step_a", "a")] },
+    };
+    expect(processBody.safeParse(body).success).toBe(false);
+  });
+
+  it("accepts a field dataSource resolving to a declared data source", () => {
+    const body = {
+      key: "p", label: { en: "P" }, baseLocale: "en",
+      fields: [{ id: "field_x", key: "x", label: { en: "X" }, type: "select", dataSource: "ds_a" }],
+      dataSources: [{ id: "ds_a", key: "a", type: "http", config: {} }],
+      workflow: { initialStep: "step_a", steps: [terminalStep("step_a", "a")] },
+    };
+    expect(processBody.safeParse(body).success).toBe(true);
+  });
+
+  it("rejects a dataSource naming an unknown id on a field nested inside a group", () => {
+    const body = {
+      key: "p", label: { en: "P" }, baseLocale: "en",
+      fields: [
+        { id: "field_g", key: "grp", label: { en: "G" }, type: "group", fields: [
+          { id: "field_n", key: "nested", label: { en: "N" }, type: "select", dataSource: "ds_missing" },
+        ] },
+      ],
+      workflow: { initialStep: "step_a", steps: [terminalStep("step_a", "a")] },
+    };
+    expect(processBody.safeParse(body).success).toBe(false);
+  });
 });
 
 describe("definition-contract: view-ref resolution over the full field tree", () => {

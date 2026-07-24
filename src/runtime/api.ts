@@ -28,6 +28,7 @@ import {
 import { buildGuardContext, evalGuard, type Actor } from "../cel/eval.js";
 import { definitionHash } from "../schema/hash.js";
 import { instance as instanceSchema, collectFieldsDeep } from "../schema/definition.js";
+import { resolveDataSource, type DataSourceRegistry } from "../engine/registry.js";
 import type {
   ProcessId,
   InstanceId,
@@ -42,6 +43,8 @@ import type {
   StepType,
   LocalizedText,
   FieldDef,
+  FieldOption,
+  DataSourceDef,
 } from "../schema/definition.js";
 
 export {
@@ -66,6 +69,7 @@ export type ResolvedViewField = {
   required: boolean;
   readonly: boolean;
   group?: string;
+  options?: FieldOption[];
 };
 
 export type AvailablePath = { id: PathId; key: string; label?: string };
@@ -143,16 +147,50 @@ function resolveFlag(v: boolean | { lang: "cel"; src: string } | undefined, ctx:
 }
 
 /**
+ * Resolve a `dataSource`-bound field's options via the registry, memoized by
+ * `DataSourceId` within one `resolveFields` call so fields on the same step
+ * sharing a data source resolve it once. A lookup miss here means the
+ * registry passed at runtime differs from the one the body was published
+ * against — publish-time `data-source-registry-validation` already confirmed
+ * every declared type resolves — so it is a "should never happen" canary,
+ * matching the project's existing style (e.g. the `definitionHash` pin
+ * mismatch).
+ */
+function resolveDataSourceOptions(
+  def: DataSourceDef,
+  registry: DataSourceRegistry,
+  cache: Map<string, Promise<FieldOption[]>>,
+): Promise<FieldOption[]> {
+  const dsId = def.id as string;
+  let pending = cache.get(dsId);
+  if (!pending) {
+    const handler = resolveDataSource(registry, def.type);
+    if (!handler) throw new Error(`data source type '${def.type}' is not registered in the runtime registry`);
+    pending = handler.resolve({ config: def.config });
+    cache.set(dsId, pending);
+  }
+  return pending;
+}
+
+/**
  * Resolve a step's ViewFields against the field catalog and current data.
  * Invisible fields are omitted. A group-container FieldDef (never a leaf
  * value in `instance.data`) is still included when visible, so a UI can
  * render its label/grouping, but its `value` is always `undefined` and its
  * `required`/`readonly` are always reported `false` regardless of the view's
  * own declaration — it is never part of the required or editable sets.
+ *
+ * `options` is populated from static `FieldDef.options` unchanged, or —
+ * for a `dataSource`-bound field — resolved at runtime via `registry`. This
+ * is the single place downstream code (submission validation, view
+ * rendering) reads options from, instead of reading `FieldDef.options`
+ * directly.
  */
-function resolveFields(body: ProcessBody, step: Step, instance: Instance, actor: Actor): ResolvedViewField[] {
+async function resolveFields(body: ProcessBody, step: Step, instance: Instance, actor: Actor, registry: DataSourceRegistry): Promise<ResolvedViewField[]> {
   const ctx = buildGuardContext(body, instance, actor);
   const fieldsById = new Map(collectFieldsDeep(body.fields).map((f) => [f.id as string, f]));
+  const dataSourcesById = new Map((body.dataSources ?? []).map((d) => [d.id as string, d]));
+  const dataSourceCache = new Map<string, Promise<FieldOption[]>>();
   const out: ResolvedViewField[] = [];
   for (const vf of step.view?.fields ?? []) {
     const field = fieldsById.get(vf.ref as string);
@@ -162,7 +200,13 @@ function resolveFields(body: ProcessBody, step: Step, instance: Instance, actor:
     const required = group ? false : resolveFlag(vf.required, ctx, false);
     const readonly = group ? false : resolveFlag(vf.readonly, ctx, false);
     const value = group ? undefined : (instance.data[field.id] as Literal | undefined);
-    out.push({ field, value, required, readonly, group: vf.group });
+    let options: FieldOption[] | undefined = field.options;
+    if (field.dataSource) {
+      const def = dataSourcesById.get(field.dataSource as string);
+      if (!def) throw new Error(`data source not found: ${field.dataSource}`); // publish-time invariant guarantees resolution; defensive only
+      options = await resolveDataSourceOptions(def, registry, dataSourceCache);
+    }
+    out.push({ field, value, required, readonly, group: vf.group, options });
   }
   return out;
 }
@@ -239,9 +283,9 @@ function expectedTypeLabel(fieldType: FieldDef["type"]): string {
   }
 }
 
-function optionValuesValid(field: FieldDef, value: Literal): boolean {
-  if (!field.options || field.options.length === 0) return true;
-  const allowed = new Set(field.options.map((o) => o.value));
+function optionValuesValid(options: FieldOption[] | undefined, value: Literal): boolean {
+  if (!options || options.length === 0) return true;
+  const allowed = new Set(options.map((o) => o.value));
   if (Array.isArray(value)) return value.every((v) => typeof v === "string" && allowed.has(v));
   return typeof value === "string" && allowed.has(value);
 }
@@ -279,15 +323,16 @@ function checkConstraints(validation: FieldDef["validation"], value: Literal): (
  * `submitAndTransition`" flow — the same flow the expense-approval example's
  * "capture" step relies on, since it is also the initial step.
  */
-function validateSubmissionData(
+async function validateSubmissionData(
   body: ProcessBody,
   step: Step,
   instance: Instance,
   actor: Actor,
   data: Record<string, Literal>,
+  registry: DataSourceRegistry,
   opts: { checkRequired: boolean } = { checkRequired: true },
-): void {
-  const resolved = resolveFields(body, step, instance, actor);
+): Promise<void> {
+  const resolved = await resolveFields(body, step, instance, actor, registry);
   const fieldsById = new Map(resolved.map((r) => [r.field.id as string, r]));
   const editable = editableFieldIds(resolved);
   const required = requiredFieldIds(resolved);
@@ -311,7 +356,7 @@ function validateSubmissionData(
       issues.push({ kind: "type-mismatch", fieldId: fieldId as FieldId, expected: expectedTypeLabel(rf.field.type) });
       continue; // skip further checks on a value of the wrong shape
     }
-    if (!optionValuesValid(rf.field, value)) {
+    if (!optionValuesValid(rf.options, value)) {
       issues.push({ kind: "invalid-option", fieldId: fieldId as FieldId });
     }
     for (const constraint of checkConstraints(rf.field.validation, value)) {
@@ -356,6 +401,7 @@ function validateSubmissionData(
 export async function createProcessInstance(
   processId: ProcessId,
   actor: Actor,
+  registry: DataSourceRegistry,
   opts?: { version?: number; data?: Instance["data"] },
   db: SQL = sql,
 ): Promise<Instance> {
@@ -397,7 +443,7 @@ export async function createProcessInstance(
     startedAt: new Date().toISOString(),
   };
 
-  validateSubmissionData(body, initial, stub, actor, submitted, { checkRequired: false });
+  await validateSubmissionData(body, initial, stub, actor, submitted, registry, { checkRequired: false });
 
   const created = await createInstance(body, { processId, version, instanceId: mintedId, data: submitted as Instance["data"] }, db);
   return resolveAutomatic(created, body, actor, db);
@@ -409,7 +455,7 @@ export async function createProcessInstance(
  * status. Uses the ordinary (unlocked) rehydrate path: a view is read-only,
  * so there is no concurrent writeback for it to race.
  */
-export async function getInstanceView(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<InstanceView> {
+export async function getInstanceView(instanceId: InstanceId, actor: Actor, registry: DataSourceRegistry, db: SQL = sql): Promise<InstanceView> {
   const { instance, body } = await loadInstanceForRead(instanceId, db);
   const step = findStep(body, instance.currentStepId as string);
   return {
@@ -418,7 +464,7 @@ export async function getInstanceView(instanceId: InstanceId, actor: Actor, db: 
     version: instance.version,
     status: instance.status,
     step: { id: step.id, key: step.key, label: step.label, type: step.type },
-    fields: resolveFields(body, step, instance, actor),
+    fields: await resolveFields(body, step, instance, actor, registry),
     availablePaths: instance.status === "running" ? resolveAvailablePaths(body, step, instance, actor) : [],
   };
 }
@@ -445,6 +491,7 @@ export async function submitAndTransition(
   pathId: PathId,
   data: Instance["data"],
   actor: Actor,
+  registry: DataSourceRegistry,
   db: SQL = sql,
 ): Promise<Instance> {
   const store = getStore(db);
@@ -469,7 +516,7 @@ export async function submitAndTransition(
       if (instance.assignment.claimedBy !== actor.id) throw new NotClaimantError(instanceId, actor.id);
     }
 
-    validateSubmissionData(body, step, instance, actor, submitted);
+    await validateSubmissionData(body, step, instance, actor, submitted, registry);
 
     return commitManualTransition(instance, pathId, body, actor, tx, data);
   });
