@@ -26,7 +26,7 @@ import type { Actor } from "../src/cel/eval.js";
 const DB = !!process.env.DATABASE_URL;
 const cel = (src: string) => ({ lang: "cel", src });
 const reg = createRegistry();
-const fetch = createServer(reg);
+const fetch = createServer();
 
 beforeAll(async () => {
   if (DB) await initSchema();
@@ -401,7 +401,7 @@ test.skipIf(!DB)("an injected fake resolver is honored instead of the default de
   const PID = pid("proc_http_fake_resolver");
   await publishBody(PID, simpleBody(), reg);
   const fakeResolver: ActorResolver = async () => ({ id: "fixed_actor", roles: [] });
-  const fakeFetch = createServer(reg, sql, fakeResolver);
+  const fakeFetch = createServer(sql, fakeResolver);
 
   // No auth headers at all — the fake resolver ignores the credential entirely.
   const res = await fakeFetch(new Request(`http://x/processes/${PID}/instances`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }));
@@ -563,7 +563,7 @@ test.skipIf(!DB)("happy path through expense-approval.json settles the async 'bo
   const expenseReg = createRegistry();
   register(expenseReg, "accounting.postInvoice", { handler: async () => ({ status: "booked" }) });
   register(expenseReg, "notify.email", { handler: async () => ({}) });
-  const expenseFetch = createServer(expenseReg);
+  const expenseFetch = createServer();
 
   const PID = pid("proc_http_expense");
   await publishBody(PID, authored, expenseReg);

@@ -27,16 +27,12 @@ function preflightResponse(method: string): Response {
 }
 
 /**
- * `registry` is accepted (not just `db`) to match `startHttpServer`'s
- * signature and so a caller constructing a server directly supplies the same
- * two arguments either way — the routes themselves need only `db`. `resolver`
- * defaults to the non-production dev header resolver (`devHeaderResolver`):
- * documented as unsuitable for a deployment real user data ever reaches, but
- * it makes the trust boundary explicit and swappable rather than an implicit
- * "any actor accepted" default.
+ * `resolver` defaults to the non-production dev header resolver
+ * (`devHeaderResolver`): documented as unsuitable for a deployment real user
+ * data ever reaches, but it makes the trust boundary explicit and swappable
+ * rather than an implicit "any actor accepted" default.
  */
 export function createServer(
-  _registry: Registry,
   db: SQL = sql,
   resolver: ActorResolver = devHeaderResolver,
 ): (req: Request) => Promise<Response> {
@@ -87,7 +83,7 @@ export function createServer(
 }
 
 export function startHttpServer(registry: Registry, db: SQL = sql, resolver: ActorResolver = devHeaderResolver): { stop: () => void } {
-  const fetch = createServer(registry, db, resolver);
+  const fetch = createServer(db, resolver);
   const port = Number(process.env.PORT ?? 3000);
   const server = Bun.serve({ fetch, port });
   const engine = startEngine(db, registry);

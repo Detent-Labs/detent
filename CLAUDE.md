@@ -122,8 +122,8 @@ floats.
 **Extensibility.** Custom actions, guards, data sources, assignment strategies,
 and field types are plugins behind a uniform envelope `{ type, config }`. The
 core validates only the envelope; each plugin ships its own JSON Schema. The
-registry maps `type -> { config schema, output schema }` (`registry.ts`,
-`HandlerDef.configSchema`/`outputSchema`) and is validated at PUBLISH time:
+registry maps `type -> { config schema }` (`registry.ts`,
+`HandlerDef.configSchema`) and is validated at PUBLISH time:
 `checkActionRegistry` (`src/engine/registry-check.ts`) resolves every action's
 `type` against the injected `Registry` and, when the handler declares a
 `configSchema`, parses the action's `config` against it — an unknown type or a
@@ -141,10 +141,8 @@ re-publish. A handler with no declared `configSchema` accepts any `config`
 `RETURN_ACTION_TYPE`) is exempt from the registry-resolution check — those
 types are dispatched internally by `subprocess.ts`, never through this
 author-facing registry, and are separately rejected in *authored* bodies by
-the existing Zod refinement in `authoredProcessBody`. `outputSchema` is still
-unread by anything (no consumer exists yet — there is no runtime result to
-check it against at publish time). Data sources are never inlined; fields bind
-to them by id and options resolve at runtime.
+the existing Zod refinement in `authoredProcessBody`. Data sources are never
+inlined; fields bind to them by id and options resolve at runtime.
 
 **Runtime record (the audit backbone).** The instance carries assignment/claim
 state and persisted timer firings. Each HistoryEntry is append-only and records
