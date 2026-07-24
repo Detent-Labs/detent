@@ -1,49 +1,30 @@
-import { describe, expect, it, mock } from "bun:test";
-import { renderToStaticMarkup } from "react-dom/server";
-
-/** `layout.ts` constructs a real `elkjs` `ELK()` at module scope, which in
- * turn constructs a `Worker` for its bundled fallback — `bun test`'s runtime
- * doesn't provide one, so importing `layout.ts` (transitively, via
- * `GraphView.tsx` -> `useDraftGraphLayout.ts` -> `layout.ts`) throws at
- * import time. No existing test imported `GraphView.tsx` before this one,
- * so this never surfaced. Mocked here rather than worked around in
- * `layout.ts` itself — this test only needs static markup, never a real
- * layout pass, and reaching into ELK's worker setup is out of scope for an
- * edge-routing/arrowhead change. */
-mock.module("../src/graph/layout", () => ({
-  NODE_WIDTH: 180,
-  NODE_HEIGHT: 56,
-  layoutGraph: async () => [],
-}));
-
-const { DraftProvider } = await import("../src/draft/store");
-const { GraphView } = await import("../src/graph/GraphView");
-const { mintId } = await import("../src/draft/ids");
+import { describe, expect, it } from "bun:test";
+import { createMermaidRenderer } from "mermaid-isomorphic";
+import { generateMermaidDsl } from "../src/graph/mermaid";
+import { draftToGraph } from "../src/graph/mapping";
+import { mintId } from "../src/draft/ids";
 import type { Draft } from "../src/draft/types";
+import type { EditorIssue } from "../src/draft/issues";
 
-/** Matches the `content-locale-rendering.test.tsx` / `i18n-rendering.test.tsx`
- * convention: `react-dom/server`'s `renderToStaticMarkup`, no jsdom/testing-
- * library. Turns out edges themselves don't render at all under this
- * technique: React Flow only paints an edge path once each endpoint node's
- * handle bounds are measured, which happens via a `ResizeObserver`-driven
- * effect that never fires under SSR (confirmed empirically — the rendered
- * markup has both nodes and the marker `<defs>`, but no edge `<path>`). So
- * the first test below can't assert on `markerEnd` after all; it instead
- * asserts on what *does* render synchronously — each node's
- * `data-handlepos` — covering the handle-position fix
- * (editor-graph-edge-routing design.md) instead.
- *
- * The marker `<defs>` block itself, unlike the edge `<path>`, is driven
- * directly by the `edges` array rather than the `ResizeObserver` pass — so
- * it does render under SSR, and the second test below asserts on its
- * computed paint (editor-graph-arrowhead-fix design.md: a prior regression
- * left the arrowhead present but fully transparent). Edge `<path>` rendering
- * itself and fitView timing stay manually verified (see that change's
- * design.md Manual Verification section); this was confirmed working live
- * against the dev server before deciding it can't be a static test. */
+/**
+ * Renders the same DSL string `GraphView.tsx` generates and hands to
+ * `mermaid.render()` in the browser — `mermaid-isomorphic` drives a real
+ * headless Chromium under the hood (Mermaid's own layout needs real
+ * `SVGTextElement.getBBox()` text measurement, which jsdom doesn't
+ * implement), replacing the old `react-dom/server`-based static-markup
+ * convention this test used under React Flow (editor-graph-mermaid
+ * design.md).
+ */
+const renderMermaid = createMermaidRenderer();
 
-describe("GraphView", () => {
-  it("renders each node's handles on the left/right (not top/bottom)", () => {
+async function renderDsl(dsl: string): Promise<string> {
+  const [result] = await renderMermaid([dsl]);
+  if (result.status !== "fulfilled") throw result.reason;
+  return result.value.svg;
+}
+
+describe("generated graph diagram", () => {
+  it("renders a directed edge with a visible (non-transparent) default arrowhead", async () => {
     const stepA = mintId("step");
     const stepB = mintId("step");
     const pathId = mintId("path");
@@ -56,20 +37,37 @@ describe("GraphView", () => {
         ],
       },
     };
+    const dsl = generateMermaidDsl(draftToGraph(draft, "en", "en"), []);
 
-    const html = renderToStaticMarkup(
-      <DraftProvider initial={draft}>
-        <GraphView />
-      </DraftProvider>,
-    );
+    const svg = await renderDsl(dsl);
 
-    expect(html).toContain('data-handlepos="left"');
-    expect(html).toContain('data-handlepos="right"');
-    expect(html).not.toContain('data-handlepos="top"');
-    expect(html).not.toContain('data-handlepos="bottom"');
+    // A default (non-issue) edge points at Mermaid's shared marker, which
+    // is colored via a `.marker{fill:#333333;stroke:#333333;}` CSS rule —
+    // not an inline `fill:none`/`stroke:none` on the marker itself, the
+    // exact regression class the React-Flow implementation once had
+    // (editor-graph-arrowhead-fix). The SVG's `<style>` block does contain
+    // unrelated `fill:none` rules elsewhere (e.g. `.flowchart-link`, an
+    // edge *line* style, not the marker), so this asserts the specific
+    // `.marker` rule paints a real color rather than a blanket string check.
+    expect(svg).toContain('marker-end="url(#');
+    expect(svg).toMatch(/\.marker\{fill:#[0-9a-fA-F]{3,6};stroke:#[0-9a-fA-F]{3,6};\}/);
   });
 
-  it("renders a visible (non-transparent) arrowhead for a non-issue edge", () => {
+  it("colors an issue-flagged node's border red and shows a visible issue badge", async () => {
+    const stepA = mintId("step");
+    const draft: Draft = {
+      workflow: { initialStep: stepA, steps: [{ id: stepA, key: "start", label: { en: "Start" }, type: "task", terminal: true }] },
+    };
+    const issues: EditorIssue[] = [{ entityType: "step", entityId: stepA, message: "bad step", source: "zod" }];
+    const dsl = generateMermaidDsl(draftToGraph(draft, "en", "en"), issues);
+
+    const svg = await renderDsl(dsl);
+
+    expect(svg).toContain("⚠ 1");
+    expect(svg).toContain("stroke:#c00 !important");
+  });
+
+  it("colors an issue-flagged edge's line and generates a matching colored arrowhead marker", async () => {
     const stepA = mintId("step");
     const stepB = mintId("step");
     const pathId = mintId("path");
@@ -82,22 +80,29 @@ describe("GraphView", () => {
         ],
       },
     };
+    const issues: EditorIssue[] = [{ entityType: "path", entityId: pathId, message: "bad guard", source: "cel" }];
+    const dsl = generateMermaidDsl(draftToGraph(draft, "en", "en"), issues);
 
-    const html = renderToStaticMarkup(
-      <DraftProvider initial={draft}>
-        <GraphView />
-      </DraftProvider>,
-    );
+    const svg = await renderDsl(dsl);
 
-    // The marker `<defs>` block (unlike the edge `<path>` itself) is driven
-    // directly by the `edges` array, not a `ResizeObserver`-gated
-    // measurement, so it renders under `renderToStaticMarkup`. A regression
-    // here (see GraphView.tsx's markerEnd comment) makes the arrowhead's
-    // polyline paint with `fill:none;stroke:none` while still leaving the
-    // marker element and its `marker-end` reference present — invisible,
-    // not absent — so this checks the computed paint, not just presence.
-    expect(html).toContain("arrowclosed");
-    expect(html).not.toMatch(/fill:\s*none/);
-    expect(html).not.toMatch(/stroke:\s*none/);
+    // Mermaid auto-generates a distinct, colored marker variant for a
+    // `linkStyle`-colored edge (id suffix matches the color) and points
+    // that edge's marker-end at it, rather than the shared default marker
+    // — resolving editor-graph-mermaid design.md's open question: no
+    // custom post-render marker patch is needed.
+    expect(svg).toMatch(/stroke:#c00/);
+    expect(svg).toMatch(/<marker[^>]*__c00"[^>]*>.*?fill="#c00"/s);
+  });
+
+  it("escapes a double-quoted label so it round-trips to a literal quote, not broken markup", async () => {
+    const stepA = mintId("step");
+    const draft: Draft = {
+      workflow: { initialStep: stepA, steps: [{ id: stepA, key: "", label: { en: 'Say "hi"' }, type: "task", terminal: true }] },
+    };
+    const dsl = generateMermaidDsl(draftToGraph(draft, "en", "en"), []);
+
+    const svg = await renderDsl(dsl);
+
+    expect(svg).toContain('Say "hi"');
   });
 });
