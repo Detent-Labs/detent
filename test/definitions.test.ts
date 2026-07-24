@@ -13,6 +13,7 @@ import { drainOutbox } from "../src/engine/outbox.js";
 import { drainResolutions } from "../src/engine/resolution.js";
 import { drainTimers } from "../src/engine/timers.js";
 import { createRegistry, register } from "../src/engine/registry.js";
+import { HTTP_ACTION_TYPE, httpHandlerDef } from "../src/handlers/http.js";
 import { compileProcessBody } from "../src/schema/compile.js";
 import { definitionHash } from "../src/schema/hash.js";
 import type { ProcessBody, ProcessId, Instance, Action } from "../src/schema/definition.js";
@@ -306,6 +307,30 @@ test.skipIf(!DB)("re-publishing an already-stored body is a no-op even after its
   expect(v.version).toBe(1);
   expect(v.definitionHash).toBe(hash);
   expect(await definitionCount()).toBe(1);
+});
+
+// --- publish rejects an invalid http.request config (registry-check integration) --
+// Confirms httpConfigSchema is actually wired as this handler's configSchema, not
+// just unit-tested in isolation (handlers-http.test.ts covers the schema/handler
+// behavior directly; this is the one integration point through publishBody).
+
+test.skipIf(!DB)("publish rejects an http.request action with a missing url", async () => {
+  const httpReg = createRegistry();
+  register(httpReg, HTTP_ACTION_TYPE, httpHandlerDef);
+  const err = await publishRegistryFails(bodyWithActionType(HTTP_ACTION_TYPE, { method: "POST" }), httpReg);
+  expect(err.issues[0]!.type).toBe(HTTP_ACTION_TYPE);
+  expect(await definitionCount()).toBe(0);
+});
+
+test.skipIf(!DB)("publish rejects an http.request action with method GET and a body", async () => {
+  const httpReg = createRegistry();
+  register(httpReg, HTTP_ACTION_TYPE, httpHandlerDef);
+  const err = await publishRegistryFails(
+    bodyWithActionType(HTTP_ACTION_TYPE, { url: "http://example.com", method: "GET", body: { a: 1 } }),
+    httpReg,
+  );
+  expect(err.issues[0]!.type).toBe(HTTP_ACTION_TYPE);
+  expect(await definitionCount()).toBe(0);
 });
 
 // --- publish round-trips through validation -----------------------------------
