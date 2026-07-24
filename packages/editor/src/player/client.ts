@@ -33,8 +33,9 @@ async function request(serverUrl: string, path: string, init?: RequestInit): Pro
   return res;
 }
 
-function actorQuery(actor: Actor): string {
-  return new URLSearchParams({ actorId: actor.id, roles: actor.roles.join(",") }).toString();
+/** The HTTP wrapper's dev resolver reads the actor from these headers only — never from a body/query `actor` field (design.md/CLAUDE.md). */
+function actorHeaders(actor: Actor): Record<string, string> {
+  return { "X-Actor-Id": actor.id, "X-Actor-Roles": actor.roles.join(",") };
 }
 
 export async function createInstance(
@@ -45,15 +46,15 @@ export async function createInstance(
 ): Promise<{ instanceId: string }> {
   const res = await request(serverUrl, `/processes/${encodeURIComponent(processId)}/instances`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ actor, version: opts.version, data: opts.data }),
+    headers: { "content-type": "application/json", ...actorHeaders(actor) },
+    body: JSON.stringify({ version: opts.version, data: opts.data }),
   });
   const body = (await res.json()) as { instanceId: string };
   return { instanceId: body.instanceId };
 }
 
 export async function getInstanceView(serverUrl: string, instanceId: string, actor: Actor): Promise<InstanceView> {
-  const res = await request(serverUrl, `/instances/${encodeURIComponent(instanceId)}?${actorQuery(actor)}`);
+  const res = await request(serverUrl, `/instances/${encodeURIComponent(instanceId)}`, { headers: actorHeaders(actor) });
   return (await res.json()) as InstanceView;
 }
 
@@ -66,7 +67,7 @@ export async function submit(
 ): Promise<void> {
   await request(serverUrl, `/instances/${encodeURIComponent(instanceId)}/submit`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ actor, pathId, data }),
+    headers: { "content-type": "application/json", ...actorHeaders(actor) },
+    body: JSON.stringify({ pathId, data }),
   });
 }

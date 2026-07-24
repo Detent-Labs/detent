@@ -34,3 +34,6 @@ Thumbs.db
 
 # Local devcontainer overrides (personal, per-machine)
 .devcontainer/docker-compose.override.yml
+
+# temp files
+tmp/

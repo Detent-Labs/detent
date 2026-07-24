@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 describe("player/client request shapes", () => {
-  it("createInstance POSTs to /processes/:processId/instances with actor, version, and data", async () => {
+  it("createInstance POSTs to /processes/:processId/instances with actor as headers, version and data in the body", async () => {
     const calls: { url: string; init: RequestInit | undefined }[] = [];
     globalThis.fetch = mock(async (url: string, init?: RequestInit) => {
       calls.push({ url, init });
@@ -27,7 +27,8 @@ describe("player/client request shapes", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]!.url).toBe("http://x/processes/proc_1/instances");
     expect(calls[0]!.init?.method).toBe("POST");
-    expect(JSON.parse(calls[0]!.init!.body as string)).toEqual({ actor, version: 2, data: { a: 1 } });
+    expect(calls[0]!.init?.headers).toMatchObject({ "X-Actor-Id": "user_1", "X-Actor-Roles": "employee" });
+    expect(JSON.parse(calls[0]!.init!.body as string)).toEqual({ version: 2, data: { a: 1 } });
   });
 
   it("createInstance omits version/data when not provided", async () => {
@@ -44,19 +45,20 @@ describe("player/client request shapes", () => {
     expect("data" in sentBody).toBe(false);
   });
 
-  it("getInstanceView GETs /instances/:instanceId with actorId and roles query params", async () => {
-    const calls: string[] = [];
-    globalThis.fetch = mock(async (url: string) => {
-      calls.push(url);
+  it("getInstanceView GETs /instances/:instanceId with the actor as X-Actor-Id/X-Actor-Roles headers", async () => {
+    const calls: { url: string; init: RequestInit | undefined }[] = [];
+    globalThis.fetch = mock(async (url: string, init?: RequestInit) => {
+      calls.push({ url, init });
       return jsonResponse(200, { instanceId: "inst_1", fields: [], availablePaths: [] });
     }) as unknown as typeof fetch;
 
     await getInstanceView("http://x", "inst_1", actor);
 
-    expect(calls[0]).toBe("http://x/instances/inst_1?actorId=user_1&roles=employee");
+    expect(calls[0]!.url).toBe("http://x/instances/inst_1");
+    expect(calls[0]!.init?.headers).toMatchObject({ "X-Actor-Id": "user_1", "X-Actor-Roles": "employee" });
   });
 
-  it("submit POSTs to /instances/:instanceId/submit with actor, pathId, and data", async () => {
+  it("submit POSTs to /instances/:instanceId/submit with actor as headers, pathId and data in the body", async () => {
     const calls: { url: string; init: RequestInit | undefined }[] = [];
     globalThis.fetch = mock(async (url: string, init?: RequestInit) => {
       calls.push({ url, init });
@@ -67,7 +69,8 @@ describe("player/client request shapes", () => {
 
     expect(calls[0]!.url).toBe("http://x/instances/inst_1/submit");
     expect(calls[0]!.init?.method).toBe("POST");
-    expect(JSON.parse(calls[0]!.init!.body as string)).toEqual({ actor, pathId: "path_ab", data: { field_amount: 10 } });
+    expect(calls[0]!.init?.headers).toMatchObject({ "X-Actor-Id": "user_1", "X-Actor-Roles": "employee" });
+    expect(JSON.parse(calls[0]!.init!.body as string)).toEqual({ pathId: "path_ab", data: { field_amount: 10 } });
   });
 });
 

@@ -22,7 +22,11 @@ function toResponse({ status, body }: HttpResult): Response {
 function preflightResponse(method: string): Response {
   return new Response(null, {
     status: 204,
-    headers: { ...CORS_ORIGIN_HEADER, "Access-Control-Allow-Methods": method, "Access-Control-Allow-Headers": "Content-Type" },
+    headers: {
+      ...CORS_ORIGIN_HEADER,
+      "Access-Control-Allow-Methods": method,
+      "Access-Control-Allow-Headers": "Content-Type, X-Actor-Id, X-Actor-Roles",
+    },
   });
 }
 
