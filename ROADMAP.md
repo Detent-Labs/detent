@@ -106,7 +106,7 @@
    Layer, auth/actor resolution, and assignment/claim enforcement — see the
    Runtime API Layer entry above for which of those it already deliberately
    excludes.
-5. Post-v1: make the engine reachable. IN PROGRESS (a–d DONE, e NOT STARTED).
+5. Post-v1: make the engine reachable. DONE (a–e all DONE).
    Planned stages, each depending on the previous one landing first:
    a. DONE. Validated the stack end-to-end with a throwaway script exercising
       `createProcessInstance` -> `getInstanceView` -> `submitAndTransition`
@@ -131,7 +131,10 @@
       `instance.assignment`, and claimant-only enforcement in
       `submitAndTransition`. See the "Auth/Actor-Resolution +
       Assignment/Claim-Enforcement" entry under CLAUDE.md's "Current state".
-   e. NOT STARTED. Real action-handler implementations registered against the
-      handler registry — today only the config envelope is validated at
-      publish (`registry-check.ts`); no handler actually executes anything.
-      Needed for a process to do more than pass data through.
+   e. DONE. Generic `http.request` action handler (`src/handlers/http.ts`),
+      registered by default in `createDefaultRegistry` (`src/engine/host.ts`).
+      Vendor-neutral REST call: config validated at publish time, an
+      `Idempotency-Key` dedup header on every attempt, a default `Content-Type`
+      for JSON bodies, and response/failure classification into the outbox's
+      existing permanent-vs-transient retry semantics. See the "Generic
+      http.request action handler" entry under CLAUDE.md's "Current state".
