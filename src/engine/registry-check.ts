@@ -10,13 +10,16 @@
  * which is an engine-owned, in-process concept `definition.ts` must not depend
  * on — the same reason `src/cel/check.ts` stays out of `definition.ts`.
  *
- * `checkAssignmentRegistry` below applies the identical shape to
- * `Step.assignment.strategy` against the sibling `AssignmentRegistry`.
+ * `checkAssignmentRegistry` below applies a direct, registry-free check to
+ * `Step.assignment.strategy`: `"static"` is the only supported type.
  */
 
+import { z } from "zod";
 import type { Action, ProcessBody, Step } from "../schema/definition.js";
 import { RESERVED_ACTION_PREFIX } from "../schema/definition.js";
-import { resolve, resolveAssignmentStrategy, type Registry, type AssignmentRegistry } from "./registry.js";
+import { resolve, type Registry, STATIC_ASSIGNMENT_STRATEGY_TYPE } from "./registry.js";
+
+const staticAssignmentConfigSchema = z.object({ candidates: z.array(z.string()) });
 
 export interface RegistryIssue {
   loc: string;
@@ -101,29 +104,26 @@ function collectAssignments(body: ProcessBody): AssignmentSite[] {
 }
 
 /**
- * Validate every step's `assignment.strategy` against `registry`, mirroring
- * `checkActionRegistry` exactly (resolve `type`, then check `config` against the
- * resolved strategy's `configSchema` when declared). A step with no `assignment`
- * is not visited.
+ * Validate every step's `assignment.strategy` directly: `"static"` is the
+ * only supported type (no registry to resolve against), and its `config`
+ * must match a fixed `{ candidates: string[] }` schema. A step with no
+ * `assignment` is not visited.
  */
-export function checkAssignmentRegistry(body: ProcessBody, registry: AssignmentRegistry): RegistryIssue[] {
+export function checkAssignmentRegistry(body: ProcessBody): RegistryIssue[] {
   const issues: RegistryIssue[] = [];
 
   for (const { step, loc } of collectAssignments(body)) {
     const strategy = step.assignment!.strategy;
-    const def = resolveAssignmentStrategy(registry, strategy.type);
-    if (!def) {
+    if (strategy.type !== STATIC_ASSIGNMENT_STRATEGY_TYPE) {
       issues.push({ loc, type: strategy.type, message: `assignment strategy type '${strategy.type}' is not registered` });
       continue;
     }
 
-    if (def.configSchema) {
-      const result = def.configSchema.safeParse(strategy.config);
-      if (!result.success) {
-        for (const issue of result.error.issues) {
-          const path = issue.path.length > 0 ? `.config.${issue.path.join(".")}` : ".config";
-          issues.push({ loc: `${loc}${path}`, type: strategy.type, message: issue.message });
-        }
+    const result = staticAssignmentConfigSchema.safeParse(strategy.config);
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        const path = issue.path.length > 0 ? `.config.${issue.path.join(".")}` : ".config";
+        issues.push({ loc: `${loc}${path}`, type: strategy.type, message: issue.message });
       }
     }
   }

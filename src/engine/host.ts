@@ -12,7 +12,7 @@ import { startOutboxWorker } from "./outbox.js";
 import { startResolutionWorker } from "./resolution.js";
 import { startTimerScheduler } from "./timers.js";
 import { registerSubprocessHandlers } from "./subprocess.js";
-import { createDefaultAssignmentRegistry, createRegistry, register, type Registry, type AssignmentRegistry } from "./registry.js";
+import { createRegistry, register, type Registry } from "./registry.js";
 import { HTTP_ACTION_TYPE, httpHandlerDef } from "../handlers/http.js";
 
 /**
@@ -34,12 +34,11 @@ export function createDefaultRegistry(): Registry {
 export function startEngine(
   db: SQL = sql,
   registry: Registry = createDefaultRegistry(),
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): { stop: () => void } {
   const { resolveBody, resolveLatestByContract } = createDefinitionStore(db);
   // Register the engine-internal subprocess handlers so the outbox worker can
   // dispatch core.spawnSubprocess / core.returnSubprocess like any other action.
-  registerSubprocessHandlers(registry, db, resolveBody, resolveLatestByContract, assignmentRegistry);
+  registerSubprocessHandlers(registry, db, resolveBody, resolveLatestByContract);
   const workers = [
     startOutboxWorker(db, registry),
     startResolutionWorker(db, resolveBody),

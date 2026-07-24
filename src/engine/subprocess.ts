@@ -40,7 +40,7 @@ import { instance as instanceSchema, type Instance, type InstanceEvent, type Pro
 import { appendInstanceEvent, newInstanceEventId } from "./store.js";
 import type { ResolveLatestByContract } from "./definitions.js";
 import type { ResolveBody } from "./resolution.js";
-import { register, createDefaultAssignmentRegistry, type Registry, type AssignmentRegistry, type HandlerContext } from "./registry.js";
+import { register, type Registry, type HandlerContext } from "./registry.js";
 import { SPAWN_ACTION_TYPE, RETURN_ACTION_TYPE } from "./transition.js";
 
 const parseInstance = (raw: unknown): Instance =>
@@ -56,7 +56,6 @@ export function makeSpawnHandler(
   db: SQL,
   resolveBody: ResolveBody,
   resolveLatestByContract: ResolveLatestByContract,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): (ctx: HandlerContext) => Promise<unknown> {
   return async (ctx) => {
     const { subprocessStepId, parentSeq } = ctx.config as { subprocessStepId: string; parentSeq: number };
@@ -104,7 +103,6 @@ export function makeSpawnHandler(
         childBody,
         { processId: spec.processId, version: childVersion, instanceId: childId, data: childData, parent: { instanceId: parentId, stepId: subprocessStepId as StepId } },
         db,
-        assignmentRegistry,
       );
     }
 
@@ -113,7 +111,7 @@ export function makeSpawnHandler(
     // child already created still reaches this, completing a drive-to-rest a
     // prior delivery started but crashed before finishing. Already-rested state
     // (terminal, or parked at a non-automatic/wait-state step) makes this a no-op.
-    await resolveAutomatic(child, childBody, SYSTEM_ACTOR, db, assignmentRegistry);
+    await resolveAutomatic(child, childBody, SYSTEM_ACTOR, db);
 
     // Cancel/spawn race backstop: if the parent was cancelled after our status
     // check — or, on redelivery, before an earlier delivery reached this point —
@@ -123,7 +121,7 @@ export function makeSpawnHandler(
     const parentNow = await loadInstance(db, parentId);
     if (parentNow && parentNow.status !== "running") {
       const childNow = await loadInstance(db, childId);
-      if (childNow && childNow.status === "running") await cancelInstance(childNow, childBody, SYSTEM_ACTOR, db, resolveBody, assignmentRegistry);
+      if (childNow && childNow.status === "running") await cancelInstance(childNow, childBody, SYSTEM_ACTOR, db, resolveBody);
     }
     return {};
   };
@@ -133,7 +131,6 @@ export function makeSpawnHandler(
 export function makeReturnHandler(
   db: SQL,
   resolveBody: ResolveBody,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): (ctx: HandlerContext) => Promise<unknown> {
   return async (ctx) => {
     // The config names the parent instance and the outcome only. Which step of the
@@ -223,14 +220,14 @@ export function makeReturnHandler(
         await appendInstanceEvent(tx, event);
         return null; // stay parked (bounded by a step timer, if declared)
       }
-      const committed = await executeAutomaticTransition(parked, path, parentBody, tx, assignmentRegistry);
+      const committed = await executeAutomaticTransition(parked, path, parentBody, tx);
       return { committed, parentBody };
     });
 
     // The remaining cascade runs to rest on committed state, off the lock: it is
     // guard-driven over data no longer in flux, and holding the row across it would
     // extend the lock for no gain.
-    if (advance) await resolveAutomatic(advance.committed, advance.parentBody, SYSTEM_ACTOR, db, assignmentRegistry);
+    if (advance) await resolveAutomatic(advance.committed, advance.parentBody, SYSTEM_ACTOR, db);
     return {};
   };
 }
@@ -241,8 +238,7 @@ export function registerSubprocessHandlers(
   db: SQL,
   resolveBody: ResolveBody,
   resolveLatestByContract: ResolveLatestByContract,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): void {
-  register(registry, SPAWN_ACTION_TYPE, { handler: makeSpawnHandler(db, resolveBody, resolveLatestByContract, assignmentRegistry) });
-  register(registry, RETURN_ACTION_TYPE, { handler: makeReturnHandler(db, resolveBody, assignmentRegistry) });
+  register(registry, SPAWN_ACTION_TYPE, { handler: makeSpawnHandler(db, resolveBody, resolveLatestByContract) });
+  register(registry, RETURN_ACTION_TYPE, { handler: makeReturnHandler(db, resolveBody) });
 }
