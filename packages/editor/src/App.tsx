@@ -3,8 +3,7 @@ import { DraftProvider, useDraft } from "./draft/store";
 import { PlayerProvider } from "./player/store";
 import { PlayerView } from "./player/PlayerView";
 import { draftFields } from "./draft/fields";
-import { LocaleProvider, useT } from "./i18n/store";
-import { LocaleSwitcher } from "./i18n/LocaleSwitcher";
+import { t } from "./i18n/catalog";
 import { FieldCatalogPanel } from "./panels/FieldCatalogPanel";
 import { DataSourcesPanel } from "./panels/DataSourcesPanel";
 import { StepsPanel } from "./panels/StepsPanel";
@@ -18,7 +17,6 @@ import { GraphView } from "./graph/GraphView";
 
 function ProcessHeader() {
   const { draft, mutate } = useDraft();
-  const t = useT();
   return (
     <fieldset className="process-header">
       <legend>{t("app.processLegend")}</legend>
@@ -42,14 +40,12 @@ function ProcessHeader() {
 function Editor() {
   const { draft, validation } = useDraft();
   const fields = draftFields(draft);
-  const t = useT();
 
   return (
     <main>
       <h1>{t("app.title")}</h1>
       {!validation.zodValid && <p className="draft-incomplete">{t("app.draftIncomplete")}</p>}
       <FileToolbar />
-      <LocaleSwitcher />
       <ContentLocaleSwitcher />
       <ProcessHeader />
       <RegistryPanel />
@@ -70,7 +66,7 @@ function Editor() {
 export function App() {
   const [mode, setMode] = useState<"structure" | "player">("structure");
   return (
-    <LocaleProvider>
+    <>
       <nav className="app-mode-toggle">
         <button type="button" aria-pressed={mode === "structure"} onClick={() => setMode("structure")}>
           Structure
@@ -89,6 +85,6 @@ export function App() {
           <PlayerView />
         </PlayerProvider>
       </div>
-    </LocaleProvider>
+    </>
   );
 }

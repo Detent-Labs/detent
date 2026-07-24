@@ -1,5 +1,5 @@
 import { useDraft } from "../draft/store";
-import { useT } from "../i18n/store";
+import { t } from "../i18n/catalog";
 import { createExampleRegistry } from "../registry/exampleRegistry";
 
 /**
@@ -10,7 +10,6 @@ import { createExampleRegistry } from "../registry/exampleRegistry";
  */
 export function RegistryPanel() {
   const { registry, setRegistry } = useDraft();
-  const t = useT();
 
   return (
     <fieldset className="registry-panel">

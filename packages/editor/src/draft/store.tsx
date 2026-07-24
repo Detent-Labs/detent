@@ -20,8 +20,8 @@ interface DraftContextValue {
   loadedChildren: Record<string, ProcessBody>;
   setChildForStep: (stepId: string, childBody: ProcessBody | undefined) => void;
   /** Which locale of the *authored process content* (label/description
-   * text) is currently shown/edited — independent of `useLocale()` (the
-   * editor's own UI-chrome language, see editor-i18n). Ephemeral editor
+   * text) is currently shown/edited — independent of the editor's own
+   * fixed-English UI-chrome text (see editor-i18n). Ephemeral editor
    * state, not persisted with the Draft. */
   contentLocale: string;
   setContentLocale: (locale: string) => void;

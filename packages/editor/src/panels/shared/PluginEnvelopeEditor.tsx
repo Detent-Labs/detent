@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Plugin } from "workflow-engine/schema";
 import type { DraftOf } from "../../draft/types";
-import { useT } from "../../i18n/store";
+import { t } from "../../i18n/catalog";
 
 type DraftPlugin = DraftOf<Plugin>;
 
@@ -19,7 +19,6 @@ interface Props {
  * (each plugin ships its own JSON Schema, checked at publish, not here).
  */
 export function PluginEnvelopeEditor({ label, value, onChange, typePlaceholder }: Props) {
-  const t = useT();
   const [configText, setConfigText] = useState(() => JSON.stringify(value?.config ?? {}, null, 2));
   const [configError, setConfigError] = useState<string | null>(null);
 

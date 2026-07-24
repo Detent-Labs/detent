@@ -17,7 +17,6 @@ mock.module("../src/graph/layout", () => ({
 }));
 
 const { DraftProvider } = await import("../src/draft/store");
-const { LocaleProvider } = await import("../src/i18n/store");
 const { GraphView } = await import("../src/graph/GraphView");
 const { mintId } = await import("../src/draft/ids");
 import type { Draft } from "../src/draft/types";
@@ -59,11 +58,9 @@ describe("GraphView", () => {
     };
 
     const html = renderToStaticMarkup(
-      <LocaleProvider>
-        <DraftProvider initial={draft}>
-          <GraphView />
-        </DraftProvider>
-      </LocaleProvider>,
+      <DraftProvider initial={draft}>
+        <GraphView />
+      </DraftProvider>,
     );
 
     expect(html).toContain('data-handlepos="left"');
@@ -87,11 +84,9 @@ describe("GraphView", () => {
     };
 
     const html = renderToStaticMarkup(
-      <LocaleProvider>
-        <DraftProvider initial={draft}>
-          <GraphView />
-        </DraftProvider>
-      </LocaleProvider>,
+      <DraftProvider initial={draft}>
+        <GraphView />
+      </DraftProvider>,
     );
 
     // The marker `<defs>` block (unlike the edge `<path>` itself) is driven

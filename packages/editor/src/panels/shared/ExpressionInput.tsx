@@ -1,6 +1,6 @@
 import type { Expression } from "workflow-engine/schema";
 import type { DraftOf } from "../../draft/types";
-import { useT } from "../../i18n/store";
+import { t } from "../../i18n/catalog";
 
 interface Props {
   value: DraftOf<Expression> | undefined;
@@ -10,7 +10,6 @@ interface Props {
 
 /** Raw CEL text entry — no non-CEL condition-builder abstraction (spec: editor-structural-panels). */
 export function ExpressionInput({ value, onChange, placeholder }: Props) {
-  const t = useT();
   return (
     <input
       type="text"

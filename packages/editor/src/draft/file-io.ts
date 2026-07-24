@@ -32,8 +32,7 @@ function downloadText(text: string, filename: string): void {
 /**
  * Save the in-progress Draft as-is (no validation gate — that's export's job).
  * `draftFileDescription` is the file-picker type description text — resolved by the
- * caller (a component, via `useT()`), never looked up here (design.md "Non-component
- * call sites receive translated strings as parameters").
+ * caller (a component, via `t()`), never looked up here.
  */
 export async function saveDraft(draft: Draft, draftFileDescription: string): Promise<void> {
   const text = stringifyDraft(draft);

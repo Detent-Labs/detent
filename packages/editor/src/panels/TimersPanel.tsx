@@ -2,7 +2,7 @@ import type { Path, PathId, Timer } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { mintId } from "../draft/ids";
-import { useT } from "../i18n/store";
+import { t } from "../i18n/catalog";
 import { ExpressionInput } from "./shared/ExpressionInput";
 import { IssueList } from "./shared/IssueList";
 import { ActionListEditor } from "./ActionListEditor";
@@ -24,7 +24,6 @@ function modeOf(timer: DraftTimer): DurationMode {
 }
 
 export function TimersPanel({ timers, paths, fields, onChange }: Props) {
-  const t = useT();
   const list = timers ?? [];
 
   const addTimer = () => {

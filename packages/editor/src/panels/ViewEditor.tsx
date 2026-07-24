@@ -1,7 +1,7 @@
 import type { View, ViewField } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
-import { useT } from "../i18n/store";
+import { t } from "../i18n/catalog";
 import { BooleanOrExpressionInput } from "./shared/BooleanOrExpressionInput";
 
 type DraftView = DraftOf<View>;
@@ -20,7 +20,6 @@ interface Props {
  * sets it.
  */
 export function ViewEditor({ view, fields, onChange }: Props) {
-  const t = useT();
   const rows = view?.fields ?? [];
 
   const setRows = (next: DraftViewField[]) => onChange({ ...view, fields: next });

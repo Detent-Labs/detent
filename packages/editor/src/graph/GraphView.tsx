@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { ReactFlow, Background, MarkerType, Position, type Node, type Edge, type ReactFlowInstance } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useDraft } from "../draft/store";
-import { useT } from "../i18n/store";
+import { t } from "../i18n/catalog";
 import { useDraftGraphLayout } from "./useDraftGraphLayout";
 import { NODE_WIDTH, NODE_HEIGHT } from "./layout";
 
@@ -17,7 +17,6 @@ import { NODE_WIDTH, NODE_HEIGHT } from "./layout";
  */
 export function GraphView() {
   const { draft, validation, contentLocale, loadGeneration } = useDraft();
-  const t = useT();
   const { graph, positions, isLayouted } = useDraftGraphLayout(draft, contentLocale, draft.baseLocale ?? "en");
 
   const instanceRef = useRef<ReactFlowInstance | null>(null);

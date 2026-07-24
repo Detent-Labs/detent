@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useDraft } from "../draft/store";
-import { useT } from "../i18n/store";
+import { t } from "../i18n/catalog";
 import {
   saveDraft,
   loadDraftViaPicker,
@@ -25,7 +25,6 @@ export function describeError(e: unknown, fallback: string): string | null {
 /** Draft save/load and validated export (task group 6) — no server, no `publishBody` call. */
 export function FileToolbar() {
   const { draft, replace, validation } = useDraft();
-  const t = useT();
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);

@@ -2,7 +2,7 @@ import type { Path, PathTrigger, Step, StepId } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { mintId } from "../draft/ids";
-import { useT } from "../i18n/store";
+import { t } from "../i18n/catalog";
 import { ExpressionInput } from "./shared/ExpressionInput";
 import { IssueList } from "./shared/IssueList";
 import { ActionListEditor } from "./ActionListEditor";
@@ -23,7 +23,6 @@ interface Props {
  * guard-priority concepts").
  */
 export function PathsPanel({ paths, steps, fields, onChange }: Props) {
-  const t = useT();
   const list = paths ?? [];
 
   const addPath = () => {

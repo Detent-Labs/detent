@@ -1,8 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DraftProvider } from "../src/draft/store";
-import { LocaleProvider, useT } from "../src/i18n/store";
-import { LocaleSwitcher } from "../src/i18n/LocaleSwitcher";
+import { t } from "../src/i18n/catalog";
 import { LocalizedTextInput } from "../src/panels/shared/LocalizedTextInput";
 import { ContentLocaleSwitcher } from "../src/panels/shared/ContentLocaleSwitcher";
 import type { Draft } from "../src/draft/types";
@@ -13,11 +12,7 @@ import type { Draft } from "../src/draft/types";
  * covered as a pure function in `localized-text.test.ts`. */
 
 function withProviders(initial: Draft, children: React.ReactNode) {
-  return (
-    <LocaleProvider>
-      <DraftProvider initial={initial}>{children}</DraftProvider>
-    </LocaleProvider>
-  );
+  return <DraftProvider initial={initial}>{children}</DraftProvider>;
 }
 
 describe("LocalizedTextInput", () => {
@@ -59,22 +54,20 @@ describe("ContentLocaleSwitcher", () => {
 });
 
 function UiChromeTitleProbe() {
-  const t = useT();
   return <>{t("app.title")}</>;
 }
 
-describe("content locale is independent of the UI-chrome locale", () => {
-  it("a Draft whose content locale is 'de' does not change the UI-chrome locale or its rendered text", () => {
+describe("UI-chrome text is unaffected by the Draft's content locale", () => {
+  it("a Draft whose content locale is 'de' does not change the UI-chrome text", () => {
     // A Draft entirely in "de" — the content-locale switcher resolves to "de",
-    // but useLocale()/useT() (UI-chrome) must stay on "en": they read from a
-    // separate LocaleContext with no code path connecting the two.
+    // but UI-chrome text (t()) is a fixed English catalog lookup with no
+    // locale of its own to be swayed by the Draft.
     const draft: Draft = { baseLocale: "de", label: { de: "Prozess" } };
     const html = renderToStaticMarkup(
       withProviders(
         draft,
         <>
           <ContentLocaleSwitcher />
-          <LocaleSwitcher />
           <UiChromeTitleProbe />
         </>,
       ),
@@ -82,8 +75,7 @@ describe("content locale is independent of the UI-chrome locale", () => {
     // Content-locale switcher resolves to the Draft's own locale ("de" is
     // the only rendered <option> and it's selected).
     expect(html).toContain('<option value="de" selected="">de</option>');
-    // UI-chrome switcher and text stay on "en", unaffected by the Draft.
-    expect(html).toContain('<select class="locale-switcher" aria-label="locale"><option value="en" selected="">en</option>');
+    // UI-chrome text stays in English, unaffected by the Draft.
     expect(html).toContain("Workflow Editor");
   });
 });
