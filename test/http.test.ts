@@ -19,7 +19,7 @@ import { drainResolutions } from "../src/engine/resolution.js";
 import { ConcurrencyConflict } from "../src/engine/transition.js";
 import { createServer } from "../src/http/server.js";
 import { mapError } from "../src/http/errors.js";
-import type { ActorResolver } from "../src/auth/resolve.js";
+import { devHeaderResolver, type ActorResolver } from "../src/auth/resolve.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
@@ -439,58 +439,130 @@ test.skipIf(!DB)("an injected fake resolver is honored instead of the default de
 // CORS
 // ============================================================
 
-test.skipIf(!DB)("a normal response carries the CORS allow-origin header", async () => {
+// Three explicitly-configured servers, one per mode, so each test states
+// which configuration it exercises rather than depending on a default.
+// `fetch` (the module-level default) stays unconfigured (undefined = no
+// CORS headers) and is what every non-CORS test above already uses.
+const corsFetch = createServer(dataSourceReg, reg, sql, devHeaderResolver, "*");
+const ALLOWED_ORIGIN = "https://app.example";
+const DISALLOWED_ORIGIN = "https://evil.example";
+const allowlistFetch = createServer(dataSourceReg, reg, sql, devHeaderResolver, [ALLOWED_ORIGIN]);
+
+const withOrigin = (req: Request, origin: string): Request => {
+  const copy = new Request(req);
+  copy.headers.set("Origin", origin);
+  return copy;
+};
+
+test.skipIf(!DB)("wildcard config: a normal response carries the CORS allow-origin header", async () => {
   const PID = pid("proc_http_cors_normal");
   await publishBody(PID, simpleBody(), reg, dataSourceReg);
 
-  const res = await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1));
+  const res = await corsFetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1));
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
 });
 
-test.skipIf(!DB)("an error response also carries the CORS allow-origin header", async () => {
-  const res = await fetch(authedReq("http://x/instances/inst_does_not_exist", "GET", user1));
+test.skipIf(!DB)("wildcard config: an error response also carries the CORS allow-origin header", async () => {
+  const res = await corsFetch(authedReq("http://x/instances/inst_does_not_exist", "GET", user1));
   expect(res.status).toBe(500);
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
 });
 
-test("OPTIONS preflight on the create-instance route returns 204 with CORS headers, without creating an instance", async () => {
-  const res = await fetch(new Request("http://x/processes/proc_x/instances", { method: "OPTIONS" }));
+test.skipIf(!DB)("wildcard config: no Vary header, since the response does not depend on the request origin", async () => {
+  const res = await corsFetch(authedReq("http://x/instances/inst_does_not_exist", "GET", user1));
+  expect(res.headers.get("Vary")).toBeNull();
+});
+
+test.skipIf(!DB)("unset config (the default): no allow-origin header, but status and body are unchanged", async () => {
+  const withCors = await corsFetch(authedReq("http://x/instances/inst_does_not_exist", "GET", user1));
+  const withoutCors = await fetch(authedReq("http://x/instances/inst_does_not_exist", "GET", user1));
+  expect(withoutCors.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  expect(withoutCors.status).toBe(withCors.status);
+  expect(await withoutCors.json()).toEqual(await withCors.json());
+});
+
+test.skipIf(!DB)("allowlist config: an allowed origin is echoed back with Vary: Origin", async () => {
+  const req = withOrigin(authedReq("http://x/instances/inst_does_not_exist", "GET", user1), ALLOWED_ORIGIN);
+  const res = await allowlistFetch(req);
+  expect(res.headers.get("Access-Control-Allow-Origin")).toBe(ALLOWED_ORIGIN);
+  expect(res.headers.get("Vary")).toBe("Origin");
+});
+
+test.skipIf(!DB)("allowlist config: a disallowed origin gets no allow-origin header, but still Vary: Origin", async () => {
+  const req = withOrigin(authedReq("http://x/instances/inst_does_not_exist", "GET", user1), DISALLOWED_ORIGIN);
+  const res = await allowlistFetch(req);
+  expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  expect(res.headers.get("Vary")).toBe("Origin");
+});
+
+test.skipIf(!DB)("allowlist config: a request with no Origin header still executes normally", async () => {
+  const res = await allowlistFetch(authedReq("http://x/instances/inst_does_not_exist", "GET", user1));
+  expect(res.status).toBe(500); // the ordinary "instance not found" mapping, unaffected by CORS
+  expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+});
+
+test("wildcard config: OPTIONS preflight on the create-instance route returns 204 with CORS headers, without creating an instance", async () => {
+  const res = await corsFetch(new Request("http://x/processes/proc_x/instances", { method: "OPTIONS" }));
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
   expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles");
 });
 
-test("OPTIONS preflight on the get-instance-view route returns 204 with CORS headers", async () => {
-  const res = await fetch(new Request("http://x/instances/inst_x", { method: "OPTIONS" }));
+test("wildcard config: OPTIONS preflight on the get-instance-view route returns 204 with CORS headers", async () => {
+  const res = await corsFetch(new Request("http://x/instances/inst_x", { method: "OPTIONS" }));
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
   expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles");
 });
 
-test("OPTIONS preflight on the submit route returns 204 with CORS headers, without submitting", async () => {
-  const res = await fetch(new Request("http://x/instances/inst_x/submit", { method: "OPTIONS" }));
+test("wildcard config: OPTIONS preflight on the submit route returns 204 with CORS headers, without submitting", async () => {
+  const res = await corsFetch(new Request("http://x/instances/inst_x/submit", { method: "OPTIONS" }));
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
   expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles");
 });
 
-test("OPTIONS preflight on the claim route returns 204 with CORS headers, without claiming", async () => {
-  const res = await fetch(new Request("http://x/instances/inst_x/claim", { method: "OPTIONS" }));
+test("wildcard config: OPTIONS preflight on the claim route returns 204 with CORS headers, without claiming", async () => {
+  const res = await corsFetch(new Request("http://x/instances/inst_x/claim", { method: "OPTIONS" }));
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
   expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles");
 });
 
-test("OPTIONS preflight on the release route returns 204 with CORS headers, without releasing", async () => {
-  const res = await fetch(new Request("http://x/instances/inst_x/release", { method: "OPTIONS" }));
+test("wildcard config: OPTIONS preflight on the release route returns 204 with CORS headers, without releasing", async () => {
+  const res = await corsFetch(new Request("http://x/instances/inst_x/release", { method: "OPTIONS" }));
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
   expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles");
+});
+
+test("allowlist config: an allowed-origin preflight echoes that origin", async () => {
+  const req = withOrigin(new Request("http://x/instances/inst_x", { method: "OPTIONS" }), ALLOWED_ORIGIN);
+  const res = await allowlistFetch(req);
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Origin")).toBe(ALLOWED_ORIGIN);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
+});
+
+test("allowlist config: a disallowed-origin preflight is still 204 with methods/headers, but no allow-origin", async () => {
+  const req = withOrigin(new Request("http://x/instances/inst_x", { method: "OPTIONS" }), DISALLOWED_ORIGIN);
+  const res = await allowlistFetch(req);
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles");
+});
+
+test("unset config (the default): OPTIONS preflight is 204 with methods/headers, but no allow-origin", async () => {
+  const res = await fetch(new Request("http://x/instances/inst_x", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
 });
 
 // ============================================================

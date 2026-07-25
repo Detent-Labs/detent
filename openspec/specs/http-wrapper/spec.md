@@ -252,29 +252,77 @@ timer would never progress through the HTTP-driven flow.
   writeback and, if a guard now matches, the instance having advanced past
   that step — with no manual draining required by the caller
 
-### Requirement: HTTP wrapper responses carry permissive CORS headers
+### Requirement: HTTP wrapper responses carry configured CORS headers
 
-Every response from the HTTP wrapper, on every route, SHALL include an
-`Access-Control-Allow-Origin: *` header, so a browser `fetch` from any
-origin (e.g. a locally-running editor dev server on a different port) is
-not blocked by the browser's same-origin policy.
+The set of browser origins the HTTP wrapper permits SHALL be configuration,
+injected into `createServer` and supplied by `startHttpServer` from the
+`CORS_ALLOWED_ORIGINS` environment variable — the same composition-root
+convention `DATABASE_URL` and `PORT` already follow.
 
-#### Scenario: A successful response carries the CORS header
-- **WHEN** any of the five routes returns a successful response
+The configured value SHALL select exactly one of three behaviors, applied
+uniformly to every response on every route, success and error alike:
+
+- **unset** — no `Access-Control-Allow-Origin` header is emitted. This is the
+  default. Same-origin frontends and non-browser clients are unaffected,
+  since CORS is enforced by browsers on cross-origin requests only.
+- **`*`** — the wildcard is emitted, identical to the prior behavior, but now
+  as an explicit opt-in visible in the deployment's configuration.
+- **an origin allowlist** — the request's `Origin` is echoed back as
+  `Access-Control-Allow-Origin` when and only when it appears on the list; a
+  request from an origin not on the list receives no such header.
+
+When the response's allowed origin depends on the request's `Origin` (the
+allowlist case), the response SHALL carry `Vary: Origin`, so a shared cache
+cannot serve an allowed origin's response to a different origin.
+
+#### Scenario: An unset configuration emits no origin header
+
+- **WHEN** the server is configured with no allowed origins and any route returns a response
+- **THEN** the response carries no `Access-Control-Allow-Origin` header
+- **AND** the response body and status are exactly what the same request would produce with CORS configured
+
+#### Scenario: A wildcard configuration echoes the wildcard
+
+- **WHEN** the server is configured with `*` and any route returns a successful response
 - **THEN** the response includes `Access-Control-Allow-Origin: *`
 
-#### Scenario: An error response carries the CORS header
-- **WHEN** any of the five routes returns an error response (4xx or 5xx)
-- **THEN** the response also includes `Access-Control-Allow-Origin: *`
+#### Scenario: An error response follows the same rule as a success
+
+- **WHEN** the server is configured with `*` and a route returns a 4xx or 5xx response
+- **THEN** that response also includes `Access-Control-Allow-Origin: *`
+
+#### Scenario: An allowlisted origin is echoed back
+
+- **WHEN** the server is configured with an allowlist containing `https://app.example`
+- **AND** a request carries `Origin: https://app.example`
+- **THEN** the response includes `Access-Control-Allow-Origin: https://app.example`
+- **AND** the response includes `Vary: Origin`
+
+#### Scenario: An origin outside the allowlist receives no origin header
+
+- **WHEN** the server is configured with an allowlist not containing `https://evil.example`
+- **AND** a request carries `Origin: https://evil.example`
+- **THEN** the response carries no `Access-Control-Allow-Origin` header
+- **AND** the response still carries `Vary: Origin`
+
+#### Scenario: A request with no Origin header is unaffected
+
+- **WHEN** a request carries no `Origin` header (a non-browser client)
+- **THEN** the route executes and returns its ordinary response regardless of the configured origins
 
 ### Requirement: HTTP wrapper answers CORS preflight requests
 
-The HTTP wrapper SHALL handle `OPTIONS` requests to each of the three
-routes as a CORS preflight: respond `204 No Content` with
-`Access-Control-Allow-Origin: *`, `Access-Control-Allow-Methods` listing
-the route's actual method, and `Access-Control-Allow-Headers` including
-`Content-Type`, without invoking the underlying Runtime API Layer
-operation.
+The HTTP wrapper SHALL handle `OPTIONS` requests to each of its routes as a
+CORS preflight: respond `204 No Content` with `Access-Control-Allow-Methods`
+listing the route's actual method, `Access-Control-Allow-Headers` including
+`Content-Type`, and the `Access-Control-Allow-Origin` header determined by
+the configured allowed origins exactly as an ordinary response's is — without
+invoking the underlying Runtime API Layer operation.
+
+A preflight from an origin the configuration does not permit SHALL still
+answer `204` and SHALL omit the origin header, rather than returning an error
+status: the browser blocks the real request on the missing header, and
+preflight handling stays uniform across every route and every configuration.
 
 #### Scenario: Preflighting the create-instance route
 - **WHEN** an `OPTIONS /processes/:processId/instances` request is made
@@ -290,6 +338,13 @@ operation.
 - **WHEN** an `OPTIONS /instances/:instanceId/submit` request is made
 - **THEN** the response is `204` with the CORS headers, and
   `submitAndTransition` is not invoked
+
+#### Scenario: A preflight from a disallowed origin is answered without the origin header
+- **WHEN** the server is configured with an allowlist and an `OPTIONS` request
+  carries an `Origin` not on it
+- **THEN** the response is `204` with `Access-Control-Allow-Methods` and
+  `Access-Control-Allow-Headers`, but no `Access-Control-Allow-Origin`
+- **AND** the underlying Runtime API Layer operation is not invoked
 
 ### Requirement: Claim the current step of an instance over HTTP
 
