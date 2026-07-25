@@ -13,6 +13,9 @@ services:
     command: sleep infinity
     environment:
       DATABASE_URL: postgres://postgres:postgres@db:5432/workflow_engine
+      # Editor Player dev server (Vite default port); see configurable-cors-origins.
+      # Unset means the HTTP wrapper emits no CORS headers at all.
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
     depends_on:
       - db
 

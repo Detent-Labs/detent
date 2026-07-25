@@ -282,18 +282,44 @@ Stage-by-stage status is in `ROADMAP.md`.
   real port); `startHttpServer` wires it to a port plus `startEngine`. Five
   routes — `POST /processes/:processId/instances`, `GET /instances/:instanceId`,
   `POST /instances/:instanceId/submit`, `POST /instances/:instanceId/claim`,
-  `POST /instances/:instanceId/release` — each OPTIONS-preflighted with
-  permissive CORS (`Access-Control-Allow-Origin: *`) so the editor's dev server
-  can reach it. `routes.ts` handlers are framework-agnostic (`(parsed request) ->
-  Runtime API call -> {status, body}`, never throwing) and resolve the caller's
-  `Actor` via an injected `ActorResolver` before calling the Runtime API,
-  replacing client-supplied actor trust. `errors.ts::mapError` maps each typed
-  Runtime API error to a status (422 validation, 409 guard-refused/
-  concurrency-conflict, 401 actor-resolution, 403 assignment/claim errors, 500
-  fallback for `PinMismatch` and anything untyped — not-found deliberately stays
-  500, see design.md). `handleSubmit` special-cases `AutomaticCascadeLoop`: the
-  write already committed before it raised, so the route reports the resulting
+  `POST /instances/:instanceId/release` — each OPTIONS-preflighted, plus the
+  read/query surface (see its own entry below). `routes.ts` handlers are
+  framework-agnostic (`(parsed request) -> Runtime API call -> {status,
+  body}`, never throwing) and resolve the caller's `Actor` via an injected
+  `ActorResolver` before calling the Runtime API, replacing client-supplied
+  actor trust. `errors.ts::mapError` maps each typed Runtime API error to a
+  status (422 validation, 409 guard-refused/concurrency-conflict, 401
+  actor-resolution, 403 assignment/claim errors, 500 fallback for
+  `PinMismatch` and anything untyped — not-found deliberately stays 500, see
+  design.md). `handleSubmit` special-cases `AutomaticCascadeLoop`: the write
+  already committed before it raised, so the route reports the resulting
   (now-`faulted`) view as a 200 instead of an error.
+
+  **CORS is configuration, not a constant** (`configurable-cors-origins`):
+  `createServer` takes an `allowedOrigins` parameter (`undefined` | `"*"` |
+  `string[]`), and `startHttpServer` sources it from `CORS_ALLOWED_ORIGINS`
+  — the same composition-root convention as `DATABASE_URL`/`PORT`. Three
+  modes, one variable: unset (the default) emits no
+  `Access-Control-Allow-Origin` header at all — CORS is browser-enforced on
+  cross-origin requests only, so this is invisible to same-origin frontends,
+  server-to-server callers, and the test suite calling `createServer`'s
+  `fetch` directly; `*` reproduces the old always-permissive behavior as an
+  explicit opt-in; a comma-separated origin list echoes the request's
+  `Origin` back only when it matches, with `Vary: Origin` on every response
+  whose header depends on the request (so a shared cache cannot leak one
+  origin's response to another). A preflight from a disallowed origin still
+  answers `204` with `Access-Control-Allow-Methods`/`-Headers` but omits the
+  origin header — the browser blocks the real request on that, so there is
+  no new error status to invent. `Access-Control-Allow-Credentials` is
+  deliberately unimplemented: nothing sends cookies today (the Player's
+  actor identity travels in headers), and `*` and credentialed CORS are
+  mutually exclusive per spec — a future cookie/session-backed
+  `ActorResolver` will need the allowlist mode this change built, not the
+  wildcard, so it is that change's job to add the credentials header, not
+  this one's. The devcontainer's `app` service sets
+  `CORS_ALLOWED_ORIGINS=http://localhost:5173` (the editor's Vite dev
+  server) so the documented Player-against-engine workflow needs no extra
+  reading.
 - Player/Preview UI (`packages/editor/src/player/`, roadmap #5c): lets a human
   drive a real process instance end-to-end through the browser, against the
   HTTP wrapper — a Structure/Player toggle in `App.tsx` switches between the
