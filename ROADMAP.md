@@ -81,7 +81,7 @@
    (a worker plausibly mid-handler right now); a `pending` row, or a `claimed` row
    whose lease has expired, is instead remapped in place through the plan's
    `fieldMap` (with a `field_version` lamination stamp and a delivery-side version
-   fold guarding the residual race — see CLAUDE.md's "Current state") and the
+   fold guarding the residual race — see `docs/current-state.md`) and the
    instance migrates immediately. An unmappable instance under `reject-and-pin` is
    skipped `step-unmappable`; both skip reasons are recorded as a `migration.skipped`
    `InstanceEvent`. The
@@ -122,12 +122,12 @@
       REST/JSON adapter over `Bun.serve` exposing the same three operations
       (plus claim/release from stage d) as REST/JSON routes, with
       typed-error-to-HTTP-status mapping. See the "HTTP wrapper" entry under
-      CLAUDE.md's "Current state" for the full shape.
+      `docs/current-state.md` for the full shape.
    c. DONE. Player/Preview UI in `packages/editor/src/player/`: a form screen
       that drives a real instance through (b), reachable via a Structure/Player
       toggle in `App.tsx` — distinct from the existing read-only structural
       graph view, which shows the FSM shape, not a running instance. See the
-      "Player/Preview UI" entry under CLAUDE.md's "Current state".
+      "Player/Preview UI" entry under `docs/current-state.md`.
    d. DONE. Auth/actor resolution + assignment/claim enforcement
       (`src/auth/resolve.ts`, `transition.ts::claimStep`/`releaseClaim`,
       `registry.ts::AssignmentRegistry`). Activates the previously
@@ -136,11 +136,11 @@
       assignment strategies resolved at step entry, exclusive claim/release on
       `instance.assignment`, and claimant-only enforcement in
       `submitAndTransition`. See the "Auth/Actor-Resolution +
-      Assignment/Claim-Enforcement" entry under CLAUDE.md's "Current state".
+      Assignment/Claim-Enforcement" entry under `docs/current-state.md`.
    e. DONE. Generic `http.request` action handler (`src/handlers/http.ts`),
       registered by default in `createDefaultRegistry` (`src/engine/host.ts`).
       Vendor-neutral REST call: config validated at publish time, an
       `Idempotency-Key` dedup header on every attempt, a default `Content-Type`
       for JSON bodies, and response/failure classification into the outbox's
       existing permanent-vs-transient retry semantics. See the "Generic
-      http.request action handler" entry under CLAUDE.md's "Current state".
+      http.request action handler" entry under `docs/current-state.md`.
