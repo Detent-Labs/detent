@@ -832,6 +832,15 @@ export type MigrationTransformDroppedReason = z.infer<typeof migrationTransformD
 export const migrationSkipReason = z.enum(["step-unmappable", "pending-actions", "child-in-flight"]);
 export type MigrationSkipReason = z.infer<typeof migrationSkipReason>;
 
+/**
+ * Why an instance was parked `faulted`. One member today — a detected automatic
+ * cascade loop is the only fault cause the engine has — kept as an enum (the
+ * `timerUnarmedReason` / `migrationSkipReason` shape) so a second cause extends
+ * the payload's contract instead of changing it.
+ */
+export const instanceFaultedReason = z.enum(["automatic-cascade-loop"]);
+export type InstanceFaultedReason = z.infer<typeof instanceFaultedReason>;
+
 export const instanceEvent = z.discriminatedUnion("kind", [
   // A reminder timer (onFire actions, no targetPath) fired: actions enqueued,
   // no transition.
@@ -911,6 +920,16 @@ export const instanceEvent = z.discriminatedUnion("kind", [
     ...instanceEventEnvelope,
     kind: z.literal("assignment.released"),
     payload: z.object({ actorId: z.string() }).strict(),
+  }),
+  // An advance cascade re-entered a step it had already entered and was
+  // stopped, parking the instance `faulted`. Not a transition (no step
+  // change) — the migration.skipped shape, not the timer.fired one: no
+  // actions are enqueued by a park. `version` is the instance's own, since it
+  // did not move.
+  z.object({
+    ...instanceEventEnvelope,
+    kind: z.literal("instance.faulted"),
+    payload: z.object({ stepId, reason: instanceFaultedReason }).strict(),
   }),
 ]);
 export type InstanceEvent = z.infer<typeof instanceEvent>;

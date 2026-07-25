@@ -17,8 +17,8 @@ number ever enters a `ProcessBody`.
 **packages/editor/src/draft/file-system-access.d.ts:1** — hand-declares only
 the two File System Access API entry points `file-io.ts` actually calls, not
 the full spec. ceiling: partial type coverage, silently wrong if a new part
-of the API is used later. upgrade: **no-trigger** — no condition named for
-extending the declarations.
+of the API is used later. upgrade: extend when `file-io.ts` starts calling
+another part of the API.
 
 **src/engine/outbox.ts:22** — fixed exponential backoff (1s, 2s, 4s, …), not
 per-action configurable. ceiling: one backoff curve for every action type.
@@ -59,19 +59,18 @@ contract's originally-intended UUIDv7. ceiling: not time-sortable across
 instances. upgrade: move to v7 only when cross-instance time ordering is
 needed.
 
-**src/engine/transition.ts:658** — `markFaulted` is a bare status flip, no
-HistoryEntry/dedicated audit event. ceiling: no persisted audit trail for a
-fault park. upgrade: **no-trigger** — the comment defers a dedicated fault
-event but names no condition for adding one.
-
 ## Summary
 
-12 markers, 2 with no trigger.
+10 markers, 0 with no trigger.
 
 Changes since the last snapshot (2026-07-24, post-ponytail-audit-cleanup):
-`definitions.ts` line numbers shifted (180, was 159; 278, was 252) from that
-change's edits (the `RegistryValidationErrorBase` merge added lines above
-both markers), content unchanged. No markers added or removed — the
-`ponytail-audit-cleanup` change touched `definitions.ts` and
-`registry-check.ts`, neither of which carries a `ponytail:` marker in the
-code it deleted or restructured.
+the `src/engine/transition.ts:658` marker is resolved and removed —
+`add-instance-faulted-event` gave `markFaulted` a persisted `instance.faulted`
+`InstanceEvent` alongside the status flip, closing the "no persisted audit
+trail for a fault park" gap. The
+`packages/editor/src/draft/file-system-access.d.ts:1` marker gained a named
+trigger ("extend when `file-io.ts` starts calling another part of the API")
+and is no longer a no-trigger entry. `definitions.ts` line numbers shifted
+(180, was 159; 278, was 252) from the prior change's edits (the
+`RegistryValidationErrorBase` merge added lines above both markers), content
+unchanged.

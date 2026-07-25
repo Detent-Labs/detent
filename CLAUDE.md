@@ -158,7 +158,7 @@ no step change get a sibling record, `InstanceEvent` (append-only, `evt_` ids): 
 discriminated union over `kind` with a kind-specific payload, carrying the instance,
 the `version` and the `transitionSeq` **in force**. An event never advances the
 sequence, so several may share one and share it with a transition; they order by
-`at`. Eight kinds exist — `timer.fired` (a reminder fired: actions enqueued, no
+`at`. Nine kinds exist — `timer.fired` (a reminder fired: actions enqueued, no
 transition), `timer.unarmed` (a declared timer produced no `fireAt` at entry, with
 the reason), `migration.skipped` (an instance left on its source version, with the
 reason), `subprocess.spawn-enqueued` (creation at a subprocess initial step
@@ -169,13 +169,17 @@ subprocess step matched, so the parent stays parked),
 could not be made JSON-safe, so its target field went unwritten; the `version` it
 carries is the TARGET version, since the `fieldId` it names is declared there),
 `assignment.claimed` (an actor claimed an unclaimed, assignment-bearing step;
-payload `{actorId}`), and `assignment.released` (the claimant released their
-claim on the current step; payload `{actorId}`). The latter two are not
+payload `{actorId}`), `assignment.released` (the claimant released their
+claim on the current step; payload `{actorId}`), and `instance.faulted` (an
+automatic cascade re-entered a step it already entered and was parked `faulted`;
+payload `{stepId, reason}`, `stepId` the repeated step). The latter three are not
 transition-shaped either — no step change, so no HistoryEntry and no
-`transitionSeq` advance, the same reasoning as `migration.skipped`.
+`transitionSeq` advance, the same reasoning as `migration.skipped`; the flip and
+the event for `instance.faulted` commit in one transaction, guarded by the same
+OCC predicate, so a `faulted` instance cannot exist without its event.
 Kinds are added additively; the record shape is settled. A kind that enqueues
 actions carries their `ActionOutcome`s — `timer.fired` and
-`subprocess.spawn-enqueued` do, the other six enqueue nothing and so must not
+`subprocess.spawn-enqueued` do, the other seven enqueue nothing and so must not
 invite a reader to expect outcomes.
 
 An `ActionOutcome` attaches to the record that **enqueued** the action, carried on the

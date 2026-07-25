@@ -17,7 +17,7 @@ import {
   AutomaticCascadeLoop,
 } from "../src/engine/transition.js";
 import { drainResolutions } from "../src/engine/resolution.js";
-import type { ProcessBody, Instance, Step, HistoryEntry } from "../src/schema/definition.js";
+import type { ProcessBody, Instance, Step, HistoryEntry, InstanceEvent } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
 const DB = !!process.env.DATABASE_URL;
@@ -128,6 +128,10 @@ const histEntries = async (id: string): Promise<HistoryEntry[]> => {
   const r = (await sql`SELECT entry FROM history_entries WHERE instance_id = ${id} ORDER BY transition_seq`) as { entry: unknown }[];
   return r.map((row) => (typeof row.entry === "string" ? JSON.parse(row.entry) : row.entry) as HistoryEntry);
 };
+const eventsOf = async (id: string): Promise<InstanceEvent[]> => {
+  const r = (await sql`SELECT event FROM instance_events WHERE instance_id = ${id} ORDER BY id`) as { event: unknown }[];
+  return r.map((row) => (typeof row.event === "string" ? JSON.parse(row.event) : row.event) as InstanceEvent);
+};
 
 // step_a (manual) -> step_g (automatic, guardless) -> step_t (terminal)
 const cascadeBody = (): ProcessBody =>
@@ -175,6 +179,20 @@ test.skipIf(!DB)("a data-independent cascade loop parks the instance faulted and
     ["step_g", "step_h"],
     ["step_h", "step_g"],
   ]);
+  // Entries above 1: no HistoryEntry for the park itself.
+  expect(entries.length).toBe(3);
+
+  // The park is durably recorded as an instance.faulted event, not just the
+  // thrown AutomaticCascadeLoop.
+  const persistedSeq = await seqOf(i.instanceId);
+  const events = await eventsOf(i.instanceId);
+  const faultEvents = events.filter((e) => e.kind === "instance.faulted");
+  expect(faultEvents.length).toBe(1);
+  const faultEvent = faultEvents[0]!;
+  expect(faultEvent.payload).toEqual({ stepId: "step_g", reason: "automatic-cascade-loop" });
+  // The event carries the seq the instance rests at without advancing it.
+  expect(faultEvent.transitionSeq).toBe(persistedSeq);
+  expect("actions" in faultEvent).toBe(false);
 });
 
 test.skipIf(!DB)("startInstance advances an instance created on an automatic initial step", async () => {

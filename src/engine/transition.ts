@@ -655,14 +655,30 @@ export async function executeAutomaticTransition(
 
 /**
  * Park a looped instance in an error state: flip status to `faulted` at its
- * current seq. ponytail: a status flip, not a transition — no seq bump and no
- * HistoryEntry (a dedicated fault audit event is deferred; the thrown
- * AutomaticCascadeLoop names the repeated step).
+ * current seq and append the `instance.faulted` event recording why. Not a
+ * transition — no seq bump, no HistoryEntry — so flip and event are written in
+ * one transaction guarded by the same OCC predicate: if the instance moved
+ * concurrently the UPDATE matches no row and neither the flip nor the event is
+ * written. The thrown AutomaticCascadeLoop still names the repeated step to the
+ * caller; this is the durable copy of that fact.
  */
-async function markFaulted(instance: Instance, db: SQL): Promise<void> {
-  await db`UPDATE instances
-    SET body = jsonb_set(body, '{status}', (${["faulted"]}::jsonb) -> 0)
-    WHERE instance_id = ${instance.instanceId} AND transition_seq = ${instance.transitionSeq}`;
+async function markFaulted(instance: Instance, repeatedStepId: Step["id"], db: SQL): Promise<void> {
+  await withTransaction(db, async (tx) => {
+    const upd = (await tx`UPDATE instances
+      SET body = jsonb_set(body, '{status}', (${["faulted"]}::jsonb) -> 0)
+      WHERE instance_id = ${instance.instanceId} AND transition_seq = ${instance.transitionSeq}
+      RETURNING instance_id`) as unknown[];
+    if (upd.length === 0) return; // lost the OCC race: instance moved, nothing to record
+    await appendInstanceEvent(tx, {
+      id: newInstanceEventId(),
+      instanceId: instance.instanceId,
+      transitionSeq: instance.transitionSeq,
+      version: instance.version,
+      kind: "instance.faulted",
+      payload: { stepId: repeatedStepId, reason: "automatic-cascade-loop" },
+      at: new Date().toISOString(),
+    });
+  });
 }
 
 /**
@@ -693,7 +709,7 @@ export async function resolveAutomatic(
 
     current = await executeAutomaticTransition(current, path, body, db);
     if (seen.has(current.currentStepId)) {
-      await markFaulted(current, db);
+      await markFaulted(current, current.currentStepId, db);
       throw new AutomaticCascadeLoop(current.currentStepId);
     }
     seen.add(current.currentStepId);
