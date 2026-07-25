@@ -40,6 +40,15 @@ const spawnEnqueued = () => ({
   payload: { stepId: "step_1a2b3c4d-0000-4000-8000-000000000005" },
 });
 
+const faulted = () => ({
+  ...fired(),
+  kind: "instance.faulted",
+  payload: {
+    stepId: "step_1a2b3c4d-0000-4000-8000-000000000005",
+    reason: "automatic-cascade-loop",
+  },
+});
+
 describe("InstanceEvent", () => {
   it("accepts both declared kinds", () => {
     expect(instanceEvent.safeParse(fired()).success).toBe(true);
@@ -103,6 +112,12 @@ describe("InstanceEvent", () => {
   it("rejects an unknown reason on timer.unarmed", () => {
     const e = unarmed();
     expect(instanceEvent.safeParse({ ...e, payload: { ...e.payload, reason: "unresolved" } }).success).toBe(false);
+  });
+
+  it("accepts instance.faulted and rejects an unknown reason", () => {
+    const e = faulted();
+    expect(instanceEvent.safeParse(e).success).toBe(true);
+    expect(instanceEvent.safeParse({ ...e, payload: { ...e.payload, reason: "unknown-cause" } }).success).toBe(false);
   });
 
   it("rejects a missing version", () => {

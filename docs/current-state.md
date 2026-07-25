@@ -199,7 +199,11 @@ Stage-by-stage status is in `ROADMAP.md`.
   unrehydratable. A `faulted` instance is a dead-end park: `executeManualTransition`
   and `fireTimer` both gate on `status !== "running"`, so it can be neither
   advanced manually nor moved by a timer (it also cannot be cancelled — the same
-  gate).
+  gate). The park itself (`markFaulted`, on a detected cascade loop) commits the
+  status flip and an `instance.faulted` `InstanceEvent` — `{stepId, reason:
+  "automatic-cascade-loop"}` — in one transaction guarded by the same
+  `transitionSeq` OCC predicate, so the durable record and the thrown
+  `AutomaticCascadeLoop` always agree on why the instance is parked.
 - Runtime API Layer (`src/runtime/api.ts`, `test/runtime-api.test.ts`): the
   first library boundary a UI can call without touching engine internals —
   three operations, no HTTP transport, no auth/actor resolution (every
