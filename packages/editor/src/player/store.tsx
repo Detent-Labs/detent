@@ -1,16 +1,15 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { createInstance as apiCreateInstance, getInstanceView as apiGetInstanceView, submit as apiSubmit, PlayerClientError } from "./client";
-import type { Actor, ClientError, InstanceView, ResolvedViewField } from "./types";
+import { createInstance as apiCreateInstance, getInstanceView as apiGetInstanceView, submit as apiSubmit, login as apiLogin, PlayerClientError } from "./client";
+import type { ClientError, InstanceView, ResolvedViewField } from "./types";
 
 export const STORAGE_KEY = "player.connection";
 
 export interface StoredConnection {
   serverUrl: string;
-  actorId: string;
-  actorRoles: string;
+  token: string;
 }
 
-export const DEFAULT_CONNECTION: StoredConnection = { serverUrl: "http://localhost:3000", actorId: "", actorRoles: "" };
+export const DEFAULT_CONNECTION: StoredConnection = { serverUrl: "http://localhost:3000", token: "" };
 
 interface StorageLike {
   getItem(key: string): string | null;
@@ -74,12 +73,12 @@ export function parseSeedData(seedDataJson: string): Record<string, unknown> | u
 export async function createInstanceAndFetchView(
   serverUrl: string,
   processId: string,
-  actor: Actor,
+  token: string,
   opts: { version?: number; seedDataJson: string },
 ): Promise<{ instanceId: string; view: InstanceView }> {
   const data = parseSeedData(opts.seedDataJson);
-  const created = await apiCreateInstance(serverUrl, processId, actor, { version: opts.version, data });
-  const view = await apiGetInstanceView(serverUrl, created.instanceId, actor);
+  const created = await apiCreateInstance(serverUrl, processId, token, { version: opts.version, data });
+  const view = await apiGetInstanceView(serverUrl, created.instanceId, token);
   return { instanceId: created.instanceId, view };
 }
 
@@ -91,19 +90,19 @@ export async function submitAndFetchView(
   instanceId: string,
   pathId: string,
   data: Record<string, unknown>,
-  actor: Actor,
+  token: string,
   currentView: InstanceView,
 ): Promise<InstanceView> {
-  await apiSubmit(serverUrl, instanceId, pathId, filterToEditable(data, currentView), actor);
-  return apiGetInstanceView(serverUrl, instanceId, actor);
+  await apiSubmit(serverUrl, instanceId, pathId, filterToEditable(data, currentView), token);
+  return apiGetInstanceView(serverUrl, instanceId, token);
 }
 
 interface PlayerContextValue {
   serverUrl: string;
-  actorId: string;
-  actorRoles: string;
+  isLoggedIn: boolean;
   setServerUrl: (url: string) => void;
-  setActor: (actorId: string, actorRoles: string) => void;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => void;
   instanceId: string | undefined;
   view: InstanceView | undefined;
   loading: boolean;
@@ -118,7 +117,7 @@ const PlayerContext = createContext<PlayerContextValue | null>(null);
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const [connection, setConnection] = useState<StoredConnection>(() => loadStoredConnection());
-  const { serverUrl, actorId, actorRoles } = connection;
+  const { serverUrl, token } = connection;
   const [instanceId, setInstanceId] = useState<string | undefined>(undefined);
   const [view, setView] = useState<InstanceView | undefined>(undefined);
   const [loading, setLoading] = useState(false);
@@ -128,21 +127,43 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     persistConnection(connection);
   }, [connection]);
 
-  const actor = (): Actor => ({
-    id: actorId,
-    roles: actorRoles
-      .split(",")
-      .map((r) => r.trim())
-      .filter(Boolean),
-  });
+  const logout = () => {
+    setConnection((c) => ({ ...c, token: "" }));
+    setInstanceId(undefined);
+    setView(undefined);
+  };
 
+  const toClientError = (err: unknown): ClientError =>
+    err instanceof PlayerClientError ? err.error : { type: "internal", message: err instanceof Error ? err.message : String(err) };
+
+  /** For every authenticated call: a 401 means an invalid/expired session —
+   * discard the token and return to the login screen (no error shown; the
+   * login screen itself is the signal). No client-side expiry tracking. */
   const run = async (fn: () => Promise<void>) => {
     setLoading(true);
     setError(undefined);
     try {
       await fn();
     } catch (err) {
-      setError(err instanceof PlayerClientError ? err.error : { type: "internal", message: err instanceof Error ? err.message : String(err) });
+      if (err instanceof PlayerClientError && err.status === 401) {
+        logout();
+        return;
+      }
+      setError(toClientError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /** Login's own 401 (wrong credentials) is reported as a generic failure,
+   * not treated as "session expired" — there is no session yet to discard. */
+  const runLogin = async (fn: () => Promise<void>) => {
+    setLoading(true);
+    setError(undefined);
+    try {
+      await fn();
+    } catch (err) {
+      setError(toClientError(err));
     } finally {
       setLoading(false);
     }
@@ -150,35 +171,39 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const value: PlayerContextValue = {
     serverUrl,
-    actorId,
-    actorRoles,
+    isLoggedIn: token !== "",
     setServerUrl: (url) => setConnection((c) => ({ ...c, serverUrl: url })),
-    setActor: (id, roles) => setConnection((c) => ({ ...c, actorId: id, actorRoles: roles })),
+    login: (email, password) =>
+      runLogin(async () => {
+        const result = await apiLogin(serverUrl, email, password);
+        setConnection((c) => ({ ...c, token: result.token }));
+      }),
+    logout,
     instanceId,
     view,
     loading,
     error,
     createInstance: (processId, version, seedDataJson) =>
       run(async () => {
-        const created = await createInstanceAndFetchView(serverUrl, processId, actor(), { version, seedDataJson });
+        const created = await createInstanceAndFetchView(serverUrl, processId, token, { version, seedDataJson });
         setInstanceId(created.instanceId);
         setView(created.view);
       }),
     openInstance: (id) =>
       run(async () => {
-        const nextView = await apiGetInstanceView(serverUrl, id, actor());
+        const nextView = await apiGetInstanceView(serverUrl, id, token);
         setInstanceId(id);
         setView(nextView);
       }),
     refresh: () =>
       run(async () => {
         if (!instanceId) return;
-        setView(await apiGetInstanceView(serverUrl, instanceId, actor()));
+        setView(await apiGetInstanceView(serverUrl, instanceId, token));
       }),
     submit: (pathId, data) =>
       run(async () => {
         if (!instanceId || !view) return;
-        setView(await submitAndFetchView(serverUrl, instanceId, pathId, data, actor(), view));
+        setView(await submitAndFetchView(serverUrl, instanceId, pathId, data, token, view));
       }),
   };
 

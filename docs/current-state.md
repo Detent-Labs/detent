@@ -498,3 +498,75 @@ Stage-by-stage status is in `ROADMAP.md`.
   process definition or cancel any instance. This is recorded as an explicit,
   known gap (see `openspec/changes/add-read-query-api`), not silently
   accepted; a real identity provider is a separate change.
+- Authentication (`src/auth/{jwt,users,login,cli}.ts`, `add-authentication`):
+  closes the gap the previous entry recorded. `jwtResolver` (`src/auth/jwt.ts`)
+  is a second, production-capable `ActorResolver`: reads
+  `Authorization: Bearer <jwt>`, dispatches on the token's `iss` claim
+  (`"bps"` -> the local HS256 signing key; anything else -> that issuer's
+  JWKS via `jose`'s `createRemoteJWKSet`, cached per URL), verifies
+  signature/`exp`/`aud`, and maps `sub` -> `Actor.id` plus the issuer's
+  configured `rolesClaim` -> `Actor.roles` (defaulting to `[]`). Both
+  branches produce the same `Actor`, so a local account and an external IdP
+  identity (e.g. Entra ID, added later as one `AUTH_ISSUERS` entry) are
+  accepted simultaneously — no rewrite for a migration period. Project-local
+  accounts live in a new `auth_users` table (`user_id` PK — the value used as
+  `Actor.id` — `email` unique, `password_hash`, `roles text[]`, `disabled`),
+  added to the existing `ensureSchema`/`initSchema` DDL in `src/engine/store.ts`.
+  `src/auth/users.ts::createUser`/`verifyLogin` hash and verify passwords with
+  `Bun.password` (argon2id, no new dependency); a wrong password, an unknown
+  email and a `disabled` user all fail identically, so `verifyLogin`'s result
+  (and `POST /auth/login`'s response) discloses nothing about which accounts
+  exist. `src/auth/login.ts::handleLogin` is the one HTTP entry point: email +
+  password in, an 8-hour `iss: "bps"` token out; there is no registration,
+  password-reset, MFA, refresh or revocation. Users are administered only from
+  `src/auth/cli.ts` (`add-user` / `set-roles` / `set-password`) — no HTTP
+  route creates, modifies or lists them. The resolver-credential seam changed
+  shape: `ActorResolver`'s credential is now the request's `Headers` directly
+  (`devHeaderResolver` reads `X-Actor-Id`/`X-Actor-Roles` off them itself),
+  not a resolver-specific object `routes.ts::extractCredential` used to
+  pre-extract; the removed `DevHeaderCredential` type is gone.
+  `src/http/server.ts::resolveAuthResolver` selects the server's resolver from
+  two environment variables, the same composition-root convention as
+  `DATABASE_URL`/`CORS_ALLOWED_ORIGINS`: `AUTH_JWT_SECRET` (the local signing
+  key) and `AUTH_ISSUERS` (a JSON array of `{iss, jwksUrl, audience,
+  rolesClaim}`, parsed and shape-checked by `parseAuthIssuers` — a malformed
+  value throws, failing startup loudly rather than silently disabling
+  issuers). If either is set the JWT resolver is active and `devHeaderResolver`
+  is not; if neither is set `devHeaderResolver` stays the default, which is
+  what keeps `test/http.test.ts` unchanged and green with no auth env set.
+  `createServer` registers `POST /auth/login` only when a signing key is
+  passed in — there is no state where the login route is reachable without
+  one, and it is otherwise a plain `404`. **All four `add-read-query-api` list
+  routes now also resolve the actor** (`handleListInstances`,
+  `handleInstanceRecord`, `handleListProcesses`, `handleListVersions`): a
+  code-review pass on this change found they had shipped with no
+  `ActorResolver` call at all, so `GET /instances`, `GET
+  /instances/:id/record`, `GET /processes` and `GET
+  /processes/:processId/versions` stayed fully open even with
+  `AUTH_JWT_SECRET` set — defeating the point of turning auth on. Fixed by
+  threading `resolver` through the same `resolveActor(req, resolver)` call
+  every other route already used; `test/http.test.ts`'s pre-existing
+  unauthenticated calls to these four routes were updated to carry a
+  credential accordingly (the dev resolver requires one now too, matching
+  every other route — the "no auth env set" default behavior that stays
+  unchanged is the *resolver selection*, not "these four routes need no
+  actor"). The CORS preflight
+  `Access-Control-Allow-Headers` list gained `Authorization` (alongside the
+  existing `Content-Type, X-Actor-Id, X-Actor-Roles`) so a browser can
+  actually send a bearer token cross-origin. The Player
+  (`packages/editor/src/player/`) connection form is now a login form (server
+  URL + email + password): `client.ts::login` calls `POST /auth/login` and
+  `store.tsx` persists `{serverUrl, token}` to `localStorage` (replacing the
+  old `{serverUrl, actorId, actorRoles}` shape) instead of actor fields, sends
+  `Authorization: Bearer <token>` on every call, and treats any `401`
+  (`PlayerClientError.status === 401`) as an invalid session — discarding the
+  token and returning to the login screen, which is also how an 8-hour expiry
+  surfaces, since the Player tracks no client-side lifetime. **Authorization
+  is still out of scope**: every authenticated actor keeps today's
+  permissions (any account can publish, cancel any instance, act as any actor
+  id it is assigned) — the gap narrows from "anyone" to "anyone with an
+  account", it does not close; that is the deliberate follow-up change.
+  **Known operational gap, recorded not silently accepted:** `/auth/login`
+  has no rate limit. The brake is `Bun.password`'s argon2id cost (~100ms per
+  attempt); a correct limiter needs a store shared across processes, which
+  this change deliberately does not build.

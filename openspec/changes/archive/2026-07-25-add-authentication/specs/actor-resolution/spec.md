@@ -1,18 +1,4 @@
-# actor-resolution
-
-## Purpose
-
-Defines the pluggable extension point that turns an untrusted request
-credential into a trusted `Actor { id, roles }` before it reaches the
-Runtime API Layer. Core ships two implementations: the non-production dev
-header resolver (below) and the production-capable JWT resolver (see the
-`jwt-authentication` capability, `src/auth/jwt.ts`). A host wires exactly
-one at startup; which is a composition-root decision, never both active at
-once. Enforcement (assignment/claim) and resolution are deliberately
-decoupled: enforcement works against whatever `Actor` it is given,
-regardless of how it was produced.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: ActorResolver is a pluggable extension point with no default production implementation
 
@@ -37,18 +23,6 @@ active at once.
 - **WHEN** the HTTP server is constructed
 - **THEN** it holds exactly one `ActorResolver`, and no route consults a second
   one
-
-### Requirement: A resolver that cannot authenticate a credential throws a distinct error
-
-An `ActorResolver` implementation, when given a credential it cannot turn
-into a trusted `Actor`, SHALL throw `ActorResolutionError` rather than
-returning a placeholder or default `Actor`.
-
-#### Scenario: An unresolvable credential throws ActorResolutionError
-
-- **WHEN** an `ActorResolver` is invoked with a credential it cannot
-  authenticate
-- **THEN** it throws `ActorResolutionError` and produces no `Actor`
 
 ### Requirement: The dev header-based resolver constructs an Actor from trusted headers
 
@@ -76,6 +50,8 @@ or empty.
 - **WHEN** the dev resolver is called with headers carrying `X-Actor-Id: user_1`
   and no `X-Actor-Roles`
 - **THEN** it resolves to `Actor { id: "user_1", roles: [] }`
+
+## ADDED Requirements
 
 ### Requirement: A resolver receives the request headers, not a resolver-specific credential shape
 
