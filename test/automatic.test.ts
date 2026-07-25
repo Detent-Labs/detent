@@ -189,7 +189,7 @@ test.skipIf(!DB)("a data-independent cascade loop parks the instance faulted and
   const faultEvents = events.filter((e) => e.kind === "instance.faulted");
   expect(faultEvents.length).toBe(1);
   const faultEvent = faultEvents[0]!;
-  expect(faultEvent.payload).toEqual({ stepId: "step_g", reason: "automatic-cascade-loop" });
+  expect(faultEvent.payload as Record<string, unknown>).toEqual({ stepId: "step_g", reason: "automatic-cascade-loop" });
   // The event carries the seq the instance rests at without advancing it.
   expect(faultEvent.transitionSeq).toBe(persistedSeq);
   expect("actions" in faultEvent).toBe(false);
