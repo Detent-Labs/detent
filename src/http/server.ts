@@ -10,6 +10,8 @@ import { sql } from "../engine/store.js";
 import { startEngine, createDefaultDataSourceRegistry } from "../engine/host.js";
 import { createRegistry, type Registry, type DataSourceRegistry } from "../engine/registry.js";
 import { devHeaderResolver, type ActorResolver } from "../auth/resolve.js";
+import { jwtResolver, type IssuerConfig } from "../auth/jwt.js";
+import { handleLogin } from "../auth/login.js";
 import {
   handleCreateInstance,
   handleGetInstanceView,
@@ -71,9 +73,50 @@ function preflightResponse(methods: string, allowed: AllowedOrigins, requestOrig
     headers: {
       ...corsHeaders(allowed, requestOrigin),
       "Access-Control-Allow-Methods": methods,
-      "Access-Control-Allow-Headers": "Content-Type, X-Actor-Id, X-Actor-Roles",
+      "Access-Control-Allow-Headers": "Content-Type, X-Actor-Id, X-Actor-Roles, Authorization",
     },
   });
+}
+
+/**
+ * Parse `AUTH_ISSUERS`: a JSON array of `{iss, jwksUrl, audience, rolesClaim}`.
+ * Unset or empty means no external issuers. A malformed value throws rather
+ * than silently disabling issuers — the composition root lets this propagate
+ * so startup fails loudly (design.md "Configuration selects the resolver").
+ */
+export function parseAuthIssuers(raw: string | undefined): IssuerConfig[] | undefined {
+  if (!raw || !raw.trim()) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("AUTH_ISSUERS is not valid JSON");
+  }
+  if (!Array.isArray(parsed)) throw new Error("AUTH_ISSUERS must be a JSON array");
+  return parsed.map((entry, i) => {
+    if (
+      typeof entry !== "object" ||
+      entry === null ||
+      typeof (entry as Record<string, unknown>).iss !== "string" ||
+      typeof (entry as Record<string, unknown>).jwksUrl !== "string" ||
+      typeof (entry as Record<string, unknown>).audience !== "string" ||
+      typeof (entry as Record<string, unknown>).rolesClaim !== "string"
+    ) {
+      throw new Error(`AUTH_ISSUERS[${i}] must be { iss, jwksUrl, audience, rolesClaim } (all strings)`);
+    }
+    return entry as IssuerConfig;
+  });
+}
+
+/**
+ * Select the server's `ActorResolver` from `AUTH_JWT_SECRET` /
+ * `AUTH_ISSUERS`: the JWT resolver if either is set, `devHeaderResolver`
+ * otherwise. The two are never active simultaneously.
+ */
+export function resolveAuthResolver(env: { AUTH_JWT_SECRET?: string; AUTH_ISSUERS?: string }): ActorResolver {
+  const issuers = parseAuthIssuers(env.AUTH_ISSUERS);
+  if (!env.AUTH_JWT_SECRET && !issuers) return devHeaderResolver;
+  return jwtResolver({ localSecret: env.AUTH_JWT_SECRET, issuers });
 }
 
 /**
@@ -94,12 +137,18 @@ function preflightResponse(methods: string, allowed: AllowedOrigins, requestOrig
  * caller that wants the prior always-`*` behavior passes `"*"` explicitly;
  * `startHttpServer` sources it from `CORS_ALLOWED_ORIGINS`.
  */
+/**
+ * `loginSecret` is `AUTH_JWT_SECRET`: `POST /auth/login` is registered only
+ * when it is set, so there is no state in which the login route is reachable
+ * without a signing key (jwt-authentication spec, "no login without a key").
+ */
 export function createServer(
   dataSourceRegistry: DataSourceRegistry,
   registry: Registry,
   db: SQL = sql,
   resolver: ActorResolver = devHeaderResolver,
   allowedOrigins: AllowedOrigins = undefined,
+  loginSecret: string | undefined = undefined,
 ): (req: Request) => Promise<Response> {
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
@@ -109,6 +158,9 @@ export function createServer(
     const preflight = (methods: string) => preflightResponse(methods, allowedOrigins, origin);
 
     // CORS preflight for every route below
+    if (loginSecret && req.method === "OPTIONS" && parts.length === 2 && parts[0] === "auth" && parts[1] === "login") {
+      return preflight("POST");
+    }
     if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "processes" && parts[2] === "instances") {
       return preflight("POST");
     }
@@ -140,13 +192,17 @@ export function createServer(
       return preflight("GET");
     }
 
+    // POST /auth/login
+    if (loginSecret && req.method === "POST" && parts.length === 2 && parts[0] === "auth" && parts[1] === "login") {
+      return toRes(await handleLogin(req, loginSecret, db));
+    }
     // POST /processes/:processId/instances
     if (req.method === "POST" && parts.length === 3 && parts[0] === "processes" && parts[2] === "instances") {
       return toRes(await handleCreateInstance(parts[1]!, req, resolver, dataSourceRegistry, db));
     }
     // GET /instances (list)
     if (req.method === "GET" && parts.length === 1 && parts[0] === "instances") {
-      return toRes(await handleListInstances(req, db));
+      return toRes(await handleListInstances(req, resolver, db));
     }
     // GET /instances/:instanceId
     if (req.method === "GET" && parts.length === 2 && parts[0] === "instances") {
@@ -166,7 +222,7 @@ export function createServer(
     }
     // GET /instances/:instanceId/record
     if (req.method === "GET" && parts.length === 3 && parts[0] === "instances" && parts[2] === "record") {
-      return toRes(await handleInstanceRecord(parts[1]!, req, db));
+      return toRes(await handleInstanceRecord(parts[1]!, req, resolver, db));
     }
     // POST /instances/:instanceId/cancel
     if (req.method === "POST" && parts.length === 3 && parts[0] === "instances" && parts[2] === "cancel") {
@@ -178,11 +234,11 @@ export function createServer(
     }
     // GET /processes (list)
     if (req.method === "GET" && parts.length === 1 && parts[0] === "processes") {
-      return toRes(await handleListProcesses(db));
+      return toRes(await handleListProcesses(req, resolver, db));
     }
     // GET /processes/:processId/versions
     if (req.method === "GET" && parts.length === 3 && parts[0] === "processes" && parts[2] === "versions") {
-      return toRes(await handleListVersions(parts[1]!, db));
+      return toRes(await handleListVersions(parts[1]!, req, resolver, db));
     }
 
     return toRes({ status: 404, body: { error: { type: "not-found", message: `no route: ${req.method} ${url.pathname}` } } });
@@ -193,10 +249,10 @@ export function startHttpServer(
   registry: Registry,
   dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
-  resolver: ActorResolver = devHeaderResolver,
+  resolver: ActorResolver = resolveAuthResolver({ AUTH_JWT_SECRET: process.env.AUTH_JWT_SECRET, AUTH_ISSUERS: process.env.AUTH_ISSUERS }),
 ): { stop: () => void } {
   const allowedOrigins = parseAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS);
-  const fetch = createServer(dataSourceRegistry, registry, db, resolver, allowedOrigins);
+  const fetch = createServer(dataSourceRegistry, registry, db, resolver, allowedOrigins, process.env.AUTH_JWT_SECRET);
   const port = Number(process.env.PORT ?? 3000);
   const server = Bun.serve({ fetch, port });
   const engine = startEngine(db, registry);

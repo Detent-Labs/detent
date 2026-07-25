@@ -48,6 +48,12 @@ export interface Actor {
   roles: string[];
 }
 
+export interface LoginResponse {
+  token: string;
+  expiresAt: string;
+  actor: Actor;
+}
+
 export interface SubmissionIssue {
   kind: string;
   fieldId: string;

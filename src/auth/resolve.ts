@@ -6,12 +6,14 @@
  * here alters that contract, it only supplies where one boundary gets its
  * value from.
  *
- * No concrete identity provider (password/JWT/OIDC) ships in core — a headless
- * engine is not itself an identity provider. Only the extension point and one
- * non-production dev resolver (below) live here.
+ * Core ships two implementations: the non-production `devHeaderResolver`
+ * (below) and the production-capable `jwtResolver` (`src/auth/jwt.ts`). A
+ * host wires exactly one at startup; which is a composition-root decision
+ * (`src/http/server.ts`), never both at once.
  */
 import type { Actor } from "../cel/eval.js";
 
+/** The credential is the request's `Headers`; each resolver reads whatever it needs. */
 export type ActorResolver = (credential: unknown) => Promise<Actor>;
 
 /** A credential could not be resolved into a trusted Actor. */
@@ -21,12 +23,6 @@ export class ActorResolutionError extends Error {
     this.name = "ActorResolutionError";
   }
 }
-
-/** The shape the dev header-based resolver expects, extracted by the caller from request headers. */
-export type DevHeaderCredential = {
-  actorIdHeader: string | null | undefined;
-  actorRolesHeader: string | null | undefined;
-};
 
 /**
  * Non-production resolver for local/dev/example use: trusts a pair of headers
@@ -38,8 +34,10 @@ export type DevHeaderCredential = {
  * a real user's data ever reaches.
  */
 export const devHeaderResolver: ActorResolver = async (credential) => {
-  const { actorIdHeader, actorRolesHeader } = credential as DevHeaderCredential;
+  const headers = credential as Headers;
+  const actorIdHeader = headers.get("X-Actor-Id");
   if (!actorIdHeader) throw new ActorResolutionError("missing X-Actor-Id header");
+  const actorRolesHeader = headers.get("X-Actor-Roles");
   const roles = actorRolesHeader ? actorRolesHeader.split(",").map((r) => r.trim()).filter(Boolean) : [];
   return { id: actorIdHeader, roles };
 };

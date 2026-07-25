@@ -22,20 +22,19 @@ import {
 import { publishBody, listProcesses, listVersions } from "../engine/definitions.js";
 import { instanceStatus } from "../schema/definition.js";
 import type { Actor } from "../cel/eval.js";
-import type { ActorResolver, DevHeaderCredential } from "../auth/resolve.js";
+import type { ActorResolver } from "../auth/resolve.js";
 import type { Registry, DataSourceRegistry } from "../engine/registry.js";
 import type { Instance, PathId, ProcessId, InstanceId, StepId, ProcessBody } from "../schema/definition.js";
 import { mapError, RequestShapeError, type HttpResult } from "./errors.js";
 
 /**
- * Extract the dev header-based credential from a request — the one concrete
- * `ActorResolver` shipped in core. A resolver expecting a different credential
- * shape (JWT, session cookie, …) needs its own extraction here; this wrapper
- * ships only the dev resolver's convention, matching the "extracts a
- * credential from the request (transport detail)" split in design.md.
+ * The credential handed to an `ActorResolver` is the request's `Headers`
+ * unchanged — each resolver reads whatever it needs (`Authorization` for
+ * JWT, `X-Actor-Id`/`X-Actor-Roles` for the dev resolver). No
+ * resolver-specific field is pre-extracted here.
  */
-function extractCredential(req: Request): DevHeaderCredential {
-  return { actorIdHeader: req.headers.get("X-Actor-Id"), actorRolesHeader: req.headers.get("X-Actor-Roles") };
+function extractCredential(req: Request): Headers {
+  return req.headers;
 }
 
 async function resolveActor(req: Request, resolver: ActorResolver): Promise<Actor> {
@@ -139,8 +138,9 @@ function parseStatuses(url: URL): Instance["status"][] | undefined {
   });
 }
 
-export async function handleListInstances(req: Request, db: SQL = sql): Promise<HttpResult> {
+export async function handleListInstances(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   try {
+    await resolveActor(req, resolver);
     const url = new URL(req.url);
     const filter: InstanceListFilter = {
       processId: (url.searchParams.get("processId") as ProcessId) ?? undefined,
@@ -159,8 +159,9 @@ export async function handleListInstances(req: Request, db: SQL = sql): Promise<
   }
 }
 
-export async function handleInstanceRecord(instanceId: string, req: Request, db: SQL = sql): Promise<HttpResult> {
+export async function handleInstanceRecord(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   try {
+    await resolveActor(req, resolver);
     const url = new URL(req.url);
     const limit = parseLimit(url);
     const cursor = url.searchParams.get("cursor") ?? undefined;
@@ -222,16 +223,18 @@ export async function handlePublish(
   }
 }
 
-export async function handleListProcesses(db: SQL = sql): Promise<HttpResult> {
+export async function handleListProcesses(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   try {
+    await resolveActor(req, resolver);
     return { status: 200, body: await listProcesses(db) };
   } catch (err) {
     return mapError(err);
   }
 }
 
-export async function handleListVersions(processId: string, db: SQL = sql): Promise<HttpResult> {
+export async function handleListVersions(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   try {
+    await resolveActor(req, resolver);
     return { status: 200, body: await listVersions(processId as ProcessId, db) };
   } catch (err) {
     return mapError(err);

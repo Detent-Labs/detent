@@ -1,8 +1,8 @@
-import type { Actor, ClientError, InstanceView, SubmissionIssue } from "./types";
+import type { ClientError, InstanceView, LoginResponse, SubmissionIssue } from "./types";
 
-/** Thrown by every function below; `.error` is the typed, display-ready shape. */
+/** Thrown by every function below; `.error` is the typed, display-ready shape. `.status` is the HTTP status (undefined on a network failure), used by the store to detect a 401 and return to login. */
 export class PlayerClientError extends Error {
-  constructor(readonly error: ClientError) {
+  constructor(readonly error: ClientError, readonly status?: number) {
     super(error.type === "validation" ? "validation" : error.type === "concurrency-conflict" ? "concurrency-conflict" : error.message);
     this.name = "PlayerClientError";
   }
@@ -29,32 +29,41 @@ async function request(serverUrl: string, path: string, init?: RequestInit): Pro
   } catch (err) {
     throw new PlayerClientError({ type: "internal", message: err instanceof Error ? err.message : String(err) });
   }
-  if (!res.ok) throw new PlayerClientError(await parseErrorBody(res));
+  if (!res.ok) throw new PlayerClientError(await parseErrorBody(res), res.status);
   return res;
 }
 
-/** The HTTP wrapper's dev resolver reads the actor from these headers only — never from a body/query `actor` field (design.md/CLAUDE.md). */
-function actorHeaders(actor: Actor): Record<string, string> {
-  return { "X-Actor-Id": actor.id, "X-Actor-Roles": actor.roles.join(",") };
+/** The HTTP wrapper's JWT resolver reads the actor from this header only — never from a body/query `actor` field (design.md/CLAUDE.md). */
+function authHeaders(token: string): Record<string, string> {
+  return { Authorization: `Bearer ${token}` };
+}
+
+export async function login(serverUrl: string, email: string, password: string): Promise<LoginResponse> {
+  const res = await request(serverUrl, "/auth/login", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  return (await res.json()) as LoginResponse;
 }
 
 export async function createInstance(
   serverUrl: string,
   processId: string,
-  actor: Actor,
+  token: string,
   opts: { version?: number; data?: Record<string, unknown> } = {},
 ): Promise<{ instanceId: string }> {
   const res = await request(serverUrl, `/processes/${encodeURIComponent(processId)}/instances`, {
     method: "POST",
-    headers: { "content-type": "application/json", ...actorHeaders(actor) },
+    headers: { "content-type": "application/json", ...authHeaders(token) },
     body: JSON.stringify({ version: opts.version, data: opts.data }),
   });
   const body = (await res.json()) as { instanceId: string };
   return { instanceId: body.instanceId };
 }
 
-export async function getInstanceView(serverUrl: string, instanceId: string, actor: Actor): Promise<InstanceView> {
-  const res = await request(serverUrl, `/instances/${encodeURIComponent(instanceId)}`, { headers: actorHeaders(actor) });
+export async function getInstanceView(serverUrl: string, instanceId: string, token: string): Promise<InstanceView> {
+  const res = await request(serverUrl, `/instances/${encodeURIComponent(instanceId)}`, { headers: authHeaders(token) });
   return (await res.json()) as InstanceView;
 }
 
@@ -63,11 +72,11 @@ export async function submit(
   instanceId: string,
   pathId: string,
   data: Record<string, unknown>,
-  actor: Actor,
+  token: string,
 ): Promise<void> {
   await request(serverUrl, `/instances/${encodeURIComponent(instanceId)}/submit`, {
     method: "POST",
-    headers: { "content-type": "application/json", ...actorHeaders(actor) },
+    headers: { "content-type": "application/json", ...authHeaders(token) },
     body: JSON.stringify({ pathId, data }),
   });
 }

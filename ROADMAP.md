@@ -152,10 +152,18 @@
    engine-side blocker before frontend work becomes the main effort: it closes
    the gap where the HTTP wrapper could only address a single instance by an
    id the caller already had, with no way to list instances, read an
-   instance's history, or discover published processes. The remaining gap
-   before a participant-facing frontend can be deployed anywhere real user
-   data reaches is auth: publish and cancel are unauthenticated writes under
-   the shipped `devHeaderResolver`, and every route trusts whatever actor the
-   resolver returns. A real identity provider (JWT/OIDC/session) against the
-   existing `ActorResolver` extension point is a separate, not-yet-started
-   change.
+   instance's history, or discover published processes.
+7. Authentication: DONE (`add-authentication`; see the "Authentication" entry
+   under `docs/current-state.md`). A production-capable JWT `ActorResolver`
+   (`src/auth/jwt.ts`) ships alongside the existing non-production
+   `devHeaderResolver`: local project accounts (`auth_users`, argon2id via
+   `Bun.password`, `POST /auth/login`, a user-management CLI) and JWKS-backed
+   external issuers are accepted through one resolver that dispatches on the
+   token's `iss` claim, so a local account and an IdP identity (e.g. Entra ID)
+   can be accepted simultaneously during a migration. Selected by
+   `AUTH_JWT_SECRET`/`AUTH_ISSUERS`; unset, the dev resolver stays the
+   default. The Player UI logs in with email/password instead of raw actor
+   headers. **Authorization remains open**: every authenticated actor keeps
+   today's permissions (any account can publish, cancel any instance, act as
+   any actor id it is assigned) — gating operations by role is a separate,
+   not-yet-started change.

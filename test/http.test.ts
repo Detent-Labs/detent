@@ -506,7 +506,7 @@ test("wildcard config: OPTIONS preflight on the create-instance route returns 20
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
-  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles, Authorization");
 });
 
 test("wildcard config: OPTIONS preflight on the get-instance-view route returns 204 with CORS headers", async () => {
@@ -514,7 +514,7 @@ test("wildcard config: OPTIONS preflight on the get-instance-view route returns 
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
-  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles, Authorization");
 });
 
 test("wildcard config: OPTIONS preflight on the submit route returns 204 with CORS headers, without submitting", async () => {
@@ -522,7 +522,7 @@ test("wildcard config: OPTIONS preflight on the submit route returns 204 with CO
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
-  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles, Authorization");
 });
 
 test("wildcard config: OPTIONS preflight on the claim route returns 204 with CORS headers, without claiming", async () => {
@@ -530,7 +530,7 @@ test("wildcard config: OPTIONS preflight on the claim route returns 204 with COR
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
-  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles, Authorization");
 });
 
 test("wildcard config: OPTIONS preflight on the release route returns 204 with CORS headers, without releasing", async () => {
@@ -538,7 +538,7 @@ test("wildcard config: OPTIONS preflight on the release route returns 204 with C
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
-  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles, Authorization");
 });
 
 test("allowlist config: an allowed-origin preflight echoes that origin", async () => {
@@ -555,7 +555,7 @@ test("allowlist config: a disallowed-origin preflight is still 204 with methods/
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
-  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles, Authorization");
 });
 
 test("unset config (the default): OPTIONS preflight is 204 with methods/headers, but no allow-origin", async () => {
@@ -725,7 +725,7 @@ test.skipIf(!DB)("GET /instances with no query lists every instance, no data fie
   await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1));
   await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1));
 
-  const res = await fetch(new Request("http://x/instances", { method: "GET" }));
+  const res = await fetch(authedReq("http://x/instances", "GET", user1));
   expect(res.status).toBe(200);
   const page = (await res.json()) as { items: Record<string, unknown>[]; cursor?: string };
   expect(page.items.length).toBe(3);
@@ -738,7 +738,7 @@ test.skipIf(!DB)("GET /instances?assignedTo=&status= lists an actor's inbox", as
   const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
   await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
 
-  const res = await fetch(new Request(`http://x/instances?assignedTo=user_1&status=running`, { method: "GET" }));
+  const res = await fetch(authedReq(`http://x/instances?assignedTo=user_1&status=running`, "GET", user1));
   expect(res.status).toBe(200);
   const page = (await res.json()) as { items: { instanceId: string }[] };
   expect(page.items.map((i) => i.instanceId)).toEqual([created.instanceId]);
@@ -751,7 +751,7 @@ test.skipIf(!DB)("GET /instances?status=running&status=cancelled widens the filt
   const toCancel = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
   await fetch(authedReq(`http://x/instances/${toCancel.instanceId}/cancel`, "POST", user1));
 
-  const res = await fetch(new Request(`http://x/instances?status=running&status=cancelled`, { method: "GET" }));
+  const res = await fetch(authedReq(`http://x/instances?status=running&status=cancelled`, "GET", user1));
   const page = (await res.json()) as { items: { instanceId: string }[] };
   const ids = page.items.map((i) => i.instanceId);
   expect(ids).toContain(running.instanceId);
@@ -769,7 +769,7 @@ test.skipIf(!DB)("GET /instances?limit=2 pages through more instances than the l
     const url = new URL("http://x/instances");
     url.searchParams.set("limit", "2");
     if (cursor) url.searchParams.set("cursor", cursor);
-    const res = await fetch(new Request(url.toString(), { method: "GET" }));
+    const res = await fetch(authedReq(url.toString(), "GET", user1));
     const page = (await res.json()) as { items: { instanceId: string }[]; cursor?: string };
     for (const item of page.items) seen.add(item.instanceId);
     cursor = page.cursor;
@@ -780,14 +780,14 @@ test.skipIf(!DB)("GET /instances?limit=2 pages through more instances than the l
 });
 
 test.skipIf(!DB)("GET /instances?limit=abc is a 400 request error", async () => {
-  const res = await fetch(new Request("http://x/instances?limit=abc", { method: "GET" }));
+  const res = await fetch(authedReq("http://x/instances?limit=abc", "GET", user1));
   expect(res.status).toBe(400);
   const body = (await res.json()) as { error: { type: string } };
   expect(body.error.type).toBe("request-shape");
 });
 
 test.skipIf(!DB)("GET /instances?status=sideways is a 400 request error", async () => {
-  const res = await fetch(new Request("http://x/instances?status=sideways", { method: "GET" }));
+  const res = await fetch(authedReq("http://x/instances?status=sideways", "GET", user1));
   expect(res.status).toBe(400);
   const body = (await res.json()) as { error: { type: string } };
   expect(body.error.type).toBe("request-shape");
@@ -803,7 +803,7 @@ test.skipIf(!DB)("GET /instances/:instanceId/record returns the merged, ordered 
   const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
   await fetch(jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, { pathId: "path_ab", data: { field_amount: 10 } }));
 
-  const res = await fetch(new Request(`http://x/instances/${created.instanceId}/record`, { method: "GET" }));
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/record`, "GET", user1));
   expect(res.status).toBe(200);
   const page = (await res.json()) as { items: { kind: string }[] };
   expect(page.items.length).toBeGreaterThan(0);
@@ -811,7 +811,7 @@ test.skipIf(!DB)("GET /instances/:instanceId/record returns the merged, ordered 
 });
 
 test.skipIf(!DB)("GET /instances/:instanceId/record for an unknown instance returns 200 with an empty sequence", async () => {
-  const res = await fetch(new Request("http://x/instances/inst_does_not_exist/record", { method: "GET" }));
+  const res = await fetch(authedReq("http://x/instances/inst_does_not_exist/record", "GET", user1));
   expect(res.status).toBe(200);
   const page = (await res.json()) as { items: unknown[] };
   expect(page.items).toEqual([]);
@@ -831,7 +831,7 @@ test.skipIf(!DB)("POST /instances/:instanceId/cancel cancels a running instance"
   const body = (await res.json()) as { status: string };
   expect(body.status).toBe("cancelled");
 
-  const record = (await (await fetch(new Request(`http://x/instances/${created.instanceId}/record`, { method: "GET" }))).json()) as {
+  const record = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}/record`, "GET", user1))).json()) as {
     items: { kind: string; entry?: { cause: string } }[];
   };
   expect(record.items.some((i) => i.kind === "transition" && i.entry?.cause === "cancel")).toBe(true);
@@ -846,7 +846,7 @@ test.skipIf(!DB)("POST /instances/:instanceId/cancel succeeds for an arbitrary a
   const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", arbitraryActor));
   expect(res.status).toBe(200);
 
-  const record = (await (await fetch(new Request(`http://x/instances/${created.instanceId}/record`, { method: "GET" }))).json()) as {
+  const record = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}/record`, "GET", user1))).json()) as {
     items: { kind: string; entry?: { cause: string; actorId?: string } }[];
   };
   const cancelEntry = record.items.find((i) => i.kind === "transition" && i.entry?.cause === "cancel");
@@ -1045,7 +1045,7 @@ test.skipIf(!DB)("GET /processes lists published processes with their newest ver
   await fetch(publishReq(user1, "proc_http_list_proc_a", simpleBody()));
   await fetch(publishReq(user1, "proc_http_list_proc_b", simpleBody()));
 
-  const res = await fetch(new Request("http://x/processes", { method: "GET" }));
+  const res = await fetch(authedReq("http://x/processes", "GET", user1));
   expect(res.status).toBe(200);
   const list = (await res.json()) as Record<string, unknown>[];
   const ids = list.map((p) => p.processId);
@@ -1059,14 +1059,14 @@ test.skipIf(!DB)("GET /processes/:processId/versions lists a twice-published pro
   await fetch(publishReq(user1, PID, simpleBody()));
   await fetch(publishReq(user1, PID, guardedBody()));
 
-  const res = await fetch(new Request(`http://x/processes/${PID}/versions`, { method: "GET" }));
+  const res = await fetch(authedReq(`http://x/processes/${PID}/versions`, "GET", user1));
   expect(res.status).toBe(200);
   const versions = (await res.json()) as { version: number }[];
   expect(versions.map((v) => v.version)).toEqual([1, 2]);
 });
 
 test.skipIf(!DB)("GET /processes/:processId/versions for an unpublished process returns an empty list", async () => {
-  const res = await fetch(new Request("http://x/processes/proc_http_never_published/versions", { method: "GET" }));
+  const res = await fetch(authedReq("http://x/processes/proc_http_never_published/versions", "GET", user1));
   expect(res.status).toBe(200);
   const versions = (await res.json()) as unknown[];
   expect(versions).toEqual([]);

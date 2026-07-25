@@ -154,6 +154,15 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // instances_selection_idx does not cover them.
   await db`CREATE INDEX IF NOT EXISTS instances_claimed_by_idx ON instances ((body->'assignment'->>'claimedBy'))`;
   await db`CREATE INDEX IF NOT EXISTS instances_candidates_idx ON instances USING GIN ((body->'assignment'->'candidates'))`;
+  // Project-local user accounts (src/auth/users.ts). user_id is the value used
+  // as Actor.id — the same convention as assignment.candidates/claimedBy.
+  await db`CREATE TABLE IF NOT EXISTS auth_users (
+    user_id       text PRIMARY KEY,
+    email         text UNIQUE NOT NULL,
+    password_hash text NOT NULL,
+    roles         text[] NOT NULL DEFAULT '{}',
+    disabled      boolean NOT NULL DEFAULT false
+  )`;
 }
 
 /**

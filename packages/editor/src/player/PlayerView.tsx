@@ -30,9 +30,37 @@ function GenericError({ error, unmatchedIssues }: { error: ClientError; unmatche
   return <p className="player-error">{error.message}</p>;
 }
 
+function LoginForm() {
+  const player = usePlayer();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  return (
+    <fieldset className="player-connection">
+      <legend>Log in</legend>
+      <label>
+        Server URL
+        <input type="text" value={player.serverUrl} onChange={(e) => player.setServerUrl(e.target.value)} />
+      </label>
+      <label>
+        Email
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      </label>
+      <label>
+        Password
+        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+      </label>
+      <button type="button" disabled={player.loading || !email || !password} onClick={() => void player.login(email, password)}>
+        Log in
+      </button>
+      {player.error && <p className="player-error">{player.error.type === "internal" ? player.error.message : "log in failed"}</p>}
+    </fieldset>
+  );
+}
+
 export function PlayerView() {
   const player = usePlayer();
-  const { view, instanceId, loading, error } = player;
+  const { view, instanceId, loading, error, isLoggedIn } = player;
 
   const [processId, setProcessId] = useState("");
   const [versionInput, setVersionInput] = useState("");
@@ -66,25 +94,22 @@ export function PlayerView() {
     }
   }
 
+  if (!isLoggedIn) {
+    return (
+      <main className="player-view">
+        <h1>Player</h1>
+        <LoginForm />
+      </main>
+    );
+  }
+
   return (
     <main className="player-view">
       <h1>Player</h1>
 
-      <fieldset className="player-connection">
-        <legend>Connection</legend>
-        <label>
-          Server URL
-          <input type="text" value={player.serverUrl} onChange={(e) => player.setServerUrl(e.target.value)} />
-        </label>
-        <label>
-          Actor id
-          <input type="text" value={player.actorId} onChange={(e) => player.setActor(e.target.value, player.actorRoles)} />
-        </label>
-        <label>
-          Actor roles (comma-separated)
-          <input type="text" value={player.actorRoles} onChange={(e) => player.setActor(player.actorId, e.target.value)} />
-        </label>
-      </fieldset>
+      <button type="button" onClick={() => player.logout()}>
+        Log out
+      </button>
 
       <fieldset className="player-instance-access">
         <legend>Instance access</legend>

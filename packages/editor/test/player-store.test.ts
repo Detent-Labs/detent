@@ -3,9 +3,9 @@ import { PlayerClientError } from "../src/player/client";
 import type { InstanceView } from "../src/player/types";
 
 const calls: { fn: string; args: unknown[] }[] = [];
-const mockResponses: { createInstance?: unknown; getInstanceView?: unknown; submit?: unknown } = {};
+const mockResponses: { createInstance?: unknown; getInstanceView?: unknown; submit?: unknown; login?: unknown } = {};
 
-/** Stub only the three fetch-calling functions; `PlayerClientError` stays
+/** Stub only the fetch-calling functions; `PlayerClientError` stays
  * the real class so `instanceof` checks (both here and inside store.tsx)
  * keep working. Registered before `store.tsx` is imported below, matching
  * the `graph-view-rendering.test.tsx` mock-before-dynamic-import convention. */
@@ -23,12 +23,16 @@ mock.module("../src/player/client", () => ({
     calls.push({ fn: "submit", args });
     return mockResponses.submit;
   }),
+  login: mock(async (...args: unknown[]) => {
+    calls.push({ fn: "login", args });
+    return mockResponses.login;
+  }),
 }));
 
 const { editableFieldIds, parseSeedData, loadStoredConnection, persistConnection, createInstanceAndFetchView, submitAndFetchView, DEFAULT_CONNECTION, STORAGE_KEY } =
   await import("../src/player/store");
 
-const actor = { id: "user_1", roles: [] };
+const token = "test-token-abc";
 
 function view(fields: InstanceView["fields"]): InstanceView {
   return {
@@ -47,6 +51,7 @@ beforeEach(() => {
   mockResponses.createInstance = undefined;
   mockResponses.getInstanceView = undefined;
   mockResponses.submit = undefined;
+  mockResponses.login = undefined;
 });
 
 describe("editableFieldIds", () => {
@@ -91,10 +96,10 @@ describe("localStorage persistence round trip", () => {
       setItem: (k: string, v: string) => void store.set(k, v),
     };
 
-    persistConnection({ serverUrl: "http://example:4000", actorId: "u1", actorRoles: "employee,admin" }, fakeStorage);
+    persistConnection({ serverUrl: "http://example:4000", token: "tok_abc" }, fakeStorage);
     const restored = loadStoredConnection(fakeStorage);
 
-    expect(restored).toEqual({ serverUrl: "http://example:4000", actorId: "u1", actorRoles: "employee,admin" });
+    expect(restored).toEqual({ serverUrl: "http://example:4000", token: "tok_abc" });
   });
 
   it("falls back to defaults with no storage or nothing stored yet", () => {
@@ -113,16 +118,16 @@ describe("createInstanceAndFetchView", () => {
     mockResponses.createInstance = { instanceId: "inst_new" };
     mockResponses.getInstanceView = view([]);
 
-    const result = await createInstanceAndFetchView("http://x", "proc_1", actor, { seedDataJson: "" });
+    const result = await createInstanceAndFetchView("http://x", "proc_1", token, { seedDataJson: "" });
 
     expect(result.instanceId).toBe("inst_new");
     expect(result.view).toEqual(view([]));
     expect(calls.map((c) => c.fn)).toEqual(["createInstance", "getInstanceView"]);
-    expect(calls[1]!.args[1]).toBe("inst_new"); // getInstanceView(serverUrl, instanceId, actor)
+    expect(calls[1]!.args[1]).toBe("inst_new"); // getInstanceView(serverUrl, instanceId, token)
   });
 
   it("rejects invalid seed JSON before calling createInstance", async () => {
-    await expect(createInstanceAndFetchView("http://x", "proc_1", actor, { seedDataJson: "{bad" })).rejects.toBeInstanceOf(PlayerClientError);
+    await expect(createInstanceAndFetchView("http://x", "proc_1", token, { seedDataJson: "{bad" })).rejects.toBeInstanceOf(PlayerClientError);
     expect(calls).toHaveLength(0);
   });
 });
@@ -144,7 +149,7 @@ describe("submitAndFetchView", () => {
       "inst_1",
       "path_ab",
       { field_amount: 10, field_locked: "attempted-override" },
-      actor,
+      token,
       currentView,
     );
 
