@@ -16,6 +16,7 @@ import {
   resolveAutomatic,
   claimStep as engineClaimStep,
   releaseClaim as engineReleaseClaim,
+  cancelInstance as engineCancelInstance,
   GuardRefused,
   ConcurrencyConflict,
   AutomaticCascadeLoop,
@@ -27,7 +28,7 @@ import {
 } from "../engine/transition.js";
 import { buildGuardContext, evalGuard, type Actor } from "../cel/eval.js";
 import { definitionHash } from "../schema/hash.js";
-import { instance as instanceSchema, collectFieldsDeep } from "../schema/definition.js";
+import { instance as instanceSchema, historyEntry as historyEntrySchema, instanceEvent as instanceEventSchema, collectFieldsDeep } from "../schema/definition.js";
 import { resolveDataSource, type DataSourceRegistry } from "../engine/registry.js";
 import type {
   ProcessId,
@@ -37,6 +38,7 @@ import type {
   Literal,
   Instance,
   InstanceStatus,
+  AssignmentState,
   ProcessBody,
   Step,
   StepId,
@@ -45,6 +47,8 @@ import type {
   FieldDef,
   FieldOption,
   DataSourceDef,
+  HistoryEntry,
+  InstanceEvent,
 } from "../schema/definition.js";
 
 export {
@@ -98,6 +102,63 @@ export class SubmissionValidationError extends Error {
     super(issues.map((i) => `${i.fieldId}: ${i.kind}`).join("; "));
     this.name = "SubmissionValidationError";
   }
+}
+
+// ============================================================
+// Instance listing + record reading
+// ============================================================
+
+/** Lifecycle state only — never the `data` payload. See design.md "Instance summaries exclude data". */
+export type InstanceSummary = {
+  instanceId: InstanceId;
+  processId: ProcessId;
+  version: number;
+  status: InstanceStatus;
+  currentStepId: StepId;
+  transitionSeq: number;
+  assignment?: AssignmentState | null;
+  startedBy?: string;
+  createdAt: string;
+};
+
+/** Filters combine conjunctively; `assignedTo` alone is a disjunction (see design.md). */
+export type InstanceListFilter = {
+  processId?: ProcessId;
+  status?: InstanceStatus[];
+  currentStepId?: StepId;
+  startedBy?: string;
+  claimedBy?: string;
+  assignedTo?: string;
+};
+
+export type Page<T> = { items: T[]; cursor?: string };
+
+export type InstanceRecordElement = { kind: "transition"; entry: HistoryEntry } | { kind: "event"; event: InstanceEvent };
+
+const DEFAULT_LIST_LIMIT = 50;
+const MAX_LIST_LIMIT = 200;
+const DEFAULT_RECORD_LIMIT = 100;
+const MAX_RECORD_LIMIT = 500;
+
+function encodeCursor(parts: string[]): string {
+  return Buffer.from(JSON.stringify(parts)).toString("base64url");
+}
+function decodeCursor(cursor: string): string[] {
+  return JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as string[];
+}
+
+function toSummary(inst: Instance, createdAt: string): InstanceSummary {
+  return {
+    instanceId: inst.instanceId,
+    processId: inst.processId,
+    version: inst.version,
+    status: inst.status,
+    currentStepId: inst.currentStepId,
+    transitionSeq: inst.transitionSeq,
+    assignment: inst.assignment,
+    startedBy: inst.startedBy,
+    createdAt: new Date(createdAt).toISOString(),
+  };
 }
 
 // ============================================================
@@ -541,4 +602,113 @@ export async function claimStep(instanceId: InstanceId, actor: Actor, db: SQL = 
  */
 export async function releaseClaim(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<Instance> {
   return engineReleaseClaim(instanceId, actor, db);
+}
+
+/**
+ * Cancel a running instance, loading its instance/body pair the same way
+ * `getInstanceView` does. Delegation to `engine/transition.ts::cancelInstance`
+ * for the actual semantics — skip onExit, enqueue `[onCancel, sink.onEntry]`,
+ * one cancel `HistoryEntry`, cascade to running children. A non-running
+ * instance is returned unchanged, matching the engine's own no-op there.
+ */
+export async function cancelInstance(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<Instance> {
+  const { instance, body } = await loadInstanceForRead(instanceId, db);
+  const store = getStore(db);
+  return engineCancelInstance(instance, body, actor, db, store.resolveBody);
+}
+
+/**
+ * List instance summaries, conjunctively filtered, keyset-paginated
+ * newest-first by `(created_at, instance_id)`. `assignedTo` is the single
+ * inbox predicate — claimed by that actor, OR unclaimed and that actor is
+ * among the current step's assignment candidates — expressed once here
+ * rather than as two filters a caller would have to combine correctly. No
+ * filter implicitly scopes to the caller; an unfiltered call returns every
+ * instance.
+ */
+export async function listInstances(
+  filter: InstanceListFilter = {},
+  page: { limit?: number; cursor?: string } = {},
+  db: SQL = sql,
+): Promise<Page<InstanceSummary>> {
+  const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
+  const [cursorCreatedAt, cursorInstanceId] = page.cursor ? decodeCursor(page.cursor) : [undefined, undefined];
+  const statusArr = filter.status && filter.status.length > 0 ? db.array(filter.status, "TEXT") : null;
+
+  const rows = (await db`
+    SELECT instance_id, body, created_at FROM instances
+    WHERE (${filter.processId ?? null}::text IS NULL OR body->>'processId' = ${filter.processId ?? null})
+      AND (${statusArr}::text[] IS NULL OR body->>'status' = ANY(${statusArr}))
+      AND (${filter.currentStepId ?? null}::text IS NULL OR body->>'currentStepId' = ${filter.currentStepId ?? null})
+      AND (${filter.startedBy ?? null}::text IS NULL OR body->>'startedBy' = ${filter.startedBy ?? null})
+      AND (${filter.claimedBy ?? null}::text IS NULL OR body->'assignment'->>'claimedBy' = ${filter.claimedBy ?? null})
+      AND (
+        ${filter.assignedTo ?? null}::text IS NULL
+        OR body->'assignment'->>'claimedBy' = ${filter.assignedTo ?? null}
+        OR (body->'assignment'->>'claimedBy' IS NULL AND body->'assignment'->'candidates' @> to_jsonb(${filter.assignedTo ?? null}::text))
+      )
+      AND (
+        ${cursorCreatedAt ?? null}::timestamptz IS NULL
+        OR (created_at, instance_id) < (${cursorCreatedAt ?? null}::timestamptz, ${cursorInstanceId ?? null})
+      )
+    ORDER BY created_at DESC, instance_id DESC
+    LIMIT ${limit + 1}
+  ` as unknown) as { instance_id: string; body: unknown; created_at: string }[];
+
+  const hasMore = rows.length > limit;
+  const pageRows = rows.slice(0, limit);
+  const items = pageRows.map((r) => toSummary(parseInstance(r.body), r.created_at));
+  const last = pageRows[pageRows.length - 1];
+  const cursor = hasMore && last ? encodeCursor([new Date(last.created_at).toISOString(), last.instance_id]) : undefined;
+  return { items, cursor };
+}
+
+/**
+ * Read one instance's runtime record — its `HistoryEntry` rows merged with
+ * its `InstanceEvent` rows into one chronologically ordered, discriminated
+ * sequence, ordered `transitionSeq` ascending then `at` ascending (an event
+ * never advances the sequence and may share one with a transition or with
+ * other events — see CLAUDE.md's runtime-record section). The merge and its
+ * ordering rule live here, not with callers: exporting two unmerged arrays
+ * would export the ordering rule to every consumer instead. An unknown
+ * instance has written nothing, so its record is an empty sequence, not an
+ * error — matching `findOrphanKeys`'s and `listInstances`'s choice not to
+ * invent a not-found case for a filter that simply matches nothing.
+ */
+export async function getInstanceRecord(
+  instanceId: InstanceId,
+  page: { limit?: number; cursor?: string } = {},
+  db: SQL = sql,
+): Promise<Page<InstanceRecordElement>> {
+  const limit = Math.min(page.limit ?? DEFAULT_RECORD_LIMIT, MAX_RECORD_LIMIT);
+  const [cursorSeqRaw, cursorAt, cursorId] = page.cursor ? decodeCursor(page.cursor) : [undefined, undefined, undefined];
+  const cursorSeq = cursorSeqRaw !== undefined ? Number(cursorSeqRaw) : null;
+
+  const rows = (await db`
+    SELECT id, transition_seq, kind, payload, at FROM (
+      SELECT id, transition_seq, 'transition' AS kind, entry AS payload, (entry->>'at') AS at
+      FROM history_entries WHERE instance_id = ${instanceId}
+      UNION ALL
+      SELECT id, transition_seq, 'event' AS kind, event AS payload, (event->>'at') AS at
+      FROM instance_events WHERE instance_id = ${instanceId}
+    ) record
+    WHERE (
+      ${cursorSeq}::int IS NULL
+      OR (transition_seq, at, id) > (${cursorSeq}::int, ${cursorAt ?? null}::text, ${cursorId ?? null})
+    )
+    ORDER BY transition_seq ASC, at ASC, id ASC
+    LIMIT ${limit + 1}
+  ` as unknown) as { id: string; transition_seq: number; kind: "transition" | "event"; payload: unknown; at: string }[];
+
+  const hasMore = rows.length > limit;
+  const pageRows = rows.slice(0, limit);
+  const items: InstanceRecordElement[] = pageRows.map((r) => {
+    const payload = typeof r.payload === "string" ? JSON.parse(r.payload) : r.payload;
+    return r.kind === "transition"
+      ? { kind: "transition" as const, entry: historyEntrySchema.parse(payload) }
+      : { kind: "event" as const, event: instanceEventSchema.parse(payload) };
+  });
+  const last = pageRows[pageRows.length - 1];
+  const cursor = hasMore && last ? encodeCursor([String(last.transition_seq), last.at, last.id]) : undefined;
+  return { items, cursor };
 }

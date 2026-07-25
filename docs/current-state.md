@@ -424,3 +424,51 @@ Stage-by-stage status is in `ROADMAP.md`.
   CEL-readable data-source results remain untouched and out of scope — a CEL
   reference to a data source is still a publish error (see "Decided, not yet
   built" in `CLAUDE.md`).
+- Read/query API (`src/runtime/api.ts`, `src/engine/definitions.ts`, `src/http/`,
+  `test/runtime-api.test.ts`, `test/definitions.test.ts`, `test/http.test.ts`):
+  closes the gap where the HTTP wrapper could only address a single instance by
+  an id the caller already had. `instances` gains a `created_at timestamptz
+  DEFAULT now()` column (runtime ids are UUIDv4, not time-sortable — see
+  CLAUDE.md — so ordering needs its own column) plus three indexes: paging
+  (`created_at DESC, instance_id DESC`), and two backing the assignment
+  filter (`assignment->>claimedBy`, a GIN index on `assignment->candidates`).
+  `listInstances(filter, page, db)` returns a keyset-paginated
+  (`created_at`/`instance_id` cursor, base64url-encoded, opaque) page of
+  `InstanceSummary` — lifecycle fields only, never `data`. Filters
+  (`processId`, `status[]`, `currentStepId`, `startedBy`, `claimedBy`) combine
+  conjunctively; `assignedTo` is one predicate expressing the inbox
+  disjunction (claimed by that actor, OR unclaimed and that actor is an
+  assignment candidate) rather than two filters a caller would have to
+  combine correctly. `getInstanceRecord(instanceId, page, db)` merges an
+  instance's `HistoryEntry` and `InstanceEvent` rows into one
+  chronologically ordered, discriminated (`{kind: "transition"|"event"}`)
+  sequence via a single `UNION ALL` query, ordered `transitionSeq` then `at`
+  in the database (the runtime record's own ordering rule, applied once here
+  rather than exported to every caller); an unknown instance yields an empty
+  sequence, not an error. `cancelInstance(instanceId, actor, db)` is a new
+  thin Runtime API Layer wrapper loading the instance/body pair and
+  delegating to the existing engine `cancelInstance`. `definitions.ts` gains
+  `listProcesses()` (one entry per process, its newest version's metadata
+  plus `key`/`label`/`baseLocale`, via `DISTINCT ON (process_id) ... ORDER BY
+  process_id, version DESC`) and `listVersions(processId)` (every published
+  version, oldest first); neither returns a body. The HTTP wrapper grows six
+  routes: `GET /instances` (listing), `GET /instances/:instanceId/record`,
+  `POST /instances/:instanceId/cancel`, `POST /processes` (publish — request
+  body `{processId, body}`, since `processId` is not part of the hashed
+  `ProcessBody`; validates against `createServer`'s own injected `Registry`,
+  never a client-supplied one), `GET /processes`, `GET
+  /processes/:processId/versions` — each OPTIONS-preflighted. `createServer`
+  now takes `registry: Registry` as an explicit parameter (previously only
+  `startEngine` saw it), so the publish check and the runtime dispatch agree
+  by construction. `errors.ts::mapError` gained a `RequestShapeError` (400,
+  for a malformed query parameter or request body) and 422 mappings for every
+  publish-time validation family (`RegistryValidationError` and its
+  assignment/data-source siblings, `CelValidationError`,
+  `CrossProcessValidationError`, `DurationValidationError`, and a bare
+  `ZodError` for an authored-schema violation). **Deliberately out of
+  scope:** authentication. Publish and cancel resolve their actor through the
+  same `ActorResolver` seam every other route uses, which in the shipped
+  configuration is `devHeaderResolver` — under it, any caller may publish a
+  process definition or cancel any instance. This is recorded as an explicit,
+  known gap (see `openspec/changes/add-read-query-api`), not silently
+  accepted; a real identity provider is a separate change.

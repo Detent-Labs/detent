@@ -28,7 +28,7 @@ const cel = (src: string) => ({ lang: "cel", src });
 const reg = createRegistry();
 const dataSourceReg = createDataSourceRegistry();
 registerDataSource(dataSourceReg, "static", { resolve: async (ctx) => (ctx.config as { options: unknown[] }).options as never });
-const fetch = createServer(dataSourceReg);
+const fetch = createServer(dataSourceReg, reg);
 
 beforeAll(async () => {
   if (DB) await initSchema();
@@ -428,7 +428,7 @@ test.skipIf(!DB)("an injected fake resolver is honored instead of the default de
   const PID = pid("proc_http_fake_resolver");
   await publishBody(PID, simpleBody(), reg, dataSourceReg);
   const fakeResolver: ActorResolver = async () => ({ id: "fixed_actor", roles: [] });
-  const fakeFetch = createServer(dataSourceReg, sql, fakeResolver);
+  const fakeFetch = createServer(dataSourceReg, reg, sql, fakeResolver);
 
   // No auth headers at all — the fake resolver ignores the credential entirely.
   const res = await fakeFetch(new Request(`http://x/processes/${PID}/instances`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }));
@@ -590,7 +590,7 @@ test.skipIf(!DB)("happy path through expense-approval.json settles the async 'bo
   const expenseReg = createRegistry();
   register(expenseReg, "accounting.postInvoice", { handler: async () => ({ status: "booked" }) });
   register(expenseReg, "notify.email", { handler: async () => ({}) });
-  const expenseFetch = createServer(dataSourceReg);
+  const expenseFetch = createServer(dataSourceReg, expenseReg);
 
   const PID = pid("proc_http_expense");
   await publishBody(PID, authored, expenseReg, dataSourceReg);
@@ -640,4 +640,462 @@ test.skipIf(!DB)("happy path through expense-approval.json settles the async 'bo
   }
 
   expect(view.status).toBe("completed");
+});
+
+// ============================================================
+// GET /instances (listing)
+// ============================================================
+
+test.skipIf(!DB)("GET /instances with no query lists every instance, no data field", async () => {
+  const PID = pid("proc_http_list_all");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1));
+  await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1));
+  await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1));
+
+  const res = await fetch(new Request("http://x/instances", { method: "GET" }));
+  expect(res.status).toBe(200);
+  const page = (await res.json()) as { items: Record<string, unknown>[]; cursor?: string };
+  expect(page.items.length).toBe(3);
+  for (const item of page.items) expect(item.data).toBeUndefined();
+});
+
+test.skipIf(!DB)("GET /instances?assignedTo=&status= lists an actor's inbox", async () => {
+  const PID = pid("proc_http_list_inbox");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+
+  const res = await fetch(new Request(`http://x/instances?assignedTo=user_1&status=running`, { method: "GET" }));
+  expect(res.status).toBe(200);
+  const page = (await res.json()) as { items: { instanceId: string }[] };
+  expect(page.items.map((i) => i.instanceId)).toEqual([created.instanceId]);
+});
+
+test.skipIf(!DB)("GET /instances?status=running&status=cancelled widens the filter", async () => {
+  const PID = pid("proc_http_list_multistatus");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const running = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  const toCancel = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${toCancel.instanceId}/cancel`, "POST", user1));
+
+  const res = await fetch(new Request(`http://x/instances?status=running&status=cancelled`, { method: "GET" }));
+  const page = (await res.json()) as { items: { instanceId: string }[] };
+  const ids = page.items.map((i) => i.instanceId);
+  expect(ids).toContain(running.instanceId);
+  expect(ids).toContain(toCancel.instanceId);
+});
+
+test.skipIf(!DB)("GET /instances?limit=2 pages through more instances than the limit", async () => {
+  const PID = pid("proc_http_list_paging");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  for (let i = 0; i < 5; i++) await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1));
+
+  const seen = new Set<string>();
+  let cursor: string | undefined;
+  for (let i = 0; i < 3; i++) {
+    const url = new URL("http://x/instances");
+    url.searchParams.set("limit", "2");
+    if (cursor) url.searchParams.set("cursor", cursor);
+    const res = await fetch(new Request(url.toString(), { method: "GET" }));
+    const page = (await res.json()) as { items: { instanceId: string }[]; cursor?: string };
+    for (const item of page.items) seen.add(item.instanceId);
+    cursor = page.cursor;
+    if (!cursor) break;
+  }
+  expect(seen.size).toBe(5);
+  expect(cursor).toBeUndefined();
+});
+
+test.skipIf(!DB)("GET /instances?limit=abc is a 400 request error", async () => {
+  const res = await fetch(new Request("http://x/instances?limit=abc", { method: "GET" }));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("GET /instances?status=sideways is a 400 request error", async () => {
+  const res = await fetch(new Request("http://x/instances?status=sideways", { method: "GET" }));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+// ============================================================
+// GET /instances/:instanceId/record
+// ============================================================
+
+test.skipIf(!DB)("GET /instances/:instanceId/record returns the merged, ordered record", async () => {
+  const PID = pid("proc_http_record");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, { pathId: "path_ab", data: { field_amount: 10 } }));
+
+  const res = await fetch(new Request(`http://x/instances/${created.instanceId}/record`, { method: "GET" }));
+  expect(res.status).toBe(200);
+  const page = (await res.json()) as { items: { kind: string }[] };
+  expect(page.items.length).toBeGreaterThan(0);
+  expect(page.items[0]!.kind).toBe("transition");
+});
+
+test.skipIf(!DB)("GET /instances/:instanceId/record for an unknown instance returns 200 with an empty sequence", async () => {
+  const res = await fetch(new Request("http://x/instances/inst_does_not_exist/record", { method: "GET" }));
+  expect(res.status).toBe(200);
+  const page = (await res.json()) as { items: unknown[] };
+  expect(page.items).toEqual([]);
+});
+
+// ============================================================
+// POST /instances/:instanceId/cancel
+// ============================================================
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel cancels a running instance", async () => {
+  const PID = pid("proc_http_cancel");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", user1));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { status: string };
+  expect(body.status).toBe("cancelled");
+
+  const record = (await (await fetch(new Request(`http://x/instances/${created.instanceId}/record`, { method: "GET" }))).json()) as {
+    items: { kind: string; entry?: { cause: string } }[];
+  };
+  expect(record.items.some((i) => i.kind === "transition" && i.entry?.cause === "cancel")).toBe(true);
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel succeeds for an arbitrary actor id, recorded as the cancellation's cause", async () => {
+  const PID = pid("proc_http_cancel_arbitrary_actor");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const arbitraryActor: Actor = { id: "totally_unrelated_actor", roles: [] };
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", arbitraryActor));
+  expect(res.status).toBe(200);
+
+  const record = (await (await fetch(new Request(`http://x/instances/${created.instanceId}/record`, { method: "GET" }))).json()) as {
+    items: { kind: string; entry?: { cause: string; actorId?: string } }[];
+  };
+  const cancelEntry = record.items.find((i) => i.kind === "transition" && i.entry?.cause === "cancel");
+  expect(cancelEntry?.entry?.actorId).toBe("totally_unrelated_actor");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel on an already-cancelled instance stays cancelled", async () => {
+  const PID = pid("proc_http_cancel_twice");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", user1));
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", user1));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { status: string };
+  expect(body.status).toBe("cancelled");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel with no resolvable credential maps to 401 and leaves the instance unchanged", async () => {
+  const PID = pid("proc_http_cancel_401");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(new Request(`http://x/instances/${created.instanceId}/cancel`, { method: "POST" }));
+  expect(res.status).toBe(401);
+
+  const view = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", user1))).json()) as { status: string };
+  expect(view.status).toBe("running");
+});
+
+// ============================================================
+// POST /processes (publish) + GET /processes + GET /processes/:processId/versions
+// ============================================================
+
+const publishReq = (actor: Actor, processId: string, body: ProcessBody) => jsonReq("http://x/processes", "POST", actor, { processId, body });
+
+/** step_a with an onEntry action of a caller-supplied type, guardless manual path to terminal step_b. */
+const actionBody = (actionType: string): ProcessBody =>
+  ({
+    key: "action_body",
+    label: { en: "Action Body" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a", key: "a", label: { en: "A" }, type: "task",
+          onEntry: [{ id: "action_x", type: actionType, config: {} }],
+          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+/** step_x --(path_done, manual, guard: an unparseable CEL expression)--> step_done. */
+const brokenCelBody = (): ProcessBody =>
+  ({
+    key: "broken_cel_body",
+    label: { en: "Broken CEL Body" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_x",
+      steps: [
+        { id: "step_x", key: "x", label: { en: "X" }, type: "task", paths: [{ id: "path_done", key: "done", to: "step_done", trigger: "manual", guard: cel("data.approved ==") }] },
+        { id: "step_done", key: "done_step", label: { en: "Done" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+/** initialStep references a step id that does not exist in workflow.steps — an authored-schema violation. */
+const structurallyInvalidBody = (): ProcessBody =>
+  ({
+    key: "invalid_body",
+    label: { en: "Invalid Body" },
+    baseLocale: "en",
+    fields: [],
+    workflow: { initialStep: "step_missing", steps: [] },
+  }) as unknown as ProcessBody;
+
+/** step_a carries an assignment strategy type other than "static" — the only supported type. */
+const badAssignmentBody = (): ProcessBody =>
+  ({
+    key: "bad_assignment_body",
+    label: { en: "Bad Assignment Body" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [{ id: "step_a", key: "a", label: { en: "A" }, type: "task", assignment: { strategy: { type: "not_static", config: {} } }, terminal: true }],
+    },
+  }) as unknown as ProcessBody;
+
+/** dataSources carries an entry of an unregistered type. */
+const badDataSourceBody = (): ProcessBody =>
+  ({
+    key: "bad_data_source_body",
+    label: { en: "Bad Data Source Body" },
+    baseLocale: "en",
+    fields: [],
+    dataSources: [{ id: "ds_a", key: "a", type: "unregistered_ds_type", config: {} }],
+    workflow: { initialStep: "step_a", steps: [{ id: "step_a", key: "a", label: { en: "A" }, type: "task", terminal: true }] },
+  }) as unknown as ProcessBody;
+
+test.skipIf(!DB)("POST /processes publishes a valid body and it is readable from the definition store", async () => {
+  const PID = "proc_http_publish_ok";
+  const res = await fetch(publishReq(user1, PID, simpleBody()));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { processId: string; version: number; definitionHash: string; status: string };
+  expect(body.version).toBe(1);
+  expect(body.processId).toBe(PID);
+
+  const store = createDefinitionStore(sql);
+  const resolved = await store.resolveBody(PID as ProcessId, 1);
+  expect(resolved).toBeDefined();
+});
+
+test.skipIf(!DB)("POST /processes re-publishing an identical body returns the same version and hash", async () => {
+  const PID = "proc_http_publish_idempotent";
+  const first = (await (await fetch(publishReq(user1, PID, simpleBody()))).json()) as { version: number; definitionHash: string };
+  const second = (await (await fetch(publishReq(user1, PID, simpleBody()))).json()) as { version: number; definitionHash: string };
+  expect(second.version).toBe(first.version);
+  expect(second.definitionHash).toBe(first.definitionHash);
+});
+
+test.skipIf(!DB)("POST /processes publishing a changed body assigns the next version", async () => {
+  const PID = "proc_http_publish_v2";
+  await fetch(publishReq(user1, PID, simpleBody()));
+  const res = await fetch(publishReq(user1, PID, guardedBody()));
+  const body = (await res.json()) as { version: number };
+  expect(body.version).toBe(2);
+});
+
+test.skipIf(!DB)("POST /processes with a malformed JSON body maps to 400", async () => {
+  const res = await fetch(
+    new Request("http://x/processes", { method: "POST", headers: { ...authHeaders(user1), "content-type": "application/json" }, body: "{not json" }),
+  );
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("POST /processes with an unregistered action type maps to 422 and names the offending action position", async () => {
+  const res = await fetch(publishReq(user1, "proc_http_publish_422_registry", actionBody("nope.unregistered")));
+  expect(res.status).toBe(422);
+  const body = (await res.json()) as { error: { type: string; issues: { loc: string }[] } };
+  expect(body.error.type).toBe("registry-validation");
+  expect(body.error.issues.length).toBeGreaterThan(0);
+  expect(body.error.issues[0]!.loc).toContain("onEntry");
+});
+
+test.skipIf(!DB)("POST /processes with an unparseable guard expression maps to 422 and names the offending expression", async () => {
+  const res = await fetch(publishReq(user1, "proc_http_publish_422_cel", brokenCelBody()));
+  expect(res.status).toBe(422);
+  const body = (await res.json()) as { error: { type: string; issues: { loc: string }[] } };
+  expect(body.error.type).toBe("cel-validation");
+  expect(body.error.issues.length).toBeGreaterThan(0);
+  expect(body.error.issues[0]!.loc).toContain("guard");
+});
+
+test.skipIf(!DB)("POST /processes with an unsupported assignment strategy type maps to 422 and names the offending position", async () => {
+  const res = await fetch(publishReq(user1, "proc_http_publish_422_assignment", badAssignmentBody()));
+  expect(res.status).toBe(422);
+  const body = (await res.json()) as { error: { type: string; issues: { loc: string }[] } };
+  expect(body.error.type).toBe("registry-validation");
+  expect(body.error.issues.length).toBeGreaterThan(0);
+  expect(body.error.issues[0]!.loc).toContain("assignment");
+});
+
+test.skipIf(!DB)("POST /processes with an unregistered data source type maps to 422 and names the offending position", async () => {
+  const res = await fetch(publishReq(user1, "proc_http_publish_422_datasource", badDataSourceBody()));
+  expect(res.status).toBe(422);
+  const body = (await res.json()) as { error: { type: string; issues: { loc: string }[] } };
+  expect(body.error.type).toBe("registry-validation");
+  expect(body.error.issues.length).toBeGreaterThan(0);
+  expect(body.error.issues[0]!.loc).toContain("dataSources");
+});
+
+test.skipIf(!DB)("POST /processes with a structurally invalid body (missing initialStep) maps to 422", async () => {
+  const res = await fetch(publishReq(user1, "proc_http_publish_422_schema", structurallyInvalidBody()));
+  expect(res.status).toBe(422);
+});
+
+test.skipIf(!DB)("a rejected publish consumes no version; a subsequent valid publish for the same process is version 1", async () => {
+  const PID = "proc_http_publish_422_no_version";
+  const rejected = await fetch(publishReq(user1, PID, actionBody("nope.unregistered")));
+  expect(rejected.status).toBe(422);
+
+  const accepted = (await (await fetch(publishReq(user1, PID, simpleBody()))).json()) as { version: number };
+  expect(accepted.version).toBe(1);
+});
+
+test.skipIf(!DB)("GET /processes lists published processes with their newest version, no bodies", async () => {
+  await fetch(publishReq(user1, "proc_http_list_proc_a", simpleBody()));
+  await fetch(publishReq(user1, "proc_http_list_proc_b", simpleBody()));
+
+  const res = await fetch(new Request("http://x/processes", { method: "GET" }));
+  expect(res.status).toBe(200);
+  const list = (await res.json()) as Record<string, unknown>[];
+  const ids = list.map((p) => p.processId);
+  expect(ids).toContain("proc_http_list_proc_a");
+  expect(ids).toContain("proc_http_list_proc_b");
+  for (const p of list) expect(p.body).toBeUndefined();
+});
+
+test.skipIf(!DB)("GET /processes/:processId/versions lists a twice-published process's versions in order", async () => {
+  const PID = "proc_http_versions";
+  await fetch(publishReq(user1, PID, simpleBody()));
+  await fetch(publishReq(user1, PID, guardedBody()));
+
+  const res = await fetch(new Request(`http://x/processes/${PID}/versions`, { method: "GET" }));
+  expect(res.status).toBe(200);
+  const versions = (await res.json()) as { version: number }[];
+  expect(versions.map((v) => v.version)).toEqual([1, 2]);
+});
+
+test.skipIf(!DB)("GET /processes/:processId/versions for an unpublished process returns an empty list", async () => {
+  const res = await fetch(new Request("http://x/processes/proc_http_never_published/versions", { method: "GET" }));
+  expect(res.status).toBe(200);
+  const versions = (await res.json()) as unknown[];
+  expect(versions).toEqual([]);
+});
+
+test.skipIf(!DB)("a publish request under a rejecting resolver maps to 401 and publishes nothing", async () => {
+  const rejectingResolver: ActorResolver = async () => {
+    throw new (await import("../src/auth/resolve.js")).ActorResolutionError("nope");
+  };
+  const rejectingFetch = createServer(dataSourceReg, reg, sql, rejectingResolver);
+  const PID = "proc_http_publish_401";
+
+  const res = await rejectingFetch(publishReq(user1, PID, simpleBody()));
+  expect(res.status).toBe(401);
+
+  const store = createDefinitionStore(sql);
+  const resolved = await store.resolveLatest(PID as ProcessId);
+  expect(resolved).toBeUndefined();
+});
+
+// ============================================================
+// CORS preflight on the new routes
+// ============================================================
+
+test("OPTIONS preflight on the instance listing route returns 204 permitting GET", async () => {
+  const res = await fetch(new Request("http://x/instances", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
+});
+
+test("OPTIONS preflight on the instance record route returns 204 permitting GET", async () => {
+  const res = await fetch(new Request("http://x/instances/inst_x/record", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
+});
+
+test("OPTIONS preflight on the cancel route returns 204 permitting POST", async () => {
+  const res = await fetch(new Request("http://x/instances/inst_x/cancel", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
+});
+
+test("OPTIONS preflight on the processes route permits GET and POST", async () => {
+  const res = await fetch(new Request("http://x/processes", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST");
+});
+
+test("OPTIONS preflight on the process-versions route returns 204 permitting GET", async () => {
+  const res = await fetch(new Request("http://x/processes/proc_x/versions", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
+});
+
+// ============================================================
+// mapError: new error-family mappings (pure function, no HTTP needed)
+// ============================================================
+
+test("a RequestShapeError maps to 400", async () => {
+  const { RequestShapeError } = await import("../src/http/errors.js");
+  const result = mapError(new RequestShapeError("bad param"));
+  expect(result.status).toBe(400);
+});
+
+test("a RegistryValidationError maps to 422", async () => {
+  const { RegistryValidationError } = await import("../src/engine/definitions.js");
+  const result = mapError(new RegistryValidationError([{ loc: "x", message: "m", type: "t" } as never]));
+  expect(result.status).toBe(422);
+});
+
+test("an AssignmentRegistryValidationError maps to 422", async () => {
+  const { AssignmentRegistryValidationError } = await import("../src/engine/definitions.js");
+  const result = mapError(new AssignmentRegistryValidationError([{ loc: "x", message: "m", type: "t" } as never]));
+  expect(result.status).toBe(422);
+});
+
+test("a DataSourceRegistryValidationError maps to 422", async () => {
+  const { DataSourceRegistryValidationError } = await import("../src/engine/definitions.js");
+  const result = mapError(new DataSourceRegistryValidationError([{ loc: "x", message: "m", type: "t" } as never]));
+  expect(result.status).toBe(422);
+});
+
+test("a CelValidationError maps to 422", async () => {
+  const { CelValidationError } = await import("../src/engine/definitions.js");
+  const result = mapError(new CelValidationError([{ loc: "x", message: "m", src: "s" } as never]));
+  expect(result.status).toBe(422);
+});
+
+test("a CrossProcessValidationError maps to 422", async () => {
+  const { CrossProcessValidationError } = await import("../src/engine/definitions.js");
+  const result = mapError(new CrossProcessValidationError("nope"));
+  expect(result.status).toBe(422);
+});
+
+test("a DurationValidationError maps to 422", async () => {
+  const { DurationValidationError } = await import("../src/schema/compile.js");
+  const result = mapError(new DurationValidationError([{ loc: "x", message: "m", value: "v" } as never]));
+  expect(result.status).toBe(422);
+});
+
+test("an unmapped error still falls back to 500", () => {
+  const result = mapError(new Error("something else entirely"));
+  expect(result.status).toBe(500);
 });

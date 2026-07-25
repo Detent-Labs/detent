@@ -7,7 +7,7 @@ import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { SQL } from "bun";
 import { z } from "zod";
 import { sql, initSchema, createInstance, rehydrate } from "../src/engine/store.js";
-import { publishBody, createDefinitionStore, CelValidationError, RegistryValidationError } from "../src/engine/definitions.js";
+import { publishBody, createDefinitionStore, listProcesses, listVersions, CelValidationError, RegistryValidationError } from "../src/engine/definitions.js";
 import { executeManualTransition } from "../src/engine/transition.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { drainResolutions } from "../src/engine/resolution.js";
@@ -487,4 +487,62 @@ test.skipIf(!DB)("a due timer fires against the store-resolved body", async () =
   const after = (await sql`SELECT body FROM instances WHERE instance_id = ${inst.instanceId}`) as { body: Instance }[];
   const state = typeof after[0].body === "string" ? JSON.parse(after[0].body as unknown as string) : after[0].body;
   expect(state.currentStepId).toBe("step_done"); // timer bypassed the guard, took path_go
+});
+
+// --- listProcesses / listVersions ----------------------------------------------
+
+const PID2 = "proc_defstore_2" as ProcessId;
+
+test.skipIf(!DB)("listProcesses lists two published processes with their newest version, no bodies", async () => {
+  const v1 = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
+  const v2 = await publishBody(PID2, waitBody("sayNo"), reg, dataSourceReg);
+
+  const processes = await listProcesses();
+  const byId = new Map(processes.map((p) => [p.processId, p]));
+  expect(byId.get(PID)?.version).toBe(v1.version);
+  expect(byId.get(PID)?.definitionHash).toBe(v1.definitionHash);
+  expect(byId.get(PID)?.key).toBe("wf");
+  expect(byId.get(PID)?.label).toEqual({ en: "Wait Flow" });
+  expect(byId.get(PID)?.baseLocale).toBe("en");
+  expect(byId.get(PID2)?.version).toBe(v2.version);
+  for (const p of processes) expect((p as unknown as { body?: unknown }).body).toBeUndefined();
+});
+
+test.skipIf(!DB)("listProcesses reports the newest version after a changed re-publish", async () => {
+  await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
+  const v2 = await publishBody(PID, waitTimerBody(), reg, dataSourceReg);
+
+  const processes = await listProcesses();
+  const entry = processes.find((p) => p.processId === PID)!;
+  expect(entry.version).toBe(2);
+  expect(entry.definitionHash).toBe(v2.definitionHash);
+});
+
+test.skipIf(!DB)("listProcesses on an empty store lists nothing", async () => {
+  const processes = await listProcesses();
+  expect(processes).toEqual([]);
+});
+
+test.skipIf(!DB)("listVersions lists a twice-published process's versions in order, no bodies", async () => {
+  const v1 = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
+  const v2 = await publishBody(PID, waitTimerBody(), reg, dataSourceReg);
+
+  const versions = await listVersions(PID);
+  expect(versions.map((v) => v.version)).toEqual([1, 2]);
+  expect(versions[0]!.definitionHash).toBe(v1.definitionHash);
+  expect(versions[1]!.definitionHash).toBe(v2.definitionHash);
+  for (const v of versions) expect((v as unknown as { body?: unknown }).body).toBeUndefined();
+});
+
+test.skipIf(!DB)("listVersions after an identical re-publish still lists exactly one version", async () => {
+  await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
+  await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg); // identical body -> no-op
+
+  const versions = await listVersions(PID);
+  expect(versions.length).toBe(1);
+});
+
+test.skipIf(!DB)("listVersions of an unpublished process is an empty list, not an error", async () => {
+  const versions = await listVersions("proc_never_published" as ProcessId);
+  expect(versions).toEqual([]);
 });
