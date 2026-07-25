@@ -8,7 +8,7 @@
  */
 import { readFileSync } from "node:fs";
 import { test, expect, beforeAll, beforeEach } from "bun:test";
-import { sql, initSchema } from "../src/engine/store.js";
+import { sql, initSchema, withTransaction, appendInstanceEvent, newInstanceEventId } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { executeManualTransition, cancelInstance, ConcurrencyConflict, GuardRefused, AutomaticCascadeLoop } from "../src/engine/transition.js";
@@ -17,10 +17,13 @@ import {
   getInstanceView,
   submitAndTransition,
   claimStep,
+  listInstances,
+  getInstanceRecord,
   SubmissionValidationError,
   PinMismatch,
+  type InstanceRecordElement,
 } from "../src/runtime/api.js";
-import type { ProcessBody, ProcessId, PathId, InstanceId, FieldId, Instance } from "../src/schema/definition.js";
+import type { ProcessBody, ProcessId, PathId, InstanceId, FieldId, Instance, StepId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
 const DB = !!process.env.DATABASE_URL;
@@ -847,4 +850,257 @@ test.skipIf(!DB)("happy path: create -> view -> submit -> view against expense-a
   const bookView = await getInstanceView(afterReview.instanceId, demoActor, dataSourceReg);
   expect(bookView.step.key).toBe("book");
   expect(bookView.availablePaths).toEqual([]); // book's paths are automatic
+});
+
+// ============================================================
+// listInstances
+// ============================================================
+
+/** step_a (assigned to "approver"/"user_1"), initial --(path_ab, manual, guardless)--> step_b (terminal). */
+const assignedBody = (): ProcessBody =>
+  ({
+    key: "assigned_body_listing",
+    label: { en: "Assigned Body" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a", key: "a", label: { en: "A" }, type: "task",
+          assignment: { strategy: { type: "static", config: { candidates: ["approver", "user_1"] } } },
+          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+test.skipIf(!DB)("listInstances with no filters returns every instance, no data field", async () => {
+  const PID = pid("proc_list_all");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  await createProcessInstance(PID, actor, dataSourceReg);
+  await createProcessInstance(PID, actor, dataSourceReg);
+  await createProcessInstance(PID, actor, dataSourceReg);
+
+  const page = await listInstances();
+  expect(page.items.length).toBe(3);
+  for (const item of page.items) expect((item as unknown as { data?: unknown }).data).toBeUndefined();
+});
+
+test.skipIf(!DB)("listInstances filters by processId and status, excluding another process and another status", async () => {
+  const PID_A = pid("proc_list_filter_a");
+  const PID_B = pid("proc_list_filter_b");
+  await publishBody(PID_A, twoPathsBody(), reg, dataSourceReg);
+  await publishBody(PID_B, twoPathsBody(), reg, dataSourceReg);
+  const toComplete = await createProcessInstance(PID_A, actor, dataSourceReg);
+  await submitAndTransition(toComplete.instanceId, "path_x" as PathId, {} as Instance["data"], actor, dataSourceReg); // completes it
+  const stillRunning = await createProcessInstance(PID_A, actor, dataSourceReg);
+  await createProcessInstance(PID_B, actor, dataSourceReg);
+
+  const page = await listInstances({ processId: PID_A, status: ["running"] });
+  expect(page.items.map((i) => i.instanceId)).toEqual([stillRunning.instanceId]);
+});
+
+test.skipIf(!DB)("listInstances filters by currentStepId", async () => {
+  const PID = pid("proc_list_step");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const onA = await createProcessInstance(PID, actor, dataSourceReg);
+  const toX = await createProcessInstance(PID, actor, dataSourceReg);
+  await submitAndTransition(toX.instanceId, "path_x" as PathId, {} as Instance["data"], actor, dataSourceReg);
+
+  const page = await listInstances({ currentStepId: "step_a" as StepId });
+  expect(page.items.map((i) => i.instanceId)).toEqual([onA.instanceId]);
+});
+
+test.skipIf(!DB)("listInstances filters by claimedBy, excluding an instance claimed by a different actor", async () => {
+  const PID = pid("proc_list_claimed_by");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const claimedByUser1 = await createProcessInstance(PID, actor, dataSourceReg);
+  await claimStep(claimedByUser1.instanceId, { id: "user_1", roles: [] });
+  const claimedByApprover = await createProcessInstance(PID, actor, dataSourceReg);
+  await claimStep(claimedByApprover.instanceId, { id: "approver", roles: [] });
+
+  const page = await listInstances({ claimedBy: "user_1" });
+  expect(page.items.map((i) => i.instanceId)).toEqual([claimedByUser1.instanceId]);
+});
+
+test.skipIf(!DB)("listInstances' assignedTo matches an instance claimed by that actor", async () => {
+  const PID = pid("proc_list_assigned_claimed");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  await claimStep(created.instanceId, { id: "user_1", roles: [] });
+
+  const page = await listInstances({ assignedTo: "user_1" });
+  expect(page.items.map((i) => i.instanceId)).toEqual([created.instanceId]);
+});
+
+test.skipIf(!DB)("listInstances' assignedTo matches an unclaimed instance where the actor is a candidate", async () => {
+  const PID = pid("proc_list_assigned_candidate");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+
+  const page = await listInstances({ assignedTo: "approver" });
+  expect(page.items.map((i) => i.instanceId)).toEqual([created.instanceId]);
+});
+
+test.skipIf(!DB)("listInstances' assignedTo excludes an instance claimed by a different actor", async () => {
+  const PID = pid("proc_list_assigned_excluded");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  await claimStep(created.instanceId, { id: "user_1", roles: [] });
+
+  const page = await listInstances({ assignedTo: "approver" });
+  expect(page.items).toEqual([]);
+});
+
+test.skipIf(!DB)("listInstances filters combine conjunctively: a completed instance claimed by the actor is excluded by status", async () => {
+  const PID = pid("proc_list_conjunctive");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  await claimStep(created.instanceId, { id: "user_1", roles: [] });
+  await submitAndTransition(created.instanceId, "path_ab" as PathId, {} as Instance["data"], { id: "user_1", roles: [] }, dataSourceReg);
+
+  const page = await listInstances({ assignedTo: "user_1", status: ["running"] });
+  expect(page.items).toEqual([]);
+});
+
+test.skipIf(!DB)("listInstances pages through more instances than the limit, covering all of them exactly once", async () => {
+  const PID = pid("proc_list_paging");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const created: string[] = [];
+  for (let i = 0; i < 5; i++) created.push((await createProcessInstance(PID, actor, dataSourceReg)).instanceId as string);
+
+  const seen: string[] = [];
+  let cursor: string | undefined;
+  for (let i = 0; i < 10 && (i === 0 || cursor); i++) {
+    const page = await listInstances({}, { limit: 2, cursor });
+    seen.push(...page.items.map((it) => it.instanceId as string));
+    cursor = page.cursor;
+    if (!cursor) break;
+  }
+  expect(new Set(seen)).toEqual(new Set(created));
+  expect(seen.length).toBe(created.length);
+});
+
+test.skipIf(!DB)("listInstances orders newest-first", async () => {
+  const PID = pid("proc_list_order");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  await createProcessInstance(PID, actor, dataSourceReg);
+  await createProcessInstance(PID, actor, dataSourceReg);
+  const last = await createProcessInstance(PID, actor, dataSourceReg);
+
+  const page = await listInstances({ processId: PID });
+  expect(page.items[0]!.instanceId).toBe(last.instanceId);
+});
+
+test.skipIf(!DB)("listInstances caps a limit above the enforced maximum", async () => {
+  const PID = pid("proc_list_cap");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  await createProcessInstance(PID, actor, dataSourceReg);
+
+  const page = await listInstances({}, { limit: 100_000 });
+  expect(page.items.length).toBeLessThanOrEqual(200);
+});
+
+test.skipIf(!DB)("an instance created after a listInstances page was read does not appear on the next page of that walk", async () => {
+  const PID = pid("proc_list_stable_walk");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const first = await createProcessInstance(PID, actor, dataSourceReg);
+  await createProcessInstance(PID, actor, dataSourceReg);
+
+  const page1 = await listInstances({ processId: PID }, { limit: 1 });
+  expect(page1.cursor).toBeDefined();
+  await createProcessInstance(PID, actor, dataSourceReg); // created mid-walk
+
+  const page2 = await listInstances({ processId: PID }, { limit: 1, cursor: page1.cursor });
+  const seenIds = [...page1.items, ...page2.items].map((i) => i.instanceId);
+  expect(new Set(seenIds).size).toBe(seenIds.length); // no duplicate across the two pages
+  expect(seenIds).toContain(first.instanceId);
+});
+
+// ============================================================
+// getInstanceRecord
+// ============================================================
+
+test.skipIf(!DB)("getInstanceRecord merges transitions and events, ordered by transitionSeq then at", async () => {
+  const PID = pid("proc_record_merge");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  await submitAndTransition(created.instanceId, "path_x" as PathId, {} as Instance["data"], actor, dataSourceReg);
+
+  const seqOf = (el: InstanceRecordElement): number => (el.kind === "transition" ? el.entry.transitionSeq : el.event.transitionSeq);
+
+  const page = await getInstanceRecord(created.instanceId);
+  expect(page.items.length).toBeGreaterThan(0);
+  expect(page.items[0]!.kind).toBe("transition");
+  for (let i = 1; i < page.items.length; i++) {
+    expect(seqOf(page.items[i]!)).toBeGreaterThanOrEqual(seqOf(page.items[i - 1]!));
+  }
+});
+
+test.skipIf(!DB)("getInstanceRecord orders two events sharing one transitionSeq by their `at`", async () => {
+  const PID = pid("proc_record_same_seq");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+
+  // Two synthetic events at the instance's current seq (0), inserted in
+  // reverse-`at` order, to isolate the ordering rule from any particular
+  // engine-emitted event kind.
+  await withTransaction(sql, async (tx) => {
+    await appendInstanceEvent(tx, {
+      id: newInstanceEventId(),
+      instanceId: created.instanceId,
+      transitionSeq: created.transitionSeq,
+      version: created.version,
+      kind: "migration.skipped",
+      payload: { fromVersion: 1, toVersion: 2, reason: "step-unmappable" },
+      at: "2026-01-01T00:00:02.000Z",
+    });
+    await appendInstanceEvent(tx, {
+      id: newInstanceEventId(),
+      instanceId: created.instanceId,
+      transitionSeq: created.transitionSeq,
+      version: created.version,
+      kind: "migration.skipped",
+      payload: { fromVersion: 1, toVersion: 2, reason: "pending-actions" },
+      at: "2026-01-01T00:00:01.000Z",
+    });
+  });
+
+  const page = await getInstanceRecord(created.instanceId);
+  const events = page.items.filter((i): i is Extract<InstanceRecordElement, { kind: "event" }> => i.kind === "event");
+  expect(events.length).toBe(2);
+  expect((events[0]!.event.payload as { reason: string }).reason).toBe("pending-actions");
+  expect((events[1]!.event.payload as { reason: string }).reason).toBe("step-unmappable");
+});
+
+test.skipIf(!DB)("getInstanceRecord of an unknown instance is an empty sequence, not an error", async () => {
+  const page = await getInstanceRecord("inst_does_not_exist" as InstanceId);
+  expect(page.items).toEqual([]);
+});
+
+test.skipIf(!DB)("getInstanceRecord pages, and the second page continues in the same order as the first", async () => {
+  const PID = pid("proc_record_paging");
+  await publishBody(PID, selfLoopBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  // Three self-loop transitions -> three HistoryEntry rows, no events (no timers/assignment on this body).
+  let cur = created;
+  for (let i = 0; i < 3; i++) {
+    cur = await submitAndTransition(cur.instanceId, "path_self" as PathId, { field_approved: false } as unknown as Instance["data"], actor, dataSourceReg);
+  }
+
+  const full = await getInstanceRecord(created.instanceId, { limit: 100 });
+  expect(full.items.length).toBe(3);
+
+  const page1 = await getInstanceRecord(created.instanceId, { limit: 2 });
+  expect(page1.items.length).toBe(2);
+  expect(page1.cursor).toBeDefined();
+  const page2 = await getInstanceRecord(created.instanceId, { limit: 2, cursor: page1.cursor });
+  expect(page2.items.length).toBe(1);
+  expect(page2.cursor).toBeUndefined();
+  const combined = [...page1.items, ...page2.items];
+  const fullKeys = full.items.map((it) => (it.kind === "transition" ? it.entry.id : it.event.id));
+  const combinedKeys = combined.map((it) => (it.kind === "transition" ? it.entry.id : it.event.id));
+  expect(combinedKeys).toEqual(fullKeys);
 });

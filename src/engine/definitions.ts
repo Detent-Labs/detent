@@ -21,6 +21,8 @@ import {
   type ProcessBody,
   type ProcessId,
   type ProcessVersion,
+  type LocalizedText,
+  type LocaleCode,
 } from "../schema/definition.js";
 import { compileProcessBody } from "../schema/compile.js";
 import { definitionHash, contractHash } from "../schema/hash.js";
@@ -254,6 +256,73 @@ export async function publishBody(
     publishedAt: new Date(inserted[0].published_at).toISOString(),
     definition: body,
   };
+}
+
+/** One process's newest published version, with its display metadata — never the body. */
+export type ProcessSummary = {
+  processId: ProcessId;
+  version: number;
+  definitionHash: string;
+  status: ProcessVersion["status"];
+  publishedAt: string;
+  key: string;
+  label: LocalizedText;
+  baseLocale: LocaleCode;
+};
+
+/** One published version of a process — never the body. */
+export type VersionSummary = {
+  version: number;
+  definitionHash: string;
+  status: ProcessVersion["status"];
+  publishedAt: string;
+};
+
+/**
+ * List every process with at least one published version, each entry
+ * describing its newest version. `DISTINCT ON (process_id)` combined with
+ * `ORDER BY process_id, version DESC` picks exactly the newest row per
+ * process and leaves the result ordered by `processId` in the same pass — no
+ * second query, no in-memory re-sort.
+ */
+export async function listProcesses(db: SQL = sql): Promise<ProcessSummary[]> {
+  const rows = (await db`
+    SELECT DISTINCT ON (process_id) process_id, version, definition_hash, status, published_at, body
+    FROM definitions
+    ORDER BY process_id, version DESC
+  `) as { process_id: string; version: number; definition_hash: string; status: string; published_at: string; body: unknown }[];
+  return rows.map((r) => {
+    const body = parseBody(r.body);
+    return {
+      processId: r.process_id as ProcessId,
+      version: Number(r.version),
+      definitionHash: r.definition_hash,
+      status: r.status as ProcessVersion["status"],
+      publishedAt: new Date(r.published_at).toISOString(),
+      key: body.key,
+      label: body.label,
+      baseLocale: body.baseLocale,
+    };
+  });
+}
+
+/**
+ * List every published version of one process, oldest first. An unpublished
+ * `processId` returns an empty list rather than throwing, matching
+ * `resolveLatest`'s own "no rows" behavior.
+ */
+export async function listVersions(processId: ProcessId, db: SQL = sql): Promise<VersionSummary[]> {
+  const rows = (await db`
+    SELECT version, definition_hash, status, published_at FROM definitions
+    WHERE process_id = ${processId}
+    ORDER BY version ASC
+  `) as { version: number; definition_hash: string; status: string; published_at: string }[];
+  return rows.map((r) => ({
+    version: Number(r.version),
+    definitionHash: r.definition_hash,
+    status: r.status as ProcessVersion["status"],
+    publishedAt: new Date(r.published_at).toISOString(),
+  }));
 }
 
 /**

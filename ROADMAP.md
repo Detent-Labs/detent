@@ -144,3 +144,18 @@
       for JSON bodies, and response/failure classification into the outbox's
       existing permanent-vs-transient retry semantics. See the "Generic
       http.request action handler" entry under `docs/current-state.md`.
+6. Read/query API: DONE (`listInstances`, `getInstanceRecord`,
+   `listProcesses`/`listVersions`, plus the `GET /instances`, `GET
+   /instances/:id/record`, `POST /instances/:id/cancel`, `POST /processes`,
+   `GET /processes`, `GET /processes/:id/versions` HTTP routes — see the
+   "Read/query API" entry under `docs/current-state.md`). This was the last
+   engine-side blocker before frontend work becomes the main effort: it closes
+   the gap where the HTTP wrapper could only address a single instance by an
+   id the caller already had, with no way to list instances, read an
+   instance's history, or discover published processes. The remaining gap
+   before a participant-facing frontend can be deployed anywhere real user
+   data reaches is auth: publish and cancel are unauthenticated writes under
+   the shipped `devHeaderResolver`, and every route trusts whatever actor the
+   resolver returns. A real identity provider (JWT/OIDC/session) against the
+   existing `ActorResolver` extension point is a separate, not-yet-started
+   change.

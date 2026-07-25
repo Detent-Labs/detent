@@ -141,6 +141,19 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // an index each batch sequentially scans the whole instances relation.
   await db`CREATE INDEX IF NOT EXISTS instances_selection_idx
     ON instances ((body->>'processId'), (body->>'version'), (body->>'status'))`;
+  // Instance listing's paging key. Runtime ids are UUIDv4 (see createInstance's
+  // ponytail note), so instance_id carries no time order on its own — a
+  // participant inbox ordered by it would be ordered arbitrarily. Idempotent add;
+  // a database created before this field existed gets `now()` for every
+  // pre-existing row, which orders that population among itself by instance_id
+  // (harmless pre-production, not a bug).
+  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now()`;
+  await db`CREATE INDEX IF NOT EXISTS instances_created_idx ON instances (created_at DESC, instance_id DESC)`;
+  // The inbox predicate ("claimed by me, or unclaimed and I am a candidate")
+  // needs its own indexes over the jsonb-nested assignment fields:
+  // instances_selection_idx does not cover them.
+  await db`CREATE INDEX IF NOT EXISTS instances_claimed_by_idx ON instances ((body->'assignment'->>'claimedBy'))`;
+  await db`CREATE INDEX IF NOT EXISTS instances_candidates_idx ON instances USING GIN ((body->'assignment'->'candidates'))`;
 }
 
 /**
