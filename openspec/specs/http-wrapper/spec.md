@@ -27,10 +27,11 @@ process/version enumeration (`GET /processes`, `GET
 /processes/:processId/versions`, backed by the `definition-store`
 capability). Every route — the original five, plus all six of these —
 resolves its actor through the same `ActorResolver` seam; publish and cancel
-are deliberately not authorized beyond that (see the dedicated requirement
-below), and the four read/enumeration routes gained actor resolution as part
-of `add-authentication` (a code-review finding: they had shipped with none,
-leaving them open even with the JWT resolver active). `POST /auth/login` (see
+additionally require a reserved role on that resolved actor (see the
+`authorization` capability), and the four read/enumeration routes gained
+actor resolution as part of `add-authentication` (a code-review finding: they
+had shipped with none, leaving them open even with the JWT resolver active).
+`POST /auth/login` (see
 the `local-user-accounts` capability) is the one route that does not resolve
 an actor — it is what issues the credential every other route consumes — and
 is registered only when a local signing key is configured.
@@ -163,6 +164,7 @@ map to `500` with `{ error: { type: "internal", message } }`.
 | `ConcurrencyConflict` | `409` | `{ error: { type: "concurrency-conflict" } }` |
 | `PinMismatch` | `500` | `{ error: { type: "internal", message } }` |
 | `ActorResolutionError` | `401` | `{ error: { type: "actor-resolution", message } }` |
+| `AuthorizationError` | `403` | `{ error: { type: "authorization", message } }` |
 | `NotAssignedError` | `403` | `{ error: { type: "not-assigned", message } }` |
 | `NotACandidateError` | `403` | `{ error: { type: "not-a-candidate", message } }` |
 | `AlreadyClaimedError` | `403` | `{ error: { type: "already-claimed", message } }` |
@@ -197,6 +199,11 @@ map to `500` with `{ error: { type: "internal", message } }`.
   `ActorResolver`
 - **THEN** the response is `401` with `error.type` equal to
   `"actor-resolution"`
+
+#### Scenario: A resolved actor lacking a required role maps to 403
+- **WHEN** a request's resolved `Actor` does not carry the role a route
+  requires (`system:publish` for publish, `system:cancel-any` for cancel)
+- **THEN** the response is `403` with `error.type` equal to `"authorization"`
 
 #### Scenario: A claim attempt on a step with no declared assignment maps to 403
 - **WHEN** `POST /instances/:instanceId/claim` targets a step with no
@@ -488,19 +495,27 @@ The HTTP wrapper SHALL expose the engine's existing instance cancellation as
 `ActorResolver` exactly as the other routes do and returning the resulting
 instance state.
 
+Cancelling SHALL require the caller's resolved `Actor` to carry the
+`system:cancel-any` role (see the `authorization` capability). This check
+SHALL run before the target instance is loaded — a caller without the role
+SHALL be rejected regardless of whether the targeted instance exists, is
+running, or is already terminal.
+
 Cancelling an instance that is not running SHALL succeed as a no-op, since
 that is the engine's own semantics, and SHALL NOT be reported as an error.
 
 #### Scenario: Cancelling a running instance
 
 - **WHEN** `POST /instances/:id/cancel` is requested for a running instance
+  by an actor carrying the `system:cancel-any` role
 - **THEN** the response is 200
 - **AND** the instance's status is `cancelled`
 - **AND** a cancel history entry has been recorded
 
 #### Scenario: Cancelling an already-cancelled instance
 
-- **WHEN** the same route is requested again for that instance
+- **WHEN** the same route is requested again for that instance by an actor
+  carrying the `system:cancel-any` role
 - **THEN** the response is 200 and the instance stays cancelled
 
 #### Scenario: Cancelling without a resolvable credential
@@ -508,12 +523,26 @@ that is the engine's own semantics, and SHALL NOT be reported as an error.
 - **WHEN** the route is requested with no resolvable credential
 - **THEN** the response is 401 and the instance is unchanged
 
+#### Scenario: Cancelling without the required role is rejected
+
+- **WHEN** `POST /instances/:id/cancel` is requested by an actor whose
+  resolved `Actor.roles` does not include `system:cancel-any`
+- **THEN** the response is 403 with `error.type` equal to `"authorization"`
+- **AND** the instance is unchanged, whether or not it exists or is running
+
 ### Requirement: Publish a process body over HTTP
 
 The HTTP wrapper SHALL expose `POST /processes`, accepting an authored process
 body and publishing it through the definition store's existing publish
 operation, returning the resulting `processId`, `version`, `definitionHash`
 and `status`.
+
+Publishing SHALL require the caller's resolved `Actor` to carry the
+`system:publish` role (see the `authorization` capability). This check SHALL
+run immediately after actor resolution, before the request body is parsed or
+any publish-time validation runs — a caller without the role SHALL be
+rejected without the definition store, registry, or CEL check ever being
+reached.
 
 Publishing SHALL run the unchanged publish-time validation chain — authored
 schema, duration bounds, action registry, CEL, cross-process. The action
@@ -525,7 +554,8 @@ idempotent on an identical body.
 
 #### Scenario: Publishing a valid body
 
-- **WHEN** `POST /processes` is requested with a valid authored body
+- **WHEN** `POST /processes` is requested with a valid authored body by an
+  actor carrying the `system:publish` role
 - **THEN** the response is 200 and carries version 1 and its hash
 - **AND** the version is readable from the definition store
 
@@ -543,6 +573,14 @@ idempotent on an identical body.
 
 - **WHEN** `POST /processes` is requested with a body that is not valid JSON
 - **THEN** the response is 400 with a typed error body
+
+#### Scenario: Publishing without the required role is rejected
+
+- **WHEN** `POST /processes` is requested by an actor whose resolved
+  `Actor.roles` does not include `system:publish`
+- **THEN** the response is 403 with `error.type` equal to `"authorization"`
+- **AND** no definition is persisted, even if the request body would
+  otherwise have been valid
 
 ### Requirement: Publish-time validation failures map to 422
 
@@ -633,36 +671,6 @@ client on another origin can reach them.
 
 - **WHEN** `OPTIONS /instances/:id/cancel` is requested
 - **THEN** the response is 204 and permits `POST`
-
-### Requirement: The added write routes are unauthenticated under the shipped resolver
-
-Publish and cancel are state-changing routes that this change deliberately
-does not authorize beyond resolving an actor through the injected
-`ActorResolver`. With the non-production `devHeaderResolver`, any caller may
-present any actor id, so any caller may publish a process definition or cancel
-any instance. With the JWT resolver active, a caller must present a verifiable
-token — but every *authenticated* actor still retains these permissions, since
-authorization is a separate capability. The wrapper SHALL keep the resolver
-seam as the single place where that changes, and SHALL NOT introduce a
-route-specific authorization mechanism of its own.
-
-#### Scenario: A cancel request under the dev resolver succeeds for any actor
-
-- **WHEN** the cancel route is requested with an arbitrary actor id header
-- **THEN** the request succeeds
-- **AND** the resolved actor is recorded as the cause of the cancellation
-
-#### Scenario: A publish request under a rejecting resolver is refused
-
-- **WHEN** the server is configured with a resolver that rejects the credential
-- **AND** the publish route is requested
-- **THEN** the response is 401 and nothing is published
-
-#### Scenario: An authenticated actor may still publish
-
-- **WHEN** the JWT resolver is active and the publish route is requested with a
-  valid token from any account
-- **THEN** the request succeeds, because no authorization check gates it
 
 ### Requirement: The login route is registered conditionally
 

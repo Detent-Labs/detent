@@ -27,6 +27,7 @@ import {
   NotClaimantError,
 } from "../engine/transition.js";
 import { buildGuardContext, evalGuard, type Actor } from "../cel/eval.js";
+import { requireRole, CANCEL_ANY_ROLE } from "../auth/authorize.js";
 import { definitionHash } from "../schema/hash.js";
 import { instance as instanceSchema, historyEntry as historyEntrySchema, instanceEvent as instanceEventSchema, collectFieldsDeep } from "../schema/definition.js";
 import { resolveDataSource, type DataSourceRegistry } from "../engine/registry.js";
@@ -610,8 +611,14 @@ export async function releaseClaim(instanceId: InstanceId, actor: Actor, db: SQL
  * for the actual semantics — skip onExit, enqueue `[onCancel, sink.onEntry]`,
  * one cancel `HistoryEntry`, cascade to running children. A non-running
  * instance is returned unchanged, matching the engine's own no-op there.
+ *
+ * Requires `CANCEL_ANY_ROLE` on `actor` (`src/auth/authorize.ts`), checked
+ * before the instance is loaded — a caller without the role is rejected
+ * regardless of whether the target instance exists, is running, or is
+ * already terminal.
  */
 export async function cancelInstance(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<Instance> {
+  requireRole(actor, CANCEL_ANY_ROLE);
   const { instance, body } = await loadInstanceForRead(instanceId, db);
   const store = getStore(db);
   return engineCancelInstance(instance, body, actor, db, store.resolveBody);
