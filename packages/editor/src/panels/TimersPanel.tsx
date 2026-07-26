@@ -2,6 +2,7 @@ import type { Path, PathId, Timer } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { mintId } from "../draft/ids";
+import { removeAt, updateAt } from "../draft/list-ops";
 import { t } from "../i18n/catalog";
 import { ExpressionInput } from "./shared/ExpressionInput";
 import { IssueList } from "./shared/IssueList";
@@ -31,9 +32,8 @@ export function TimersPanel({ timers, paths, fields, onChange }: Props) {
     onChange([...list, next]);
   };
 
-  const removeTimer = (index: number) => onChange(list.filter((_, i) => i !== index));
-  const updateTimer = (index: number, patch: Partial<DraftTimer>) =>
-    onChange(list.map((t, i) => (i === index ? { ...t, ...patch } : t)));
+  const removeTimer = (index: number) => onChange(removeAt(list, index));
+  const updateTimer = (index: number, patch: Partial<DraftTimer>) => onChange(updateAt(list, index, patch));
 
   return (
     <div className="timers-panel">

@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Action, Expression, FieldId } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import { mintId } from "../draft/ids";
+import { removeAt, updateAt } from "../draft/list-ops";
 import type { DraftField } from "../draft/fields";
 import { FieldExpressionMapEditor } from "./shared/FieldExpressionMapEditor";
 import { IssueList, NotCheckedBadge } from "./shared/IssueList";
@@ -32,11 +33,11 @@ export function ActionListEditor({ label, actions, onChange, fields }: Props) {
   };
 
   const removeAction = (index: number) => {
-    onChange(list.filter((_, i) => i !== index));
+    onChange(removeAt(list, index));
   };
 
   const updateAction = (index: number, patch: Partial<DraftAction>) => {
-    onChange(list.map((a, i) => (i === index ? { ...a, ...patch } : a)));
+    onChange(updateAt(list, index, patch));
   };
 
   return (
