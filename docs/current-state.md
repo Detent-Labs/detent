@@ -565,10 +565,10 @@ Stage-by-stage status is in `ROADMAP.md`.
   was still out of scope as of this change** — every authenticated actor kept
   today's permissions (any account could publish, cancel any instance) — see
   the next entry for the deliberate follow-up that closed it.
-  **Known operational gap, recorded not silently accepted:** `/auth/login`
-  has no rate limit. The brake is `Bun.password`'s argon2id cost (~100ms per
-  attempt); a correct limiter needs a store shared across processes, which
-  this change deliberately does not build.
+  **Known operational gap, recorded not silently accepted (at the time):**
+  `/auth/login` had no rate limit beyond `Bun.password`'s argon2id cost
+  (~100ms per attempt) — see the `add-login-rate-limit` entry below for the
+  deliberate follow-up that closed it.
 - Authorization (`src/auth/authorize.ts`, `add-authorization`): closes the gap
   the previous entry recorded. Two reserved roles on the already-resolved
   `Actor.roles` every `ActorResolver` populates — `PUBLISH_ROLE =
@@ -593,3 +593,21 @@ Stage-by-stage status is in `ROADMAP.md`.
   `cli.ts set-roles <email> system:publish,system:cancel-any` covers it.
   **BREAKING**: any account that published or cancelled instances before this
   change needs the relevant role granted, or it now gets `403`.
+- Login rate limiting (`src/auth/login.ts`, `add-login-rate-limit`): closes
+  the gap the `add-authentication` entry recorded. `handleLogin` tracks
+  attempts per normalized email (`trim().toLowerCase()`) in an in-memory
+  `Map`, checked and recorded synchronously — before `await verifyLogin` —
+  so the check-and-increment is atomic against concurrent requests for the
+  same email and no argon2id hash runs once an email is blocked. After
+  `MAX_ATTEMPTS` (5) attempts within `WINDOW_MS` (15 minutes) a further
+  request for that email gets `429` (`{error: {type: "rate-limited",
+  message}}`); a successful login clears the entry. The normalized email is
+  the tracking key only — `verifyLogin` still receives the request's
+  original, unmodified email, since that lookup is case-sensitive and no
+  stored email is normalized anywhere in this codebase. `MAX_TRACKED_EMAILS`
+  (50,000) caps the map's size, failing open (untracked, not rejected) for a
+  not-yet-tracked email once at capacity, so an attacker submitting unlimited
+  distinct fake emails can't grow the map without bound. Per-process,
+  in-memory, no new dependency: per-IP limiting and cross-process
+  coordination are out of scope (single `Bun.serve` process today; see the
+  change's design.md).
