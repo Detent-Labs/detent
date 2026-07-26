@@ -3,6 +3,7 @@ import type { DraftOf } from "../draft/types";
 import { useDraft } from "../draft/store";
 import { t } from "../i18n/catalog";
 import { mintId } from "../draft/ids";
+import { removeAt, updateAt } from "../draft/list-ops";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { IssueList } from "./shared/IssueList";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput";
@@ -39,15 +40,13 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
   const setOptions = (options: DraftOption[]) => onChange({ options, dataSource: options.length > 0 ? undefined : field.dataSource });
 
   const addOption = () => setOptions([...(field.options ?? []), { value: "", label: seedLocalizedText(contentLocale) }]);
-  const updateOption = (i: number, patch: Partial<DraftOption>) =>
-    setOptions((field.options ?? []).map((o, idx) => (idx === i ? { ...o, ...patch } : o)));
-  const removeOption = (i: number) => setOptions((field.options ?? []).filter((_, idx) => idx !== i));
+  const updateOption = (i: number, patch: Partial<DraftOption>) => setOptions(updateAt(field.options ?? [], i, patch));
+  const removeOption = (i: number) => setOptions(removeAt(field.options ?? [], i));
 
   const addSubField = () =>
     onChange({ fields: [...(field.fields ?? []), { id: mintId("field"), key: "", label: seedLocalizedText(contentLocale), type: "string" }] });
-  const updateSubField = (i: number, patch: Partial<DraftField>) =>
-    onChange({ fields: (field.fields ?? []).map((f, idx) => (idx === i ? { ...f, ...patch } : f)) });
-  const removeSubField = (i: number) => onChange({ fields: (field.fields ?? []).filter((_, idx) => idx !== i) });
+  const updateSubField = (i: number, patch: Partial<DraftField>) => onChange({ fields: updateAt(field.fields ?? [], i, patch) });
+  const removeSubField = (i: number) => onChange({ fields: removeAt(field.fields ?? [], i) });
 
   return (
     <div className="field-row">

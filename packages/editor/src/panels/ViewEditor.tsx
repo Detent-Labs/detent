@@ -1,6 +1,7 @@
 import type { View, ViewField } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
+import { removeAt, updateAt } from "../draft/list-ops";
 import { t } from "../i18n/catalog";
 import { BooleanOrExpressionInput } from "./shared/BooleanOrExpressionInput";
 
@@ -33,10 +34,9 @@ export function ViewEditor({ view, fields, onChange }: Props) {
     setRows([...rows, { ref: target.id }]);
   };
 
-  const removeRow = (index: number) => setRows(rows.filter((_, i) => i !== index));
+  const removeRow = (index: number) => setRows(removeAt(rows, index));
 
-  const updateRow = (index: number, patch: Partial<DraftViewField>) =>
-    setRows(rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  const updateRow = (index: number, patch: Partial<DraftViewField>) => setRows(updateAt(rows, index, patch));
 
   const move = (index: number, delta: number) => {
     const target = index + delta;
