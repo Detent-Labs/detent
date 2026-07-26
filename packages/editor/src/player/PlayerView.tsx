@@ -53,7 +53,11 @@ function LoginForm() {
       <button type="button" disabled={player.loading || !email || !password} onClick={() => void player.login(email, password)}>
         Log in
       </button>
-      {player.error && <p className="player-error">{player.error.type === "internal" ? player.error.message : "log in failed"}</p>}
+      {player.error && (
+        <p className="player-error">
+          {player.error.type === "internal" || player.error.type === "rate-limited" ? player.error.message : "log in failed"}
+        </p>
+      )}
     </fieldset>
   );
 }

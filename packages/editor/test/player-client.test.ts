@@ -120,6 +120,12 @@ describe("player/client error mapping", () => {
     await expectClientError(() => getInstanceView("http://x", "inst_1", token), { type: "internal", message: "boom" });
   });
 
+  it("maps a 429 rate-limited response", async () => {
+    globalThis.fetch = mock(async () => jsonResponse(429, { error: { type: "rate-limited", message: "too many login attempts, try again later" } })) as unknown as typeof fetch;
+
+    await expectClientError(() => getInstanceView("http://x", "inst_1", token), { type: "rate-limited", message: "too many login attempts, try again later" });
+  });
+
   it("maps a network failure to internal", async () => {
     globalThis.fetch = mock(async () => {
       throw new Error("connection refused");

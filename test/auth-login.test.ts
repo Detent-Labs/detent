@@ -8,7 +8,7 @@ import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { createUser } from "../src/auth/users.js";
 import { jwtResolver } from "../src/auth/jwt.js";
-import { handleLogin } from "../src/auth/login.js";
+import { handleLogin, checkAndRecordAttempt, MAX_ATTEMPTS, WINDOW_MS, MAX_TRACKED_EMAILS } from "../src/auth/login.js";
 import { createServer } from "../src/http/server.js";
 import { PUBLISH_ROLE } from "../src/auth/authorize.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
@@ -114,4 +114,97 @@ test.skipIf(!DB)("a malformed JSON body maps to 400", async () => {
   const req = new Request("http://x/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: "{not json" });
   const result = await handleLogin(req, SECRET);
   expect(result.status).toBe(400);
+});
+
+test("checkAndRecordAttempt allows up to MAX_ATTEMPTS, then limits, then resets after WINDOW_MS", () => {
+  let t = 0;
+  const now = () => t;
+  const map = new Map<string, { count: number; windowStart: number }>();
+
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    expect(checkAndRecordAttempt(map, "a@example.com", now)).toBe("ok");
+  }
+  expect(checkAndRecordAttempt(map, "a@example.com", now)).toBe("limited");
+
+  t += WINDOW_MS + 1;
+  expect(checkAndRecordAttempt(map, "a@example.com", now)).toBe("ok");
+});
+
+test("checkAndRecordAttempt fails open once MAX_TRACKED_EMAILS distinct keys are tracked", () => {
+  const now = () => 0;
+  const map = new Map<string, { count: number; windowStart: number }>();
+  for (let i = 0; i < MAX_TRACKED_EMAILS; i++) map.set(`user${i}@example.com`, { count: 1, windowStart: 0 });
+
+  expect(checkAndRecordAttempt(map, "new@example.com", now)).toBe("ok");
+  expect(map.has("new@example.com")).toBe(false);
+  expect(map.size).toBe(MAX_TRACKED_EMAILS);
+
+  // an already-tracked email is unaffected by capacity
+  map.set("tracked@example.com", { count: MAX_ATTEMPTS, windowStart: 0 });
+  expect(checkAndRecordAttempt(map, "tracked@example.com", now)).toBe("limited");
+});
+
+test.skipIf(!DB)("an email under MAX_ATTEMPTS is not rate-limited", async () => {
+  await createUser("login5@example.com", "correct-horse", []);
+  for (let i = 0; i < MAX_ATTEMPTS - 1; i++) {
+    const result = await handleLogin(loginRequest("login5@example.com", "wrong-password"), SECRET);
+    expect(result.status).toBe(401);
+  }
+});
+
+test.skipIf(!DB)("after MAX_ATTEMPTS failed attempts, further attempts are rejected with 429 and verifyLogin is bypassed", async () => {
+  await createUser("login6@example.com", "correct-horse", []);
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    const result = await handleLogin(loginRequest("login6@example.com", "wrong-password"), SECRET);
+    expect(result.status).toBe(401);
+  }
+  // the correct password would normally succeed — 429 here proves the limiter, not verifyLogin, rejected it
+  const limited = await handleLogin(loginRequest("login6@example.com", "correct-horse"), SECRET);
+  expect(limited.status).toBe(429);
+  expect((limited.body as { error: { type: string } }).error.type).toBe("rate-limited");
+});
+
+test.skipIf(!DB)("a successful login resets the counter", async () => {
+  await createUser("login7@example.com", "correct-horse", []);
+  for (let i = 0; i < MAX_ATTEMPTS - 1; i++) {
+    const result = await handleLogin(loginRequest("login7@example.com", "wrong-password"), SECRET);
+    expect(result.status).toBe(401);
+  }
+  const success = await handleLogin(loginRequest("login7@example.com", "correct-horse"), SECRET);
+  expect(success.status).toBe(200);
+
+  // if the counter hadn't been cleared, this next attempt would already be at/over MAX_ATTEMPTS and get 429
+  const afterReset = await handleLogin(loginRequest("login7@example.com", "wrong-password"), SECRET);
+  expect(afterReset.status).toBe(401);
+});
+
+test.skipIf(!DB)("two different emails are rate-limited independently", async () => {
+  await createUser("login8a@example.com", "correct-horse", []);
+  await createUser("login8b@example.com", "correct-horse", []);
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    const result = await handleLogin(loginRequest("login8a@example.com", "wrong-password"), SECRET);
+    expect(result.status).toBe(401);
+  }
+  const limitedA = await handleLogin(loginRequest("login8a@example.com", "wrong-password"), SECRET);
+  expect(limitedA.status).toBe(429);
+
+  const unaffectedB = await handleLogin(loginRequest("login8b@example.com", "wrong-password"), SECRET);
+  expect(unaffectedB.status).toBe(401);
+});
+
+test.skipIf(!DB)("rate limiting is keyed by normalized email — case/whitespace variants share one limit", async () => {
+  await createUser("login9@example.com", "correct-horse", []);
+  const variants = ["login9@example.com", "LOGIN9@EXAMPLE.COM", " Login9@Example.com ", "login9@example.com", "LOGIN9@example.COM"];
+  for (const email of variants) {
+    const result = await handleLogin(loginRequest(email, "wrong-password"), SECRET);
+    expect(result.status).toBe(401);
+  }
+  const limited = await handleLogin(loginRequest(" login9@example.com", "wrong-password"), SECRET);
+  expect(limited.status).toBe(429);
+});
+
+test.skipIf(!DB)("an account whose stored email contains uppercase letters can still log in (normalization is tracker-only)", async () => {
+  await createUser("Login10@Example.com", "correct-horse", ["employee"]);
+  const result = await handleLogin(loginRequest("Login10@Example.com", "correct-horse"), SECRET);
+  expect(result.status).toBe(200);
 });
