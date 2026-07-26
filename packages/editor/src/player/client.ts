@@ -19,6 +19,7 @@ async function parseErrorBody(res: Response): Promise<ClientError> {
   if (err?.type === "validation") return { type: "validation", issues: (err.issues ?? []) as SubmissionIssue[] };
   if (err?.type === "guard-refused") return { type: "guard-refused", message: err.message ?? "the selected path is no longer available" };
   if (err?.type === "concurrency-conflict") return { type: "concurrency-conflict" };
+  if (err?.type === "rate-limited") return { type: "rate-limited", message: err.message ?? "too many attempts, try again later" };
   return { type: "internal", message: err?.message ?? `HTTP ${res.status}` };
 }
 

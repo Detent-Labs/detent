@@ -64,4 +64,5 @@ export type ClientError =
   | { type: "validation"; issues: SubmissionIssue[] }
   | { type: "guard-refused"; message: string }
   | { type: "concurrency-conflict" }
+  | { type: "rate-limited"; message: string }
   | { type: "internal"; message: string };
