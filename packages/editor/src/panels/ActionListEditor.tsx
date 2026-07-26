@@ -3,7 +3,7 @@ import type { Action, Expression, FieldId } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import { mintId } from "../draft/ids";
 import type { DraftField } from "../draft/fields";
-import { ExpressionInput } from "./shared/ExpressionInput";
+import { FieldExpressionMapEditor } from "./shared/FieldExpressionMapEditor";
 import { IssueList, NotCheckedBadge } from "./shared/IssueList";
 import { useDraft } from "../draft/store";
 import { t } from "../i18n/catalog";
@@ -87,20 +87,7 @@ function ActionRow({
 
   const output = action.output ?? {};
 
-  const setOutputEntry = (fieldId: string, expr: DraftOf<Expression> | undefined) => {
-    const next = { ...output };
-    if (expr === undefined) delete next[fieldId as FieldId];
-    else next[fieldId as FieldId] = expr;
-    onChange({ output: next });
-  };
-
-  const addOutputEntry = () => {
-    if (fields.length === 0) return;
-    const firstUnused = fields.find((f) => f.id !== undefined && !(f.id in output));
-    const target = firstUnused ?? fields[0];
-    if (target?.id === undefined) return;
-    setOutputEntry(target.id, { lang: "cel", src: "" });
-  };
+  const setOutput = (next: Partial<Record<FieldId, DraftOf<Expression>>>) => onChange({ output: next });
 
   return (
     <div className="action-row">
@@ -122,31 +109,15 @@ function ActionRow({
         </p>
       )}
 
-      <div className="action-output">
-        <span>{t("actions.outputMappingLabel")}</span>
-        {Object.entries(output).map(([fieldId, expr]) => (
-          <div key={fieldId} className="action-output-row">
-            <select value={fieldId} onChange={(e) => {
-              const value = expr;
-              setOutputEntry(fieldId, undefined);
-              setOutputEntry(e.target.value, value);
-            }}>
-              {fields.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.key ?? f.id}
-                </option>
-              ))}
-            </select>
-            <ExpressionInput value={expr} onChange={(v) => setOutputEntry(fieldId, v)} placeholder={t("actions.resultCelPlaceholder")} />
-            <button type="button" onClick={() => setOutputEntry(fieldId, undefined)}>
-              {t("actions.removeOutputMapping")}
-            </button>
-          </div>
-        ))}
-        <button type="button" onClick={addOutputEntry} disabled={fields.length === 0}>
-          {t("actions.addOutputMapping")}
-        </button>
-      </div>
+      <FieldExpressionMapEditor
+        legend={t("actions.outputMappingLabel")}
+        addLabel={t("actions.addOutputMapping")}
+        removeLabel={t("actions.removeOutputMapping")}
+        placeholder={t("actions.resultCelPlaceholder")}
+        mapping={output}
+        fields={fields}
+        onChange={setOutput}
+      />
 
       {!validation.registryChecked && <NotCheckedBadge label="registry" />}
       <IssueList entityId={action.id} />
