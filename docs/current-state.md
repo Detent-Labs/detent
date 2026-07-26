@@ -562,11 +562,34 @@ Stage-by-stage status is in `ROADMAP.md`.
   (`PlayerClientError.status === 401`) as an invalid session — discarding the
   token and returning to the login screen, which is also how an 8-hour expiry
   surfaces, since the Player tracks no client-side lifetime. **Authorization
-  is still out of scope**: every authenticated actor keeps today's
-  permissions (any account can publish, cancel any instance, act as any actor
-  id it is assigned) — the gap narrows from "anyone" to "anyone with an
-  account", it does not close; that is the deliberate follow-up change.
+  was still out of scope as of this change** — every authenticated actor kept
+  today's permissions (any account could publish, cancel any instance) — see
+  the next entry for the deliberate follow-up that closed it.
   **Known operational gap, recorded not silently accepted:** `/auth/login`
   has no rate limit. The brake is `Bun.password`'s argon2id cost (~100ms per
   attempt); a correct limiter needs a store shared across processes, which
   this change deliberately does not build.
+- Authorization (`src/auth/authorize.ts`, `add-authorization`): closes the gap
+  the previous entry recorded. Two reserved roles on the already-resolved
+  `Actor.roles` every `ActorResolver` populates — `PUBLISH_ROLE =
+  "system:publish"` and `CANCEL_ANY_ROLE = "system:cancel-any"` — gate the two
+  process-admin operations that previously had no permission check at all:
+  `POST /processes` (`handlePublish`, checked immediately after actor
+  resolution, before the request body is even parsed) and
+  `POST /instances/:id/cancel` (`runtime/api.ts::cancelInstance`, checked
+  before the target instance is loaded — a caller without the role is
+  rejected whether or not the instance exists). `requireRole(actor, role)`
+  throws a distinct `AuthorizationError`, mapped by `mapError` to `403`
+  (`{error: {type: "authorization", message}}`) — separate from
+  `ActorResolutionError`'s `401` (no valid identity vs. valid identity,
+  insufficient permission). No policy engine, no role hierarchy: two fixed
+  strings checked directly, the same pattern as
+  `Step.assignment.strategy.type`'s single `"static"` check. Deliberately
+  unrelated to assignment/claim enforcement — `submitAndTransition`,
+  `claimStep`, `releaseClaim` are untouched, and an actor holding neither
+  reserved role still fully participates in any process instance it is an
+  assignment candidate for. Granting the roles needs no new tooling —
+  `auth_users.roles` was already a free-form `string[]`, so the existing
+  `cli.ts set-roles <email> system:publish,system:cancel-any` covers it.
+  **BREAKING**: any account that published or cancelled instances before this
+  change needs the relevant role granted, or it now gets `403`.

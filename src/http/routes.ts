@@ -23,6 +23,7 @@ import { publishBody, listProcesses, listVersions } from "../engine/definitions.
 import { instanceStatus } from "../schema/definition.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
+import { requireRole, PUBLISH_ROLE } from "../auth/authorize.js";
 import type { Registry, DataSourceRegistry } from "../engine/registry.js";
 import type { Instance, PathId, ProcessId, InstanceId, StepId, ProcessBody } from "../schema/definition.js";
 import { mapError, RequestShapeError, type HttpResult } from "./errors.js";
@@ -191,9 +192,9 @@ export async function handleCancel(instanceId: string, req: Request, resolver: A
  * one the client could supply.
  *
  * Resolves the actor through the same `ActorResolver` seam every other route
- * uses, even though publishing itself needs no `Actor` value — the resolver
- * is the one trust boundary this route has, and skipping it would make
- * publish reachable by a caller no resolver would ever accept.
+ * uses, and additionally requires `PUBLISH_ROLE` on the resolved actor before
+ * the request body is even parsed (`src/auth/authorize.ts`) — publish carries
+ * no other use for the actor value.
  */
 export async function handlePublish(
   req: Request,
@@ -203,7 +204,8 @@ export async function handlePublish(
   db: SQL = sql,
 ): Promise<HttpResult> {
   try {
-    await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver);
+    requireRole(actor, PUBLISH_ROLE);
     let parsed: { processId?: unknown; body?: unknown };
     try {
       parsed = (await req.json()) as { processId?: unknown; body?: unknown };

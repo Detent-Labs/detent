@@ -20,6 +20,7 @@ import { ConcurrencyConflict } from "../src/engine/transition.js";
 import { createServer } from "../src/http/server.js";
 import { mapError } from "../src/http/errors.js";
 import { devHeaderResolver, type ActorResolver } from "../src/auth/resolve.js";
+import { PUBLISH_ROLE, CANCEL_ANY_ROLE } from "../src/auth/authorize.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
@@ -177,6 +178,8 @@ const authedReq = (url: string, method: string, actor: Actor) =>
   new Request(url, { method, headers: authHeaders(actor) });
 
 const user1: Actor = { id: "user_1", roles: [] };
+/** Carries both reserved roles, for the publish / cancel-any-instance routes this suite exercises as an administrator. */
+const admin: Actor = { id: "user_admin", roles: [PUBLISH_ROLE, CANCEL_ANY_ROLE] };
 
 // ============================================================
 // Happy path per route
@@ -749,7 +752,7 @@ test.skipIf(!DB)("GET /instances?status=running&status=cancelled widens the filt
   await publishBody(PID, simpleBody(), reg, dataSourceReg);
   const running = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
   const toCancel = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
-  await fetch(authedReq(`http://x/instances/${toCancel.instanceId}/cancel`, "POST", user1));
+  await fetch(authedReq(`http://x/instances/${toCancel.instanceId}/cancel`, "POST", admin));
 
   const res = await fetch(authedReq(`http://x/instances?status=running&status=cancelled`, "GET", user1));
   const page = (await res.json()) as { items: { instanceId: string }[] };
@@ -826,7 +829,7 @@ test.skipIf(!DB)("POST /instances/:instanceId/cancel cancels a running instance"
   await publishBody(PID, simpleBody(), reg, dataSourceReg);
   const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
 
-  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", user1));
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", admin));
   expect(res.status).toBe(200);
   const body = (await res.json()) as { status: string };
   expect(body.status).toBe("cancelled");
@@ -837,12 +840,12 @@ test.skipIf(!DB)("POST /instances/:instanceId/cancel cancels a running instance"
   expect(record.items.some((i) => i.kind === "transition" && i.entry?.cause === "cancel")).toBe(true);
 });
 
-test.skipIf(!DB)("POST /instances/:instanceId/cancel succeeds for an arbitrary actor id, recorded as the cancellation's cause", async () => {
+test.skipIf(!DB)("POST /instances/:instanceId/cancel succeeds for an arbitrary actor id carrying the cancel-any role, recorded as the cancellation's cause", async () => {
   const PID = pid("proc_http_cancel_arbitrary_actor");
   await publishBody(PID, simpleBody(), reg, dataSourceReg);
   const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
 
-  const arbitraryActor: Actor = { id: "totally_unrelated_actor", roles: [] };
+  const arbitraryActor: Actor = { id: "totally_unrelated_actor", roles: [CANCEL_ANY_ROLE] };
   const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", arbitraryActor));
   expect(res.status).toBe(200);
 
@@ -857,9 +860,9 @@ test.skipIf(!DB)("POST /instances/:instanceId/cancel on an already-cancelled ins
   const PID = pid("proc_http_cancel_twice");
   await publishBody(PID, simpleBody(), reg, dataSourceReg);
   const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
-  await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", user1));
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", admin));
 
-  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", user1));
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", admin));
   expect(res.status).toBe(200);
   const body = (await res.json()) as { status: string };
   expect(body.status).toBe("cancelled");
@@ -955,7 +958,7 @@ const badDataSourceBody = (): ProcessBody =>
 
 test.skipIf(!DB)("POST /processes publishes a valid body and it is readable from the definition store", async () => {
   const PID = "proc_http_publish_ok";
-  const res = await fetch(publishReq(user1, PID, simpleBody()));
+  const res = await fetch(publishReq(admin, PID, simpleBody()));
   expect(res.status).toBe(200);
   const body = (await res.json()) as { processId: string; version: number; definitionHash: string; status: string };
   expect(body.version).toBe(1);
@@ -968,23 +971,23 @@ test.skipIf(!DB)("POST /processes publishes a valid body and it is readable from
 
 test.skipIf(!DB)("POST /processes re-publishing an identical body returns the same version and hash", async () => {
   const PID = "proc_http_publish_idempotent";
-  const first = (await (await fetch(publishReq(user1, PID, simpleBody()))).json()) as { version: number; definitionHash: string };
-  const second = (await (await fetch(publishReq(user1, PID, simpleBody()))).json()) as { version: number; definitionHash: string };
+  const first = (await (await fetch(publishReq(admin, PID, simpleBody()))).json()) as { version: number; definitionHash: string };
+  const second = (await (await fetch(publishReq(admin, PID, simpleBody()))).json()) as { version: number; definitionHash: string };
   expect(second.version).toBe(first.version);
   expect(second.definitionHash).toBe(first.definitionHash);
 });
 
 test.skipIf(!DB)("POST /processes publishing a changed body assigns the next version", async () => {
   const PID = "proc_http_publish_v2";
-  await fetch(publishReq(user1, PID, simpleBody()));
-  const res = await fetch(publishReq(user1, PID, guardedBody()));
+  await fetch(publishReq(admin, PID, simpleBody()));
+  const res = await fetch(publishReq(admin, PID, guardedBody()));
   const body = (await res.json()) as { version: number };
   expect(body.version).toBe(2);
 });
 
 test.skipIf(!DB)("POST /processes with a malformed JSON body maps to 400", async () => {
   const res = await fetch(
-    new Request("http://x/processes", { method: "POST", headers: { ...authHeaders(user1), "content-type": "application/json" }, body: "{not json" }),
+    new Request("http://x/processes", { method: "POST", headers: { ...authHeaders(admin), "content-type": "application/json" }, body: "{not json" }),
   );
   expect(res.status).toBe(400);
   const body = (await res.json()) as { error: { type: string } };
@@ -992,7 +995,7 @@ test.skipIf(!DB)("POST /processes with a malformed JSON body maps to 400", async
 });
 
 test.skipIf(!DB)("POST /processes with an unregistered action type maps to 422 and names the offending action position", async () => {
-  const res = await fetch(publishReq(user1, "proc_http_publish_422_registry", actionBody("nope.unregistered")));
+  const res = await fetch(publishReq(admin, "proc_http_publish_422_registry", actionBody("nope.unregistered")));
   expect(res.status).toBe(422);
   const body = (await res.json()) as { error: { type: string; issues: { loc: string }[] } };
   expect(body.error.type).toBe("registry-validation");
@@ -1001,7 +1004,7 @@ test.skipIf(!DB)("POST /processes with an unregistered action type maps to 422 a
 });
 
 test.skipIf(!DB)("POST /processes with an unparseable guard expression maps to 422 and names the offending expression", async () => {
-  const res = await fetch(publishReq(user1, "proc_http_publish_422_cel", brokenCelBody()));
+  const res = await fetch(publishReq(admin, "proc_http_publish_422_cel", brokenCelBody()));
   expect(res.status).toBe(422);
   const body = (await res.json()) as { error: { type: string; issues: { loc: string }[] } };
   expect(body.error.type).toBe("cel-validation");
@@ -1010,7 +1013,7 @@ test.skipIf(!DB)("POST /processes with an unparseable guard expression maps to 4
 });
 
 test.skipIf(!DB)("POST /processes with an unsupported assignment strategy type maps to 422 and names the offending position", async () => {
-  const res = await fetch(publishReq(user1, "proc_http_publish_422_assignment", badAssignmentBody()));
+  const res = await fetch(publishReq(admin, "proc_http_publish_422_assignment", badAssignmentBody()));
   expect(res.status).toBe(422);
   const body = (await res.json()) as { error: { type: string; issues: { loc: string }[] } };
   expect(body.error.type).toBe("registry-validation");
@@ -1019,7 +1022,7 @@ test.skipIf(!DB)("POST /processes with an unsupported assignment strategy type m
 });
 
 test.skipIf(!DB)("POST /processes with an unregistered data source type maps to 422 and names the offending position", async () => {
-  const res = await fetch(publishReq(user1, "proc_http_publish_422_datasource", badDataSourceBody()));
+  const res = await fetch(publishReq(admin, "proc_http_publish_422_datasource", badDataSourceBody()));
   expect(res.status).toBe(422);
   const body = (await res.json()) as { error: { type: string; issues: { loc: string }[] } };
   expect(body.error.type).toBe("registry-validation");
@@ -1027,23 +1030,56 @@ test.skipIf(!DB)("POST /processes with an unregistered data source type maps to 
   expect(body.error.issues[0]!.loc).toContain("dataSources");
 });
 
+test.skipIf(!DB)("POST /processes without the system:publish role maps to 403 and persists nothing", async () => {
+  const PID = "proc_http_publish_forbidden";
+  const res = await fetch(publishReq(user1, PID, simpleBody()));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("authorization");
+
+  const store = createDefinitionStore(sql);
+  const resolved = await store.resolveBody(PID as ProcessId, 1);
+  expect(resolved).toBeUndefined();
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel without the system:cancel-any role maps to 403 and leaves the instance unchanged", async () => {
+  const PID = pid("proc_http_cancel_forbidden");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", user1));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("authorization");
+
+  const view = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", user1))).json()) as { status: string };
+  expect(view.status).toBe("running");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel without the system:cancel-any role maps to 403 even for a nonexistent instance", async () => {
+  const res = await fetch(authedReq("http://x/instances/inst_does_not_exist/cancel", "POST", user1));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("authorization");
+});
+
 test.skipIf(!DB)("POST /processes with a structurally invalid body (missing initialStep) maps to 422", async () => {
-  const res = await fetch(publishReq(user1, "proc_http_publish_422_schema", structurallyInvalidBody()));
+  const res = await fetch(publishReq(admin, "proc_http_publish_422_schema", structurallyInvalidBody()));
   expect(res.status).toBe(422);
 });
 
 test.skipIf(!DB)("a rejected publish consumes no version; a subsequent valid publish for the same process is version 1", async () => {
   const PID = "proc_http_publish_422_no_version";
-  const rejected = await fetch(publishReq(user1, PID, actionBody("nope.unregistered")));
+  const rejected = await fetch(publishReq(admin, PID, actionBody("nope.unregistered")));
   expect(rejected.status).toBe(422);
 
-  const accepted = (await (await fetch(publishReq(user1, PID, simpleBody()))).json()) as { version: number };
+  const accepted = (await (await fetch(publishReq(admin, PID, simpleBody()))).json()) as { version: number };
   expect(accepted.version).toBe(1);
 });
 
 test.skipIf(!DB)("GET /processes lists published processes with their newest version, no bodies", async () => {
-  await fetch(publishReq(user1, "proc_http_list_proc_a", simpleBody()));
-  await fetch(publishReq(user1, "proc_http_list_proc_b", simpleBody()));
+  await fetch(publishReq(admin, "proc_http_list_proc_a", simpleBody()));
+  await fetch(publishReq(admin, "proc_http_list_proc_b", simpleBody()));
 
   const res = await fetch(authedReq("http://x/processes", "GET", user1));
   expect(res.status).toBe(200);
@@ -1056,8 +1092,8 @@ test.skipIf(!DB)("GET /processes lists published processes with their newest ver
 
 test.skipIf(!DB)("GET /processes/:processId/versions lists a twice-published process's versions in order", async () => {
   const PID = "proc_http_versions";
-  await fetch(publishReq(user1, PID, simpleBody()));
-  await fetch(publishReq(user1, PID, guardedBody()));
+  await fetch(publishReq(admin, PID, simpleBody()));
+  await fetch(publishReq(admin, PID, guardedBody()));
 
   const res = await fetch(authedReq(`http://x/processes/${PID}/versions`, "GET", user1));
   expect(res.status).toBe(200);
@@ -1165,6 +1201,14 @@ test("a DurationValidationError maps to 422", async () => {
   const { DurationValidationError } = await import("../src/schema/compile.js");
   const result = mapError(new DurationValidationError([{ loc: "x", message: "m", value: "v" } as never]));
   expect(result.status).toBe(422);
+});
+
+test("an AuthorizationError maps to 403", async () => {
+  const { AuthorizationError } = await import("../src/auth/authorize.js");
+  const result = mapError(new AuthorizationError("actor 'user_1' lacks required role 'system:publish'"));
+  expect(result.status).toBe(403);
+  const body = result.body as { error: { type: string } };
+  expect(body.error.type).toBe("authorization");
 });
 
 test("an unmapped error still falls back to 500", () => {

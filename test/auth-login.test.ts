@@ -10,6 +10,7 @@ import { createUser } from "../src/auth/users.js";
 import { jwtResolver } from "../src/auth/jwt.js";
 import { handleLogin } from "../src/auth/login.js";
 import { createServer } from "../src/http/server.js";
+import { PUBLISH_ROLE } from "../src/auth/authorize.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import type { ProcessBody } from "../src/schema/definition.js";
 
@@ -60,7 +61,7 @@ test.skipIf(!DB)("a valid login returns 200 with a token, expiresAt ~8h ahead, a
 });
 
 test.skipIf(!DB)("the returned token authenticates a subsequent request", async () => {
-  await createUser("login2@example.com", "correct-horse", ["employee"]);
+  await createUser("login2@example.com", "correct-horse", ["employee", PUBLISH_ROLE]);
   const loginResult = await handleLogin(loginRequest("login2@example.com", "correct-horse"), SECRET);
   const { token } = loginResult.body as { token: string };
 

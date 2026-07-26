@@ -163,7 +163,16 @@
    can be accepted simultaneously during a migration. Selected by
    `AUTH_JWT_SECRET`/`AUTH_ISSUERS`; unset, the dev resolver stays the
    default. The Player UI logs in with email/password instead of raw actor
-   headers. **Authorization remains open**: every authenticated actor keeps
-   today's permissions (any account can publish, cancel any instance, act as
-   any actor id it is assigned) — gating operations by role is a separate,
-   not-yet-started change.
+   headers.
+8. Authorization: DONE (`add-authorization`; see the "Authorization" entry
+   under `docs/current-state.md`). Closes the gap stage 7 recorded. Two
+   reserved roles on the `Actor.roles` every resolver already populates —
+   `system:publish`, `system:cancel-any` — gate `POST /processes` and
+   `POST /instances/:id/cancel`, the two operations that previously had no
+   permission check at all. A caller lacking the role gets a distinct
+   `AuthorizationError`, mapped to HTTP 403. Assignment/claim enforcement
+   (stage 5d) is untouched — an actor holding neither reserved role still
+   fully participates in any instance it is an assignment candidate for.
+   **BREAKING**: any account that published or cancelled instances before
+   this change needs the role granted via the existing `cli.ts set-roles`,
+   or it now gets 403.

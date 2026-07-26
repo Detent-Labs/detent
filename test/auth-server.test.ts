@@ -11,6 +11,7 @@ import { createUser } from "../src/auth/users.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
 import { createServer, resolveAuthResolver, parseAuthIssuers } from "../src/http/server.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
+import { PUBLISH_ROLE } from "../src/auth/authorize.js";
 
 const DB = !!process.env.DATABASE_URL;
 const SECRET = "auth-server-test-secret";
@@ -105,7 +106,7 @@ test.skipIf(!DB)("with the JWT resolver active, X-Actor-Id alone is 401", async 
 test.skipIf(!DB)("with the JWT resolver active, a valid token reaches the route (200)", async () => {
   const resolver = resolveAuthResolver({ AUTH_JWT_SECRET: SECRET });
   const fetch = createServer(dataSourceReg, reg, sql, resolver, undefined, SECRET);
-  await createUser("route-test@example.com", "correct-horse", []);
+  await createUser("route-test@example.com", "correct-horse", [PUBLISH_ROLE]);
   const loginRes = await fetch(
     new Request("http://x/auth/login", {
       method: "POST",

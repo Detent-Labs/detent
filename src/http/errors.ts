@@ -18,6 +18,7 @@ import {
   NotClaimantError,
 } from "../runtime/api.js";
 import { ActorResolutionError } from "../auth/resolve.js";
+import { AuthorizationError } from "../auth/authorize.js";
 import {
   CrossProcessValidationError,
   CelValidationError,
@@ -75,6 +76,9 @@ export function mapError(err: unknown): HttpResult {
   }
   if (err instanceof ActorResolutionError) {
     return { status: 401, body: { error: { type: "actor-resolution", message: err.message } } };
+  }
+  if (err instanceof AuthorizationError) {
+    return { status: 403, body: { error: { type: "authorization", message: err.message } } };
   }
   if (err instanceof NotAssignedError) {
     return { status: 403, body: { error: { type: "not-assigned", message: err.message } } };
