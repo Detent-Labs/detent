@@ -9,45 +9,8 @@ Last scanned: 2026-07-24.
 
 ## Findings
 
-**1. `shrink:`** A field-id→CEL-expression map editor (a row with a field
-`<select>`, an `ExpressionInput`, a remove button, plus set/delete-entry and
-add-first-unused-field logic) is implemented twice, near byte-for-byte
-identical: `ActionListEditor`'s output-mapping block and `MappingEditor`
-(used for a subprocess step's `inputMapping`/`outputMapping`). Extract one
-shared `FieldExpressionMapEditor` component parameterized by
-label/add-label/remove-label/placeholder, used by both call sites.
-[packages/editor/src/panels/ActionListEditor.tsx:88-149 vs
-packages/editor/src/panels/SubprocessSpecEditor.tsx:18-74]
-(~25-30 lines)
-
-**2. `shrink:`** The `addX`/`removeX(index)`/`updateX(index, patch)`
-array-CRUD-by-index triple (`filter((_, i) => i !== index)` /
-`map((x, i) => i === index ? {...x, ...patch} : x)`) is reimplemented
-independently six times across the editor panels — `PathsPanel`,
-`TimersPanel`, `ViewEditor`, `ActionListEditor`, and `FieldCatalogPanel`'s
-option/sub-field rows — each ~3 lines of the same shape. One generic
-`removeAt(list, i)` / `updateAt(list, i, patch)` helper replaces all six.
-[packages/editor/src/panels/PathsPanel.tsx:38-40,
-TimersPanel.tsx:34-36, ViewEditor.tsx:36-39, ActionListEditor.tsx:34-40,
-FieldCatalogPanel.tsx:42-50]
-(~15-18 lines)
-
-**3. `shrink:`** `checkActionRegistry` and `checkDataSourceRegistry` still
-duplicate the resolve→not-registered→`configSchema`-safeParse loop body
-verbatim — the previous audit only deduped the inner Zod-issue-mapping
-sub-loop (`mapConfigIssues`); this outer shape was missed. A small
-`checkTypedConfig(sites, resolveFn, typeOf, configOf)` helper collapses
-both.
-[src/engine/registry-check.ts:74-93 vs 148-165]
-(~8-10 lines)
-
-**4. `shrink:`** `migrateInstances` and `findOrphanKeys` both hand-roll the
-identical keyset-pagination loop shape (`let last = ""; for (;;) { SELECT …
-WHERE instance_id > last … LIMIT BATCH; if empty break; … }`). Low
-priority — the per-row bodies differ substantially and the surrounding
-domain logic is otherwise justified.
-[src/engine/migration.ts:543-592 vs 606-638]
-(~8-10 lines)
+None open — all four findings from the 2026-07-24 scan have been triaged (see
+below). Re-run `/ponytail-audit` for a fresh scan.
 
 ## Checked, not flagged (deliberate, per CLAUDE.md)
 
@@ -65,9 +28,28 @@ domain logic is otherwise justified.
   route count; a table-driven dispatcher would be the over-engineering here.
 - `src/engine/idempotency.ts`'s hand-rolled UUIDv5 — Node's `crypto` has no
   built-in v5; documented as a deliberate no-dependency choice.
+- `migrateInstances`/`findOrphanKeys` keyset-pagination loop (finding 4,
+  2026-07-24 scan) — reviewed 2026-07-26, declined. The audit already flagged
+  it low priority; the per-row bodies differ substantially (4-way outcome
+  categorization with two error types vs. parse-and-check with one), and the
+  two queries themselves differ in SELECT columns and WHERE predicate, so a
+  real extraction would need the query injected via callback — more
+  indirection than the ~8-10 lines of loop boilerplate it would save.
+  [src/engine/migration.ts:543-592 vs 606-638]
 
 ## Resolved since last scan
 
+- ~~Field-id→CEL-expression map editor duplication~~ (finding 1) — extracted
+  shared `FieldExpressionMapEditor`, used by `ActionListEditor` and
+  `SubprocessSpecEditor`; also fixed a field-switch duplication bug found
+  during implementation.
+- ~~`addX`/`removeX`/`updateX` array-CRUD-by-index duplication~~ (finding 2)
+  — extracted `removeAt`/`updateAt` helper, fixed across all six sites
+  (`PathsPanel`, `TimersPanel`, `ViewEditor`, `ActionListEditor`,
+  `FieldCatalogPanel`).
+- ~~`checkActionRegistry`/`checkDataSourceRegistry` outer loop duplication~~
+  (finding 3) — extracted shared `checkTypedConfig` helper, deduping the
+  registry-validation loop.
 - ~~`packages/editor/src/draft/validate.ts`~~ — deleted (zero callers,
   superseded by `validation.ts::runValidation`).
 - ~~`RegistryValidationError`/`AssignmentRegistryValidationError`
@@ -88,4 +70,5 @@ domain logic is otherwise justified.
 
 ## Net
 
--60 to -70 lines, -0 deps possible.
+Findings 1-3 landed (~48-58 lines cut); finding 4 declined as not worth the
+indirection. -0 deps throughout.
