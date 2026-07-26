@@ -40,6 +40,37 @@ function mapConfigIssues(loc: string, type: string, zodIssues: z.ZodIssue[]): Re
   });
 }
 
+interface TypedSite {
+  loc: string;
+  type: string;
+  config: unknown;
+}
+
+/**
+ * Shared resolve -> not-registered -> configSchema-safeParse-and-map loop used
+ * by both checkActionRegistry and checkDataSourceRegistry: only the resolve
+ * function and the "not registered" entity label differ between them.
+ */
+function checkTypedConfig(
+  sites: TypedSite[],
+  resolveFn: (type: string) => { configSchema?: z.ZodTypeAny } | undefined,
+  entityLabel: string,
+): RegistryIssue[] {
+  const issues: RegistryIssue[] = [];
+  for (const { loc, type, config } of sites) {
+    const def = resolveFn(type);
+    if (!def) {
+      issues.push({ loc, type, message: `${entityLabel} type '${type}' is not registered` });
+      continue;
+    }
+    if (def.configSchema) {
+      const result = def.configSchema.safeParse(config);
+      if (!result.success) issues.push(...mapConfigIssues(loc, type, result.error.issues));
+    }
+  }
+  return issues;
+}
+
 /** Collect every Action in the body with a locating path, mirroring src/cel/check.ts's collect(). */
 function collect(body: ProcessBody): Site[] {
   const sites: Site[] = [];
@@ -72,24 +103,10 @@ function collect(body: ProcessBody): Site[] {
  * author-facing registry this check enforces.
  */
 export function checkActionRegistry(body: ProcessBody, registry: Registry): RegistryIssue[] {
-  const issues: RegistryIssue[] = [];
-
-  for (const { action, loc } of collect(body)) {
-    if (action.type.startsWith(RESERVED_ACTION_PREFIX)) continue;
-
-    const def = resolve(registry, action.type);
-    if (!def) {
-      issues.push({ loc, type: action.type, message: `action type '${action.type}' is not registered` });
-      continue;
-    }
-
-    if (def.configSchema) {
-      const result = def.configSchema.safeParse(action.config);
-      if (!result.success) issues.push(...mapConfigIssues(loc, action.type, result.error.issues));
-    }
-  }
-
-  return issues;
+  const sites = collect(body)
+    .filter(({ action }) => !action.type.startsWith(RESERVED_ACTION_PREFIX))
+    .map(({ action, loc }) => ({ loc, type: action.type, config: action.config }));
+  return checkTypedConfig(sites, (type) => resolve(registry, type), "action");
 }
 
 interface AssignmentSite {
@@ -146,20 +163,7 @@ function collectDataSources(body: ProcessBody): DataSourceSite[] {
  * (`body.dataSources`), not several action positions to visit.
  */
 export function checkDataSourceRegistry(body: ProcessBody, dataSourceRegistry: DataSourceRegistry): RegistryIssue[] {
-  const issues: RegistryIssue[] = [];
-
-  for (const { dataSource, loc } of collectDataSources(body)) {
-    const def = resolveDataSource(dataSourceRegistry, dataSource.type);
-    if (!def) {
-      issues.push({ loc, type: dataSource.type, message: `data source type '${dataSource.type}' is not registered` });
-      continue;
-    }
-
-    if (def.configSchema) {
-      const result = def.configSchema.safeParse(dataSource.config);
-      if (!result.success) issues.push(...mapConfigIssues(loc, dataSource.type, result.error.issues));
-    }
-  }
-
-  return issues;
+  const sites = collectDataSources(body)
+    .map(({ dataSource, loc }) => ({ loc, type: dataSource.type, config: dataSource.config }));
+  return checkTypedConfig(sites, (type) => resolveDataSource(dataSourceRegistry, type), "data source");
 }
