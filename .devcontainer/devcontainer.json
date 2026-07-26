@@ -19,8 +19,14 @@
     "source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume"
   ],
 
-  // Bun (installed in the image) is the package manager.
-  "postCreateCommand": "bun install",
+  // Bun (installed in the image) is the package manager. Playwright's browser
+  // binary can't be baked into the image itself (node_modules lives on the
+  // bind-mounted workspace, not the image, so it doesn't exist at build time) —
+  // it has to be installed after `bun install` resolves the project's actual
+  // playwright version, or packages/editor/test/graph-view-rendering.test.tsx
+  // (mermaid-isomorphic needs a real headless Chromium; jsdom can't do
+  // SVGTextElement.getBBox()) fails with a missing-executable error.
+  "postCreateCommand": "bun install && ./packages/editor/node_modules/.bin/playwright install --with-deps chromium",
 
   "customizations": {
     "vscode": {
