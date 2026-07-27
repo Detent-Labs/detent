@@ -45,6 +45,7 @@ import type {
   StepId,
   StepType,
   LocalizedText,
+  BaseFieldType,
   FieldDef,
   FieldOption,
   DataSourceDef,
@@ -301,48 +302,30 @@ function findStep(body: ProcessBody, stepId: string): Step {
 // Submission validation
 // ============================================================
 
-/** Baseline JS-shape check per FieldDef.type, mirroring check.ts::celType's mapping. */
+/** Expected JS shape per BaseFieldType, mirroring check.ts::celType's mapping. Exhaustive over BaseFieldType: a future member missing here is a compile error. */
+const JS_TYPE: Record<BaseFieldType, string> = {
+  string: "string",
+  date: "string",
+  datetime: "string",
+  select: "string",
+  reference: "string",
+  number: "number",
+  boolean: "boolean",
+  multiselect: "string[]",
+  file: "any", // opaque / unreachable (group refs are excluded before this is called)
+  group: "any",
+};
+
 function typeMatches(fieldType: FieldDef["type"], value: Literal): boolean {
   if (typeof fieldType !== "string") return true; // plugin type: opaque, accept
-  switch (fieldType) {
-    case "string":
-    case "date":
-    case "datetime":
-    case "select":
-    case "reference":
-      return typeof value === "string";
-    case "number":
-      return typeof value === "number";
-    case "boolean":
-      return typeof value === "boolean";
-    case "multiselect":
-      return Array.isArray(value) && value.every((v) => typeof v === "string");
-    case "file":
-    case "group":
-      return true; // opaque / unreachable (group refs are excluded before this is called)
-    default:
-      return true;
-  }
+  const expected = JS_TYPE[fieldType];
+  if (expected === "any") return true;
+  if (expected === "string[]") return Array.isArray(value) && value.every((v) => typeof v === "string");
+  return typeof value === expected;
 }
 
 function expectedTypeLabel(fieldType: FieldDef["type"]): string {
-  if (typeof fieldType !== "string") return "any";
-  switch (fieldType) {
-    case "string":
-    case "date":
-    case "datetime":
-    case "select":
-    case "reference":
-      return "string";
-    case "number":
-      return "number";
-    case "boolean":
-      return "boolean";
-    case "multiselect":
-      return "string[]";
-    default:
-      return "any";
-  }
+  return typeof fieldType !== "string" ? "any" : JS_TYPE[fieldType];
 }
 
 function optionValuesValid(options: FieldOption[] | undefined, value: Literal): boolean {
