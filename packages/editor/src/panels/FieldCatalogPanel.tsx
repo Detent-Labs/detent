@@ -4,6 +4,7 @@ import { useDraft } from "../draft/store";
 import { t } from "../i18n/catalog";
 import { mintId } from "../draft/ids";
 import { removeAt, updateAt } from "../draft/list-ops";
+import { addToDraftArray, updateInDraftArray } from "../draft/draft-array-crud";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { IssueList } from "./shared/IssueList";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput";
@@ -165,9 +166,11 @@ export function FieldCatalogPanel() {
   const dataSources = draft.dataSources ?? [];
 
   const addField = () => {
-    mutate((d) => {
-      d.fields ??= [];
-      d.fields.push({ id: mintId("field"), key: "", label: seedLocalizedText(contentLocale), type: "string" });
+    addToDraftArray(mutate, (d) => (d.fields ??= []), {
+      id: mintId("field"),
+      key: "",
+      label: seedLocalizedText(contentLocale),
+      type: "string",
     });
   };
 
@@ -178,10 +181,7 @@ export function FieldCatalogPanel() {
   };
 
   const updateField = (index: number, patch: Partial<DraftField>) => {
-    mutate((d) => {
-      const field = d.fields?.[index];
-      if (field) Object.assign(field, patch);
-    });
+    updateInDraftArray(mutate, (d) => d.fields?.[index], patch);
   };
 
   return (
