@@ -275,10 +275,15 @@ change lands.
 
 ## Conventions
 - TypeScript strict, ESM.
-- **UI work in `packages/editor`, `packages/app`, or `packages/form-ui` goes
-  through the design skill first.** Before implementing or reshaping any
-  screen or component, invoke `/frontend-design:frontend-design` for visual
-  direction — do not default to plain React/CSS choices.
+- **UI work in `packages/editor`, `packages/app`, `packages/admin`,
+  `packages/studio`, or `packages/form-ui` goes through the design skills
+  first.** Before implementing or reshaping any screen or component, invoke
+  `/frontend-design:frontend-design` for visual direction; for UI/UX work
+  also pull in the installed Vercel skills (`web-design-guidelines`,
+  `vercel-react-best-practices`, `vercel-composition-patterns`) — do not
+  default to plain React/CSS choices. Prefer semantic HTML5 elements
+  (`<nav>`, `<main>`, `<button>`, `<dialog>`, ...) over generic
+  `<div>`/`<span>` soup.
 - Bun is the runtime, package manager, and test runner. Use `bun`, not npm/pnpm:
   `bun install`, `bun test`. Typechecking stays with `tsc --noEmit` (`bun run
   typecheck`) — Bun does not typecheck. The Bun version is pinned by `BUN_VERSION`
