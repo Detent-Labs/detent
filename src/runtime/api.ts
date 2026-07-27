@@ -132,7 +132,12 @@ export type InstanceSummary = {
   processBaseLocale: LocaleCode;
 };
 
-/** Filters combine conjunctively; `assignedTo` alone is a disjunction (see design.md). */
+/**
+ * Filters combine conjunctively; `assignedTo` alone is a disjunction (see design.md).
+ * `assignedToRoles` extends the unclaimed-candidate half of that disjunction to role
+ * membership, not just literal id — `assignment.candidates` holds whichever of the two
+ * a step's assignment was authored with. Only meaningful alongside `assignedTo`.
+ */
 export type InstanceListFilter = {
   processId?: ProcessId;
   status?: InstanceStatus[];
@@ -140,6 +145,7 @@ export type InstanceListFilter = {
   startedBy?: string;
   claimedBy?: string;
   assignedTo?: string;
+  assignedToRoles?: string[];
 };
 
 export type Page<T> = { items: T[]; cursor?: string };
@@ -670,6 +676,7 @@ export async function listInstances(
   const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
   const [cursorCreatedAt, cursorInstanceId] = page.cursor ? decodeCursor(page.cursor) : [undefined, undefined];
   const statusArr = filter.status && filter.status.length > 0 ? db.array(filter.status, "TEXT") : null;
+  const assignedToRolesArr = filter.assignedToRoles && filter.assignedToRoles.length > 0 ? db.array(filter.assignedToRoles, "TEXT") : null;
 
   const rows = (await db`
     SELECT instance_id, body, created_at FROM instances
@@ -681,7 +688,10 @@ export async function listInstances(
       AND (
         ${filter.assignedTo ?? null}::text IS NULL
         OR body->'assignment'->>'claimedBy' = ${filter.assignedTo ?? null}
-        OR (body->'assignment'->>'claimedBy' IS NULL AND body->'assignment'->'candidates' @> to_jsonb(${filter.assignedTo ?? null}::text))
+        OR (body->'assignment'->>'claimedBy' IS NULL AND (
+          body->'assignment'->'candidates' @> to_jsonb(${filter.assignedTo ?? null}::text)
+          OR (${assignedToRolesArr}::text[] IS NOT NULL AND body->'assignment'->'candidates' ?| ${assignedToRolesArr})
+        ))
       )
       AND (
         ${cursorCreatedAt ?? null}::timestamptz IS NULL

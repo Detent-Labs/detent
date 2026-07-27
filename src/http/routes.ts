@@ -162,6 +162,7 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
       startedBy: url.searchParams.get("startedBy") ?? undefined,
       claimedBy: url.searchParams.get("claimedBy") ?? undefined,
       assignedTo: scope === "mine" ? actor.id : assignedTo,
+      assignedToRoles: scope === "mine" ? actor.roles : undefined,
     };
     const limit = parseLimit(url);
     const cursor = url.searchParams.get("cursor") ?? undefined;

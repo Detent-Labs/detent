@@ -976,6 +976,25 @@ test.skipIf(!DB)("listInstances' assignedTo matches an unclaimed instance where 
   expect(page.items.map((i) => i.instanceId)).toEqual([created.instanceId]);
 });
 
+test.skipIf(!DB)("listInstances' assignedTo matches an unclaimed instance where one of the actor's roles is a candidate", async () => {
+  const PID = pid("proc_list_assigned_role_candidate");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+
+  const page = await listInstances({ assignedTo: "user_42", assignedToRoles: ["approver"] });
+  expect(page.items.map((i) => i.instanceId)).toEqual([created.instanceId]);
+});
+
+test.skipIf(!DB)("listInstances' assignedTo with a matching role still excludes an instance claimed by a different actor", async () => {
+  const PID = pid("proc_list_assigned_role_excluded");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  await claimStep(created.instanceId, { id: "user_1", roles: [] });
+
+  const page = await listInstances({ assignedTo: "user_42", assignedToRoles: ["approver"] });
+  expect(page.items).toEqual([]);
+});
+
 test.skipIf(!DB)("listInstances' assignedTo excludes an instance claimed by a different actor", async () => {
   const PID = pid("proc_list_assigned_excluded");
   await publishBody(PID, assignedBody(), reg, dataSourceReg);

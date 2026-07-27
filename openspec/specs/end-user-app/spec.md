@@ -11,7 +11,9 @@ small hand-written History-API routing hook, talking to the engine only
 through the HTTP wrapper. Step forms render through the shared `form-ui`
 package, so what an author previews in the editor's Player is what a
 participant gets. Out of scope for v1: case history view, notifications,
-attachments, comments, delegation, and role/group-based assignment.
+attachments, comments, delegation, and a dedicated `groups` assignment
+filter (distinct from `Step.assignment.candidates`, which already matches by
+an actor's id or any of their roles — see `instance-query`).
 
 ## Requirements
 

@@ -463,9 +463,15 @@ Stage-by-stage status is in `ROADMAP.md`.
   `InstanceSummary` — lifecycle fields only, never `data`. Filters
   (`processId`, `status[]`, `currentStepId`, `startedBy`, `claimedBy`) combine
   conjunctively; `assignedTo` is one predicate expressing the inbox
-  disjunction (claimed by that actor, OR unclaimed and that actor is an
+  disjunction (claimed by that actor, OR unclaimed and that actor's id is an
   assignment candidate) rather than two filters a caller would have to
-  combine correctly. `getInstanceRecord(instanceId, page, db)` merges an
+  combine correctly. `scope=mine` (the HTTP wrapper's derived filter, see
+  `end-user-app`) additionally passes `assignedToRoles` — the resolved
+  actor's roles — so the unclaimed half of the disjunction also matches a
+  role-based candidate (`assignment.candidates ?| assignedToRoles`, a second
+  GIN-backed predicate alongside the id one), mirroring the id-or-role
+  eligibility `claimStep`/`isEligibleCandidate` already enforce. A bare
+  `assignedTo=<id>` query has no role list and matches by id only. `getInstanceRecord(instanceId, page, db)` merges an
   instance's `HistoryEntry` and `InstanceEvent` rows into one
   chronologically ordered, discriminated (`{kind: "transition"|"event"}`)
   sequence via a single `UNION ALL` query, ordered `transitionSeq` then `at`
