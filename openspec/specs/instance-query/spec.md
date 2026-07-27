@@ -33,12 +33,18 @@ The read SHALL accept these optional filters, combined conjunctively:
 `processId`, `status` (one or more of the instance statuses), `currentStepId`,
 `startedBy`, `claimedBy`, and `assignedTo`. `assignedTo` SHALL match an
 instance whose current step is claimed by that actor, OR whose current step is
-unclaimed and lists that actor among its assignment candidates — the
+unclaimed and lists that actor's id among its assignment candidates — the
 participant inbox predicate. The read SHALL additionally accept `scope: "mine"`,
 which applies the identical inbox predicate against the calling actor resolved
 from the request's credential rather than a client-supplied id; a caller MUST
 NOT be able to substitute `scope=mine` for the effect of an arbitrary
-`assignedTo` value belonging to another actor.
+`assignedTo` value belonging to another actor. Because `scope: "mine"`
+resolves a full `Actor` (id and roles) rather than a bare id string, its
+inbox predicate additionally matches an unclaimed instance that lists any of
+the actor's roles among its assignment candidates — the same id-or-role
+eligibility `claimStep` already applies (`isEligibleCandidate`). A bare
+`assignedTo=<id>` filter has no role list to check against and so matches by
+id only, identically for a claimed or an unclaimed instance.
 
 With no filters the read SHALL return every instance, subject to paging. The
 read SHALL NOT scope results to the calling actor implicitly.
@@ -111,6 +117,16 @@ read SHALL NOT scope results to the calling actor implicitly.
 - **WHEN** the read is called with `scope: "mine"` by authenticated actor A
 - **THEN** the predicate is evaluated against A, resolved from the request's
   credential, with no way for the request to substitute a different actor id
+
+#### Scenario: scope=mine's inbox predicate also matches by role, not id alone
+
+- **WHEN** an instance's current step is unclaimed and lists role R (not
+  actor A's id) among its assignment candidates
+- **AND** the read is called with `scope: "mine"` by authenticated actor A,
+  who holds role R
+- **THEN** that instance is returned
+- **AND** an equivalent bare `assignedTo: A` call (no role list available)
+  does not return it
 
 ### Requirement: Instance listing is keyset-paginated in a stable order
 
