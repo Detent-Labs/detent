@@ -15,6 +15,7 @@
 import type { SQL } from "bun";
 import { sql } from "./store.js";
 import { resolve, type Registry } from "./registry.js";
+import { pollForever } from "./poll.js";
 import { evalOutput } from "../cel/eval.js";
 import type { Action, ActionOutcome } from "../schema/definition.js";
 
@@ -232,21 +233,5 @@ export function startOutboxWorker(
   registry: Registry = new Map(),
   intervalMs = 500,
 ): { stop: () => void } {
-  let stopped = false;
-  let timer: ReturnType<typeof setTimeout>;
-  const tick = async (): Promise<void> => {
-    try {
-      await drainOutbox(db, registry);
-    } catch {
-      // transient (e.g. DB blip); the next tick retries.
-    }
-    if (!stopped) timer = setTimeout(tick, intervalMs);
-  };
-  timer = setTimeout(tick, intervalMs);
-  return {
-    stop: () => {
-      stopped = true;
-      clearTimeout(timer);
-    },
-  };
+  return pollForever(() => drainOutbox(db, registry), intervalMs);
 }

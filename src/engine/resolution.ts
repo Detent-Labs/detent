@@ -17,6 +17,7 @@ import { resolveAutomatic } from "./transition.js";
 import { definitionHash } from "../schema/hash.js";
 import { instance as instanceSchema, type Instance, type ProcessBody } from "../schema/definition.js";
 import { SYSTEM_ACTOR } from "../cel/eval.js";
+import { pollForever } from "./poll.js";
 
 export { SYSTEM_ACTOR };
 
@@ -113,21 +114,5 @@ export function startResolutionWorker(
   intervalMs = 500,
   leaseMs: number = CLAIM_LEASE_MS,
 ): { stop: () => void } {
-  let stopped = false;
-  let timer: ReturnType<typeof setTimeout>;
-  const tick = async (): Promise<void> => {
-    try {
-      await drainResolutions(db, resolveBody, leaseMs);
-    } catch {
-      // transient (e.g. DB blip); the next tick retries.
-    }
-    if (!stopped) timer = setTimeout(tick, intervalMs);
-  };
-  timer = setTimeout(tick, intervalMs);
-  return {
-    stop: () => {
-      stopped = true;
-      clearTimeout(timer);
-    },
-  };
+  return pollForever(() => drainResolutions(db, resolveBody, leaseMs), intervalMs);
 }
