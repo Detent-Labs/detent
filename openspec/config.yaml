@@ -26,22 +26,29 @@ context: |
   OpenSpec change (propose -> specs/tasks -> implement -> verify -> archive),
   never a direct edit.
 
-  Beyond the engine, a Bun workspace (`packages/*`) adds `packages/editor`: a
-  React/Vite structural editor (field/step/path/timer/action/contract panels,
-  an editor-owned Draft model, a read-only auto-layouted graph view,
-  file-based draft I/O, UI-chrome i18n, participant-facing content
-  localization). It reaches the engine only through the engine package's
-  `exports` map and reuses the engine's own publish-time validators for live
-  validation — it authors definitions, it does not run them.
+  Beyond the engine, a Bun workspace (`packages/*`) adds three packages.
+  `packages/editor`: a React/Vite structural editor (field/step/path/timer/
+  action/contract panels, an editor-owned Draft model, a Mermaid-rendered
+  read-only auto-layouted graph view, file-based draft I/O, a Player
+  preview backed by the live HTTP API, UI-chrome i18n, participant-facing
+  content localization). `packages/app`: the participant-facing end-user
+  app (Login / My-tasks inbox / Task / Start-a-process screens over
+  `scope=mine`-derived inbox filtering and JWT auth). `packages/form-ui`: a
+  source-only, no-build field-form renderer shared by the editor's Player
+  and the end-user app, so what an author previews is what a participant
+  gets. All three reach the engine only through the HTTP wrapper or the
+  engine package's `exports` map — none author-or-run definitions in-process
+  except via those boundaries.
 
   `src/runtime/api.ts` (the Runtime API Layer) is the in-process boundary
   that actually runs an instance — `createProcessInstance`,
-  `getInstanceView`, `submitAndTransition` — validating and writing
-  user-submitted data (nothing else in the engine does). Post-v1 roadmap
-  (`CLAUDE.md` #5, "make the engine reachable"): a thin HTTP wrapper over
-  these three ops (proposed as the `http-wrapper` change), then an editor
-  player/preview UI, then real auth/assignment enforcement and real action
-  handlers — each stage builds on the one before it.
+  `getInstanceView`, `submitAndTransition`, `claimStep`/`releaseClaim`,
+  `listInstances`/`getInstanceRecord` — validating and writing
+  user-submitted data (nothing else in the engine does). `src/http/` wraps
+  it as `http-wrapper`; JWT/local-account auth (`jwt-authentication`,
+  `local-user-accounts`) and role-gated publish/cancel (`authorization`) sit
+  in front of it. All of this is built — nothing here is still "post-v1
+  roadmap"; see `ROADMAP.md` for current stage-by-stage status.
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.

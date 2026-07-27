@@ -301,7 +301,7 @@ left `faulted`.
 
 ### Requirement: Claim the current step of a running instance
 
-`claimStep(instanceId, actor, db?)` SHALL row-lock the instance, require
+`claimStep(instanceId, actor, db?)` SHALL row-lock the instance and, when
 `status === "running"`, require the current step has a declared
 `instance.assignment`, require the actor is an eligible candidate (`actor.id`
 or any of `actor.roles` present in `assignment.candidates`), and require
@@ -310,13 +310,21 @@ actor.id`, `claimedAt` to the current time, append an `assignment.claimed`
 `InstanceEvent`, and return the updated `Instance`. It SHALL throw
 `NotAssignedError` when the current step has no declared `assignment`,
 `NotACandidateError` when the actor is not eligible, and `AlreadyClaimedError`
-when `claimedBy` is already set.
+when `claimedBy` is already set. On a non-running instance it SHALL NOT
+throw — it returns the instance unchanged, a silent no-op (see
+`assignment-claim-release-consolidation`).
 
 #### Scenario: An eligible candidate claims successfully
 - **WHEN** `claimStep` is called by an eligible candidate on a running
   instance's unclaimed, assignment-bearing current step
 - **THEN** it returns the updated `Instance` with `assignment.claimedBy`
   set to the actor's id
+
+#### Scenario: A non-running instance is a no-op
+- **WHEN** `claimStep` is called on an instance whose `status` is not
+  `"running"`
+- **THEN** it returns the instance unchanged, with no error thrown and no
+  `assignment.claimed` event appended
 
 #### Scenario: A step with no declared assignment cannot be claimed
 - **WHEN** `claimStep` is called on a running instance whose current step has
@@ -336,11 +344,13 @@ when `claimedBy` is already set.
 
 ### Requirement: Release a claim on the current step of a running instance
 
-`releaseClaim(instanceId, actor, db?)` SHALL row-lock the instance, require
-`assignment.claimedBy === actor.id`, and on success clear `claimedBy` and
-`claimedAt`, append an `assignment.released` `InstanceEvent`, and return the
-updated `Instance`. It SHALL throw `NotClaimantError` when the calling
-actor does not hold the claim.
+`releaseClaim(instanceId, actor, db?)` SHALL row-lock the instance and, when
+`status === "running"`, require `assignment.claimedBy === actor.id`, and on
+success clear `claimedBy` and `claimedAt`, append an `assignment.released`
+`InstanceEvent`, and return the updated `Instance`. It SHALL throw
+`NotClaimantError` when the calling actor does not hold the claim. On a
+non-running instance it SHALL NOT throw — it returns the instance unchanged,
+a silent no-op (see `assignment-claim-release-consolidation`).
 
 #### Scenario: The claimant releases successfully
 - **WHEN** `releaseClaim` is called by the actor currently holding the

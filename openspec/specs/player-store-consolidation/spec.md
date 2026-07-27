@@ -47,23 +47,36 @@ from pre-consolidation behavior.
   settles (success or error), and `error` is cleared at the start of every
   call, regardless of which call it is
 
-### Requirement: First-available-locale-text lookup shares one implementation
+### Requirement: Locale-text lookup is NOT consolidated — two divergent implementations exist
 
-Every Player-side component that renders the first available translation
-of a `LocalizedText` value (currently `FieldInput` for field/option labels,
-`PlayerView` for the current step's label) SHALL do so through one shared
-function, not independently-maintained, structurally identical copies.
+This requirement documents the current, unconsolidated state rather than an
+achieved one; it is carried here as a known gap this capability's name
+implies is closed but isn't. `PlayerView.tsx` SHALL resolve the current
+step's label via `firstLocalizedText`
+(`packages/editor/src/player/locale-text.ts`, `Object.values(value)[0]`) —
+locale-blind, it returns whichever entry happens to be first regardless of
+the active locale. Field/option labels are no longer Player-owned code at
+all (they moved to the shared `form-ui` package, see `editor-player`'s
+"Field rendering is delegated to the shared form-ui package"), and
+`form-ui`'s `FieldInput` SHALL resolve them via
+`resolveText`/`resolveLocalizedText` (`packages/form-ui/src/locale.ts`),
+which IS locale-and-baseLocale-aware. Neither implementation SHALL call the
+other today, and no shared function exists across the two. Fixing this —
+either by having `PlayerView` call `form-ui`'s locale-aware resolver, or by
+deliberately deciding the step-label case doesn't need locale-awareness — is
+open follow-up work, not something this spec should claim is done until it
+actually is.
 
 #### Scenario: A field label with only a non-base-locale entry still renders
 
-- **WHEN** `FieldInput` renders a field or option whose `label` has only a
-  non-English (or non-current-locale) entry
-- **THEN** the shared lookup returns that entry's text rather than an
-  empty string
+- **WHEN** `form-ui`'s `FieldInput` renders a field or option whose `label`
+  has only a non-English (or non-current-locale) entry
+- **THEN** `resolveText` returns that entry's text rather than an empty
+  string
 
-#### Scenario: An empty or absent LocalizedText value falls back safely
+#### Scenario: PlayerView's step-label lookup is locale-blind
 
-- **WHEN** the shared lookup is called with `undefined` or an empty
-  `LocalizedText` record
-- **THEN** it returns `""`, matching pre-consolidation behavior for both
-  call sites
+- **WHEN** `PlayerView` renders the current step's label via
+  `firstLocalizedText`
+- **THEN** it returns whichever locale entry is first in the object, not
+  necessarily the entry for the active locale — unlike `form-ui`'s resolver

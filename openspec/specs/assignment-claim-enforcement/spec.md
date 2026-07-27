@@ -121,15 +121,18 @@ them.
 ### Requirement: Claiming a step is exclusive
 
 Claiming a running instance's current step SHALL row-lock the instance
-(`SELECT ... FOR UPDATE`), require the instance is `running`, require the
-current step has a declared (non-unset) `instance.assignment`, require the
-requesting actor is an eligible candidate, and require `claimedBy` is
-currently unset. On success it SHALL set `claimedBy` to the actor's id and
-`claimedAt` to the current time, and SHALL commit with no `HistoryEntry`
-(no step change) and no `transitionSeq` advance (not a transition). A claim
-attempt against a step with no declared assignment SHALL throw
-`NotAssignedError`, distinct from `NotACandidateError`/`AlreadyClaimedError`
-so it maps to its own HTTP status.
+(`SELECT ... FOR UPDATE`), require the current step has a declared
+(non-unset) `instance.assignment`, require the requesting actor is an
+eligible candidate, and require `claimedBy` is currently unset. On success it
+SHALL set `claimedBy` to the actor's id and `claimedAt` to the current time,
+and SHALL commit with no `HistoryEntry` (no step change) and no
+`transitionSeq` advance (not a transition). A claim attempt against a step
+with no declared assignment SHALL throw `NotAssignedError`, distinct from
+`NotACandidateError`/`AlreadyClaimedError` so it maps to its own HTTP status.
+Against a non-running instance none of these checks run: the row lock is
+taken, `status !== "running"` short-circuits to a silent no-op, and the
+instance is returned unchanged (see `assignment-claim-release-consolidation`)
+— not a rejection, since there is no assignment state to reject a change to.
 
 #### Scenario: An eligible candidate claims an unclaimed step
 

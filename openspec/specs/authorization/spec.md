@@ -4,7 +4,10 @@
 
 Gates the two process-admin HTTP operations that carry no permission check
 today — publishing a process definition and cancelling an arbitrary
-instance — behind a reserved role on the already-resolved `Actor`. Built on
+instance — behind a reserved role on the already-resolved `Actor`. Cancelling
+one's *own* instance is a separate, narrower path this capability does not
+gate — see "An instance's starter may cancel it without the reserved role"
+below. Built on
 top of `actor-resolution`/`jwt-authentication`/`local-user-accounts`: those
 capabilities establish *who* the caller is; this one decides whether that
 identity may perform an administrative operation. Deliberately minimal — two
@@ -91,3 +94,27 @@ role and still fully participate in process instances it is assigned to.
   current step, submits data via `submitAndTransition`
 - **THEN** the submission is processed normally, unaffected by this
   capability
+
+### Requirement: An instance's starter may cancel it without the reserved role
+
+`cancelInstance` (`src/runtime/api.ts`) SHALL first attempt `requireRole(actor,
+CANCEL_ANY_ROLE)`; when that throws `AuthorizationError`, `cancelInstance`
+SHALL NOT propagate the rejection. It SHALL instead load the instance and
+SHALL permit the cancellation when `instance.startedBy === actor.id` — an
+actor who started an instance may cancel it without holding
+`system:cancel-any`, so an abandoned start doesn't strand an unassigned
+running instance. This bypass SHALL be `cancelInstance`-specific, not a third
+reserved role or a general "owner" permission model: it SHALL NOT extend to
+publish, and SHALL NOT let a starter cancel an instance they did not start.
+
+#### Scenario: A starter without the reserved role cancels their own instance
+
+- **WHEN** an actor who lacks `system:cancel-any`, but whose id matches the
+  instance's `startedBy`, calls `cancelInstance`
+- **THEN** the cancellation succeeds
+
+#### Scenario: A non-starter without the reserved role is still rejected
+
+- **WHEN** an actor who lacks `system:cancel-any` and did not start the
+  instance calls `cancelInstance`
+- **THEN** it throws `AuthorizationError`

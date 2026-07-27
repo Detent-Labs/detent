@@ -617,3 +617,25 @@ Stage-by-stage status is in `ROADMAP.md`.
   in-memory, no new dependency: per-IP limiting and cross-process
   coordination are out of scope (single `Bun.serve` process today; see the
   change's design.md).
+- End-user app (`packages/app`, `packages/form-ui`, `add-end-user-app`): the
+  participant-facing frontend — Login, My-tasks (inbox), Task, Start-a-process,
+  four screens over a small hand-written History-API routing hook, talking to
+  the engine only through the HTTP wrapper. `packages/form-ui` is a new
+  source-only, no-build package extracted from the editor's Player field
+  renderer so both the editor's Player and the end-user app render step forms
+  through the identical component tree — a fix to one benefits both, and what
+  an author previews is what a participant gets. Only the end-user app
+  currently imports `form-ui/form-ui.css`; the editor's Player does not, so
+  its forms are presently unstyled (a known gap, not a design choice — see
+  `form-ui`'s spec). Two small engine-side additions: `InstanceSummary` gained
+  `processLabel`/`stepLabel`/`processBaseLocale` (resolved through the pinned
+  version body) so the inbox can render without shipping whole process bodies
+  to end-user browsers, and `POST /instances/:id/cancel` accepts
+  `startedBy === actor.id` as an alternative to `system:cancel-any` (see
+  `authorization`'s "An instance's starter may cancel it without the reserved
+  role" entry) so an abandoned start doesn't strand an unassigned running
+  instance. The my-tasks screen issues `GET /instances?scope=mine&limit=200`
+  and never a client-supplied `assignedTo`, so the server alone decides what
+  "mine" means. Read/query API's `assignedTo`/`assignedToRoles` role-matching
+  fix (see that entry above) was found and closed in the same area, during a
+  post-launch documentation audit of this stage.

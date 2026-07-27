@@ -256,11 +256,11 @@ return `200 OK` with that view, whose `status` field reflects `"faulted"`.
 
 ### Requirement: The HTTP server keeps the engine's background workers running
 
-`startHttpServer()` SHALL, in addition to serving the three routes, call
-the existing `startEngine` so the timer, outbox-delivery, and re-resolution
-background workers run for as long as the server process is up. Without
-this, an instance parked on a wait-state with a pending async action or
-timer would never progress through the HTTP-driven flow.
+`startHttpServer()` SHALL, in addition to serving this capability's routes,
+call the existing `startEngine` so the timer, outbox-delivery, and
+re-resolution background workers run for as long as the server process is up.
+Without this, an instance parked on a wait-state with a pending async action
+or timer would never progress through the HTTP-driven flow.
 
 #### Scenario: An async action enqueued via HTTP eventually settles
 - **WHEN** a submission drives an instance onto a step whose `onEntry`
@@ -421,6 +421,15 @@ route rejects a missing or invalid bearer token when the JWT resolver is
 active") — this was previously the one route with no actor resolution at
 all; it is brought in line with the rest.
 
+The route SHALL additionally accept a `scope` query parameter, whose only
+recognized value is `"mine"`; any other value SHALL be rejected as a request
+error. When `scope=mine`, the wrapper derives `assignedTo` (and the resolved
+actor's roles, for `instance-query`'s role-matching half of the inbox
+predicate — see that capability) from the resolved actor rather than a query
+parameter, and SHALL reject a request that combines `scope=mine` with an
+explicit `assignedTo` value as a request error — `scope=mine` and `assignedTo`
+are alternatives, never combined.
+
 The response SHALL carry the page of summaries and the next cursor, with the
 cursor absent on the last page.
 
@@ -433,6 +442,11 @@ cursor absent on the last page.
 
 - **WHEN** `GET /instances?assignedTo=user-1&status=running` is requested with a resolvable credential
 - **THEN** the response carries only running instances claimed by, or claimable by, `user-1`
+
+#### Scenario: scope=mine rejects an explicit assignedTo
+
+- **WHEN** `GET /instances?scope=mine&assignedTo=user-1` is requested with a resolvable credential
+- **THEN** the response is a request error, and neither value is applied
 
 #### Scenario: Repeating the status parameter widens the filter
 

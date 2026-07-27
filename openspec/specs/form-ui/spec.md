@@ -102,11 +102,14 @@ not two independently-maintained copies of the same `<input type="text">`.
 - **THEN** it renders the same `<input type="text">` shape as a
   free-text-fallback field, through the same code path
 
-### Requirement: Groups nest their member fields; order, required, and readonly are honored
+### Requirement: Groups nest their member fields; required and readonly are honored
 
 A `group` field SHALL render as a container housing the fields that carry its
-key in `ResolvedViewField.group`, in the order given by each field's resolved
-view `order`. A resolved view field with `required` set SHALL display a
+key in `ResolvedViewField.group`. Fields render in the order the resolved
+view array carries them (declaration order) — neither `FieldDef` nor
+`ResolvedViewField` carries an `order` property, so there is no per-field
+sort key to render by; a step's authored field order is what determines
+render order. A resolved view field with `required` set SHALL display a
 visible required marker with no client-side submission enforcement
 (requiredness is validated server-side). A resolved view field with
 `readonly` set SHALL render its input in a disabled state.
@@ -117,12 +120,6 @@ visible required marker with no client-side submission enforcement
   `ResolvedViewField.group` names that group's key
 - **THEN** the member fields render nested within the group's container, not
   flattened alongside it
-
-#### Scenario: Fields render in resolved view order
-
-- **WHEN** a step view assigns explicit `order` values to its fields
-- **THEN** the fields render in ascending `order`, not catalog-declaration
-  order
 
 #### Scenario: A required field displays a marker with no client-side gate
 
@@ -137,24 +134,22 @@ visible required marker with no client-side submission enforcement
 
 ### Requirement: Per-field validation errors attach to their matching input
 
-When a submission attempt yields a `SubmissionValidationError`, `form-ui`
-SHALL attach each entry in `issues` to the input for the field its `fieldId`
-names, rendering an inline message beside that input. An issue whose
-`fieldId` matches no field currently rendered SHALL NOT be silently dropped;
-it SHALL still be surfaced (e.g. in a form-level summary), so no validation
-issue is lost to a stale or mismatched view.
+`form-ui`'s `FieldForm` SHALL accept a pre-partitioned `issuesByField` map
+(fieldId -> messages) as a prop and attach each entry to the input for the
+field it names, rendering an inline message beside that input. `form-ui`
+itself has no visibility into a `SubmissionValidationError`'s raw `issues`
+array and so cannot detect or surface an issue whose `fieldId` matches no
+currently rendered field — that partitioning, including surfacing an
+unmatched issue (e.g. in a form-level summary), is each consumer's own
+responsibility, currently implemented independently and identically in both
+`packages/app/src/screens/TaskScreen.tsx` and
+`packages/editor/src/player/PlayerView.tsx` rather than shared in `form-ui`.
 
 #### Scenario: A validation issue displays beside its field
 
-- **WHEN** a submission returns a `SubmissionValidationError` with an issue
-  for a field currently rendered in the form
-- **THEN** that issue's message renders attached to that field's input
-
-#### Scenario: An unmatched issue is still surfaced
-
-- **WHEN** a `SubmissionValidationError` issue's `fieldId` does not match any
-  currently rendered field
-- **THEN** the issue is still displayed, not discarded
+- **WHEN** a consumer passes an `issuesByField` map with an entry for a field
+  currently rendered in the form
+- **THEN** that entry's message renders attached to that field's input
 
 ### Requirement: Path-submit buttons render from availablePaths
 
@@ -199,9 +194,19 @@ end-user app passes its active locale).
 
 `form-ui` SHALL ship the CSS for everything it renders (fields, groups,
 validation errors, path buttons) as part of the package, so both the editor's
-Player and the end-user app render forms with identical structure and
+Player and the end-user app CAN render forms with identical structure and
 identical styling — a shared component tree without a shared stylesheet would
-still let the two apps' rendering drift visually.
+still let the two apps' rendering drift visually. Currently only the
+end-user app imports it (`packages/app/src/main.tsx`); the editor's Player
+renders the same `form-ui` component tree without importing
+`form-ui/form-ui.css` anywhere in `packages/editor`, so the Player's forms
+are presently unstyled — the package satisfies its half of this requirement,
+the editor does not yet satisfy the other.
+
+#### Scenario: The end-user app imports the shared stylesheet
+
+- **WHEN** `packages/app`'s entry point is inspected
+- **THEN** it imports `form-ui/form-ui.css`
 
 #### Scenario: Both consumers import the same stylesheet
 
