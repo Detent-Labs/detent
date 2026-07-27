@@ -11,7 +11,7 @@ import { createUser } from "../src/auth/users.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
 import { createServer, resolveAuthResolver, parseAuthIssuers } from "../src/http/server.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
-import { PUBLISH_ROLE } from "../src/auth/authorize.js";
+import { PUBLISH_ROLE, ADMIN_ROLE } from "../src/auth/authorize.js";
 
 const DB = !!process.env.DATABASE_URL;
 const SECRET = "auth-server-test-secret";
@@ -155,7 +155,9 @@ test.skipIf(!DB)("with the JWT resolver active, the four list/record routes reje
 test.skipIf(!DB)("with the JWT resolver active, the four list/record routes succeed with a valid token", async () => {
   const resolver = resolveAuthResolver({ AUTH_JWT_SECRET: SECRET });
   const fetch = createServer(dataSourceReg, reg, sql, resolver, undefined, SECRET);
-  await createUser("list-routes-test@example.com", "correct-horse", []);
+  // system:admin is required for /instances (omitted scope) and /instances/:id/record
+  // since admin-shell-and-ops; this test is about the resolver/route wiring, not scope.
+  await createUser("list-routes-test@example.com", "correct-horse", [ADMIN_ROLE]);
   const loginRes = await fetch(
     new Request("http://x/auth/login", {
       method: "POST",

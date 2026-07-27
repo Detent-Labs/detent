@@ -13,6 +13,10 @@ import type { Actor } from "../cel/eval.js";
 export const PUBLISH_ROLE = "system:publish";
 /** Required to call `POST /instances/:id/cancel`. */
 export const CANCEL_ANY_ROLE = "system:cancel-any";
+/** Required for `scope=all` on `GET /instances`, `GET /instances/:id/record`, and every `/admin/*` route. */
+export const ADMIN_ROLE = "system:admin";
+/** Required for every studio route (`/drafts/*`). Implies nothing else — publishing still separately requires `system:publish`. */
+export const DEVELOPER_ROLE = "system:developer";
 
 /** The resolved Actor lacks a role an operation requires. Distinct from ActorResolutionError (no valid identity at all). */
 export class AuthorizationError extends Error {

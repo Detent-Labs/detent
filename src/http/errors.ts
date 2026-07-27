@@ -27,17 +27,13 @@ import {
   DataSourceRegistryValidationError,
 } from "../engine/definitions.js";
 import { DurationValidationError } from "../schema/compile.js";
+import { DraftConflictError } from "../engine/drafts.js";
 import { ZodError } from "zod";
+import { RequestShapeError } from "../errors.js";
 
 export type HttpResult = { status: number; body: unknown };
 
-/** A request's shape (a query parameter, a JSON body) is malformed — the client can fix it by reading the API. */
-export class RequestShapeError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "RequestShapeError";
-  }
-}
+export { RequestShapeError };
 
 type IssuesMapping = { ctor: new (...args: any[]) => Error & { issues: unknown }; status: number; type: string };
 type MessageMapping = { ctor: new (...args: any[]) => Error; status: number; type: string };
@@ -64,6 +60,7 @@ const MESSAGE_ERRORS: MessageMapping[] = [
   { ctor: AlreadyClaimedError, status: 403, type: "already-claimed" },
   { ctor: NotClaimedError, status: 403, type: "not-claimed" },
   { ctor: NotClaimantError, status: 403, type: "not-claimant" },
+  { ctor: DraftConflictError, status: 409, type: "draft-conflict" },
 ];
 
 export function mapError(err: unknown): HttpResult {

@@ -20,7 +20,7 @@ import { ConcurrencyConflict } from "../src/engine/transition.js";
 import { createServer } from "../src/http/server.js";
 import { mapError } from "../src/http/errors.js";
 import { devHeaderResolver, type ActorResolver } from "../src/auth/resolve.js";
-import { PUBLISH_ROLE, CANCEL_ANY_ROLE } from "../src/auth/authorize.js";
+import { PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE } from "../src/auth/authorize.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
@@ -178,8 +178,8 @@ const authedReq = (url: string, method: string, actor: Actor) =>
   new Request(url, { method, headers: authHeaders(actor) });
 
 const user1: Actor = { id: "user_1", roles: [] };
-/** Carries both reserved roles, for the publish / cancel-any-instance routes this suite exercises as an administrator. */
-const admin: Actor = { id: "user_admin", roles: [PUBLISH_ROLE, CANCEL_ANY_ROLE] };
+/** Carries all three reserved roles, for the publish / cancel-any-instance / admin-gated routes this suite exercises as an administrator. */
+const admin: Actor = { id: "user_admin", roles: [PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE] };
 /** Neither the reserved role nor (in these tests) the instance's starter — a plain third party. */
 const bystander: Actor = { id: "user_bystander", roles: [] };
 
@@ -730,7 +730,7 @@ test.skipIf(!DB)("GET /instances with no query lists every instance, no data fie
   await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1));
   await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1));
 
-  const res = await fetch(authedReq("http://x/instances", "GET", user1));
+  const res = await fetch(authedReq("http://x/instances", "GET", admin));
   expect(res.status).toBe(200);
   const page = (await res.json()) as { items: Record<string, unknown>[]; cursor?: string };
   expect(page.items.length).toBe(3);
@@ -743,7 +743,7 @@ test.skipIf(!DB)("GET /instances?assignedTo=&status= lists an actor's inbox", as
   const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
   await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
 
-  const res = await fetch(authedReq(`http://x/instances?assignedTo=user_1&status=running`, "GET", user1));
+  const res = await fetch(authedReq(`http://x/instances?assignedTo=user_1&status=running`, "GET", admin));
   expect(res.status).toBe(200);
   const page = (await res.json()) as { items: { instanceId: string }[] };
   expect(page.items.map((i) => i.instanceId)).toEqual([created.instanceId]);
@@ -795,7 +795,7 @@ test.skipIf(!DB)("GET /instances?status=running&status=cancelled widens the filt
   const toCancel = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
   await fetch(authedReq(`http://x/instances/${toCancel.instanceId}/cancel`, "POST", admin));
 
-  const res = await fetch(authedReq(`http://x/instances?status=running&status=cancelled`, "GET", user1));
+  const res = await fetch(authedReq(`http://x/instances?status=running&status=cancelled`, "GET", admin));
   const page = (await res.json()) as { items: { instanceId: string }[] };
   const ids = page.items.map((i) => i.instanceId);
   expect(ids).toContain(running.instanceId);
@@ -813,7 +813,7 @@ test.skipIf(!DB)("GET /instances?limit=2 pages through more instances than the l
     const url = new URL("http://x/instances");
     url.searchParams.set("limit", "2");
     if (cursor) url.searchParams.set("cursor", cursor);
-    const res = await fetch(authedReq(url.toString(), "GET", user1));
+    const res = await fetch(authedReq(url.toString(), "GET", admin));
     const page = (await res.json()) as { items: { instanceId: string }[]; cursor?: string };
     for (const item of page.items) seen.add(item.instanceId);
     cursor = page.cursor;
@@ -824,17 +824,54 @@ test.skipIf(!DB)("GET /instances?limit=2 pages through more instances than the l
 });
 
 test.skipIf(!DB)("GET /instances?limit=abc is a 400 request error", async () => {
-  const res = await fetch(authedReq("http://x/instances?limit=abc", "GET", user1));
+  const res = await fetch(authedReq("http://x/instances?limit=abc", "GET", admin));
   expect(res.status).toBe(400);
   const body = (await res.json()) as { error: { type: string } };
   expect(body.error.type).toBe("request-shape");
 });
 
 test.skipIf(!DB)("GET /instances?status=sideways is a 400 request error", async () => {
-  const res = await fetch(authedReq("http://x/instances?status=sideways", "GET", user1));
+  const res = await fetch(authedReq("http://x/instances?status=sideways", "GET", admin));
   expect(res.status).toBe(400);
   const body = (await res.json()) as { error: { type: string } };
   expect(body.error.type).toBe("request-shape");
+});
+
+// ============================================================
+// scope=all / omitted-scope tightening (system:admin required)
+// ============================================================
+
+test.skipIf(!DB)("GET /instances with an omitted scope, without system:admin, maps to 403 and performs no read", async () => {
+  const res = await fetch(authedReq("http://x/instances", "GET", user1));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("authorization");
+});
+
+test.skipIf(!DB)("GET /instances?scope=all without system:admin maps to 403", async () => {
+  const res = await fetch(authedReq("http://x/instances?scope=all", "GET", user1));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("authorization");
+});
+
+test.skipIf(!DB)("GET /instances?scope=all with system:admin succeeds", async () => {
+  const PID = pid("proc_http_list_scope_all_admin");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1));
+
+  const res = await fetch(authedReq("http://x/instances?scope=all", "GET", admin));
+  expect(res.status).toBe(200);
+});
+
+test.skipIf(!DB)("GET /instances?scope=mine succeeds without system:admin", async () => {
+  const res = await fetch(authedReq("http://x/instances?scope=mine", "GET", user1));
+  expect(res.status).toBe(200);
+});
+
+test.skipIf(!DB)("GET /instances with no resolvable credential is still 401, regardless of scope", async () => {
+  const res = await fetch(new Request("http://x/instances"));
+  expect(res.status).toBe(401);
 });
 
 // ============================================================
@@ -847,7 +884,7 @@ test.skipIf(!DB)("GET /instances/:instanceId/record returns the merged, ordered 
   const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
   await fetch(jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, { pathId: "path_ab", data: { field_amount: 10 } }));
 
-  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/record`, "GET", user1));
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/record`, "GET", admin));
   expect(res.status).toBe(200);
   const page = (await res.json()) as { items: { kind: string }[] };
   expect(page.items.length).toBeGreaterThan(0);
@@ -855,10 +892,22 @@ test.skipIf(!DB)("GET /instances/:instanceId/record returns the merged, ordered 
 });
 
 test.skipIf(!DB)("GET /instances/:instanceId/record for an unknown instance returns 200 with an empty sequence", async () => {
-  const res = await fetch(authedReq("http://x/instances/inst_does_not_exist/record", "GET", user1));
+  const res = await fetch(authedReq("http://x/instances/inst_does_not_exist/record", "GET", admin));
   expect(res.status).toBe(200);
   const page = (await res.json()) as { items: unknown[] };
   expect(page.items).toEqual([]);
+});
+
+test.skipIf(!DB)("GET /instances/:instanceId/record without system:admin maps to 403 and performs no read", async () => {
+  const res = await fetch(authedReq("http://x/instances/inst_does_not_exist/record", "GET", user1));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("authorization");
+});
+
+test.skipIf(!DB)("GET /instances/:instanceId/record with no resolvable credential is 401, whether or not the instance exists", async () => {
+  const res = await fetch(new Request("http://x/instances/inst_does_not_exist/record"));
+  expect(res.status).toBe(401);
 });
 
 // ============================================================
@@ -875,7 +924,7 @@ test.skipIf(!DB)("POST /instances/:instanceId/cancel cancels a running instance"
   const body = (await res.json()) as { status: string };
   expect(body.status).toBe("cancelled");
 
-  const record = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}/record`, "GET", user1))).json()) as {
+  const record = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}/record`, "GET", admin))).json()) as {
     items: { kind: string; entry?: { cause: string } }[];
   };
   expect(record.items.some((i) => i.kind === "transition" && i.entry?.cause === "cancel")).toBe(true);
@@ -890,7 +939,7 @@ test.skipIf(!DB)("POST /instances/:instanceId/cancel succeeds for an arbitrary a
   const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", arbitraryActor));
   expect(res.status).toBe(200);
 
-  const record = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}/record`, "GET", user1))).json()) as {
+  const record = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}/record`, "GET", admin))).json()) as {
     items: { kind: string; entry?: { cause: string; actorId?: string } }[];
   };
   const cancelEntry = record.items.find((i) => i.kind === "transition" && i.entry?.cause === "cancel");
@@ -1180,6 +1229,17 @@ test.skipIf(!DB)("a publish request under a rejecting resolver maps to 401 and p
   const store = createDefinitionStore(sql);
   const resolved = await store.resolveLatest(PID as ProcessId);
   expect(resolved).toBeUndefined();
+});
+
+// ============================================================
+// routes.ts stays the participant-facing surface (admin-operations-api:
+// "The participant route file gains no admin handler")
+// ============================================================
+
+test("routes.ts exports no admin-prefixed handler — those live in admin-routes.ts", async () => {
+  const routes = await import("../src/http/routes.js");
+  const adminExports = Object.keys(routes).filter((k) => k.toLowerCase().includes("admin"));
+  expect(adminExports).toEqual([]);
 });
 
 // ============================================================

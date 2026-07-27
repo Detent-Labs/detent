@@ -199,7 +199,7 @@
    Out of scope, deliberately: case history view, notifications, attachments,
    comments, delegation, and a dedicated `groups` assignment filter (distinct
    from `Step.assignment.candidates`, which already matches by id or role).
-10. Admin area: NOT STARTED (design approved 2026-07-27, see
+10. Admin area: IN PROGRESS (design approved 2026-07-27, see
     `docs/superpowers/specs/2026-07-27-admin-developer-area-design.md`). The
     operator's product: `packages/app` serves the participant,
     `packages/studio` (stage 11) the developer, `packages/admin` the operator.
@@ -208,19 +208,30 @@
     timers), user administration, and `POST /admin/migrations/run`.
     Same boundaries as the other frontends: runtime access through the
     HTTP wrapper only, no direct database reads. One new reserved role,
-    `system:admin`, checked directly like the two from stage 8. One new engine
-    module, `src/engine/admin-queries.ts`, for the reads that have no API
-    today (outbox rows by status, pending timers, instances per published
-    version); one new function, `users.ts::setDisabled`. Every other operation
-    reuses an existing engine path, so the only new writes are the two
-    outbox-row repairs, which touch no instance state and therefore cannot
-    interact with the `transitionSeq` OCC invariants.
-    **BREAKING**: `GET /instances?scope=all` and `GET /instances/:id/record`
-    are reachable today by any authenticated actor — every logged-in
-    participant can list all instances and read any record. Both move behind
-    `system:admin`. No current caller is affected (the end-user app uses
-    `scope=mine`, the Player drives a single instance it created), and
-    `scope=mine` stays open to every authenticated actor.
+    `system:admin`, checked directly like the two from stage 8.
+    Delivery is three OpenSpec changes, only the first with scaffolding:
+    `admin-shell-and-ops` (DONE), `admin-users` (NOT STARTED),
+    `admin-migration-run` (NOT STARTED).
+    `admin-shell-and-ops` is DONE (see `docs/current-state.md`'s "Admin area
+    (operations)" entry): `packages/admin` scaffolding and login/shell, one new
+    engine module `src/engine/admin-queries.ts` for the reads that had no API
+    (outbox rows by status, outbox counts, pending timers) plus the two
+    dead-letter repairs (requeue, discard — a new `discarded` outbox status,
+    pure row updates touching no instance state so neither can interact with
+    the `transitionSeq` OCC invariants), one new route file
+    `src/http/admin-routes.ts`, and the Operations screens (all-instances
+    list, instance detail with cancel, outbox, timers).
+    **BREAKING, shipped**: `GET /instances?scope=all` (and an omitted `scope`,
+    which has always meant the same thing) and `GET /instances/:id/record`
+    were reachable by any authenticated actor — every logged-in participant
+    could list all instances and read any record. Both now require
+    `system:admin`. No current caller was affected (the end-user app uses
+    `scope=mine`, the Player drives a single instance it created); `scope=mine`
+    stays open to every authenticated actor. An account that relied on either
+    read without the role needs it granted via `src/auth/cli.ts set-roles`.
+    Still to come (`admin-users`, `admin-migration-run`): one new function,
+    `users.ts::setDisabled`, for user administration; `POST
+    /admin/migrations/run` reusing the existing migration engine path.
     The design's original **Processes** and **Tools** areas were reassigned to
     stage 11 — authoring belongs to the developer, operating to the operator —
     which also moves `GET /admin/registry`, `POST /admin/migrations/plans` and
@@ -235,9 +246,7 @@
     must stay resolvable in the append-only record — `auth_users.disabled`,
     which `verifyLogin` already honours, is the correct mechanism), and live
     updates (refresh control plus refetch-on-focus, as in stage 9).
-    Delivery is three OpenSpec changes, only the first with scaffolding:
-    `admin-shell-and-ops`, `admin-users`, `admin-migration-run`.
-11. Process Studio: NOT STARTED (design approved 2026-07-27, see
+11. Process Studio: IN PROGRESS (design approved 2026-07-27, see
     `docs/superpowers/specs/2026-07-27-process-studio-design.md`). The
     developer's product, `packages/studio`, and one new reserved role,
     `system:developer`. It supersedes stage 4's `packages/editor`, which was a
@@ -272,3 +281,17 @@
     `studio-shell-and-drafts`, `studio-canvas`, `studio-json-view`,
     `studio-lifecycle`, `studio-tools-and-player` (the last deletes
     `packages/editor`).
+
+    **Process Studio — shell and drafts: DONE** (`studio-shell-and-drafts`).
+    `DEVELOPER_ROLE` in `src/auth/authorize.ts`; the `drafts` table
+    (`src/engine/store.ts::initSchema`); `src/engine/drafts.ts`
+    (get/save/list/delete, revision-checked optimistic concurrency,
+    `DraftConflictError`); `src/http/studio-routes.ts` (the four `/drafts`
+    routes, gated by `DEVELOPER_ROLE`, mapped through `src/http/errors.ts`);
+    `packages/studio` — login/session/shell mirroring `packages/admin`, the
+    editor's `draft/`/`panels/`/`i18n/`/`registry/` carried over with
+    file-persistence replaced by the draft routes, and a process list merging
+    `GET /processes` with `GET /drafts`. Canvas, the JSON surface, publish/
+    versions/migration planning, and tools/Player remain NOT STARTED
+    (`packages/editor` stays untouched and functional until the last of
+    those lands).

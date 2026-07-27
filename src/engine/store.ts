@@ -79,6 +79,11 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // safe row's Action.output field ids in place, and lets delivery detect (and
   // suppress) a writeback whose instance has since migrated out from under it.
   await db`ALTER TABLE outbox ADD COLUMN IF NOT EXISTS field_version integer`;
+  // Denormalized copy of the failure message from the row's most recent delivery
+  // attempt, so an outbox listing is self-sufficient without a jsonb scan across
+  // history_entries/instance_events for the ActionOutcome that already carries it.
+  // Cleared to NULL on a successful delivery. Idempotent add.
+  await db`ALTER TABLE outbox ADD COLUMN IF NOT EXISTS last_error text`;
   // Migration locks an instance's undelivered outbox rows before its instance row
   // (matching drainOutbox's own lock order); without this index that scan and lock
   // sequentially scan the whole table.
@@ -162,6 +167,23 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     password_hash text NOT NULL,
     roles         text[] NOT NULL DEFAULT '{}',
     disabled      boolean NOT NULL DEFAULT false
+  )`;
+  // Studio's mutable draft store: one row per process, the authored (uncompiled)
+  // body an author is still editing. Deliberately not `definitions` with
+  // `status='draft'` — that table is what resolution.ts and the timer worker
+  // rehydrate *running instances* from, and a mutable body there would put one
+  // forgotten read site between a half-finished draft and a live instance.
+  // `layout` sits beside `body`, never inside it: definitionHash is the JCS hash
+  // of ProcessBody only, so a moved box carried in the body would mint a new
+  // version at the next publish.
+  await db`CREATE TABLE IF NOT EXISTS drafts (
+    process_id   text PRIMARY KEY,
+    body         jsonb NOT NULL,
+    layout       jsonb NOT NULL DEFAULT '{}',
+    revision     integer NOT NULL DEFAULT 0,
+    base_version integer,
+    updated_by   text NOT NULL,
+    updated_at   timestamptz NOT NULL DEFAULT now()
   )`;
 }
 
