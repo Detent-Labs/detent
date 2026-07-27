@@ -37,3 +37,6 @@ Thumbs.db
 
 # temp files
 tmp/
+
+# Brainstorming companion mockups (per-session, local)
+.superpowers/
