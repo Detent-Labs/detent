@@ -3,7 +3,6 @@
   "version": 1,
   "definitionHash": "16da012aabc01f1420f766861186249586045e9562c5d12dbb9b10cf09004ee7",
   "status": "published",
-  "compatibility": "compatible",
   "publishedAt": "2026-07-18T09:00:00Z",
   "definition": {
     "key": "expense_approval",

@@ -158,7 +158,6 @@ export type Duration = z.infer<typeof duration>;
 
 /** ISO 8601 timestamp. */
 export const timestamp = z.string();
-export type Timestamp = z.infer<typeof timestamp>;
 
 // ============================================================
 // Expression: CEL, pure and total, no now(). Guards read data / instance /
@@ -196,7 +195,6 @@ export type Plugin = z.infer<typeof plugin>;
 // ============================================================
 
 export const definitionStatus = z.enum(["draft", "published", "deprecated", "archived"]);
-export const compatibility = z.enum(["compatible", "breaking"]);
 export const stepType = z.enum(["task", "subprocess"]); // terminal is a property, not a type
 export const pathTrigger = z.enum(["manual", "automatic"]);
 export const execution = z.enum(["async", "blocking"]); // v1 implements async only
@@ -206,11 +204,8 @@ export const baseFieldType = z.enum([
   "select", "multiselect", "reference", "file", "group",
 ]);
 
-export type DefinitionStatus = z.infer<typeof definitionStatus>;
-export type Compatibility = z.infer<typeof compatibility>;
 export type StepType = z.infer<typeof stepType>;
 export type PathTrigger = z.infer<typeof pathTrigger>;
-export type Execution = z.infer<typeof execution>;
 export type InstanceStatus = z.infer<typeof instanceStatus>;
 export type BaseFieldType = z.infer<typeof baseFieldType>;
 
@@ -323,7 +318,6 @@ export const retryPolicy = z.object({
   backoff: z.enum(["none", "fixed", "exponential"]),
   baseDelay: duration.optional(),
 });
-export type RetryPolicy = z.infer<typeof retryPolicy>;
 
 export const action = plugin.extend({
   id: actionId,
@@ -344,7 +338,6 @@ export const timerAction = z.object({
   actions: z.array(action).optional(),
   targetPath: pathId.optional(),
 });
-export type TimerAction = z.infer<typeof timerAction>;
 
 export const timer = z
   .object({
@@ -680,7 +673,6 @@ export const publishedProcessBody = processBody.superRefine((b, ctx) => {
       path: ["workflow", "steps"],
     });
 });
-export type PublishedProcessBody = z.infer<typeof publishedProcessBody>;
 
 /**
  * A migration rule. `fromVersion` lives on the plan key `(processId, fromVersion,
@@ -714,7 +706,6 @@ export const processVersion = z.object({
   version: z.number(),
   definitionHash: z.string(),
   status: definitionStatus,
-  compatibility: compatibility.optional(),
   publishedAt: timestamp.optional(),
   definition: processBody,
 });
@@ -839,7 +830,6 @@ export type MigrationSkipReason = z.infer<typeof migrationSkipReason>;
  * the payload's contract instead of changing it.
  */
 export const instanceFaultedReason = z.enum(["automatic-cascade-loop"]);
-export type InstanceFaultedReason = z.infer<typeof instanceFaultedReason>;
 
 export const instanceEvent = z.discriminatedUnion("kind", [
   // A reminder timer (onFire actions, no targetPath) fired: actions enqueued,
@@ -933,7 +923,6 @@ export const instanceEvent = z.discriminatedUnion("kind", [
   }),
 ]);
 export type InstanceEvent = z.infer<typeof instanceEvent>;
-export type InstanceEventKind = InstanceEvent["kind"];
 
 export const instance = z.object({
   instanceId,

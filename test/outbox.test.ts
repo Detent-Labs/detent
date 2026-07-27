@@ -94,6 +94,20 @@ const ghostBody = (): ProcessBody =>
     },
   }) as unknown as ProcessBody;
 
+// One action declaring its own retry policy, on step_b's onEntry.
+const retryActionBody = (retry: Action["retry"]): ProcessBody =>
+  ({
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true, onEntry: [{ id: "action_r1", type: "r1", config: {}, retry } as unknown as Action] },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
 // A reminder timer (actions, no targetPath): fires without advancing transitionSeq,
 // so its actions share the seq of whatever record the instance last rested at.
 const reminder = { id: "timer_r1", duration: "PT1H", onFire: { actions: [act("rem")] } };
@@ -337,6 +351,36 @@ test.skipIf(!DB)("a row that keeps failing exhausts attempts and dead-letters", 
 
   await makeDue(inst.instanceId);
   expect(await drainOutbox(sql, reg, okDeliver)).toBe(0); // dead-letter rows are excluded
+});
+
+test.skipIf(!DB)("an action's declared retry.maxAttempts overrides the default", async () => {
+  const body = retryActionBody({ maxAttempts: 2, backoff: "exponential" } as Action["retry"]);
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  for (let i = 0; i < 2; i++) {
+    await makeDue(inst.instanceId); // bypass backoff to drive escalation
+    await drainOutbox(sql, reg, boom);
+  }
+  const r = await rows(inst.instanceId);
+  // Would still be 'pending' (not yet dead-lettered) at attempts=2 under the
+  // engine default (MAX_ATTEMPTS=5) — dead-lettering here proves the
+  // declared maxAttempts:2 was honored, not the default.
+  expect(r.every((x) => x.status === "dead-letter" && x.attempts === 2)).toBe(true);
+});
+
+test.skipIf(!DB)("an action's declared retry.backoff 'fixed' with baseDelay overrides the default exponential schedule", async () => {
+  const body = retryActionBody({ maxAttempts: 5, backoff: "fixed", baseDelay: "PT5S" } as Action["retry"]);
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  await drainOutbox(sql, reg, boom); // one failed attempt
+  const r = await rows(inst.instanceId);
+  const delta = new Date(r[0].next_attempt_at as string).getTime() - Date.now();
+  // The engine default at attempts=1 would back off ~1000ms (BACKOFF_BASE_MS);
+  // the declared fixed 5s policy proves the override applied, not the default.
+  expect(delta).toBeGreaterThan(4000);
+  expect(delta).toBeLessThan(6000);
 });
 
 test.skipIf(!DB)("re-enqueuing an existing idempotency_key is rejected, original row untouched", async () => {

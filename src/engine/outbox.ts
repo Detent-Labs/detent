@@ -16,13 +16,31 @@ import type { SQL } from "bun";
 import { sql } from "./store.js";
 import { resolve, type Registry } from "./registry.js";
 import { pollForever } from "./poll.js";
+import { durationMs } from "./duration.js";
 import { evalOutput } from "../cel/eval.js";
 import type { Action, ActionOutcome } from "../schema/definition.js";
 
 export const MAX_ATTEMPTS = 5;
-// ponytail: fixed exponential backoff (1s, 2s, 4s, …); make per-action configurable
-// only if delivery SLAs ever diverge.
 const BACKOFF_BASE_MS = 1000;
+
+/** An action's own `retry.maxAttempts`, or the engine default when it declares none. */
+function maxAttemptsFor(action: Action): number {
+  return action.retry?.maxAttempts ?? MAX_ATTEMPTS;
+}
+
+/** An action's own `retry.backoff`/`retry.baseDelay`-driven delay for this attempt, or the engine default schedule when it declares none. */
+function backoffMsFor(action: Action, attempts: number): number {
+  const policy = action.retry;
+  const baseDelayMs = policy?.baseDelay !== undefined ? durationMs(policy.baseDelay) : BACKOFF_BASE_MS;
+  switch (policy?.backoff ?? "exponential") {
+    case "none":
+      return 0;
+    case "fixed":
+      return baseDelayMs;
+    case "exponential":
+      return baseDelayMs * 2 ** (attempts - 1);
+  }
+}
 // A claimed row whose lease has elapsed is treated as abandoned (crashed worker)
 // and reclaimed by a later drain. ponytail: 30s covers ordinary handler I/O;
 // raise only if a real handler legitimately runs longer.
@@ -205,7 +223,7 @@ export async function drainOutbox(
         const suppressed = Object.keys(patch).length > 0 && affected === 0;
         await appendOutcome(tx, row, { status: "succeeded", attempts, suppressed });
         delivered++;
-      } else if (permanent || attempts >= MAX_ATTEMPTS) {
+      } else if (permanent || attempts >= maxAttemptsFor(row.action)) {
         const cas = (await tx`UPDATE outbox SET status = 'dead-letter', attempts = ${attempts}
           WHERE idempotency_key = ${row.idempotency_key} AND status = 'claimed'
           RETURNING idempotency_key`) as unknown[];
@@ -213,7 +231,7 @@ export async function drainOutbox(
         await appendOutcome(tx, row, { status: "dead-letter", attempts });
       } else {
         // Transient: back off and return to pending (drop the lease) for a later drain.
-        const backoffMs = BACKOFF_BASE_MS * 2 ** (attempts - 1);
+        const backoffMs = backoffMsFor(row.action, attempts);
         await tx`UPDATE outbox SET status = 'pending', attempts = ${attempts}, claimed_at = NULL,
           next_attempt_at = now() + (${backoffMs} * interval '1 millisecond')
           WHERE idempotency_key = ${row.idempotency_key} AND status = 'claimed'`;
