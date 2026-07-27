@@ -295,3 +295,25 @@
     versions/migration planning, and tools/Player remain NOT STARTED
     (`packages/editor` stays untouched and functional until the last of
     those lands).
+12. Unified shell (consolidate app/admin/studio): NOT STARTED, deliberately
+    deferred — no urgency, raised 2026-07-28 as a "someday" question, not a
+    committed stage. Today `packages/app`, `packages/admin`, and
+    `packages/studio` are three independently-built Vite SPAs, each with its
+    own near-identical `session.ts` (token+actorId in localStorage),
+    `LoginScreen.tsx`, and hand-written `routing.ts` history-API hook — but
+    all three already share one backend, one JWT auth flow (stage 7), and
+    `packages/form-ui` as a common rendering layer, so there's no router or
+    state-management mismatch to reconcile. Two independent, sequenceable
+    steps, not one big-bang merge:
+    a. Shared login/session across the three origins first — smallest change,
+       biggest payoff ("log in once, stay in everywhere"), apps stay
+       separately deployable.
+    b. Only if still wanted later: one shell with role-gated routing
+       (`/admin/*`, `/studio/*`, `/app/*`) replacing the three duplicated
+       session/login/routing modules with one. Tradeoff to weigh before
+       starting this step: one bundle for three audiences (operator/
+       developer/participant) inflates bundle size for all three and couples
+       deploys that are currently independent — so it's a deliberate call,
+       not a default.
+    Neither step has an OpenSpec change yet; write one (starting with 12a)
+    when this actually gets scheduled.
