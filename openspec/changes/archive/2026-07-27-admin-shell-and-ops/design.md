@@ -175,6 +175,39 @@ returns, so the shell does not need to provoke a 403 to find out. The server
 check is what enforces; the client check only avoids rendering a UI whose every
 request will fail.
 
+### The instance header's `definitionHash` and armed timer reuse existing reads, added post-hoc
+
+Not decided when this document was first written, and worth recording now that
+implementation resolved it: `InstanceView` (`GET /instances/:id`) carries
+`processId`/`version`/`status`/`step` but not `definitionHash`, `transitionSeq`,
+claim state, or armed timers, and none of the four routes this change ships adds
+a dedicated single-instance read for them (that would be a fifth route beyond
+tasks.md's scope). The instance screen instead derives them from reads already
+in service:
+
+- `definitionHash` — `GET /processes/:id/versions` (existing), matched by
+  `view.version`.
+- Armed timer — `GET /admin/timers` (this change's own route) with a capped
+  page (`TIMERS_SCAN_LIMIT = 200`), filtered client-side to the instance id.
+  `admin-queries.ts::listPendingTimers` has no `instanceId` filter (by design —
+  three call sites, three statements, no filter DSL — see "`admin-queries.ts`
+  returns rows, not a DSL" above), so this is a scale ceiling, not a bug: it
+  covers the pending-timer backlog any real deployment carries today; add the
+  filter if that stops holding.
+- `transitionSeq` and claim state — derived from however much of
+  `GET /instances/:id/record` has loaded (the last transition's
+  `transitionSeq`; the last `assignment.claimed`/`assignment.released` event's
+  `actorId`). Both are last-wins over the loaded page, so an instance whose
+  full record exceeds one page could show stale claim state until "Load more
+  history" reaches the tail. Accepted: the primary state shown (`status`,
+  current step) comes from `InstanceView` directly and is never stale:
+  only these two secondary diagnostic fields carry the caveat.
+
+`processBaseLocale` (needed to render the current step's label in the
+process's own base locale, not an arbitrary object-key order) is resolved the
+same way — `GET /processes` (existing), matched by `processId` — since it too
+is absent from `InstanceView`.
+
 ## Risks / Trade-offs
 
 - **The `scope` tightening is breaking for an unknown external caller** → No

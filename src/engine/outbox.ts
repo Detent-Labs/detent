@@ -174,17 +174,19 @@ export async function drainOutbox(
     // permanent distinguishes a dead-letter from a transient retry.
     let patch: Record<string, unknown> | undefined;
     let permanent = false;
+    let failureMessage: string | undefined;
     try {
       patch = await deliverFn(row, registry);
     } catch (e) {
       permanent = e instanceof PermanentError;
+      failureMessage = e instanceof Error ? e.message : String(e);
     }
 
     // tx2: CAS on the claimed state. A reclaimed-then-late peer whose row is
     // already 'delivered' finds zero rows and applies nothing.
     await db.begin(async (tx) => {
       if (patch !== undefined) {
-        const cas = (await tx`UPDATE outbox SET status = 'delivered', delivered_at = now(), attempts = ${attempts}
+        const cas = (await tx`UPDATE outbox SET status = 'delivered', delivered_at = now(), attempts = ${attempts}, last_error = NULL
           WHERE idempotency_key = ${row.idempotency_key} AND status = 'claimed'
           RETURNING idempotency_key`) as unknown[];
         if (cas.length === 0) return; // already delivered by a peer
@@ -224,7 +226,7 @@ export async function drainOutbox(
         await appendOutcome(tx, row, { status: "succeeded", attempts, suppressed });
         delivered++;
       } else if (permanent || attempts >= maxAttemptsFor(row.action)) {
-        const cas = (await tx`UPDATE outbox SET status = 'dead-letter', attempts = ${attempts}
+        const cas = (await tx`UPDATE outbox SET status = 'dead-letter', attempts = ${attempts}, last_error = ${failureMessage ?? null}
           WHERE idempotency_key = ${row.idempotency_key} AND status = 'claimed'
           RETURNING idempotency_key`) as unknown[];
         if (cas.length === 0) return;
@@ -232,7 +234,7 @@ export async function drainOutbox(
       } else {
         // Transient: back off and return to pending (drop the lease) for a later drain.
         const backoffMs = backoffMsFor(row.action, attempts);
-        await tx`UPDATE outbox SET status = 'pending', attempts = ${attempts}, claimed_at = NULL,
+        await tx`UPDATE outbox SET status = 'pending', attempts = ${attempts}, claimed_at = NULL, last_error = ${failureMessage ?? null},
           next_attempt_at = now() + (${backoffMs} * interval '1 millisecond')
           WHERE idempotency_key = ${row.idempotency_key} AND status = 'claimed'`;
       }

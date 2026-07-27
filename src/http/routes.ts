@@ -23,7 +23,7 @@ import { publishBody, listProcesses, listVersions } from "../engine/definitions.
 import { instanceStatus } from "../schema/definition.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
-import { requireRole, PUBLISH_ROLE } from "../auth/authorize.js";
+import { requireRole, PUBLISH_ROLE, ADMIN_ROLE } from "../auth/authorize.js";
 import type { Registry, DataSourceRegistry } from "../engine/registry.js";
 import type { Instance, PathId, ProcessId, InstanceId, StepId, ProcessBody } from "../schema/definition.js";
 import { mapError, RequestShapeError, type HttpResult } from "./errors.js";
@@ -136,11 +136,11 @@ function parseStatuses(url: URL): Instance["status"][] | undefined {
   });
 }
 
-/** Only "mine" is a recognized scope value; anything else is a request error. */
-function parseScope(url: URL): "mine" | undefined {
+/** An omitted scope resolves to "all" — that is what it has always meant. Any other value is a request error. */
+function parseScope(url: URL): "mine" | "all" {
   const raw = url.searchParams.get("scope");
-  if (raw === null) return undefined;
-  if (raw !== "mine") throw new RequestShapeError(`unknown scope '${raw}'`);
+  if (raw === null) return "all";
+  if (raw !== "mine" && raw !== "all") throw new RequestShapeError(`unknown scope '${raw}'`);
   return raw;
 }
 
@@ -154,6 +154,9 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
     // pair it with its own assignedTo value to see another actor's instances.
     if (scope === "mine" && assignedTo !== undefined) {
       throw new RequestShapeError("scope=mine cannot be combined with an explicit assignedTo");
+    }
+    if (scope === "all") {
+      requireRole(actor, ADMIN_ROLE);
     }
     const filter: InstanceListFilter = {
       processId: (url.searchParams.get("processId") as ProcessId) ?? undefined,
@@ -173,7 +176,8 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
 
 export async function handleInstanceRecord(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(async () => {
-    await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver);
+    requireRole(actor, ADMIN_ROLE);
     const url = new URL(req.url);
     const limit = parseLimit(url);
     const cursor = url.searchParams.get("cursor") ?? undefined;

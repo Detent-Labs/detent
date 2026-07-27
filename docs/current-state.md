@@ -639,3 +639,120 @@ Stage-by-stage status is in `ROADMAP.md`.
   "mine" means. Read/query API's `assignedTo`/`assignedToRoles` role-matching
   fix (see that entry above) was found and closed in the same area, during a
   post-launch documentation audit of this stage.
+- Admin area (operations) (`packages/admin`, `src/engine/admin-queries.ts`,
+  `src/http/admin-routes.ts`, `admin-shell-and-ops`): the operator-facing
+  frontend and its server surface — stage 10's first of three changes. A new
+  reserved role `ADMIN_ROLE = "system:admin"` (`src/auth/authorize.ts`) gates
+  every `/admin/*` route and, **BREAKING**, the two reads that previously
+  carried no permission check at all: `GET /instances` now requires it for
+  `scope=all` (an omitted `scope` resolves to `"all"`, same as before — the
+  hole was the omitted case, not a new spelling of it; `scope=mine` stays open
+  to every authenticated actor), and `GET /instances/:id/record` requires it
+  unconditionally. `admin-queries.ts` adds the reads/repairs the engine had no
+  API for: `listOutbox`/`countOutboxByStatus` (outbox rows by status, with
+  their `last_error` — see below — but never the action's `config`, which may
+  hold credentials), `listPendingTimers` (running instances with a due
+  `next_timer_at`), and two pure outbox-row repairs, `requeueOutboxRow`
+  (`status` back to `pending`, `attempts` reset to 0) and `discardOutboxRow`
+  (`status` to `discarded` — never a `DELETE`, since `idempotency_key` is the
+  dedup anchor). Both repairs are guarded by `WHERE status = 'dead-letter'`
+  and report the updated row or `null`; `admin-routes.ts` maps `null` to 404
+  (no such row) or 409 (present but not a dead letter) by a follow-up read.
+  `outbox` gained a `last_error text` column (idempotent add, like
+  `claimed_at`/`event_id`/`field_version`): `drainOutbox` stamps the failure
+  message on both failure branches and clears it on success, so an outbox
+  listing is self-sufficient without a jsonb scan across the runtime record.
+  `discarded` is a fifth outbox status, inert to every existing consumer by
+  construction — `drainOutbox`'s claim predicate is an explicit allowlist
+  (`pending` due, or `claimed` with an expired lease) that never matches it,
+  and `migrateInstances` locks and remaps every non-`delivered` row of an
+  instance (including a `discarded` one) in `field_version` lock-step, since
+  only a *live-claimed* row blocks migration. `packages/admin` mirrors
+  `packages/app`'s shape (own `package.json`/`vite.config.ts`/`tsconfig.json`,
+  React 18 + Vite 6, a hand-written History-API routing hook, `session.ts` for
+  the JWT) but not its code: no `form-ui` dependency (it renders records and
+  system state, never step forms), no i18n. Login and session reuse are
+  identical to the end-user app; the shell additionally reads `roles` off the
+  login response and renders an explanatory empty state — presentational only,
+  the server-side `requireRole` is the enforcement — when `system:admin` is
+  absent. Four screens: `/instances` (all-instances list via `scope=all`, the
+  `InstanceListFilter` filters, cursor paging — filter/paging state in a tested
+  pure module, `screens/instancesLogic.ts`), `/instances/:id` (a header plus
+  the merged transition/event timeline from `GET /instances/:id/record`, with
+  cancel the only write action — no forced transition, no `data` edit;
+  `transitionSeq` and claim state are derived from however much of the record
+  has loaded, since neither has a single-instance read of its own, and
+  `definitionHash` is looked up from `GET /processes/:id/versions` by the
+  view's `version` — no new instance-detail route was added beyond the four
+  the change actually ships), `/outbox` (per-status counts, retry/discard
+  offered only on `dead-letter` rows, retry behind a confirmation naming the
+  re-run risk), and `/timers` (overdue-first, with overdue classification in a
+  tested pure module, `screens/timersLogic.ts`). Every screen refreshes on an
+  explicit control plus refetch-on-window-focus; no polling, no websocket.
+- Process Studio — shell and drafts (`packages/studio`, `src/engine/drafts.ts`,
+  `src/http/studio-routes.ts`, `studio-shell-and-drafts`): the developer's
+  substrate — stage 11's first of five changes; `packages/editor` stays
+  untouched and functional until the last one deletes it. A new reserved role
+  `DEVELOPER_ROLE = "system:developer"` (`src/auth/authorize.ts`) gates every
+  studio route and implies nothing else — publishing still separately requires
+  `system:publish`. A new table, `drafts` (`src/engine/store.ts::initSchema`):
+  one mutable draft per process (`process_id` primary key), holding the
+  **authored**, uncompiled body plus a `layout jsonb` column kept beside it
+  (never inside it, so a moved box never changes `definitionHash`), a
+  `revision integer` for optimistic concurrency, a nullable `base_version`,
+  and `updated_by`/`updated_at`. Deliberately not `definitions` with the
+  declared-but-inert `status='draft'` — that table is what `resolution.ts`
+  and the timer worker rehydrate running instances from. `src/engine/drafts.ts`
+  exports `getDraft`/`saveDraft`/`listDrafts`/`deleteDraft`; `saveDraft`
+  validates only the request's envelope (`body`/`layout` are JSON objects,
+  `revision` a non-negative integer — `RequestShapeError` otherwise, imported
+  from the new leaf module `src/errors.ts` rather than `src/http/errors.ts`,
+  which would have created an import cycle since `http/errors.ts` in turn
+  imports `DraftConflictError` from `drafts.ts` for its own 409 mapping) and
+  never parses the body against `processBody`: a draft under construction
+  routinely violates the authoring-time invariants, and correctness is
+  enforced live in the studio's editing UI and unconditionally at publish
+  instead. Saving is `UPDATE … WHERE process_id = $1 AND revision = $2`
+  (`revision = revision + 1` on a hit), the same "conditional update, caller
+  supplies the expected value" pattern `transitionSeq` already establishes; a
+  first save at `revision = 0` for a process with no row is an `INSERT`, and a
+  lost create race or a stale `revision` both raise `DraftConflictError`
+  (its own class, distinct from `runtime/api.ts::ConcurrencyConflict`, which
+  means an instance `transitionSeq` mismatch to every existing client) — never
+  merged. `src/http/studio-routes.ts` exposes `GET /drafts`,
+  `GET /drafts/:processId` (404 when absent), `PUT /drafts/:processId` and
+  `DELETE /drafts/:processId`, kept out of `routes.ts` the same way
+  `admin-routes.ts` is; `updated_by` always comes from the resolved actor,
+  never the request body. `packages/studio` mirrors `packages/app`'s shape
+  (own `package.json`/`vite.config.ts`/`tsconfig.json`, React 18 + Vite 6, a
+  hand-written History-API routing hook, `session.ts` for the JWT under its
+  own storage key) the way `packages/admin` does, plus `immer` and `zod`; no
+  `form-ui`, `mermaid` or `@panzoom/panzoom` yet. Login and the
+  role-gated-empty-state shell follow `packages/admin`'s pattern exactly
+  (`system:developer` in place of `system:admin`) — presentational only, the
+  server-side `requireRole` is the enforcement. The editor's `draft/`,
+  `panels/`, `i18n/` and `registry/` are copied into `packages/studio/src`
+  (`packages/editor` untouched, a deliberate duplication window closed only
+  when change 5 deletes the editor): the file-persistence pieces
+  (`file-io.ts`, `file-system-access.d.ts`, `load-guard.ts`,
+  `panels/FileToolbar.tsx`, and `io.ts`'s Draft-round-trip/import functions,
+  which depended on the dropped load guard) are removed, and `FileToolbar` is
+  replaced by `panels/DraftToolbar.tsx` — explicit save/discard against the
+  draft routes, with a save/conflict state machine (`screens/draftSaveLogic.ts`,
+  unit-tested independent of any component) that on a 409 leaves the open
+  Draft's in-memory state untouched and offers a reload, which replaces the
+  Draft via the store's existing `replace()` and adopts the stored
+  revision/layout — never a silent retry, never a merge. `draft/ids.ts` gained
+  a seventh minter, `process`, over the contract's `processId` schema. Live
+  validation is unchanged: the engine's own publish-time chain imported
+  through the exports map at compile time, exactly as
+  `packages/editor/src/draft/validation.ts` already did, and it never blocks
+  saving. The process list (`screens/processListLogic.ts`, a pure module
+  following `packages/app/src/screens/inboxLogic.ts`) merges
+  `GET /processes` with `GET /drafts` into one row per process id — draft-only,
+  published-only, or both — with new/open/discard actions; "New process"
+  mints a `proc_`-prefixed id client-side and issues exactly one
+  `PUT /drafts/:processId` at `revision = 0`, no server-side id allocation.
+  Publishing, canvas editing, the JSON surface, and migration planning are not
+  part of this change; the existing editor's export path plus `POST
+  /processes` remains the only publish path until change 4.

@@ -642,3 +642,41 @@ test.skipIf(!DB)("a writeback whose instance has not migrated still delivers nor
   expect(o[0]).toMatchObject({ status: "succeeded" });
   expect(o[0].suppressed).toBeUndefined();
 });
+
+// --- last_error column ---------------------------------------------------
+
+test.skipIf(!DB)("a transient failure records the error message and stays pending", async () => {
+  const body = threeActionBody();
+  const inst = await create();
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  await drainOutbox(sql, reg, boom);
+  const r = await rows(inst.instanceId);
+  expect(r.every((x) => x.status === "pending" && x.last_error === "delivery failed")).toBe(true);
+});
+
+test.skipIf(!DB)("a permanent failure dead-letters carrying the error that killed it", async () => {
+  const body = ghostBody(); // unregistered type -> PermanentError
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  await drainOutbox(sql, reg);
+  const r = await rows(inst.instanceId);
+  expect(r.every((x) => x.status === "dead-letter" && typeof x.last_error === "string" && (x.last_error as string).length > 0)).toBe(true);
+});
+
+test.skipIf(!DB)("a later success clears a previously recorded error", async () => {
+  const body = outputBody(false);
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  await drainOutbox(sql, reg, boom); // first attempt fails, records last_error
+  let r = await rows(inst.instanceId);
+  expect(r[0].last_error).toBe("delivery failed");
+
+  await makeDue(inst.instanceId);
+  await drainOutbox(sql, reg, okDeliver); // succeeds, must clear last_error
+  r = await rows(inst.instanceId);
+  expect(r[0].status).toBe("delivered");
+  expect(r[0].last_error).toBeNull();
+});

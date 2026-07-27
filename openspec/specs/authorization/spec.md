@@ -2,38 +2,55 @@
 
 ## Purpose
 
-Gates the two process-admin HTTP operations that carry no permission check
-today — publishing a process definition and cancelling an arbitrary
-instance — behind a reserved role on the already-resolved `Actor`. Cancelling
-one's *own* instance is a separate, narrower path this capability does not
-gate — see "An instance's starter may cancel it without the reserved role"
-below. Built on
-top of `actor-resolution`/`jwt-authentication`/`local-user-accounts`: those
-capabilities establish *who* the caller is; this one decides whether that
-identity may perform an administrative operation. Deliberately minimal — two
-fixed role strings, checked directly at the two call sites that need them,
-with no policy engine, role hierarchy, or pluggable extension point. See the
-`http-wrapper` capability for how the resulting `403` surfaces over HTTP.
+Gates the process-admin, operator-facing, and studio HTTP operations that
+carry no permission check of their own behind a reserved role on the
+already-resolved `Actor`: publishing a process definition, cancelling an
+arbitrary instance, the unfiltered instance listing, an instance's merged
+record, every `/admin/*` route, and every studio route. Cancelling one's
+*own* instance is a separate, narrower path this capability does not gate —
+see "An instance's starter may cancel it without the reserved role" below.
+Built on top of `actor-resolution`/`jwt-authentication`/`local-user-accounts`:
+those capabilities establish *who* the caller is; this one decides whether
+that identity may perform an administrative, operator-facing, or authoring
+operation. Deliberately minimal — four fixed role strings, checked directly
+at each call site that needs one, with no policy engine, role hierarchy, or
+pluggable extension point. See the `http-wrapper` capability for how the
+resulting `403` surfaces over HTTP.
 
 ## Requirements
 
 ### Requirement: Reserved role constants gate process-admin operations
 
-The engine SHALL define two reserved role strings in `src/auth/authorize.ts`:
-`PUBLISH_ROLE = "system:publish"` and `CANCEL_ANY_ROLE =
-"system:cancel-any"`. These SHALL be the only roles this capability defines;
-no role hierarchy, wildcard, or general permission/policy model SHALL exist.
-The `system:` prefix is a naming convention only, distinguishing these two
-engine-reserved roles from free-form business roles a deployment assigns for
-`Step.assignment` (e.g. `"finance-approver"`) — it is not structurally
-enforced, since `Actor.roles` and `auth_users.roles` remain plain
-`string[]`.
+The engine SHALL define four reserved role strings in
+`src/auth/authorize.ts`: `PUBLISH_ROLE = "system:publish"`, `CANCEL_ANY_ROLE =
+"system:cancel-any"`, `ADMIN_ROLE = "system:admin"` and `DEVELOPER_ROLE =
+"system:developer"`. These SHALL be the only roles this capability defines; no
+role hierarchy, wildcard, or general permission/policy model SHALL exist — in
+particular no one of them SHALL imply any other. The `system:` prefix is a
+naming convention only, distinguishing these engine-reserved roles from
+free-form business roles a deployment assigns for `Step.assignment` (e.g.
+`"finance-approver"`) — it is not structurally enforced, since `Actor.roles`
+and `auth_users.roles` remain plain `string[]`.
 
 #### Scenario: The reserved role constants are exported
 
 - **WHEN** `src/auth/authorize.ts` is inspected for exports
-- **THEN** it exports `PUBLISH_ROLE` with value `"system:publish"` and
-  `CANCEL_ANY_ROLE` with value `"system:cancel-any"`
+- **THEN** it exports `PUBLISH_ROLE` with value `"system:publish"`,
+  `CANCEL_ANY_ROLE` with value `"system:cancel-any"`, `ADMIN_ROLE` with value
+  `"system:admin"` and `DEVELOPER_ROLE` with value `"system:developer"`
+
+#### Scenario: The admin role implies nothing
+
+- **WHEN** `requireRole(actor, PUBLISH_ROLE)` is called for an actor whose
+  `roles` is exactly `["system:admin"]`
+- **THEN** it throws `AuthorizationError`
+
+#### Scenario: The developer role implies nothing
+
+- **WHEN** `requireRole(actor, PUBLISH_ROLE)` or `requireRole(actor,
+  ADMIN_ROLE)` is called for an actor whose `roles` is exactly
+  `["system:developer"]`
+- **THEN** it throws `AuthorizationError`
 
 ### Requirement: requireRole throws a distinct error when the actor lacks the role
 
@@ -62,14 +79,16 @@ identity" rather than "valid identity, insufficient permission").
   whose `roles` is an empty array
 - **THEN** it throws `AuthorizationError`
 
-### Requirement: Authorization is checked directly at the two gated operations, not through an extension point
+### Requirement: Authorization is checked directly at each gated operation, not through an extension point
 
-Publishing a process body and cancelling an arbitrary instance are the only
-two operations this capability gates. No plugin envelope, registry, or
-configurable policy SHALL be introduced for authorization — each gated
-operation calls `requireRole` directly with its fixed role constant, the
-same "checked directly, not an extension point" pattern the engine already
-uses for `Step.assignment.strategy.type`'s single `"static"` check.
+Publishing a process body, cancelling an arbitrary instance, reading the
+unfiltered instance listing, reading an instance's record, every `/admin/*`
+route, and every studio route are the operations this capability gates. No
+plugin envelope, registry, or configurable policy SHALL be introduced for
+authorization — each gated operation calls `requireRole` directly with its
+fixed role constant, the same "checked directly, not an extension point"
+pattern the engine already uses for `Step.assignment.strategy.type`'s single
+`"static"` check.
 
 #### Scenario: No authorization plugin registry exists
 
@@ -77,6 +96,18 @@ uses for `Step.assignment.strategy.type`'s single `"static"` check.
   extension points are inspected
 - **THEN** no corresponding authorization or permission registry exists
   alongside them
+
+#### Scenario: Each admin route calls requireRole directly
+
+- **WHEN** `src/http/admin-routes.ts` is inspected
+- **THEN** each handler calls `requireRole(actor, ADMIN_ROLE)` itself, with no
+  intervening policy abstraction
+
+#### Scenario: Each studio route calls requireRole directly
+
+- **WHEN** `src/http/studio-routes.ts` is inspected
+- **THEN** each handler calls `requireRole(actor, DEVELOPER_ROLE)` itself, with
+  no intervening policy abstraction
 
 ### Requirement: Authorization is orthogonal to assignment/claim enforcement
 
@@ -103,9 +134,10 @@ SHALL NOT propagate the rejection. It SHALL instead load the instance and
 SHALL permit the cancellation when `instance.startedBy === actor.id` — an
 actor who started an instance may cancel it without holding
 `system:cancel-any`, so an abandoned start doesn't strand an unassigned
-running instance. This bypass SHALL be `cancelInstance`-specific, not a third
-reserved role or a general "owner" permission model: it SHALL NOT extend to
-publish, and SHALL NOT let a starter cancel an instance they did not start.
+running instance. This bypass SHALL be `cancelInstance`-specific, not a
+reserved role of its own or a general "owner" permission model: it SHALL NOT
+extend to publish, and SHALL NOT let a starter cancel an instance they did not
+start.
 
 #### Scenario: A starter without the reserved role cancels their own instance
 
@@ -118,3 +150,62 @@ publish, and SHALL NOT let a starter cancel an instance they did not start.
 - **WHEN** an actor who lacks `system:cancel-any` and did not start the
   instance calls `cancelInstance`
 - **THEN** it throws `AuthorizationError`
+
+### Requirement: The operator role gates the operator-facing reads and routes
+
+`ADMIN_ROLE` SHALL gate every `/admin/*` route and, additionally, the two
+existing reads that today carry no permission check at all: the unfiltered
+instance listing (`GET /instances` with `scope=all` or with `scope` omitted)
+and `GET /instances/:instanceId/record`. `scope=mine` SHALL remain open to
+every authenticated actor, so an actor holding no reserved role still fully
+participates in the instances it is a candidate for.
+
+This is a **BREAKING** tightening: an account that relied on either read
+without holding `system:admin` must be granted the role via the existing
+`src/auth/cli.ts set-roles`.
+
+#### Scenario: A participant can still see their own work
+
+- **WHEN** an actor holding no reserved role requests `GET /instances?scope=mine`
+- **THEN** the response is 200 and carries their assignments
+
+#### Scenario: The same participant cannot see everything
+
+- **WHEN** that actor requests `GET /instances?scope=all` or `GET /instances`
+  with no `scope`
+- **THEN** the response is 403
+
+#### Scenario: The same participant cannot read a record
+
+- **WHEN** that actor requests `GET /instances/:id/record`, including for an
+  instance they started
+- **THEN** the response is 403
+
+### Requirement: The developer role gates the authoring surface
+
+`DEVELOPER_ROLE` SHALL gate every studio route, starting with the four draft
+routes this change introduces. It SHALL NOT grant any operation the other
+reserved roles gate: publishing a process body SHALL continue to require
+`system:publish` in addition, and the operator reads and `/admin/*` routes
+SHALL continue to require `system:admin`.
+
+This is additive, not a tightening: the routes it gates are new, so no
+existing caller loses access. An account that needs studio is granted the role
+via the existing `src/auth/cli.ts set-roles`.
+
+#### Scenario: A developer reaches the authoring surface
+
+- **WHEN** an actor holding `system:developer` calls a studio route
+- **THEN** the request is authorized
+
+#### Scenario: A developer does not thereby gain publish or admin rights
+
+- **WHEN** an actor holding only `system:developer` calls `POST /processes` or
+  an `/admin/*` route
+- **THEN** the response is 403
+
+#### Scenario: No existing caller is affected
+
+- **WHEN** this change is applied
+- **THEN** every route that existed beforehand requires exactly the roles it
+  required beforehand

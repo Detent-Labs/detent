@@ -1,0 +1,235 @@
+/*
+ * Same token structure as packages/admin/src/app.css / packages/app/src/app.css
+ * (primitives -> semantic aliases; components reference only the semantic
+ * layer) so the three frontends read as siblings, not a mismatched pair.
+ */
+
+:root {
+  --paper-50: #eef1f2;
+  --ledger-100: #dce3e0;
+  --ink-900: #1c2230;
+  --slate-500: #56606b;
+  --stamp-blue-600: #2c4a6e;
+  --seal-700: #6e7b3f;
+  --alert-700: #a23b2e;
+
+  --color-surface: var(--paper-50);
+  --color-surface-muted: var(--ledger-100);
+  --color-text: var(--ink-900);
+  --color-text-muted: var(--slate-500);
+  --color-border: var(--ledger-100);
+  --color-accent: var(--stamp-blue-600);
+  --color-accent-contrast: #ffffff;
+  --color-success: var(--seal-700);
+  --color-danger: var(--alert-700);
+
+  --font-display: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper-50: #171b22;
+    --ledger-100: #2a303a;
+    --ink-900: #e9ecef;
+    --slate-500: #9aa5b1;
+    --stamp-blue-600: #7ea3cc;
+    --seal-700: #9db072;
+    --alert-700: #d97362;
+    --color-accent-contrast: #10141a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+button {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  border: none;
+  border-radius: 3px;
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.studio-back {
+  display: block;
+  background: none;
+  color: var(--color-accent);
+  padding: 0;
+  margin-bottom: var(--space-3);
+}
+
+input,
+select {
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  padding: var(--space-2);
+  background: var(--color-surface);
+}
+
+h1,
+h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: 1.25rem;
+  margin: 0 0 var(--space-4);
+}
+
+h2 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+.studio-screen {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-3) var(--space-5);
+}
+
+.studio-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.studio-header nav {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.studio-header-right {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.studio-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.studio-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 20rem;
+}
+
+.studio-login-form label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.9rem;
+}
+
+.studio-empty-role {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.studio-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  align-items: center;
+}
+
+.studio-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.studio-table th {
+  text-align: left;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.studio-table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.studio-empty {
+  color: var(--color-text-muted);
+  padding: var(--space-4) 0;
+}
+
+.studio-error {
+  color: var(--color-danger);
+}
+
+.studio-conflict {
+  border: 1px solid var(--color-danger);
+  border-radius: 4px;
+  padding: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

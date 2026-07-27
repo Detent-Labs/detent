@@ -25,6 +25,8 @@ import {
   handleListProcesses,
   handleListVersions,
 } from "./routes.js";
+import { handleAdminListOutbox, handleAdminOutboxRetry, handleAdminOutboxDiscard, handleAdminListTimers } from "./admin-routes.js";
+import { handleListDrafts, handleGetDraft, handleSaveDraft, handleDeleteDraft } from "./studio-routes.js";
 import type { HttpResult } from "./errors.js";
 
 /**
@@ -191,6 +193,24 @@ export function createServer(
     if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "processes" && parts[2] === "versions") {
       return preflight("GET");
     }
+    if (req.method === "OPTIONS" && parts.length === 2 && parts[0] === "admin" && parts[1] === "outbox") {
+      return preflight("GET");
+    }
+    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "admin" && parts[1] === "outbox" && parts[3] === "retry") {
+      return preflight("POST");
+    }
+    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "admin" && parts[1] === "outbox" && parts[3] === "discard") {
+      return preflight("POST");
+    }
+    if (req.method === "OPTIONS" && parts.length === 2 && parts[0] === "admin" && parts[1] === "timers") {
+      return preflight("GET");
+    }
+    if (req.method === "OPTIONS" && parts.length === 1 && parts[0] === "drafts") {
+      return preflight("GET");
+    }
+    if (req.method === "OPTIONS" && parts.length === 2 && parts[0] === "drafts") {
+      return preflight("GET, PUT, DELETE");
+    }
 
     // POST /auth/login
     if (loginSecret && req.method === "POST" && parts.length === 2 && parts[0] === "auth" && parts[1] === "login") {
@@ -239,6 +259,38 @@ export function createServer(
     // GET /processes/:processId/versions
     if (req.method === "GET" && parts.length === 3 && parts[0] === "processes" && parts[2] === "versions") {
       return toRes(await handleListVersions(parts[1]!, req, resolver, db));
+    }
+    // GET /admin/outbox
+    if (req.method === "GET" && parts.length === 2 && parts[0] === "admin" && parts[1] === "outbox") {
+      return toRes(await handleAdminListOutbox(req, resolver, db));
+    }
+    // POST /admin/outbox/:idempotencyKey/retry
+    if (req.method === "POST" && parts.length === 4 && parts[0] === "admin" && parts[1] === "outbox" && parts[3] === "retry") {
+      return toRes(await handleAdminOutboxRetry(parts[2]!, req, resolver, db));
+    }
+    // POST /admin/outbox/:idempotencyKey/discard
+    if (req.method === "POST" && parts.length === 4 && parts[0] === "admin" && parts[1] === "outbox" && parts[3] === "discard") {
+      return toRes(await handleAdminOutboxDiscard(parts[2]!, req, resolver, db));
+    }
+    // GET /admin/timers
+    if (req.method === "GET" && parts.length === 2 && parts[0] === "admin" && parts[1] === "timers") {
+      return toRes(await handleAdminListTimers(req, resolver, db));
+    }
+    // GET /drafts (list)
+    if (req.method === "GET" && parts.length === 1 && parts[0] === "drafts") {
+      return toRes(await handleListDrafts(req, resolver, db));
+    }
+    // GET /drafts/:processId
+    if (req.method === "GET" && parts.length === 2 && parts[0] === "drafts") {
+      return toRes(await handleGetDraft(parts[1]!, req, resolver, db));
+    }
+    // PUT /drafts/:processId
+    if (req.method === "PUT" && parts.length === 2 && parts[0] === "drafts") {
+      return toRes(await handleSaveDraft(parts[1]!, req, resolver, db));
+    }
+    // DELETE /drafts/:processId
+    if (req.method === "DELETE" && parts.length === 2 && parts[0] === "drafts") {
+      return toRes(await handleDeleteDraft(parts[1]!, req, resolver, db));
     }
 
     return toRes({ status: 404, body: { error: { type: "not-found", message: `no route: ${req.method} ${url.pathname}` } } });
