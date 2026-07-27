@@ -1,12 +1,6 @@
 import type { ReactNode } from "react";
-import type { LocalizedText } from "workflow-engine/schema";
 import type { ResolvedViewField, SubmissionIssue } from "./types";
-
-function firstLocalizedText(value: LocalizedText | undefined): string {
-  if (!value) return "";
-  const values = Object.values(value);
-  return values[0] ?? "";
-}
+import { firstLocalizedText } from "./locale-text";
 
 interface FieldFormProps {
   fields: ResolvedViewField[];

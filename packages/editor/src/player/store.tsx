@@ -138,31 +138,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   /** For every authenticated call: a 401 means an invalid/expired session —
    * discard the token and return to the login screen (no error shown; the
-   * login screen itself is the signal). No client-side expiry tracking. */
-  const run = async (fn: () => Promise<void>) => {
+   * login screen itself is the signal). No client-side expiry tracking.
+   * `isLogin` opts out of that: login's own 401 (wrong credentials) is
+   * reported as a generic failure instead, since there is no session yet
+   * to discard. */
+  const run = async (fn: () => Promise<void>, opts?: { isLogin?: boolean }) => {
     setLoading(true);
     setError(undefined);
     try {
       await fn();
     } catch (err) {
-      if (err instanceof PlayerClientError && err.status === 401) {
+      if (!opts?.isLogin && err instanceof PlayerClientError && err.status === 401) {
         logout();
         return;
       }
-      setError(toClientError(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /** Login's own 401 (wrong credentials) is reported as a generic failure,
-   * not treated as "session expired" — there is no session yet to discard. */
-  const runLogin = async (fn: () => Promise<void>) => {
-    setLoading(true);
-    setError(undefined);
-    try {
-      await fn();
-    } catch (err) {
       setError(toClientError(err));
     } finally {
       setLoading(false);
@@ -174,10 +163,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     isLoggedIn: token !== "",
     setServerUrl: (url) => setConnection((c) => ({ ...c, serverUrl: url })),
     login: (email, password) =>
-      runLogin(async () => {
+      run(async () => {
         const result = await apiLogin(serverUrl, email, password);
         setConnection((c) => ({ ...c, token: result.token }));
-      }),
+      }, { isLogin: true }),
     logout,
     instanceId,
     view,

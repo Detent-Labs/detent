@@ -2,11 +2,7 @@ import { useEffect, useState } from "react";
 import { usePlayer } from "./store";
 import { FieldForm } from "./FieldInput";
 import type { ClientError, SubmissionIssue } from "./types";
-
-function firstText(value: Record<string, string> | undefined): string {
-  if (!value) return "";
-  return Object.values(value)[0] ?? "";
-}
+import { firstLocalizedText } from "./locale-text";
 
 function GenericError({ error, unmatchedIssues }: { error: ClientError; unmatchedIssues: SubmissionIssue[] }) {
   if (error.type === "validation") {
@@ -156,7 +152,7 @@ export function PlayerView() {
       {view && (
         <section className="player-instance">
           <h2>
-            {view.step.key} — {firstText(view.step.label) || view.step.key}
+            {view.step.key} — {firstLocalizedText(view.step.label) || view.step.key}
           </h2>
           <p className="player-instance-meta">
             instance {instanceId} · status {view.status}
