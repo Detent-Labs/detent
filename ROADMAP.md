@@ -317,3 +317,36 @@
        not a default.
     Neither step has an OpenSpec change yet; write one (starting with 12a)
     when this actually gets scheduled.
+13. i18n extensions (content-translation UI; UI-chrome white-label overrides):
+    NOT STARTED, deliberately deferred — raised 2026-07-28 as a brainstorm, not
+    a committed stage. Two independent sub-projects, not one change:
+    a. Content-translation UI (Studio/Editor). `LocalizedText` (the
+       process/step/field labels a participant sees) already lives in the
+       DB — inline in the versioned JSON definition/draft body — so there is
+       nothing to move. Studio/editor already support inline per-field
+       locale editing (`ContentLocaleSwitcher`, `LocalizedTextInput`).
+       Missing: a cross-cutting view showing which `LocalizedText` entries
+       lack an entry for a given locale across all of a process's
+       steps/fields (maybe across processes), instead of discovering gaps
+       field-by-field. Pure UI addition, no schema/storage change.
+    b. UI-chrome white-label overrides (app/editor/studio/admin). Motivated
+       by a per-customer wording requirement (white-label), not language
+       count: each customer already gets its own deployment/DB (existing
+       environment-separation convention) and wants to edit its own
+       UI-chrome wording (buttons/headings) itself, without a redeploy. This
+       touches the same ground as `2026-07-24-collapse-editor-i18n`'s
+       decision (fixed English in editor/studio) but only adds a
+       per-deployment override layer — not a reversion to a general
+       locale-switcher. Sketch: a new sparse table
+       `ui_string_overrides(package, locale, key, value)` overlays the
+       existing hardcoded catalogs (`override ?? builtin[locale] ??
+       builtin[baseLocale] ?? key` — the same fallback shape `app`'s `t()`
+       already uses), loaded once per session by each frontend, with a
+       `system:admin`-gated editing screen in `packages/admin` (a new
+       `src/engine/ui-strings.ts` plus routes, mirroring
+       `admin-queries.ts`/`admin-routes.ts`). Scoped to text only — no
+       logos/colors/theming. A UI-strings client duplicated across four
+       packages continues the dedup question stage 12 already flagged as
+       "someday" — not resolved here.
+    Neither sub-project has an OpenSpec change yet; write one when either
+    actually gets scheduled.
