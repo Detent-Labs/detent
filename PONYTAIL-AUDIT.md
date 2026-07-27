@@ -5,57 +5,13 @@ cut first. Read-only report — nothing here has been applied. Regenerate with
 `/ponytail-audit`; this file is a snapshot, re-run before trusting it after
 further changes land.
 
-Last scanned: 2026-07-26.
+Last scanned: 2026-07-26. All 8 findings from that scan resolved
+2026-07-27 — see "Resolved from the 2026-07-26 scan" below.
 
 ## Findings
 
-1. shrink `DataSourcesPanel`/`StepsPanel`/`FieldCatalogPanel` each hand-roll
-   an identical add/remove/update-by-index triplet against `mutate`
-   (`d.X ??= []; d.X.push(...)` / `d.X?.splice(index,1)` /
-   `Object.assign(d.X?.[index], patch)`) — the same shape the `removeAt`/
-   `updateAt` fix addressed, but that fix targets pure prop-array transforms
-   (returns a new array); these three mutate a root-level draft array
-   in-place, a different call convention the earlier fix couldn't cover.
-   Extract a shared `mutate`-based CRUD helper.
-   [packages/editor/src/panels/DataSourcesPanel.tsx:16-34,
-   StepsPanel.tsx:41-65, FieldCatalogPanel.tsx:167-185]
-2. shrink `startOutboxWorker`/`startResolutionWorker`/`startTimerScheduler`
-   — byte-identical poll-loop body (`stopped`/`timer`/`tick`/`setTimeout`,
-   11 lines), differing only in the drain call. Extract one
-   `pollForever(tick, intervalMs)` helper.
-   [src/engine/outbox.ts:230-252, src/engine/resolution.ts:110-133,
-   src/engine/timers.ts:61-83]
-3. shrink `runValidation` has four near-identical loops mapping a
-   validator's issue list into `EditorIssue` — the same mapping-loop shape
-   already deduped elsewhere into `mapConfigIssues`. Extract one
-   `pushIssues(items, source)` helper.
-   [packages/editor/src/draft/validation.ts:61-97]
-4. shrink `run` and `runLogin` in the Player store are near-identical
-   (setLoading/setError/try/catch/finally), differing only in the
-   401→logout branch. Collapse into one `run(fn, { isLogin })` helper.
-   [packages/editor/src/player/store.tsx:142-170]
-5. stdlib `firstText` (PlayerView.tsx) and `firstLocalizedText`
-   (FieldInput.tsx) are identical one-line "first value of a locale record"
-   helpers, duplicated in the same directory. Move one into `player/types.ts`
-   or a shared util and import it.
-   [packages/editor/src/player/FieldInput.tsx:5-9, PlayerView.tsx:6-9]
-6. yagni `FieldExpressionMapEditor`'s `emptyLabel` prop is declared and
-   rendered but never passed by either caller (`SubprocessSpecEditor`,
-   `ActionListEditor`). Drop the prop and the
-   `entries.length === 0 && emptyLabel` branch.
-   [packages/editor/src/panels/shared/FieldExpressionMapEditor.tsx:11,23,57]
-7. shrink `TOKEN_LIFETIME = "8h"` and
-   `TOKEN_LIFETIME_MS = 8 * 60 * 60 * 1000` encode the same duration twice
-   in different forms, kept in sync by hand. Derive one from the other.
-   [src/auth/login.ts:21-22]
-8. delete `PlayerClientError`'s message ternary
-   (`error.type === "validation" ? "validation" : ... : error.message`) —
-   nothing reads `Error.prototype.message` on a caught `PlayerClientError`;
-   every catch site reads `.error` or `.status` instead. Simplify to
-   `super(error.type)`.
-   [packages/editor/src/player/client.ts:6]
-
-Net if all applied: -~100 lines, -0 deps.
+None outstanding. Regenerate with `/ponytail-audit` for a fresh scan
+before trusting this section again.
 
 ## Checked, not flagged (deliberate, per CLAUDE.md)
 
@@ -94,6 +50,72 @@ Net if all applied: -~100 lines, -0 deps.
   `jwtResolver`), justifying the interface.
 - `client.ts`'s `authHeaders()` wrapper — reviewed 2026-07-26, three call
   sites, not one.
+
+## Resolved from the 2026-07-26 scan
+
+Each landed via its own OpenSpec change (propose → apply → verify → sync
+→ archive), archived under `openspec/changes/archive/2026-07-27-*`.
+
+- ~~`DataSourcesPanel`/`StepsPanel`/`FieldCatalogPanel` root-level-draft-
+  array CRUD duplication~~ (finding 1) — extracted
+  `addToDraftArray`/`updateInDraftArray`
+  (`packages/editor/src/draft/draft-array-crud.ts`); `removeFromDraftArray`
+  was considered and dropped during implementation (a bare `mutate`
+  pass-through with nothing shared to lift). `StepsPanel`'s `removeStep`
+  and its `initialStep`/`setExpanded` bookkeeping stayed out of scope
+  (different shape / step-specific, per design). OpenSpec change:
+  `dedupe-editor-panel-crud`.
+- ~~`startOutboxWorker`/`startResolutionWorker`/`startTimerScheduler`
+  poll-loop duplication~~ (finding 2) — extracted `pollForever(tick,
+  intervalMs)` (`src/engine/poll.ts`), including the identical
+  swallow-and-retry `catch` body, not just the `setTimeout` shell. Highest
+  scrutiny of this batch (engine core, load-bearing delivery/timer
+  semantics); verified via the full test suite plus a standalone script
+  directly exercising `pollForever`'s timing/stop semantics, since the
+  wrapper had no pre-existing dedicated test. OpenSpec change:
+  `dedupe-engine-poll-loops`.
+- ~~`runValidation`'s four validator-issue-mapping loops~~ (finding 3) —
+  extracted `pushIssues(issues, body, items, source)`
+  (`packages/editor/src/draft/validation.ts`); the Zod-issues branch
+  stayed out of scope (different input shape, different `resolveLoc`
+  target). OpenSpec change: `dedupe-editor-validation-issues`.
+- ~~Player store `run`/`runLogin` duplication~~ (finding 4) — collapsed
+  into `run(fn, { isLogin })`. Verified end-to-end against a real running
+  HTTP server (seeded user, wrong-password and corrupted-token 401 paths
+  both driven through the actual UI via `playwright-cli`), since neither
+  path had automated coverage (`run`/`runLogin` are closures inside
+  `PlayerProvider`, and this project has no jsdom/testing-library setup
+  for interactive component tests). OpenSpec change: `dedupe-editor-player`.
+- ~~`firstText`/`firstLocalizedText` duplication~~ (finding 5) — deduped
+  into `firstLocalizedText` (`packages/editor/src/player/locale-text.ts`),
+  imported by both `FieldInput.tsx` and `PlayerView.tsx`. Bundled with
+  finding 4 and finding 8 into the same OpenSpec change
+  (`dedupe-editor-player`) — same directory, same subsystem.
+- ~~`FieldExpressionMapEditor`'s unused `emptyLabel` prop~~ (finding 6) —
+  dropped the prop and its dead render branch; confirmed zero callers
+  repo-wide both before and after. Bundled with finding 1 into
+  `dedupe-editor-panel-crud`.
+- ~~`TOKEN_LIFETIME`/`TOKEN_LIFETIME_MS` duplicate duration encoding~~
+  (finding 7) — both now derive from `TOKEN_LIFETIME_HOURS = 8`
+  (`src/auth/login.ts`); produced values unchanged (`"8h"` / `28800000`).
+  Considered and rejected: passing the millisecond count directly to
+  `jose`'s `setExpirationTime` — a `number` there is an absolute
+  Unix-seconds timestamp to `jose`, not a relative duration, which would
+  have silently broken token expiry. OpenSpec change:
+  `dedupe-auth-token-lifetime`.
+- ~~`PlayerClientError`'s unread message ternary~~ (finding 8) —
+  simplified to `super(error.type)`; confirmed no catch site anywhere
+  reads `Error.prototype.message` on a caught `PlayerClientError` (every
+  site reads `.error` or `.status`). Bundled with findings 4 and 5 into
+  `dedupe-editor-player`.
+
+Net (2026-07-26 scan): findings 1-8 all landed, -21 net lines across
+touched source files (108 insertions, 129 deletions;
+`packages/editor/src/panels`, `packages/editor/src/player`,
+`packages/editor/src/draft/validation.ts`, `src/engine/{outbox,
+resolution,timers,poll}.ts`, `src/auth/login.ts`), -0 deps throughout. No
+gamestoppers — every finding was a pure, verified behavior-preserving
+refactor with no schema/contract/engine-behavior change.
 
 ## Resolved from the 2026-07-24 scan
 
