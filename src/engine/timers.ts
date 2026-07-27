@@ -13,6 +13,7 @@ import { sql } from "./store.js";
 import { fireTimer } from "./transition.js";
 import { instance as instanceSchema, type Instance } from "../schema/definition.js";
 import type { ResolveBody } from "./resolution.js";
+import { pollForever } from "./poll.js";
 
 function parseInstance(raw: unknown): Instance {
   return instanceSchema.parse(typeof raw === "string" ? JSON.parse(raw) : raw);
@@ -63,21 +64,5 @@ export function startTimerScheduler(
   resolveBody: ResolveBody = () => undefined,
   intervalMs = 500,
 ): { stop: () => void } {
-  let stopped = false;
-  let timer: ReturnType<typeof setTimeout>;
-  const tick = async (): Promise<void> => {
-    try {
-      await drainTimers(db, resolveBody);
-    } catch {
-      // transient (e.g. DB blip); the next tick retries.
-    }
-    if (!stopped) timer = setTimeout(tick, intervalMs);
-  };
-  timer = setTimeout(tick, intervalMs);
-  return {
-    stop: () => {
-      stopped = true;
-      clearTimeout(timer);
-    },
-  };
+  return pollForever(() => drainTimers(db, resolveBody), intervalMs);
 }
