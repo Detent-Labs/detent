@@ -39,62 +39,45 @@ export class RequestShapeError extends Error {
   }
 }
 
+type IssuesMapping = { ctor: new (...args: any[]) => Error & { issues: unknown }; status: number; type: string };
+type MessageMapping = { ctor: new (...args: any[]) => Error; status: number; type: string };
+
+const ISSUES_ERRORS: IssuesMapping[] = [
+  { ctor: SubmissionValidationError, status: 422, type: "validation" },
+  { ctor: RegistryValidationError, status: 422, type: "registry-validation" },
+  { ctor: AssignmentRegistryValidationError, status: 422, type: "registry-validation" },
+  { ctor: DataSourceRegistryValidationError, status: 422, type: "registry-validation" },
+  { ctor: CelValidationError, status: 422, type: "cel-validation" },
+  { ctor: DurationValidationError, status: 422, type: "duration-validation" },
+  { ctor: ZodError, status: 422, type: "schema-validation" },
+];
+
+const MESSAGE_ERRORS: MessageMapping[] = [
+  { ctor: RequestShapeError, status: 400, type: "request-shape" },
+  { ctor: CrossProcessValidationError, status: 422, type: "cross-process-validation" },
+  { ctor: GuardRefused, status: 409, type: "guard-refused" },
+  { ctor: PinMismatch, status: 500, type: "internal" },
+  { ctor: ActorResolutionError, status: 401, type: "actor-resolution" },
+  { ctor: AuthorizationError, status: 403, type: "authorization" },
+  { ctor: NotAssignedError, status: 403, type: "not-assigned" },
+  { ctor: NotACandidateError, status: 403, type: "not-a-candidate" },
+  { ctor: AlreadyClaimedError, status: 403, type: "already-claimed" },
+  { ctor: NotClaimedError, status: 403, type: "not-claimed" },
+  { ctor: NotClaimantError, status: 403, type: "not-claimant" },
+];
+
 export function mapError(err: unknown): HttpResult {
-  if (err instanceof RequestShapeError) {
-    return { status: 400, body: { error: { type: "request-shape", message: err.message } } };
-  }
-  if (err instanceof SubmissionValidationError) {
-    return { status: 422, body: { error: { type: "validation", issues: err.issues } } };
-  }
-  if (
-    err instanceof RegistryValidationError ||
-    err instanceof AssignmentRegistryValidationError ||
-    err instanceof DataSourceRegistryValidationError
-  ) {
-    return { status: 422, body: { error: { type: "registry-validation", issues: err.issues } } };
-  }
-  if (err instanceof CelValidationError) {
-    return { status: 422, body: { error: { type: "cel-validation", issues: err.issues } } };
-  }
-  if (err instanceof CrossProcessValidationError) {
-    return { status: 422, body: { error: { type: "cross-process-validation", message: err.message } } };
-  }
-  if (err instanceof DurationValidationError) {
-    return { status: 422, body: { error: { type: "duration-validation", issues: err.issues } } };
-  }
-  if (err instanceof ZodError) {
-    return { status: 422, body: { error: { type: "schema-validation", issues: err.issues } } };
-  }
-  if (err instanceof GuardRefused) {
-    return { status: 409, body: { error: { type: "guard-refused", message: err.message } } };
+  const issues = ISSUES_ERRORS.find((e) => err instanceof e.ctor);
+  if (issues) {
+    return { status: issues.status, body: { error: { type: issues.type, issues: (err as { issues: unknown }).issues } } };
   }
   if (err instanceof ConcurrencyConflict) {
     return { status: 409, body: { error: { type: "concurrency-conflict" } } };
   }
-  if (err instanceof PinMismatch) {
-    return { status: 500, body: { error: { type: "internal", message: err.message } } };
+  const message = MESSAGE_ERRORS.find((e) => err instanceof e.ctor);
+  if (message) {
+    return { status: message.status, body: { error: { type: message.type, message: (err as Error).message } } };
   }
-  if (err instanceof ActorResolutionError) {
-    return { status: 401, body: { error: { type: "actor-resolution", message: err.message } } };
-  }
-  if (err instanceof AuthorizationError) {
-    return { status: 403, body: { error: { type: "authorization", message: err.message } } };
-  }
-  if (err instanceof NotAssignedError) {
-    return { status: 403, body: { error: { type: "not-assigned", message: err.message } } };
-  }
-  if (err instanceof NotACandidateError) {
-    return { status: 403, body: { error: { type: "not-a-candidate", message: err.message } } };
-  }
-  if (err instanceof AlreadyClaimedError) {
-    return { status: 403, body: { error: { type: "already-claimed", message: err.message } } };
-  }
-  if (err instanceof NotClaimedError) {
-    return { status: 403, body: { error: { type: "not-claimed", message: err.message } } };
-  }
-  if (err instanceof NotClaimantError) {
-    return { status: 403, body: { error: { type: "not-claimant", message: err.message } } };
-  }
-  const message = err instanceof Error ? err.message : String(err);
-  return { status: 500, body: { error: { type: "internal", message } } };
+  const fallbackMessage = err instanceof Error ? err.message : String(err);
+  return { status: 500, body: { error: { type: "internal", message: fallbackMessage } } };
 }
