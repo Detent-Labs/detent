@@ -8,7 +8,6 @@ interface FieldExpressionMapEditorProps {
   addLabel: string;
   removeLabel: string;
   placeholder?: string;
-  emptyLabel?: string;
   mapping: Partial<Record<FieldId, DraftOf<Expression>>> | undefined;
   fields: DraftField[];
   onChange: (next: Partial<Record<FieldId, DraftOf<Expression>>>) => void;
@@ -20,7 +19,6 @@ export function FieldExpressionMapEditor({
   addLabel,
   removeLabel,
   placeholder,
-  emptyLabel,
   mapping,
   fields,
   onChange,
@@ -54,7 +52,6 @@ export function FieldExpressionMapEditor({
   return (
     <fieldset>
       <legend>{legend}</legend>
-      {entries.length === 0 && emptyLabel && <p className="empty">{emptyLabel}</p>}
       {entries.map(([fieldId, expr]) => (
         <div key={fieldId} className="mapping-row">
           <select value={fieldId} onChange={(e) => moveEntry(fieldId, e.target.value, expr)}>

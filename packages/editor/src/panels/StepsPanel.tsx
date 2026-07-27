@@ -5,6 +5,7 @@ import type { DraftField } from "../draft/fields";
 import { useDraft } from "../draft/store";
 import { t } from "../i18n/catalog";
 import { mintId } from "../draft/ids";
+import { addToDraftArray, updateInDraftArray } from "../draft/draft-array-crud";
 import { ActionListEditor } from "./ActionListEditor";
 import { ViewEditor } from "./ViewEditor";
 import { SubprocessSpecEditor } from "./SubprocessSpecEditor";
@@ -40,12 +41,16 @@ export function StepsPanel({ fields }: Props) {
 
   const addStep = () => {
     const id = mintId("step");
-    mutate((d) => {
-      d.workflow ??= {};
-      d.workflow.steps ??= [];
-      d.workflow.steps.push({ id, key: "", label: seedLocalizedText(contentLocale), type: "task" });
-      d.workflow.initialStep ??= id;
-    });
+    addToDraftArray(
+      mutate,
+      (d) => {
+        d.workflow ??= {};
+        d.workflow.steps ??= [];
+        d.workflow.initialStep ??= id;
+        return d.workflow.steps;
+      },
+      { id, key: "", label: seedLocalizedText(contentLocale), type: "task" },
+    );
     setExpanded(id);
   };
 
@@ -58,10 +63,7 @@ export function StepsPanel({ fields }: Props) {
   };
 
   const updateStep = (index: number, patch: Partial<DraftStep>) => {
-    mutate((d) => {
-      const step = d.workflow?.steps?.[index];
-      if (step) Object.assign(step, patch);
-    });
+    updateInDraftArray(mutate, (d) => d.workflow?.steps?.[index], patch);
   };
 
   return (

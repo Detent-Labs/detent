@@ -3,6 +3,7 @@ import type { DraftOf } from "../draft/types";
 import { useDraft } from "../draft/store";
 import { t } from "../i18n/catalog";
 import { mintId } from "../draft/ids";
+import { addToDraftArray, updateInDraftArray } from "../draft/draft-array-crud";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { IssueList } from "./shared/IssueList";
 
@@ -14,10 +15,7 @@ export function DataSourcesPanel() {
   const dataSources = draft.dataSources ?? [];
 
   const addDataSource = () => {
-    mutate((d) => {
-      d.dataSources ??= [];
-      d.dataSources.push({ id: mintId("dataSource"), key: "", type: "", config: {} });
-    });
+    addToDraftArray(mutate, (d) => (d.dataSources ??= []), { id: mintId("dataSource"), key: "", type: "", config: {} });
   };
 
   const removeDataSource = (index: number) => {
@@ -27,10 +25,7 @@ export function DataSourcesPanel() {
   };
 
   const updateDataSource = (index: number, patch: Partial<DraftDataSource>) => {
-    mutate((d) => {
-      const ds = d.dataSources?.[index];
-      if (ds) Object.assign(ds, patch);
-    });
+    updateInDraftArray(mutate, (d) => d.dataSources?.[index], patch);
   };
 
   return (
