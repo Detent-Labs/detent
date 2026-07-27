@@ -34,11 +34,13 @@ entity looks like.
 
 ### Requirement: Editor mints entity ids at creation time
 Every entity created in the Draft (step, path, field, timer, action,
-contract outcome) SHALL receive a prefixed UUIDv4 id, minted by the
+dataSource) SHALL receive a prefixed UUIDv4 id, minted by the
 editor at the moment of creation, using the same prefix scheme as the
-contract (`step_`, `path_`, etc.). Authors SHALL interact with entities
-only via `key` and `label`; the minted `id` SHALL NOT be exposed as an
-editable field in the authoring surface.
+contract (`step_`, `path_`, etc. — see `MINTERS` in
+`packages/editor/src/draft/ids.ts`). `contract.outcomes` is a plain
+`string[]` with no id concept and is NOT part of this set. Authors SHALL
+interact with entities only via `key` and `label`; the minted `id` SHALL NOT
+be exposed as an editable field in the authoring surface.
 
 #### Scenario: New step receives an id immediately
 - **WHEN** an author creates a new step in the Draft

@@ -8,7 +8,11 @@ required), so these have nowhere to go in it. Together the two records are the a
 backbone: they interleave by instant and correlate by `transitionSeq`, which an event
 records but never advances.
 
-Six kinds are defined, added additively while the record shape stays settled:
+Nine kinds are defined, added additively while the record shape stays settled.
+This table is the canonical enumeration; three of the nine (`assignment.claimed`,
+`assignment.released`, `instance.faulted`) are owned in detail by other
+capabilities' specs (`assignment-claim-release-consolidation`,
+`automatic-transitions`) and are listed here only for completeness:
 
 | kind | fact recorded | enqueues actions |
 | --- | --- | --- |
@@ -18,6 +22,9 @@ Six kinds are defined, added additively while the record shape stays settled:
 | `subprocess.spawn-enqueued` | creation at a subprocess `initialStep` enqueued its spawn | yes |
 | `subprocess.outcome-unmatched` | a child returned an outcome no path on the parent's subprocess step matched | no |
 | `migration.transform-dropped` | a migration `transforms` entry raised or produced a non-JSON-safe value, with the reason | no |
+| `assignment.claimed` | an actor claimed an unclaimed, assignment-bearing step | no |
+| `assignment.released` | the claimant released their claim on the current step | no |
+| `instance.faulted` | an automatic cascade re-entered a step it already entered, parking the instance | no |
 
 A kind that enqueues actions carries their `ActionOutcome`s; a kind that enqueues
 none MUST NOT invite a reader to expect them.

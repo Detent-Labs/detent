@@ -62,9 +62,10 @@ the Player SHALL load and display that instance's current view.
 
 #### Scenario: Creating an instance with no seed data
 - **WHEN** an author submits a `processId` with no seed data
-- **THEN** the Player calls the create-instance route with only `actor`
-  (and `version` if provided) and, on success, displays the created
-  instance's current step
+- **THEN** the Player calls the create-instance route with no `data` field
+  (and `version` if provided) — identity is implicit via the bearer token,
+  never a client-supplied `actor` field — and, on success, displays the
+  created instance's current step
 
 #### Scenario: Creating an instance with seed data
 - **WHEN** an author submits a `processId` and a raw-JSON seed data object
@@ -114,50 +115,25 @@ form, and render `availablePaths` as submit actions.
 - **THEN** the Player renders the form read-only with no submit action,
   rather than an action that would fail
 
-### Requirement: Field rendering covers every BaseFieldType
+### Requirement: Field rendering is delegated to the shared form-ui package
 
-The Player's field renderer SHALL render a usable input for every
-`BaseFieldType`: `string`, `number`, `date`, and `datetime` as native text/
-number/date/datetime-local inputs; `boolean` as a checkbox;
-`select`/`multiselect` as a `select` built from `field.options` when
-present — populated for both static `FieldDef.options` fields and
-`dataSource`-bound fields alike, since `getInstanceView` now resolves
-`options` for both, per the `data-source-resolution` capability; `group` as
-a nested container housing the fields that carry its key in
-`ResolvedViewField.group`. A field of type `reference`, `file`, or a
-`Plugin` envelope type SHALL render as a free-text input, since no dedicated
-widget, reference picker, or file upload exists in this preview tool — this
-fallback no longer applies to a `select`/`multiselect` field solely because
-it carries `field.dataSource` instead of static `field.options`.
+The Player SHALL render a loaded instance's current step through `form-ui`'s
+`FieldForm`/`FieldInput` (`PlayerView.tsx` imports them directly) and SHALL
+own no field-rendering component of its own. Every-`BaseFieldType` coverage,
+dataSource-bound option resolution, group nesting, readonly/required
+presentation, and the free-text fallback for `reference`/`file`/`Plugin`
+types are `form-ui`'s requirements, not the Player's — see `form-ui`'s
+"Field rendering covers every BaseFieldType" and related requirements. This
+is what keeps rendering WYSIWYG between the editor's Player and the
+end-user app (`end-user-app`): both SHALL consume the same package rather
+than parallel, drift-prone field renderers.
 
-#### Scenario: Every BaseFieldType renders without error
-- **WHEN** the Player renders a step whose view includes at least one field
-  of each `BaseFieldType`
-- **THEN** every field renders a corresponding input with no rendering
-  error
+#### Scenario: The Player imports form-ui's field components rather than its own
 
-#### Scenario: A dataSource-bound field renders using its resolved options
-- **WHEN** a `select` or `multiselect` field declares `field.dataSource`
-  instead of `field.options`
-- **THEN** the Player renders it as a `select` built from the field's
-  resolved `options`, the same as a static-`options` field, with no free-text
-  fallback or "not yet supported" note
-
-#### Scenario: A group field nests its member fields
-- **WHEN** a step view includes a `group` field and other fields whose
-  `ResolvedViewField.group` names that group's key
-- **THEN** the Player renders the member fields nested within the group's
-  container, not flattened alongside it
-
-#### Scenario: A readonly field's input is disabled
-- **WHEN** a resolved view field has `readonly` set
-- **THEN** the Player renders its input in a disabled state
-
-#### Scenario: A required field displays a required marker
-- **WHEN** a resolved view field has `required` set
-- **THEN** the Player renders a visible marker on that field, with no
-  client-side submission enforcement — requiredness is validated
-  server-side by `submitAndTransition`
+- **WHEN** `packages/editor/src/player/PlayerView.tsx` is inspected for its
+  field-rendering imports
+- **THEN** it imports `FieldForm`/`FieldInput` from `form-ui`, and no
+  Player-local field-rendering component exists
 
 ### Requirement: Player submits only visible, editable fields
 

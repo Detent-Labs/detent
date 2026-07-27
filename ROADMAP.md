@@ -176,3 +176,26 @@
    **BREAKING**: any account that published or cancelled instances before
    this change needs the role granted via the existing `cli.ts set-roles`,
    or it now gets 403.
+9. End-user app: DONE (`add-end-user-app`; see the `end-user-app` capability
+   spec and the "End-User App" note this stage adds under
+   `docs/current-state.md`). The participant-facing frontend stage 6
+   anticipated ("frontend work becomes the main effort"). `packages/app`:
+   Login / My-tasks (inbox, `scope=mine`) / Task / Start-a-process, four
+   screens over a small hand-written routing hook, no dependency beyond
+   React. `packages/form-ui`: the shared, source-only field-form renderer
+   extracted so the editor's Player and the end-user app render forms
+   identically — one place to fix a field-rendering bug, not two. Two small
+   engine-side additions rode along: `InstanceSummary` gained
+   `processLabel`/`stepLabel`/`processBaseLocale` so the inbox can render
+   without shipping whole process bodies to the browser, and
+   `POST /instances/:id/cancel` accepts `startedBy === actor.id` alongside
+   `system:cancel-any` (see `authorization`'s "starter may cancel" note) so
+   an abandoned start doesn't strand an unassigned instance. A same-session
+   audit (2026-07-27) found and fixed one real gap in this stage: the
+   `scope=mine` inbox filter matched a candidate by actor id only, never by
+   role, so a released or unclaimed role-assigned task could silently vanish
+   from a participant's inbox — see `instance-query`'s role-matching
+   requirement and `docs/current-state.md`'s Read/query API entry.
+   Out of scope, deliberately: case history view, notifications, attachments,
+   comments, delegation, and a dedicated `groups` assignment filter (distinct
+   from `Step.assignment.candidates`, which already matches by id or role).

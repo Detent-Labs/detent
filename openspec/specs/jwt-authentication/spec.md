@@ -101,9 +101,16 @@ the resolver and are accepted simultaneously.
 `jwtResolver` SHALL map the token's `sub` claim to `Actor.id` and the claim
 named by the issuer's configured `rolesClaim` to `Actor.roles`. A token
 carrying no such claim SHALL resolve to `roles: []` rather than being rejected.
-For an external identity provider the `Actor.id` value SHALL be the provider's
-stable subject identifier (for Entra ID, the `oid` claim), never an email
-address.
+This applies identically to every issuer, local or external — `IssuerConfig`
+(`src/auth/jwt.ts`) has no per-issuer subject-claim field, only `iss`,
+`jwksUrl`, `audience`, `rolesClaim`. NOT YET BUILT: for an external identity
+provider whose `sub` is not a stable, non-PII subject identifier (e.g. Entra
+ID, where the stable identifier is the `oid` claim, not `sub`), `Actor.id`
+today is whatever that provider's `sub` contains — there is no configurable
+subject-claim override to point at `oid` instead. A deployment integrating
+such a provider must currently ensure its `sub` claim is already the value
+this system should use as the actor's identity; this is a known gap, not a
+guarantee the code enforces.
 
 #### Scenario: The configured roles claim populates Actor.roles
 

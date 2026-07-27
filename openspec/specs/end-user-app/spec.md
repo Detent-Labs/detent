@@ -151,26 +151,40 @@ SHALL NOT poll on a timer or subscription.
 - **THEN** no further inbox request is issued until focus changes, a manual
   refresh, or a submission occurs
 
-### Requirement: Task screen opens read-only with an explicit Claim step
+### Requirement: Task screen opens with an explicit Claim step; submission (not field editing) is claim-gated
 
-`GET /instances/:instanceId` SHALL render through `form-ui`, initially
-read-only with a **Claim** button (`POST /instances/:id/claim`). The task
+`GET /instances/:instanceId` SHALL render through `form-ui` with a **Claim**
+button (`POST /instances/:id/claim`) when the task is unclaimed. The task
 SHALL NOT be claimed merely by opening it — a user MUST be able to view
-whether a task concerns them before claiming it. After a successful claim the
-form SHALL become editable and its path buttons SHALL submit
-(`POST /instances/:id/submit`).
+whether a task concerns them before claiming it. Field editability is
+governed solely by `form-ui`'s own `readonly`/`required` handling of the
+resolved view (see `form-ui`), independent of claim state — `TaskScreen.tsx`
+passes no claim-derived disabled/readonly prop, so an unclaimed task's
+non-readonly fields ARE typeable before claiming. What claim state actually
+gates is submission: path-submit buttons only become active, sending
+`POST /instances/:id/submit`, once the claim succeeds — `submitAndTransition`
+itself requires the calling actor hold the claim on an assignment-bearing
+step (`NotClaimedError`/`NotClaimantError`), so an unclaimed edit is
+inert — typing does not persist anything until a submit the server would
+accept.
 
 #### Scenario: Opening a task does not claim it
 
 - **WHEN** a user opens `/tasks/:instanceId` for an unclaimed task
-- **THEN** the form renders read-only with a Claim button, and no claim
-  request has been sent
+- **THEN** the form renders with a Claim button, and no claim request has
+  been sent
 
-#### Scenario: Claiming makes the form editable
+#### Scenario: An unclaimed task's fields are visible and typeable, but not submittable
+
+- **WHEN** a user opens `/tasks/:instanceId` for an unclaimed,
+  assignment-bearing task and edits a non-readonly field
+- **THEN** the input accepts the edit, but no path-submit action is
+  available until the task is claimed
+
+#### Scenario: Claiming enables submission
 
 - **WHEN** a user clicks Claim and the claim succeeds
-- **THEN** the form becomes editable and its path buttons become active
-  submit actions
+- **THEN** the form's path buttons become active submit actions
 
 ### Requirement: Release is available at any time; submitting returns to the list
 

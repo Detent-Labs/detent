@@ -44,6 +44,11 @@ examples/                  serialized example definitions
 test/                      bun:test suites; tests run inside the container
 packages/editor/           structural editor + read-only graph view (React + Vite; workspace package,
                             reaches the engine only through its exports map)
+packages/app/              end-user app: participant-facing Login/My-tasks/Task/Start-a-process screens
+                            (React + Vite; workspace package, talks to the engine only over the HTTP wrapper)
+packages/form-ui/          shared step-form renderer (source-only, no build step); consumed by both
+                            packages/editor's Player and packages/app, so what an author previews is
+                            what a participant gets
 ```
 
 ## The contract: load-bearing rules
@@ -253,13 +258,14 @@ See `ROADMAP.md` for stage-by-stage status (DONE/NOT STARTED) and what each stag
 
 ## Codebase memory (knowledge graph)
 The repo is indexed into codebase-memory-mcp (`full` mode, covering the engine,
-the Runtime API Layer, and the editor package; `packages/editor/{dist,node_modules}`
+the Runtime API Layer, the editor package, the end-user app (`packages/app`),
+and the shared form renderer (`packages/form-ui`); `packages/*/{dist,node_modules}`
 excluded). Resolve the `project` arg via `list_projects` (match on root_path);
 the slug is machine-specific, never hardcode it. Entry points: `search_graph`
 (find symbols), `get_code_snippet` (read a body), `trace_path` (callers/callees,
 `mode=calls|data_flow|cross_service` — useful for tracing across the
-engine↔runtime↔editor boundary, e.g. `packages/editor` -> `workflow-engine`
-exports -> `src/engine/`), `query_graph` (Cypher), `get_architecture`,
+engine↔runtime↔editor/app boundary, e.g. `packages/editor` or `packages/app` ->
+`workflow-engine` exports -> `src/engine/`), `query_graph` (Cypher), `get_architecture`,
 `search_code` (graph-augmented text search). Real call chains exist now — prefer
 the graph over Read/grep for "who calls X" / "what does Y touch" questions that
 span more than a file or two; Read/grep is still fine for a single known file.
@@ -297,6 +303,19 @@ change lands.
   file contend and fail spuriously. Observed, not fully characterised: full runs have
   been stable across many consecutive passes while single-file reruns were not. Read
   a verdict off a *named* test failure, never off a pass count alone.
+- **Running `bun test` wipes whatever manual/demo state was in the devcontainer's
+  Postgres** — the same `beforeEach` truncates that make DB suites reliable
+  (`definitions`, `instances`, `history_entries`, `instance_events`, `outbox`,
+  `auth_users`, ...) run against the one database the running dev server
+  (`bun run serve`) also reads and writes when you're manually exercising the
+  end-user app or editor Player in a browser. There is no separate database for
+  manual/demo use. Observed twice in one session: a demo user (`auth_users`) and
+  a demo process's instances were both silently wiped by a `bun test` run
+  started for unrelated regression verification, mid-demo. If you need durable
+  demo state alongside test runs, recreate it after the last `bun test` run, or
+  set up a dedicated database for manual testing (not yet done — see the
+  `pg-test` container pattern used for host-run tests in memory as a starting
+  point, though that's for tests, not demo persistence).
 - **Never mutate, stash, or check out the shared working tree to test something.**
   Mutation testing (revert a line, confirm a named test fails) is the right technique
   and must happen on a copy — the tree usually holds uncommitted work, and a

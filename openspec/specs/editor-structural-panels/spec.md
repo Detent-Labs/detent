@@ -67,9 +67,12 @@ Wherever a panel edits `ProcessBody.label`/`description`, `Step.label`/
 `description`, `FieldDef.label`/`description`, or `FieldOption.label`, it
 SHALL do so through an input bound to the Draft's currently selected
 content locale, writing the entered text into that `LocalizedText` value's
-entry for that locale. The content locale is independent of the editor's
-own UI-chrome locale (`editor-i18n`): switching one SHALL NOT change the
-other.
+entry for that locale. This content locale is a Draft-level concept and has
+no relationship to the editor's own UI-chrome text, which is a fixed,
+single, non-switchable English catalog with no locale state of its own (see
+`editor-i18n`) — there is no `useLocale()` hook or UI-chrome locale to be
+"independent" of; the content locale is simply the only switchable locale
+the editor has.
 
 #### Scenario: Editing a label writes to the current content locale's entry
 - **WHEN** the current content locale is `de` and an author types into a
@@ -82,9 +85,11 @@ other.
   field whose `label` is `{ en: "Amount", de: "Betrag" }`
 - **THEN** the label input displays `"Betrag"`
 
-#### Scenario: Switching content locale does not affect the UI-chrome locale
+#### Scenario: Switching content locale does not affect the UI-chrome text
 - **WHEN** an author changes the content-locale switcher
-- **THEN** the editor's own interface language (`useLocale()`) is unchanged
+- **THEN** the editor's own UI-chrome text (rendered via `editor-i18n`'s
+  fixed English catalog) is unaffected — there is nothing for it to switch
+  to
 
 ### Requirement: A new content locale can be added from the panel
 The content-locale switcher SHALL allow adding a locale not yet used

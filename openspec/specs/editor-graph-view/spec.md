@@ -54,33 +54,44 @@ entities they represent, sourced from the same issue list the panels use.
 - **THEN** the issue shown on the graph edge and the issue shown on the
   paths panel are the same `EditorIssue` entry, not independently derived
 
-### Requirement: Graph node labels resolve through the current content locale
-A step node's displayed label SHALL be resolved from its `LocalizedText`
-`label` via `resolveLocalizedText`, using the Draft's currently selected
-content locale and the process's `baseLocale` as the fallback, rather than
-rendering a raw string.
+### Requirement: Graph node labels prefer the step's key; locale resolution is a fallback only
 
-#### Scenario: Node label reflects the selected content locale
-- **WHEN** the current content locale is `de` and a step's `label` is
-  `{ en: "Review", de: "Prüfen" }`
+A step node's displayed label SHALL be its `key` whenever `key` is
+non-empty; only when `key` is empty SHALL the label fall back to resolving
+`LocalizedText` `label` (via `resolveLocalizedText`, content locale with
+`baseLocale` fallback), and SHALL fall back further to a fixed placeholder
+when neither yields text. Since every step created through the normal
+authoring flow has a non-empty `key`, this means: in practice, switching the
+content locale does NOT change a node's displayed label for any real Draft —
+the locale-resolved path is live code, but effectively unreachable outside a
+deliberately keyless step. This was previously documented as if
+content-locale switching always drove the node label; it does not.
+
+#### Scenario: A step with a key displays that key regardless of content locale
+- **WHEN** a step has a non-empty `key` and a `LocalizedText` `label`
+- **THEN** the graph view's corresponding node displays the `key`, and
+  switching the content locale does not change it
+
+#### Scenario: A keyless step falls back to its resolved label
+- **WHEN** a step's `key` is empty and its `label` is
+  `{ en: "Review", de: "Prüfen" }` with the current content locale `de`
 - **THEN** the graph view's corresponding node displays `"Prüfen"`
 
-#### Scenario: Node label falls back to the base locale
-- **WHEN** the current content locale is `fr` and a step's `label` is
-  `{ en: "Review" }` with the process's `baseLocale` set to `en`
-- **THEN** the graph view's corresponding node displays `"Review"`
+#### Scenario: A keyless step with no label falls back to a placeholder
+- **WHEN** a step's `key` is empty and it has no resolvable `label`
+- **THEN** the graph view's corresponding node displays `"(unnamed step)"`
 
-#### Scenario: Switching content locale updates node labels
-- **WHEN** an author switches the content locale
-- **THEN** every node's displayed label updates to reflect the newly
-  selected locale (or its base-locale fallback) without requiring any
-  other Draft change
+### Requirement: Graph edges route directly, without looping via the opposite side
 
-### Requirement: Graph edges route directly via fixed handle positions
 Edges SHALL render as short, direct connections between steps laid out by
 the graph's horizontal auto-layout — leaving a source step from its
 trailing side and entering a target step from its leading side — rather
 than as a free-form curve that loops via the opposite side of either node.
+This is achieved through Mermaid's `flowchart LR` auto-routing (the graph
+view renders via Mermaid, not React-Flow — there are no fixed per-node
+"handle" positions to route between); the functional outcome (direct
+source-right-to-target-left edges) is what this requirement constrains, not
+a specific rendering mechanism.
 
 #### Scenario: A forward edge is direct, not a loop
 - **WHEN** the graph view renders an edge between two steps laid out
