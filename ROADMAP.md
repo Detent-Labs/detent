@@ -199,3 +199,42 @@
    Out of scope, deliberately: case history view, notifications, attachments,
    comments, delegation, and a dedicated `groups` assignment filter (distinct
    from `Step.assignment.candidates`, which already matches by id or role).
+10. Admin/developer area: NOT STARTED (design approved 2026-07-27, see
+    `docs/superpowers/specs/2026-07-27-admin-developer-area-design.md`). The
+    third product on the engine and the third role: `packages/editor` serves
+    the author, `packages/app` the participant, `packages/admin` the operator.
+    Four areas over ten routes — operations (all instances, the merged
+    transition+event record, outbox with dead-letter retry/discard, pending
+    timers), processes (versions, publish, migration with a `findOrphanKeys`
+    dry run), developer tools (the running server's handler registry, the
+    definition validator, a static CEL check), and user administration.
+    Same boundaries as the other two frontends: runtime access through the
+    HTTP wrapper only, no direct database reads; `workflow-engine/schema`,
+    `/schema/compile`, `/cel/check` and `/engine/registry-check` imported at
+    compile time the way `packages/editor/src/draft/validation.ts` already
+    does, which is what makes the validator and the CEL check pure frontend
+    features with no endpoint behind them. One new reserved role,
+    `system:admin`, checked directly like the two from stage 8. One new engine
+    module, `src/engine/admin-queries.ts`, for the reads that have no API
+    today (outbox rows by status, pending timers, instances per published
+    version); one new function, `users.ts::setDisabled`. Every other operation
+    reuses an existing engine path, so the only new writes are the two
+    outbox-row repairs, which touch no instance state and therefore cannot
+    interact with the `transitionSeq` OCC invariants.
+    **BREAKING**: `GET /instances?scope=all` and `GET /instances/:id/record`
+    are reachable today by any authenticated actor — every logged-in
+    participant can list all instances and read any record. Both move behind
+    `system:admin`. No current caller is affected (the end-user app uses
+    `scope=mine`, the Player drives a single instance it created), and
+    `scope=mine` stays open to every authenticated actor.
+    Out of scope, deliberately: forced transitions and direct `data` edits
+    (both would write instance state outside the engine's paths), evaluating
+    CEL against live instance data (needs an endpoint reading other people's
+    instances; static type-checking against a version's field catalog is what
+    an operator actually needs), deleting users (`user_id` *is* `Actor.id` and
+    must stay resolvable in the append-only record — `auth_users.disabled`,
+    which `verifyLogin` already honours, is the correct mechanism), and live
+    updates (refresh control plus refetch-on-focus, as in stage 9).
+    Delivery is four OpenSpec changes, only the first with scaffolding:
+    `admin-shell-and-ops`, `admin-processes`, `admin-dev-tools`,
+    `admin-users`.
