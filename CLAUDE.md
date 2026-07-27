@@ -275,6 +275,10 @@ change lands.
 
 ## Conventions
 - TypeScript strict, ESM.
+- **UI work in `packages/editor`, `packages/app`, or `packages/form-ui` goes
+  through the design skill first.** Before implementing or reshaping any
+  screen or component, invoke `/frontend-design:frontend-design` for visual
+  direction — do not default to plain React/CSS choices.
 - Bun is the runtime, package manager, and test runner. Use `bun`, not npm/pnpm:
   `bun install`, `bun test`. Typechecking stays with `tsc --noEmit` (`bun run
   typecheck`) — Bun does not typecheck. The Bun version is pinned by `BUN_VERSION`
