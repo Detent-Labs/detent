@@ -4,7 +4,18 @@ import { validateProcessBody, checkSubprocessChildRefs } from "workflow-engine/c
 import { checkActionRegistry } from "workflow-engine/engine/registry-check";
 import type { Registry } from "workflow-engine/engine/registry";
 import type { Draft } from "./types";
-import { resolveLoc, type EditorIssue } from "./issues";
+import { resolveLoc, type EditorIssue, type IssueSource } from "./issues";
+
+function pushIssues(
+  issues: EditorIssue[],
+  body: Draft,
+  items: readonly { loc: string; message: string }[],
+  source: IssueSource,
+): void {
+  for (const item of items) {
+    issues.push({ ...resolveLoc(body, item.loc), message: item.message, source });
+  }
+}
 
 export interface ValidationResult {
   zodValid: boolean;
@@ -58,9 +69,7 @@ export function runValidation(
   const body = parsed.data;
   const issues: EditorIssue[] = [];
 
-  for (const d of validateDurations(body)) {
-    issues.push({ ...resolveLoc(body, d.loc), message: d.message, source: "duration" });
-  }
+  pushIssues(issues, body, validateDurations(body), "duration");
 
   let compiled: ProcessBody | undefined;
   try {
@@ -73,14 +82,8 @@ export function runValidation(
   const registryChecked = registry !== undefined;
 
   if (compiled) {
-    if (registry) {
-      for (const r of checkActionRegistry(compiled, registry)) {
-        issues.push({ ...resolveLoc(body, r.loc), message: r.message, source: "registry" });
-      }
-    }
-    for (const c of validateProcessBody(compiled)) {
-      issues.push({ ...resolveLoc(body, c.loc), message: c.message, source: "cel" });
-    }
+    if (registry) pushIssues(issues, body, checkActionRegistry(compiled, registry), "registry");
+    pushIssues(issues, body, validateProcessBody(compiled), "cel");
   }
 
   const subprocessStepStatus: Record<string, "checked" | "not-checked"> = {};
@@ -92,9 +95,7 @@ export function runValidation(
       return;
     }
     subprocessStepStatus[step.id] = "checked";
-    for (const c of checkSubprocessChildRefs(body, stepIndex, childBody)) {
-      issues.push({ ...resolveLoc(body, c.loc), message: c.message, source: "cel" });
-    }
+    pushIssues(issues, body, checkSubprocessChildRefs(body, stepIndex, childBody), "cel");
   });
 
   return { zodValid: true, issues, registryChecked, subprocessStepStatus };
