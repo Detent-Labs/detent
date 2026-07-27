@@ -48,19 +48,16 @@ export function FieldInput({ field, allFields, values, onChange, issuesByField }
     );
   }
 
-  // reference / file / a Plugin envelope type: no dedicated widget in this
-  // preview tool, all fall back to free text. A dataSource-bound select/
-  // multiselect field is NOT included here — its options are resolved
-  // server-side into `field.options`, same as a static-options field.
-  const isFreeTextFallback = def.type === "reference" || def.type === "file" || typeof def.type !== "string";
-
   const value = values[def.id];
   const disabled = field.readonly;
+  const options = (field.options ?? []).map((o) => (
+    <option key={o.value} value={o.value}>
+      {firstLocalizedText(o.label) || o.value}
+    </option>
+  ));
 
   let control: ReactNode;
-  if (isFreeTextFallback) {
-    control = <input type="text" disabled={disabled} value={(value as string) ?? ""} onChange={(e) => onChange(def.id, e.target.value)} />;
-  } else if (def.type === "boolean") {
+  if (def.type === "boolean") {
     control = <input type="checkbox" disabled={disabled} checked={!!value} onChange={(e) => onChange(def.id, e.target.checked)} />;
   } else if (def.type === "number") {
     control = (
@@ -79,11 +76,7 @@ export function FieldInput({ field, allFields, values, onChange, issuesByField }
     control = (
       <select disabled={disabled} value={(value as string) ?? ""} onChange={(e) => onChange(def.id, e.target.value)}>
         <option value="" />
-        {(field.options ?? []).map((o) => (
-          <option key={o.value} value={o.value}>
-            {firstLocalizedText(o.label) || o.value}
-          </option>
-        ))}
+        {options}
       </select>
     );
   } else if (def.type === "multiselect") {
@@ -95,14 +88,15 @@ export function FieldInput({ field, allFields, values, onChange, issuesByField }
         value={selected}
         onChange={(e) => onChange(def.id, Array.from(e.target.selectedOptions).map((o) => o.value))}
       >
-        {(field.options ?? []).map((o) => (
-          <option key={o.value} value={o.value}>
-            {firstLocalizedText(o.label) || o.value}
-          </option>
-        ))}
+        {options}
       </select>
     );
   } else {
+    // string, reference, file, or a Plugin envelope type: no dedicated
+    // widget beyond free text (reference/file/plugin have none in this
+    // preview tool; string simply is text). A dataSource-bound select/
+    // multiselect field is NOT included here — its options are resolved
+    // server-side into `field.options`, same as a static-options field.
     control = <input type="text" disabled={disabled} value={(value as string) ?? ""} onChange={(e) => onChange(def.id, e.target.value)} />;
   }
 
