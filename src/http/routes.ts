@@ -34,12 +34,17 @@ import { mapError, RequestShapeError, type HttpResult } from "./errors.js";
  * JWT, `X-Actor-Id`/`X-Actor-Roles` for the dev resolver). No
  * resolver-specific field is pre-extracted here.
  */
-function extractCredential(req: Request): Headers {
-  return req.headers;
+async function resolveActor(req: Request, resolver: ActorResolver): Promise<Actor> {
+  return resolver(req.headers);
 }
 
-async function resolveActor(req: Request, resolver: ActorResolver): Promise<Actor> {
-  return resolver(extractCredential(req));
+/** Runs `fn`, mapping any thrown error via `mapError`. Every handler but `handleSubmit` uses this — it alone needs a non-error branch on `AutomaticCascadeLoop`. */
+async function guarded(fn: () => Promise<HttpResult>): Promise<HttpResult> {
+  try {
+    return await fn();
+  } catch (err) {
+    return mapError(err);
+  }
 }
 
 export async function handleCreateInstance(
@@ -49,14 +54,12 @@ export async function handleCreateInstance(
   dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
 ): Promise<HttpResult> {
-  try {
+  return guarded(async () => {
     const actor = await resolveActor(req, resolver);
     const body = (await req.json()) as { version?: number; data?: Instance["data"] };
     const created = await createProcessInstance(processId as ProcessId, actor, dataSourceRegistry, { version: body.version, data: body.data }, db);
     return { status: 201, body: created };
-  } catch (err) {
-    return mapError(err);
-  }
+  });
 }
 
 export async function handleGetInstanceView(
@@ -66,13 +69,11 @@ export async function handleGetInstanceView(
   dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
 ): Promise<HttpResult> {
-  try {
+  return guarded(async () => {
     const actor = await resolveActor(req, resolver);
     const view = await getInstanceView(instanceId as InstanceId, actor, dataSourceRegistry, db);
     return { status: 200, body: view };
-  } catch (err) {
-    return mapError(err);
-  }
+  });
 }
 
 export async function handleSubmit(
@@ -100,23 +101,19 @@ export async function handleSubmit(
 }
 
 export async function handleClaim(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  try {
+  return guarded(async () => {
     const actor = await resolveActor(req, resolver);
     const updated = await claimStep(instanceId as InstanceId, actor, db);
     return { status: 200, body: updated };
-  } catch (err) {
-    return mapError(err);
-  }
+  });
 }
 
 export async function handleRelease(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  try {
+  return guarded(async () => {
     const actor = await resolveActor(req, resolver);
     const updated = await releaseClaim(instanceId as InstanceId, actor, db);
     return { status: 200, body: updated };
-  } catch (err) {
-    return mapError(err);
-  }
+  });
 }
 
 /** `limit=abc` or a `limit` that is not a positive integer is a request error, not a silent default. */
@@ -140,7 +137,7 @@ function parseStatuses(url: URL): Instance["status"][] | undefined {
 }
 
 export async function handleListInstances(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  try {
+  return guarded(async () => {
     await resolveActor(req, resolver);
     const url = new URL(req.url);
     const filter: InstanceListFilter = {
@@ -155,32 +152,26 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
     const cursor = url.searchParams.get("cursor") ?? undefined;
     const page = await listInstances(filter, { limit, cursor }, db);
     return { status: 200, body: page };
-  } catch (err) {
-    return mapError(err);
-  }
+  });
 }
 
 export async function handleInstanceRecord(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  try {
+  return guarded(async () => {
     await resolveActor(req, resolver);
     const url = new URL(req.url);
     const limit = parseLimit(url);
     const cursor = url.searchParams.get("cursor") ?? undefined;
     const page = await getInstanceRecord(instanceId as InstanceId, { limit, cursor }, db);
     return { status: 200, body: page };
-  } catch (err) {
-    return mapError(err);
-  }
+  });
 }
 
 export async function handleCancel(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  try {
+  return guarded(async () => {
     const actor = await resolveActor(req, resolver);
     const updated = await cancelInstance(instanceId as InstanceId, actor, db);
     return { status: 200, body: updated };
-  } catch (err) {
-    return mapError(err);
-  }
+  });
 }
 
 /**
@@ -203,7 +194,7 @@ export async function handlePublish(
   dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
 ): Promise<HttpResult> {
-  try {
+  return guarded(async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, PUBLISH_ROLE);
     let parsed: { processId?: unknown; body?: unknown };
@@ -220,25 +211,19 @@ export async function handlePublish(
       status: 200,
       body: { processId: published.processId, version: published.version, definitionHash: published.definitionHash, status: published.status },
     };
-  } catch (err) {
-    return mapError(err);
-  }
+  });
 }
 
 export async function handleListProcesses(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  try {
+  return guarded(async () => {
     await resolveActor(req, resolver);
     return { status: 200, body: await listProcesses(db) };
-  } catch (err) {
-    return mapError(err);
-  }
+  });
 }
 
 export async function handleListVersions(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  try {
+  return guarded(async () => {
     await resolveActor(req, resolver);
     return { status: 200, body: await listVersions(processId as ProcessId, db) };
-  } catch (err) {
-    return mapError(err);
-  }
+  });
 }
