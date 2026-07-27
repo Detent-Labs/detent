@@ -27,7 +27,7 @@ import { SPAWN_ACTION_TYPE, RETURN_ACTION_TYPE, STATIC_ASSIGNMENT_STRATEGY_TYPE 
 import { armStepTimers, minFireAt, type TimerDrop } from "./duration.js";
 import { buildGuardContext, evalGuard, SYSTEM_ACTOR, type Actor } from "../cel/eval.js";
 import { CANCEL_SINK_STEP_ID, instance as instanceSchema } from "../schema/definition.js";
-import type { ProcessBody, Instance, HistoryEntry, InstanceEvent, Action, Step, Path } from "../schema/definition.js";
+import type { ProcessBody, Instance, HistoryEntry, InstanceEvent, Action, Step, Path, AssignmentState } from "../schema/definition.js";
 
 /**
  * Re-exported from registry.ts, their home (a leaf module store.ts can import
@@ -843,28 +843,33 @@ async function loadForClaim(tx: SQL, instanceId: string): Promise<Instance> {
 }
 
 /**
- * Claim the current step of a running instance. Row-locks (the same pattern
- * `submitAndTransition` uses to guard against a concurrent writeback), requires
- * the current step has a declared assignment and is unclaimed, and requires the
- * actor is an eligible candidate. Not a transition: `jsonb_set` replaces the
- * whole `{assignment}` path directly rather than routing through
- * `applyStepEntry`, so no HistoryEntry is appended and `transitionSeq` is
- * untouched. A no-op on a non-running instance, matching every other
- * transition entry point's (`cancelInstance`, `commitManualTransition`, …)
- * non-running no-op.
+ * Shared claim/release sequence: row-lock (the same pattern
+ * `submitAndTransition` uses to guard against a concurrent writeback),
+ * no-op on a non-running instance (matching every other transition entry
+ * point's — `cancelInstance`, `commitManualTransition`, … — non-running
+ * no-op), run the operation's guard against the current assignment, write
+ * the computed next assignment, and append an event carrying the same
+ * timestamp as the write — computed once, here, so the assignment's
+ * stamped time and the event's `at` can never drift apart. Not a
+ * transition: `jsonb_set` replaces the whole `{assignment}` path directly
+ * rather than routing through `applyStepEntry`, so no HistoryEntry is
+ * appended and `transitionSeq` is untouched.
  */
-export async function claimStep(instanceId: string, actor: Actor, db: SQL = sql): Promise<Instance> {
+async function updateAssignment(
+  instanceId: string,
+  actor: Actor,
+  db: SQL,
+  guard: (assignment: AssignmentState | null | undefined) => void,
+  computeNext: (assignment: AssignmentState, at: string) => AssignmentState,
+  eventKind: "assignment.claimed" | "assignment.released",
+): Promise<Instance> {
   return withTransaction(db, async (tx) => {
     const inst = await loadForClaim(tx, instanceId);
     if (inst.status !== "running") return inst;
 
-    const assignment = inst.assignment;
-    if (!assignment) throw new NotAssignedError(instanceId);
-    if (assignment.claimedBy !== undefined) throw new AlreadyClaimedError(instanceId);
-    if (!isEligibleCandidate(actor, assignment.candidates)) throw new NotACandidateError(instanceId, actor.id);
-
-    const claimedAt = new Date().toISOString();
-    const next = { candidates: assignment.candidates, claimedBy: actor.id, claimedAt };
+    guard(inst.assignment);
+    const at = new Date().toISOString();
+    const next = computeNext(inst.assignment as AssignmentState, at);
     await tx`UPDATE instances SET body = jsonb_set(body, '{assignment}', (${[next]}::jsonb) -> 0)
       WHERE instance_id = ${instanceId}`;
 
@@ -873,14 +878,29 @@ export async function claimStep(instanceId: string, actor: Actor, db: SQL = sql)
       instanceId: inst.instanceId,
       transitionSeq: inst.transitionSeq,
       version: inst.version,
-      kind: "assignment.claimed",
+      kind: eventKind,
       payload: { actorId: actor.id },
-      at: claimedAt,
+      at,
     };
     await appendInstanceEvent(tx, event);
 
     return { ...inst, assignment: next };
   });
+}
+
+export async function claimStep(instanceId: string, actor: Actor, db: SQL = sql): Promise<Instance> {
+  return updateAssignment(
+    instanceId,
+    actor,
+    db,
+    (assignment) => {
+      if (!assignment) throw new NotAssignedError(instanceId);
+      if (assignment.claimedBy !== undefined) throw new AlreadyClaimedError(instanceId);
+      if (!isEligibleCandidate(actor, assignment.candidates)) throw new NotACandidateError(instanceId, actor.id);
+    },
+    (assignment, at) => ({ candidates: assignment.candidates, claimedBy: actor.id, claimedAt: at }),
+    "assignment.claimed",
+  );
 }
 
 /**
@@ -889,29 +909,14 @@ export async function claimStep(instanceId: string, actor: Actor, db: SQL = sql)
  * same shape as `claimStep`. A no-op on a non-running instance.
  */
 export async function releaseClaim(instanceId: string, actor: Actor, db: SQL = sql): Promise<Instance> {
-  return withTransaction(db, async (tx) => {
-    const inst = await loadForClaim(tx, instanceId);
-    if (inst.status !== "running") return inst;
-
-    const assignment = inst.assignment;
-    if (!assignment || assignment.claimedBy !== actor.id) throw new NotClaimantError(instanceId, actor.id);
-
-    const releasedAt = new Date().toISOString();
-    const next = { candidates: assignment.candidates };
-    await tx`UPDATE instances SET body = jsonb_set(body, '{assignment}', (${[next]}::jsonb) -> 0)
-      WHERE instance_id = ${instanceId}`;
-
-    const event: InstanceEvent = {
-      id: newInstanceEventId(),
-      instanceId: inst.instanceId,
-      transitionSeq: inst.transitionSeq,
-      version: inst.version,
-      kind: "assignment.released",
-      payload: { actorId: actor.id },
-      at: releasedAt,
-    };
-    await appendInstanceEvent(tx, event);
-
-    return { ...inst, assignment: next };
-  });
+  return updateAssignment(
+    instanceId,
+    actor,
+    db,
+    (assignment) => {
+      if (!assignment || assignment.claimedBy !== actor.id) throw new NotClaimantError(instanceId, actor.id);
+    },
+    (assignment) => ({ candidates: assignment.candidates }),
+    "assignment.released",
+  );
 }
