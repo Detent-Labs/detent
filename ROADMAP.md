@@ -199,21 +199,15 @@
    Out of scope, deliberately: case history view, notifications, attachments,
    comments, delegation, and a dedicated `groups` assignment filter (distinct
    from `Step.assignment.candidates`, which already matches by id or role).
-10. Admin/developer area: NOT STARTED (design approved 2026-07-27, see
+10. Admin area: NOT STARTED (design approved 2026-07-27, see
     `docs/superpowers/specs/2026-07-27-admin-developer-area-design.md`). The
-    third product on the engine and the third role: `packages/editor` serves
-    the author, `packages/app` the participant, `packages/admin` the operator.
-    Four areas over ten routes — operations (all instances, the merged
+    operator's product: `packages/app` serves the participant,
+    `packages/studio` (stage 11) the developer, `packages/admin` the operator.
+    Two areas plus the migration run — operations (all instances, the merged
     transition+event record, outbox with dead-letter retry/discard, pending
-    timers), processes (versions, publish, migration with a `findOrphanKeys`
-    dry run), developer tools (the running server's handler registry, the
-    definition validator, a static CEL check), and user administration.
-    Same boundaries as the other two frontends: runtime access through the
-    HTTP wrapper only, no direct database reads; `workflow-engine/schema`,
-    `/schema/compile`, `/cel/check` and `/engine/registry-check` imported at
-    compile time the way `packages/editor/src/draft/validation.ts` already
-    does, which is what makes the validator and the CEL check pure frontend
-    features with no endpoint behind them. One new reserved role,
+    timers), user administration, and `POST /admin/migrations/run`.
+    Same boundaries as the other frontends: runtime access through the
+    HTTP wrapper only, no direct database reads. One new reserved role,
     `system:admin`, checked directly like the two from stage 8. One new engine
     module, `src/engine/admin-queries.ts`, for the reads that have no API
     today (outbox rows by status, pending timers, instances per published
@@ -227,6 +221,12 @@
     `system:admin`. No current caller is affected (the end-user app uses
     `scope=mine`, the Player drives a single instance it created), and
     `scope=mine` stays open to every authenticated actor.
+    The design's original **Processes** and **Tools** areas were reassigned to
+    stage 11 — authoring belongs to the developer, operating to the operator —
+    which also moves `GET /admin/registry`, `POST /admin/migrations/plans` and
+    `GET /admin/migrations/orphan-keys` to unprefixed studio routes and drops
+    the standalone definition validator (studio's editing view already
+    validates live against the same chain). Running a migration stays here.
     Out of scope, deliberately: forced transitions and direct `data` edits
     (both would write instance state outside the engine's paths), evaluating
     CEL against live instance data (needs an endpoint reading other people's
@@ -235,6 +235,40 @@
     must stay resolvable in the append-only record — `auth_users.disabled`,
     which `verifyLogin` already honours, is the correct mechanism), and live
     updates (refresh control plus refetch-on-focus, as in stage 9).
-    Delivery is four OpenSpec changes, only the first with scaffolding:
-    `admin-shell-and-ops`, `admin-processes`, `admin-dev-tools`,
-    `admin-users`.
+    Delivery is three OpenSpec changes, only the first with scaffolding:
+    `admin-shell-and-ops`, `admin-users`, `admin-migration-run`.
+11. Process Studio: NOT STARTED (design approved 2026-07-27, see
+    `docs/superpowers/specs/2026-07-27-process-studio-design.md`). The
+    developer's product, `packages/studio`, and one new reserved role,
+    `system:developer`. It supersedes stage 4's `packages/editor`, which was a
+    proof of concept for the editing half only: it holds a draft in a file on
+    one machine, renders the graph read-only, and cannot publish. Six routes
+    plus login — process list, editing over three surfaces (canvas primary,
+    the carried-over panels as inspector, a replacing JSON view), published
+    versions with a JSON diff, Player beside the merged instance record,
+    migration-plan authoring with a `findOrphanKeys` dry run, and tools
+    (registry of the running server, static CEL scratchpad).
+    One new table, `drafts` — one mutable draft per process, optimistic
+    concurrency on a `revision` column (stale save = 409, no merge), `layout`
+    stored beside the body because `definitionHash` is the JCS hash of
+    `ProcessBody` and a moved box must not mint a version. Deliberately not
+    `definitions` with the declared-but-inert `status='draft'`: that table is
+    what the resolution and timer workers rehydrate running instances from.
+    One new engine module, `src/engine/drafts.ts`; one new route file,
+    `src/http/studio-routes.ts`. Publish, versions and migration planning
+    reuse existing engine paths unchanged.
+    Environment separation is an operational convention (`DATABASE_URL` per
+    environment), not a product feature, so Player test instances can never
+    reach production and no `is_test` column is needed. **Version numbers are
+    environment-local** — `publishBody` counts per database, so the same
+    definition may be v5 in dev and v2 in production; `definitionHash` is the
+    only identity that carries across an environment boundary.
+    Out of scope, deliberately: branches / multiple named drafts (merge
+    semantics over a graph is its own project), guard-level execution tracing
+    (the instance record already answers "why is it parked"), multi-environment
+    transport as a product feature, a standalone validator screen, and live
+    collaboration.
+    Delivery is five OpenSpec changes, only the first with scaffolding:
+    `studio-shell-and-drafts`, `studio-canvas`, `studio-json-view`,
+    `studio-lifecycle`, `studio-tools-and-player` (the last deletes
+    `packages/editor`).
