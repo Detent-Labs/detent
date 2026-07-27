@@ -944,5 +944,9 @@ export const instance = z.object({
   status: instanceStatus,
   startedAt: timestamp,
   startedBy: z.string().optional(),
+  // Written at every step entry (creation included) alongside currentStepId.
+  // Optional only for instances that predate this field — nothing ever wrote
+  // it for them, so a reader falls back to startedAt for those.
+  currentStepEnteredAt: timestamp.optional(),
 });
 export type Instance = z.infer<typeof instance>;

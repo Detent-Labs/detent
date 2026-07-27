@@ -242,6 +242,7 @@ export async function createInstance(
     instanceId?: string;
     data?: Instance["data"];
     parent?: { instanceId: string; stepId: StepId };
+    startedBy?: string;
   },
   db: SQL = sql,
 ): Promise<Instance> {
@@ -274,6 +275,8 @@ export async function createInstance(
     ...(opts.parent ? { parent: opts.parent } : {}),
     status: initial?.terminal ? "completed" : "running",
     startedAt,
+    currentStepEnteredAt: startedAt,
+    ...(opts.startedBy !== undefined ? { startedBy: opts.startedBy } : {}),
   });
   const { armed: timers, drops } = armStepTimers(initial, startedAt, body, seed);
   // Creation is a step entry like any other, so an assignment-bearing initial

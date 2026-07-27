@@ -136,17 +136,32 @@ function parseStatuses(url: URL): Instance["status"][] | undefined {
   });
 }
 
+/** Only "mine" is a recognized scope value; anything else is a request error. */
+function parseScope(url: URL): "mine" | undefined {
+  const raw = url.searchParams.get("scope");
+  if (raw === null) return undefined;
+  if (raw !== "mine") throw new RequestShapeError(`unknown scope '${raw}'`);
+  return raw;
+}
+
 export async function handleListInstances(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(async () => {
-    await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver);
     const url = new URL(req.url);
+    const scope = parseScope(url);
+    const assignedTo = url.searchParams.get("assignedTo") ?? undefined;
+    // scope=mine derives "mine" from the resolved actor — a caller cannot
+    // pair it with its own assignedTo value to see another actor's instances.
+    if (scope === "mine" && assignedTo !== undefined) {
+      throw new RequestShapeError("scope=mine cannot be combined with an explicit assignedTo");
+    }
     const filter: InstanceListFilter = {
       processId: (url.searchParams.get("processId") as ProcessId) ?? undefined,
       status: parseStatuses(url),
       currentStepId: (url.searchParams.get("currentStepId") as StepId) ?? undefined,
       startedBy: url.searchParams.get("startedBy") ?? undefined,
       claimedBy: url.searchParams.get("claimedBy") ?? undefined,
-      assignedTo: url.searchParams.get("assignedTo") ?? undefined,
+      assignedTo: scope === "mine" ? actor.id : assignedTo,
     };
     const limit = parseLimit(url);
     const cursor = url.searchParams.get("cursor") ?? undefined;

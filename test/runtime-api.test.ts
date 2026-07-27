@@ -888,6 +888,38 @@ test.skipIf(!DB)("listInstances with no filters returns every instance, no data 
   for (const item of page.items) expect((item as unknown as { data?: unknown }).data).toBeUndefined();
 });
 
+test.skipIf(!DB)("listInstances resolves processLabel/stepLabel from the pinned version body, and nothing else from it", async () => {
+  const PID = pid("proc_list_labels");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  await createProcessInstance(PID, actor, dataSourceReg);
+
+  const page = await listInstances({ processId: PID });
+  const item = page.items[0]!;
+  expect(item.processLabel).toEqual({ en: "Two Paths Body" });
+  expect(item.stepLabel).toEqual({ en: "A" });
+  expect(item.processBaseLocale).toBe("en");
+  expect(Object.keys(item)).not.toContain("workflow");
+  expect(Object.keys(item)).not.toContain("fields");
+});
+
+test.skipIf(!DB)("listInstances' currentStepEnteredAt reflects the current step's entry, updated by a transition rather than fixed at creation", async () => {
+  const PID = pid("proc_list_step_entered");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+
+  const beforePage = await listInstances({ processId: PID });
+  const before = beforePage.items[0]!;
+  expect(before.currentStepEnteredAt).toBeDefined();
+
+  await new Promise((r) => setTimeout(r, 5));
+  await submitAndTransition(created.instanceId, "path_x" as PathId, {} as Instance["data"], actor, dataSourceReg);
+
+  const afterPage = await listInstances({ processId: PID });
+  const after = afterPage.items[0]!;
+  expect(after.currentStepEnteredAt).toBeDefined();
+  expect(new Date(after.currentStepEnteredAt!).getTime()).toBeGreaterThan(new Date(before.currentStepEnteredAt!).getTime());
+});
+
 test.skipIf(!DB)("listInstances filters by processId and status, excluding another process and another status", async () => {
   const PID_A = pid("proc_list_filter_a");
   const PID_B = pid("proc_list_filter_b");
