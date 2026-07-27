@@ -18,8 +18,9 @@ import { verifyLogin } from "./users.js";
 import { LOCAL_ISSUER } from "./jwt.js";
 import type { HttpResult } from "../http/errors.js";
 
-const TOKEN_LIFETIME = "8h";
-const TOKEN_LIFETIME_MS = 8 * 60 * 60 * 1000;
+const TOKEN_LIFETIME_HOURS = 8;
+const TOKEN_LIFETIME = `${TOKEN_LIFETIME_HOURS}h`;
+const TOKEN_LIFETIME_MS = TOKEN_LIFETIME_HOURS * 60 * 60 * 1000;
 
 export const MAX_ATTEMPTS = 5;
 export const WINDOW_MS = 15 * 60 * 1000;
