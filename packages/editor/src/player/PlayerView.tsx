@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { usePlayer } from "./store";
-import { FieldForm } from "./FieldInput";
+import { FieldForm, PathButtons } from "form-ui";
 import type { ClientError, SubmissionIssue } from "./types";
 import { firstLocalizedText } from "./locale-text";
 
@@ -158,15 +158,15 @@ export function PlayerView() {
             instance {instanceId} · status {view.status}
           </p>
 
-          <FieldForm fields={view.fields} values={formValues} onChange={(fieldId, value) => setFormValues((v) => ({ ...v, [fieldId]: value }))} issuesByField={issuesByField} />
+          <FieldForm
+            fields={view.fields}
+            values={formValues}
+            onChange={(fieldId, value) => setFormValues((v) => ({ ...v, [fieldId]: value }))}
+            locale="en"
+            issuesByField={issuesByField}
+          />
 
-          <div className="player-paths">
-            {view.availablePaths.map((path) => (
-              <button key={path.id} type="button" disabled={loading} onClick={() => void player.submit(path.id, formValues)}>
-                {path.label ?? path.key}
-              </button>
-            ))}
-          </div>
+          <PathButtons paths={view.availablePaths} onSubmit={(pathId) => void player.submit(pathId, formValues)} loading={loading} />
 
           <button type="button" disabled={loading} onClick={() => void player.refresh()}>
             Refresh

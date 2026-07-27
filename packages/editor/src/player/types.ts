@@ -1,37 +1,18 @@
-import type { BaseFieldType, Plugin, LocalizedText, FieldOption } from "workflow-engine/schema";
+import type { LocalizedText } from "workflow-engine/schema";
+import type { WireField, ResolvedViewField, AvailablePath, SubmissionIssue } from "form-ui";
 
 /**
  * The Player talks to the engine only over HTTP (JSON), never in-process —
  * unlike the Draft/structural editor side, it has no reason to import
  * engine-internal runtime types (`ResolvedViewField`, `InstanceView`, ...
  * from `src/runtime/api.ts`), which the root package doesn't export anyway.
- * These types mirror the HTTP wrapper's wire shapes instead.
+ * These types mirror the HTTP wrapper's wire shapes instead. The field-form
+ * shapes (`WireField`/`ResolvedViewField`/`AvailablePath`/`SubmissionIssue`)
+ * live in `form-ui`, shared with the end-user app, so the Player re-exports
+ * them here rather than declaring its own copies.
  */
 
-export interface WireField {
-  id: string;
-  key: string;
-  label: LocalizedText;
-  description?: LocalizedText;
-  type: BaseFieldType | Plugin;
-  options?: FieldOption[];
-  dataSource?: string;
-}
-
-export interface ResolvedViewField {
-  field: WireField;
-  value: unknown;
-  required: boolean;
-  readonly: boolean;
-  group?: string;
-  options?: FieldOption[];
-}
-
-export interface AvailablePath {
-  id: string;
-  key: string;
-  label?: string;
-}
+export type { WireField, ResolvedViewField, AvailablePath, SubmissionIssue };
 
 export interface InstanceView {
   instanceId: string;
@@ -52,12 +33,6 @@ export interface LoginResponse {
   token: string;
   expiresAt: string;
   actor: Actor;
-}
-
-export interface SubmissionIssue {
-  kind: string;
-  fieldId: string;
-  [key: string]: unknown;
 }
 
 export type ClientError =

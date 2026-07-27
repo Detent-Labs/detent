@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { editableFieldIds as formUiEditableFieldIds, filterToEditable as formUiFilterToEditable } from "form-ui";
 import { createInstance as apiCreateInstance, getInstanceView as apiGetInstanceView, submit as apiSubmit, login as apiLogin, PlayerClientError } from "./client";
-import type { ClientError, InstanceView, ResolvedViewField } from "./types";
+import type { ClientError, InstanceView } from "./types";
 
 export const STORAGE_KEY = "player.connection";
 
@@ -37,24 +38,17 @@ export function persistConnection(conn: StoredConnection, storage: StorageLike |
   storage?.setItem(STORAGE_KEY, JSON.stringify(conn));
 }
 
-function isGroupField(field: ResolvedViewField): boolean {
-  return field.field.type === "group";
-}
-
 /** Visible, non-readonly, non-group-container field ids — the field-set
  * boundary `submitAndTransition` enforces server-side (editor-player spec:
- * "Player submits only visible, editable fields"). */
+ * "Player submits only visible, editable fields"). Shared with the end-user
+ * app via `form-ui`; re-exported here so existing callers/tests need no
+ * import-path change. */
 export function editableFieldIds(view: InstanceView): Set<string> {
-  return new Set(view.fields.filter((f) => !isGroupField(f) && !f.readonly).map((f) => f.field.id));
+  return formUiEditableFieldIds(view.fields);
 }
 
 function filterToEditable(data: Record<string, unknown>, view: InstanceView): Record<string, unknown> {
-  const editable = editableFieldIds(view);
-  const filtered: Record<string, unknown> = {};
-  for (const [fieldId, value] of Object.entries(data)) {
-    if (editable.has(fieldId)) filtered[fieldId] = value;
-  }
-  return filtered;
+  return formUiFilterToEditable(data, view.fields);
 }
 
 /** Empty/whitespace-only input means "no seed data", not an error. */

@@ -180,6 +180,8 @@ const authedReq = (url: string, method: string, actor: Actor) =>
 const user1: Actor = { id: "user_1", roles: [] };
 /** Carries both reserved roles, for the publish / cancel-any-instance routes this suite exercises as an administrator. */
 const admin: Actor = { id: "user_admin", roles: [PUBLISH_ROLE, CANCEL_ANY_ROLE] };
+/** Neither the reserved role nor (in these tests) the instance's starter — a plain third party. */
+const bystander: Actor = { id: "user_bystander", roles: [] };
 
 // ============================================================
 // Happy path per route
@@ -747,6 +749,45 @@ test.skipIf(!DB)("GET /instances?assignedTo=&status= lists an actor's inbox", as
   expect(page.items.map((i) => i.instanceId)).toEqual([created.instanceId]);
 });
 
+test.skipIf(!DB)("GET /instances?scope=mine returns the same instances as assignedTo=<actor.id> for the calling actor", async () => {
+  const PID = pid("proc_http_list_scope_mine");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+
+  const res = await fetch(authedReq(`http://x/instances?scope=mine`, "GET", user1));
+  expect(res.status).toBe(200);
+  const page = (await res.json()) as { items: { instanceId: string }[] };
+  expect(page.items.map((i) => i.instanceId)).toEqual([created.instanceId]);
+});
+
+test.skipIf(!DB)("GET /instances?scope=mine cannot be used to see another actor's instances", async () => {
+  const PID = pid("proc_http_list_scope_mine_isolated");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+
+  // "approver" is a candidate on the same step-shape but never claimed this instance, and user_1 holds the claim.
+  const res = await fetch(authedReq(`http://x/instances?scope=mine`, "GET", { id: "approver", roles: [] }));
+  expect(res.status).toBe(200);
+  const page = (await res.json()) as { items: { instanceId: string }[] };
+  expect(page.items.map((i) => i.instanceId)).not.toContain(created.instanceId);
+});
+
+test.skipIf(!DB)("GET /instances?scope=mine&assignedTo=<other> is a 400 request error", async () => {
+  const res = await fetch(authedReq(`http://x/instances?scope=mine&assignedTo=someone_else`, "GET", user1));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("GET /instances?scope=sideways is a 400 request error", async () => {
+  const res = await fetch(authedReq(`http://x/instances?scope=sideways`, "GET", user1));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
 test.skipIf(!DB)("GET /instances?status=running&status=cancelled widens the filter", async () => {
   const PID = pid("proc_http_list_multistatus");
   await publishBody(PID, simpleBody(), reg, dataSourceReg);
@@ -1042,12 +1083,12 @@ test.skipIf(!DB)("POST /processes without the system:publish role maps to 403 an
   expect(resolved).toBeUndefined();
 });
 
-test.skipIf(!DB)("POST /instances/:instanceId/cancel without the system:cancel-any role maps to 403 and leaves the instance unchanged", async () => {
+test.skipIf(!DB)("POST /instances/:instanceId/cancel without the system:cancel-any role, by a non-starter, maps to 403 and leaves the instance unchanged", async () => {
   const PID = pid("proc_http_cancel_forbidden");
   await publishBody(PID, simpleBody(), reg, dataSourceReg);
   const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
 
-  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", user1));
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", bystander));
   expect(res.status).toBe(403);
   const body = (await res.json()) as { error: { type: string } };
   expect(body.error.type).toBe("authorization");
@@ -1057,10 +1098,28 @@ test.skipIf(!DB)("POST /instances/:instanceId/cancel without the system:cancel-a
 });
 
 test.skipIf(!DB)("POST /instances/:instanceId/cancel without the system:cancel-any role maps to 403 even for a nonexistent instance", async () => {
-  const res = await fetch(authedReq("http://x/instances/inst_does_not_exist/cancel", "POST", user1));
+  const res = await fetch(authedReq("http://x/instances/inst_does_not_exist/cancel", "POST", bystander));
   expect(res.status).toBe(403);
   const body = (await res.json()) as { error: { type: string } };
   expect(body.error.type).toBe("authorization");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel authorizes the instance's own starter even without the system:cancel-any role", async () => {
+  const PID = pid("proc_http_cancel_by_starter");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", user1));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { status: string };
+  expect(body.status).toBe("cancelled");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel with the system:cancel-any role is authorized before any instance lookup, even for a nonexistent instance", async () => {
+  const res = await fetch(authedReq("http://x/instances/inst_does_not_exist/cancel", "POST", admin));
+  // Authorization passes (no 403/401); the subsequent load fails instead, distinctly from an authorization rejection.
+  expect(res.status).not.toBe(403);
+  expect(res.status).not.toBe(401);
 });
 
 test.skipIf(!DB)("POST /processes with a structurally invalid body (missing initialStep) maps to 422", async () => {

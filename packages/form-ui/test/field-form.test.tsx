@@ -1,18 +1,17 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { FieldForm } from "../src/player/FieldInput";
-import type { ResolvedViewField } from "../src/player/types";
+import { FieldForm } from "../src/FieldForm.js";
+import type { ResolvedViewField, SubmissionIssue } from "../src/types.js";
 
-/** Matches the `graph-view-rendering.test.tsx` / `content-locale-rendering.test.tsx`
- * convention: `react-dom/server`'s `renderToStaticMarkup`, no jsdom/testing-library. */
+/** `react-dom/server`'s `renderToStaticMarkup`, no jsdom/testing-library —
+ * matches the editor's own rendering-test convention. */
 
 function noop() {
-  // FieldForm/FieldInput require an onChange handler; static rendering
-  // never fires one.
+  // FieldForm/FieldInput require an onChange handler; static rendering never fires one.
 }
 
-function renderFields(fields: ResolvedViewField[], values: Record<string, unknown> = {}): string {
-  return renderToStaticMarkup(<FieldForm fields={fields} values={values} onChange={noop} />);
+function renderFields(fields: ResolvedViewField[], values: Record<string, unknown> = {}, issuesByField?: Map<string, SubmissionIssue[]>): string {
+  return renderToStaticMarkup(<FieldForm fields={fields} values={values} onChange={noop} locale="en" issuesByField={issuesByField} />);
 }
 
 const baseField = (overrides: Partial<ResolvedViewField["field"]>): ResolvedViewField["field"] => ({
@@ -23,7 +22,7 @@ const baseField = (overrides: Partial<ResolvedViewField["field"]>): ResolvedView
   ...overrides,
 });
 
-describe("FieldInput: every BaseFieldType renders its expected input", () => {
+describe("FieldForm: every BaseFieldType renders its expected input", () => {
   it("string -> text input", () => {
     const html = renderFields([{ field: baseField({ id: "f1", type: "string" }), value: undefined, required: false, readonly: false }]);
     expect(html).toContain('type="text"');
@@ -79,7 +78,34 @@ describe("FieldInput: every BaseFieldType renders its expected input", () => {
   });
 });
 
-describe("FieldInput: group nesting", () => {
+describe("FieldForm: locale resolution with fallback", () => {
+  it("resolves the label in the given locale", () => {
+    const html = renderToStaticMarkup(
+      <FieldForm
+        fields={[{ field: baseField({ id: "f1", label: { en: "English", de: "Deutsch" } }), value: undefined, required: false, readonly: false }]}
+        values={{}}
+        onChange={noop}
+        locale="de"
+      />,
+    );
+    expect(html).toContain("Deutsch");
+  });
+
+  it("falls back to baseLocale when the active locale has no entry", () => {
+    const html = renderToStaticMarkup(
+      <FieldForm
+        fields={[{ field: baseField({ id: "f1", label: { en: "English" } }), value: undefined, required: false, readonly: false }]}
+        values={{}}
+        onChange={noop}
+        locale="de"
+        baseLocale="en"
+      />,
+    );
+    expect(html).toContain("English");
+  });
+});
+
+describe("FieldForm: group nesting", () => {
   it("nests member fields inside the group's fieldset, not flattened alongside it", () => {
     const html = renderFields([
       { field: baseField({ id: "f_group", key: "grp", type: "group" }), value: undefined, required: false, readonly: false },
@@ -87,7 +113,6 @@ describe("FieldInput: group nesting", () => {
     ]);
     expect(html).toContain("<fieldset");
     expect(html).toContain("Child");
-    // the child's label must appear between the fieldset's open/close tags
     const fieldsetOpen = html.indexOf("<fieldset");
     const fieldsetClose = html.indexOf("</fieldset>");
     const childLabelPos = html.indexOf("Child");
@@ -96,7 +121,7 @@ describe("FieldInput: group nesting", () => {
   });
 });
 
-describe("FieldInput: readonly and required", () => {
+describe("FieldForm: readonly and required", () => {
   it("disables the input when readonly is set", () => {
     const html = renderFields([{ field: baseField({ id: "f1" }), value: "x", required: false, readonly: true }]);
     expect(html).toContain("disabled=");
@@ -104,16 +129,16 @@ describe("FieldInput: readonly and required", () => {
 
   it("shows a required marker when required is set", () => {
     const html = renderFields([{ field: baseField({ id: "f1" }), value: undefined, required: true, readonly: false }]);
-    expect(html).toContain("player-required-marker");
+    expect(html).toContain("form-ui-required-marker");
   });
 
   it("shows no required marker when required is not set", () => {
     const html = renderFields([{ field: baseField({ id: "f1" }), value: undefined, required: false, readonly: false }]);
-    expect(html).not.toContain("player-required-marker");
+    expect(html).not.toContain("form-ui-required-marker");
   });
 });
 
-describe("FieldInput: free-text fallback", () => {
+describe("FieldForm: free-text fallback", () => {
   it("renders reference as free text", () => {
     const html = renderFields([{ field: baseField({ id: "f1", type: "reference" }), value: undefined, required: false, readonly: false }]);
     expect(html).toContain('type="text"');
@@ -130,10 +155,9 @@ describe("FieldInput: free-text fallback", () => {
     ]);
     expect(html).toContain('type="text"');
   });
-
 });
 
-describe("FieldInput: dataSource-bound field", () => {
+describe("FieldForm: dataSource-bound field", () => {
   it("renders as a populated <select> from its resolved options, not free text", () => {
     const html = renderFields([
       {
@@ -146,6 +170,18 @@ describe("FieldInput: dataSource-bound field", () => {
     ]);
     expect(html).toContain("<select");
     expect(html).toContain("United States");
-    expect(html).not.toContain("data source resolution not yet supported");
+  });
+});
+
+describe("FieldForm: per-field validation errors", () => {
+  it("attaches a matching issue beside its field", () => {
+    const issuesByField = new Map<string, SubmissionIssue[]>([["f1", [{ kind: "required-missing", fieldId: "f1" }]]]);
+    const html = renderFields([{ field: baseField({ id: "f1" }), value: undefined, required: false, readonly: false }], {}, issuesByField);
+    expect(html).toContain("required-missing");
+  });
+
+  it("renders no issue list when there are no issues for a field", () => {
+    const html = renderFields([{ field: baseField({ id: "f1" }), value: undefined, required: false, readonly: false }]);
+    expect(html).not.toContain("form-ui-field-issues");
   });
 });

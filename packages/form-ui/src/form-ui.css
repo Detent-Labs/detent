@@ -1,0 +1,36 @@
+/* ponytail: structural layout only, no visual design yet — real styling
+   lands with the end-user app screens (packages/app), then flows back here
+   so the editor's Player picks it up too. */
+
+.form-ui-field-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.form-ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.form-ui-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.form-ui-required-marker {
+  margin-left: 0.25rem;
+}
+
+.form-ui-field-issues {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.form-ui-paths {
+  display: flex;
+  gap: 0.5rem;
+}

@@ -27,7 +27,7 @@ import {
   NotClaimantError,
 } from "../engine/transition.js";
 import { buildGuardContext, evalGuard, type Actor } from "../cel/eval.js";
-import { requireRole, CANCEL_ANY_ROLE } from "../auth/authorize.js";
+import { requireRole, CANCEL_ANY_ROLE, AuthorizationError } from "../auth/authorize.js";
 import { definitionHash } from "../schema/hash.js";
 import { instance as instanceSchema, historyEntry as historyEntrySchema, instanceEvent as instanceEventSchema, collectFieldsDeep } from "../schema/definition.js";
 import { resolveDataSource, type DataSourceRegistry } from "../engine/registry.js";
@@ -45,6 +45,7 @@ import type {
   StepId,
   StepType,
   LocalizedText,
+  LocaleCode,
   BaseFieldType,
   FieldDef,
   FieldOption,
@@ -121,6 +122,14 @@ export type InstanceSummary = {
   assignment?: AssignmentState | null;
   startedBy?: string;
   createdAt: string;
+  // Absent only for an instance that predates this field; a caller falls
+  // back to createdAt/startedAt in that case.
+  currentStepEnteredAt?: string;
+  // Raw LocalizedText maps (not resolved to one locale) — the caller picks
+  // its own active locale with fallback to processBaseLocale.
+  processLabel: LocalizedText;
+  stepLabel: LocalizedText;
+  processBaseLocale: LocaleCode;
 };
 
 /** Filters combine conjunctively; `assignedTo` alone is a disjunction (see design.md). */
@@ -149,7 +158,11 @@ function decodeCursor(cursor: string): string[] {
   return JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as string[];
 }
 
-function toSummary(inst: Instance, createdAt: string): InstanceSummary {
+async function toSummary(inst: Instance, createdAt: string, store: DefinitionStore): Promise<InstanceSummary> {
+  const body = await store.resolveBody(inst.processId, inst.version);
+  if (!body) throw new Error(`no published body for process ${inst.processId} version ${inst.version}`);
+  const step = body.workflow.steps.find((s) => s.id === inst.currentStepId);
+  if (!step) throw new Error(`current step not in body: ${inst.currentStepId}`);
   return {
     instanceId: inst.instanceId,
     processId: inst.processId,
@@ -160,6 +173,10 @@ function toSummary(inst: Instance, createdAt: string): InstanceSummary {
     assignment: inst.assignment,
     startedBy: inst.startedBy,
     createdAt: new Date(createdAt).toISOString(),
+    currentStepEnteredAt: inst.currentStepEnteredAt ? new Date(inst.currentStepEnteredAt).toISOString() : undefined,
+    processLabel: body.label,
+    stepLabel: step.label,
+    processBaseLocale: body.baseLocale,
   };
 }
 
@@ -490,7 +507,11 @@ export async function createProcessInstance(
 
   await validateSubmissionData(body, initial, stub, actor, submitted, registry, { checkRequired: false });
 
-  const created = await createInstance(body, { processId, version, instanceId: mintedId, data: submitted as Instance["data"] }, db);
+  const created = await createInstance(
+    body,
+    { processId, version, instanceId: mintedId, data: submitted as Instance["data"], startedBy: actor.id },
+    db,
+  );
   return resolveAutomatic(created, body, actor, db);
 }
 
@@ -601,8 +622,33 @@ export async function releaseClaim(instanceId: InstanceId, actor: Actor, db: SQL
  * already terminal.
  */
 export async function cancelInstance(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<Instance> {
-  requireRole(actor, CANCEL_ANY_ROLE);
-  const { instance, body } = await loadInstanceForRead(instanceId, db);
+  // Fast, load-free path: a system:cancel-any caller is authorized before any
+  // instance lookup, exactly as before this function also accepted a case's
+  // own starter.
+  try {
+    requireRole(actor, CANCEL_ANY_ROLE);
+    const { instance, body } = await loadInstanceForRead(instanceId, db);
+    const store = getStore(db);
+    return engineCancelInstance(instance, body, actor, db, store.resolveBody);
+  } catch (err) {
+    if (!(err instanceof AuthorizationError)) throw err;
+  }
+  // Role-less path: authorizing requires loading the instance to check
+  // startedBy. A caller lacking the role must learn nothing about the
+  // instance from a failed attempt — an unresolvable instance and a
+  // resolvable-but-not-mine one both collapse to the same AuthorizationError,
+  // preserving the pre-existing "no role -> opaque 403, regardless of
+  // whether the target exists" guarantee.
+  let instance: Instance;
+  let body: ProcessBody;
+  try {
+    ({ instance, body } = await loadInstanceForRead(instanceId, db));
+  } catch {
+    throw new AuthorizationError(`actor '${actor.id}' may not cancel instance '${instanceId}'`);
+  }
+  if (instance.startedBy !== actor.id) {
+    throw new AuthorizationError(`actor '${actor.id}' may not cancel instance '${instanceId}'`);
+  }
   const store = getStore(db);
   return engineCancelInstance(instance, body, actor, db, store.resolveBody);
 }
@@ -647,7 +693,8 @@ export async function listInstances(
 
   const hasMore = rows.length > limit;
   const pageRows = rows.slice(0, limit);
-  const items = pageRows.map((r) => toSummary(parseInstance(r.body), r.created_at));
+  const store = getStore(db);
+  const items = await Promise.all(pageRows.map((r) => toSummary(parseInstance(r.body), r.created_at, store)));
   const last = pageRows[pageRows.length - 1];
   const cursor = hasMore && last ? encodeCursor([new Date(last.created_at).toISOString(), last.instance_id]) : undefined;
   return { items, cursor };

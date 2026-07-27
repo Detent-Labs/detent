@@ -192,6 +192,7 @@ export function planStepEntry(
   const entering: Instance = {
     ...instance,
     currentStepId: target.id,
+    currentStepEnteredAt: at,
     transitionSeq: nextSeq,
     status,
     timers: [],
@@ -355,6 +356,7 @@ export async function applyStepEntry(tx: SQL, plan: StepEntryPlan, extraFields?:
   const patch = {
     ...(extraFields ?? {}),
     currentStepId: next.currentStepId,
+    currentStepEnteredAt: next.currentStepEnteredAt,
     transitionSeq: next.transitionSeq,
     status: next.status,
     timers: next.timers,
