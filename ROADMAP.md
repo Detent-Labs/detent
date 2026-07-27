@@ -350,3 +350,66 @@
        "someday" — not resolved here.
     Neither sub-project has an OpenSpec change yet; write one when either
     actually gets scheduled.
+14. Deployment & operations readiness: NOT STARTED, deliberately deferred —
+    raised 2026-07-28 as a "someday" question while sketching what shipping
+    to a real customer needs beyond stages 1–13. Today the only run path is
+    the devcontainer. Missing: a production Docker image (or images) for the
+    engine and each frontend, health/readiness endpoints for orchestration,
+    and a documented backup/restore runbook for the Postgres schema (no
+    engine schema change implied — this is packaging and ops documentation).
+    No OpenSpec change yet.
+15. Observability: NOT STARTED, deliberately deferred — raised 2026-07-28.
+    No structured logging convention, no metrics, no tracing today; outbox
+    backlog, timer latency, and `faulted`-instance rate are only visible by
+    hand through the admin area. A real deployment needs at least metrics
+    plus a logging convention before an operator can tell the system is
+    healthy without watching the UI. No OpenSpec change yet.
+16. Notifications: NOT STARTED, deliberately deferred — raised 2026-07-28.
+    Stage 9 excluded notifications from the end-user app on purpose; an
+    inbox-only model without email/webhook on assignment or reminder is a
+    gap for customers used to being pushed to, not polling. Likely shape: a
+    new action-handler type on the existing action registry (mirroring
+    `http.request`, roadmap #5e), not a new schema concept. No OpenSpec
+    change yet.
+17. Escalation pattern: NOT STARTED, deliberately deferred — raised
+    2026-07-28, depends on stage 16 landing first. Timers are already
+    first-class, but there is no documented recipe for "SLA breached →
+    notify a manager / reassign" — today every customer would reinvent it
+    per process. A documented pattern (and maybe a reusable subprocess
+    example), not a new engine capability. No OpenSpec change yet.
+18. Environment promotion: NOT STARTED, deliberately deferred — raised
+    2026-07-28. Stage 11 explicitly excluded multi-environment transport as
+    a product feature, and version numbers are environment-local
+    (`definitionHash` is the only identity that carries across a boundary —
+    see stage 11). Without an export/import path for process definitions
+    between databases, moving a definition from staging to production is a
+    manual rebuild. Touches Studio. No OpenSpec change yet.
+19. Data retention & deletion policy: NOT STARTED, deliberately deferred —
+    raised 2026-07-28. The runtime record is append-only by design (see
+    "Runtime record" in CLAUDE.md) and nothing is ever archived or deleted
+    today, so storage grows unbounded and a GDPR erasure request has no
+    defined answer against an append-only audit trail. This needs a
+    deliberate policy decision before any code — not a default to build
+    around. No OpenSpec change yet.
+20. Reporting & analytics: NOT STARTED, deliberately deferred — raised
+    2026-07-28. The admin area (stage 10) is operations-focused (instances,
+    outbox, timers); a process owner wants cycle time, bottleneck, and SLA
+    views instead — a distinct audience from stage 10's operator, kept as
+    its own stage rather than folded into admin since the consumer and the
+    data shape both differ. No OpenSpec change yet.
+21. HTTP API documentation: NOT STARTED, deliberately deferred — raised
+    2026-07-28. The HTTP wrapper (`src/http/`) has no published OpenAPI/
+    contract document; needed once a customer integrates against it
+    directly rather than only through the shipped frontends. Documentation
+    only, no engine change. No OpenSpec change yet.
+22. Extended task collaboration: NOT STARTED, deliberately deferred — raised
+    2026-07-28. Stage 9 explicitly excluded attachments, comments, and
+    delegation from the end-user app; classic BPM-suite expectations that
+    may resurface as a customer ask rather than a committed direction. No
+    OpenSpec change yet.
+23. Multi-tenancy: NOT STARTED, deliberately deferred — raised 2026-07-28.
+    Today's convention is one deployment/database per customer (see stage
+    11's environment-separation note). A shared-infrastructure SaaS model
+    would need tenant isolation this convention doesn't provide — this is a
+    business-model decision to make first, not a technical default to build
+    toward speculatively. No OpenSpec change yet.
