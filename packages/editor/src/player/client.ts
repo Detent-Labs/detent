@@ -3,7 +3,7 @@ import type { ClientError, InstanceView, LoginResponse, SubmissionIssue } from "
 /** Thrown by every function below; `.error` is the typed, display-ready shape. `.status` is the HTTP status (undefined on a network failure), used by the store to detect a 401 and return to login. */
 export class PlayerClientError extends Error {
   constructor(readonly error: ClientError, readonly status?: number) {
-    super(error.type === "validation" ? "validation" : error.type === "concurrency-conflict" ? "concurrency-conflict" : error.message);
+    super(error.type);
     this.name = "PlayerClientError";
   }
 }
