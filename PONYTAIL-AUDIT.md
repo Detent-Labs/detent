@@ -5,15 +5,100 @@ cut first. Read-only report — nothing here has been applied. Regenerate with
 `/ponytail-audit`; this file is a snapshot, re-run before trusting it after
 further changes land.
 
-Last scanned: 2026-07-27. All 9 findings from that scan resolved
-2026-07-27 — see "Resolved from the 2026-07-27 scan" below. The
-2026-07-26 scan's 8 findings were all resolved 2026-07-27 too — see that
-section further down.
+Last scanned: 2026-07-28. `packages/app` (end-user app), `packages/admin`,
+and `packages/studio` were all added after the 2026-07-27 snapshot below and
+had never been through a pass — this scan focused there. The pre-existing
+engine/schema/cel/editor/form-ui code was left unscanned this round (already
+covered three times over; see "Checked, not flagged" further down).
 
 ## Findings
 
-None outstanding. Regenerate with `/ponytail-audit` for a fresh scan
-before trusting this section again.
+1. `delete` `packages/studio/src/{draft,panels,registry}` (2088 lines, 26
+   files) are byte-identical copies of `packages/editor/src/{draft,panels,
+   registry}` — verified with `diff`, not eyeballed; only `draft/ids.ts`
+   (+2 lines) and `draft/io.ts` (studio correctly drops the
+   File-System-Access-only 60 lines) genuinely diverge. Extract into a
+   shared workspace package the same way `packages/form-ui` is already
+   shared between `editor` and `app`; delete the studio copies and import.
+   [packages/studio/src/draft/store.tsx:1-119, packages/studio/src/panels/StepsPanel.tsx:1-236]
+2. `delete` `EditScreen.tsx`'s `ProcessHeader` (32 lines) duplicates editor
+   `App.tsx`'s `ProcessHeader` (21 lines) minus the `description` field —
+   folds into finding 1's shared package. [packages/studio/src/screens/EditScreen.tsx:27-58]
+3. `delete` `packages/studio/src/i18n/catalog.ts` — 114 of 129 lines are
+   verbatim copies of editor's catalog (same panels, same keys); only
+   `app.title`/`draftToolbar.*` differ from editor's `fileToolbar.*`/
+   `graph.*`. Share the catalog, override the differing keys per app.
+   [packages/studio/src/i18n/catalog.ts:1-129]
+4. `dedup` Four near-identical fetch-wrapper API clients — `request()` +
+   `parseErrorBody()` + a `*ClientError` class — in `app`, `admin`,
+   `studio`, and editor's `player/client.ts`: same `API_BASE` fallback,
+   same try/catch-as-network-error, same status-throw. One shared
+   `createApiClient(errorMapper)` factory, each package supplying only its
+   error-type union. [packages/app/src/api/client.ts:8-62, packages/admin/src/api/client.ts:19-63, packages/studio/src/api/client.ts, packages/editor/src/player/client.ts:4-35]
+5. `dedup` Three identical session stores (`StorageLike`, `browserStorage`,
+   `loadSession`/`persistSession`/`clearSession`) in `app`, `admin`,
+   `studio` — differ only by storage key and admin's extra `roles` field.
+   Shared `createSessionStore<T>(key)` factory. [packages/app/src/session.ts:1-37, packages/admin/src/session.ts:1-38, packages/studio/src/session.ts:1-37]
+6. `dedup` Three identical `useRoute()` History-API hooks in `app`,
+   `admin`, `studio` — same `useState`/`popstate` body, differing only in
+   the `Route` union and its match/path functions (`admin/routing.ts`'s own
+   comment admits it was "adapted from packages/app/src/routing.ts").
+   Shared `useHistoryRoute<R>(matchRoute, routePath)`. [packages/app/src/routing.ts:30-46, packages/admin/src/routing.ts:36-52, packages/studio/src/routing.ts:25-41]
+7. `delete` `resolveActor`/`guarded` reimplemented byte-for-byte in both
+   `src/http/admin-routes.ts` and `src/http/studio-routes.ts` instead of
+   imported from `routes.ts` — both files' own docstrings admit the
+   duplication ("Same shape as routes.ts::guarded"). Export both from
+   `routes.ts` and import. [src/http/admin-routes.ts:16-28, src/http/studio-routes.ts:17-29]
+8. `delete` `parseLimit` reimplemented identically in `admin-routes.ts`
+   instead of imported from `routes.ts` (comment: "Same rule as
+   routes.ts::parseLimit"). [src/http/admin-routes.ts:30-37]
+9. `delete` `encodeCursor`/`decodeCursor` reimplemented identically in the
+   new `src/engine/admin-queries.ts` — exact duplicate of the private
+   functions already in `runtime/api.ts`. Export once, import both.
+   [src/engine/admin-queries.ts:44-49]
+10. `delete` Test bootstrap (`DB`, `reg`, `fetch`, `beforeAll`/`beforeEach`
+    truncate, `authedReq`) copy-pasted into `http-admin.test.ts` and
+    `http-studio.test.ts` from `http.test.ts`'s pattern; studio's
+    `authedReq` variant (optional `body` param) already subsumes the
+    other two. Shared `test/helpers/http-fixture.ts`.
+    [test/http-admin.test.ts:14-30, test/http-studio.test.ts:14-38]
+11. `yagni` Admin's 6-variant `ClientError` union + `parseErrorBody`'s
+    type-switch — all 12 `catch` sites across admin's five screens check
+    only `err instanceof AdminClientError && err.status === 401`; none
+    reads `.error.type`/`.message`. Collapse to a single `message: string`
+    derived as `parsed?.error?.message ?? \`HTTP ${res.status}\``.
+    [packages/admin/src/api/client.ts:26]
+12. `shrink` `src/http/server.ts`'s hand-rolled route matcher grew 6 new
+    `OPTIONS`-preflight `if` blocks + 8 new dispatch `if` blocks for the
+    admin/studio routes on top of the original five (previously judged
+    "appropriately minimal at this route count" in the 2026-07-24 scan —
+    that verdict no longer holds at 19 routes). A small iterated route
+    table (`{method, match, methods, handler}[]`) now pays for itself.
+    [src/http/server.ts:196-213,263-294]
+13. `delete` `packages/app`'s `Actor.roles` and `InstanceView.status`/
+    `.processId`/`.version`/`ProcessSummary.version` are typed but never
+    read anywhere in the package. [packages/app/src/api/types.ts:6-9,38-46,48-54]
+14. `stdlib` `waitingLabel` hand-computes minute/hour/day relative-time
+    buckets with `Math.floor` division chains; `Intl.RelativeTimeFormat`
+    already covers this. [packages/app/src/screens/inboxLogic.ts:81-89]
+15. `native` `LoginScreen`'s submit button gates on
+    `disabled={loading || !email || !password}`, duplicating what
+    `required` on the email/password `<input>`s already gives free; keep
+    only `disabled={loading}`. [packages/app/src/screens/LoginScreen.tsx:48,52,54]
+16. `shrink` `t()`'s fallback chain `catalog[locale][key] ?? catalog.en[key]
+    ?? key` is unreachable — `de` is typed `Record<keyof typeof en,
+    string>`, so every key exists in every locale by construction.
+    [packages/app/src/i18n/catalog.ts:94-96]
+17. `shrink` `App.tsx` repeats the `typeof localStorage === "undefined" ?
+    undefined : localStorage` guard inline twice instead of reusing
+    `session.ts`'s `browserStorage()` default-parameter pattern.
+    [packages/app/src/App.tsx:14,24]
+
+net: -2600 lines, -0 deps possible.
+
+Not applied — this is a report only. Route each finding through its own
+OpenSpec change before landing, per this repo's prior ponytail-audit
+resolutions.
 
 ## Resolved from the 2026-07-27 scan
 
