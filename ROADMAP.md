@@ -384,30 +384,43 @@
     see stage 11). Without an export/import path for process definitions
     between databases, moving a definition from staging to production is a
     manual rebuild. Touches Studio. No OpenSpec change yet.
-19. Data retention & deletion policy: NOT STARTED, deliberately deferred —
+19. Database seed data: NOT STARTED, deliberately deferred — raised
+    2026-07-28. A fresh database (devcontainer spin-up, or any new
+    environment) starts completely empty — no example process, no demo
+    user, no sample instances. CLAUDE.md already documents recreating demo
+    state by hand after `bun test`'s `beforeEach` truncation wipes it; a
+    seed script (e.g. `bun run seed`, publishing `examples/*.json` and
+    provisioning a demo account per reserved role via `src/auth/cli.ts`)
+    would replace that manual step and give a new developer or environment
+    something to look at immediately. Needs to be idempotent — safe to
+    re-run against an already-seeded database without duplicating rows.
+    Ranked ahead of the items below: it is not customer-facing like 14–18,
+    but it is cheap and the pain it fixes is already recurring. No
+    OpenSpec change yet.
+20. Data retention & deletion policy: NOT STARTED, deliberately deferred —
     raised 2026-07-28. The runtime record is append-only by design (see
     "Runtime record" in CLAUDE.md) and nothing is ever archived or deleted
     today, so storage grows unbounded and a GDPR erasure request has no
     defined answer against an append-only audit trail. This needs a
     deliberate policy decision before any code — not a default to build
     around. No OpenSpec change yet.
-20. Reporting & analytics: NOT STARTED, deliberately deferred — raised
+21. Reporting & analytics: NOT STARTED, deliberately deferred — raised
     2026-07-28. The admin area (stage 10) is operations-focused (instances,
     outbox, timers); a process owner wants cycle time, bottleneck, and SLA
     views instead — a distinct audience from stage 10's operator, kept as
     its own stage rather than folded into admin since the consumer and the
     data shape both differ. No OpenSpec change yet.
-21. HTTP API documentation: NOT STARTED, deliberately deferred — raised
+22. HTTP API documentation: NOT STARTED, deliberately deferred — raised
     2026-07-28. The HTTP wrapper (`src/http/`) has no published OpenAPI/
     contract document; needed once a customer integrates against it
     directly rather than only through the shipped frontends. Documentation
     only, no engine change. No OpenSpec change yet.
-22. Extended task collaboration: NOT STARTED, deliberately deferred — raised
+23. Extended task collaboration: NOT STARTED, deliberately deferred — raised
     2026-07-28. Stage 9 explicitly excluded attachments, comments, and
     delegation from the end-user app; classic BPM-suite expectations that
     may resurface as a customer ask rather than a committed direction. No
     OpenSpec change yet.
-23. Multi-tenancy: NOT STARTED, deliberately deferred — raised 2026-07-28.
+24. Multi-tenancy: NOT STARTED, deliberately deferred — raised 2026-07-28.
     Today's convention is one deployment/database per customer (see stage
     11's environment-separation note). A shared-infrastructure SaaS model
     would need tenant isolation this convention doesn't provide — this is a
