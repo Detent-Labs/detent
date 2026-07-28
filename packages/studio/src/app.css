@@ -231,6 +231,48 @@ h2 {
   max-width: none;
 }
 
+.studio-publish-result {
+  color: var(--color-success);
+}
+
+.studio-json-editor {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-1);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  resize: vertical;
+}
+
+.studio-diff {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.studio-diff li {
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.studio-diff code {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+}
+
+.studio-diff-added code:first-child {
+  color: var(--color-success);
+}
+
+.studio-diff-removed code:first-child {
+  color: var(--color-danger);
+}
+
 .canvas-layout {
   display: flex;
   gap: var(--space-3);

@@ -1,4 +1,14 @@
-import type { ClientError, DraftRecord, DraftSummary, LoginResponse, ProcessSummary, VersionSummary } from "./types.js";
+import type {
+  ClientError,
+  DraftRecord,
+  DraftSummary,
+  LoginResponse,
+  ProcessSummary,
+  VersionSummary,
+  PublishResult,
+  MigrationPlan,
+  OrphanKeyScan,
+} from "./types.js";
 
 /** Same-origin by default (the app is deployed alongside its API); override
  * for local dev against the devcontainer's server via VITE_API_URL. */
@@ -32,6 +42,8 @@ async function parseErrorBody(res: Response): Promise<ClientError> {
       return { type: "not-found", message };
     case "draft-conflict":
       return { type: "draft-conflict", message };
+    case "migration-plan":
+      return { type: "migration-plan", message };
     default:
       return { type: "internal", message };
   }
@@ -109,4 +121,42 @@ export async function saveDraft(processId: string, input: SaveDraftInput, token:
 
 export async function deleteDraft(processId: string, token: string): Promise<void> {
   await request(`/drafts/${encodeURIComponent(processId)}`, token, { method: "DELETE" });
+}
+
+/** Publishes the *persisted* draft server-side — there is nothing for the caller to supply beyond the process id (studio-publish spec). */
+export async function publishDraft(processId: string, token: string): Promise<PublishResult> {
+  const res = await request(`/drafts/${encodeURIComponent(processId)}/publish`, token, { method: "POST" });
+  return (await res.json()) as PublishResult;
+}
+
+/** The compiled body of one published version — opaque JSON, used for diffing (process-version-inspection spec). */
+export async function getVersionBody(processId: string, version: number, token: string): Promise<unknown> {
+  const res = await request(`/processes/${encodeURIComponent(processId)}/versions/${version}`, token);
+  return await res.json();
+}
+
+/** `undefined` for a key with no registered plan (404), never thrown — same "expected shape" reasoning as getDraft. */
+export async function getMigrationPlan(processId: string, fromVersion: number, toVersion: number, token: string): Promise<MigrationPlan | undefined> {
+  try {
+    const res = await request(`/migration-plans/${encodeURIComponent(processId)}/${fromVersion}/${toVersion}`, token);
+    return (await res.json()) as MigrationPlan;
+  } catch (err) {
+    if (err instanceof StudioClientError && err.error.type === "not-found") return undefined;
+    throw err;
+  }
+}
+
+/** `spec` is opaque JSON (parsed from the plan editor's textarea) — validated server-side, same as saveDraft's `body`. */
+export async function putMigrationPlan(processId: string, fromVersion: number, toVersion: number, spec: unknown, token: string): Promise<MigrationPlan> {
+  const res = await request(`/migration-plans/${encodeURIComponent(processId)}/${fromVersion}/${toVersion}`, token, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(spec),
+  });
+  return (await res.json()) as MigrationPlan;
+}
+
+export async function getOrphanKeys(processId: string, version: number, token: string): Promise<OrphanKeyScan> {
+  const res = await request(`/processes/${encodeURIComponent(processId)}/versions/${version}/orphan-keys`, token);
+  return (await res.json()) as OrphanKeyScan;
 }

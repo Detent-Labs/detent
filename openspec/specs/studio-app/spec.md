@@ -150,7 +150,12 @@ Live validation SHALL remain exactly what it is today — the engine's own
 publish-time chain run in the browser, reporting issues in place — and SHALL
 NOT block saving, since a work-in-progress draft is expected to be invalid.
 
-Publishing is NOT part of this screen in this change.
+The screen SHALL offer a **Publish** action (see the `studio-publish`
+capability) that calls `POST /drafts/:processId/publish` against the
+currently persisted draft — not the in-browser edit state. When unsaved
+local changes are present, the action SHALL prompt the user to save first
+rather than publishing stale or ahead-of-server content. On success, the
+screen SHALL confirm the new version number and `definitionHash`.
 
 #### Scenario: A draft round-trips through the panels
 
@@ -170,6 +175,18 @@ Publishing is NOT part of this screen in this change.
 - **WHEN** live validation reports issues for the current draft
 - **THEN** the issues are displayed and the save action remains available and
   succeeds
+
+#### Scenario: Publishing with unsaved changes prompts a save first
+
+- **WHEN** the developer clicks Publish while local edits have not been saved
+- **THEN** the studio prompts to save before publishing and does not call
+  `POST /drafts/:processId/publish` until the save completes
+
+#### Scenario: A successful publish is confirmed on screen
+
+- **WHEN** `POST /drafts/:processId/publish` succeeds
+- **THEN** the screen displays the returned version number and
+  `definitionHash`
 
 ### Requirement: A save conflict is surfaced and resolved by reloading, never merged
 

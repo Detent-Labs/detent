@@ -104,6 +104,11 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
                       Create draft
                     </button>
                   )}
+                  {row.published && (
+                    <button type="button" onClick={() => navigate({ name: "versions", processId: row.processId })}>
+                      Versions
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

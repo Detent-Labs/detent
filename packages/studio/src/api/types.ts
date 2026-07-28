@@ -51,10 +51,37 @@ export interface DraftSummary {
   updatedAt: string;
 }
 
+/** Echoed by POST /drafts/:processId/publish — mirrors src/engine/definitions.ts's publishBody return. */
+export interface PublishResult {
+  processId: string;
+  version: number;
+  definitionHash: string;
+  status: string;
+}
+
+/** Mirrors src/engine/migration.ts::resolveMigrationPlan's return shape. `spec` is opaque JSON, never parsed client-side — same as DraftRecord.body. */
+export interface MigrationPlan {
+  spec: unknown;
+  appliedAt: string | null;
+}
+
+/** Mirrors src/engine/migration.ts::OrphanKeyEntry. */
+export interface OrphanKeyEntry {
+  instanceId: string;
+  keys: string[];
+}
+
+/** Mirrors src/engine/migration.ts::OrphanKeyScan. */
+export interface OrphanKeyScan {
+  orphans: OrphanKeyEntry[];
+  unreadable: string[];
+}
+
 export type ClientError =
   | { type: "authorization"; message: string }
   | { type: "actor-resolution"; message: string }
   | { type: "request-shape"; message: string }
   | { type: "not-found"; message: string }
   | { type: "draft-conflict"; message: string }
+  | { type: "migration-plan"; message: string }
   | { type: "internal"; message: string };

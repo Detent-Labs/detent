@@ -28,6 +28,7 @@ import {
 } from "../engine/definitions.js";
 import { DurationValidationError } from "../schema/compile.js";
 import { DraftConflictError } from "../engine/drafts.js";
+import { MigrationPlanError } from "../engine/migration.js";
 import { ZodError } from "zod";
 import { RequestShapeError } from "../errors.js";
 
@@ -61,6 +62,7 @@ const MESSAGE_ERRORS: MessageMapping[] = [
   { ctor: NotClaimedError, status: 403, type: "not-claimed" },
   { ctor: NotClaimantError, status: 403, type: "not-claimant" },
   { ctor: DraftConflictError, status: 409, type: "draft-conflict" },
+  { ctor: MigrationPlanError, status: 409, type: "migration-plan" },
 ];
 
 export function mapError(err: unknown): HttpResult {

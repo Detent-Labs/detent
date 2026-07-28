@@ -5,11 +5,14 @@
  * DATABASE_URL is unset.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
-import { sql, initSchema } from "../src/engine/store.js";
+import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
+import { createDefinitionStore } from "../src/engine/definitions.js";
+import { migrateInstances } from "../src/engine/migration.js";
 import { createServer } from "../src/http/server.js";
-import { DEVELOPER_ROLE } from "../src/auth/authorize.js";
+import { DEVELOPER_ROLE, PUBLISH_ROLE } from "../src/auth/authorize.js";
 import type { Actor } from "../src/cel/eval.js";
+import type { ProcessId } from "../src/schema/definition.js";
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
@@ -20,11 +23,13 @@ beforeAll(async () => {
   if (DB) await initSchema();
 });
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE drafts, outbox, instances, history_entries, instance_events, definitions`;
+  if (DB) await sql`TRUNCATE drafts, outbox, instances, history_entries, instance_events, definitions, migration_plans`;
 });
 
 const developer: Actor = { id: "user_dev", roles: [DEVELOPER_ROLE] };
 const bystander: Actor = { id: "user_bystander", roles: [] };
+const publisher: Actor = { id: "user_publisher", roles: [DEVELOPER_ROLE, PUBLISH_ROLE] };
+const publishOnly: Actor = { id: "user_publish_only", roles: [PUBLISH_ROLE] };
 
 const authedReq = (url: string, method: string, actor: Actor, body?: unknown) =>
   new Request(url, {
@@ -47,6 +52,27 @@ const authoredBody = (label: string) => ({
   fields: [],
   workflow: { initialStep: "step_a", steps: [{ id: "step_a", key: "a", label: { en: "A" }, type: "task" }] },
 });
+
+/** Unlike `authoredBody` (deliberately invalid — no exit — legal for a draft), this has an exit and publishes cleanly. */
+const publishableBody = (label: string, fields: { id: string; key: string; label: { en: string }; type: string }[] = []) => ({
+  key: "wf",
+  label: { en: label },
+  baseLocale: "en",
+  fields,
+  workflow: {
+    initialStep: "step_a",
+    steps: [
+      { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }] },
+      { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+    ],
+  },
+});
+
+/** A running instance pinned to a published version, its body resolved from the store so its hash matches the compiled pin — same pattern as migration.test.ts's `mkInstance`. */
+const mkInstance = async (processId: ProcessId, version: number, data?: Record<string, unknown>) => {
+  const body = (await createDefinitionStore(sql).resolveBody(processId, version))!;
+  return createInstance(body, { processId, version, ...(data ? { data: data as never } : {}) }, sql);
+};
 
 // ============================================================
 // GET /drafts
@@ -189,6 +215,219 @@ test.skipIf(!DB)("DELETE /drafts/:processId for a process with no draft maps to 
 });
 
 // ============================================================
+// POST /drafts/:processId/publish
+// ============================================================
+
+test.skipIf(!DB)("POST /drafts/:processId/publish with no resolvable credential maps to 401", async () => {
+  const res = await fetch(new Request(`http://x/drafts/${pid()}/publish`, { method: "POST" }));
+  expect(res.status).toBe(401);
+});
+
+test.skipIf(!DB)("POST /drafts/:processId/publish without system:developer maps to 403, even holding system:publish", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  const res = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publishOnly));
+  expect(res.status).toBe(403);
+});
+
+test.skipIf(!DB)("POST /drafts/:processId/publish without system:publish maps to 403, even holding system:developer", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  const res = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", developer));
+  expect(res.status).toBe(403);
+});
+
+test.skipIf(!DB)("publishing a process with no draft maps to 404", async () => {
+  const res = await fetch(authedReq(`http://x/drafts/${pid()}/publish`, "POST", publisher));
+  expect(res.status).toBe(404);
+});
+
+test.skipIf(!DB)("a successful publish stamps base_version, leaves revision unchanged, and returns the new version", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+
+  const res = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { processId: string; version: number; definitionHash: string; status: string };
+  expect(body.processId).toBe(processId);
+  expect(body.version).toBe(1);
+  expect(body.status).toBe("published");
+
+  const stored = (await sql`SELECT base_version, revision FROM drafts WHERE process_id = ${processId}`) as { base_version: number | null; revision: number }[];
+  expect(stored[0]!.base_version).toBe(1);
+  expect(stored[0]!.revision).toBe(0);
+});
+
+test.skipIf(!DB)("a second publish after further edits updates base_version to the latest", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher)); // -> version 1
+
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v2"), layout: {}, revision: 0 })); // -> revision 1
+  const res = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher)); // -> version 2
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { version: number };
+  expect(body.version).toBe(2);
+
+  const stored = (await sql`SELECT base_version FROM drafts WHERE process_id = ${processId}`) as { base_version: number | null }[];
+  expect(stored[0]!.base_version).toBe(2);
+});
+
+// ============================================================
+// GET /processes/:processId/versions/:version
+// ============================================================
+
+test.skipIf(!DB)("GET /processes/:processId/versions/:version with no resolvable credential maps to 401", async () => {
+  const res = await fetch(new Request(`http://x/processes/${pid()}/versions/1`));
+  expect(res.status).toBe(401);
+});
+
+test.skipIf(!DB)("GET /processes/:processId/versions/:version without system:developer maps to 403, even though the metadata sibling requires no role", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
+
+  const versionRes = await fetch(authedReq(`http://x/processes/${processId}/versions/1`, "GET", bystander));
+  expect(versionRes.status).toBe(403);
+
+  const metadataRes = await fetch(authedReq(`http://x/processes/${processId}/versions`, "GET", bystander));
+  expect(metadataRes.status).toBe(200);
+});
+
+test.skipIf(!DB)("GET /processes/:processId/versions/:version returns the compiled body for a published version", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
+
+  const res = await fetch(authedReq(`http://x/processes/${processId}/versions/1`, "GET", developer));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { key: string; label: { en: string } };
+  expect(body.key).toBe("wf");
+  expect(body.label.en).toBe("v1");
+});
+
+test.skipIf(!DB)("GET /processes/:processId/versions/:version for a version never published maps to 404", async () => {
+  const res = await fetch(authedReq(`http://x/processes/${pid()}/versions/1`, "GET", developer));
+  expect(res.status).toBe(404);
+});
+
+test.skipIf(!DB)("GET /processes/:processId/versions/:version with a non-numeric version maps to 400", async () => {
+  const res = await fetch(authedReq(`http://x/processes/${pid()}/versions/abc`, "GET", developer));
+  expect(res.status).toBe(400);
+});
+
+// ============================================================
+// GET/PUT /migration-plans/:processId/:fromVersion/:toVersion
+// ============================================================
+
+test.skipIf(!DB)("GET /migration-plans/... without system:developer maps to 403", async () => {
+  const res = await fetch(authedReq(`http://x/migration-plans/${pid()}/1/2`, "GET", bystander));
+  expect(res.status).toBe(403);
+});
+
+test.skipIf(!DB)("PUT /migration-plans/... without system:developer maps to 403 and registers nothing", async () => {
+  const processId = pid();
+  const res = await fetch(authedReq(`http://x/migration-plans/${processId}/1/2`, "PUT", bystander, {}));
+  expect(res.status).toBe(403);
+
+  const rows = (await sql`SELECT 1 FROM migration_plans WHERE process_id = ${processId}`) as unknown[];
+  expect(rows.length).toBe(0);
+});
+
+test.skipIf(!DB)("GET /migration-plans/... for an unregistered key maps to 404", async () => {
+  const res = await fetch(authedReq(`http://x/migration-plans/${pid()}/1/2`, "GET", developer));
+  expect(res.status).toBe(404);
+});
+
+test.skipIf(!DB)("register-then-read round trip; re-registering an unapplied plan overwrites the spec", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher)); // -> version 1
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v2"), layout: {}, revision: 0 }));
+  await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher)); // -> version 2
+
+  const putRes = await fetch(authedReq(`http://x/migration-plans/${processId}/1/2`, "PUT", developer, {}));
+  expect(putRes.status).toBe(200);
+
+  const getRes = await fetch(authedReq(`http://x/migration-plans/${processId}/1/2`, "GET", developer));
+  expect(getRes.status).toBe(200);
+  const got = (await getRes.json()) as { appliedAt: string | null };
+  expect(got.appliedAt).toBeNull();
+
+  const putRes2 = await fetch(authedReq(`http://x/migration-plans/${processId}/1/2`, "PUT", developer, { transforms: {} }));
+  expect(putRes2.status).toBe(200);
+});
+
+test.skipIf(!DB)("registering a plan with fromVersion equal to toVersion maps to 409 migration-plan", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
+
+  const res = await fetch(authedReq(`http://x/migration-plans/${processId}/1/1`, "PUT", developer, {}));
+  expect(res.status).toBe(409);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("migration-plan");
+});
+
+test.skipIf(!DB)("registering against an already-applied plan is rejected", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v2"), layout: {}, revision: 0 }));
+  await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
+
+  await fetch(authedReq(`http://x/migration-plans/${processId}/1/2`, "PUT", developer, {}));
+  await migrateInstances(processId as ProcessId, 1, 2, sql); // no instances -> empty run, still freezes
+
+  const res = await fetch(authedReq(`http://x/migration-plans/${processId}/1/2`, "PUT", developer, { transforms: {} }));
+  expect(res.status).toBe(409);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("migration-plan");
+});
+
+// ============================================================
+// GET /processes/:processId/versions/:version/orphan-keys
+// ============================================================
+
+test.skipIf(!DB)("GET .../orphan-keys without system:developer maps to 403", async () => {
+  const res = await fetch(authedReq(`http://x/processes/${pid()}/versions/1/orphan-keys`, "GET", bystander));
+  expect(res.status).toBe(403);
+});
+
+test.skipIf(!DB)("GET .../orphan-keys for an unpublished version maps to 409 migration-plan", async () => {
+  const res = await fetch(authedReq(`http://x/processes/${pid()}/versions/1/orphan-keys`, "GET", developer));
+  expect(res.status).toBe(409);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("migration-plan");
+});
+
+test.skipIf(!DB)("GET .../orphan-keys for a clean published version returns an empty result", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
+
+  const res = await fetch(authedReq(`http://x/processes/${processId}/versions/1/orphan-keys`, "GET", developer));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { orphans: unknown[]; unreadable: string[] };
+  expect(body.orphans).toEqual([]);
+  expect(body.unreadable).toEqual([]);
+});
+
+test.skipIf(!DB)("GET .../orphan-keys reports an instance's data keys absent from the version's field catalog", async () => {
+  const processId = pid();
+  const fieldA = { id: "field_a", key: "a", label: { en: "A" }, type: "string" };
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1", [fieldA]), layout: {}, revision: 0 }));
+  await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
+
+  const inst = await mkInstance(processId as ProcessId, 1, { field_a: "kept", field_ghost: "orphan" });
+
+  const res = await fetch(authedReq(`http://x/processes/${processId}/versions/1/orphan-keys`, "GET", developer));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { orphans: { instanceId: string; keys: string[] }[] };
+  expect(body.orphans).toEqual([{ instanceId: inst.instanceId, keys: ["field_ghost"] }]);
+});
+
+// ============================================================
 // CORS preflight
 // ============================================================
 
@@ -202,4 +441,28 @@ test("OPTIONS preflight on the drafts item route returns 204 permitting GET, PUT
   const res = await fetch(new Request("http://x/drafts/proc_x", { method: "OPTIONS" }));
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET, PUT, DELETE");
+});
+
+test("OPTIONS preflight on the draft publish route returns 204 permitting POST", async () => {
+  const res = await fetch(new Request("http://x/drafts/proc_x/publish", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
+});
+
+test("OPTIONS preflight on the version-body route returns 204 permitting GET", async () => {
+  const res = await fetch(new Request("http://x/processes/proc_x/versions/1", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
+});
+
+test("OPTIONS preflight on the migration-plans route returns 204 permitting GET, PUT", async () => {
+  const res = await fetch(new Request("http://x/migration-plans/proc_x/1/2", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET, PUT");
+});
+
+test("OPTIONS preflight on the orphan-keys route returns 204 permitting GET", async () => {
+  const res = await fetch(new Request("http://x/processes/proc_x/versions/1/orphan-keys", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
 });
