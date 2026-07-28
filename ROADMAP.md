@@ -209,8 +209,8 @@
     Same boundaries as the other frontends: runtime access through the
     HTTP wrapper only, no direct database reads. One new reserved role,
     `system:admin`, checked directly like the two from stage 8.
-    Delivery is three OpenSpec changes, only the first with scaffolding:
-    `admin-shell-and-ops` (DONE), `admin-users` (NOT STARTED),
+    Delivery is three OpenSpec changes:
+    `admin-shell-and-ops` (DONE), `admin-users` (DONE),
     `admin-migration-run` (NOT STARTED).
     `admin-shell-and-ops` is DONE (see `docs/current-state.md`'s "Admin area
     (operations)" entry): `packages/admin` scaffolding and login/shell, one new
@@ -229,9 +229,25 @@
     `scope=mine`, the Player drives a single instance it created); `scope=mine`
     stays open to every authenticated actor. An account that relied on either
     read without the role needs it granted via `src/auth/cli.ts set-roles`.
-    Still to come (`admin-users`, `admin-migration-run`): one new function,
-    `users.ts::setDisabled`, for user administration; `POST
-    /admin/migrations/run` reusing the existing migration engine path.
+    `admin-users` is DONE (see `docs/current-state.md`'s "Admin area (user
+    administration)" entry): the one HTTP carve-out from
+    `local-user-accounts`'s CLI-only administration. Two new
+    `src/auth/users.ts` functions — `listUsers` and `setDisabled(userId,
+    disabled, db)`, the latter keyed by `userId` (unlike `setRoles`/
+    `setPassword`'s `email`) since its caller addresses a row from a
+    `listUsers` result, not a human typing an address — and three new
+    `system:admin`-gated routes (`GET /admin/users`, `POST
+    /admin/users/:id/disable`, `POST /admin/users/:id/enable`). Creating a
+    user, changing a password, or assigning roles remain CLI-only. Disabling
+    blocks the user's *next* login only; it does not revoke an already-issued
+    JWT, since token verification performs no per-request database lookup —
+    proven end-to-end (log in, disable via the new route, the pre-disable
+    token still authenticates, a fresh login then fails). `packages/admin`
+    gains a `/users` screen: list plus a disable/enable toggle, the disable
+    action behind a confirmation naming that non-revocation caveat so an
+    operator doesn't mistake it for an immediate lockout.
+    Still to come (`admin-migration-run`): `POST /admin/migrations/run`
+    reusing the existing migration engine path.
     The design's original **Processes** and **Tools** areas were reassigned to
     stage 11 — authoring belongs to the developer, operating to the operator —
     which also moves `GET /admin/registry`, `POST /admin/migrations/plans` and
@@ -244,7 +260,8 @@
     instances; static type-checking against a version's field catalog is what
     an operator actually needs), deleting users (`user_id` *is* `Actor.id` and
     must stay resolvable in the append-only record — `auth_users.disabled`,
-    which `verifyLogin` already honours, is the correct mechanism), and live
+    which `verifyLogin` already honours and `admin-users` now exposes over
+    HTTP, is the correct mechanism), and live
     updates (refresh control plus refetch-on-focus, as in stage 9).
 11. Process Studio: IN PROGRESS (design approved 2026-07-27, see
     `docs/superpowers/specs/2026-07-27-process-studio-design.md`). The
