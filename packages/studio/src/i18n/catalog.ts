@@ -24,6 +24,10 @@ const en = {
   "draftToolbar.conflictReload": "Reload",
   "draftToolbar.unsaved": "Unsaved changes",
   "draftToolbar.saved": "Saved",
+  "draftToolbar.publish": "Publish",
+  "draftToolbar.publishing": "Publishing…",
+  "draftToolbar.publishConfirmSave": "Save your changes and publish?",
+  "draftToolbar.publishSuccess": "Published",
 
   "fieldCatalog.heading": "Field catalog",
   "fieldCatalog.empty": "No fields yet.",

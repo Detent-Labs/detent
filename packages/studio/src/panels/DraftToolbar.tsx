@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useDraft } from "../draft/store.js";
 import { t } from "../i18n/catalog.js";
-import { saveDraft, getDraft, deleteDraft, StudioClientError } from "../api/client.js";
+import { saveDraft, getDraft, deleteDraft, publishDraft, StudioClientError } from "../api/client.js";
 import { applySaveResult, applyReload, type DraftSaveState } from "../screens/draftSaveLogic.js";
+import { isDirty } from "../screens/publishGateLogic.js";
 import type { Draft } from "../draft/types.js";
+import type { PublishResult } from "../api/types.js";
 
 interface DraftToolbarProps {
   processId: string;
@@ -24,6 +26,11 @@ export function DraftToolbar({ processId, token, saveState, onSaveState, onDisca
   const { draft, replace } = useDraft();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The body last known to be persisted — initialized from the just-loaded draft (nothing
+  // edited yet, so "current" already equals "saved"), then advanced on every successful save.
+  const [savedBody, setSavedBody] = useState<Draft>(() => structuredClone(draft));
+  const [publishing, setPublishing] = useState(false);
+  const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
 
   const withUnauthorized = async (action: () => Promise<void>) => {
     try {
@@ -38,16 +45,45 @@ export function DraftToolbar({ processId, token, saveState, onSaveState, onDisca
     }
   };
 
-  const save = () =>
-    withUnauthorized(async () => {
-      setSaving(true);
-      try {
-        const result = await saveDraft(processId, { body: draft, layout: saveState.layout, revision: saveState.revision }, token);
-        onSaveState(applySaveResult(saveState, result));
-      } finally {
-        setSaving(false);
-      }
-    });
+  /** Returns whether the save persisted (false on a 409 — the conflict banner below already explains that, so a caller chaining off this shouldn't proceed). */
+  const doSave = async (): Promise<boolean> => {
+    setSaving(true);
+    try {
+      const result = await saveDraft(processId, { body: draft, layout: saveState.layout, revision: saveState.revision }, token);
+      if (result) setSavedBody(structuredClone(draft));
+      onSaveState(applySaveResult(saveState, result));
+      return result !== undefined;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const save = () => withUnauthorized(() => doSave().then(() => undefined));
+
+  const doPublish = async () => {
+    setPublishing(true);
+    try {
+      setPublishResult(await publishDraft(processId, token));
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  /**
+   * Publish always targets the persisted draft (studio-publish spec) — a dirty
+   * in-browser edit is never sent implicitly. Confirming saves first and only
+   * then publishes; declining or a save conflict leaves the draft unpublished
+   * (studio-app spec: "does not call the publish route until the save completes").
+   */
+  const publish = () => {
+    if (isDirty(draft, savedBody)) {
+      if (!confirm(t("draftToolbar.publishConfirmSave"))) return;
+      return withUnauthorized(async () => {
+        if (await doSave()) await doPublish();
+      });
+    }
+    return withUnauthorized(doPublish);
+  };
 
   const reload = () =>
     withUnauthorized(async () => {
@@ -73,7 +109,15 @@ export function DraftToolbar({ processId, token, saveState, onSaveState, onDisca
       <button type="button" onClick={() => void discard()}>
         {t("draftToolbar.discard")}
       </button>
+      <button type="button" disabled={publishing} onClick={() => void publish()}>
+        {publishing ? t("draftToolbar.publishing") : t("draftToolbar.publish")}
+      </button>
       {error && <p className="studio-error">{error}</p>}
+      {publishResult && (
+        <p className="studio-publish-result">
+          {t("draftToolbar.publishSuccess")} v{publishResult.version} ({publishResult.definitionHash.slice(0, 12)})
+        </p>
+      )}
       {saveState.conflict && (
         <p className="studio-conflict">
           {t("draftToolbar.conflictMessage")}{" "}

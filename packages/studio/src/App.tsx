@@ -4,6 +4,8 @@ import { loadSession, persistSession, clearSession, type Session } from "./sessi
 import { LoginScreen } from "./screens/LoginScreen.js";
 import { ProcessesScreen } from "./screens/ProcessesScreen.js";
 import { EditScreen } from "./screens/EditScreen.js";
+import { VersionsScreen } from "./screens/VersionsScreen.js";
+import { MigrationPlanScreen } from "./screens/MigrationPlanScreen.js";
 
 /** Mirrors src/auth/authorize.ts::DEVELOPER_ROLE — the server is the enforcement; this is presentational only (studio-app spec's "An authenticated actor without the developer role sees an explanatory empty state"). */
 const DEVELOPER_ROLE = "system:developer";
@@ -63,6 +65,17 @@ export function App() {
 
       {route.name === "processes" && <ProcessesScreen token={session.token} navigate={navigate} onUnauthorized={logout} />}
       {route.name === "edit" && <EditScreen processId={route.processId} token={session.token} navigate={navigate} onUnauthorized={logout} />}
+      {route.name === "versions" && <VersionsScreen processId={route.processId} token={session.token} navigate={navigate} onUnauthorized={logout} />}
+      {route.name === "migrate" && (
+        <MigrationPlanScreen
+          processId={route.processId}
+          from={route.from}
+          to={route.to}
+          token={session.token}
+          navigate={navigate}
+          onUnauthorized={logout}
+        />
+      )}
     </div>
   );
 }

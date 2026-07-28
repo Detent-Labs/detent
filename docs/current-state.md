@@ -822,3 +822,54 @@ Stage-by-stage status is in `ROADMAP.md`.
   existing convention (`packages/app/src/screens/inboxLogic.ts`). The canvas
   introduces no operation the panels can't already do — deletion and every
   field edit remain panel-only.
+- Process Studio — lifecycle (`src/http/studio-routes.ts`, `src/engine/drafts.ts`,
+  `src/http/errors.ts`, `packages/studio/src/panels/DraftToolbar.tsx`,
+  `packages/studio/src/screens/{VersionsScreen,MigrationPlanScreen}.tsx`,
+  `studio-lifecycle`): stage 11's fourth of five changes. Closes the gap the
+  prior two changes left open — a Studio draft could only be published via
+  `packages/editor`'s export path plus a manual `POST /processes` call.
+  `POST /drafts/:processId/publish` publishes the *persisted* draft
+  server-side, never a client-supplied body, requiring both
+  `DEVELOPER_ROLE` and `PUBLISH_ROLE` (neither implies the other); it is the
+  first `studio-routes.ts` handler needing `registry`/`dataSourceRegistry`
+  (every prior one took only `resolver`/`db`), now threaded through
+  `src/http/server.ts`'s dispatcher the same way `handlePublish` already
+  receives them. `publishBody` and the new `drafts.ts::markDraftPublished`
+  (a plain `base_version` `UPDATE`, deliberately outside `saveDraft`'s
+  revision-checked optimistic concurrency, since `base_version` carries no
+  part of that contract) run inside one `withTransaction`
+  (`src/engine/store.ts`), so a stamp failure rolls back the publish instead
+  of leaving a published version un-stamped. Three more routes expose
+  existing engine-only functions over HTTP for the first time — `GET
+  /processes/:processId/versions/:version` (the compiled body `resolveBody`
+  already resolves; `DEVELOPER_ROLE`-gated, unlike its metadata-only,
+  no-role-required sibling `GET /processes/:processId/versions`), `GET`/`PUT
+  /migration-plans/:processId/:fromVersion/:toVersion` (wrapping
+  `registerMigrationPlan`/`resolveMigrationPlan` unchanged — `PUT` free-edits
+  an unapplied plan and inherits the engine's existing frozen-plan rejection),
+  and `GET /processes/:processId/versions/:version/orphan-keys` (wrapping
+  `findOrphanKeys`; version-keyed rather than plan-keyed, since the scan is
+  independent of any migration target) — all `DEVELOPER_ROLE`-gated and
+  unprefixed (studio-only by role check, not by URL, the same convention
+  `process-drafts`'s `/drafts` routes already established). `MigrationPlanError`
+  gained one `errors.ts` mapping (409, `migration-plan`) shared by all three,
+  since it previously fell through to the generic 500. `packages/studio`
+  gained: a Publish action on the edit screen, gated by a dirty-check pure
+  module (`screens/publishGateLogic.ts::isDirty`, comparing the in-browser
+  draft against the last-saved snapshot) — a `confirm()` prompt offers to
+  save then publish when dirty, mirroring the existing discard-confirmation
+  convention rather than silently chaining or hard-blocking; a Versions
+  screen listing published versions and diffing any two (or a draft against
+  its `base_version`) via a from-scratch JSON diff
+  (`screens/versionDiffLogic.ts::diffJson`) — no diff library exists
+  anywhere in the repo to reuse, and none was added, objects recurse
+  key-by-key and everything else (including arrays) compares whole; and a
+  migration-plan authoring screen, a JSON-textarea editor over
+  `MigrationSpec` (`screens/migrationPlanLogic.ts`) plus an orphan-key
+  dry-run panel — no field-by-field form exists anywhere in the repo for
+  `MigrationSpec`'s shape to extend, and the server already owns validation
+  at `PUT /migration-plans/...`, so a bespoke widget-per-field UI would only
+  duplicate it. Deliberately out of scope: *executing* a migration plan
+  (stays `admin-migration-run`'s future `POST /admin/migrations/run`, an
+  operator action) and the registry/CEL-scratchpad tools screen plus Player
+  (`studio-tools-and-player`).

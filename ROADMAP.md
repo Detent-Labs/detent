@@ -308,9 +308,10 @@
     `packages/studio` — login/session/shell mirroring `packages/admin`, the
     editor's `draft/`/`panels/`/`i18n/`/`registry/` carried over with
     file-persistence replaced by the draft routes, and a process list merging
-    `GET /processes` with `GET /drafts`. The JSON surface, publish/versions/
-    migration planning, and tools/Player remain NOT STARTED (`packages/editor`
-    stays untouched and functional until the last of those lands).
+    `GET /processes` with `GET /drafts`. The JSON surface and tools/Player
+    remain NOT STARTED (`packages/editor` stays untouched and functional
+    until the last of those lands); publish, versions and migration planning
+    are now DONE (see `studio-lifecycle` below).
 
     **Process Studio — canvas: DONE** (`studio-canvas`). `/processes/:id/edit`
     is now canvas-primary: a hand-rolled SVG canvas (deliberately not Mermaid,
@@ -342,6 +343,43 @@
     rendering/pointer wiring is not, per the repo's existing convention.
     Deletion and every field edit remain panel-only — the canvas adds no
     authoring operation the panels couldn't already do.
+
+    **Process Studio — lifecycle: DONE** (`studio-lifecycle`). Closes the gap
+    where a Studio draft could only be published via `packages/editor`'s
+    export path plus a manual `POST /processes` call. `POST
+    /drafts/:processId/publish` (`src/http/studio-routes.ts`) publishes the
+    *persisted* draft server-side — never a client-supplied body — requiring
+    both `system:developer` and `system:publish` (the latter implied by
+    neither the former nor the reverse, per `authorization`); `publishBody`
+    and the new `src/engine/drafts.ts::markDraftPublished` (a plain
+    `base_version` stamp, outside `saveDraft`'s revision-checked optimistic
+    concurrency) run inside one `withTransaction` so a stamp failure can't
+    leave a published version un-stamped. Three more routes newly expose
+    existing engine-only functions over HTTP for the first time, all
+    `system:developer`-gated and unprefixed (studio-only by role, not by URL,
+    same as the `/drafts` routes): `GET /processes/:processId/versions/:version`
+    (the compiled body `resolveBody` already resolves, unlike its
+    metadata-only, unauthenticated-role sibling), `GET`/`PUT
+    /migration-plans/:processId/:fromVersion/:toVersion` (wrapping
+    `registerMigrationPlan`/`resolveMigrationPlan` unchanged), and `GET
+    /processes/:processId/versions/:version/orphan-keys` (wrapping
+    `findOrphanKeys`, version-keyed rather than plan-keyed since the scan is
+    independent of any migration target). `MigrationPlanError` gained one
+    `src/http/errors.ts` mapping (409, `migration-plan`) shared by all three.
+    `packages/studio` gained a Publish action on the edit screen
+    (`DraftToolbar.tsx`, gated by a dirty-check pure module,
+    `screens/publishGateLogic.ts` — a `confirm()` prompt offers to save then
+    publish, mirroring the existing discard-confirmation convention rather
+    than silently chaining or blocking), a Versions screen (list plus a
+    from-scratch JSON diff, `screens/versionDiffLogic.ts` — no diff library
+    exists anywhere in the repo to reuse, and none was added), and a
+    migration-plan authoring screen (a JSON-textarea editor over
+    `MigrationSpec` — no field-by-field form exists anywhere to extend, and
+    the server already owns validation — plus an orphan-key dry-run panel).
+    Deliberately out of scope: *executing* a migration plan (stays
+    `admin-migration-run`'s future `POST /admin/migrations/run`, an operator
+    action) and the registry/CEL-scratchpad tools screen plus Player
+    (`studio-tools-and-player`).
 12. Unified shell (consolidate app/admin/studio): NOT STARTED, deliberately
     deferred — no urgency, raised 2026-07-28 as a "someday" question, not a
     committed stage. Today `packages/app`, `packages/admin`, and

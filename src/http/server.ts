@@ -34,7 +34,17 @@ import {
   handleAdminDisableUser,
   handleAdminEnableUser,
 } from "./admin-routes.js";
-import { handleListDrafts, handleGetDraft, handleSaveDraft, handleDeleteDraft } from "./studio-routes.js";
+import {
+  handleListDrafts,
+  handleGetDraft,
+  handleSaveDraft,
+  handleDeleteDraft,
+  handlePublishDraft,
+  handleGetVersionBody,
+  handleGetMigrationPlan,
+  handlePutMigrationPlan,
+  handleGetOrphanKeys,
+} from "./studio-routes.js";
 import type { HttpResult } from "./errors.js";
 
 /**
@@ -228,6 +238,18 @@ export function createServer(
     if (req.method === "OPTIONS" && parts.length === 2 && parts[0] === "drafts") {
       return preflight("GET, PUT, DELETE");
     }
+    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "drafts" && parts[2] === "publish") {
+      return preflight("POST");
+    }
+    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "processes" && parts[2] === "versions") {
+      return preflight("GET");
+    }
+    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "migration-plans") {
+      return preflight("GET, PUT");
+    }
+    if (req.method === "OPTIONS" && parts.length === 5 && parts[0] === "processes" && parts[2] === "versions" && parts[4] === "orphan-keys") {
+      return preflight("GET");
+    }
 
     // POST /auth/login
     if (loginSecret && req.method === "POST" && parts.length === 2 && parts[0] === "auth" && parts[1] === "login") {
@@ -320,6 +342,26 @@ export function createServer(
     // DELETE /drafts/:processId
     if (req.method === "DELETE" && parts.length === 2 && parts[0] === "drafts") {
       return toRes(await handleDeleteDraft(parts[1]!, req, resolver, db));
+    }
+    // POST /drafts/:processId/publish
+    if (req.method === "POST" && parts.length === 3 && parts[0] === "drafts" && parts[2] === "publish") {
+      return toRes(await handlePublishDraft(parts[1]!, req, resolver, registry, dataSourceRegistry, db));
+    }
+    // GET /processes/:processId/versions/:version/orphan-keys
+    if (req.method === "GET" && parts.length === 5 && parts[0] === "processes" && parts[2] === "versions" && parts[4] === "orphan-keys") {
+      return toRes(await handleGetOrphanKeys(parts[1]!, parts[3]!, req, resolver, db));
+    }
+    // GET /processes/:processId/versions/:version (body)
+    if (req.method === "GET" && parts.length === 4 && parts[0] === "processes" && parts[2] === "versions") {
+      return toRes(await handleGetVersionBody(parts[1]!, parts[3]!, req, resolver, db));
+    }
+    // GET /migration-plans/:processId/:fromVersion/:toVersion
+    if (req.method === "GET" && parts.length === 4 && parts[0] === "migration-plans") {
+      return toRes(await handleGetMigrationPlan(parts[1]!, parts[2]!, parts[3]!, req, resolver, db));
+    }
+    // PUT /migration-plans/:processId/:fromVersion/:toVersion
+    if (req.method === "PUT" && parts.length === 4 && parts[0] === "migration-plans") {
+      return toRes(await handlePutMigrationPlan(parts[1]!, parts[2]!, parts[3]!, req, resolver, db));
     }
 
     return toRes({ status: 404, body: { error: { type: "not-found", message: `no route: ${req.method} ${url.pathname}` } } });

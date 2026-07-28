@@ -1,12 +1,22 @@
 import { useCallback, useEffect, useState } from "react";
 
-export type Route = { name: "processes" } | { name: "edit"; processId: string } | { name: "login" };
+export type Route =
+  | { name: "processes" }
+  | { name: "edit"; processId: string }
+  | { name: "login" }
+  | { name: "versions"; processId: string }
+  | { name: "migrate"; processId: string; from: string; to: string };
 
 /** Pure — testable without a DOM. An unrecognized path falls back to the process list rather than a dead end. */
 export function matchRoute(path: string): Route {
   if (path === "/login") return { name: "login" };
   const editMatch = /^\/processes\/([^/]+)\/edit$/.exec(path);
   if (editMatch) return { name: "edit", processId: decodeURIComponent(editMatch[1]!) };
+  const versionsMatch = /^\/processes\/([^/]+)\/versions$/.exec(path);
+  if (versionsMatch) return { name: "versions", processId: decodeURIComponent(versionsMatch[1]!) };
+  const migrateMatch = /^\/processes\/([^/]+)\/migrate\/([^/]+)\/([^/]+)$/.exec(path);
+  if (migrateMatch)
+    return { name: "migrate", processId: decodeURIComponent(migrateMatch[1]!), from: migrateMatch[2]!, to: migrateMatch[3]! };
   return { name: "processes" };
 }
 
@@ -18,6 +28,10 @@ export function routePath(route: Route): string {
       return `/processes/${encodeURIComponent(route.processId)}/edit`;
     case "login":
       return "/login";
+    case "versions":
+      return `/processes/${encodeURIComponent(route.processId)}/versions`;
+    case "migrate":
+      return `/processes/${encodeURIComponent(route.processId)}/migrate/${route.from}/${route.to}`;
   }
 }
 

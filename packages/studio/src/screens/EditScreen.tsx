@@ -87,6 +87,9 @@ function EditorArea({ processId, token, initialRevision, initialLayout, navigate
       <button type="button" className="studio-back" onClick={() => navigate({ name: "processes" })}>
         ← Back to processes
       </button>
+      <button type="button" className="studio-back" onClick={() => navigate({ name: "versions", processId })}>
+        Versions
+      </button>
       <h1>{t("app.title")}</h1>
       {!validation.zodValid && <p className="draft-incomplete">{t("app.draftIncomplete")}</p>}
       <DraftToolbar

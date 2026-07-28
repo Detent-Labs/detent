@@ -155,3 +155,12 @@ export async function deleteDraft(processId: ProcessId, db: SQL = sql): Promise<
   const rows = (await db`DELETE FROM drafts WHERE process_id = ${processId} RETURNING process_id`) as unknown[];
   return rows.length > 0;
 }
+
+/**
+ * Stamps `base_version` after a successful publish. Not routed through
+ * `saveDraft` — it touches neither `body`, `layout`, nor `revision`, so it
+ * carries none of `saveDraft`'s revision-checked optimistic concurrency.
+ */
+export async function markDraftPublished(processId: ProcessId, version: number, db: SQL = sql): Promise<void> {
+  await db`UPDATE drafts SET base_version = ${version} WHERE process_id = ${processId}`;
+}

@@ -8,7 +8,7 @@ import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
-import { getDraft, saveDraft, listDrafts, deleteDraft, DraftConflictError } from "../src/engine/drafts.js";
+import { getDraft, saveDraft, listDrafts, deleteDraft, markDraftPublished, DraftConflictError } from "../src/engine/drafts.js";
 import { RequestShapeError } from "../src/errors.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 
@@ -146,6 +146,27 @@ test.skipIf(!DB)("deleteDraft leaves published versions intact", async () => {
 
 test.skipIf(!DB)("deleteDraft on an absent draft reports nothing removed", async () => {
   expect(await deleteDraft(pid(), sql)).toBe(false);
+});
+
+test.skipIf(!DB)("markDraftPublished stamps base_version without changing revision, body, or layout", async () => {
+  const processId = pid();
+  await saveDraft(processId, { body: invalidBody("v1"), layout: { step_a: { x: 1, y: 2 } }, revision: 0, updatedBy: "user_a" }, sql);
+  await saveDraft(processId, { body: invalidBody("v2"), layout: { step_a: { x: 1, y: 2 } }, revision: 0, updatedBy: "user_a" }, sql); // -> revision 1
+
+  await markDraftPublished(processId, 3, sql);
+
+  const stored = await getDraft(processId, sql);
+  expect(stored?.baseVersion).toBe(3);
+  expect(stored?.revision).toBe(1);
+  expect((stored?.body as { label: { en: string } }).label.en).toBe("v2");
+});
+
+test.skipIf(!DB)("a second markDraftPublished replaces the earlier base_version", async () => {
+  const processId = pid();
+  await saveDraft(processId, { body: invalidBody("v1"), layout: {}, revision: 0, updatedBy: "user_a" }, sql);
+  await markDraftPublished(processId, 1, sql);
+  await markDraftPublished(processId, 2, sql);
+  expect((await getDraft(processId, sql))?.baseVersion).toBe(2);
 });
 
 // ============================================================
