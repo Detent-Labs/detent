@@ -21,12 +21,23 @@ type DraftStep = DraftOf<Step>;
 
 interface Props {
   fields: DraftField[];
+  /** Controlled accordion selection (studio-canvas: canvas step/edge
+   * selection drives which step's row is expanded). Uncontrolled — internal
+   * `useState`, today's behavior — when `onSelectStep` is omitted. */
+  selectedStepId?: string;
+  onSelectStep?: (stepId: string | undefined) => void;
 }
 
-export function StepsPanel({ fields }: Props) {
+export function StepsPanel({ fields, selectedStepId, onSelectStep }: Props) {
   const { draft, mutate, validation, setChildForStep, contentLocale } = useDraft();
   const steps = draft.workflow?.steps ?? [];
-  const [expanded, setExpanded] = useState<string | undefined>(undefined);
+  const isControlled = onSelectStep !== undefined;
+  const [internalExpanded, setInternalExpanded] = useState<string | undefined>(undefined);
+  const expanded = isControlled ? selectedStepId : internalExpanded;
+  const setExpanded = (id: string | undefined) => {
+    if (isControlled) onSelectStep!(id);
+    else setInternalExpanded(id);
+  };
   const [childLoadError, setChildLoadError] = useState<string | null>(null);
 
   const loadChildFile = async (stepId: string | undefined, file: File | undefined) => {

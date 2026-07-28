@@ -1,6 +1,15 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "bun:test";
-import { processVersion, processBody, publishedProcessBody, instanceEvent, migrationSpec, MAX_TIMER_DURATION_MS, type ProcessBody } from "../src/schema/definition.js";
+import {
+  processVersion,
+  processBody,
+  publishedProcessBody,
+  instanceEvent,
+  migrationSpec,
+  MAX_TIMER_DURATION_MS,
+  checkPathTriggerConsistency,
+  type ProcessBody,
+} from "../src/schema/definition.js";
 import { compileProcessBody, validateDurations, DurationValidationError } from "../src/schema/compile.js";
 import { definitionHash } from "../src/schema/hash.js";
 
@@ -176,6 +185,72 @@ describe("definition-contract: subprocess step coupling and wait-state", () => {
       },
     };
     expect(processBody.safeParse(body).success).toBe(false);
+  });
+});
+
+describe("checkPathTriggerConsistency (shared by definition.ts and studio's canvas)", () => {
+  it("accepts an empty path list", () => {
+    expect(checkPathTriggerConsistency([]).ok).toBe(true);
+  });
+
+  it("accepts all-manual paths", () => {
+    const result = checkPathTriggerConsistency([{ trigger: "manual" }, { trigger: "manual" }]);
+    expect(result.ok).toBe(true);
+  });
+
+  it("accepts all-automatic guarded paths with unique priorities", () => {
+    const result = checkPathTriggerConsistency([
+      { trigger: "automatic", guard: { lang: "cel", src: "true" }, priority: 1 },
+      { trigger: "automatic", guard: { lang: "cel", src: "false" }, priority: 2 },
+    ]);
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects mixing manual and automatic triggers", () => {
+    const result = checkPathTriggerConsistency([{ trigger: "manual" }, { trigger: "automatic", priority: 1 }]);
+    expect(result.ok).toBe(false);
+    expect(result.reasons).toContain("a step's paths must be all-manual or all-automatic, not mixed");
+  });
+
+  it("rejects two or more automatic paths missing a priority", () => {
+    const result = checkPathTriggerConsistency([{ trigger: "automatic" }, { trigger: "automatic" }]);
+    expect(result.ok).toBe(false);
+    expect(result.reasons).toContain("automatic paths need a priority when a step has two or more");
+  });
+
+  it("rejects duplicate automatic priorities", () => {
+    const result = checkPathTriggerConsistency([
+      { trigger: "automatic", priority: 1 },
+      { trigger: "automatic", priority: 1 },
+    ]);
+    expect(result.ok).toBe(false);
+    expect(result.reasons).toContain("automatic path priorities must be unique");
+  });
+
+  it("rejects more than one guardless (default) automatic path", () => {
+    const result = checkPathTriggerConsistency([
+      { trigger: "automatic", priority: 1 },
+      { trigger: "automatic", priority: 2 },
+    ]);
+    expect(result.ok).toBe(false);
+    expect(result.reasons).toContain("at most one default (guardless) automatic path per step");
+  });
+
+  it("rejects a guardless default that isn't the highest priority", () => {
+    const result = checkPathTriggerConsistency([
+      { trigger: "automatic", guard: { lang: "cel", src: "true" }, priority: 2 },
+      { trigger: "automatic", priority: 1 },
+    ]);
+    expect(result.ok).toBe(false);
+    expect(result.reasons).toContain("the default (guardless) automatic path must have the highest priority");
+  });
+
+  it("accepts a guardless default holding the highest priority", () => {
+    const result = checkPathTriggerConsistency([
+      { trigger: "automatic", guard: { lang: "cel", src: "true" }, priority: 1 },
+      { trigger: "automatic", priority: 2 },
+    ]);
+    expect(result.ok).toBe(true);
   });
 });
 
