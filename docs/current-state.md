@@ -778,3 +778,47 @@ Stage-by-stage status is in `ROADMAP.md`.
   Publishing, canvas editing, the JSON surface, and migration planning are not
   part of this change; the existing editor's export path plus `POST
   /processes` remains the only publish path until change 4.
+- Process Studio — canvas (`packages/studio/src/canvas/`, `StepsPanel.tsx`,
+  `EditScreen.tsx`, `src/schema/definition.ts`, `studio-canvas`): stage 11's
+  second of five changes. `/processes/:id/edit` becomes canvas-primary: a
+  hand-rolled SVG canvas (`CanvasView.tsx`) replaces the stacked-panels-only
+  column, deliberately not Mermaid (display-only, no drag affordance) and not
+  a graph-editing library (the interaction surface — drag a node, drag from a
+  handle — is small and fixed, and the domain graph has no parallelism to
+  support). `StepsPanel` is mounted unconditionally as a fixed-width inspector
+  beside the canvas — its `expanded` accordion state, previously internal
+  `useState`, is now an optional controlled prop (`selectedStepId`/
+  `onSelectStep`, uncontrolled when `onSelectStep` is omitted) so canvas
+  selection can drive it without ever hiding the panel's own list or
+  "+ Add step" action; selecting a path edge resolves to its *source* step
+  and expands that step's row (no standalone `PathsPanel` mount — it is
+  already nested there). `src/schema/definition.ts` gained
+  `checkPathTriggerConsistency`, extracted from the step `superRefine`'s
+  inline all-manual-or-all-automatic / unique-automatic-priority check (same
+  behavior, same messages, one implementation now instead of duplicated
+  logic) — the canvas's `canvas/connection.ts` wraps it to reject an
+  inconsistent drag-to-connect inline, before a path is ever created, using
+  the same rule the engine enforces at publish. Node position writes to
+  `EditorArea`'s `saveState.layout` via a new `onMoveStep` callback — not
+  `useDraft()`/`mutate()`, since layout was never part of the Draft model's
+  body-mutation surface, it round-trips through `DraftToolbar`'s save call as
+  its own state; a created path, by contrast, is a real schema entity and
+  writes through `mutate()`/`updateInDraftArray`, the same call
+  `PathsPanel`'s "add path" action makes. `canvas/layout.ts::autoPlaceSteps`
+  gives a step absent from `layout` a deterministic position via a one-time
+  client-side BFS-depth-from-`initialStep` traversal (depth → column, order →
+  row) — rendered only, never written back until the step is actually
+  dragged, so an unrelated save doesn't invent layout rows. `@panzoom/panzoom`
+  (already a dependency of `packages/editor`'s read-only graph view) drives
+  pan/zoom and a "fit to view" control; every node and edge `<g>` carries
+  Panzoom's own `panzoom-exclude` class — found live during implementation
+  (a real browser check via `playwright-cli`, not just `bun:test`, which
+  can't see DOM event ordering): without it, Panzoom's native down-handler,
+  bound directly to the SVG element, wins the race against React's synthetic
+  dispatch and silently turns every node drag and drag-to-connect into a
+  canvas pan instead. `canvas/geometry.ts` (hit-testing, drag-delta) and
+  `canvas/connection.ts` are pure and unit-tested alongside `layout.ts`; the
+  SVG/React rendering and pointer wiring itself is not, per this repo's
+  existing convention (`packages/app/src/screens/inboxLogic.ts`). The canvas
+  introduces no operation the panels can't already do — deletion and every
+  field edit remain panel-only.

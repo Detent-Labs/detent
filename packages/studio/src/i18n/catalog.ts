@@ -117,6 +117,10 @@ const en = {
 
   "issues.notChecked": "not checked",
 
+  "canvas.fitToView": "Fit to view",
+  "canvas.elseMarker": "else",
+  "canvas.inspectorEmpty": "Select a step or a path to edit it.",
+
   "expression.placeholder": "CEL expression",
   "plugin.typePlaceholder": "plugin type identifier",
 } as const;

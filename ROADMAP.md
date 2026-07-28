@@ -308,10 +308,40 @@
     `packages/studio` — login/session/shell mirroring `packages/admin`, the
     editor's `draft/`/`panels/`/`i18n/`/`registry/` carried over with
     file-persistence replaced by the draft routes, and a process list merging
-    `GET /processes` with `GET /drafts`. Canvas, the JSON surface, publish/
-    versions/migration planning, and tools/Player remain NOT STARTED
-    (`packages/editor` stays untouched and functional until the last of
-    those lands).
+    `GET /processes` with `GET /drafts`. The JSON surface, publish/versions/
+    migration planning, and tools/Player remain NOT STARTED (`packages/editor`
+    stays untouched and functional until the last of those lands).
+
+    **Process Studio — canvas: DONE** (`studio-canvas`). `/processes/:id/edit`
+    is now canvas-primary: a hand-rolled SVG canvas (deliberately not Mermaid,
+    which is display-only, and not a graph-editing library — the interaction
+    surface is small and the domain graph deliberately simple, no parallelism)
+    replaces the stacked-panels-only column, with `StepsPanel` mounted
+    unconditionally as a fixed-width inspector beside it (its own list and
+    "+ Add step" stay reachable with nothing selected — canvas selection only
+    drives which step's accordion `StepsPanel` expands, an edge selection
+    resolving to its source step since a path isn't independently
+    addressable). Steps are dragged to reposition and connected by dragging
+    from a per-node handle; a new `checkPathTriggerConsistency` function
+    extracted from `src/schema/definition.ts`'s step `superRefine` (one rule,
+    two call sites) gives the canvas the same all-manual-or-all-automatic /
+    priority check the engine already enforces, rejecting an inconsistent
+    drag-to-connect inline instead of silently creating an invalid path.
+    Position writes to `EditorArea`'s `saveState.layout` — never the Draft
+    model's `mutate()`, since layout was never body — while a created path
+    writes through `mutate()` the same way `PathsPanel`'s own "add path"
+    action does. A step absent from `layout` is auto-placed by a one-time,
+    client-side BFS-depth-from-`initialStep` traversal, rendered but never
+    persisted until actually dragged. `@panzoom/panzoom` (already used by
+    `packages/editor`'s read-only graph view) drives pan/zoom; every node and
+    edge group carries Panzoom's own `panzoom-exclude` class; a live-browser
+    check during implementation found that without it, Panzoom's native
+    down-handler wins a race against React's synthetic events and silently
+    turns every drag into a pan. Pure logic (`canvas/layout.ts`,
+    `canvas/geometry.ts`, `canvas/connection.ts`) is unit-tested; SVG
+    rendering/pointer wiring is not, per the repo's existing convention.
+    Deletion and every field edit remain panel-only — the canvas adds no
+    authoring operation the panels couldn't already do.
 12. Unified shell (consolidate app/admin/studio): NOT STARTED, deliberately
     deferred — no urgency, raised 2026-07-28 as a "someday" question, not a
     committed stage. Today `packages/app`, `packages/admin`, and

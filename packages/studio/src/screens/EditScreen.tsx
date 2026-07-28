@@ -16,6 +16,8 @@ import { getDraft, StudioClientError } from "../api/client.js";
 import type { DraftRecord } from "../api/types.js";
 import type { Route } from "../routing.js";
 import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
+import { CanvasView } from "../canvas/CanvasView.js";
+import type { Point } from "../canvas/geometry.js";
 
 interface EditScreenProps {
   processId: string;
@@ -70,10 +72,18 @@ interface EditorAreaProps {
 function EditorArea({ processId, token, initialRevision, initialLayout, navigate, onUnauthorized }: EditorAreaProps) {
   const { draft, validation } = useDraft();
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
+  const [selectedStepId, setSelectedStepId] = useState<string | undefined>(undefined);
   const fields = draftFields(draft);
 
+  // Position is not body — it lives in `saveState.layout` (round-tripped
+  // opaquely by DraftToolbar's save call already), never in the Draft
+  // model's `mutate()` (design.md: the two are separate existing surfaces).
+  const onMoveStep = (stepId: string, point: Point) => {
+    setSaveState((s) => ({ ...s, layout: { ...s.layout, [stepId]: point } }));
+  };
+
   return (
-    <main className="studio-screen">
+    <main className="studio-screen studio-edit-screen">
       <button type="button" className="studio-back" onClick={() => navigate({ name: "processes" })}>
         ← Back to processes
       </button>
@@ -92,8 +102,13 @@ function EditorArea({ processId, token, initialRevision, initialLayout, navigate
       <RegistryPanel />
       <FieldCatalogPanel />
       <DataSourcesPanel />
-      <StepsPanel fields={fields} />
       <ContractPanel />
+      <div className="canvas-layout">
+        <CanvasView layout={saveState.layout} onMoveStep={onMoveStep} selectedStepId={selectedStepId} onSelectStep={setSelectedStepId} />
+        <aside className="canvas-inspector">
+          <StepsPanel fields={fields} selectedStepId={selectedStepId} onSelectStep={setSelectedStepId} />
+        </aside>
+      </div>
     </main>
   );
 }

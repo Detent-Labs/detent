@@ -420,6 +420,55 @@ export type SubprocessSpec = z.infer<typeof subprocessSpec>;
 // Step. Local invariants (self-contained) live here as a superRefine.
 // ============================================================
 
+export interface PathTriggerCheckResult {
+  ok: boolean;
+  reasons: string[];
+}
+
+/** Structural, not `Pick<Path, ...>`: only `guard`'s presence/absence is
+ * ever inspected here, never its shape, so this stays satisfied by both a
+ * real `Path` and `packages/studio`'s Draft-shaped (all-optional) paths
+ * without either side needing a cast. */
+export interface PathTriggerCandidate {
+  trigger: PathTrigger;
+  guard?: unknown;
+  priority?: number;
+}
+
+/**
+ * A step's paths must be all-manual or all-automatic, never mixed; among
+ * automatic paths, priority is required and unique when there are two or
+ * more, at most one may be guardless (the default), and a default must hold
+ * the highest priority. Shared by the step `superRefine` below and by
+ * `packages/studio`'s canvas, which checks a would-be path against a step's
+ * existing paths before creating it (see `studio-canvas`).
+ */
+export function checkPathTriggerConsistency(paths: PathTriggerCandidate[]): PathTriggerCheckResult {
+  const reasons: string[] = [];
+
+  const triggers = new Set(paths.map((p) => p.trigger));
+  if (triggers.has("manual") && triggers.has("automatic"))
+    reasons.push("a step's paths must be all-manual or all-automatic, not mixed");
+
+  const autos = paths.filter((p) => p.trigger === "automatic");
+  const guarded = autos.filter((p) => p.guard !== undefined);
+  const guardless = autos.filter((p) => p.guard === undefined);
+
+  if (autos.length >= 2) {
+    const prios = autos.map((p) => p.priority);
+    if (prios.some((x) => x === undefined)) reasons.push("automatic paths need a priority when a step has two or more");
+    else if (new Set(prios).size !== prios.length) reasons.push("automatic path priorities must be unique");
+  }
+  if (guardless.length > 1) reasons.push("at most one default (guardless) automatic path per step");
+  if (guardless.length === 1 && guarded.length > 0) {
+    const gd = guardless[0].priority;
+    const maxGuarded = Math.max(...guarded.map((p) => p.priority ?? -Infinity));
+    if (gd === undefined || gd <= maxGuarded) reasons.push("the default (guardless) automatic path must have the highest priority");
+  }
+
+  return { ok: reasons.length === 0, reasons };
+}
+
 export const step = z
   .object({
     id: stepId,
@@ -458,25 +507,7 @@ export const step = z
     if (s.type === "subprocess" && paths.some((p) => p.trigger === "manual"))
       add("a subprocess step is a wait-state: its paths must be all-automatic");
 
-    const triggers = new Set(paths.map((p) => p.trigger));
-    if (triggers.has("manual") && triggers.has("automatic"))
-      add("a step's paths must be all-manual or all-automatic, not mixed");
-
-    const autos = paths.filter((p) => p.trigger === "automatic");
-    const guarded = autos.filter((p) => p.guard !== undefined);
-    const guardless = autos.filter((p) => p.guard === undefined);
-
-    if (autos.length >= 2) {
-      const prios = autos.map((p) => p.priority);
-      if (prios.some((x) => x === undefined)) add("automatic paths need a priority when a step has two or more");
-      else if (new Set(prios).size !== prios.length) add("automatic path priorities must be unique");
-    }
-    if (guardless.length > 1) add("at most one default (guardless) automatic path per step");
-    if (guardless.length === 1 && guarded.length > 0) {
-      const gd = guardless[0].priority;
-      const maxGuarded = Math.max(...guarded.map((p) => p.priority ?? -Infinity));
-      if (gd === undefined || gd <= maxGuarded) add("the default (guardless) automatic path must have the highest priority");
-    }
+    checkPathTriggerConsistency(paths).reasons.forEach((reason) => add(reason));
   });
 export type Step = z.infer<typeof step>;
 
