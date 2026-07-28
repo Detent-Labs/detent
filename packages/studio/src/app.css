@@ -220,6 +220,21 @@ h2 {
   color: var(--color-danger);
 }
 
+.studio-json-error {
+  white-space: pre-line;
+}
+
+.studio-surface-toggle {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.studio-surface-toggle button[aria-selected="true"] {
+  font-weight: 600;
+  text-decoration: underline;
+}
+
 .studio-conflict {
   border: 1px solid var(--color-danger);
   border-radius: 4px;

@@ -119,6 +119,12 @@ const en = {
   "registry.notLoadedOption": "not loaded",
   "registry.exampleOption": "example registry (http.call, notify.email)",
 
+  "edit.structureTab": "Structure",
+  "edit.jsonTab": "JSON",
+
+  "jsonView.label": "Draft body (JSON)",
+  "jsonView.apply": "Apply",
+
   "issues.notChecked": "not checked",
 
   "canvas.fitToView": "Fit to view",

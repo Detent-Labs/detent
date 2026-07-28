@@ -18,6 +18,7 @@ import type { Route } from "../routing.js";
 import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
 import { CanvasView } from "../canvas/CanvasView.js";
 import type { Point } from "../canvas/geometry.js";
+import { JsonView } from "../panels/JsonView.js";
 
 interface EditScreenProps {
   processId: string;
@@ -70,9 +71,10 @@ interface EditorAreaProps {
 
 /** Rendered inside DraftProvider, so it — and DraftToolbar, its child — can read/replace the Draft via useDraft(). */
 function EditorArea({ processId, token, initialRevision, initialLayout, navigate, onUnauthorized }: EditorAreaProps) {
-  const { draft, validation } = useDraft();
+  const { draft, validation, replace } = useDraft();
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
   const [selectedStepId, setSelectedStepId] = useState<string | undefined>(undefined);
+  const [surface, setSurface] = useState<"structure" | "json">("structure");
   const fields = draftFields(draft);
 
   // Position is not body — it lives in `saveState.layout` (round-tripped
@@ -101,17 +103,31 @@ function EditorArea({ processId, token, initialRevision, initialLayout, navigate
         onUnauthorized={onUnauthorized}
       />
       <ContentLocaleSwitcher />
-      <ProcessHeader />
       <RegistryPanel />
-      <FieldCatalogPanel />
-      <DataSourcesPanel />
-      <ContractPanel />
-      <div className="canvas-layout">
-        <CanvasView layout={saveState.layout} onMoveStep={onMoveStep} selectedStepId={selectedStepId} onSelectStep={setSelectedStepId} />
-        <aside className="canvas-inspector">
-          <StepsPanel fields={fields} selectedStepId={selectedStepId} onSelectStep={setSelectedStepId} />
-        </aside>
+      <div className="studio-surface-toggle" role="tablist">
+        <button type="button" role="tab" aria-selected={surface === "structure"} onClick={() => setSurface("structure")}>
+          {t("edit.structureTab")}
+        </button>
+        <button type="button" role="tab" aria-selected={surface === "json"} onClick={() => setSurface("json")}>
+          {t("edit.jsonTab")}
+        </button>
       </div>
+      {surface === "structure" ? (
+        <>
+          <ProcessHeader />
+          <FieldCatalogPanel />
+          <DataSourcesPanel />
+          <ContractPanel />
+          <div className="canvas-layout">
+            <CanvasView layout={saveState.layout} onMoveStep={onMoveStep} selectedStepId={selectedStepId} onSelectStep={setSelectedStepId} />
+            <aside className="canvas-inspector">
+              <StepsPanel fields={fields} selectedStepId={selectedStepId} onSelectStep={setSelectedStepId} />
+            </aside>
+          </div>
+        </>
+      ) : (
+        <JsonView draft={draft} onApply={replace} />
+      )}
     </main>
   );
 }
