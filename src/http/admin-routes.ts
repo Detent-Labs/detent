@@ -1,13 +1,15 @@
 /**
  * Operator-facing routes behind `system:admin`: outbox listing/counts, the two
- * dead-letter repairs, and pending timers. Kept out of `routes.ts`, which
- * stays the participant-facing surface. Same framework-agnostic handler shape
- * and `guarded` wrapper as `routes.ts`; each handler resolves the actor then
- * requires `ADMIN_ROLE` before any read or write.
+ * dead-letter repairs, pending timers, and listing/disabling/enabling local
+ * users. Kept out of `routes.ts`, which stays the participant-facing surface.
+ * Same framework-agnostic handler shape and `guarded` wrapper as `routes.ts`;
+ * each handler resolves the actor then requires `ADMIN_ROLE` before any read
+ * or write.
  */
 import type { SQL } from "bun";
 import { sql } from "../engine/store.js";
 import { listOutbox, countOutboxByStatus, listPendingTimers, requeueOutboxRow, discardOutboxRow, getOutboxRow, type OutboxListFilter } from "../engine/admin-queries.js";
+import { listUsers, setDisabled } from "../auth/users.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, ADMIN_ROLE } from "../auth/authorize.js";
@@ -96,4 +98,31 @@ export async function handleAdminListTimers(req: Request, resolver: ActorResolve
     const page = await listPendingTimers({ limit, cursor }, db);
     return { status: 200, body: page };
   });
+}
+
+export async function handleAdminListUsers(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(async () => {
+    const actor = await resolveActor(req, resolver);
+    requireRole(actor, ADMIN_ROLE);
+    const users = await listUsers(db);
+    return { status: 200, body: { items: users } };
+  });
+}
+
+async function handleSetUserDisabled(userId: string, disabled: boolean, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return guarded(async () => {
+    const actor = await resolveActor(req, resolver);
+    requireRole(actor, ADMIN_ROLE);
+    const updated = await setDisabled(userId, disabled, db);
+    if (!updated) return { status: 404, body: { error: { type: "not-found", message: `no user: ${userId}` } } };
+    return { status: 200, body: updated };
+  });
+}
+
+export async function handleAdminDisableUser(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return handleSetUserDisabled(userId, true, req, resolver, db);
+}
+
+export async function handleAdminEnableUser(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return handleSetUserDisabled(userId, false, req, resolver, db);
 }

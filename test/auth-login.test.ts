@@ -5,12 +5,13 @@
  * verifies a hand-signed token in isolation (see test/auth-jwt.test.ts).
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
+import { SignJWT } from "jose";
 import { sql, initSchema } from "../src/engine/store.js";
 import { createUser } from "../src/auth/users.js";
-import { jwtResolver } from "../src/auth/jwt.js";
+import { jwtResolver, LOCAL_ISSUER } from "../src/auth/jwt.js";
 import { handleLogin, checkAndRecordAttempt, MAX_ATTEMPTS, WINDOW_MS, MAX_TRACKED_EMAILS } from "../src/auth/login.js";
 import { createServer } from "../src/http/server.js";
-import { PUBLISH_ROLE } from "../src/auth/authorize.js";
+import { PUBLISH_ROLE, ADMIN_ROLE } from "../src/auth/authorize.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import type { ProcessBody } from "../src/schema/definition.js";
 
@@ -92,6 +93,38 @@ test.skipIf(!DB)("the returned token authenticates a subsequent request", async 
   const created = (await createRes.json()) as { instanceId: string };
   const viewRes = await fetch(new Request(`http://x/instances/${created.instanceId}`, { headers: { Authorization: `Bearer ${token}` } }));
   expect(viewRes.status).toBe(200);
+});
+
+test.skipIf(!DB)("a token issued before the user is disabled via the admin route still authenticates until it expires", async () => {
+  const { userId } = await createUser("login-disable@example.com", "correct-horse", ["employee"]);
+  const loginResult = await handleLogin(loginRequest("login-disable@example.com", "correct-horse"), SECRET);
+  const { token } = loginResult.body as { token: string };
+
+  const reg = createRegistry();
+  const dataSourceReg = createDataSourceRegistry();
+  const resolver = jwtResolver({ localSecret: SECRET });
+  const fetch = createServer(dataSourceReg, reg, sql, resolver);
+
+  const adminToken = await new SignJWT({ roles: [ADMIN_ROLE] })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuer(LOCAL_ISSUER)
+    .setSubject("user_admin_for_this_test")
+    .setExpirationTime("8h")
+    .sign(new TextEncoder().encode(SECRET));
+
+  const disableRes = await fetch(
+    new Request(`http://x/admin/users/${userId}/disable`, { method: "POST", headers: { Authorization: `Bearer ${adminToken}` } }),
+  );
+  expect(disableRes.status).toBe(200);
+
+  // the pre-disable token is unaffected: jwtResolver verifies signature/exp only, no per-request DB lookup
+  // (scope=mine, since this actor holds no system:admin role and the default scope=all requires it)
+  const viewRes = await fetch(new Request("http://x/instances?scope=mine", { headers: { Authorization: `Bearer ${token}` } }));
+  expect(viewRes.status).toBe(200);
+
+  // but a fresh login attempt for the now-disabled user fails
+  const reLogin = await handleLogin(loginRequest("login-disable@example.com", "correct-horse"), SECRET);
+  expect(reLogin.status).toBe(401);
 });
 
 test.skipIf(!DB)("wrong password and unknown email return an identical generic 401", async () => {

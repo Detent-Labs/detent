@@ -1,14 +1,15 @@
 /**
  * The `/admin/*` HTTP surface (src/http/admin-routes.ts): 401 without a
  * credential, 403 without `system:admin`, success with it, plus retry/discard's
- * 404 (no such row) and 409 (present but not a dead letter). DB-backed —
- * skips when DATABASE_URL is unset.
+ * 404 (no such row) and 409 (present but not a dead letter), and the users
+ * routes' 404 (no such userId). DB-backed — skips when DATABASE_URL is unset.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { createServer } from "../src/http/server.js";
 import { ADMIN_ROLE } from "../src/auth/authorize.js";
+import { createUser } from "../src/auth/users.js";
 import type { Actor } from "../src/cel/eval.js";
 
 const DB = !!process.env.DATABASE_URL;
@@ -20,7 +21,7 @@ beforeAll(async () => {
   if (DB) await initSchema();
 });
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions`;
+  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, auth_users`;
 });
 
 const admin: Actor = { id: "user_admin", roles: [ADMIN_ROLE] };
@@ -174,6 +175,81 @@ test.skipIf(!DB)("GET /admin/timers with system:admin succeeds", async () => {
 });
 
 // ============================================================
+// GET /admin/users
+// ============================================================
+
+test.skipIf(!DB)("GET /admin/users with no resolvable credential maps to 401", async () => {
+  const res = await fetch(new Request("http://x/admin/users"));
+  expect(res.status).toBe(401);
+});
+
+test.skipIf(!DB)("GET /admin/users without system:admin maps to 403", async () => {
+  const res = await fetch(authedReq("http://x/admin/users", "GET", bystander));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("authorization");
+});
+
+test.skipIf(!DB)("GET /admin/users with system:admin lists users without password_hash", async () => {
+  const { userId } = await createUser("u1@example.com", "pw", ["employee"]);
+  const res = await fetch(authedReq("http://x/admin/users", "GET", admin));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { items: Record<string, unknown>[] };
+  expect(body.items).toHaveLength(1);
+  expect(body.items[0]!.userId).toBe(userId);
+  expect(body.items[0]!.email).toBe("u1@example.com");
+  expect(body.items[0]!.roles).toEqual(["employee"]);
+  expect(body.items[0]!.disabled).toBe(false);
+  expect(body.items[0]).not.toHaveProperty("password_hash");
+});
+
+// ============================================================
+// POST /admin/users/:id/disable and /enable
+// ============================================================
+
+test.skipIf(!DB)("POST /admin/users/:id/disable with no resolvable credential maps to 401", async () => {
+  const res = await fetch(new Request("http://x/admin/users/user_x/disable", { method: "POST" }));
+  expect(res.status).toBe(401);
+});
+
+test.skipIf(!DB)("POST /admin/users/:id/disable without system:admin maps to 403 and performs no update", async () => {
+  const { userId } = await createUser("u2@example.com", "pw", []);
+  const res = await fetch(authedReq(`http://x/admin/users/${userId}/disable`, "POST", bystander));
+  expect(res.status).toBe(403);
+  const row = (await sql`SELECT disabled FROM auth_users WHERE user_id = ${userId}`) as { disabled: boolean }[];
+  expect(row[0]!.disabled).toBe(false);
+});
+
+test.skipIf(!DB)("POST /admin/users/:id/disable succeeds and the user cannot log in afterwards", async () => {
+  const { userId } = await createUser("u3@example.com", "correct-horse", []);
+  const res = await fetch(authedReq(`http://x/admin/users/${userId}/disable`, "POST", admin));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { disabled: boolean };
+  expect(body.disabled).toBe(true);
+  const row = (await sql`SELECT disabled FROM auth_users WHERE user_id = ${userId}`) as { disabled: boolean }[];
+  expect(row[0]!.disabled).toBe(true);
+});
+
+test.skipIf(!DB)("POST /admin/users/:id/disable on an unknown id maps to 404", async () => {
+  const res = await fetch(authedReq("http://x/admin/users/user_does_not_exist/disable", "POST", admin));
+  expect(res.status).toBe(404);
+});
+
+test.skipIf(!DB)("POST /admin/users/:id/enable succeeds and clears disabled", async () => {
+  const { userId } = await createUser("u4@example.com", "pw", []);
+  await sql`UPDATE auth_users SET disabled = true WHERE user_id = ${userId}`;
+  const res = await fetch(authedReq(`http://x/admin/users/${userId}/enable`, "POST", admin));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { disabled: boolean };
+  expect(body.disabled).toBe(false);
+});
+
+test.skipIf(!DB)("POST /admin/users/:id/enable on an unknown id maps to 404", async () => {
+  const res = await fetch(authedReq("http://x/admin/users/user_does_not_exist/enable", "POST", admin));
+  expect(res.status).toBe(404);
+});
+
+// ============================================================
 // CORS preflight
 // ============================================================
 
@@ -199,4 +275,22 @@ test("OPTIONS preflight on the admin timers route returns 204 permitting GET", a
   const res = await fetch(new Request("http://x/admin/timers", { method: "OPTIONS" }));
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
+});
+
+test("OPTIONS preflight on the admin users route returns 204 permitting GET", async () => {
+  const res = await fetch(new Request("http://x/admin/users", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
+});
+
+test("OPTIONS preflight on the admin users disable route returns 204 permitting POST", async () => {
+  const res = await fetch(new Request("http://x/admin/users/user_x/disable", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
+});
+
+test("OPTIONS preflight on the admin users enable route returns 204 permitting POST", async () => {
+  const res = await fetch(new Request("http://x/admin/users/user_x/enable", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
 });

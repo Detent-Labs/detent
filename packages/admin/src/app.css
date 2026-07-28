@@ -270,7 +270,8 @@ h2 {
 }
 
 .admin-badge-completed,
-.admin-badge-delivered {
+.admin-badge-delivered,
+.admin-badge-enabled {
   color: var(--color-success);
 }
 
@@ -281,7 +282,8 @@ h2 {
 
 .admin-badge-faulted,
 .admin-badge-dead-letter,
-.admin-badge-overdue {
+.admin-badge-overdue,
+.admin-badge-disabled {
   color: var(--color-danger);
 }
 

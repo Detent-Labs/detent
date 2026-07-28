@@ -5,15 +5,17 @@
 The operator-facing frontend, `packages/admin`: a workspace package mirroring
 `packages/app`'s shape (React 18, Vite 6, own build/typecheck, a hand-written
 History-API routing hook, `session.ts` for the JWT), reusing the existing
-login mechanism, with a role-aware shell and the Operations screens
+login mechanism, with a role-aware shell, the Operations screens
 (all-instances list, instance detail with the merged record and cancel,
-outbox with dead-letter retry/discard, pending timers) — reaching the engine
-exclusively through the HTTP wrapper, never a direct database read or an
-imported engine runtime module. It renders records and system state, never
-step forms, so it does not depend on `form-ui`. See the `admin-operations-api`
-capability for the server-side reads/routes this frontend calls, and the
-`authorization` capability for the `system:admin` role its shell checks
-(presentationally) and every `/admin/*` route enforces (authoritatively).
+outbox with dead-letter retry/discard, pending timers), and a Users screen
+(list + disable/enable) — reaching the engine exclusively through the HTTP
+wrapper, never a direct database read or an imported engine runtime module.
+It renders records and system state, never step forms, so it does not depend
+on `form-ui`. See the `admin-operations-api` capability for the operations
+server-side reads/routes and `admin-user-management` for the users routes
+this frontend calls, and the `authorization` capability for the
+`system:admin` role its shell checks (presentationally) and every `/admin/*`
+route enforces (authoritatively).
 
 ## Requirements
 
@@ -182,6 +184,46 @@ classification SHALL live in a tested pure module, not inline in the component.
 
 - **WHEN** a listed timer's fire time is in the past
 - **THEN** it is rendered as overdue
+
+### Requirement: A Users screen lists accounts and toggles disable/enable
+
+The `/users` screen SHALL list every local user via `GET /admin/users`,
+showing email, roles, and disabled state, and SHALL offer a disable/enable
+toggle per row calling the corresponding `POST /admin/users/:id/disable` or
+`POST /admin/users/:id/enable` route. It SHALL NOT offer creating a user,
+changing a password, or editing roles — those remain CLI-only
+(`local-user-accounts`).
+
+The disable action SHALL be presented with a confirmation stating that it
+blocks the user's *next* login but does not end an already-active session
+(that token remains valid until it expires, per `admin-user-management`), so
+an operator does not mistake this for immediate revocation.
+
+The screen SHALL follow the same refresh convention as Operations/Outbox/
+Timers: an explicit refresh control and a refetch on window focus, no
+polling.
+
+#### Scenario: Listing users
+
+- **WHEN** the operator opens the Users screen
+- **THEN** every local user is shown with email, roles, and disabled state
+
+#### Scenario: Disabling a user from the screen
+
+- **WHEN** the operator confirms disabling an enabled user
+- **THEN** `POST /admin/users/:id/disable` is called and the row shows
+  disabled after the refresh
+
+#### Scenario: The disable confirmation names the session caveat
+
+- **WHEN** the operator triggers the disable action
+- **THEN** the confirmation states that an already-active session is not
+  immediately ended
+
+#### Scenario: No create, password, or role controls
+
+- **WHEN** the Users screen is inspected for write actions
+- **THEN** only the disable/enable toggle is offered
 
 ### Requirement: Data is refreshed on demand, not pushed
 

@@ -8,6 +8,8 @@ import type {
   OutboxRow,
   PendingTimerPage,
   ProcessSummary,
+  UserPage,
+  UserSummary,
   VersionSummary,
 } from "./types.js";
 
@@ -155,4 +157,19 @@ export async function listPendingTimers(token: string, opts: { limit?: number; c
   if (opts.cursor !== undefined) query.set("cursor", opts.cursor);
   const res = await request(`/admin/timers?${query}`, token);
   return (await res.json()) as PendingTimerPage;
+}
+
+export async function listUsers(token: string): Promise<UserPage> {
+  const res = await request("/admin/users", token);
+  return (await res.json()) as UserPage;
+}
+
+export async function disableUser(userId: string, token: string): Promise<UserSummary> {
+  const res = await request(`/admin/users/${encodeURIComponent(userId)}/disable`, token, { method: "POST" });
+  return (await res.json()) as UserSummary;
+}
+
+export async function enableUser(userId: string, token: string): Promise<UserSummary> {
+  const res = await request(`/admin/users/${encodeURIComponent(userId)}/enable`, token, { method: "POST" });
+  return (await res.json()) as UserSummary;
 }
