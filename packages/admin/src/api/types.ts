@@ -106,6 +106,18 @@ export interface PendingTimerPage {
   cursor?: string;
 }
 
+/** Mirrors src/auth/users.ts::UserSummary — never password_hash. */
+export interface UserSummary {
+  userId: string;
+  email: string;
+  roles: string[];
+  disabled: boolean;
+}
+
+export interface UserPage {
+  items: UserSummary[];
+}
+
 export type ClientError =
   | { type: "authorization"; message: string }
   | { type: "actor-resolution"; message: string }

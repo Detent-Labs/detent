@@ -1,11 +1,11 @@
 /**
  * `auth_users` schema (ensureSchema/initSchema) + `src/auth/users.ts`
- * (createUser/verifyLogin/setRoles/setPassword). DB-backed, skips when
- * DATABASE_URL is unset.
+ * (createUser/verifyLogin/setRoles/setPassword/listUsers/setDisabled).
+ * DB-backed, skips when DATABASE_URL is unset.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
-import { createUser, verifyLogin, setRoles, setPassword } from "../src/auth/users.js";
+import { createUser, verifyLogin, setRoles, setPassword, listUsers, setDisabled } from "../src/auth/users.js";
 
 const DB = !!process.env.DATABASE_URL;
 
@@ -69,4 +69,32 @@ test.skipIf(!DB)("setPassword changes the password that verifies", async () => {
   await setPassword("g@example.com", "new-pw");
   expect(await verifyLogin("g@example.com", "old-pw")).toBeUndefined();
   expect(await verifyLogin("g@example.com", "new-pw")).toBeDefined();
+});
+
+test.skipIf(!DB)("listUsers returns every user without password_hash", async () => {
+  await createUser("h1@example.com", "pw", ["employee"]);
+  await createUser("h2@example.com", "pw", []);
+  const users = await listUsers();
+  expect(users.map((u) => u.email).sort()).toEqual(["h1@example.com", "h2@example.com"]);
+  const h1 = users.find((u) => u.email === "h1@example.com")!;
+  expect(h1.roles).toEqual(["employee"]);
+  expect(h1.disabled).toBe(false);
+  expect(h1).not.toHaveProperty("password_hash");
+});
+
+test.skipIf(!DB)("setDisabled flips the flag and returns the updated row, or undefined for an unknown userId", async () => {
+  const { userId } = await createUser("i@example.com", "pw", ["employee"]);
+  const updated = await setDisabled(userId, true);
+  expect(updated).toEqual({ userId, email: "i@example.com", roles: ["employee"], disabled: true });
+  const [after] = await listUsers();
+  expect(after!.disabled).toBe(true);
+  expect(await setDisabled("user_does_not_exist", true)).toBeUndefined();
+});
+
+test.skipIf(!DB)("a user disabled via setDisabled fails verifyLogin exactly like one disabled directly in the DB", async () => {
+  const { userId } = await createUser("j@example.com", "correct-horse", []);
+  await setDisabled(userId, true);
+  expect(await verifyLogin("j@example.com", "correct-horse")).toBeUndefined();
+  await setDisabled(userId, false);
+  expect(await verifyLogin("j@example.com", "correct-horse")).toBeDefined();
 });

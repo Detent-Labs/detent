@@ -25,7 +25,15 @@ import {
   handleListProcesses,
   handleListVersions,
 } from "./routes.js";
-import { handleAdminListOutbox, handleAdminOutboxRetry, handleAdminOutboxDiscard, handleAdminListTimers } from "./admin-routes.js";
+import {
+  handleAdminListOutbox,
+  handleAdminOutboxRetry,
+  handleAdminOutboxDiscard,
+  handleAdminListTimers,
+  handleAdminListUsers,
+  handleAdminDisableUser,
+  handleAdminEnableUser,
+} from "./admin-routes.js";
 import { handleListDrafts, handleGetDraft, handleSaveDraft, handleDeleteDraft } from "./studio-routes.js";
 import type { HttpResult } from "./errors.js";
 
@@ -205,6 +213,15 @@ export function createServer(
     if (req.method === "OPTIONS" && parts.length === 2 && parts[0] === "admin" && parts[1] === "timers") {
       return preflight("GET");
     }
+    if (req.method === "OPTIONS" && parts.length === 2 && parts[0] === "admin" && parts[1] === "users") {
+      return preflight("GET");
+    }
+    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "admin" && parts[1] === "users" && parts[3] === "disable") {
+      return preflight("POST");
+    }
+    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "admin" && parts[1] === "users" && parts[3] === "enable") {
+      return preflight("POST");
+    }
     if (req.method === "OPTIONS" && parts.length === 1 && parts[0] === "drafts") {
       return preflight("GET");
     }
@@ -275,6 +292,18 @@ export function createServer(
     // GET /admin/timers
     if (req.method === "GET" && parts.length === 2 && parts[0] === "admin" && parts[1] === "timers") {
       return toRes(await handleAdminListTimers(req, resolver, db));
+    }
+    // GET /admin/users
+    if (req.method === "GET" && parts.length === 2 && parts[0] === "admin" && parts[1] === "users") {
+      return toRes(await handleAdminListUsers(req, resolver, db));
+    }
+    // POST /admin/users/:id/disable
+    if (req.method === "POST" && parts.length === 4 && parts[0] === "admin" && parts[1] === "users" && parts[3] === "disable") {
+      return toRes(await handleAdminDisableUser(parts[2]!, req, resolver, db));
+    }
+    // POST /admin/users/:id/enable
+    if (req.method === "POST" && parts.length === 4 && parts[0] === "admin" && parts[1] === "users" && parts[3] === "enable") {
+      return toRes(await handleAdminEnableUser(parts[2]!, req, resolver, db));
     }
     // GET /drafts (list)
     if (req.method === "GET" && parts.length === 1 && parts[0] === "drafts") {
