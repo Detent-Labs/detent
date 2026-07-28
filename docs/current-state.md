@@ -689,6 +689,28 @@ Stage-by-stage status is in `ROADMAP.md`.
   re-run risk), and `/timers` (overdue-first, with overdue classification in a
   tested pure module, `screens/timersLogic.ts`). Every screen refreshes on an
   explicit control plus refetch-on-window-focus; no polling, no websocket.
+- Admin area (user administration) (`packages/admin`, `src/auth/users.ts`,
+  `src/http/admin-routes.ts`, `admin-users`, `admin-user-management`): stage
+  10's second of three changes, the one HTTP carve-out from
+  `local-user-accounts`'s CLI-only administration. `src/auth/users.ts` gains
+  `listUsers` (every `auth_users` row as `{userId, email, roles, disabled}`,
+  never `password_hash`) and `setDisabled(userId, disabled, db)` — keyed by
+  `userId`, unlike `setRoles`/`setPassword`'s `email`, since its caller is a
+  row from a `listUsers` result rather than a human typing an address they
+  know; it returns the updated row via `RETURNING`, or `undefined` for an
+  unknown id, so the HTTP handler needs no follow-up query to answer 200/404.
+  Three new `system:admin`-gated routes in `admin-routes.ts`: `GET
+  /admin/users`, `POST /admin/users/:id/disable`, `POST
+  /admin/users/:id/enable`. Creating a user, changing a password, or
+  assigning roles remain CLI-only — this change adds no HTTP path for any of
+  those three. Disabling takes effect on the user's *next* login attempt only;
+  it does not revoke a JWT already issued to them, since token verification
+  performs no per-request database lookup (proven by an end-to-end test:
+  log in, disable via the new route, the pre-disable token still
+  authenticates, a fresh login attempt then fails). `packages/admin` gains a
+  `/users` screen — list plus a disable/enable toggle, the disable action
+  behind a confirmation naming that caveat — with no create/password/role
+  controls.
 - Process Studio — shell and drafts (`packages/studio`, `src/engine/drafts.ts`,
   `src/http/studio-routes.ts`, `studio-shell-and-drafts`): the developer's
   substrate — stage 11's first of five changes; `packages/editor` stays
