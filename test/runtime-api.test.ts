@@ -644,6 +644,26 @@ test.skipIf(!DB)("constraint: a string violating pattern is rejected", async () 
   await expectIssue({ field_name: "B0b" }, { kind: "constraint", fieldId: "field_name", constraint: "pattern" });
 });
 
+// harden-publish-validation: pattern is evaluated only when the value's own
+// length constraints raised no violation. field_name declares both
+// maxLength: 10 and pattern: "^[A-Za-z]+$" (see line ~66) — a value that is
+// simultaneously too long AND would fail the pattern (digits present) must
+// report ONLY the maxLength violation, proving the pattern was never run
+// against it, not merely that both violations happened to be reported.
+test.skipIf(!DB)("constraint: an over-maxLength value is not also pattern-tested", async () => {
+  const instanceId = await freshInstance();
+  let raised: unknown;
+  try {
+    await submitAndTransition(instanceId, "path_ab" as PathId, { field_name: "1234567890123" } as unknown as Instance["data"], actor, dataSourceReg);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(SubmissionValidationError);
+  const issues = (raised as SubmissionValidationError).issues as unknown as Record<string, unknown>[];
+  expect(issues).toContainEqual(expect.objectContaining({ kind: "constraint", fieldId: "field_name", constraint: "maxLength" }));
+  expect(issues).not.toContainEqual(expect.objectContaining({ kind: "constraint", fieldId: "field_name", constraint: "pattern" }));
+});
+
 test.skipIf(!DB)("rule-failed: a validation.rule that evaluates false is rejected", async () => {
   await expectIssue({ field_note: "forbidden" }, { kind: "rule-failed", fieldId: "field_note" });
 });

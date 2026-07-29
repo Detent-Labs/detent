@@ -699,9 +699,9 @@ test.skipIf(!DB)("6.6 an instance with only delivered rows migrates immediately"
 
 test.skipIf(!DB)("6.8 timer reconciliation: surviving fireAt kept, withdrawn dropped, new armed, next_timer_at recomputed", async () => {
   const p = pid();
-  const timerKeep = { id: "timer_keep", key: "keep", duration: "PT1H", onFire: { actions: [] } };
-  const timerGone = { id: "timer_gone", key: "gone", duration: "PT10M", onFire: { actions: [] } };
-  const timerNew = { id: "timer_new", key: "new", duration: "PT30M", onFire: { actions: [] } };
+  const timerKeep = { id: "timer_keep", duration: "PT1H", onFire: { actions: [] } };
+  const timerGone = { id: "timer_gone", duration: "PT10M", onFire: { actions: [] } };
+  const timerNew = { id: "timer_new", duration: "PT30M", onFire: { actions: [] } };
   const v1 = waitBody({ key: "a", fields: [f("x", "string")], waitTimers: [timerKeep, timerGone] });
   const v2 = waitBody({ key: "a", fields: [f("x", "string")], waitTimers: [timerKeep, timerNew] });
   await twoVersions(p, v1, v2, {} as MigrationSpec);
@@ -722,7 +722,7 @@ test.skipIf(!DB)("6.8 timer reconciliation: surviving fireAt kept, withdrawn dro
 
 test.skipIf(!DB)("6.8 a fired timer that survives is neither resurrected nor dropped", async () => {
   const p = pid();
-  const timerR = { id: "timer_r", key: "r", duration: "PT1H", onFire: { actions: [] } };
+  const timerR = { id: "timer_r", duration: "PT1H", onFire: { actions: [] } };
   const b = waitBody({ key: "a", fields: [f("x", "string")], waitTimers: [timerR] });
   await twoVersions(p, b, b, {} as MigrationSpec);
   const inst = await mkInstance(p, 1);
@@ -737,8 +737,8 @@ test.skipIf(!DB)("6.8 a fired timer that survives is neither resurrected nor dro
 
 test.skipIf(!DB)("6.8 a redeclared duration is detected and re-armed at the migration instant", async () => {
   const p = pid();
-  const timerT1 = { id: "timer_t", key: "t", duration: "PT1H", onFire: { actions: [] } };
-  const timerT2 = { id: "timer_t", key: "t", duration: "PT2H", onFire: { actions: [] } };
+  const timerT1 = { id: "timer_t", duration: "PT1H", onFire: { actions: [] } };
+  const timerT2 = { id: "timer_t", duration: "PT2H", onFire: { actions: [] } };
   const v1 = waitBody({ key: "a", fields: [f("x", "string")], waitTimers: [timerT1] });
   const v2 = waitBody({ key: "a", fields: [f("x", "string")], waitTimers: [timerT2] });
   await twoVersions(p, v1, v2, {} as MigrationSpec);
@@ -760,8 +760,8 @@ test.skipIf(!DB)("6.8 a redeclared duration is detected and re-armed at the migr
 
 test.skipIf(!DB)("6.8 a duration-to-deadline flip is detected and re-armed via deadline evaluation", async () => {
   const p = pid();
-  const timerAsDuration = { id: "timer_t", key: "t", duration: "PT1H", onFire: { actions: [] } };
-  const timerAsDeadline = { id: "timer_t", key: "t", deadline: cel("data.due"), onFire: { actions: [] } };
+  const timerAsDuration = { id: "timer_t", duration: "PT1H", onFire: { actions: [] } };
+  const timerAsDeadline = { id: "timer_t", deadline: cel("data.due"), onFire: { actions: [] } };
   const v1 = waitBody({ key: "a", fields: [f("x", "string"), f("due", "string")], waitTimers: [timerAsDuration] });
   const v2 = waitBody({ key: "a", fields: [f("x", "string"), f("due", "string")], waitTimers: [timerAsDeadline] });
   await twoVersions(p, v1, v2, {} as MigrationSpec);
@@ -778,8 +778,8 @@ test.skipIf(!DB)("6.8 a duration-to-deadline flip is detected and re-armed via d
 
 test.skipIf(!DB)("6.8 a deadline-to-duration flip is detected and re-armed relative to the migration instant", async () => {
   const p = pid();
-  const timerAsDeadline = { id: "timer_t", key: "t", deadline: cel("data.due"), onFire: { actions: [] } };
-  const timerAsDuration = { id: "timer_t", key: "t", duration: "PT1H", onFire: { actions: [] } };
+  const timerAsDeadline = { id: "timer_t", deadline: cel("data.due"), onFire: { actions: [] } };
+  const timerAsDuration = { id: "timer_t", duration: "PT1H", onFire: { actions: [] } };
   const v1 = waitBody({ key: "a", fields: [f("x", "string"), f("due", "string")], waitTimers: [timerAsDeadline] });
   const v2 = waitBody({ key: "a", fields: [f("x", "string"), f("due", "string")], waitTimers: [timerAsDuration] });
   await twoVersions(p, v1, v2, {} as MigrationSpec);
@@ -799,8 +799,8 @@ test.skipIf(!DB)("6.8 a deadline-to-duration flip is detected and re-armed relat
 
 test.skipIf(!DB)("6.8 a changed deadline source is detected and re-armed", async () => {
   const p = pid();
-  const timerV1 = { id: "timer_t", key: "t", deadline: cel("data.due"), onFire: { actions: [] } };
-  const timerV2 = { id: "timer_t", key: "t", deadline: cel("data.due2"), onFire: { actions: [] } };
+  const timerV1 = { id: "timer_t", deadline: cel("data.due"), onFire: { actions: [] } };
+  const timerV2 = { id: "timer_t", deadline: cel("data.due2"), onFire: { actions: [] } };
   const v1 = waitBody({ key: "a", fields: [f("x", "string"), f("due", "string"), f("due2", "string")], waitTimers: [timerV1] });
   const v2 = waitBody({ key: "a", fields: [f("x", "string"), f("due", "string"), f("due2", "string")], waitTimers: [timerV2] });
   await twoVersions(p, v1, v2, {} as MigrationSpec);
@@ -817,8 +817,8 @@ test.skipIf(!DB)("6.8 a changed deadline source is detected and re-armed", async
 
 test.skipIf(!DB)("6.8 a fired timer is kept even if its declaration changed", async () => {
   const p = pid();
-  const timerR1 = { id: "timer_r", key: "r", duration: "PT1H", onFire: { actions: [] } };
-  const timerR2 = { id: "timer_r", key: "r", duration: "PT2H", onFire: { actions: [] } };
+  const timerR1 = { id: "timer_r", duration: "PT1H", onFire: { actions: [] } };
+  const timerR2 = { id: "timer_r", duration: "PT2H", onFire: { actions: [] } };
   const v1 = waitBody({ key: "a", fields: [f("x", "string")], waitTimers: [timerR1] });
   const v2 = waitBody({ key: "a", fields: [f("x", "string")], waitTimers: [timerR2] });
   await twoVersions(p, v1, v2, {} as MigrationSpec);
@@ -835,8 +835,8 @@ test.skipIf(!DB)("6.8 a fired timer is kept even if its declaration changed", as
 
 test.skipIf(!DB)("6.8 a carried timer with no provenance is trusted and kept even if the declaration changed", async () => {
   const p = pid();
-  const timerL1 = { id: "timer_l", key: "l", duration: "PT1H", onFire: { actions: [] } };
-  const timerL2 = { id: "timer_l", key: "l", duration: "PT9H", onFire: { actions: [] } };
+  const timerL1 = { id: "timer_l", duration: "PT1H", onFire: { actions: [] } };
+  const timerL2 = { id: "timer_l", duration: "PT9H", onFire: { actions: [] } };
   const v1 = waitBody({ key: "a", fields: [f("x", "string")], waitTimers: [timerL1] });
   const v2 = waitBody({ key: "a", fields: [f("x", "string")], waitTimers: [timerL2] });
   await twoVersions(p, v1, v2, {} as MigrationSpec);
@@ -1139,7 +1139,7 @@ test.skipIf(!DB)("a newly declared deadline arms against the target catalog over
   const p = pid();
   const v1 = waitBody({ key: "a", fields: [f("src", "string")] });
   // v2 renames src->due and its step declares a deadline reading `data.due`.
-  const dl = { id: "timer_dl", key: "dl", deadline: cel("data.due"), onFire: { actions: [] } };
+  const dl = { id: "timer_dl", deadline: cel("data.due"), onFire: { actions: [] } };
   const v2 = waitBody({ key: "a", fields: [f("due", "string")], waitTimers: [dl] });
   await twoVersions(p, v1, v2, { fieldMap: { field_src: "field_due" }, transforms: {} } as unknown as MigrationSpec);
   const inst = await mkInstance(p, 1, { field_src: "2027-06-01T00:00:00Z" });
@@ -1154,7 +1154,7 @@ test.skipIf(!DB)("a deadline that raises at migration is dropped as timer.unarme
   const p = pid();
   const v1 = waitBody({ key: "a", fields: [f("x", "string")] });
   // v2 declares a deadline reading a field the instance never wrote -> raises at arming.
-  const dl = { id: "timer_dl", key: "dl", deadline: cel("data.missing"), onFire: { actions: [] } };
+  const dl = { id: "timer_dl", deadline: cel("data.missing"), onFire: { actions: [] } };
   const v2 = waitBody({ key: "a", fields: [f("x", "string"), f("missing", "string")], waitTimers: [dl] });
   await twoVersions(p, v1, v2, {} as MigrationSpec);
   const inst = await mkInstance(p, 1);

@@ -88,11 +88,81 @@ Stage-by-stage status is in `ROADMAP.md`.
   instance's own cancel transition (no HistoryEntry, no `transitionSeq` change);
   only the cascade resumes. A first call that omitted `resolveBody` therefore
   leaves a `pending` sweep a later call can finish.
+- Publish-time structural checks (`src/schema/compile.ts`, harden-publish-validation;
+  `test/compile-validation.test.ts`, `test/cancel.test.ts`). Six write-path checks
+  run inside `compileProcessBody`. They run right after `validateDurations`.
+  They run **before** the `publishedProcessBody`-valid idempotent early return.
+  That placement makes a check unbypassable. A hand-written body cannot skip it
+  by merely satisfying `publishedProcessBody`, which checks only the
+  cancel-sink count.
+
+  Each check returns a located `CompileIssue[]` (`{loc, value, message}`, the
+  `DurationIssue` shape). `compileProcessBody` collects every issue and throws
+  one `CompileValidationError` (mapped to 422 in `http/errors.ts`). The six:
+  - The reserved `core.` action-prefix ban, now checked on both compile
+    branches. It moved out of `authoredProcessBody`: a compiled body injects
+    no action of this type, so the ban is safe to apply to every body. The
+    cancel-sink id/key/outcome checks stay in `authoredProcessBody`, since a
+    compiled body legitimately carries all three.
+  - An unknown-key walk over the authored body, at every depth: process,
+    contract, field (including nested group fields), data source, workflow,
+    step, path, action, timer, view field, validation. It derives each
+    object schema's known key set from Zod's `.shape` rather than a
+    transcribed list. Record-typed positions (`localizedText`,
+    `Action.output`, `SubprocessSpec.*Mapping`, `Plugin.config`) skip the
+    check on their own keys, since those keys are data, not a fixed shape.
+    The walk still checks Expression-shaped values found inside them.
+  - Every catalog `FieldValidation.pattern` compiles with `new RegExp`; its
+    source is also length-bounded.
+  - `SubprocessSpec.outputMapping` keys and `ProcessContract.inputFields`/
+    `outputFields` resolve against the process's own recursive field set
+    (reusing `collectFieldsDeep`). This deliberately does NOT join the base
+    `processBody` superRefine beside the sibling `Action.output` check:
+    that would tighten the read schema and could strand an
+    already-published body's running instances.
+  - `FieldDef.key` must match `/^[a-z_][a-z0-9_]*$/` — the CEL identifier
+    grammar `data.<key>` requires.
+  - Length bounds (`MAX_KEY_LENGTH`/`MAX_PLUGIN_TYPE_LENGTH`/
+    `MAX_DURATION_LENGTH`/`MAX_EXPRESSION_LENGTH`/`MAX_PATTERN_LENGTH`) on
+    every authored `key`, `Plugin.type`, `duration`, `Expression.src` and
+    `pattern` that reaches an interpreter or an index.
+
+  Defense in depth backs the six checks above. `checkActionRegistry`
+  (`registry-check.ts`) no longer filters out the reserved prefix. The compile
+  pass now bans that prefix before any body reaches this check. The filter was
+  dead code; removing it is the depth. The two internal subprocess handlers
+  (`SPAWN_ACTION_TYPE`/`RETURN_ACTION_TYPE`,
+  `subprocess.ts::registerSubprocessHandlers`) declare `configSchema`s
+  (`{subprocessStepId, parentSeq}` / `{parentInstanceId, childOutcome}`). Both
+  schemas reject a forged config on shape, even if a future path ever
+  produced one.
+
+  Two related fixes ride along. `src/runtime/api.ts::checkConstraints` skips
+  `pattern` after a `minLength`/`maxLength` violation. It runs `pattern` only
+  on a value that passed both. `WeakMap<ProcessBody, Map<string, RegExp>>`
+  caches the compiled `RegExp` per immutable published body. This replaces
+  one `RegExp` compile per submission. `Bun.serve` declares `maxRequestBodySize`
+  (`src/http/server.ts`, 8 MiB) instead of inheriting Bun's 128 MiB default.
+  `drafts.ts::checkEnvelope` gained a matching serialized-size bound on
+  `body`+`layout` together: `drafts.ts` is a module boundary a non-HTTP caller
+  could also reach.
+
+  `packages/studio/src/draft/validation.ts::runValidation` catches
+  `CompileValidationError` alongside the pre-existing `DurationValidationError`.
+  It renders the caught issues under a new `"structural"` `IssueSource`.
+  Without that catch, the error would propagate uncaught and crash Studio's
+  live-validation panel. Known gap, documented on `runValidation` itself: the
+  unknown-key check can never fire from Studio's live validation.
+  `runValidation` first runs `authoredProcessBody.safeParse`. That Zod parse
+  strips undeclared keys before `compileProcessBody` ever sees them. Only the
+  real `POST /processes` publish call catches an unknown key, since it runs
+  `compileProcessBody` on the raw, un-parsed body.
 - Subprocess execution (`src/engine/subprocess.ts`, `test/subprocess.test.ts`):
-  makes a `subprocess` step live via two engine-internal outbox handlers (reserved
-  `core.` type prefix, rejected in authored bodies; the two type constants are homed
+  makes a `subprocess` step live via two engine-internal outbox handlers. The
+  compile pass rejects the reserved `core.` type prefix at publish; see the
+  structural-checks entry above. The two type constants are homed
   in `registry.ts`, a leaf both `store.ts` and `transition.ts` can import, and
-  re-exported from `transition.ts`). Entering a subprocess step enqueues
+  re-exported from `transition.ts`. Entering a subprocess step enqueues
   `core.spawnSubprocess`,
   which resolves the child body by `versionBinding` (`pinned` → `pinnedVersion`;
   `latest-at-spawn` → newest version whose `contractHash` equals `contractRef`, via

@@ -87,6 +87,13 @@ function isJsonObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+// Sized to the largest plausible legitimate draft (a few megabytes of body and
+// layout together). The HTTP server now declares its own maxRequestBodySize
+// (src/http/server.ts), which covers a draft save arriving over HTTP — but
+// drafts.ts is a module boundary in its own right, so this bound exists to
+// hold for a caller that does not arrive over HTTP too.
+const MAX_DRAFT_ENVELOPE_BYTES = 8 * 1024 * 1024; // 8 MiB
+
 function checkEnvelope(input: SaveDraftInput): void {
   if (!isJsonObject(input.body)) {
     throw new RequestShapeError("draft body must be a JSON object");
@@ -96,6 +103,10 @@ function checkEnvelope(input: SaveDraftInput): void {
   }
   if (typeof input.revision !== "number" || !Number.isInteger(input.revision) || input.revision < 0) {
     throw new RequestShapeError("draft revision must be a non-negative integer");
+  }
+  const size = Buffer.byteLength(JSON.stringify(input.body), "utf8") + Buffer.byteLength(JSON.stringify(input.layout), "utf8");
+  if (size > MAX_DRAFT_ENVELOPE_BYTES) {
+    throw new RequestShapeError(`draft envelope exceeds the ${MAX_DRAFT_ENVELOPE_BYTES}-byte bound`);
   }
 }
 

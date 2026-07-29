@@ -1,5 +1,5 @@
 import { authoredProcessBody, type ProcessBody } from "workflow-engine/schema";
-import { compileProcessBody, validateDurations, DurationValidationError } from "workflow-engine/schema/compile";
+import { compileProcessBody, validateDurations, DurationValidationError, CompileValidationError } from "workflow-engine/schema/compile";
 import { validateProcessBody, checkSubprocessChildRefs } from "workflow-engine/cel/check";
 import { checkActionRegistry } from "workflow-engine/engine/registry-check";
 import type { Registry } from "workflow-engine/engine/registry";
@@ -45,6 +45,18 @@ export interface ValidationResult {
  * is always called against the pre-compile `body` (which has no sink) —
  * safe because the sink carries no CEL/actions, so no issue can ever be
  * rooted there.
+ *
+ * KNOWN GAP (harden-publish-validation): `compileProcessBody`'s unknown-key
+ * check (`checkUnknownKeys`) can never fire from THIS function. It runs here
+ * against `authoredProcessBody.safeParse(draft).data` — already Zod-parsed,
+ * which strips undeclared keys before `compileProcessBody` ever sees them —
+ * whereas `publishBody` (src/engine/definitions.ts) calls `compileProcessBody`
+ * on the raw, un-parsed authored body, which is the only place an unknown key
+ * is actually visible. So an unknown key is silently absent from Studio's
+ * live validation and surfaces only at the real publish call. The other five
+ * structural checks (reserved prefix, pattern, id resolution, field-key
+ * format, length bounds) are unaffected — they inspect DECLARED values,
+ * which survive the Zod parse intact.
  */
 export function runValidation(
   draft: Draft,
@@ -75,8 +87,20 @@ export function runValidation(
   try {
     compiled = compileProcessBody(body);
   } catch (e) {
-    if (!(e instanceof DurationValidationError)) throw e;
-    compiled = undefined; // already reported via the direct validateDurations call above
+    if (e instanceof DurationValidationError) {
+      compiled = undefined; // already reported via the direct validateDurations call above
+    } else if (e instanceof CompileValidationError) {
+      // harden-publish-validation: the six write-path structural checks
+      // (unknown keys, reserved action prefix, pattern compile/length,
+      // outputMapping/contract id resolution, field-key format, length
+      // bounds) — reported the same way duration issues are, and for the
+      // same reason: a structurally invalid body has no compiled form to run
+      // the registry/CEL checks below against.
+      pushIssues(issues, body, e.issues, "structural");
+      compiled = undefined;
+    } else {
+      throw e;
+    }
   }
 
   const registryChecked = registry !== undefined;
