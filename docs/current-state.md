@@ -234,8 +234,9 @@ Stage-by-stage status is in `ROADMAP.md`.
 - Editor (`packages/editor`, a Bun workspace package that reaches the engine
   only through its `exports` map — no file moves, the boundary is `exports`,
   not directory layout): a structural editor plus an auto-layouted
-  **read-only** graph view (`@xyflow/react` + `elkjs`); canvas editing
-  (drag-to-connect) is out of scope. Panels (`src/panels/`) cover the field
+  **read-only** graph view (Mermaid); canvas editing (drag-to-connect) is out
+  of scope here — it exists in `packages/studio` instead (see the Process
+  Studio entries below). Panels (`src/panels/`) cover the field
   catalog, data sources, steps (incl. per-step view), paths, timers, actions,
   and the subprocess contract, editing an editor-owned **Draft model**
   (`src/draft/`) — a structural superset of `AuthoredProcessBody` (refs and
@@ -265,17 +266,28 @@ Stage-by-stage status is in `ROADMAP.md`.
   fallback-to-base lookup, used by both `GraphView` node labels and the
   editor's `LocalizedTextInput` panels. `Path`/`Timer`/`Plugin` `description`
   stay plain `string` (authoring-facing, not participant-facing). The graph
-  view (`src/graph/GraphView.tsx`, `layout.ts`, `useDraftGraphLayout.ts`)
-  fixes node handles to `Right`/`Left` to match ELK's horizontal layout
-  direction, routes edges as `smoothstep` with a directional `markerEnd`
-  arrowhead (issue-flagged edges tint the marker to match their red stroke —
-  watch for the `{ color: undefined, ...marker }` spread-clobber bug class
-  when touching this: an explicit `color: undefined` key silently overrides
-  `@xyflow/system`'s own fallback and renders the arrowhead invisible), and
-  fits the view once ELK layout resolves (`isLayouted`) — including on a
-  reload/import into an already-mounted session, tracked via a
+  view (`src/graph/GraphView.tsx`, `mapping.ts`, `mermaid.ts`) renders
+  through **Mermaid** (`editor-graph-mermaid`, which replaced the original
+  `@xyflow/react` + `elkjs` implementation — neither dependency remains):
+  `draftToGraph` builds a locale-resolved `DraftGraph`, `generateMermaidDsl`
+  emits a `flowchart LR` DSL from it, and `mermaid.render()` returns an SVG
+  assigned via `innerHTML` — safe because `securityLevel: "strict"` (Mermaid's
+  default, set explicitly) runs the SVG through DOMPurify internally, which
+  matters since node labels are author-entered. Validation issues surface as a
+  `⚠ N` label badge plus `style`/`linkStyle` red stroke, edges addressed
+  positionally by emission index since `linkStyle` has no id form. Node ids
+  swap `-` for `_` (Mermaid ids are word characters; the mapping is 1:1 and
+  reversible because ids never contain underscores). Mermaid regenerates the
+  whole SVG on every render — no incremental diffing the way React Flow's
+  node/edge arrays had — so `@panzoom/panzoom` supplies pan/zoom and the
+  current transform is captured before the old SVG is discarded and reapplied
+  to the new one, preserving the viewport across a structural edit or a
+  content-locale switch. The exception is the first render of a given load,
+  which fits to the viewport instead (`computeFitTransform`, pure and
+  unit-testable, capped at scale 1); the gate resets on reload/import via the
   `loadGeneration` counter in `DraftProvider`'s reducer state, not only on
-  first mount.
+  first mount. Read-only needs no explicit disabling here: a rendered Mermaid
+  SVG carries no drag or delete affordance of its own.
 - HTTP wrapper (`src/http/`, `test/http.test.ts`, roadmap #5b): a thin REST/JSON
   adapter over the Runtime API Layer via `Bun.serve`. `createServer` returns a
   plain `fetch(req): Promise<Response>` (testable with `new Request(...)`, no
@@ -873,3 +885,35 @@ Stage-by-stage status is in `ROADMAP.md`.
   (stays `admin-migration-run`'s future `POST /admin/migrations/run`, an
   operator action) and the registry/CEL-scratchpad tools screen plus Player
   (`studio-tools-and-player`).
+- Process Studio — JSON view (`packages/studio/src/panels/{JsonView,
+  draftJsonLogic}.ts(x)`, `src/draft/load-guard.ts`, `screens/EditScreen.tsx`,
+  `studio-json-view`): stage 11's third of five changes, entirely
+  client-side — no engine, route or schema change. Adds the third of the edit
+  screen's three surfaces alongside Canvas and Panels, switched by a
+  `role="tablist"` Structure/JSON toggle in `EditorArea` (a `surface`
+  `useState`, not a route). The two are **fully mutually exclusive**: every
+  draft-body-mutating component (`ProcessHeader`, `FieldCatalogPanel`,
+  `DataSourcesPanel`, `ContractPanel`, the canvas and everything nested under
+  it) is grouped under "Structure" and unmounted while JSON is shown, so a
+  stale textarea can never silently clobber a panel edit made while it was
+  open — tightened during review, the change's first draft toggled only
+  Canvas + `StepsPanel`. `DraftToolbar`, the registry selector and the
+  content-locale switcher stay mounted on both surfaces, since none of them
+  mutates the draft body. `JsonView` seeds its local `text` from the current
+  draft **once, on mount** — no resync effect, and switching away unmounts it
+  so switching back always remounts fresh — and writes only on an explicit
+  Apply, through `parseDraftText` (`panels/draftJsonLogic.ts`, mirroring
+  `screens/migrationPlanLogic.ts`'s parse/format shape): `JSON.parse`, then
+  `checkDraftShape`, the editor's file-based Load guard ported verbatim to
+  `packages/studio/src/draft/load-guard.ts` rather than reimplemented more
+  weakly — a `Draft` has no remote gate the way a `MigrationSpec` does
+  (`replace()` writes straight into the client state every panel
+  destructures), so the shape check has to happen here. A parse or shape
+  failure leaves the draft untouched and shows the located issues inline;
+  empty/whitespace text is a valid empty draft (`{}`), matching
+  `parseSpecText`'s convention. Apply reuses the Draft model's existing
+  `replace()` path — the one Load/Import already used — not a new mutation
+  surface. `test/draftJsonLogic.test.ts` and `test/load-guard.test.ts` cover
+  the pure modules; the textarea/toggle wiring is untested, per this repo's
+  existing convention. Tools/Player (`studio-tools-and-player`, which also
+  deletes `packages/editor`) is the only remaining piece of stage 11.
