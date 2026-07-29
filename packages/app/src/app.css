@@ -235,16 +235,41 @@ h2 {
 
 .app-task-row {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) 0;
   border-bottom: 1px solid var(--color-border);
-  cursor: pointer;
 }
 
+/* The row still washes on hover, same as before — every row now carries a
+   real control, so the hover cue no longer needs to be conditional on a
+   clickable-row class. */
 .app-task-row:hover {
   background: var(--color-surface-muted);
+}
+
+/* The control wrapping the row's identifying content (process + step). Reset
+   to plain text so it reads as part of the ledger row, not a call-to-action
+   button; :focus-visible (below) is what makes it discoverable by keyboard. */
+.app-task-link {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  background: none;
+  border: none;
+  margin: 0;
+  padding: var(--space-1) 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.app-task-link:hover .app-task-step {
+  text-decoration: underline;
 }
 
 .app-task-process {

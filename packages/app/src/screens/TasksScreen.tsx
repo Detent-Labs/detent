@@ -123,12 +123,18 @@ export function TasksScreen({ token, actorId, locale, navigate, onUnauthorized }
           {g.label && <h2>{g.label}</h2>}
           <ul className="app-task-list">
             {g.items.map((item) => (
-              <li key={item.instanceId} className="app-task-row" onClick={() => navigate({ name: "task", instanceId: item.instanceId })}>
+              <li key={item.instanceId} className="app-task-row">
                 <span className={`app-stamp ${isClaimedByCurrentUser(item, actorId) ? "app-stamp-mine" : "app-stamp-open"}`}>
                   {isClaimedByCurrentUser(item, actorId) ? t(locale, "tasks.claimedByYou") : isUnclaimed(item) ? t(locale, "tasks.unclaimed") : ""}
                 </span>
-                <span className="app-task-process">{processLabelOf(item, locale)}</span>
-                <span className="app-task-step">{stepLabelOf(item, locale)}</span>
+                <button
+                  type="button"
+                  className="app-task-link"
+                  onClick={() => navigate({ name: "task", instanceId: item.instanceId })}
+                >
+                  <span className="app-task-process">{processLabelOf(item, locale)}</span>
+                  <span className="app-task-step">{stepLabelOf(item, locale)}</span>
+                </button>
                 <span className="app-task-waiting">{waitingLabel(waitingSince(item), locale)}</span>
               </li>
             ))}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Step, StepType } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
@@ -40,6 +40,18 @@ export function StepsPanel({ fields, selectedStepId, onSelectStep }: Props) {
   };
   const [childLoadError, setChildLoadError] = useState<string | null>(null);
 
+  // Keyed by step id, so a newly added step's header can receive focus once
+  // it exists in the DOM — a pointer user sees the new card open where they
+  // clicked "add step"; a keyboard user needs focus moved there explicitly.
+  const headerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [pendingFocusStepId, setPendingFocusStepId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!pendingFocusStepId) return;
+    headerRefs.current[pendingFocusStepId]?.focus();
+    setPendingFocusStepId(undefined);
+  }, [pendingFocusStepId]);
+
   const loadChildFile = async (stepId: string | undefined, file: File | undefined) => {
     if (!stepId || !file) return;
     try {
@@ -63,6 +75,7 @@ export function StepsPanel({ fields, selectedStepId, onSelectStep }: Props) {
       { id, key: "", label: seedLocalizedText(contentLocale), type: "task" },
     );
     setExpanded(id);
+    setPendingFocusStepId(id);
   };
 
   const removeStep = (id: string | undefined) => {
@@ -105,16 +118,29 @@ export function StepsPanel({ fields, selectedStepId, onSelectStep }: Props) {
 
       {steps.map((step, index) => {
         const isOpen = expanded === step.id;
+        const bodyId = `step-card-body-${step.id ?? index}`;
         return (
           <div className="step-card" key={step.id ?? index}>
-            <div className="step-card-header" onClick={() => setExpanded(isOpen ? undefined : step.id)}>
+            <button
+              type="button"
+              ref={(el) => {
+                headerRefs.current[step.id ?? String(index)] = el;
+              }}
+              className="step-card-header"
+              aria-expanded={isOpen}
+              aria-controls={bodyId}
+              onClick={() => setExpanded(isOpen ? undefined : step.id)}
+            >
               <strong>{step.key || t("steps.unnamedStep")}</strong>
               <span>{step.type ?? "task"}</span>
               {step.terminal && <span className="badge">{t("steps.terminalBadge")}</span>}
-            </div>
+              <span className="step-card-chevron" aria-hidden="true">
+                ▸
+              </span>
+            </button>
 
             {isOpen && (
-              <div className="step-card-body">
+              <div className="step-card-body" id={bodyId}>
                 <label>
                   key
                   <input type="text" value={step.key ?? ""} onChange={(e) => updateStep(index, { key: e.target.value })} />
