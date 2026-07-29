@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getMigrationPlan, putMigrationPlan, getOrphanKeys, StudioClientError } from "../api/client.js";
 import { parseSpecText, formatSpecText } from "./migrationPlanLogic.js";
 import type { Route } from "../routing.js";
 import type { OrphanKeyScan } from "../api/types.js";
+import { describeCaughtError } from "../errors.js";
+import { t } from "../i18n/catalog.js";
 
 interface MigrationPlanScreenProps {
   processId: string;
@@ -20,14 +22,16 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
   const [text, setText] = useState("{}");
   const [appliedAt, setAppliedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orphans, setOrphans] = useState<OrphanKeyScan | undefined>(undefined);
   const [scanning, setScanning] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     let cancelled = false;
     setLoading(true);
+    setLoadError(undefined);
     getMigrationPlan(processId, fromVersion, toVersion, token)
       .then((plan) => {
         if (cancelled || !plan) return;
@@ -36,8 +40,11 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        if (e instanceof StudioClientError && e.status === 401) onUnauthorized();
-        else throw e;
+        if (e instanceof StudioClientError && e.status === 401) {
+          onUnauthorized();
+          return;
+        }
+        setLoadError(describeCaughtError(e));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -46,6 +53,8 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
       cancelled = true;
     };
   }, [processId, fromVersion, toVersion, token, onUnauthorized]);
+
+  useEffect(() => load(), [load]);
 
   const save = async () => {
     const parsed = parseSpecText(text);
@@ -59,15 +68,11 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
       const result = await putMigrationPlan(processId, fromVersion, toVersion, parsed.spec, token);
       setAppliedAt(result.appliedAt);
     } catch (e) {
-      if (e instanceof StudioClientError) {
-        if (e.status === 401) {
-          onUnauthorized();
-          return;
-        }
-        setError(e.error.message);
+      if (e instanceof StudioClientError && e.status === 401) {
+        onUnauthorized();
         return;
       }
-      throw e;
+      setError(describeCaughtError(e));
     } finally {
       setSaving(false);
     }
@@ -79,15 +84,11 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
     try {
       setOrphans(await getOrphanKeys(processId, version, token));
     } catch (e) {
-      if (e instanceof StudioClientError) {
-        if (e.status === 401) {
-          onUnauthorized();
-          return;
-        }
-        setError(e.error.message);
+      if (e instanceof StudioClientError && e.status === 401) {
+        onUnauthorized();
         return;
       }
-      throw e;
+      setError(describeCaughtError(e));
     } finally {
       setScanning(false);
     }
@@ -101,9 +102,18 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
       <h1>
         Migration plan {fromVersion} → {toVersion}
       </h1>
+      {loadError && (
+        <div className="studio-error-banner" role="alert">
+          <span className="studio-error-banner-stamp">{t("error.failed")}</span>
+          <span className="studio-error-banner-message">{loadError}</span>
+          <button type="button" onClick={() => load()} disabled={loading}>
+            {t("error.retry")}
+          </button>
+        </div>
+      )}
       {loading ? (
         <p className="studio-empty">Loading…</p>
-      ) : (
+      ) : loadError ? null : (
         <>
           {appliedAt && (
             <p className="studio-conflict">

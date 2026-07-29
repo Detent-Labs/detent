@@ -133,6 +133,18 @@ const en = {
 
   "expression.placeholder": "CEL expression",
   "plugin.typePlaceholder": "plugin type identifier",
+
+  "error.retry": "Retry",
+  "error.failed": "Failed",
+  "error.authorization": "You don't have permission to do that.",
+  "error.actorResolution": "Your session could not be resolved. Sign in again.",
+  "error.requestShape": "That request was malformed.",
+  "error.notFound": "Not found.",
+  "error.draftConflict": "This draft was changed elsewhere.",
+  "error.migrationPlan": "This migration plan can't be changed right now.",
+  "error.network": "Could not reach the server. Check your connection and try again.",
+  "error.serverError": "The server hit an error. Try again.",
+  "error.generic": "Something went wrong. Try again.",
 } as const;
 
 export type TranslationKey = keyof typeof en;

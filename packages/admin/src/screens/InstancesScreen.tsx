@@ -3,6 +3,7 @@ import { listInstances, AdminClientError } from "../api/client.js";
 import type { InstanceSummary } from "../api/types.js";
 import type { Route } from "../routing.js";
 import { useRefresh } from "../useRefresh.js";
+import { describeCaughtError } from "../errors.js";
 import { EMPTY_INSTANCE_FILTER, toListParams, labelText, type InstanceFilterState } from "./instancesLogic.js";
 
 interface InstancesScreenProps {
@@ -17,18 +18,20 @@ export function InstancesScreen({ token, navigate, onUnauthorized }: InstancesSc
   const [items, setItems] = useState<InstanceSummary[]>([]);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | undefined>(undefined);
   const [filter, setFilter] = useState<InstanceFilterState>(EMPTY_INSTANCE_FILTER);
   const { reloadToken, refresh } = useRefresh();
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(undefined);
     try {
       const page = await listInstances(token, toListParams(filter, PAGE_LIMIT));
       setItems(page.items);
       setCursor(page.cursor);
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else throw err;
+      else setError(describeCaughtError(err));
     } finally {
       setLoading(false);
     }
@@ -37,13 +40,14 @@ export function InstancesScreen({ token, navigate, onUnauthorized }: InstancesSc
   const loadMore = useCallback(async () => {
     if (!cursor) return;
     setLoading(true);
+    setError(undefined);
     try {
       const page = await listInstances(token, toListParams(filter, PAGE_LIMIT, cursor));
       setItems((prev) => [...prev, ...page.items]);
       setCursor(page.cursor);
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else throw err;
+      else setError(describeCaughtError(err));
     } finally {
       setLoading(false);
     }
@@ -77,7 +81,17 @@ export function InstancesScreen({ token, navigate, onUnauthorized }: InstancesSc
         </button>
       </div>
 
-      {items.length === 0 && !loading && <p className="admin-empty">No instances match these filters.</p>}
+      {error && (
+        <div className="admin-error-banner" role="alert">
+          <span className="admin-error-banner-stamp">Failed</span>
+          <span className="admin-error-banner-message">{error}</span>
+          <button type="button" onClick={refresh} disabled={loading}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {items.length === 0 && !loading && !error && <p className="admin-empty">No instances match these filters.</p>}
 
       {items.length > 0 && (
         <table className="admin-table">
