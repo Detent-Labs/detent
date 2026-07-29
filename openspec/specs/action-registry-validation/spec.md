@@ -20,11 +20,20 @@ whose `type` is not registered SHALL produce a located issue and SHALL NOT be
 checked further (its `config` is not validated when its `type` is already
 unresolved).
 
-An action whose `type` uses the reserved `core.` prefix (`SPAWN_ACTION_TYPE`,
-`RETURN_ACTION_TYPE`) SHALL be exempt from this check — these are
-engine-dispatched internally and never reach an author-facing registry
-lookup by construction (authored bodies with a `core.`-prefixed type are
-already rejected by a separate, existing check).
+No action type SHALL be exempt from this check, including one using the
+reserved `core.` prefix. The previous exemption rested on the premise that a
+`core.`-prefixed type "can never be present in an authored body"; that premise
+was falsified by the compile pass's idempotent early return, which skipped the
+only check enforcing it. With the prefix ban now on the write path and ahead
+of that return (`definition-contract`), a `core.`-prefixed action cannot reach
+this check from a published body at all — so removing the exemption costs
+nothing and removes a second layer that would have to be re-argued if any
+other path ever produced one.
+
+The engine's two internal handlers (`SPAWN_ACTION_TYPE`, `RETURN_ACTION_TYPE`)
+SHALL declare `configSchema`s describing the config they are actually
+dispatched with, so that a config reaching them is shape-checked rather than
+accepted as author-controlled `unknown`.
 
 #### Scenario: An action with a registered type passes
 
@@ -46,12 +55,20 @@ already rejected by a separate, existing check).
 - **THEN** validation produces one located issue per action, covering all
   five positions
 
-#### Scenario: A core.-prefixed action type is not checked against the registry
+#### Scenario: A core.-prefixed action type is checked like any other
 
-- **WHEN** a compiled body carries an action whose `type` starts with the
+- **WHEN** validation encounters an action whose `type` starts with the
   reserved `core.` prefix
-- **THEN** validation does not reject it for being unregistered, regardless
-  of whether that exact type string is present in the registry
+- **THEN** it is resolved against the registry and, when the resolved handler
+  declares a `configSchema`, its `config` is parsed against that schema —
+  it is not skipped
+
+#### Scenario: The internal handlers declare their config shape
+
+- **WHEN** the subprocess handlers are registered
+- **THEN** the spawn handler declares a `configSchema` for
+  `{ subprocessStepId, parentSeq }` and the return handler one for
+  `{ parentInstanceId, childOutcome }`
 
 ### Requirement: A resolved action's config is checked against its handler's schema
 

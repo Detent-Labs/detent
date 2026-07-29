@@ -88,6 +88,17 @@ so there is no concurrent writeback for it to race. `getInstanceView` SHALL
 take a required `registry: DataSourceRegistry` parameter, threaded into the
 `resolveFields` call that resolves the current step's view.
 
+`getInstanceView` SHALL authorize `actor` against the loaded instance before
+returning anything, per the `authorization` capability's relationship rule
+(`ADMIN_ROLE`, or `startedBy`, or current claimant, or eligible candidate on
+the current step), throwing `AuthorizationError` otherwise. `actor` is
+therefore load-bearing twice — as the authorization subject and as the CEL
+guard context `resolveFields`/`resolveAvailablePaths` evaluate against. For a
+caller without `ADMIN_ROLE`, a failure to load the instance SHALL surface as
+that same `AuthorizationError`, so an unrelated caller cannot distinguish a
+nonexistent instance from one they may not read; a caller holding
+`ADMIN_ROLE` SHALL see the ordinary not-found failure.
+
 `fields` SHALL contain exactly the current step's `ViewField`s whose resolved
 `visible` (literal `boolean`, used as-is, or CEL, evaluated with total
 semantics, default `true`) is `true` against `buildGuardContext(body,
@@ -114,6 +125,18 @@ SHALL be empty when the instance is not `running`, when the current step has
 no manual paths, or when every manual path's guard is false — `status` is
 always present so a caller can distinguish these cases.
 
+#### Scenario: An unrelated actor is refused before any field resolves
+- **WHEN** an authenticated actor with no relationship to the instance and no
+  `ADMIN_ROLE` calls `getInstanceView`
+- **THEN** it throws `AuthorizationError`, and no data source is resolved and
+  no field value is read out
+
+#### Scenario: A related actor reads the view unchanged
+- **WHEN** the caller is the instance's starter, its current claimant, an
+  eligible candidate on the current step, or holds `ADMIN_ROLE`
+- **THEN** the view resolves exactly as it did before this requirement
+  changed — same `fields`, same `availablePaths`
+
 #### Scenario: An invisible field is omitted
 - **WHEN** a step's view marks a field's `visible` expression false against
   the instance's current data
@@ -136,7 +159,7 @@ always present so a caller can distinguish these cases.
 
 #### Scenario: View on a non-running instance still resolves
 - **WHEN** `getInstanceView` is called for a `completed` or `cancelled`
-  instance
+  instance by an actor with a relationship to it
 - **THEN** it returns the instance's `status` and its terminal step's
   resolved `fields`, with `availablePaths` empty
 
@@ -160,9 +183,18 @@ FOR UPDATE`), resolve and hash-verify its pinned `ProcessBody`, and — if the
 current step has a declared (non-unset) `instance.assignment` — require
 `actor.id === instance.assignment.claimedBy`, throwing `NotClaimedError`
 when `claimedBy` is unset and `NotClaimantError` when it is set to a
-different actor, before any submission validation runs. A step with no
-declared `assignment` is unaffected by this check, identical to today's
-behavior. Once this check passes (or is not applicable), it SHALL validate
+different actor, before any submission validation runs.
+
+A step with **no** declared `assignment` SHALL NOT thereby be open to every
+authenticated actor: the caller must be the instance's starter
+(`instance.startedBy === actor.id`) or carry `ADMIN_ROLE`, and SHALL be
+rejected with `AuthorizationError` otherwise, before any submission
+validation runs. This floor is deliberately weaker than the claimant rule —
+starter or operator are the only relationships an assignment-less step
+defines — and exists so that omitting one optional authoring key cannot make
+a step writable by an actor with no relationship to the instance at all.
+
+Once this check passes, it SHALL validate
 `data` against the current step's resolved view (using the required
 `registry: DataSourceRegistry` parameter to resolve `dataSource`-bound
 fields' options, per the `data-source-resolution` capability) and against
@@ -294,10 +326,22 @@ left `faulted`.
 - **THEN** the enforcement check passes and submission proceeds to field
   validation as normal
 
-#### Scenario: A step with no declared assignment is unaffected
-- **WHEN** the current step has no `assignment` field
-- **THEN** `submitAndTransition` performs no claim check, identical to
-  today's behavior
+#### Scenario: The starter may submit a step with no declared assignment
+- **WHEN** the current step has no `assignment` field and the calling actor
+  started the instance
+- **THEN** no claim check applies and submission proceeds to field
+  validation as normal
+
+#### Scenario: An operator may submit a step with no declared assignment
+- **WHEN** the current step has no `assignment` field and the calling actor
+  carries `ADMIN_ROLE` without having started the instance
+- **THEN** submission proceeds to field validation as normal
+
+#### Scenario: An unrelated actor may not submit a step with no declared assignment
+- **WHEN** the current step has no `assignment` field and the calling actor
+  neither started the instance nor carries `ADMIN_ROLE`
+- **THEN** it throws `AuthorizationError` before any field validation runs,
+  and the instance is uncommitted
 
 ### Requirement: Claim the current step of a running instance
 
@@ -449,3 +493,106 @@ applies `default` anywhere today, and this change does not add that.
   field the initial step's view marks required
 - **THEN** creation succeeds — the required check runs only on
   `submitAndTransition`, never on creation
+
+### Requirement: A pattern constraint is tested only after the length constraints pass, against a cached expression
+
+When validating a submitted value against `FieldValidation`, the engine SHALL
+evaluate `pattern` only if that value's `minLength`/`maxLength` constraints
+were satisfied. A value that already violates a length constraint is rejected
+regardless, so running a pattern — which may backtrack catastrophically and
+which JavaScript cannot time out — against an over-long, submitter-supplied
+string is unnecessary work with an unbounded worst case. Today the length
+violation is recorded and execution falls through to the pattern test.
+
+The compiled `RegExp` for a pattern SHALL be cached per published body rather
+than constructed per submission and per field. A published body is immutable,
+which is what makes it a sound cache key.
+
+A pattern reaching this point is known to compile, because the compile pass
+rejects one that does not (`definition-contract`). Construction failure at
+submission time is therefore no longer an expected condition.
+
+#### Scenario: An over-long value is not pattern-tested
+
+- **WHEN** a submitted string exceeds the field's `maxLength` and the field
+  also declares a `pattern`
+- **THEN** the length issue is reported and the pattern is not evaluated
+  against that value
+
+#### Scenario: A conforming-length value is pattern-tested as before
+
+- **WHEN** a submitted string satisfies the field's length constraints
+- **THEN** the pattern is evaluated and a mismatch is reported exactly as it
+  is today
+
+#### Scenario: Repeated submissions reuse one compiled expression
+
+- **WHEN** many submissions validate the same field of the same published
+  body
+- **THEN** the pattern is compiled once for that body, not once per
+  submission
+
+### Requirement: An operation targeting a non-running instance is rejected at the boundary
+
+`submitAndTransition`, `claimStep` and `releaseClaim` SHALL throw
+`InstanceNotRunningError`, carrying the instance id and the observed status,
+when the target instance's status is not `running`. The check SHALL happen
+after the instance is loaded under its row lock and before any work is
+committed, so the rejection is exact rather than optimistic.
+
+The engine-level no-op SHALL remain: `commitManualTransition` and
+`updateAssignment` keep returning the instance unchanged for a non-running
+instance, because internal idempotent re-entry (a timer firing against an
+instance a cascade already completed) must not throw. What changes is only
+that a *caller-initiated* operation is told.
+
+Reporting success for an operation that did nothing is the defect this closes.
+Today a submission against a `cancelled`, `completed` or `faulted` instance
+row-locks it, hash-checks its body, enforces the claim, validates the data,
+calls the engine, receives the untouched instance, commits zero writes, and is
+returned as a normal `200` — the submitted data silently discarded. The
+permanent case is a `faulted` instance, where every later submission answers
+success forever.
+
+The concurrent case is the same defect with a race in front of it: of two
+submissions to the same instance, the loser's data is discarded once the
+winner's transition leaves the step, and the loser is currently told it
+succeeded. After this change the loser receives `InstanceNotRunningError` if
+the instance is no longer running — or one of the ordinary errors that already
+apply (a claim error, a validation error, a guard refusal) if it is. There is
+no outcome in which the loser's data is kept: the step it belonged to has been
+left.
+
+#### Scenario: A submission to a cancelled instance is rejected
+
+- **WHEN** `submitAndTransition` targets an instance whose status is
+  `cancelled`
+- **THEN** it throws `InstanceNotRunningError` naming that status, and no
+  data is written
+
+#### Scenario: A submission to a faulted instance is rejected every time
+
+- **WHEN** an instance was parked `faulted` by the automatic cascade's loop
+  guard and a submission is retried against it
+- **THEN** each attempt throws `InstanceNotRunningError` rather than
+  answering success
+
+#### Scenario: Claim and release are rejected the same way
+
+- **WHEN** `claimStep` or `releaseClaim` targets a non-running instance
+- **THEN** it throws `InstanceNotRunningError`, rather than returning the
+  instance unchanged
+
+#### Scenario: The engine-level no-op is unchanged
+
+- **WHEN** an internal caller re-enters `commitManualTransition` or
+  `updateAssignment` for a non-running instance
+- **THEN** it returns the instance unchanged, as today — the rejection lives
+  at the runtime-API boundary, not in the engine
+
+#### Scenario: Of two concurrent submissions, the loser learns it lost
+
+- **WHEN** two `submitAndTransition` calls target the same instance
+  concurrently and the winner's transition leaves the instance non-running
+- **THEN** exactly one fulfils and the other rejects with
+  `InstanceNotRunningError`, rather than both fulfilling
