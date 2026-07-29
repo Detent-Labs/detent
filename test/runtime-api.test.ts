@@ -21,9 +21,12 @@ import {
   getInstanceRecord,
   SubmissionValidationError,
   PinMismatch,
+  NotFoundError,
+  InstanceNotRunningError,
   type InstanceRecordElement,
 } from "../src/runtime/api.js";
 import { ADMIN_ROLE, AuthorizationError } from "../src/auth/authorize.js";
+import { RequestShapeError } from "../src/errors.js";
 import type { ProcessBody, ProcessId, PathId, InstanceId, FieldId, Instance, StepId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
@@ -791,21 +794,30 @@ test.skipIf(!DB)("a concurrent action writeback landing during submitAndTransiti
   expect(data.field_note).toBe("hello"); // the submission's own write also landed
 });
 
-test.skipIf(!DB)("two concurrent submitAndTransition calls serialize instead of both committing", async () => {
+test.skipIf(!DB)("two concurrent submitAndTransition calls: the winner fulfils, the loser learns it lost", async () => {
   const PID = pid("proc_two_paths_1");
   await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
   const created = await createProcessInstance(PID, actor, dataSourceReg);
 
-  // Both resolve (fulfilled): the row lock serializes them, and the loser's
-  // own read comes back fresh — by the time it runs, the instance is already
-  // `completed` on a terminal step, so `commitManualTransition`'s existing
-  // non-running no-op returns it unchanged rather than throwing. The
-  // assertion that matters is that only ONE transition actually committed.
+  // The row lock serializes the two calls; the loser's own locked read comes
+  // back fresh — by the time it runs, the instance is already `completed` on
+  // a terminal step. Previously `commitManualTransition`'s non-running no-op
+  // returned it unchanged and the loser was told 200 with its data silently
+  // discarded (see correct-api-error-responses's design.md — the sharpest
+  // edge of that change). The runtime-API boundary now rejects instead: the
+  // loser's submitAndTransition call throws InstanceNotRunningError, thrown
+  // right after the loser's own locked read, before the engine's no-op is
+  // ever reached. Exactly ONE transition still commits — the write behavior
+  // is unchanged, only the loser's answer is.
   const results = await Promise.allSettled([
     submitAndTransition(created.instanceId, "path_x" as PathId, {} as Instance["data"], actor, dataSourceReg),
     submitAndTransition(created.instanceId, "path_y" as PathId, {} as Instance["data"], actor, dataSourceReg),
   ]);
-  expect(results.every((r) => r.status === "fulfilled")).toBe(true);
+  const fulfilled = results.filter((r) => r.status === "fulfilled");
+  const rejected = results.filter((r) => r.status === "rejected");
+  expect(fulfilled).toHaveLength(1);
+  expect(rejected).toHaveLength(1);
+  expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(InstanceNotRunningError);
 
   const hist = (await sql`SELECT 1 FROM history_entries WHERE instance_id = ${created.instanceId}`) as unknown[];
   expect(hist).toHaveLength(1); // exactly one commit landed, no double-commit
@@ -884,14 +896,79 @@ test.skipIf(!DB)("a post-commit cascade loop throws AutomaticCascadeLoop but lea
   expect(view.status).toBe("faulted");
 });
 
-test.skipIf(!DB)("an unresolvable processId/version surfaces a plain Error", async () => {
+// ============================================================
+// InstanceNotRunningError: submit against a non-running instance
+// ============================================================
+
+test.skipIf(!DB)("a submission to a cancelled instance throws InstanceNotRunningError and writes nothing", async () => {
+  const PID = pid("proc_submit_cancelled_1");
+  const published = await publishBody(PID, selfLoopBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  const cancelled = await cancelInstance(created, published.definition, actor);
+  expect(cancelled.status).toBe("cancelled");
+
+  let raised: unknown;
+  try {
+    await submitAndTransition(cancelled.instanceId, "path_x" as PathId, {} as Instance["data"], actor, dataSourceReg);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(InstanceNotRunningError);
+  expect((raised as InstanceNotRunningError).status).toBe("cancelled");
+
+  // No additional write landed beyond the cancel's own commit: the rejected
+  // submission's transitionSeq matches the cancellation's, not one higher.
+  const row = (await sql`SELECT transition_seq FROM instances WHERE instance_id = ${cancelled.instanceId}`) as { transition_seq: number }[];
+  expect(row[0]!.transition_seq).toBe(cancelled.transitionSeq);
+});
+
+test.skipIf(!DB)("a submission to a faulted instance throws InstanceNotRunningError, every time", async () => {
+  const PID = pid("proc_submit_faulted_1");
+  await publishBody(PID, cascadeLoopBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+
+  // Fault the instance via the automatic-cascade loop guard, same setup as
+  // "a post-commit cascade loop throws AutomaticCascadeLoop..." above.
+  let raised: unknown;
+  try {
+    await submitAndTransition(
+      created.instanceId,
+      "path_ag" as PathId,
+      { field_marker: "first" } as unknown as Instance["data"],
+      actor, dataSourceReg,
+    );
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(AutomaticCascadeLoop);
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
+  expect(view.status).toBe("faulted");
+
+  // Retried against the now-faulted instance, twice: each attempt is told,
+  // rather than silently discarding the retry and reporting success forever.
+  for (let i = 0; i < 2; i++) {
+    let retryRaised: unknown;
+    try {
+      await submitAndTransition(created.instanceId, "path_ag" as PathId, {} as Instance["data"], actor, dataSourceReg);
+    } catch (e) {
+      retryRaised = e;
+    }
+    expect(retryRaised).toBeInstanceOf(InstanceNotRunningError);
+    expect((retryRaised as InstanceNotRunningError).status).toBe("faulted");
+  }
+});
+
+test.skipIf(!DB)("an unresolvable processId/version surfaces a typed NotFoundError", async () => {
+  // Pinned to the typed error, not just "some Error" — see design.md "Type
+  // the not-found throws rather than special-casing them in the fallback":
+  // this now asserts the engine's intent, not the absence of a mapping.
   let raised: unknown;
   try {
     await createProcessInstance(pid("proc_does_not_exist"), actor, dataSourceReg);
   } catch (e) {
     raised = e;
   }
-  expect(raised).toBeInstanceOf(Error);
+  expect(raised).toBeInstanceOf(NotFoundError);
   expect(raised).not.toBeInstanceOf(SubmissionValidationError);
 });
 
@@ -1179,6 +1256,47 @@ test.skipIf(!DB)("listInstances pages through more instances than the limit, cov
   }
   expect(new Set(seen)).toEqual(new Set(created));
   expect(seen.length).toBe(created.length);
+});
+
+test.skipIf(!DB)("listInstances with a malformed cursor raises RequestShapeError, not an uncaught SyntaxError or Postgres cast error", async () => {
+  let raised: unknown;
+  try {
+    await listInstances({}, { cursor: "%%%" });
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(RequestShapeError);
+});
+
+test.skipIf(!DB)("listInstances with a well-formed but wrong-arity cursor raises RequestShapeError", async () => {
+  const wrongArity = Buffer.from(JSON.stringify(["only-one"])).toString("base64url");
+  let raised: unknown;
+  try {
+    await listInstances({}, { cursor: wrongArity });
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(RequestShapeError);
+});
+
+test.skipIf(!DB)("listInstances with a stale but well-formed cursor is a legitimate empty page, not an error", async () => {
+  const PID = pid("proc_list_stale_cursor");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  await createProcessInstance(PID, actor, dataSourceReg);
+
+  const stale = Buffer.from(JSON.stringify([new Date(0).toISOString(), "inst_00000000-0000-0000-0000-000000000000"])).toString("base64url");
+  const page = await listInstances({ processId: PID }, { cursor: stale });
+  expect(page.items).toEqual([]);
+});
+
+test.skipIf(!DB)("getInstanceRecord with a malformed cursor raises RequestShapeError", async () => {
+  let raised: unknown;
+  try {
+    await getInstanceRecord("inst_does_not_exist" as InstanceId, { cursor: "%%%" });
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(RequestShapeError);
 });
 
 test.skipIf(!DB)("listInstances orders newest-first", async () => {

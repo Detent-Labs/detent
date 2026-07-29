@@ -9,7 +9,7 @@ import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { NotAssignedError, NotACandidateError, AlreadyClaimedError, NotClaimedError, NotClaimantError } from "../src/engine/transition.js";
-import { createProcessInstance, claimStep, releaseClaim, submitAndTransition } from "../src/runtime/api.js";
+import { createProcessInstance, claimStep, releaseClaim, submitAndTransition, cancelInstance, InstanceNotRunningError } from "../src/runtime/api.js";
 import { AuthorizationError, ADMIN_ROLE } from "../src/auth/authorize.js";
 import type { ProcessBody, ProcessId, PathId, InstanceEvent } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
@@ -164,6 +164,51 @@ test.skipIf(!DB)("two concurrent releaseClaim calls by the claimant resolve to e
 
   const releasedEvents = (await eventsOf(inst.instanceId)).filter((e) => e.kind === "assignment.released");
   expect(releasedEvents).toHaveLength(1);
+});
+
+// ============================================================
+// InstanceNotRunningError: claim/release against a non-running instance
+// ============================================================
+//
+// `engineClaimStep`/`engineReleaseClaim` (engine/transition.ts::updateAssignment)
+// no-op — return the instance unchanged — against a non-running instance,
+// for internal idempotent re-entry. These wrappers detect that no-op after
+// the fact (claiming/releasing never changes `status`, so a returned
+// instance whose status isn't `running` can only mean the no-op fired) and
+// tell the caller instead of silently succeeding — see runtime-api spec
+// "Claim and release are rejected the same way".
+
+test.skipIf(!DB)("claimStep against a cancelled instance throws InstanceNotRunningError instead of no-op succeeding", async () => {
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+  const cancelled = await cancelInstance(inst.instanceId, candidate); // candidate is the starter
+  expect(cancelled.status).toBe("cancelled");
+
+  let raised: unknown;
+  try {
+    await claimStep(inst.instanceId, candidate);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(InstanceNotRunningError);
+  expect((raised as InstanceNotRunningError).status).toBe("cancelled");
+});
+
+test.skipIf(!DB)("releaseClaim against a cancelled instance throws InstanceNotRunningError instead of no-op succeeding", async () => {
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+  await claimStep(inst.instanceId, candidate);
+  const cancelled = await cancelInstance(inst.instanceId, candidate);
+  expect(cancelled.status).toBe("cancelled");
+
+  let raised: unknown;
+  try {
+    await releaseClaim(inst.instanceId, candidate);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(InstanceNotRunningError);
+  expect((raised as InstanceNotRunningError).status).toBe("cancelled");
 });
 
 test.skipIf(!DB)("submitAndTransition rejects an unclaimed assigned step", async () => {

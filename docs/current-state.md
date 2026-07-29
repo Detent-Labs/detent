@@ -417,12 +417,18 @@ Stage-by-stage status is in `ROADMAP.md`.
   body}`, never throwing) and resolve the caller's `Actor` via an injected
   `ActorResolver` before calling the Runtime API, replacing client-supplied
   actor trust. `errors.ts::mapError` maps each typed Runtime API error to a
-  status (422 validation, 409 guard-refused/concurrency-conflict, 401
-  actor-resolution, 403 assignment/claim errors, 500 fallback for
-  `PinMismatch` and anything untyped — not-found deliberately stays 500, see
-  design.md). `handleSubmit` special-cases `AutomaticCascadeLoop`: the write
-  already committed before it raised, so the route reports the resulting
-  (now-`faulted`) view as a 200 instead of an error.
+  status: 422 for validation, 409 for guard-refused/concurrency-conflict/
+  instance-not-running, 401 for actor-resolution, 403 for assignment/claim
+  errors, 500 for `PinMismatch` and the typed not-found case. Not-found
+  deliberately stays 500 — see design.md and `correct-api-error-responses`
+  below. Any *unrecognized* throw — a `Bun.sql` error, a plugin handler's own
+  throw — falls back to 500 with a message-free body. That fallback also
+  logs server-side. Its `console.error` call records the error and its
+  stack. It also records the request's method and path (see the entry
+  below for the full shape). Separately, `handleSubmit` special-cases
+  `AutomaticCascadeLoop`. The write already committed before it raised. So
+  the route reports the resulting (now-`faulted`) view as a 200, not an
+  error.
 
   **CORS is configuration, not a constant** (`configurable-cors-origins`):
   `createServer` takes an `allowedOrigins` parameter (`undefined` | `"*"` |
@@ -1169,3 +1175,94 @@ Stage-by-stage status is in `ROADMAP.md`.
   `packages/form-ui` declares it as a peer dependency, matching how it
   already declares react. `@marcbachmann/cel-js` now pins an exact version
   instead of a caret range — see `CLAUDE.md`'s one-CEL-library rule for why.
+
+<!-- antislop: allow sentence-length -->
+- Correct the HTTP boundary's error responses (`src/errors.ts`,
+  `src/http/errors.ts`, `src/runtime/api.ts`, `src/pagination.ts`,
+  `src/engine/admin-queries.ts`, `src/http/{routes,admin-routes,studio-routes}.ts`,
+  `correct-api-error-responses`): closes four gaps at the boundary between a
+  client mistake and an engine fault.
+
+  The 500 fallback in `mapError` no longer reflects `err.message`. Its final
+  branch now returns `{ error: { type: "internal" } }` with no `message` —
+  the shape `ConcurrencyConflict` already used. That branch also logs the
+  error server-side: its message, its stack, and the request's method and
+  path, via `console.error`. An unrecognized throw is a `Bun.sql` error
+  naming relations, columns or constraints, or a plugin handler's own throw.
+  It stops leaking to the client. It starts leaving a server-side trace
+  instead.
+
+  Three route files thread their `req`'s method and path into
+  `mapError`: `routes.ts`, `admin-routes.ts`, and `studio-routes.ts`. Each
+  does it through its own (still-duplicated) `guarded` wrapper.
+
+  Two new typed errors live in `src/errors.ts`. That leaf module is already
+  home to `RequestShapeError`, for the same import-cycle reason. They carve
+  out the two conditions that still need their own answer.
+
+  `NotFoundError` replaces the Runtime API Layer's eight untyped not-found
+  `Error` throws. Those are `api.ts`'s "instance not found", "no published
+  body", and "no published version" sites. `NotFoundError` still maps to
+  500 *with* a message. That behavior stays the same. It now pins the
+  engine's intent, not the absence of a mapping.
+
+  Four sites stay deliberately untyped. They go message-free under the
+  fallback. Two are `toSummary`'s and `findStep`'s "current step not in
+  body" — a structural mismatch, not a not-found condition. The other two
+  are the "should never happen" data-source-registry lookups.
+
+  Not-found stays 500, not 404. That choice is deliberate. This change's
+  design.md records it as an open question, not a decision made here.
+
+  `InstanceNotRunningError` (409, `instance-not-running`) carries the
+  instance id and its observed status. It closes a silent-success gap.
+  `submitAndTransition`, `claimStep` and `releaseClaim` used to reach a
+  non-running no-op in their own engine functions. Both
+  `commitManualTransition` and `updateAssignment` correctly keep that
+  no-op, for internal idempotent re-entry. One example: a timer firing
+  against an instance a cascade already completed.
+
+  But those three wrappers used to hand back the untouched instance as an
+  ordinary 200. A submission against a `cancelled`/`completed`/`faulted`
+  instance used to discard its data forever, silently. In a race to leave
+  a step, the response used to tell the loser it won.
+
+  `submitAndTransition` now checks `instance.status` itself. It checks
+  right after its own locked read. It checks before the claim check, and
+  before any validation.
+
+  But `claimStep`/`releaseClaim` are thin delegations with no locked read
+  of their own. They instead detect the engine's no-op *after* the fact:
+  claiming and releasing never change `status`. A returned instance whose
+  status isn't `running` can only mean the no-op fired. It fired against
+  the row the engine's own row lock read. The check is exact, not a second
+  unlocked check racing it.
+
+  `test/runtime-api.test.ts`'s two-concurrent-submissions test changed too.
+  It used to assert both fulfilled. It now asserts one fulfilled, one
+  `InstanceNotRunningError` — the prior assertion *was* the defect.
+
+  Both previously-cast request bodies are now parsed. Now
+  `handleCreateInstance` and `handleSubmit` run their `req.json()` result
+  through a `zod` schema. The schemas are `{ version?: positive int, data?:
+  record }` and `{ pathId: string, data: record, default {} }`,
+  respectively, both via a shared `parseJsonBody` helper.
+
+  That helper raises `RequestShapeError` (400) for invalid JSON. It also
+  raises it for a shape mismatch. It never lets a bare `ZodError` through.
+  `mapError` maps that to 422, the field-validation status, not this one.
+  `data` stays deliberately loose (`z.record(z.unknown())`). Field-level
+  validation is `validateSubmissionData`'s job, not the transport edge's.
+
+  `api.ts` and `admin-queries.ts` used to duplicate `decodeCursor`/
+  `encodeCursor` verbatim (`PONYTAIL-AUDIT.md` finding 9). Both now import
+  them from the new `src/pagination.ts`. Now `decodeCursor` takes an
+  `arity` parameter. Listing cursors are 2-tuples; `getInstanceRecord`'s is a
+  3-tuple. It wraps the base64url-decode-then-`JSON.parse` step in a `try`.
+  It then checks the result is an array of exactly `arity` strings, raising
+  `RequestShapeError` otherwise.
+
+  Validation stays shallow on purpose. A cursor's *values* can be stale, or
+  point past the end of a result set. That is still a legitimate empty
+  page, not an error. Only a cursor that could not have come from
+  `encodeCursor` gets rejected.

@@ -10,7 +10,7 @@
  * this suite now also covers the auth-actor-assignment-claim change.
  */
 import { readFileSync } from "node:fs";
-import { test, expect, beforeAll, beforeEach } from "bun:test";
+import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { createRegistry, register, createDataSourceRegistry, registerDataSource } from "../src/engine/registry.js";
@@ -112,6 +112,32 @@ const cascadeLoopBody = (): ProcessBody =>
         },
         { id: "step_g", key: "g", label: { en: "G" }, type: "task", paths: [{ id: "path_gh", key: "gh", to: "step_h", trigger: "automatic" }] },
         { id: "step_h", key: "h", label: { en: "H" }, type: "task", paths: [{ id: "path_hg", key: "hg", to: "step_g", trigger: "automatic" }] },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+/** Two divergent guardless manual paths off one step, both leading to a terminal step. Same shape as runtime-api.test.ts's twoPathsBody. */
+const twoPathsBody = (): ProcessBody =>
+  ({
+    key: "two_paths_body",
+    label: { en: "Two Paths Body" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          paths: [
+            { id: "path_x", key: "x", to: "step_x", trigger: "manual" },
+            { id: "path_y", key: "y", to: "step_y", trigger: "manual" },
+          ],
+        },
+        { id: "step_x", key: "x_step", label: { en: "X" }, type: "task", terminal: true },
+        { id: "step_y", key: "y_step", label: { en: "Y" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -369,6 +395,116 @@ test.skipIf(!DB)("an unknown instanceId maps to 500, not 404, for an ADMIN_ROLE 
   const body = (await res.json()) as { error: { type: string; message: string } };
   expect(body.error.type).toBe("internal");
   expect(body.error.message).toContain("inst_does_not_exist");
+});
+
+test.skipIf(!DB)("an unrecognized internal failure is 500 with no message, and is logged server-side with the method and path", async () => {
+  const PID = pid("proc_http_fallback_500");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  // A deliberately broken dependency, not a mock: corrupt the persisted
+  // currentStepId to a step id absent from the published body, so
+  // `findStep`'s defensive (deliberately untyped) throw fires — a genuine
+  // internal fault mapError has no typed mapping for, unlike NotFoundError.
+  await sql`UPDATE instances SET body = jsonb_set(body, '{currentStepId}', '"step_does_not_exist"'::jsonb) WHERE instance_id = ${created.instanceId}`;
+
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    const res = await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", admin));
+    expect(res.status).toBe(500);
+    const body = (await res.json()) as { error: { type: string; message?: string } };
+    expect(body.error.type).toBe("internal");
+    expect(body.error.message).toBeUndefined(); // message-free, unlike the typed NotFoundError case above
+    expect(errorSpy).toHaveBeenCalled();
+    const logged = errorSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(logged).toContain("GET");
+    expect(logged).toContain(`/instances/${created.instanceId}`);
+    expect(logged).toContain("step_does_not_exist"); // the actual fault, visible server-side only
+  } finally {
+    errorSpy.mockRestore();
+  }
+});
+
+// ============================================================
+// Request bodies are parsed, never cast (submit / create-instance)
+// ============================================================
+
+test.skipIf(!DB)("POST /instances/:instanceId/submit with no pathId is a 400 request-shape, and writes nothing", async () => {
+  const PID = pid("proc_http_submit_no_pathid");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, { data: { field_amount: 10 } }));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+
+  const view = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", user1))).json()) as { step: { key: string } };
+  expect(view.step.key).toBe("a"); // unmoved
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/submit with a pathId but no data is accepted with an empty data, per the declared default", async () => {
+  const PID = pid("proc_http_submit_no_data");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, { pathId: "path_x" }));
+  expect(res.status).toBe(200); // not 500 (the pre-fix Object.keys(undefined) TypeError) and not 400
+  const body = (await res.json()) as { currentStepId: string };
+  expect(body.currentStepId).toBe("step_x");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/submit with malformed JSON is a 400 request-shape, not a 500", async () => {
+  const PID = pid("proc_http_submit_bad_json");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(
+    new Request(`http://x/instances/${created.instanceId}/submit`, { method: "POST", headers: authHeaders(user1), body: "{not json" }),
+  );
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("POST /processes/:processId/instances with malformed JSON is a 400 request-shape, not a 500", async () => {
+  const PID = pid("proc_http_create_bad_json");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+
+  const res = await fetch(new Request(`http://x/processes/${PID}/instances`, { method: "POST", headers: authHeaders(user1), body: "not json at all" }));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("POST /processes/:processId/instances with a non-integer version is a 400", async () => {
+  const PID = pid("proc_http_create_bad_version_1");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+
+  const res = await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1, { version: 1.5 }));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("POST /processes/:processId/instances with a negative version is a 400", async () => {
+  const PID = pid("proc_http_create_bad_version_2");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+
+  const res = await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1, { version: -1 }));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("POST /processes/:processId/instances with version as a string is a 400", async () => {
+  const PID = pid("proc_http_create_bad_version_3");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+
+  const res = await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1, { version: "1" }));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
 });
 
 // ============================================================
@@ -660,6 +796,72 @@ test.skipIf(!DB)("POST /instances/:instanceId/release by a non-claimant maps to 
   expect(body.error.type).toBe("not-claimant");
 });
 
+// ============================================================
+// InstanceNotRunningError -> 409 (submit/claim/release against a non-running instance)
+// ============================================================
+
+test.skipIf(!DB)("submitting to a cancelled instance maps to 409 instance-not-running and writes nothing", async () => {
+  const PID = pid("proc_http_submit_cancelled");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", admin));
+
+  const res = await fetch(
+    jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, { pathId: "path_ab", data: { field_amount: 10 } }),
+  );
+  expect(res.status).toBe(409);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("instance-not-running");
+
+  const view = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", user1))).json()) as { status: string };
+  expect(view.status).toBe("cancelled"); // unchanged; the submission wrote nothing
+});
+
+test.skipIf(!DB)("submitting to a faulted instance maps to 409 instance-not-running, every time", async () => {
+  const PID = pid("proc_http_submit_faulted");
+  await publishBody(PID, cascadeLoopBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const first = await fetch(
+    jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, { pathId: "path_ag", data: { field_marker: "x" } }),
+  );
+  expect(first.status).toBe(200); // AutomaticCascadeLoop -> faulted view, not an error response
+  const view = (await first.json()) as { status: string };
+  expect(view.status).toBe("faulted");
+
+  for (let i = 0; i < 2; i++) {
+    const retry = await fetch(jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, { pathId: "path_ag", data: {} }));
+    expect(retry.status).toBe(409);
+    const body = (await retry.json()) as { error: { type: string } };
+    expect(body.error.type).toBe("instance-not-running");
+  }
+});
+
+test.skipIf(!DB)("claiming a cancelled instance's step maps to 409 instance-not-running", async () => {
+  const PID = pid("proc_http_claim_cancelled");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", admin));
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+  expect(res.status).toBe(409);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("instance-not-running");
+});
+
+test.skipIf(!DB)("releasing a claim on a cancelled instance maps to 409 instance-not-running", async () => {
+  const PID = pid("proc_http_release_cancelled");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", admin));
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/release`, "POST", user1));
+  expect(res.status).toBe(409);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("instance-not-running");
+});
+
 test.skipIf(!DB)("submitting an unclaimed assigned step maps to 403 not-claimed", async () => {
   const PID = pid("proc_http_submit_403a");
   await publishBody(PID, assignedBody(), reg, dataSourceReg);
@@ -860,6 +1062,55 @@ test.skipIf(!DB)("GET /instances?limit=abc is a 400 request error", async () => 
 
 test.skipIf(!DB)("GET /instances?status=sideways is a 400 request error", async () => {
   const res = await fetch(authedReq("http://x/instances?status=sideways", "GET", admin));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+// ============================================================
+// A malformed pagination cursor is a client error
+// ============================================================
+
+test.skipIf(!DB)("GET /instances?cursor=%%% is a 400 request error, not a 500", async () => {
+  const res = await fetch(authedReq("http://x/instances?cursor=%25%25%25", "GET", admin));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("GET /instances with a well-formed but wrong-arity cursor is a 400", async () => {
+  // listInstances' cursor is a 2-tuple (createdAt, instanceId); this decodes
+  // to valid JSON — a 1-element array — so only the arity check catches it.
+  const wrongArity = Buffer.from(JSON.stringify(["only-one"])).toString("base64url");
+  const res = await fetch(authedReq(`http://x/instances?cursor=${wrongArity}`, "GET", admin));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("GET /instances with a cursor decoding to non-string elements is a 400", async () => {
+  const wrongShape = Buffer.from(JSON.stringify([1, 2])).toString("base64url");
+  const res = await fetch(authedReq(`http://x/instances?cursor=${wrongShape}`, "GET", admin));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("GET /instances with a stale but well-formed cursor is still a valid request, answering an empty page", async () => {
+  const PID = pid("proc_http_stale_cursor");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1));
+
+  // Well-formed, but points past the end of any real result set.
+  const stale = Buffer.from(JSON.stringify([new Date(0).toISOString(), "inst_00000000-0000-0000-0000-000000000000"])).toString("base64url");
+  const res = await fetch(authedReq(`http://x/instances?cursor=${stale}`, "GET", admin));
+  expect(res.status).toBe(200);
+  const page = (await res.json()) as { items: unknown[] };
+  expect(page.items).toEqual([]);
+});
+
+test.skipIf(!DB)("GET /admin/outbox?cursor=%%% behaves identically to the instance listing: 400, not 500", async () => {
+  const res = await fetch(authedReq("http://x/admin/outbox?cursor=%25%25%25", "GET", admin));
   expect(res.status).toBe(400);
   const body = (await res.json()) as { error: { type: string } };
   expect(body.error.type).toBe("request-shape");
@@ -1194,10 +1445,10 @@ test.skipIf(!DB)("POST /instances/:instanceId/cancel authorizes the instance's o
 
 test.skipIf(!DB)("POST /instances/:instanceId/cancel with the system:cancel-any role is authorized before any instance lookup, even for a nonexistent instance", async () => {
   const res = await fetch(authedReq("http://x/instances/inst_does_not_exist/cancel", "POST", admin));
-  // Authorization passes (no 403/401); the subsequent load fails instead — an
-  // untyped "not found" `Error` from the Runtime API Layer, which
-  // `mapError`'s fallback maps to 500/"internal" (see src/http/errors.ts;
-  // design.md's "Error mapping" for why not-found stays 500 instead of 404).
+  // Authorization passes (no 403/401); the subsequent load fails instead — a
+  // typed `NotFoundError` from the Runtime API Layer, which `mapError` maps
+  // to 500/"internal" with its message intact (see src/http/errors.ts;
+  // design.md's "Keep not-found at 500" for why it stays 500 instead of 404).
   // Pinned exactly, not just "not 403/401" as before, so this test fails if
   // the response is anything else — 400, 404, or a crash — not only if it
   // becomes a disguised authorization rejection. Paired with the role-less
@@ -1369,6 +1620,66 @@ test("an AuthorizationError maps to 403", async () => {
 });
 
 test("an unmapped error still falls back to 500", () => {
-  const result = mapError(new Error("something else entirely"));
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    const result = mapError(new Error("something else entirely"));
+    expect(result.status).toBe(500);
+  } finally {
+    errorSpy.mockRestore();
+  }
+});
+
+test("a NotFoundError maps to 500 with its message intact", async () => {
+  const { NotFoundError } = await import("../src/http/errors.js");
+  const result = mapError(new NotFoundError("instance not found: inst_x"));
   expect(result.status).toBe(500);
+  const body = result.body as { error: { type: string; message: string } };
+  expect(body.error.type).toBe("internal");
+  expect(body.error.message).toBe("instance not found: inst_x");
+});
+
+test("an InstanceNotRunningError maps to 409", async () => {
+  const { InstanceNotRunningError } = await import("../src/http/errors.js");
+  const result = mapError(new InstanceNotRunningError("inst_x", "cancelled"));
+  expect(result.status).toBe(409);
+  const body = result.body as { error: { type: string; message: string } };
+  expect(body.error.type).toBe("instance-not-running");
+  expect(body.error.message).toContain("cancelled");
+});
+
+test("the fallback's 500 body carries no message, unlike every typed mapping above", () => {
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    const result = mapError(new Error('relation "instances" does not exist'));
+    const body = result.body as { error: { type: string; message?: string } };
+    expect(body.error.type).toBe("internal");
+    expect(body.error.message).toBeUndefined();
+  } finally {
+    errorSpy.mockRestore();
+  }
+});
+
+test("the fallback logs the error and, when supplied, the request's method and path", () => {
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    mapError(new Error("boom"), { method: "POST", path: "/instances/inst_x/submit" });
+    expect(errorSpy).toHaveBeenCalled();
+    const logged = errorSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(logged).toContain("POST");
+    expect(logged).toContain("/instances/inst_x/submit");
+    expect(logged).toContain("boom");
+  } finally {
+    errorSpy.mockRestore();
+  }
+});
+
+test("the fallback still logs when no context is supplied (a direct mapError call outside routes.ts)", () => {
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    const result = mapError(new Error("boom"));
+    expect(result.status).toBe(500);
+    expect(errorSpy).toHaveBeenCalled();
+  } finally {
+    errorSpy.mockRestore();
+  }
 });

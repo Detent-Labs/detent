@@ -14,7 +14,7 @@ import type { Registry, DataSourceRegistry } from "../engine/registry.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, DEVELOPER_ROLE, PUBLISH_ROLE } from "../auth/authorize.js";
-import { mapError, RequestShapeError, type HttpResult } from "./errors.js";
+import { mapError, RequestShapeError, type HttpResult, type ErrorContext } from "./errors.js";
 import type { ProcessId, ProcessBody, MigrationSpec } from "../schema/definition.js";
 
 /** Shared by every `:version`/`:fromVersion`/`:toVersion` path segment — no existing HTTP handler parses a numeric path param, so this is the one place that convention starts. */
@@ -29,17 +29,22 @@ async function resolveActor(req: Request, resolver: ActorResolver): Promise<Acto
   return resolver(req.headers);
 }
 
+/** Same shape as routes.ts::errorContext. */
+function errorContext(req: Request): ErrorContext {
+  return { method: req.method, path: new URL(req.url).pathname };
+}
+
 /** Same shape as routes.ts::guarded. */
-async function guarded(fn: () => Promise<HttpResult>): Promise<HttpResult> {
+async function guarded(req: Request, fn: () => Promise<HttpResult>): Promise<HttpResult> {
   try {
     return await fn();
   } catch (err) {
-    return mapError(err);
+    return mapError(err, errorContext(req));
   }
 }
 
 export async function handleListDrafts(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, DEVELOPER_ROLE);
     return { status: 200, body: await listDrafts(db) };
@@ -47,7 +52,7 @@ export async function handleListDrafts(req: Request, resolver: ActorResolver, db
 }
 
 export async function handleGetDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, DEVELOPER_ROLE);
     const draft = await getDraft(processId as ProcessId, db);
@@ -57,7 +62,7 @@ export async function handleGetDraft(processId: string, req: Request, resolver: 
 }
 
 export async function handleSaveDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, DEVELOPER_ROLE);
     let parsed: { body?: unknown; layout?: unknown; revision?: unknown };
@@ -72,7 +77,7 @@ export async function handleSaveDraft(processId: string, req: Request, resolver:
 }
 
 export async function handleDeleteDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, DEVELOPER_ROLE);
     const removed = await deleteDraft(processId as ProcessId, db);
@@ -99,7 +104,7 @@ export async function handlePublishDraft(
   dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
 ): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, DEVELOPER_ROLE);
     requireRole(actor, PUBLISH_ROLE);
@@ -119,7 +124,7 @@ export async function handlePublishDraft(
 
 /** The compiled body `resolveBody` already resolves for engine use — unlike the metadata-only sibling `GET /processes/:processId/versions`, this requires `DEVELOPER_ROLE`. */
 export async function handleGetVersionBody(processId: string, versionRaw: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, DEVELOPER_ROLE);
     const version = parseVersion(versionRaw, "version");
@@ -138,7 +143,7 @@ export async function handleGetMigrationPlan(
   resolver: ActorResolver,
   db: SQL = sql,
 ): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, DEVELOPER_ROLE);
     const fromVersion = parseVersion(fromRaw, "fromVersion");
@@ -158,7 +163,7 @@ export async function handlePutMigrationPlan(
   resolver: ActorResolver,
   db: SQL = sql,
 ): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, DEVELOPER_ROLE);
     const fromVersion = parseVersion(fromRaw, "fromVersion");
@@ -177,7 +182,7 @@ export async function handlePutMigrationPlan(
 
 /** Read-only orphan-key dry run, wrapping `findOrphanKeys` unchanged. Version-keyed, not plan-keyed — the scan is independent of any specific migration target. */
 export async function handleGetOrphanKeys(processId: string, versionRaw: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, DEVELOPER_ROLE);
     const version = parseVersion(versionRaw, "version");

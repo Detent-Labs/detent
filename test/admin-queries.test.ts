@@ -11,6 +11,7 @@ import { createRegistry, register, createDataSourceRegistry } from "../src/engin
 import { drainOutbox } from "../src/engine/outbox.js";
 import { registerMigrationPlan, migrateInstances } from "../src/engine/migration.js";
 import { listOutbox, countOutboxByStatus, listPendingTimers, requeueOutboxRow, discardOutboxRow, getOutboxRow } from "../src/engine/admin-queries.js";
+import { RequestShapeError } from "../src/errors.js";
 import type { ProcessBody, Instance, MigrationSpec } from "../src/schema/definition.js";
 
 const DB = !!process.env.DATABASE_URL;
@@ -122,6 +123,37 @@ test.skipIf(!DB)("listOutbox pages through more rows than the limit", async () =
   }
   expect(seen.size).toBe(5);
   expect(cursor).toBeUndefined();
+});
+
+test.skipIf(!DB)("listOutbox with a malformed cursor raises RequestShapeError, not an uncaught SyntaxError or Postgres cast error", async () => {
+  let raised: unknown;
+  try {
+    await listOutbox({}, { cursor: "%%%" }, sql);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(RequestShapeError);
+});
+
+test.skipIf(!DB)("listOutbox with a well-formed but wrong-arity cursor raises RequestShapeError", async () => {
+  const wrongArity = Buffer.from(JSON.stringify(["only-one"])).toString("base64url");
+  let raised: unknown;
+  try {
+    await listOutbox({}, { cursor: wrongArity }, sql);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(RequestShapeError);
+});
+
+test.skipIf(!DB)("listPendingTimers with a malformed cursor raises RequestShapeError, the same extracted helper listOutbox uses", async () => {
+  let raised: unknown;
+  try {
+    await listPendingTimers({ cursor: "%%%" }, sql);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(RequestShapeError);
 });
 
 // ============================================================
