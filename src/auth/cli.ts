@@ -7,8 +7,13 @@
  *   bun run src/auth/cli.ts set-password <email> <password>
  */
 import { createUser, setRoles, setPassword } from "./users.js";
+import { initSchema } from "../engine/store.js";
 
 async function main(argv: string[]): Promise<void> {
+  // Every statement in initSchema is CREATE ... IF NOT EXISTS, so this is a
+  // no-op against a database that already has the schema — and load-bearing
+  // against a fresh one, since add-user is often the first thing run there.
+  await initSchema();
   const [command, ...args] = argv;
   switch (command) {
     case "add-user": {
