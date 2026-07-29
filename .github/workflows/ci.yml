@@ -52,6 +52,16 @@ jobs:
             exit 1
           fi
 
+      # packages/editor's graph-rendering suite drives a real headless
+      # Chromium through mermaid-isomorphic (Mermaid's layout needs real text
+      # measurement). Run from the package so `bunx` resolves the
+      # workspace-local playwright rather than fetching a newer one, whose
+      # browser build would not match. `--with-deps` adds the system
+      # libraries the runner image lacks.
+      - name: Install Playwright browser
+        working-directory: packages/editor
+        run: bunx playwright install --with-deps chromium-headless-shell
+
       # Bun does not typecheck; a type error passes `bun test` cleanly, so
       # this is its own step.
       - name: Typecheck
