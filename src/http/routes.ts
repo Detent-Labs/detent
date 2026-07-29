@@ -26,7 +26,37 @@ import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, PUBLISH_ROLE, ADMIN_ROLE } from "../auth/authorize.js";
 import type { Registry, DataSourceRegistry } from "../engine/registry.js";
 import type { Instance, PathId, ProcessId, InstanceId, StepId, ProcessBody } from "../schema/definition.js";
-import { mapError, RequestShapeError, type HttpResult } from "./errors.js";
+import { mapError, RequestShapeError, type HttpResult, type ErrorContext } from "./errors.js";
+import { z } from "zod";
+
+/**
+ * Shallow envelope schemas for the two routes that used to cast an unchecked
+ * `req.json()` result (`api.ts:59`/`:89` before this change). Deliberately
+ * loose on `data`: field-level validation is `validateSubmissionData`'s job,
+ * so duplicating it here would create two places to change a rule — see
+ * design.md "Zod for the two request bodies, not hand-written checks".
+ */
+const createInstanceBodySchema = z.object({
+  version: z.number().int().positive().optional(),
+  data: z.record(z.unknown()).optional(),
+});
+const submitBodySchema = z.object({
+  pathId: z.string(),
+  data: z.record(z.unknown()).default({}),
+});
+
+/** Parses `req`'s JSON body against `schema`, raising `RequestShapeError` (400) for invalid JSON or a shape mismatch alike — never a bare `ZodError`, which `mapError` maps to 422, the field-validation status, not the request-shape one. */
+async function parseJsonBody<T>(req: Request, schema: z.ZodType<T>): Promise<T> {
+  let raw: unknown;
+  try {
+    raw = await req.json();
+  } catch {
+    throw new RequestShapeError("request body is not valid JSON");
+  }
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) throw new RequestShapeError(`request body does not match the expected shape: ${parsed.error.message}`);
+  return parsed.data;
+}
 
 /**
  * The credential handed to an `ActorResolver` is the request's `Headers`
@@ -38,12 +68,17 @@ async function resolveActor(req: Request, resolver: ActorResolver): Promise<Acto
   return resolver(req.headers);
 }
 
-/** Runs `fn`, mapping any thrown error via `mapError`. Every handler but `handleSubmit` uses this — it alone needs a non-error branch on `AutomaticCascadeLoop`. */
-async function guarded(fn: () => Promise<HttpResult>): Promise<HttpResult> {
+/** `req`'s method and path, for `mapError`'s fallback log — an actionable trace needs the request, not just the stack. */
+function errorContext(req: Request): ErrorContext {
+  return { method: req.method, path: new URL(req.url).pathname };
+}
+
+/** Runs `fn`, mapping any thrown error via `mapError` with `req`'s method/path attached. Every handler but `handleSubmit` uses this — it alone needs a non-error branch on `AutomaticCascadeLoop`. */
+async function guarded(req: Request, fn: () => Promise<HttpResult>): Promise<HttpResult> {
   try {
     return await fn();
   } catch (err) {
-    return mapError(err);
+    return mapError(err, errorContext(req));
   }
 }
 
@@ -54,10 +89,10 @@ export async function handleCreateInstance(
   dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
 ): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
-    const body = (await req.json()) as { version?: number; data?: Instance["data"] };
-    const created = await createProcessInstance(processId as ProcessId, actor, dataSourceRegistry, { version: body.version, data: body.data }, db);
+    const body = await parseJsonBody(req, createInstanceBodySchema);
+    const created = await createProcessInstance(processId as ProcessId, actor, dataSourceRegistry, { version: body.version, data: body.data as Instance["data"] | undefined }, db);
     return { status: 201, body: created };
   });
 }
@@ -69,7 +104,7 @@ export async function handleGetInstanceView(
   dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
 ): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     const view = await getInstanceView(instanceId as InstanceId, actor, dataSourceRegistry, db);
     return { status: 200, body: view };
@@ -86,8 +121,8 @@ export async function handleSubmit(
   let actor: Actor | undefined;
   try {
     actor = await resolveActor(req, resolver);
-    const body = (await req.json()) as { pathId: string; data: Instance["data"] };
-    const updated = await submitAndTransition(instanceId as InstanceId, body.pathId as PathId, body.data, actor, dataSourceRegistry, db);
+    const body = await parseJsonBody(req, submitBodySchema);
+    const updated = await submitAndTransition(instanceId as InstanceId, body.pathId as PathId, body.data as Instance["data"], actor, dataSourceRegistry, db);
     return { status: 200, body: updated };
   } catch (err) {
     // The write already committed before this raised; report the resulting
@@ -96,12 +131,12 @@ export async function handleSubmit(
       const view = await getInstanceView(instanceId as InstanceId, actor, dataSourceRegistry, db);
       return { status: 200, body: view };
     }
-    return mapError(err);
+    return mapError(err, errorContext(req));
   }
 }
 
 export async function handleClaim(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     const updated = await claimStep(instanceId as InstanceId, actor, db);
     return { status: 200, body: updated };
@@ -109,7 +144,7 @@ export async function handleClaim(instanceId: string, req: Request, resolver: Ac
 }
 
 export async function handleRelease(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     const updated = await releaseClaim(instanceId as InstanceId, actor, db);
     return { status: 200, body: updated };
@@ -145,7 +180,7 @@ function parseScope(url: URL): "mine" | "all" {
 }
 
 export async function handleListInstances(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     const url = new URL(req.url);
     const scope = parseScope(url);
@@ -175,7 +210,7 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
 }
 
 export async function handleInstanceRecord(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, ADMIN_ROLE);
     const url = new URL(req.url);
@@ -187,7 +222,7 @@ export async function handleInstanceRecord(instanceId: string, req: Request, res
 }
 
 export async function handleCancel(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     const updated = await cancelInstance(instanceId as InstanceId, actor, db);
     return { status: 200, body: updated };
@@ -214,7 +249,7 @@ export async function handlePublish(
   dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
 ): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, PUBLISH_ROLE);
     let parsed: { processId?: unknown; body?: unknown };
@@ -235,14 +270,14 @@ export async function handlePublish(
 }
 
 export async function handleListProcesses(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     await resolveActor(req, resolver);
     return { status: 200, body: await listProcesses(db) };
   });
 }
 
 export async function handleListVersions(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     await resolveActor(req, resolver);
     return { status: 200, body: await listVersions(processId as ProcessId, db) };
   });

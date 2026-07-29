@@ -13,19 +13,24 @@ import { listUsers, setDisabled } from "../auth/users.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, ADMIN_ROLE } from "../auth/authorize.js";
-import { mapError, RequestShapeError, type HttpResult } from "./errors.js";
+import { mapError, RequestShapeError, type HttpResult, type ErrorContext } from "./errors.js";
 
 /** Same credential-passthrough seam as routes.ts::resolveActor. */
 async function resolveActor(req: Request, resolver: ActorResolver): Promise<Actor> {
   return resolver(req.headers);
 }
 
+/** Same shape as routes.ts::errorContext. */
+function errorContext(req: Request): ErrorContext {
+  return { method: req.method, path: new URL(req.url).pathname };
+}
+
 /** Same shape as routes.ts::guarded. */
-async function guarded(fn: () => Promise<HttpResult>): Promise<HttpResult> {
+async function guarded(req: Request, fn: () => Promise<HttpResult>): Promise<HttpResult> {
   try {
     return await fn();
   } catch (err) {
-    return mapError(err);
+    return mapError(err, errorContext(req));
   }
 }
 
@@ -54,7 +59,7 @@ async function notFoundOrConflict(idempotencyKey: string, db: SQL): Promise<Http
 }
 
 export async function handleAdminListOutbox(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, ADMIN_ROLE);
     const url = new URL(req.url);
@@ -71,7 +76,7 @@ export async function handleAdminListOutbox(req: Request, resolver: ActorResolve
 }
 
 export async function handleAdminOutboxRetry(idempotencyKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, ADMIN_ROLE);
     const updated = await requeueOutboxRow(idempotencyKey, db);
@@ -80,7 +85,7 @@ export async function handleAdminOutboxRetry(idempotencyKey: string, req: Reques
 }
 
 export async function handleAdminOutboxDiscard(idempotencyKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, ADMIN_ROLE);
     const updated = await discardOutboxRow(idempotencyKey, db);
@@ -89,7 +94,7 @@ export async function handleAdminOutboxDiscard(idempotencyKey: string, req: Requ
 }
 
 export async function handleAdminListTimers(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, ADMIN_ROLE);
     const url = new URL(req.url);
@@ -101,7 +106,7 @@ export async function handleAdminListTimers(req: Request, resolver: ActorResolve
 }
 
 export async function handleAdminListUsers(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, ADMIN_ROLE);
     const users = await listUsers(db);
@@ -110,7 +115,7 @@ export async function handleAdminListUsers(req: Request, resolver: ActorResolver
 }
 
 async function handleSetUserDisabled(userId: string, disabled: boolean, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
-  return guarded(async () => {
+  return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, ADMIN_ROLE);
     const updated = await setDisabled(userId, disabled, db);

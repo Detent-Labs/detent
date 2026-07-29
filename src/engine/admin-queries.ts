@@ -10,6 +10,7 @@
 import type { SQL } from "bun";
 import { sql } from "./store.js";
 import { instance as instanceSchema, type Instance, type InstanceId, type ProcessId, type StepId } from "../schema/definition.js";
+import { encodeCursor, decodeCursor } from "../pagination.js";
 
 export type Page<T> = { items: T[]; cursor?: string };
 
@@ -40,13 +41,6 @@ export type PendingTimer = {
 
 const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 200;
-
-function encodeCursor(parts: string[]): string {
-  return Buffer.from(JSON.stringify(parts)).toString("base64url");
-}
-function decodeCursor(cursor: string): string[] {
-  return JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as string[];
-}
 
 function toOutboxRow(r: {
   idempotency_key: string;
@@ -87,7 +81,7 @@ export async function listOutbox(
   db: SQL = sql,
 ): Promise<Page<OutboxRow>> {
   const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
-  const [cursorCreatedAt, cursorKey] = page.cursor ? decodeCursor(page.cursor) : [undefined, undefined];
+  const [cursorCreatedAt, cursorKey] = page.cursor ? decodeCursor(page.cursor, 2) : [undefined, undefined];
   const statusArr = filter.status && filter.status.length > 0 ? db.array(filter.status, "TEXT") : null;
 
   const rows = (await db`
@@ -124,7 +118,7 @@ export async function countOutboxByStatus(db: SQL = sql): Promise<Record<string,
  */
 export async function listPendingTimers(page: { limit?: number; cursor?: string } = {}, db: SQL = sql): Promise<Page<PendingTimer>> {
   const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
-  const [cursorTime, cursorId] = page.cursor ? decodeCursor(page.cursor) : [undefined, undefined];
+  const [cursorTime, cursorId] = page.cursor ? decodeCursor(page.cursor, 2) : [undefined, undefined];
 
   const rows = (await db`
     SELECT instance_id, body, next_timer_at FROM instances

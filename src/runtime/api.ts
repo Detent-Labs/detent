@@ -30,6 +30,8 @@ import {
 import { buildGuardContext, evalGuard, type Actor } from "../cel/eval.js";
 import { requireRole, CANCEL_ANY_ROLE, ADMIN_ROLE, AuthorizationError } from "../auth/authorize.js";
 import { definitionHash } from "../schema/hash.js";
+import { NotFoundError, InstanceNotRunningError } from "../errors.js";
+import { encodeCursor, decodeCursor } from "../pagination.js";
 import { instance as instanceSchema, historyEntry as historyEntrySchema, instanceEvent as instanceEventSchema, collectFieldsDeep, typeMatches, expectedTypeLabel } from "../schema/definition.js";
 import { resolveDataSource, type DataSourceRegistry } from "../engine/registry.js";
 import type {
@@ -64,6 +66,8 @@ export {
   AlreadyClaimedError,
   NotClaimedError,
   NotClaimantError,
+  NotFoundError,
+  InstanceNotRunningError,
 };
 
 // ============================================================
@@ -157,18 +161,11 @@ const MAX_LIST_LIMIT = 200;
 const DEFAULT_RECORD_LIMIT = 100;
 const MAX_RECORD_LIMIT = 500;
 
-function encodeCursor(parts: string[]): string {
-  return Buffer.from(JSON.stringify(parts)).toString("base64url");
-}
-function decodeCursor(cursor: string): string[] {
-  return JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as string[];
-}
-
 async function toSummary(inst: Instance, createdAt: string, store: DefinitionStore): Promise<InstanceSummary> {
   const body = await store.resolveBody(inst.processId, inst.version);
-  if (!body) throw new Error(`no published body for process ${inst.processId} version ${inst.version}`);
+  if (!body) throw new NotFoundError(`no published body for process ${inst.processId} version ${inst.version}`);
   const step = body.workflow.steps.find((s) => s.id === inst.currentStepId);
-  if (!step) throw new Error(`current step not in body: ${inst.currentStepId}`);
+  if (!step) throw new Error(`current step not in body: ${inst.currentStepId}`); // structural mismatch, not a not-found condition — see findStep
   return {
     instanceId: inst.instanceId,
     processId: inst.processId,
@@ -212,11 +209,11 @@ function isGroupField(f: FieldDef): boolean {
 /** Read-only load: unlocked peek for processId/version, then resolveBody, then rehydrate's pin check. */
 async function loadInstanceForRead(instanceId: string, db: SQL): Promise<{ instance: Instance; body: ProcessBody }> {
   const rows = (await db`SELECT body FROM instances WHERE instance_id = ${instanceId}`) as { body: unknown }[];
-  if (rows.length === 0) throw new Error(`instance not found: ${instanceId}`);
+  if (rows.length === 0) throw new NotFoundError(`instance not found: ${instanceId}`);
   const peek = parseInstance(rows[0].body);
   const store = getStore(db);
   const body = await store.resolveBody(peek.processId, peek.version);
-  if (!body) throw new Error(`no published body for process ${peek.processId} version ${peek.version}`);
+  if (!body) throw new NotFoundError(`no published body for process ${peek.processId} version ${peek.version}`);
   const instance = await rehydrate(peek.instanceId, body, db);
   return { instance, body };
 }
@@ -487,12 +484,12 @@ export async function createProcessInstance(
   let body: ProcessBody;
   if (opts?.version !== undefined) {
     const resolved = await store.resolveBody(processId, opts.version);
-    if (!resolved) throw new Error(`no published body for process ${processId} version ${opts.version}`);
+    if (!resolved) throw new NotFoundError(`no published body for process ${processId} version ${opts.version}`);
     version = opts.version;
     body = resolved;
   } else {
     const latest = await store.resolveLatest(processId);
-    if (!latest) throw new Error(`no published version for process ${processId}`);
+    if (!latest) throw new NotFoundError(`no published version for process ${processId}`);
     version = latest.version;
     body = latest.body;
   }
@@ -606,11 +603,20 @@ export async function submitAndTransition(
 
   const committed = await withTransaction(db, async (tx) => {
     const rows = (await tx`SELECT body FROM instances WHERE instance_id = ${instanceId} FOR UPDATE`) as { body: unknown }[];
-    if (rows.length === 0) throw new Error(`instance not found: ${instanceId}`);
+    if (rows.length === 0) throw new NotFoundError(`instance not found: ${instanceId}`);
     const instance = parseInstance(rows[0].body);
 
+    // Exact, not optimistic: checked right after the locked read, before any
+    // further work (body resolution, claim enforcement, validation). A
+    // cancelled/completed/faulted instance answers InstanceNotRunningError
+    // instead of silently discarding the submission and reporting success —
+    // see runtime-api spec "An operation targeting a non-running instance is
+    // rejected at the boundary". The engine-level no-op in
+    // commitManualTransition stays, for internal idempotent re-entry.
+    if (instance.status !== "running") throw new InstanceNotRunningError(instance.instanceId, instance.status);
+
     const body = await store.resolveBody(instance.processId, instance.version);
-    if (!body) throw new Error(`no published body for process ${instance.processId} version ${instance.version}`);
+    if (!body) throw new NotFoundError(`no published body for process ${instance.processId} version ${instance.version}`);
     const gotHash = definitionHash(body);
     if (gotHash !== instance.definitionHash) throw new PinMismatch(instance.instanceId, instance.definitionHash, gotHash);
 
@@ -633,7 +639,7 @@ export async function submitAndTransition(
   });
 
   const body = await store.resolveBody(committed.processId, committed.version);
-  if (!body) throw new Error(`no published body for process ${committed.processId} version ${committed.version}`);
+  if (!body) throw new NotFoundError(`no published body for process ${committed.processId} version ${committed.version}`);
   return resolveAutomatic(committed, body, actor, db);
 }
 
@@ -641,17 +647,30 @@ export async function submitAndTransition(
  * Claim the current step of a running instance. Thin delegation to the engine
  * implementation — see `engine/transition.ts::claimStep` for the row-lock,
  * candidate-eligibility, and exclusivity semantics.
+ *
+ * `engineClaimStep` no-ops (returns the instance unchanged) rather than
+ * throwing when the instance is not running — that no-op exists for internal
+ * idempotent re-entry and must stay. A *caller-initiated* claim needs to be
+ * told, so this wrapper detects the no-op after the fact: claiming never
+ * changes `status`, so a returned instance whose status is not `running` can
+ * only mean the no-op branch fired against the row the engine's own row lock
+ * read — exact, not a separate unlocked check racing it.
  */
 export async function claimStep(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<Instance> {
-  return engineClaimStep(instanceId, actor, db);
+  const updated = await engineClaimStep(instanceId, actor, db);
+  if (updated.status !== "running") throw new InstanceNotRunningError(updated.instanceId, updated.status);
+  return updated;
 }
 
 /**
  * Release a claim on the current step of a running instance. Thin delegation
  * to the engine implementation — see `engine/transition.ts::releaseClaim`.
+ * Same non-running detection as `claimStep`, for the same reason.
  */
 export async function releaseClaim(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<Instance> {
-  return engineReleaseClaim(instanceId, actor, db);
+  const updated = await engineReleaseClaim(instanceId, actor, db);
+  if (updated.status !== "running") throw new InstanceNotRunningError(updated.instanceId, updated.status);
+  return updated;
 }
 
 /**
@@ -713,7 +732,7 @@ export async function listInstances(
   db: SQL = sql,
 ): Promise<Page<InstanceSummary>> {
   const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
-  const [cursorCreatedAt, cursorInstanceId] = page.cursor ? decodeCursor(page.cursor) : [undefined, undefined];
+  const [cursorCreatedAt, cursorInstanceId] = page.cursor ? decodeCursor(page.cursor, 2) : [undefined, undefined];
   const statusArr = filter.status && filter.status.length > 0 ? db.array(filter.status, "TEXT") : null;
   const assignedToRolesArr = filter.assignedToRoles && filter.assignedToRoles.length > 0 ? db.array(filter.assignedToRoles, "TEXT") : null;
 
@@ -767,7 +786,7 @@ export async function getInstanceRecord(
   db: SQL = sql,
 ): Promise<Page<InstanceRecordElement>> {
   const limit = Math.min(page.limit ?? DEFAULT_RECORD_LIMIT, MAX_RECORD_LIMIT);
-  const [cursorSeqRaw, cursorAt, cursorId] = page.cursor ? decodeCursor(page.cursor) : [undefined, undefined, undefined];
+  const [cursorSeqRaw, cursorAt, cursorId] = page.cursor ? decodeCursor(page.cursor, 3) : [undefined, undefined, undefined];
   const cursorSeq = cursorSeqRaw !== undefined ? Number(cursorSeqRaw) : null;
 
   const rows = (await db`

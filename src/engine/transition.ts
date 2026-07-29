@@ -444,6 +444,11 @@ export async function commitManualTransition(
   db: SQL = sql,
   dataPatch?: Instance["data"],
 ): Promise<Instance> {
+  // Deliberately a no-op, not a throw: internal idempotent re-entry (e.g. a
+  // timer firing against an instance a cascade already completed) must not
+  // throw. A caller-initiated rejection lives one layer up, at the
+  // runtime-API boundary (`submitAndTransition`'s own status check) — see
+  // correct-api-error-responses's design.md.
   if (instance.status !== "running") return instance;
 
   const source = body.workflow.steps.find((s) => s.id === instance.currentStepId);
@@ -867,6 +872,10 @@ async function updateAssignment(
 ): Promise<Instance> {
   return withTransaction(db, async (tx) => {
     const inst = await loadForClaim(tx, instanceId);
+    // Deliberately a no-op, not a throw — same reasoning as
+    // commitManualTransition's. The runtime-API wrappers (`claimStep`/
+    // `releaseClaim` in `runtime/api.ts`) detect this no-op after the fact
+    // and reject the caller-initiated request themselves.
     if (inst.status !== "running") return inst;
 
     guard(inst.assignment);
