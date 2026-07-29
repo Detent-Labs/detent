@@ -101,7 +101,11 @@ mapping and is never visible to guards. Use ONE CEL library for both the editor
 
 A guard is total: a runtime error is not a match, not a throw. The most
 common cause is a field the instance has not written yet. The path is not
-taken (the wait-state idiom).
+taken (the wait-state idiom). `@marcbachmann/cel-js` pins an exact version in
+`package.json` (no caret). An evaluation-semantics change in the library
+must not silently reroute or park an already-published, immutable body. An
+upgrade is a deliberate, reviewed commit that re-runs `test/cel.test.ts`,
+never an incidental `bun update`.
 
 A subprocess `inputMapping`/`outputMapping` entry now agrees with that rule
 instead of contradicting it. A raising entry leaves its target unwritten. It

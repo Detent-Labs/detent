@@ -11,8 +11,13 @@ import { createRegistry, createDataSourceRegistry } from "../src/engine/registry
 import { NotAssignedError, NotACandidateError, AlreadyClaimedError, NotClaimedError, NotClaimantError } from "../src/engine/transition.js";
 import { createProcessInstance, claimStep, releaseClaim, submitAndTransition } from "../src/runtime/api.js";
 import { AuthorizationError, ADMIN_ROLE } from "../src/auth/authorize.js";
-import type { ProcessBody, ProcessId, PathId } from "../src/schema/definition.js";
+import type { ProcessBody, ProcessId, PathId, InstanceEvent } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
+
+const eventsOf = async (id: string): Promise<InstanceEvent[]> => {
+  const r = (await sql`SELECT event FROM instance_events WHERE instance_id = ${id} ORDER BY id`) as { event: unknown }[];
+  return r.map((x) => (typeof x.event === "string" ? JSON.parse(x.event) : x.event) as InstanceEvent);
+};
 
 const DB = !!process.env.DATABASE_URL;
 const candidate: Actor = { id: "user_1", roles: [] };
@@ -102,6 +107,33 @@ test.skipIf(!DB)("claimStep rejects claiming an already-claimed step", async () 
   await rejectsWith(claimStep(inst.instanceId, roleActor), AlreadyClaimedError);
 });
 
+// Two actors racing to claim the same unclaimed step resolve to exactly one
+// winner (the assignment-claim-enforcement spec's scenario). Unlike the
+// sequential test above, both calls are issued concurrently via
+// `Promise.allSettled` so the second call can only observe the first's
+// outcome through `claimStep`'s `SELECT ... FOR UPDATE` row lock, not
+// through already-committed state — this is what would catch the lock being
+// removed, which the sequential test cannot. Modelled on
+// `test/timer.test.ts`'s "two concurrent fireTimer calls commit exactly one
+// transition".
+test.skipIf(!DB)("two concurrent claimStep calls on the same step resolve to exactly one winner", async () => {
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+
+  const results = await Promise.allSettled([claimStep(inst.instanceId, candidate), claimStep(inst.instanceId, roleActor)]);
+  const fulfilled = results.filter((r) => r.status === "fulfilled");
+  const rejected = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+  expect(fulfilled).toHaveLength(1);
+  expect(rejected).toHaveLength(1);
+  expect(rejected[0]!.reason).toBeInstanceOf(AlreadyClaimedError);
+
+  // Proves the outcome at the record level, not only at the API level: a
+  // race that let both calls through would still show a single API winner
+  // if the second write silently clobbered the first's event.
+  const claimedEvents = (await eventsOf(inst.instanceId)).filter((e) => e.kind === "assignment.claimed");
+  expect(claimedEvents).toHaveLength(1);
+});
+
 test.skipIf(!DB)("releaseClaim succeeds for the claimant, rejects a non-claimant", async () => {
   await publishBody(PID, assignedBody(), reg, dataSourceReg);
   const inst = await createProcessInstance(PID, candidate, dataSourceReg);
@@ -109,6 +141,29 @@ test.skipIf(!DB)("releaseClaim succeeds for the claimant, rejects a non-claimant
   await rejectsWith(releaseClaim(inst.instanceId, roleActor), NotClaimantError);
   const released = await releaseClaim(inst.instanceId, candidate);
   expect(released.assignment?.claimedBy).toBeUndefined();
+});
+
+// Mirrored release race: the same claimant issues two concurrent
+// `releaseClaim` calls. `releaseClaim`'s row lock serializes them exactly
+// like `claimStep`'s does — the first to acquire the lock clears
+// `claimedBy`, so the second observes an already-released assignment and
+// fails its own claimant guard (`assignment.claimedBy !== actor.id`, now
+// `undefined !== actor.id`), rejecting with `NotClaimantError` rather than
+// both succeeding as a double release.
+test.skipIf(!DB)("two concurrent releaseClaim calls by the claimant resolve to exactly one winner", async () => {
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+  await claimStep(inst.instanceId, candidate);
+
+  const results = await Promise.allSettled([releaseClaim(inst.instanceId, candidate), releaseClaim(inst.instanceId, candidate)]);
+  const fulfilled = results.filter((r) => r.status === "fulfilled");
+  const rejected = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+  expect(fulfilled).toHaveLength(1);
+  expect(rejected).toHaveLength(1);
+  expect(rejected[0]!.reason).toBeInstanceOf(NotClaimantError);
+
+  const releasedEvents = (await eventsOf(inst.instanceId)).filter((e) => e.kind === "assignment.released");
+  expect(releasedEvents).toHaveLength(1);
 });
 
 test.skipIf(!DB)("submitAndTransition rejects an unclaimed assigned step", async () => {

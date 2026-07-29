@@ -1194,9 +1194,19 @@ test.skipIf(!DB)("POST /instances/:instanceId/cancel authorizes the instance's o
 
 test.skipIf(!DB)("POST /instances/:instanceId/cancel with the system:cancel-any role is authorized before any instance lookup, even for a nonexistent instance", async () => {
   const res = await fetch(authedReq("http://x/instances/inst_does_not_exist/cancel", "POST", admin));
-  // Authorization passes (no 403/401); the subsequent load fails instead, distinctly from an authorization rejection.
-  expect(res.status).not.toBe(403);
-  expect(res.status).not.toBe(401);
+  // Authorization passes (no 403/401); the subsequent load fails instead — an
+  // untyped "not found" `Error` from the Runtime API Layer, which
+  // `mapError`'s fallback maps to 500/"internal" (see src/http/errors.ts;
+  // design.md's "Error mapping" for why not-found stays 500 instead of 404).
+  // Pinned exactly, not just "not 403/401" as before, so this test fails if
+  // the response is anything else — 400, 404, or a crash — not only if it
+  // becomes a disguised authorization rejection. Paired with the role-less
+  // 403 test above: the two together prove a role-holding caller's failure
+  // differs from a role-lacking caller's, which is the non-disclosure
+  // property `cancelInstance`'s ordering exists to preserve.
+  expect(res.status).toBe(500);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("internal");
 });
 
 test.skipIf(!DB)("POST /processes with a structurally invalid body (missing initialStep) maps to 422", async () => {
