@@ -18,9 +18,22 @@ export async function createUser(email: string, password: string, roles: string[
 }
 
 /**
+ * A process-lifetime dummy hash, verified against on the no-such-row path so
+ * that path costs the same argon2id work as a real one. A promise, not
+ * `await`ed at module scope, so importing this module (e.g. from
+ * `src/auth/cli.ts`) stays synchronous — the promise settles long before any
+ * real login reaches it. Generated from a random UUID so no attacker-known
+ * plaintext maps to it.
+ */
+const DUMMY_HASH = Bun.password.hash(crypto.randomUUID());
+
+/**
  * Unknown email, wrong password and a disabled user all return `undefined` —
  * the same generic failure, so a caller cannot learn from this function's
- * result which email addresses exist or which accounts are disabled.
+ * result, or from its timing, which email addresses exist or which accounts
+ * are disabled. Exactly one `Bun.password.verify` runs on every path: a
+ * `return` before verifying (the no-such-row shape) would make the unknown-
+ * email path roughly two orders of magnitude faster than a known one.
  */
 export async function verifyLogin(email: string, password: string, db: SQL = sql): Promise<{ userId: string; roles: string[] } | undefined> {
   const rows = (await db`SELECT user_id, password_hash, roles, disabled FROM auth_users WHERE email = ${email}`) as {
@@ -30,9 +43,8 @@ export async function verifyLogin(email: string, password: string, db: SQL = sql
     disabled: boolean;
   }[];
   const row = rows[0];
-  if (!row) return undefined;
-  const valid = await Bun.password.verify(password, row.password_hash);
-  if (!valid || row.disabled) return undefined;
+  const valid = await Bun.password.verify(password, row?.password_hash ?? (await DUMMY_HASH));
+  if (!row || !valid || row.disabled) return undefined;
   return { userId: row.user_id, roles: row.roles };
 }
 

@@ -29,7 +29,7 @@ const cel = (src: string) => ({ lang: "cel", src });
 const reg = createRegistry();
 const dataSourceReg = createDataSourceRegistry();
 registerDataSource(dataSourceReg, "static", { resolve: async (ctx) => (ctx.config as { options: unknown[] }).options as never });
-const fetch = createServer(dataSourceReg, reg);
+const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
 beforeAll(async () => {
   if (DB) await initSchema();
@@ -667,7 +667,7 @@ test.skipIf(!DB)("happy path through expense-approval.json settles the async 'bo
   const expenseReg = createRegistry();
   register(expenseReg, "accounting.postInvoice", { handler: async () => ({ status: "booked" }) });
   register(expenseReg, "notify.email", { handler: async () => ({}) });
-  const expenseFetch = createServer(dataSourceReg, expenseReg);
+  const expenseFetch = createServer(dataSourceReg, expenseReg, sql, devHeaderResolver);
 
   const PID = pid("proc_http_expense");
   await publishBody(PID, authored, expenseReg, dataSourceReg);

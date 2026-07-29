@@ -550,8 +550,18 @@ Stage-by-stage status is in `ROADMAP.md`.
   rolesClaim}`, parsed and shape-checked by `parseAuthIssuers` — a malformed
   value throws, failing startup loudly rather than silently disabling
   issuers). If either is set the JWT resolver is active and `devHeaderResolver`
-  is not; if neither is set `devHeaderResolver` stays the default, which is
-  what keeps `test/http.test.ts` unchanged and green with no auth env set.
+  is not.
+  **Updated by `harden-auth-configuration`:** if an operator configures
+  neither variable, startup now fails. The operator must set
+  `ALLOW_INSECURE_DEV_AUTH=1` to choose `devHeaderResolver` on purpose. Doing
+  so also prints a startup warning naming the trusted headers. Selecting the
+  unsigned-header resolver now always reflects an operator's explicit choice,
+  never an omitted variable. `createServer`'s `resolver` parameter also lost
+  its default, so no call site can reach `devHeaderResolver` by omission.
+  Every test that wants it now passes `devHeaderResolver` explicitly.
+  `AUTH_JWT_SECRET`, when set, must encode to at least 32 bytes — the
+  HMAC-SHA-256 output size. A short key fails startup and names the variable.
+  A one-character key is no longer a working HS256 deployment.
   `createServer` registers `POST /auth/login` only when a signing key is
   passed in — there is no state where the login route is reachable without
   one, and it is otherwise a plain `404`. **All four `add-read-query-api` list
@@ -629,6 +639,38 @@ Stage-by-stage status is in `ROADMAP.md`.
   in-memory, no new dependency: per-IP limiting and cross-process
   coordination are out of scope (single `Bun.serve` process today; see the
   change's design.md).
+- Auth hardening, no-auth-configured fallback (`src/http/server.ts`,
+  `harden-auth-configuration`): startup now fails if an operator configures
+  neither `AUTH_JWT_SECRET` nor `AUTH_ISSUERS`. The operator must set
+  `ALLOW_INSECURE_DEV_AUTH=1` to choose `devHeaderResolver` on purpose. That
+  also prints a startup warning naming the trusted headers.
+- Auth hardening, signing key length (`src/http/server.ts`,
+  `harden-auth-configuration`): `AUTH_JWT_SECRET`, when set, must now encode
+  to at least 32 bytes — the HMAC-SHA-256 output size. A shorter value fails
+  startup and names the variable.
+- Auth hardening, rate limiter (`src/auth/login.ts`,
+  `harden-auth-configuration`): `checkAndRecordAttempt` now sweeps expired
+  entries before it judges capacity. A not-yet-tracked email that still
+  meets a full map after the sweep fails **closed**, with the same `429`. It
+  no longer runs untracked. A full map used to disable rate limiting for
+  every new email, permanently. Now it only delays a new email until its
+  window expires.
+- Auth hardening, login timing (`src/auth/users.ts`,
+  `harden-auth-configuration`): `verifyLogin` now performs one password
+  verification on every path, including the no-such-row path. The no-such-row
+  path checks against a process-lifetime dummy hash. Its timing no longer
+  discloses which emails have accounts.
+- Content-Security-Policy for the four SPAs
+  (`packages/{app,admin,studio,editor}/vite.config.ts`,
+  `harden-auth-configuration`): rides along in the same change, at the same
+  blast radius. Every browser package's production build now emits a
+  Content-Security-Policy meta tag (`script-src 'self'`, `object-src 'none'`,
+  `base-uri 'none'`, `form-action 'self'`, `frame-ancestors 'none'`,
+  `connect-src` derived from `VITE_API_URL`). A build-only Vite plugin
+  injects it, so `bun run dev` keeps working as before. This is defense in
+  depth for the bearer token in `localStorage`. Its 8-hour expiry means
+  nothing can revoke it early. There is no known injection sink in the tree
+  today.
 - End-user app (`packages/app`, `packages/form-ui`, `add-end-user-app`): the
   participant-facing frontend — Login, My-tasks (inbox), Task, Start-a-process,
   four screens over a small hand-written History-API routing hook, talking to

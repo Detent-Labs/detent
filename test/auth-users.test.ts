@@ -44,6 +44,25 @@ test.skipIf(!DB)("an unknown email does not verify", async () => {
   expect(await verifyLogin("nobody@example.com", "anything")).toBeUndefined();
 });
 
+test.skipIf(!DB)("an unknown email takes comparable time to a known one with the wrong password", async () => {
+  await createUser("timing@example.com", "correct-horse", []);
+
+  const time = async (fn: () => Promise<unknown>): Promise<number> => {
+    const start = performance.now();
+    await fn();
+    return performance.now() - start;
+  };
+
+  const knownWrong = await time(() => verifyLogin("timing@example.com", "wrong-password"));
+  const unknown = await time(() => verifyLogin("nobody-timing@example.com", "wrong-password"));
+
+  // Before this fix, an unknown email skipped Bun.password.verify entirely and
+  // returned roughly two orders of magnitude faster (about 1/100 the duration).
+  // A 1/2 bound is a wide margin that separates the two behaviors without
+  // depending on machine speed — do not tighten it, or this becomes a flaky test.
+  expect(unknown).toBeGreaterThan(knownWrong / 2);
+});
+
 test.skipIf(!DB)("no plaintext password is stored", async () => {
   await createUser("d@example.com", "correct-horse", []);
   const rows = (await sql`SELECT password_hash FROM auth_users WHERE email = ${"d@example.com"}`) as { password_hash: string }[];

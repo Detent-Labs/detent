@@ -51,7 +51,17 @@ export function checkAndRecordAttempt(map: Map<string, AttemptEntry>, email: str
     entry.count += 1;
     return "ok";
   }
-  if (!entry && map.size >= MAX_TRACKED_EMAILS) return "ok"; // fail open: don't grow the map without bound
+  if (!entry && map.size >= MAX_TRACKED_EMAILS) {
+    // Expired entries carry no information (they'd reset on next use anyway),
+    // so reclaim them before judging capacity.
+    for (const [trackedEmail, trackedEntry] of map) {
+      if (t - trackedEntry.windowStart > WINDOW_MS) map.delete(trackedEmail);
+    }
+    // Still full of live windows: fail closed rather than admit an untracked
+    // email, which would let a flood of distinct emails silently and
+    // permanently disable rate limiting for everyone.
+    if (map.size >= MAX_TRACKED_EMAILS) return "limited";
+  }
   map.set(email, { count: 1, windowStart: t });
   return "ok";
 }

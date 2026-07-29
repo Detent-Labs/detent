@@ -16,7 +16,7 @@ import { createRegistry, createDataSourceRegistry } from "../src/engine/registry
 import type { ProcessBody } from "../src/schema/definition.js";
 
 const DB = !!process.env.DATABASE_URL;
-const SECRET = "auth-login-test-secret-value";
+const SECRET = "auth-login-test-secret-value-0123456789"; // >= 32 encoded bytes; models a configuration the server now requires
 
 const simpleBody = (): ProcessBody =>
   ({
@@ -163,18 +163,60 @@ test("checkAndRecordAttempt allows up to MAX_ATTEMPTS, then limits, then resets 
   expect(checkAndRecordAttempt(map, "a@example.com", now)).toBe("ok");
 });
 
-test("checkAndRecordAttempt fails open once MAX_TRACKED_EMAILS distinct keys are tracked", () => {
+// This suite exercises the capacity (MAX_TRACKED_EMAILS) fail-closed path at the
+// pure checkAndRecordAttempt level, not through handleLogin end-to-end. Reaching
+// capacity via real handleLogin calls now costs one Bun.password.verify per
+// distinct email (the login-timing fix in src/auth/users.ts runs the dummy-hash
+// verification on every path, ~100ms each), so a literal 50,000-request
+// end-to-end test would take well over an hour. The MAX_ATTEMPTS 429 path below
+// already proves handleLogin's dispatch on a "limited" result short-circuits
+// before verifyLogin; that dispatch is identical regardless of which branch of
+// checkAndRecordAttempt produced "limited".
+test("checkAndRecordAttempt fails closed once MAX_TRACKED_EMAILS live-window keys are tracked", () => {
   const now = () => 0;
   const map = new Map<string, { count: number; windowStart: number }>();
   for (let i = 0; i < MAX_TRACKED_EMAILS; i++) map.set(`user${i}@example.com`, { count: 1, windowStart: 0 });
 
-  expect(checkAndRecordAttempt(map, "new@example.com", now)).toBe("ok");
+  expect(checkAndRecordAttempt(map, "new@example.com", now)).toBe("limited");
   expect(map.has("new@example.com")).toBe(false);
   expect(map.size).toBe(MAX_TRACKED_EMAILS);
 
-  // an already-tracked email is unaffected by capacity
+  // an already-tracked email under MAX_ATTEMPTS is admitted normally, even
+  // though the map is at full capacity — the entry-exists branch never
+  // consults map size
+  map.set("under-limit@example.com", { count: 1, windowStart: 0 });
+  expect(checkAndRecordAttempt(map, "under-limit@example.com", now)).toBe("ok");
+
+  // an already-tracked email already at MAX_ATTEMPTS is still rate-limited
+  // normally, for the ordinary MAX_ATTEMPTS reason, not because of capacity
   map.set("tracked@example.com", { count: MAX_ATTEMPTS, windowStart: 0 });
   expect(checkAndRecordAttempt(map, "tracked@example.com", now)).toBe("limited");
+});
+
+test("checkAndRecordAttempt reclaims expired entries before judging capacity, and admits the new email", () => {
+  const now = () => 0;
+  const map = new Map<string, { count: number; windowStart: number }>();
+  // Every entry's window started long enough ago to have expired by "now".
+  for (let i = 0; i < MAX_TRACKED_EMAILS; i++) {
+    map.set(`user${i}@example.com`, { count: 1, windowStart: -(WINDOW_MS + 1) });
+  }
+
+  expect(checkAndRecordAttempt(map, "new@example.com", now)).toBe("ok");
+  expect(map.has("new@example.com")).toBe(true);
+  expect(map.size).toBe(1); // every expired entry was swept, only the new one remains
+});
+
+test("a flood of distinct emails cannot permanently disable the limiter — expired entries free capacity again", () => {
+  let t = 0;
+  const now = () => t;
+  const map = new Map<string, { count: number; windowStart: number }>();
+  for (let i = 0; i < MAX_TRACKED_EMAILS; i++) map.set(`flood${i}@example.com`, { count: 1, windowStart: t });
+
+  expect(checkAndRecordAttempt(map, "victim@example.com", now)).toBe("limited");
+
+  t += WINDOW_MS + 1;
+  expect(checkAndRecordAttempt(map, "victim@example.com", now)).toBe("ok");
+  expect(map.has("victim@example.com")).toBe(true);
 });
 
 test.skipIf(!DB)("an email under MAX_ATTEMPTS is not rate-limited", async () => {
