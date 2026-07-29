@@ -1158,15 +1158,19 @@ Stage-by-stage status is in `ROADMAP.md`.
   `migration.ts::migrateOne` read it. Both close a sequential-scan gap the
   function's other jsonb-nested predicates already had an index for.
 
-- CI (`.github/workflows/ci.yml`, `add-ci-and-dependency-hygiene`): one job,
-  triggered on every push and pull request, runs against a real `postgres:16`
-  service using the devcontainer's credentials (`postgres`/`postgres`,
-  database `workflow_engine`). Four steps run in order: install with the
-  frozen lockfile, a guard requiring `DATABASE_URL`, typecheck, then test.
-  The guard step matters most. Without it, a misconfigured job still prints a
-  green `bun test` result. It silently skips the 500+ database-backed test
-  sites that make up most of the suite. Bun installs at the Dockerfile's
-  pinned version, so CI and a local run cannot drift apart.
+- CI (`.githooks/pre-push`, `add-ci-and-dependency-hygiene`): no hosted
+  service runs this repository, by the owner's decision. The gate is a
+  `pre-push` hook, which runs `bun run check` (typecheck, then `bun test`)
+  through `docker compose exec` in the dev container. A non-zero exit blocks
+  the push. Running there closes the finding's real hazard: the container's
+  environment already carries `DATABASE_URL`. So the 500+ database-backed
+  test sites that make up most of the suite cannot skip silently and report a
+  meaningless green. It also pins Bun to the Dockerfile's version, so no
+  host-side drift.
+
+- Two gaps the hook has and a hosted gate would not. `--no-verify` bypasses
+  it. A clone arms it with `git config core.hooksPath .githooks` (README's
+  Develop block); until then it is inert.
 <!-- antislop: allow sentence-length -->
 - Dependency-manifest fixes ride along in the same change. `zod` now lives in
   the root's `dependencies`, not `devDependencies` as before. Six modules

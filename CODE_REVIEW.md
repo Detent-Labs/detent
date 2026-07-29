@@ -50,26 +50,40 @@ Verified against the code on 2026-07-29, one anchor per change:
 | `correct-api-error-responses` | ERR-3, 4, 5, 8 | commit `b49051d` |
 | `render-frontend-error-states` | ERR-2, CQ-3 | no `else throw err` remains in any package; `packages/studio/src/panels/DraftToolbar.tsx:103` (`reloaded` advances `savedBody`) |
 | `spa-accessibility-pass` | CQ-1, CQ-2, PERF-3 | row navigation is a real `<button>` in `packages/app` and `packages/admin`; `packages/studio/src/panels/StepsPanel.tsx:130` (`aria-expanded`); `packages/form-ui/src/FieldForm.tsx:87-89` |
-| `add-ci-and-dependency-hygiene` | TEST-1, 2, 3, DEP-1, 2, DOC-1 | `.github/workflows/ci.yml`; `zod` in `dependencies` and `@marcbachmann/cel-js` at `8.0.0` in `package.json:26-30`; `test/assignment.runtime-api.test.ts:123`/`:158` (interleaved claim and release races) |
+| `add-ci-and-dependency-hygiene` | TEST-1, 2, 3, DEP-1, 2, DOC-1 | `.githooks/pre-push` (see the note below); `zod` in `dependencies` and `@marcbachmann/cel-js` at `8.0.0` in `package.json:26-30`; `test/assignment.runtime-api.test.ts:123`/`:158` (interleaved claim and release races) |
 | `fix-schema-bootstrap-and-indexes` | ERR-9, PERF-1, 2 | `src/http/server.ts:424` (`await initSchema(db)`), `src/engine/store.ts:93`/`:223` (both indexes) |
 
 **Verification run** (devcontainer, `DATABASE_URL` set, Bun 1.3.11):
-`bun run typecheck` clean across the engine and all five packages;
-`bun test` at 1303 pass / 4 fail across 89 files. The four failures are all
-`vite-config.test.ts`, which cannot load `@rollup/rollup-linux-x64-gnu`. A
-Windows host installed this checkout's `node_modules`, so it holds the win32
-optional binary instead. CI installs on Linux and runs those four green.
+`bun run typecheck` clean across the engine and all five packages, `bun test`
+at 1319 pass / 0 fail across 89 files.
 
-That run exposed two defects in the delivered work, both fixed here:
+Reaching that green took three corrections:
 
 - `test/http-body-size.test.ts` asserted that Bun answers an over-size body
   by resetting the connection. Bun 1.3.11 returns 413 instead. The bound
   itself holds, since the route handler never runs, so the test now accepts
   either refusal.
-- `.github/workflows/ci.yml` ran `bun test` without installing a browser, so
-  `packages/editor`'s four graph-rendering tests failed on every push. It
-  now installs the workspace-local Playwright browser with its system
-  libraries.
+- `packages/editor`'s four graph-rendering tests drive a real headless
+  Chromium and need the browser installed. Run
+  `bunx playwright install --with-deps chromium-headless-shell` from
+  `packages/editor`, so `bunx` resolves the workspace-local playwright. From
+  the repository root `bunx` fetches a newer one, whose browser build does
+  not match.
+- The four `vite-config.test.ts` suites could not load
+  `@rollup/rollup-linux-x64-gnu`, because a Windows host had installed this
+  checkout's `node_modules`. Run `bun install` inside the container, per
+  `CLAUDE.md`'s rule that all tooling runs there.
+
+**TEST-1 deviates from the recommendation.** The owner does not want a hosted
+service executing this repository. So the change deletes
+`.github/workflows/ci.yml` and puts `.githooks/pre-push` in its place. The
+hook runs `bun run check` in the dev container: typecheck, then the full
+suite. A failure blocks the push. `DATABASE_URL` is already in the
+container's environment, so the silent-skip hazard the finding names cannot
+arise. One clone-local step arms it: `git config core.hooksPath .githooks`.
+
+Two gaps a hosted gate would not have. `--no-verify` bypasses the hook. A
+clone that skips that `git config` step has no gate at all.
 
 ## Detailed Findings
 

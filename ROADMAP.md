@@ -1,11 +1,11 @@
 # Roadmap
 
-CI: DONE (`add-ci-and-dependency-hygiene`). `.github/workflows/ci.yml` runs
-`bun install --frozen-lockfile`, a `DATABASE_URL`-set guard, `bun run
-typecheck`, and the full `bun test` suite against a real `postgres:16`
-service, on every push and pull request. See the "CI" entry in
-`docs/current-state.md` for the full shape. Not a numbered stage: it gates
-every stage below rather than adding a capability of its own.
+CI: DONE (`add-ci-and-dependency-hygiene`). No hosted service runs this
+repository, by the owner's decision. `.githooks/pre-push` is the gate. It
+runs `bun run check` (typecheck, then the full `bun test` suite) in the dev
+container, where `DATABASE_URL` is already set. A non-zero exit blocks the
+push. See the "CI" entry in `docs/current-state.md` for the full shape. Not a numbered stage: it gates every stage below rather than adding a
+capability of its own.
 
 1. Validation layer (Zod-first): DONE. definition.ts is Zod-sourced with TS types
    via z.infer and the structural invariants as refinements / superRefine; the

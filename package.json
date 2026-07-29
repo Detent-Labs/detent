@@ -17,6 +17,7 @@
     "typecheck:engine": "tsc --noEmit",
     "typecheck": "bun run typecheck:engine && bun run --filter './packages/*' typecheck",
     "test": "bun test",
+    "check": "bun run typecheck && bun test",
     "serve": "bun run src/http/server.ts"
   },
   "devDependencies": {
