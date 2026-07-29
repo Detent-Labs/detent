@@ -26,18 +26,27 @@ context: |
   OpenSpec change (propose -> specs/tasks -> implement -> verify -> archive),
   never a direct edit.
 
-  Beyond the engine, a Bun workspace (`packages/*`) adds three packages.
-  `packages/editor`: a React/Vite structural editor (field/step/path/timer/
-  action/contract panels, an editor-owned Draft model, a Mermaid-rendered
-  read-only auto-layouted graph view, file-based draft I/O, a Player
-  preview backed by the live HTTP API, UI-chrome i18n, participant-facing
-  content localization). `packages/app`: the participant-facing end-user
-  app (Login / My-tasks inbox / Task / Start-a-process screens over
-  `scope=mine`-derived inbox filtering and JWT auth). `packages/form-ui`: a
-  source-only, no-build field-form renderer shared by the editor's Player
-  and the end-user app, so what an author previews is what a participant
-  gets. All three reach the engine only through the HTTP wrapper or the
-  engine package's `exports` map — none author-or-run definitions in-process
+  Beyond the engine, a Bun workspace (`packages/*`) adds five packages, one
+  per audience. `packages/studio`: Process Studio, the developer's product —
+  server-persisted drafts (the `drafts` table, optimistic concurrency on a
+  `revision` column), a canvas-primary edit screen (drag-to-move,
+  drag-to-connect) with the structural panels as inspector and a replacing
+  JSON surface, publish, published versions with a JSON diff, and
+  migration-plan authoring; gated by `system:developer`. `packages/admin`:
+  the operator's product — all-instances list, merged transition/event
+  record with cancel, outbox with dead-letter retry/discard, pending timers,
+  user administration; gated by `system:admin`. `packages/app`: the
+  participant-facing end-user app (Login / My-tasks inbox / Task /
+  Start-a-process screens over `scope=mine`-derived inbox filtering and JWT
+  auth). `packages/form-ui`: a source-only, no-build field-form renderer
+  shared by the editor's Player and the end-user app, so what an author
+  previews is what a participant gets. `packages/editor`: the original
+  React/Vite structural editor (Draft model, panels, a Mermaid-rendered
+  read-only graph view, file-based draft I/O, a Player preview backed by the
+  live HTTP API) — a proof of concept for the editing half only, superseded
+  by `packages/studio` and deleted when `studio-tools-and-player` lands.
+  All five reach the engine only through the HTTP wrapper or the engine
+  package's `exports` map — none author-or-run definitions in-process
   except via those boundaries.
 
   `src/runtime/api.ts` (the Runtime API Layer) is the in-process boundary
@@ -45,9 +54,11 @@ context: |
   `getInstanceView`, `submitAndTransition`, `claimStep`/`releaseClaim`,
   `listInstances`/`getInstanceRecord` — validating and writing
   user-submitted data (nothing else in the engine does). `src/http/` wraps
-  it as `http-wrapper`; JWT/local-account auth (`jwt-authentication`,
-  `local-user-accounts`) and role-gated publish/cancel (`authorization`) sit
-  in front of it. All of this is built — nothing here is still "post-v1
+  it as `http-wrapper`, alongside `src/http/admin-routes.ts` and
+  `src/http/studio-routes.ts`; JWT/local-account auth (`jwt-authentication`,
+  `local-user-accounts`) and role-gated operations (`authorization`:
+  `system:publish`, `system:cancel-any`, `system:admin`, `system:developer`)
+  sit in front of it. All of this is built — nothing here is still "post-v1
   roadmap"; see `ROADMAP.md` for current stage-by-stage status.
 
 # Per-artifact rules (optional)

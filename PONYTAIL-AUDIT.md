@@ -5,22 +5,34 @@ cut first. Read-only report — nothing here has been applied. Regenerate with
 `/ponytail-audit`; this file is a snapshot, re-run before trusting it after
 further changes land.
 
-Last scanned: 2026-07-28. `packages/app` (end-user app), `packages/admin`,
-and `packages/studio` were all added after the 2026-07-27 snapshot below and
-had never been through a pass — this scan focused there. The pre-existing
-engine/schema/cel/editor/form-ui code was left unscanned this round (already
-covered three times over; see "Checked, not flagged" further down).
+Last scanned: 2026-07-29. Re-verified every 2026-07-28 finding (none has been
+applied — they are all still open) and scanned the three Process Studio
+changes that landed since: `studio-canvas`, `studio-lifecycle`, and
+`studio-json-view`. Two findings got measurably worse in that window (1 and
+12); the genuinely new code is lean, one nit aside (finding 18). The
+pre-existing engine/schema/cel/editor/form-ui code was left unscanned this
+round (already covered three times over; see "Checked, not flagged" further
+down).
 
 ## Findings
 
-1. `delete` `packages/studio/src/{draft,panels,registry}` (2088 lines, 26
-   files) are byte-identical copies of `packages/editor/src/{draft,panels,
-   registry}` — verified with `diff`, not eyeballed; only `draft/ids.ts`
-   (+2 lines) and `draft/io.ts` (studio correctly drops the
-   File-System-Access-only 60 lines) genuinely diverge. Extract into a
-   shared workspace package the same way `packages/form-ui` is already
-   shared between `editor` and `app`; delete the studio copies and import.
-   [packages/studio/src/draft/store.tsx:1-119, packages/studio/src/panels/StepsPanel.tsx:1-236]
+1. `delete` `packages/studio/src/{draft,panels,registry,i18n}` (2578 lines,
+   30 files) duplicate `packages/editor/src/{draft,panels,registry,i18n}` —
+   verified with `diff`, not eyeballed. Only four files genuinely diverge
+   (`draft/io.ts` 76 diff lines, studio correctly dropping the
+   File-System-Access-only path; `i18n/catalog.ts` 42; `panels/
+   StepsPanel.tsx` 17, the canvas's controlled-`expanded` prop; `draft/
+   ids.ts` 8) — every other file is byte-identical. **Grew since the
+   2026-07-28 scan**: `studio-json-view` added `draft/load-guard.ts` as a
+   fifth byte-identical copy (verbatim port, by the change's own design) and
+   `studio-canvas` was the only change to make a studio panel diverge at
+   all. Extract into a shared workspace package the same way
+   `packages/form-ui` is already shared between `editor` and `app`; delete
+   the studio copies and import. Note the interaction with the roadmap:
+   `studio-tools-and-player` deletes `packages/editor` outright, which
+   resolves this by subtraction — so the cheap move is to sequence that
+   change rather than build the shared package first.
+   [packages/studio/src/draft/store.tsx:1-119, packages/studio/src/draft/load-guard.ts:1-62, packages/studio/src/panels/StepsPanel.tsx:1-236]
 2. `delete` `EditScreen.tsx`'s `ProcessHeader` (32 lines) duplicates editor
    `App.tsx`'s `ProcessHeader` (21 lines) minus the `description` field —
    folds into finding 1's shared package. [packages/studio/src/screens/EditScreen.tsx:27-58]
@@ -72,9 +84,12 @@ covered three times over; see "Checked, not flagged" further down).
     `OPTIONS`-preflight `if` blocks + 8 new dispatch `if` blocks for the
     admin/studio routes on top of the original five (previously judged
     "appropriately minimal at this route count" in the 2026-07-24 scan —
-    that verdict no longer holds at 19 routes). A small iterated route
-    table (`{method, match, methods, handler}[]`) now pays for itself.
-    [src/http/server.ts:196-213,263-294]
+    that verdict no longer holds). **Worse since 2026-07-28**:
+    `studio-lifecycle` added four more routes (publish, version body,
+    migration-plan GET/PUT, orphan-keys), putting the file at 393 lines and
+    52 method-dispatch branches across 23 routes. A small iterated route
+    table (`{method, match, methods, handler}[]`) now pays for itself
+    several times over. [src/http/server.ts]
 13. `delete` `packages/app`'s `Actor.roles` and `InstanceView.status`/
     `.processId`/`.version`/`ProcessSummary.version` are typed but never
     read anywhere in the package. [packages/app/src/api/types.ts:6-9,38-46,48-54]
@@ -93,8 +108,13 @@ covered three times over; see "Checked, not flagged" further down).
     undefined : localStorage` guard inline twice instead of reusing
     `session.ts`'s `browserStorage()` default-parameter pattern.
     [packages/app/src/App.tsx:14,24]
+18. `shrink` `selectVersion(selection, which, version)` is a one-line
+    `{...selection, [which]: version}` spread with its own exported type and
+    unit test, called from one place. Inline it at the call site and keep
+    `canDiff`/`diffJson` (both carry real logic).
+    [packages/studio/src/screens/versionDiffLogic.ts:11-13]
 
-net: -2600 lines, -0 deps possible.
+net: -3100 lines, -0 deps possible.
 
 Not applied — this is a report only. Route each finding through its own
 OpenSpec change before landing, per this repo's prior ponytail-audit
@@ -165,6 +185,37 @@ capability spec covered `src/http/`; `http-wrapper` does — corrected
 before implementation). 861 tests pass (859 + 2 new, covering finding 7's
 per-action override behavior), 0 fail, -0 deps throughout. No
 gamestoppers.
+
+### Checked 2026-07-29, not flagged
+
+The three Process Studio changes that landed this day, scanned in full:
+
+- `packages/studio/src/canvas/` (`CanvasView.tsx` 334 lines, plus
+  `layout.ts`/`geometry.ts`/`connection.ts` at 73/31/31) — a hand-rolled SVG
+  canvas is the *lazy* choice here, not the over-engineered one: the
+  alternative was a graph-editing library for two interactions
+  (drag-a-node, drag-from-a-handle). `connection.ts` wraps the engine's own
+  `checkPathTriggerConsistency` rather than restating the rule, and that
+  function was extracted from `definition.ts`'s `superRefine` so there is
+  one implementation, not two. `geometry.ts`'s `dragDelta` is a one-line
+  subtraction, but it has a real call site and a test, matching the studio
+  spec's extract-the-testable-logic convention.
+- `versionDiffLogic.ts::diffJson` (55 lines) — a from-scratch JSON diff with
+  no library added, arrays deliberately compared whole instead of running a
+  real array-diff algorithm. Correct trade at this body size. (Its
+  `selectVersion` sibling is finding 18.)
+- `panels/draftJsonLogic.ts` + `JsonView.tsx` (34 + 52 lines) — reuses the
+  Draft model's existing `replace()` path and `migrationPlanLogic.ts`'s
+  parse/format shape; seeds text once on mount with no resync effect. No new
+  mutation surface, nothing speculative. (The *guard* it calls,
+  `load-guard.ts`, is a duplicate — that's finding 1, not this.)
+- `MigrationPlanScreen.tsx` (162 lines) — a JSON textarea over
+  `MigrationSpec` rather than a field-by-field form, with validation left to
+  the server that already owns it. Exactly the ladder's answer.
+- `src/engine/drafts.ts` (166 lines) / `src/http/studio-routes.ts` (187
+  lines) — thin; `markDraftPublished` is a plain `UPDATE` deliberately kept
+  outside `saveDraft`'s revision check. The duplicated `resolveActor`/
+  `guarded`/`parseLimit` helpers in the route file are findings 7-8, not new.
 
 ### Checked this scan, not flagged
 

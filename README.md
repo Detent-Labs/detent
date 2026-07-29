@@ -11,7 +11,8 @@ by explicit Paths (transitions). This is *not* BPMN token flow.
 A serialized JSON process definition is the one artifact three roles share:
 
 - **Engine** — executes definitions.
-- **Editor** — produces them graphically (`packages/editor`).
+- **Editor** — produces them graphically (`packages/studio`, superseding the
+  `packages/editor` proof of concept).
 - **Hand-authoring** — definitions written directly as JSON (rare).
 
 `src/schema/definition.ts` is that contract, expressed as Zod schemas with TS
@@ -24,8 +25,9 @@ All conditions are CEL (`{ lang: "cel", src }`) — pure, total, no `now()`.
 
 ## Status
 
-Schema, validation, a working engine, a Runtime API Layer, and an editor (v1
-structural scope).
+Schema, validation, a working engine, a Runtime API Layer, an HTTP wrapper with
+JWT authentication and role-gated authorization, and three frontends
+(participant, operator, developer).
 
 | Piece | State |
 |-------|-------|
@@ -34,19 +36,25 @@ structural scope).
 | `src/cel/eval.ts` | Runtime CEL: guards (total — a runtime error is `false`), Action.output writeback, and migration `transforms` (total per entry). |
 | `src/schema/compile.ts` | Publish-time pass: injects the cancel-sink (+ reserved outcome for a contracted process) before hashing, deterministic and idempotent. |
 | `src/engine/` | Instance store, transactional outbox (delivery + writeback + retry/dead-letter + reclaim), transition executor (manual/automatic/timer), async wait-state re-resolution, timer arming + scheduler, crash recovery, runtime cancellation, subprocess execution (`subprocess.ts`: spawn + return + downward cancel cascade), instance migration (`migration.ts`: plan store + row-locked, keyset-paginated version migration), definition/version store (`definitions.ts`) + `startEngine` host. PostgreSQL via `Bun.sql`. |
-| `src/runtime/api.ts` | Runtime API Layer: `createProcessInstance` / `getInstanceView` / `submitAndTransition` — the first boundary a UI can call without touching engine internals. No HTTP transport, auth, or assignment enforcement yet. |
-| `packages/editor/` | React + Vite structural editor: field/step/path/timer/action/contract panels editing a Draft model, live validation against the engine's own publish-time validators, a read-only auto-layouted graph view, file-based draft I/O (load/save/import/export), UI-chrome i18n, content-locale editing. Canvas editing (drag-to-connect) is out of scope. |
+| `src/runtime/api.ts` | Runtime API Layer: instance creation, view resolution, submit-and-transition, claim/release, cancel, and the read/query surface (`listInstances` / `getInstanceRecord`) — the boundary a UI calls without touching engine internals. Every function takes an explicit `Actor`. |
+| `src/http/` | Thin REST/JSON wrapper over `Bun.serve` around the Runtime API Layer, plus the admin and studio route files. Typed-error-to-HTTP-status mapping, configurable CORS. |
+| `src/auth/` | `ActorResolver` seam with two implementations (a non-production dev-header resolver and a production-capable JWT resolver accepting local `auth_users` accounts and JWKS-backed external issuers), login + rate limiting, a user-admin CLI, and the reserved roles (`system:publish`, `system:cancel-any`, `system:admin`, `system:developer`). |
+| `src/handlers/` | `http.request` — the one shipped action handler; a vendor-neutral REST call with engine-set idempotency and outbox-aligned retry semantics. |
+| `packages/studio/` | Process Studio, the developer's product: server-persisted drafts, canvas editing (drag-to-connect), the structural panels as inspector, a replacing JSON surface, publish, published versions with a JSON diff, and migration-plan authoring. Tools + Player are the remaining piece. |
+| `packages/admin/` | The operator's product: all-instances list, merged transition/event record with cancel, outbox with dead-letter retry/discard, pending timers, user administration. |
+| `packages/app/` | The participant's product: Login / My-tasks inbox / Task / Start-a-process. |
+| `packages/form-ui/` | Source-only shared step-form renderer, so what an author previews is what a participant gets. |
+| `packages/editor/` | The original structural editor — a proof of concept for the editing half only (file-based drafts, read-only Mermaid graph, no publish). Superseded by `packages/studio`; deleted once `studio-tools-and-player` lands. |
 | `examples/expense-approval.json` | Complete Capture → Review → Book example. |
 | `examples/subprocess-*.json` | A loan-application parent calling a credit-check subprocess (child) — spawn, `child.outcome` routing, return writeback. |
 | `test/` | `bun:test` suites; each invariant ships a test that rejects a violating definition. |
 
-Roadmap: validation (done) → CEL wiring (done) → engine skeleton (done) →
-editor (done, v1 structural scope) → Runtime API Layer (done). Runtime
-cancellation, subprocess execution (spawn/return + downward cancel
-propagation), both timer kinds (`duration` and `deadline`), and instance
-migration (explicit, operator-invoked, plan-governed) are done. Not yet
-built: canvas editing in the editor, an HTTP transport around the Runtime API
-Layer, auth/actor resolution, and assignment/claim enforcement.
+Done: validation, CEL wiring, the engine (runtime cancellation, subprocess
+execution with downward cancel propagation, both timer kinds, plan-governed
+instance migration), the Runtime API Layer, the HTTP wrapper, authentication
+and authorization, assignment/claim enforcement, and the read/query API — plus
+the participant, operator and developer frontends. See `ROADMAP.md` for
+stage-by-stage status and what is deliberately deferred.
 
 ## Develop
 

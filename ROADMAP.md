@@ -308,10 +308,11 @@
     `packages/studio` — login/session/shell mirroring `packages/admin`, the
     editor's `draft/`/`panels/`/`i18n/`/`registry/` carried over with
     file-persistence replaced by the draft routes, and a process list merging
-    `GET /processes` with `GET /drafts`. The JSON surface and tools/Player
-    remain NOT STARTED (`packages/editor` stays untouched and functional
-    until the last of those lands); publish, versions and migration planning
-    are now DONE (see `studio-lifecycle` below).
+    `GET /processes` with `GET /drafts`. The JSON surface is now DONE (see
+    `studio-json-view` below), as are publish, versions, and migration
+    planning (see `studio-lifecycle` below); tools/Player remains the only
+    NOT STARTED piece (`packages/editor` stays untouched and functional
+    until it lands).
 
     **Process Studio — canvas: DONE** (`studio-canvas`). `/processes/:id/edit`
     is now canvas-primary: a hand-rolled SVG canvas (deliberately not Mermaid,
@@ -380,6 +381,32 @@
     `admin-migration-run`'s future `POST /admin/migrations/run`, an operator
     action) and the registry/CEL-scratchpad tools screen plus Player
     (`studio-tools-and-player`).
+
+    **Process Studio — JSON view: DONE** (`studio-json-view`). Adds the third
+    of the edit screen's three surfaces: a JSON view alongside Canvas and
+    Panels ("Structure"), switchable via a Structure/JSON toggle in
+    `EditorArea` (`EditScreen.tsx`). The two are fully mutually exclusive —
+    every draft-body-mutating component (`ProcessHeader`, `FieldCatalogPanel`,
+    `DataSourcesPanel`, `ContractPanel`, Canvas, and everything nested under
+    it) is grouped under "Structure" and unmounted while "JSON" is shown, so a
+    stale JSON textarea can never silently clobber a panel edit made while it
+    was open (`DraftToolbar`, the registry selector, and the content-locale
+    switcher stay visible regardless, since none of them mutate the draft
+    body — this exclusivity was tightened during review; the first draft of
+    the change only toggled Canvas+StepsPanel). `JsonView`
+    (`packages/studio/src/panels/JsonView.tsx`) seeds its local text from the
+    current draft once, on mount — no live resync — and writes only on an
+    explicit Apply, through `parseDraftText` (`panels/draftJsonLogic.ts`):
+    `JSON.parse`, then the same load-time shape guard the editor's file-based
+    Load already used, `checkDraftShape`, ported verbatim to
+    `packages/studio/src/draft/load-guard.ts` rather than reimplemented more
+    weakly. A parse or shape failure leaves the draft untouched and shows an
+    inline error; empty/whitespace text is treated as a valid empty draft
+    (`{}`), matching `migrationPlanLogic.ts`'s existing convention. Reuses the
+    Draft model's existing `replace()` path — the one Load/Import already
+    used — not a new mutation surface. Tools/Player remains the only NOT
+    STARTED piece of this stage (`studio-tools-and-player`, which also
+    deletes `packages/editor`).
 12. Unified shell (consolidate app/admin/studio): NOT STARTED, deliberately
     deferred — no urgency, raised 2026-07-28 as a "someday" question, not a
     committed stage. Today `packages/app`, `packages/admin`, and

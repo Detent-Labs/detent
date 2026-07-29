@@ -38,17 +38,28 @@ package.json               Bun workspace root (workspaces: packages/*); engine p
                             (./schema, ./cel/check, ./schema/compile, ./engine/registry, ./engine/registry-check)
 tsconfig.json              strict; NodeNext ESM; covers src + test
 src/schema/definition.ts   Zod schemas = the contract; TS types via z.infer; invariants included
-src/engine/                executor: instance store, outbox, transitions, timers, subprocess
+src/engine/                executor: instance store, outbox, transitions, timers, subprocess, drafts,
+                            definitions, migration, admin queries
 src/runtime/api.ts         Runtime API Layer: createProcessInstance / getInstanceView / submitAndTransition
+                            / claimStep / releaseClaim / cancelInstance / listInstances / getInstanceRecord
+src/http/                  REST/JSON wrapper over Bun.serve (routes.ts, admin-routes.ts, studio-routes.ts)
+src/auth/                  ActorResolver seam (dev-header + JWT), local accounts, login, roles, CLI
+src/handlers/              action handlers; http.request is the only one shipped
 examples/                  serialized example definitions
 test/                      bun:test suites; tests run inside the container
-packages/editor/           structural editor + read-only graph view (React + Vite; workspace package,
-                            reaches the engine only through its exports map)
+docs/current-state.md      per-subsystem descriptive counterpart to this file
+packages/studio/           Process Studio, the developer's product: server-persisted drafts, canvas
+                            editing, panels-as-inspector, JSON surface, publish, versions+diff,
+                            migration-plan authoring (React + Vite; HTTP wrapper + exports map)
+packages/admin/            operator's product: instances, merged record, outbox, timers, users
+                            (React + Vite; talks to the engine only over the HTTP wrapper)
 packages/app/              end-user app: participant-facing Login/My-tasks/Task/Start-a-process screens
                             (React + Vite; workspace package, talks to the engine only over the HTTP wrapper)
 packages/form-ui/          shared step-form renderer (source-only, no build step); consumed by both
                             packages/editor's Player and packages/app, so what an author previews is
                             what a participant gets
+packages/editor/           the original structural editor + read-only Mermaid graph — a proof of concept
+                            superseded by packages/studio; deleted when studio-tools-and-player lands
 ```
 
 ## The contract: load-bearing rules
@@ -258,9 +269,9 @@ See `ROADMAP.md` for stage-by-stage status (DONE/NOT STARTED) and what each stag
 
 ## Codebase memory (knowledge graph)
 The repo is indexed into codebase-memory-mcp (`full` mode, covering the engine,
-the Runtime API Layer, the editor package, the end-user app (`packages/app`),
-and the shared form renderer (`packages/form-ui`); `packages/*/{dist,node_modules}`
-excluded). Resolve the `project` arg via `list_projects` (match on root_path);
+the Runtime API Layer, the HTTP/auth layers, and every frontend package
+(`packages/studio`, `packages/admin`, `packages/app`, `packages/form-ui`,
+`packages/editor`); `packages/*/{dist,node_modules}` excluded). Resolve the `project` arg via `list_projects` (match on root_path);
 the slug is machine-specific, never hardcode it. Entry points: `search_graph`
 (find symbols), `get_code_snippet` (read a body), `trace_path` (callers/callees,
 `mode=calls|data_flow|cross_service` — useful for tracing across the
