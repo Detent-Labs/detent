@@ -42,20 +42,24 @@ test.skipIf(!DB)("an ordinary-size request reaches the route handler", async () 
 test.skipIf(!DB)("a request body over the declared bound is refused before any route handler runs", async () => {
   await withRealServer(async (url) => {
     const oversized = "x".repeat(MAX_REQUEST_BODY_SIZE + 1024);
-    // Bun refuses an over-size body at the transport layer: the connection is
-    // reset rather than answered, never with a typed engine error, and the
-    // route handler never runs at all. A clean HTTP response would mean the
-    // bound did not apply.
-    let refused = false;
+    // Bun refuses an over-size body at the transport layer, so the route
+    // handler never runs and no typed engine error is produced. How it
+    // refuses is Bun's business and has varied across versions: 1.3.11
+    // answers 413, earlier lines reset the connection. Accept either — the
+    // property under test is that the request is refused on size, which a
+    // route-level status (a publish body this malformed maps to 422) would
+    // disprove.
+    let refused: "reset" | number;
     try {
-      await fetch(`${url}/processes`, {
+      const res = await fetch(`${url}/processes`, {
         method: "POST",
         headers: { "content-type": "application/json", "X-Actor-Id": "u", "X-Actor-Roles": "system:publish" },
         body: oversized,
       });
+      refused = res.status;
     } catch {
-      refused = true;
+      refused = "reset";
     }
-    expect(refused).toBe(true);
+    expect(refused === "reset" || refused === 413).toBe(true);
   });
 });

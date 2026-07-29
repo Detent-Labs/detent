@@ -2,6 +2,8 @@
 
 **Date:** 2026-07-29
 **Scope:** Entire codebase
+**Status:** Closed. The team shipped and archived every finding below. See
+[Implementation status](#implementation-status) for the per-change evidence.
 
 **Summary:** The engine core is unusually well-built: the state-before-side-effects contract, optimistic concurrency, row-lock ordering, subprocess idempotency and migration data-retention are all correct and, more importantly, *reasoned about in writing at the point of implementation*. The test suite is honest — zero mocking across 41 suites, real interleaved-transaction concurrency tests, systematic per-route authorization coverage — which makes its remaining blind spots narrow and nameable. The weaknesses cluster at the edges the contract does not reach: there is no object-level authorization on the instance-read path, the auth configuration fails open by omission, one publish-path validation gap lets a privileged author reach engine-internal action dispatch, and a single unresponsive HTTP target permanently halts all async side-effect delivery. The frontend packages are structurally sound (pure logic extracted and unit-tested, no injection surface, server-side enforcement never confused with client gating) but share a repeated error-handling pattern that renders affirmatively wrong empty states, and primary navigation in three of five packages is mouse-only. Nothing here is architectural rework; the ten highest-impact items are small, local, and mostly one-function changes.
 
@@ -27,6 +29,47 @@ Top findings:
 2. Land CI (TEST-1) immediately after, with `DATABASE_URL` mandatory, so the fixes and the 546 `skipIf` DB tests stop depending on human memory.
 3. Then SEC-3, SEC-4 and ERR-1, which are the three defects that can put a *published, immutable* definition or the whole side-effect subsystem into an unrecoverable state.
 4. Treat CQ-1/CQ-2 as one accessibility pass across the SPAs, routed through the design skills per `CLAUDE.md`.
+
+## Implementation status
+
+The team closed all 27 findings. Each landed as one of the nine OpenSpec
+changes listed under
+[Disposition](#disposition--findings-to-openspec-changes). All nine now sit
+in `openspec/changes/archive/2026-07-29-*`. The findings and recommendations
+below stand as written. They record the state that prompted the work, not the
+state of the tree.
+
+Verified against the code on 2026-07-29, one anchor per change:
+
+| Change | Closes | Verified at |
+|---|---|---|
+| `authorize-instance-access` | SEC-1, SEC-5 | `src/runtime/api.ts:554-561` (read predicate), `:632` (submit floor without an assignment) |
+| `harden-auth-configuration` | SEC-2, 6, 7, 8, 9 | `src/http/server.ts:151-158` (`ALLOW_INSECURE_DEV_AUTH`), `:132` (32-byte minimum), `src/auth/login.ts:53-63` (sweep, then fail closed), `src/auth/users.ts:28`/`:46` (dummy hash), `packages/*/vite.config.ts:11-31` (CSP injected at build) |
+| `harden-publish-validation` | SEC-3, 4, 10, ARCH-3, 4, CQ-4 | `src/schema/compile.ts` (`checkReservedActionPrefix`, `checkPatterns`, `checkUnknownKeys`, `checkIdResolution`, `checkFieldKeyFormat`, `checkLengthBounds`), `src/http/server.ts:428` (`maxRequestBodySize`) |
+| `bound-async-delivery` | ERR-1, 6, 7, ARCH-1, 2 | `src/engine/outbox.ts:103`/`:223-225` (lease-bounded race), `:182` (attempts incremented in the claim), `src/engine/timers.ts:34` (bounded push out of the due scan) |
+| `correct-api-error-responses` | ERR-3, 4, 5, 8 | commit `b49051d` |
+| `render-frontend-error-states` | ERR-2, CQ-3 | no `else throw err` remains in any package; `packages/studio/src/panels/DraftToolbar.tsx:103` (`reloaded` advances `savedBody`) |
+| `spa-accessibility-pass` | CQ-1, CQ-2, PERF-3 | row navigation is a real `<button>` in `packages/app` and `packages/admin`; `packages/studio/src/panels/StepsPanel.tsx:130` (`aria-expanded`); `packages/form-ui/src/FieldForm.tsx:87-89` |
+| `add-ci-and-dependency-hygiene` | TEST-1, 2, 3, DEP-1, 2, DOC-1 | `.github/workflows/ci.yml`; `zod` in `dependencies` and `@marcbachmann/cel-js` at `8.0.0` in `package.json:26-30`; `test/assignment.runtime-api.test.ts:123`/`:158` (interleaved claim and release races) |
+| `fix-schema-bootstrap-and-indexes` | ERR-9, PERF-1, 2 | `src/http/server.ts:424` (`await initSchema(db)`), `src/engine/store.ts:93`/`:223` (both indexes) |
+
+**Verification run** (devcontainer, `DATABASE_URL` set, Bun 1.3.11):
+`bun run typecheck` clean across the engine and all five packages;
+`bun test` at 1303 pass / 4 fail across 89 files. The four failures are all
+`vite-config.test.ts`, which cannot load `@rollup/rollup-linux-x64-gnu`. A
+Windows host installed this checkout's `node_modules`, so it holds the win32
+optional binary instead. CI installs on Linux and runs those four green.
+
+That run exposed two defects in the delivered work, both fixed here:
+
+- `test/http-body-size.test.ts` asserted that Bun answers an over-size body
+  by resetting the connection. Bun 1.3.11 returns 413 instead. The bound
+  itself holds, since the route handler never runs, so the test now accepts
+  either refusal.
+- `.github/workflows/ci.yml` ran `bun test` without installing a browser, so
+  `packages/editor`'s four graph-rendering tests failed on every push. It
+  now installs the workspace-local Playwright browser with its system
+  libraries.
 
 ## Detailed Findings
 
