@@ -25,9 +25,10 @@ import {
   AlreadyClaimedError,
   NotClaimedError,
   NotClaimantError,
+  isEligibleCandidate,
 } from "../engine/transition.js";
 import { buildGuardContext, evalGuard, type Actor } from "../cel/eval.js";
-import { requireRole, CANCEL_ANY_ROLE, AuthorizationError } from "../auth/authorize.js";
+import { requireRole, CANCEL_ANY_ROLE, ADMIN_ROLE, AuthorizationError } from "../auth/authorize.js";
 import { definitionHash } from "../schema/hash.js";
 import { instance as instanceSchema, historyEntry as historyEntrySchema, instanceEvent as instanceEventSchema, collectFieldsDeep } from "../schema/definition.js";
 import { resolveDataSource, type DataSourceRegistry } from "../engine/registry.js";
@@ -526,9 +527,35 @@ export async function createProcessInstance(
  * fields, and currently available manual paths — for an instance in any
  * status. Uses the ordinary (unlocked) rehydrate path: a view is read-only,
  * so there is no concurrent writeback for it to race.
+ *
+ * Authorizes `actor` against the loaded instance before resolving anything:
+ * `ADMIN_ROLE`, the instance's starter, the current step's claimant, or an
+ * eligible candidate on the current step's assignment (`isEligibleCandidate`,
+ * shared with `claimStep` so the two predicates cannot drift). Load-failure
+ * handling mirrors `cancelInstance`: an `ADMIN_ROLE` caller loads directly (a
+ * missing instance surfaces as today's not-found); every other caller loads
+ * inside a `try` whose `catch` collapses into `AuthorizationError`, so a
+ * nonexistent instance and one the caller may not read are indistinguishable.
  */
 export async function getInstanceView(instanceId: InstanceId, actor: Actor, registry: DataSourceRegistry, db: SQL = sql): Promise<InstanceView> {
-  const { instance, body } = await loadInstanceForRead(instanceId, db);
+  let instance: Instance;
+  let body: ProcessBody;
+  if (actor.roles.includes(ADMIN_ROLE)) {
+    ({ instance, body } = await loadInstanceForRead(instanceId, db));
+  } else {
+    try {
+      ({ instance, body } = await loadInstanceForRead(instanceId, db));
+    } catch {
+      throw new AuthorizationError(`actor '${actor.id}' may not read instance '${instanceId}'`);
+    }
+    if (
+      instance.startedBy !== actor.id &&
+      instance.assignment?.claimedBy !== actor.id &&
+      !isEligibleCandidate(actor, instance.assignment?.candidates ?? [])
+    ) {
+      throw new AuthorizationError(`actor '${actor.id}' may not read instance '${instanceId}'`);
+    }
+  }
   const step = findStep(body, instance.currentStepId as string);
   return {
     instanceId: instance.instanceId,
@@ -581,11 +608,15 @@ export async function submitAndTransition(
 
     const step = findStep(body, instance.currentStepId as string);
 
-    // Claimant-only enforcement: before any submission validation. A step with
-    // no declared assignment is unaffected — identical to today's behavior.
+    // Claimant-only enforcement: before any submission validation. A step
+    // with no declared assignment is not thereby open to every authenticated
+    // actor — the floor is starter or ADMIN_ROLE, the only relationships an
+    // assignment-less step defines.
     if (instance.assignment) {
       if (instance.assignment.claimedBy === undefined) throw new NotClaimedError(instanceId);
       if (instance.assignment.claimedBy !== actor.id) throw new NotClaimantError(instanceId, actor.id);
+    } else if (instance.startedBy !== actor.id && !actor.roles.includes(ADMIN_ROLE)) {
+      throw new AuthorizationError(`actor '${actor.id}' may not submit instance '${instanceId}'`);
     }
 
     await validateSubmissionData(body, step, instance, actor, submitted, registry);
