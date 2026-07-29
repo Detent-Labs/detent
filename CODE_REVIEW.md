@@ -503,3 +503,52 @@ Sorted by impact ÷ effort. Effort: S ≈ under a day, M ≈ a few days, L ≈ a
 | 23 | Constrain `FieldDef.key` to an identifier regex on the write path, with a rejecting test | CQ-4 | S |
 | 24 | Correct README's `bun test` line, `docs/current-state.md:539-541`, and the `src/auth/cli.ts:2-3` header comment | DOC-1 | S |
 | 25 | Memoize `autoPlaced`/`nodePositions` in `CanvasView`; extract the node `<g>` into a `React.memo` child if profiling warrants | PERF-3 | S |
+
+## Disposition — findings to OpenSpec changes
+
+Every finding above is covered by one of nine changes under
+`openspec/changes/`. Findings were consolidated wherever they shared a seam, a
+placement rule, or a failure surface; a change exists only where a finding
+could not be meaningfully folded into another.
+
+| Change | Closes |
+|---|---|
+| `authorize-instance-access` | SEC-1, SEC-5 |
+| `harden-auth-configuration` | SEC-2, SEC-6, SEC-7, SEC-8, SEC-9 |
+| `harden-publish-validation` | SEC-3, SEC-4, SEC-10, ARCH-3, ARCH-4, CQ-4 |
+| `bound-async-delivery` | ERR-1, ERR-6, ERR-7, ARCH-1, ARCH-2 |
+| `correct-api-error-responses` | ERR-3, ERR-4, ERR-5, ERR-8 |
+| `render-frontend-error-states` | ERR-2, CQ-3 |
+| `spa-accessibility-pass` | CQ-1, CQ-2, PERF-3 |
+| `add-ci-and-dependency-hygiene` | TEST-1, TEST-2, TEST-3, DEP-1, DEP-2, DOC-1 |
+| `fix-schema-bootstrap-and-indexes` | ERR-9, PERF-1, PERF-2 |
+
+Three of the report's recommendations were **not** adopted as written, each for
+a reason recorded in the relevant change's `design.md`:
+
+- **SEC-3** — moving "the whole reserved-identity check" into the base
+  `processBody` superRefine would reject every *compiled* body, which
+  legitimately carries the cancel-sink id, key and reserved outcome. Only the
+  action-prefix ban generalizes, and it moves into the compile pass ahead of
+  the idempotent return rather than into the shared read schema.
+- **ARCH-4** — resolving `outputMapping` keys and contract field lists "in the
+  superRefine beside the existing `Action.output` loop" would tighten the
+  **read** schema, so a body already published with that defect would become
+  unreadable and its running instances unrehydratable. Both checks go on the
+  write path instead, per `CLAUDE.md`'s stated placement rule; the sibling
+  check predates that rule.
+- **PERF-1/PERF-2** — the two indexes are specified as *existing*, not as
+  producing an index scan. `persistence` already establishes that asserting a
+  query plan asserts something the planner is free to vary; plan inspection is
+  a verification step for the change, not a pinned property.
+
+One factual correction to the report: SEC-2's "blast radius on tests is one
+assertion" is understated. `test/auth-server.test.ts:17`'s `SECRET` is 23
+bytes and is fed to `resolveAuthResolver` at seven sites in that file, so it
+falls below SEC-6's proposed 32-byte minimum and must be lengthened as well
+(`test/auth-login.test.ts:19`, at 28 bytes, reaches `handleLogin` directly and
+is not forced to change).
+
+ERR-7 was decided in favour of making `evalFieldMap` total per entry with a
+new `mapping.entry-dropped` event, rather than documenting the fatality as
+intended — the report left this open as a question for the team.
