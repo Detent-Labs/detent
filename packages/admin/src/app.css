@@ -246,12 +246,29 @@ h2 {
   vertical-align: top;
 }
 
-.admin-table tr.admin-row-clickable {
-  cursor: pointer;
+/* Every row now carries a real control (.admin-row-link) rather than a
+   click handler on the <tr> itself, so the hover wash is unconditional. */
+.admin-table tbody tr:hover {
+  background: var(--color-surface-muted);
 }
 
-.admin-table tr.admin-row-clickable:hover {
-  background: var(--color-surface-muted);
+/* The control wrapping a row's identifying cell. Reset to plain text so it
+   reads as a table cell, not a call-to-action button; :focus-visible (above)
+   is what makes it discoverable by keyboard. */
+.admin-row-link {
+  background: none;
+  border: none;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.admin-row-link:hover {
+  text-decoration: underline;
 }
 
 .admin-badge {
