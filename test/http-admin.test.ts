@@ -1,17 +1,22 @@
 /**
  * The `/admin/*` HTTP surface (src/http/admin-routes.ts): 401 without a
  * credential, 403 without `system:admin`, success with it, plus retry/discard's
- * 404 (no such row) and 409 (present but not a dead letter), and the users
- * routes' 404 (no such userId). DB-backed — skips when DATABASE_URL is unset.
+ * 404 (no such row) and 409 (present but not a dead letter), the users
+ * routes' 404 (no such userId), and migrations/run's 409 (no registered
+ * plan) and request error (non-integer version). DB-backed — skips when
+ * DATABASE_URL is unset.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
-import { sql, initSchema } from "../src/engine/store.js";
+import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { createServer } from "../src/http/server.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
 import { ADMIN_ROLE } from "../src/auth/authorize.js";
 import { createUser } from "../src/auth/users.js";
+import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
+import { registerMigrationPlan } from "../src/engine/migration.js";
 import type { Actor } from "../src/cel/eval.js";
+import type { ProcessBody, Instance, MigrationSpec } from "../src/schema/definition.js";
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
@@ -22,7 +27,7 @@ beforeAll(async () => {
   if (DB) await initSchema();
 });
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, auth_users`;
+  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, auth_users, migration_plans`;
 });
 
 const admin: Actor = { id: "user_admin", roles: [ADMIN_ROLE] };
@@ -35,6 +40,46 @@ const insertRow = async (opts: { key: string; instanceId?: string; status: strin
   await sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, status, attempts)
     VALUES (${opts.key}, ${opts.instanceId ?? "inst_fixture"}, 1, ${"action_for_" + opts.key},
       ${{ id: "action_for_" + opts.key, type: "noop", config: {} }}, ${opts.status}, ${opts.attempts ?? 0})`;
+};
+
+// ---- migration fixtures (mirrors test/migration.test.ts's minimal shape) -----
+
+let migrationN = 0;
+const migrationPid = () => `proc_http_admin_migration_${++migrationN}` as Instance["processId"];
+
+const migrationWaitBody = (key: string): ProcessBody =>
+  ({
+    key,
+    label: { en: key },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_wait",
+      steps: [
+        { id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task", paths: [{ id: "path_done", key: "done", to: "step_done", trigger: "manual" }] },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+/** Publishes `count` distinct trivial versions (1..count) of the same process, label-stamped so each lands on its own version. */
+const publishMigrationVersions = async (p: Instance["processId"], count: number): Promise<void> => {
+  for (let i = 1; i <= count; i++) {
+    const body = structuredClone(migrationWaitBody("http_admin_migration")) as Record<string, unknown>;
+    body.label = { en: `http_admin_migration #${i}` };
+    await publishBody(p, body as unknown as ProcessBody, reg, dataSourceReg);
+  }
+};
+
+const createRunningInstance = async (p: Instance["processId"], version: number): Promise<Instance> => {
+  const body = (await createDefinitionStore(sql).resolveBody(p, version))!;
+  return createInstance(body, { processId: p, version }, sql);
+};
+
+/** `instances.version` is not a column — the pin lives inside the jsonb `body`. */
+const loadInstance = async (instanceId: string): Promise<Instance> => {
+  const r = (await sql`SELECT body FROM instances WHERE instance_id = ${instanceId}`) as { body: unknown }[];
+  return JSON.parse(typeof r[0]!.body === "string" ? (r[0]!.body as string) : JSON.stringify(r[0]!.body)) as Instance;
 };
 
 // ============================================================
@@ -251,6 +296,69 @@ test.skipIf(!DB)("POST /admin/users/:id/enable on an unknown id maps to 404", as
 });
 
 // ============================================================
+// POST /admin/migrations/run
+// ============================================================
+
+const runMigrationReq = (body: unknown, actor: Actor) =>
+  new Request("http://x/admin/migrations/run", {
+    method: "POST",
+    headers: { "content-type": "application/json", "X-Actor-Id": actor.id, ...(actor.roles.length > 0 ? { "X-Actor-Roles": actor.roles.join(",") } : {}) },
+    body: JSON.stringify(body),
+  });
+
+test.skipIf(!DB)("POST /admin/migrations/run with no resolvable credential maps to 401", async () => {
+  const res = await fetch(new Request("http://x/admin/migrations/run", { method: "POST", body: "{}" }));
+  expect(res.status).toBe(401);
+});
+
+test.skipIf(!DB)("POST /admin/migrations/run without system:admin maps to 403 and migrates nothing", async () => {
+  const p = migrationPid();
+  await publishMigrationVersions(p, 2);
+  await registerMigrationPlan(p, 1, 2, {} as MigrationSpec, sql);
+  const inst = await createRunningInstance(p, 1);
+
+  const res = await fetch(runMigrationReq({ processId: p, fromVersion: 1, toVersion: 2 }, bystander));
+  expect(res.status).toBe(403);
+
+  expect((await loadInstance(inst.instanceId)).version).toBe(1);
+});
+
+test.skipIf(!DB)("POST /admin/migrations/run on a registered plan migrates the running instance", async () => {
+  const p = migrationPid();
+  await publishMigrationVersions(p, 2);
+  await registerMigrationPlan(p, 1, 2, {} as MigrationSpec, sql);
+  const inst = await createRunningInstance(p, 1);
+
+  const res = await fetch(runMigrationReq({ processId: p, fromVersion: 1, toVersion: 2 }, admin));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { migrated: string[]; skipped: string[]; conflicted: string[]; failed: string[] };
+  expect(body.migrated).toEqual([inst.instanceId]);
+  expect(body.skipped).toEqual([]);
+  expect(body.conflicted).toEqual([]);
+  expect(body.failed).toEqual([]);
+
+  expect((await loadInstance(inst.instanceId)).version).toBe(2);
+});
+
+test.skipIf(!DB)("POST /admin/migrations/run with no registered plan maps to 409", async () => {
+  const p = migrationPid();
+  await publishMigrationVersions(p, 2);
+
+  const res = await fetch(runMigrationReq({ processId: p, fromVersion: 1, toVersion: 2 }, admin));
+  expect(res.status).toBe(409);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("migration-plan");
+});
+
+test.skipIf(!DB)("POST /admin/migrations/run with a non-integer fromVersion maps to a request error", async () => {
+  const p = migrationPid();
+  const res = await fetch(runMigrationReq({ processId: p, fromVersion: "not-a-number", toVersion: 2 }, admin));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+// ============================================================
 // CORS preflight
 // ============================================================
 
@@ -292,6 +400,12 @@ test("OPTIONS preflight on the admin users disable route returns 204 permitting 
 
 test("OPTIONS preflight on the admin users enable route returns 204 permitting POST", async () => {
   const res = await fetch(new Request("http://x/admin/users/user_x/enable", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
+});
+
+test("OPTIONS preflight on the admin migrations run route returns 204 permitting POST", async () => {
+  const res = await fetch(new Request("http://x/admin/migrations/run", { method: "OPTIONS" }));
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
 });

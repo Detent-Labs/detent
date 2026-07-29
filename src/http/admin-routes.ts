@@ -10,6 +10,8 @@ import type { SQL } from "bun";
 import { sql } from "../engine/store.js";
 import { listOutbox, countOutboxByStatus, listPendingTimers, requeueOutboxRow, discardOutboxRow, getOutboxRow, type OutboxListFilter } from "../engine/admin-queries.js";
 import { listUsers, setDisabled } from "../auth/users.js";
+import { migrateInstances } from "../engine/migration.js";
+import type { ProcessId } from "../schema/definition.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, ADMIN_ROLE } from "../auth/authorize.js";
@@ -40,6 +42,13 @@ function parseLimit(url: URL): number | undefined {
   if (raw === null) return undefined;
   const n = Number(raw);
   if (!Number.isInteger(n) || n <= 0) throw new RequestShapeError(`limit must be a positive integer, got '${raw}'`);
+  return n;
+}
+
+/** Same rejection rule as studio-routes.ts::parseVersion, applied to a request-body field instead of a path segment. */
+function parseVersionField(raw: unknown, label: string): number {
+  const n = Number(raw);
+  if (!Number.isInteger(n)) throw new RequestShapeError(`${label} must be an integer`);
   return n;
 }
 
@@ -130,4 +139,23 @@ export async function handleAdminDisableUser(userId: string, req: Request, resol
 
 export async function handleAdminEnableUser(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return handleSetUserDisabled(userId, false, req, resolver, db);
+}
+
+/** Wraps `migrateInstances` unchanged. No new engine logic: `MigrationPlanError` (e.g. no registered plan) falls through to `mapError`, mapped 409 the same way `PUT /migration-plans/...` already maps it. */
+export async function handleAdminRunMigration(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    requireRole(actor, ADMIN_ROLE);
+    let body: { processId?: unknown; fromVersion?: unknown; toVersion?: unknown };
+    try {
+      body = (await req.json()) as typeof body;
+    } catch {
+      throw new RequestShapeError("request body is not valid JSON");
+    }
+    if (typeof body.processId !== "string" || !body.processId) throw new RequestShapeError("processId is required");
+    const fromVersion = parseVersionField(body.fromVersion, "fromVersion");
+    const toVersion = parseVersionField(body.toVersion, "toVersion");
+    const result = await migrateInstances(body.processId as ProcessId, fromVersion, toVersion, db);
+    return { status: 200, body: result };
+  });
 }

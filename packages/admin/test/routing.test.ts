@@ -18,6 +18,10 @@ describe("matchRoute", () => {
     expect(matchRoute("/users")).toEqual({ name: "users" });
   });
 
+  it("resolves the migrations route", () => {
+    expect(matchRoute("/migrations")).toEqual({ name: "migrations" });
+  });
+
   it("resolves the login route", () => {
     expect(matchRoute("/login")).toEqual({ name: "login" });
   });
@@ -38,6 +42,7 @@ describe("routePath", () => {
       { name: "outbox" as const },
       { name: "timers" as const },
       { name: "users" as const },
+      { name: "migrations" as const },
       { name: "login" as const },
       { name: "instance" as const, instanceId: "inst_1" },
     ];

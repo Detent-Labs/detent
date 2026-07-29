@@ -118,10 +118,19 @@ export interface UserPage {
   items: UserSummary[];
 }
 
+/** Mirrors src/engine/migration.ts::MigrationResult. */
+export interface MigrationResult {
+  migrated: string[];
+  skipped: string[];
+  conflicted: string[];
+  failed: string[];
+}
+
 export type ClientError =
   | { type: "authorization"; message: string }
   | { type: "actor-resolution"; message: string }
   | { type: "request-shape"; message: string }
   | { type: "not-found"; message: string }
   | { type: "conflict"; message: string }
+  | { type: "migration-plan"; message: string }
   | { type: "internal"; message: string };
