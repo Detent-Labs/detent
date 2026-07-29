@@ -173,14 +173,18 @@ test.skipIf(!DB)("a fresh claim (within lease) is not stolen by another pass", a
 
 // --- resolver miss: left for a later pass, no crash ---------------------------
 
-test.skipIf(!DB)("a body resolver returning undefined leaves the instance flagged", async () => {
+test.skipIf(!DB)("a body resolver returning undefined leaves the instance claimed for lease-expiry retry", async () => {
   const body = waitBody("sayYes");
   const inst = await createFrom(body);
   await executeManualTransition(inst, "path_ab", body, actor);
   await drainOutbox(sql, reg); // flags 'pending'
 
   expect(await drainResolutions(sql, () => undefined)).toBe(0); // nothing processed
-  expect(await resolveState(inst.instanceId)).toBe("pending"); // still flagged
+  // Left 'claimed', not requeued to 'pending': an immediate requeue would make
+  // the row selectable again on the very next pass, a write loop at the poll
+  // interval for a persistently unresolvable process. The claim's own lease is
+  // the retry cadence instead.
+  expect(await resolveState(inst.instanceId)).toBe("claimed");
   expect((await readInst(inst.instanceId)).currentStepId as string).toBe("step_wait");
 });
 
@@ -213,7 +217,7 @@ test.skipIf(!DB)("a commit onto a terminal step does not flag resolve_state, and
 
 // --- poison-row isolation: one unparseable claimed row does not starve the batch --
 
-test.skipIf(!DB)("an unparseable claimed instance is requeued and does not starve the batch", async () => {
+test.skipIf(!DB)("an unparseable claimed instance is left claimed and does not starve the batch", async () => {
   const body = waitBody("sayYes");
   // Two good parked instances, both flagged 'pending' with go="yes" written.
   const g1 = await createFrom(body);
@@ -227,10 +231,47 @@ test.skipIf(!DB)("an unparseable claimed instance is requeued and does not starv
   await sql`INSERT INTO instances (instance_id, transition_seq, body, resolve_state)
     VALUES (${"inst_poison"}, ${0}, ${{ status: "running" }}, 'pending')`;
 
-  // Both good instances are processed and the poison is requeued, instead of the
-  // parse throw aborting the pass and stranding the rest of the batch.
+  // Both good instances are processed and the poison is left claimed (its lease
+  // is the retry cadence), instead of the parse throw aborting the pass and
+  // stranding the rest of the batch, and instead of an immediate requeue that
+  // would make it a write loop at the poll interval.
   expect(await drainResolutions(sql, () => body)).toBe(2);
   expect((await readInst(g1.instanceId)).currentStepId as string).toBe("step_done");
   expect((await readInst(g2.instanceId)).currentStepId as string).toBe("step_done");
-  expect(await resolveState("inst_poison")).toBe("pending"); // requeued, not lost
+  expect(await resolveState("inst_poison")).toBe("claimed"); // left for lease-expiry reclaim, not lost
+});
+
+// --- progress marker: not re-claimed until the lease expires -----------------
+
+test.skipIf(!DB)("a resolver throw for one instance does not block another in the same pass, and the failed one waits out its lease", async () => {
+  const body = waitBody("sayYes");
+  // Two instances against distinct processIds, so the resolver can selectively
+  // fail one by processId without either instance's own identity mattering.
+  const createAs = (pid: string) => createInstance(body, { processId: pid as Instance["processId"], version: 1 });
+  const good = await createAs("proc_resolve_good");
+  const bad = await createAs("proc_resolve_bad");
+  await executeManualTransition(good, "path_ab", body, actor);
+  await executeManualTransition(bad, "path_ab", body, actor);
+  expect(await drainOutbox(sql, reg)).toBe(2); // both flagged 'pending'
+
+  const flaky = (pid: string) => {
+    if (pid === "proc_resolve_bad") throw new Error("simulated resolver failure");
+    return body;
+  };
+  expect(await drainResolutions(sql, flaky)).toBe(1); // good processed; bad isolated, not counted
+  expect((await readInst(good.instanceId)).currentStepId as string).toBe("step_done");
+  expect(await resolveState(good.instanceId)).toBe("idle");
+  expect(await resolveState(bad.instanceId)).toBe("claimed"); // left for lease-expiry retry
+
+  // Immediate re-drain: the lease has not elapsed, so the claim query does not
+  // reselect it — not a write loop at the poll interval.
+  expect(await drainResolutions(sql, flaky)).toBe(0);
+  expect(await resolveState(bad.instanceId)).toBe("claimed");
+
+  // Once its lease elapses it is reclaimed, and — with a working resolver —
+  // resolves normally: the fault was transient, not terminal.
+  await sql`UPDATE instances SET resolve_claimed_at = now() - interval '1 hour' WHERE instance_id = ${bad.instanceId}`;
+  expect(await drainResolutions(sql, () => body)).toBe(1);
+  expect(await resolveState(bad.instanceId)).toBe("idle");
+  expect((await readInst(bad.instanceId)).currentStepId as string).toBe("step_done");
 });

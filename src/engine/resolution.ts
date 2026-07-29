@@ -68,37 +68,42 @@ export async function drainResolutions(
     )
     RETURNING instance_id, body`) as { instance_id: string; body: unknown }[];
 
-  // Return a claimed row to 'pending' so a later pass retries it (resolver miss,
-  // or a lost OCC race / cascade fault). Only touches a row still 'claimed', so a
-  // concurrent writeback that re-flagged 'pending' is preserved.
-  const requeue = (id: string) =>
-    db`UPDATE instances SET resolve_state = 'pending' WHERE instance_id = ${id} AND resolve_state = 'claimed'`;
-
+  // A failing instance is left 'claimed' rather than requeued to 'pending':
+  // requeueing makes the row selectable again on the very next pass, so a
+  // persistent per-instance fault becomes a write loop at the poll interval,
+  // and — since the claim scan is ordered by instance_id and capped — enough
+  // such rows occupy the whole batch and starve every other flagged instance.
+  // Leaving it 'claimed' reuses the lease-expiry predicate above as the retry
+  // cadence instead: bounded, already implemented, already tested. The cost is
+  // a transient failure waits up to one lease before its next attempt instead
+  // of retrying at once — not observable for a worker whose job is to re-drive
+  // a parked wait-state. A concurrent writeback still wins: outbox.ts's
+  // writeback sets resolve_state = 'pending' unconditionally (not gated on the
+  // current state), so it overwrites a 'claimed' row left behind by a failure
+  // exactly as it would overwrite a fresh claim — a legitimately re-flagged
+  // instance is never delayed by this.
   let processed = 0;
   for (const row of claimed) {
     try {
       // Body parse and body resolution are inside the boundary: a corrupt jsonb
-      // row or a resolver that throws requeues this one instance rather than
-      // aborting the pass and stranding every other claimed instance for a lease.
+      // row or a resolver that throws leaves this one instance claimed (for
+      // lease-expiry retry) rather than aborting the pass and stranding every
+      // other claimed instance.
       const inst = parseInstance(row.body);
       const body = await resolveBody(inst.processId, inst.version);
-      if (!body) {
-        await requeue(row.instance_id);
-        continue;
-      }
+      if (!body) continue; // resolver miss: leave claimed; retried once the lease expires
       // Verify the resolver returned the body the instance is pinned to, same
       // check rehydrate() makes. A mismatch is a resolver misconfiguration;
-      // requeue rather than run against the wrong definition.
+      // leave claimed rather than run against the wrong definition.
       if (definitionHash(body) !== inst.definitionHash)
         throw new Error(`resolveBody returned a body not matching instance pin: ${inst.instanceId}`);
       // Re-drive automatic evaluation. A no-op on a manual/terminal step or a
       // still-unmatched wait-state; a matching guard transitions to rest. OCC on
-      // transitionSeq makes a concurrent transition safe (this one loses and is
-      // requeued).
+      // transitionSeq makes a concurrent transition safe (this one loses and
+      // stays claimed for the lease to reclaim).
       await resolveAutomatic(inst, body, SYSTEM_ACTOR, db);
     } catch {
-      await requeue(row.instance_id);
-      continue;
+      continue; // leave claimed; the lease-expiry predicate is the retry cadence
     }
     await db`UPDATE instances SET resolve_state = 'idle'
       WHERE instance_id = ${row.instance_id} AND resolve_state = 'claimed'`;
