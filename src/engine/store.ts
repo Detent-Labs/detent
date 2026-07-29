@@ -22,8 +22,56 @@ import { armStepTimers, minFireAt } from "./duration.js";
 import { idempotencyKey } from "./idempotency.js";
 import { SPAWN_ACTION_TYPE, STATIC_ASSIGNMENT_STRATEGY_TYPE } from "./registry.js";
 
-/** Shared client. Constructed lazily-ish; a query throws if DATABASE_URL is unset. */
-export const sql = new SQL(process.env.DATABASE_URL ?? "");
+/**
+ * Constructs the real client on first use, throwing an error naming
+ * `DATABASE_URL` if it is unset at that point, rather than the empty string
+ * this module used to hand `SQL` and let fail later with an opaque
+ * connection error on whichever query happened to run first.
+ *
+ * Deferred to first use rather than module load: every real entry point
+ * (`startHttpServer`, `src/auth/cli.ts`) now calls `initSchema` before doing
+ * anything else, so for them this still fails immediately, before a request
+ * is served or a command runs — `initSchema`'s first statement is the first
+ * use. The difference only matters to a module that merely *imports*
+ * `sql`/`initSchema` without ever calling either — most of this repo's
+ * `bun:test` suites do exactly that at module scope, gated behind
+ * `test.skipIf(!DATABASE_URL)` at the individual test, not the import. An
+ * eager throw here would fail that `import` itself, for every such suite,
+ * turning a documented graceful skip (see CLAUDE.md) into a crash.
+ */
+let realSql: SQL | undefined;
+function getSql(): SQL {
+  if (realSql) return realSql;
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error(
+      "DATABASE_URL is not set. Set it to a Postgres connection string before starting the engine (server, CLI, or script).",
+    );
+  }
+  realSql = new SQL(url);
+  return realSql;
+}
+
+/**
+ * Shared client. A `Proxy` rather than the real `SQL` instance directly, so
+ * that constructing it (see `getSql` above) can be deferred to first use.
+ * `sql` is called as a tagged-template function (`` sql`...` ``) and has
+ * methods accessed off it (`.begin`, `.close`, ...); the `apply`/`get` traps
+ * forward both to the real, lazily-constructed instance.
+ */
+export const sql: SQL = new Proxy(function sql() {} as unknown as SQL, {
+  apply(_target, thisArg, args) {
+    return Reflect.apply(getSql() as unknown as (...a: unknown[]) => unknown, thisArg, args);
+  },
+  get(_target, prop, _receiver) {
+    const real = getSql();
+    const value = Reflect.get(real as object, prop, real);
+    return typeof value === "function" ? value.bind(real) : value;
+  },
+  has(_target, prop) {
+    return Reflect.has(getSql() as object, prop);
+  },
+});
 
 export async function initSchema(db: SQL = sql): Promise<void> {
   await db`CREATE TABLE IF NOT EXISTS instances (
@@ -37,6 +85,12 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     transition_seq integer NOT NULL,
     entry jsonb NOT NULL
   )`;
+  // Mirrors instance_events' own index on the structurally identical
+  // predicate. Readers: outbox.ts::appendOutcome (UPDATE ... WHERE
+  // instance_id = $1 AND transition_seq = $2, run for every delivered and
+  // dead-lettered outbox row while it holds the outbox row lock) and
+  // api.ts::getInstanceRecord (WHERE instance_id = ...).
+  await db`CREATE INDEX IF NOT EXISTS history_entries_instance_idx ON history_entries (instance_id, transition_seq)`;
   // Append-only runtime events that are not transitions, shaped like
   // history_entries. `kind` is promoted out of the jsonb so the log is queryable
   // by kind ("which instances dropped a timer, and why") without a jsonb scan.
@@ -159,6 +213,14 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // instances_selection_idx does not cover them.
   await db`CREATE INDEX IF NOT EXISTS instances_claimed_by_idx ON instances ((body->'assignment'->>'claimedBy'))`;
   await db`CREATE INDEX IF NOT EXISTS instances_candidates_idx ON instances USING GIN ((body->'assignment'->'candidates'))`;
+  // Child-instance lookup: the cancel cascade's child sweep and the migration
+  // live-child gate both filter on the parent's instanceId. A plain B-tree
+  // expression index — equality on one extracted text value, the same shape
+  // as instances_claimed_by_idx (GIN above is for the candidates containment
+  // predicate, not this one). `status` is deliberately left out: it is low
+  // cardinality, and the parent id alone reduces the scan to a handful of
+  // rows. Readers: transition.ts::sweepCancelledChildren, migration.ts::migrateOne.
+  await db`CREATE INDEX IF NOT EXISTS instances_parent_idx ON instances ((body->'parent'->>'instanceId'))`;
   // Project-local user accounts (src/auth/users.ts). user_id is the value used
   // as Actor.id — the same convention as assignment.candidates/claimedBy.
   await db`CREATE TABLE IF NOT EXISTS auth_users (
