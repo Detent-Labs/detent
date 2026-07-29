@@ -702,6 +702,14 @@ export type ProcessBody = z.infer<typeof processBody>;
  * Hand-authored body: the reserved cancellation identity is engine-owned, so an
  * author may not use the cancel-sink id/key or the reserved outcome. The
  * compile pass validates input against this before injecting the sink.
+ *
+ * The reserved `core.` action-prefix ban does NOT live here: a compiled body
+ * legitimately contains none of that prefix's actions (they are synthesized at
+ * runtime, never stored), so the ban generalizes to every body reaching the
+ * compile pass and lives there instead (`src/schema/compile.ts`), ahead of the
+ * `publishedProcessBody`-valid early return this schema's sibling does not
+ * gate. See `harden-publish-validation` design.md for why the prefix ban and
+ * the three identity checks below split onto different sides of that line.
  */
 export const authoredProcessBody = processBody.superRefine((b, ctx) => {
   const add = (message: string, path: (string | number)[]) =>
@@ -710,16 +718,6 @@ export const authoredProcessBody = processBody.superRefine((b, ctx) => {
     if (s.id === CANCEL_SINK_STEP_ID) add("reserved cancel-sink step id may not be authored", ["workflow", "steps", i, "id"]);
     if (s.key === CANCEL_SINK_KEY) add("reserved cancel-sink step key may not be authored", ["workflow", "steps", i, "key"]);
     if (s.outcome === RESERVED_CANCEL_OUTCOME) add(`outcome '${RESERVED_CANCEL_OUTCOME}' is reserved for cancellation`, ["workflow", "steps", i, "outcome"]);
-    // No authored action may use the engine-reserved type prefix.
-    const stepActions = [
-      ...(s.onEntry ?? []), ...(s.onExit ?? []), ...(s.onCancel ?? []),
-      ...(s.paths ?? []).flatMap((p) => p.onPath ?? []),
-      ...(s.timers ?? []).flatMap((t) => t.onFire.actions ?? []),
-    ];
-    stepActions.forEach((a) => {
-      if (a.type.startsWith(RESERVED_ACTION_PREFIX))
-        add(`action type '${a.type}' uses the reserved '${RESERVED_ACTION_PREFIX}' prefix`, ["workflow", "steps", i]);
-    });
   });
   if (b.contract?.outcomes?.includes(RESERVED_CANCEL_OUTCOME))
     add(`outcome '${RESERVED_CANCEL_OUTCOME}' is reserved for cancellation`, ["contract", "outcomes"]);

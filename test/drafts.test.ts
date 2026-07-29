@@ -201,6 +201,31 @@ test.skipIf(!DB)("an envelope violation on an existing draft leaves the stored r
   expect((stored?.body as { label: { en: string } }).label.en).toBe("v1");
 });
 
+// harden-publish-validation: the envelope check also bounds the serialized
+// size of body+layout together — the same reasoning that gave the HTTP server
+// its own maxRequestBodySize (src/http/server.ts), restated here since
+// drafts.ts is a module boundary in its own right and may be reached by a
+// non-HTTP caller.
+test.skipIf(!DB)("saveDraft rejects an over-size body/layout pair and leaves any stored draft untouched", async () => {
+  const processId = pid();
+  await saveDraft(processId, { body: invalidBody("v1"), layout: {}, revision: 0, updatedBy: "user_a" }, sql);
+  const oversizedBody = { key: "p", padding: "x".repeat(9 * 1024 * 1024) };
+  await expectRejects(
+    saveDraft(processId, { body: oversizedBody, layout: {}, revision: 0, updatedBy: "user_b" } as never, sql),
+    RequestShapeError,
+  );
+  const stored = await getDraft(processId, sql);
+  expect(stored?.revision).toBe(0);
+  expect((stored?.body as { label: { en: string } }).label.en).toBe("v1");
+});
+
+test.skipIf(!DB)("saveDraft accepts a draft of the size a real process definition reaches", async () => {
+  const processId = pid();
+  const realisticBody = { ...(invalidBody("v1") as Record<string, unknown>), padding: "x".repeat(200_000) }; // ~200 KB, well under the bound
+  const saved = await saveDraft(processId, { body: realisticBody, layout: {}, revision: 0, updatedBy: "user_a" }, sql);
+  expect(saved.revision).toBe(0);
+});
+
 // ============================================================
 // hash invariant: layout never affects definitionHash
 // ============================================================

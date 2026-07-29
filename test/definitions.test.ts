@@ -336,9 +336,14 @@ test.skipIf(!DB)("publish rejects an http.request action with method GET and a b
 
 // --- publish round-trips through validation -----------------------------------
 
-// An authored body carrying content the contract does not declare. Every read
-// re-parses (strip mode), so anything not stripped BEFORE the hash is content
-// the hash covers and no read can reproduce.
+// An authored body carrying content the contract does not declare.
+// harden-publish-validation: this is now a publish-time rejection
+// (src/schema/compile.ts::checkUnknownKeys), not silent stripping — see
+// test/cancel.test.ts's "compile: unknown keys are rejected, not stripped"
+// for the compile-pass-level coverage. This file keeps the round-trip/hash-
+// stability tests below it, now against a CLEAN body: their point is
+// definitionHash reproducibility and rehydration, not the unknown-key check
+// itself.
 const dirtyBody = (): ProcessBody => {
   const b = waitBody("sayYes") as unknown as Record<string, any>;
   b.uiMeta = { editor: "v1", palette: ["#fff"] };
@@ -346,26 +351,13 @@ const dirtyBody = (): ProcessBody => {
   return b as unknown as ProcessBody;
 };
 
-test.skipIf(!DB)("unknown authored keys reach neither the hash nor the store", async () => {
-  const v = await publishBody(PID, dirtyBody(), reg, dataSourceReg);
-
-  // The returned body is the validated one.
-  const returned = v.definition as unknown as Record<string, any>;
-  expect(returned.uiMeta).toBeUndefined();
-  expect(returned.workflow.steps[0].editorNote).toBeUndefined();
-
-  // So is the persisted one.
-  const rows = (await sql`SELECT body FROM definitions WHERE process_id = ${PID} AND version = ${v.version}`) as { body: unknown }[];
-  const stored = (typeof rows[0].body === "string" ? JSON.parse(rows[0].body as string) : rows[0].body) as Record<string, any>;
-  expect(stored.uiMeta).toBeUndefined();
-  expect(stored.workflow.steps[0].editorNote).toBeUndefined();
-
-  // The hash is the hash of the stripped body — identical to the clean publish.
-  expect(v.definitionHash).toBe(definitionHash(compileProcessBody(waitBody("sayYes"))));
+test.skipIf(!DB)("unknown authored keys are rejected at publish, nothing is persisted", async () => {
+  await expect(publishBody(PID, dirtyBody(), reg, dataSourceReg)).rejects.toThrow();
+  expect(await definitionCount()).toBe(0);
 });
 
 test.skipIf(!DB)("a publish -> read round trip is hash-stable", async () => {
-  const v = await publishBody(PID, dirtyBody(), reg, dataSourceReg);
+  const v = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
   const { resolveBody } = createDefinitionStore();
   const resolved = (await resolveBody(PID, v.version))!;
   // The pin is only meaningful if the body every reader gets recomputes to it.
@@ -373,7 +365,7 @@ test.skipIf(!DB)("a publish -> read round trip is hash-stable", async () => {
 });
 
 test.skipIf(!DB)("an instance created from the publish return value rehydrates", async () => {
-  const v = await publishBody(PID, dirtyBody(), reg, dataSourceReg);
+  const v = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
   const { resolveBody } = createDefinitionStore();
   const resolved = (await resolveBody(PID, v.version))!;
 
@@ -384,7 +376,7 @@ test.skipIf(!DB)("an instance created from the publish return value rehydrates",
 });
 
 test.skipIf(!DB)("re-publishing the read-back body is a hash-matched no-op", async () => {
-  const v = await publishBody(PID, dirtyBody(), reg, dataSourceReg);
+  const v = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
   const { resolveBody } = createDefinitionStore();
   const resolved = (await resolveBody(PID, v.version))!;
 

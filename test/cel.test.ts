@@ -177,7 +177,7 @@ const deadlineStep = (src: string) => ({
   label: { en: "A" },
   type: "task",
   paths: [{ id: "path_a", key: "pa", to: "step_b", trigger: "manual" }],
-  timers: [{ id: "timer_a", key: "ta", deadline: { lang: "cel", src }, onFire: { actions: [] } }],
+  timers: [{ id: "timer_a", deadline: { lang: "cel", src }, onFire: { actions: [] } }],
 });
 
 const typedFields = [
@@ -287,7 +287,7 @@ test("the deadline result-type expectation does not leak into other sites", () =
       { id: "path_a", key: "pa", to: "step_b", trigger: "automatic", priority: 1, guard: { lang: "cel", src: "data.amount > 0.0" } },
     ],
     // A well-typed deadline alongside them, to prove the sites are collected together.
-    timers: [{ id: "timer_a", key: "ta", deadline: { lang: "cel", src: "data.due_at" }, onFire: { actions: [] } }],
+    timers: [{ id: "timer_a", deadline: { lang: "cel", src: "data.due_at" }, onFire: { actions: [] } }],
   };
   expect(validateProcessBody(body({ fields: typedFields, steps: [step] }))).toEqual([]);
 });

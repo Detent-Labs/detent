@@ -26,7 +26,7 @@ import {
   AssignmentRegistryValidationError,
   DataSourceRegistryValidationError,
 } from "../engine/definitions.js";
-import { DurationValidationError } from "../schema/compile.js";
+import { DurationValidationError, CompileValidationError } from "../schema/compile.js";
 import { DraftConflictError } from "../engine/drafts.js";
 import { MigrationPlanError } from "../engine/migration.js";
 import { ZodError } from "zod";
@@ -46,6 +46,7 @@ const ISSUES_ERRORS: IssuesMapping[] = [
   { ctor: DataSourceRegistryValidationError, status: 422, type: "registry-validation" },
   { ctor: CelValidationError, status: 422, type: "cel-validation" },
   { ctor: DurationValidationError, status: 422, type: "duration-validation" },
+  { ctor: CompileValidationError, status: 422, type: "compile-validation" },
   { ctor: ZodError, status: 422, type: "schema-validation" },
 ];
 

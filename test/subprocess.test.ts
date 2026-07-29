@@ -14,6 +14,7 @@ import { drainOutbox } from "../src/engine/outbox.js";
 import { drainResolutions } from "../src/engine/resolution.js";
 import { subprocessChildId } from "../src/engine/idempotency.js";
 import { authoredProcessBody } from "../src/schema/definition.js";
+import { compileProcessBody, CompileValidationError } from "../src/schema/compile.js";
 import { contractHash } from "../src/schema/hash.js";
 import { buildGuardContext, evalFieldMap, SYSTEM_ACTOR } from "../src/cel/eval.js";
 import type { ProcessBody, Instance } from "../src/schema/definition.js";
@@ -462,14 +463,23 @@ beforeAll(async () => {
 
 // --- pure: authoring invariant, deterministic ids, contract hash ---------------
 
-test("an authored action using the reserved core. prefix is rejected", () => {
+// harden-publish-validation: the reserved-prefix ban moved out of
+// authoredProcessBody into the compile pass (src/schema/compile.ts), so it
+// now applies on BOTH compile branches — authoredProcessBody itself no
+// longer rejects it (see test/cancel.test.ts's "compile: reserved action
+// prefix" coverage for the compile-pass behavior, including the additive
+// SEC-3 regression). This asserts the schema-level move: authoredProcessBody
+// alone is silent on it, compileProcessBody is not.
+test("an authored action using the reserved core. prefix is rejected at compile, not by authoredProcessBody alone", () => {
   const withType = (type: string): ProcessBody =>
     ({ key: "k", baseLocale: "en", label: { en: "L" }, fields: [], workflow: { initialStep: "step_a", steps: [
       { id: "step_a", key: "a", label: { en: "A" }, type: "task", onEntry: [{ id: "action_x", type, config: {} }], paths: [manualPath("path_ab", "step_b")] },
       { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
     ] } }) as unknown as ProcessBody;
-  expect(authoredProcessBody.safeParse(withType("core.spawnSubprocess")).success).toBe(false);
+  expect(authoredProcessBody.safeParse(withType("core.spawnSubprocess")).success).toBe(true);
+  expect(() => compileProcessBody(withType("core.spawnSubprocess"))).toThrow(CompileValidationError);
   expect(authoredProcessBody.safeParse(withType("email")).success).toBe(true);
+  expect(() => compileProcessBody(withType("email"))).not.toThrow();
 });
 
 test("subprocessChildId is deterministic and varies by coordinate", () => {

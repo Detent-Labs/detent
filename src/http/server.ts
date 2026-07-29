@@ -395,6 +395,15 @@ export function createServer(
   };
 }
 
+// Sized to the largest plausible legitimate request — a definition or draft of
+// a few megabytes — rather than Bun's 128 MiB default, which today is the
+// only bound between an HTTP caller and persisted state: no route narrows it,
+// saveDraft deliberately validates only its envelope, and a `file`- or
+// plugin-typed field's submitted value passes the runtime type check with no
+// size constraint an author could even declare. One declared value applies to
+// every route — publish, draft save and submission alike.
+export const MAX_REQUEST_BODY_SIZE = 8 * 1024 * 1024; // 8 MiB
+
 /**
  * Async so the schema is created — `await initSchema(db)` — before
  * `Bun.serve` starts accepting requests; a fire-and-forget call here would
@@ -416,7 +425,7 @@ export async function startHttpServer(
   const allowedOrigins = parseAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS);
   const fetch = createServer(dataSourceRegistry, registry, db, resolver, allowedOrigins, process.env.AUTH_JWT_SECRET);
   const port = Number(process.env.PORT ?? 3000);
-  const server = Bun.serve({ fetch, port });
+  const server = Bun.serve({ fetch, port, maxRequestBodySize: MAX_REQUEST_BODY_SIZE });
   const engine = startEngine(db, registry);
   console.log(`HTTP server listening on :${server.port}`);
   return {

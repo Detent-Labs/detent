@@ -27,6 +27,7 @@
  */
 
 import type { SQL } from "bun";
+import { z } from "zod";
 import { createInstance, withTransaction } from "./store.js";
 import {
   resolveAutomatic,
@@ -269,6 +270,14 @@ export function makeReturnHandler(
   };
 }
 
+// Config shapes the engine itself synthesizes at transition.ts:251 and :276 —
+// declared so a forged config reaching either handler (defense in depth behind
+// the write-path reserved-prefix ban; see compile.ts::checkReservedActionPrefix
+// and registry-check.ts::checkActionRegistry) is rejected on shape rather than
+// accepted as author-controlled `unknown`.
+const spawnConfigSchema = z.object({ subprocessStepId: z.string(), parentSeq: z.number() });
+const returnConfigSchema = z.object({ parentInstanceId: z.string(), childOutcome: z.string().nullable() });
+
 /** Register both internal handlers into a registry (used by startEngine). */
 export function registerSubprocessHandlers(
   registry: Registry,
@@ -276,6 +285,9 @@ export function registerSubprocessHandlers(
   resolveBody: ResolveBody,
   resolveLatestByContract: ResolveLatestByContract,
 ): void {
-  register(registry, SPAWN_ACTION_TYPE, { handler: makeSpawnHandler(db, resolveBody, resolveLatestByContract) });
-  register(registry, RETURN_ACTION_TYPE, { handler: makeReturnHandler(db, resolveBody) });
+  register(registry, SPAWN_ACTION_TYPE, {
+    handler: makeSpawnHandler(db, resolveBody, resolveLatestByContract),
+    configSchema: spawnConfigSchema,
+  });
+  register(registry, RETURN_ACTION_TYPE, { handler: makeReturnHandler(db, resolveBody), configSchema: returnConfigSchema });
 }
