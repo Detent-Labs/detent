@@ -93,10 +93,29 @@ test("an unregistered type is not also checked for a config violation", () => {
   expect(issues.length).toBe(1); // just the "not registered" issue, no separate config issue
 });
 
-test("a core.-prefixed action type is never checked against the registry", () => {
-  const reg = createRegistry(); // empty — would reject anything if it were checked
+// harden-publish-validation: the reserved-prefix ban now runs inside the
+// compile pass itself (src/schema/compile.ts::checkReservedActionPrefix),
+// ahead of both compile branches — so a core.-prefixed action can no longer
+// reach a published body at all. checkActionRegistry no longer special-cases
+// it away: resolved like any other type, against whatever the registry
+// happens to hold.
+test("a core.-prefixed action type is resolved against the registry like any other", () => {
+  const reg = createRegistry(); // empty — nothing is registered
   const issues = checkActionRegistry(bodyWithActions({ onEntry: [action("core.spawnSubprocess")] }), reg);
-  expect(issues.length).toBe(0);
+  expect(issues.length).toBe(1);
+  expect(issues[0]!.type).toBe("core.spawnSubprocess");
+  expect(issues[0]!.message.toLowerCase()).toContain("not registered");
+});
+
+test("a core.-prefixed action type registered with a configSchema is config-checked too", () => {
+  const reg = createRegistry();
+  register(reg, "core.spawnSubprocess", {
+    handler: async () => ({}),
+    configSchema: z.object({ subprocessStepId: z.string(), parentSeq: z.number() }),
+  });
+  const issues = checkActionRegistry(bodyWithActions({ onEntry: [action("core.spawnSubprocess", { subprocessStepId: "step_a", parentSeq: "not-a-number" })] }), reg);
+  expect(issues.length).toBe(1);
+  expect(issues[0]!.loc).toContain("onEntry");
 });
 
 test("multiple invalid actions each produce their own issue, not just the first", () => {

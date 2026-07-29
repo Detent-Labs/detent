@@ -16,7 +16,6 @@
 
 import { z } from "zod";
 import type { Action, DataSourceDef, ProcessBody, Step } from "../schema/definition.js";
-import { RESERVED_ACTION_PREFIX } from "../schema/definition.js";
 import { resolve, type Registry, STATIC_ASSIGNMENT_STRATEGY_TYPE, resolveDataSource, type DataSourceRegistry } from "./registry.js";
 
 const staticAssignmentConfigSchema = z.object({ candidates: z.array(z.string()) });
@@ -95,17 +94,22 @@ function collect(body: ProcessBody): Site[] {
  * issue rather than throwing on the first, so a publish rejection is fixable
  * in one pass (same contract as `validateProcessBody`).
  *
- * An action whose `type` carries the reserved `core.` prefix is skipped
- * entirely: it is never present in an authored body (rejected by
- * `authoredProcessBody`'s own reserved-prefix refinement) and the compile pass
- * injects no action of this type into any position `collect()` visits — these
- * types are dispatched internally by `subprocess.ts`, never through the
- * author-facing registry this check enforces.
+ * No action type is exempt, including one using the reserved `core.` prefix.
+ * The previous exemption rested on the premise that such a type "can never be
+ * present in an authored body" — falsified by `compileProcessBody`'s
+ * idempotent early return, which skipped the only check enforcing it
+ * (`harden-publish-validation`). The reserved-prefix ban now runs inside the
+ * compile pass itself, ahead of both compile branches
+ * (`src/schema/compile.ts::checkReservedActionPrefix`), so a `core.`-prefixed
+ * action cannot reach this check from a published body at all; resolving it
+ * here anyway, rather than special-casing it away, means a future path that
+ * did produce one would be validated instead of waved through. The engine's
+ * two internal handlers (`SPAWN_ACTION_TYPE`, `RETURN_ACTION_TYPE`) register
+ * with `configSchema`s of their own (`src/engine/subprocess.ts`) for exactly
+ * that reason.
  */
 export function checkActionRegistry(body: ProcessBody, registry: Registry): RegistryIssue[] {
-  const sites = collect(body)
-    .filter(({ action }) => !action.type.startsWith(RESERVED_ACTION_PREFIX))
-    .map(({ action, loc }) => ({ loc, type: action.type, config: action.config }));
+  const sites = collect(body).map(({ action, loc }) => ({ loc, type: action.type, config: action.config }));
   return checkTypedConfig(sites, (type) => resolve(registry, type), "action");
 }
 
