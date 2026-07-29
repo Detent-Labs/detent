@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Panzoom, { type PanzoomObject } from "@panzoom/panzoom";
 import type { PathTrigger } from "workflow-engine/schema";
 import { useDraft } from "../draft/store";
@@ -61,14 +61,22 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const autoPlaced = autoPlaceSteps(steps as LayoutStep[], initialStepId, layout);
+  // Neither computation reads pointer/drag state, so without memoization
+  // both re-run on every pointer-move event during a drag for nothing.
+  // Keyed on their actual inputs only.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const autoPlaced = useMemo(() => autoPlaceSteps(steps as LayoutStep[], initialStepId, layout), [steps, initialStepId, layout]);
   const positionOf = (stepId: string): Point => {
     const recorded = layout[stepId];
     if (isPoint(recorded)) return recorded;
     return autoPlaced[stepId] ?? { x: 0, y: 0 };
   };
 
-  const nodePositions: NodePosition[] = steps.filter((s) => s.id).map((s) => ({ id: s.id as string, ...positionOf(s.id as string) }));
+  const nodePositions: NodePosition[] = useMemo(
+    () => steps.filter((s) => s.id).map((s) => ({ id: s.id as string, ...positionOf(s.id as string) })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [steps, initialStepId, layout],
+  );
 
   const [nodeDrag, setNodeDrag] = useState<{ stepId: string; startPointer: Point; startPos: Point; current: Point } | null>(null);
   const [connectDrag, setConnectDrag] = useState<{ sourceStepId: string; current: Point } | null>(null);

@@ -90,8 +90,17 @@ export function TimersScreen({ token, navigate, onUnauthorized }: TimersScreenPr
           </thead>
           <tbody>
             {items.map((t) => (
-              <tr key={t.instanceId} className="admin-row-clickable" onClick={() => navigate({ name: "instance", instanceId: t.instanceId })}>
-                <td>{t.instanceId}</td>
+              <tr key={t.instanceId}>
+                <td>
+                  <button
+                    type="button"
+                    className="admin-row-link"
+                    aria-label={`Open instance: ${t.instanceId} — ${t.processId} at ${t.currentStepId}`}
+                    onClick={() => navigate({ name: "instance", instanceId: t.instanceId })}
+                  >
+                    {t.instanceId}
+                  </button>
+                </td>
                 <td>{t.processId}</td>
                 <td>{t.currentStepId}</td>
                 <td>

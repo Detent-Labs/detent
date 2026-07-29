@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { LocaleCode } from "workflow-engine/schema";
 import type { ResolvedViewField, SubmissionIssue } from "./types.js";
 import { resolveText } from "./locale.js";
+import { issueMessage } from "./issue-messages.js";
 
 interface FieldFormProps {
   fields: ResolvedViewField[];
@@ -73,6 +74,20 @@ export function FieldInput({ field, allFields, values, onChange, locale, baseLoc
 
   const value = values[def.id];
   const disabled = field.readonly;
+  const hasIssues = issues.length > 0;
+  const issuesId = `${def.id}-issues`;
+  // Every branch below carries the same three: required/invalid state
+  // announced programmatically (not only via the visual marker/styling),
+  // and the issue list linked as a description rather than folded into the
+  // control's name. `aria-required` only, never native `required` — the
+  // engine is the validator, and native blocking would prevent the
+  // submission it's meant to judge (design.md's default, chosen for every
+  // branch here).
+  const a11yProps = {
+    "aria-required": field.required || undefined,
+    "aria-invalid": hasIssues || undefined,
+    "aria-describedby": hasIssues ? issuesId : undefined,
+  } as const;
   // Select/multiselect share this one option-list build — never two
   // independently-maintained copies of the same map.
   const options = (field.options ?? []).map((o) => (
@@ -83,7 +98,7 @@ export function FieldInput({ field, allFields, values, onChange, locale, baseLoc
 
   let control: ReactNode;
   if (def.type === "boolean") {
-    control = <input type="checkbox" disabled={disabled} checked={!!value} onChange={(e) => onChange(def.id, e.target.checked)} />;
+    control = <input type="checkbox" disabled={disabled} checked={!!value} onChange={(e) => onChange(def.id, e.target.checked)} {...a11yProps} />;
   } else if (def.type === "number") {
     control = (
       <input
@@ -91,15 +106,26 @@ export function FieldInput({ field, allFields, values, onChange, locale, baseLoc
         disabled={disabled}
         value={value === undefined || value === null ? "" : String(value)}
         onChange={(e) => onChange(def.id, e.target.value === "" ? undefined : Number(e.target.value))}
+        {...a11yProps}
       />
     );
   } else if (def.type === "date") {
-    control = <input type="date" disabled={disabled} value={(value as string) ?? ""} onChange={(e) => onChange(def.id, e.target.value)} />;
+    control = (
+      <input type="date" disabled={disabled} value={(value as string) ?? ""} onChange={(e) => onChange(def.id, e.target.value)} {...a11yProps} />
+    );
   } else if (def.type === "datetime") {
-    control = <input type="datetime-local" disabled={disabled} value={(value as string) ?? ""} onChange={(e) => onChange(def.id, e.target.value)} />;
+    control = (
+      <input
+        type="datetime-local"
+        disabled={disabled}
+        value={(value as string) ?? ""}
+        onChange={(e) => onChange(def.id, e.target.value)}
+        {...a11yProps}
+      />
+    );
   } else if (def.type === "select") {
     control = (
-      <select disabled={disabled} value={(value as string) ?? ""} onChange={(e) => onChange(def.id, e.target.value)}>
+      <select disabled={disabled} value={(value as string) ?? ""} onChange={(e) => onChange(def.id, e.target.value)} {...a11yProps}>
         <option value="" />
         {options}
       </select>
@@ -112,6 +138,7 @@ export function FieldInput({ field, allFields, values, onChange, locale, baseLoc
         disabled={disabled}
         value={selected}
         onChange={(e) => onChange(def.id, Array.from(e.target.selectedOptions).map((o) => o.value))}
+        {...a11yProps}
       >
         {options}
       </select>
@@ -122,27 +149,31 @@ export function FieldInput({ field, allFields, values, onChange, locale, baseLoc
     // reference/file/plugin. A dataSource-bound select/multiselect field is
     // NOT included here — its options are resolved server-side into
     // `field.options`, same as a static-options field.
-    control = <input type="text" disabled={disabled} value={(value as string) ?? ""} onChange={(e) => onChange(def.id, e.target.value)} />;
+    control = (
+      <input type="text" disabled={disabled} value={(value as string) ?? ""} onChange={(e) => onChange(def.id, e.target.value)} {...a11yProps} />
+    );
   }
 
   return (
-    <label className="form-ui-field">
-      <span className="form-ui-field-label">
-        {label}
-        {field.required && (
-          <span className="form-ui-required-marker" title="required">
-            *
-          </span>
-        )}
-      </span>
-      {control}
-      {issues.length > 0 && (
-        <ul className="form-ui-field-issues">
+    <div className="form-ui-field">
+      <label className="form-ui-field-control">
+        <span className="form-ui-field-label">
+          {label}
+          {field.required && (
+            <span className="form-ui-required-marker" title="required">
+              *
+            </span>
+          )}
+        </span>
+        {control}
+      </label>
+      {hasIssues && (
+        <ul className="form-ui-field-issues" id={issuesId}>
           {issues.map((issue, i) => (
-            <li key={i}>{issue.kind}</li>
+            <li key={i}>{issueMessage(issue, locale, baseLocale)}</li>
           ))}
         </ul>
       )}
-    </label>
+    </div>
   );
 }

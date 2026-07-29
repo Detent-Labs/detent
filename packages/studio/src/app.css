@@ -496,6 +496,40 @@ h2 {
   transform: rotate(-2deg);
 }
 
+/* Step card disclosure header — a real <button> now (spa-accessibility-pass),
+   reset to a full-width bar rather than the default accent pill so it still
+   reads as a header, not a call-to-action. */
+.step-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  background: none;
+  color: inherit;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.step-card-header:hover {
+  background: var(--color-surface-muted);
+}
+
+/* The one deliberate visual addition beyond a plain reset: aria-expanded's
+   state needs a visual counterpart too, not color alone. */
+.step-card-chevron {
+  margin-left: auto;
+  transition: transform 0.15s ease;
+}
+
+.step-card-header[aria-expanded="true"] .step-card-chevron {
+  transform: rotate(90deg);
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
