@@ -286,6 +286,24 @@ test.skipIf(!DB)("GET /instances/:instanceId on a non-running (completed) instan
   expect(view.availablePaths).toEqual([]);
 });
 
+test.skipIf(!DB)("GET /instances/:instanceId for a third-party authenticated actor is 403 authorization, mirroring the record route", async () => {
+  const PID = pid("proc_http_view_third_party");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", bystander));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("authorization");
+});
+
+test.skipIf(!DB)("GET /instances/:instanceId for a nonexistent instance, as an unrelated actor, is also 403 — non-disclosure", async () => {
+  const res = await fetch(authedReq("http://x/instances/inst_does_not_exist", "GET", bystander));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("authorization");
+});
+
 // ============================================================
 // Typed error mappings
 // ============================================================
@@ -333,14 +351,20 @@ test.skipIf(!DB)("a pin mismatch maps to 500 (via GET on a corrupted pin)", asyn
 
   await sql`UPDATE instances SET body = jsonb_set(body, '{definitionHash}', '"deadbeef"'::jsonb) WHERE instance_id = ${created.instanceId}`;
 
-  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", user1));
+  // ADMIN_ROLE, not user1: authorize-instance-access collapses a non-admin
+  // caller's load failure (including a pin mismatch) into 403 authorization,
+  // so only the admin path still surfaces the underlying 500.
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", admin));
   expect(res.status).toBe(500);
   const body = (await res.json()) as { error: { type: string } };
   expect(body.error.type).toBe("internal");
 });
 
-test.skipIf(!DB)("an unknown instanceId maps to 500, not 404", async () => {
-  const res = await fetch(authedReq("http://x/instances/inst_does_not_exist", "GET", user1));
+test.skipIf(!DB)("an unknown instanceId maps to 500, not 404, for an ADMIN_ROLE caller", async () => {
+  // ADMIN_ROLE: a non-admin caller now gets 403 authorization for a
+  // nonexistent instance (non-disclosure), not 500 — see
+  // "GET /instances/:instanceId for a nonexistent instance ... is also 403".
+  const res = await fetch(authedReq("http://x/instances/inst_does_not_exist", "GET", admin));
   expect(res.status).toBe(500);
   const body = (await res.json()) as { error: { type: string; message: string } };
   expect(body.error.type).toBe("internal");
@@ -468,7 +492,10 @@ test.skipIf(!DB)("wildcard config: a normal response carries the CORS allow-orig
 });
 
 test.skipIf(!DB)("wildcard config: an error response also carries the CORS allow-origin header", async () => {
-  const res = await corsFetch(authedReq("http://x/instances/inst_does_not_exist", "GET", user1));
+  // admin: a non-admin caller now gets 403 for a nonexistent instance
+  // (authorize-instance-access); this test wants the ordinary 500
+  // not-found mapping as its error fixture, unrelated to CORS.
+  const res = await corsFetch(authedReq("http://x/instances/inst_does_not_exist", "GET", admin));
   expect(res.status).toBe(500);
   expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
 });
@@ -501,7 +528,8 @@ test.skipIf(!DB)("allowlist config: a disallowed origin gets no allow-origin hea
 });
 
 test.skipIf(!DB)("allowlist config: a request with no Origin header still executes normally", async () => {
-  const res = await allowlistFetch(authedReq("http://x/instances/inst_does_not_exist", "GET", user1));
+  // admin: see the wildcard-config error-response test above for why.
+  const res = await allowlistFetch(authedReq("http://x/instances/inst_does_not_exist", "GET", admin));
   expect(res.status).toBe(500); // the ordinary "instance not found" mapping, unaffected by CORS
   expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
 });

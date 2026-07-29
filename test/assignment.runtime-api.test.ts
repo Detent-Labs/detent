@@ -10,6 +10,7 @@ import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { NotAssignedError, NotACandidateError, AlreadyClaimedError, NotClaimedError, NotClaimantError } from "../src/engine/transition.js";
 import { createProcessInstance, claimStep, releaseClaim, submitAndTransition } from "../src/runtime/api.js";
+import { AuthorizationError, ADMIN_ROLE } from "../src/auth/authorize.js";
 import type { ProcessBody, ProcessId, PathId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
@@ -17,6 +18,7 @@ const DB = !!process.env.DATABASE_URL;
 const candidate: Actor = { id: "user_1", roles: [] };
 const roleActor: Actor = { id: "user_2", roles: ["approver"] };
 const outsider: Actor = { id: "user_3", roles: [] };
+const operator: Actor = { id: "user_operator", roles: [ADMIN_ROLE] };
 const reg = createRegistry();
 const dataSourceReg = createDataSourceRegistry();
 const PID = "proc_assign_rtapi" as ProcessId;
@@ -134,7 +136,26 @@ test.skipIf(!DB)("submitAndTransition succeeds for the claimant", async () => {
 test.skipIf(!DB)("a step with no assignment is unaffected by claim enforcement (regression guard)", async () => {
   await publishBody(PID, unassignedBody(), reg, dataSourceReg);
   const inst = await createProcessInstance(PID, candidate, dataSourceReg);
-  // No claim taken at all — succeeds exactly as before this change.
+  // No claim taken at all — succeeds exactly as before this change. `candidate`
+  // is the instance's starter here, so this pins the starter case of the
+  // assignment-less floor, not "anyone authenticated."
   const updated = await submitAndTransition(inst.instanceId, "path_ab" as PathId, {}, candidate, dataSourceReg);
+  expect(updated.currentStepId as string).toBe("step_b");
+});
+
+test.skipIf(!DB)("submitAndTransition rejects an outsider on a step with no declared assignment", async () => {
+  await publishBody(PID, unassignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+  // outsider neither started the instance nor carries ADMIN_ROLE, and the
+  // step declares no assignment to be a candidate on — the floor rejects.
+  await rejectsWith(submitAndTransition(inst.instanceId, "path_ab" as PathId, {}, outsider, dataSourceReg), AuthorizationError);
+});
+
+test.skipIf(!DB)("submitAndTransition succeeds for an ADMIN_ROLE actor on a step with no declared assignment, without having started it", async () => {
+  await publishBody(PID, unassignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+  // operator did not start the instance, but carries ADMIN_ROLE — the floor's
+  // second arm.
+  const updated = await submitAndTransition(inst.instanceId, "path_ab" as PathId, {}, operator, dataSourceReg);
   expect(updated.currentStepId as string).toBe("step_b");
 });
