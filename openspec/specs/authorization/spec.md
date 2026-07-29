@@ -7,8 +7,11 @@ carry no permission check of their own behind a reserved role on the
 already-resolved `Actor`: publishing a process definition, cancelling an
 arbitrary instance, the unfiltered instance listing, an instance's merged
 record, every `/admin/*` route, and every studio route. Cancelling one's
-*own* instance is a separate, narrower path this capability does not gate —
-see "An instance's starter may cancel it without the reserved role" below.
+*own* instance, and a developer reading the record of an instance they
+started through Studio's Player, are each a separate, narrower path this
+capability does not gate — see "An instance's starter may cancel it without
+the reserved role" and "A developer may read the record of an instance they
+started, without the reserved role" below.
 Built on top of `actor-resolution`/`jwt-authentication`/`local-user-accounts`:
 those capabilities establish *who* the caller is; this one decides whether
 that identity may perform an administrative, operator-facing, or authoring
@@ -183,6 +186,55 @@ without holding `system:admin` must be granted the role via the existing
 - **WHEN** that actor requests `GET /instances/:id/record`, including for an
   instance they started
 - **THEN** the response is 403
+
+### Requirement: A developer may read the record of an instance they started, without the reserved role
+
+`getInstanceRecord` (`src/runtime/api.ts`) SHALL first attempt
+`requireRole(actor, ADMIN_ROLE)`; when that throws `AuthorizationError`,
+`getInstanceRecord` SHALL NOT propagate the rejection. It SHALL instead load
+the instance and SHALL permit the read when both `actor.roles` includes
+`DEVELOPER_ROLE` and `instance.startedBy === actor.id` — a developer reading
+the record of an instance created through their own Studio Player session,
+without holding `system:admin`. This bypass SHALL be `getInstanceRecord`-
+specific, mirroring `cancelInstance`'s existing starter bypass for
+`system:cancel-any`: it SHALL NOT extend to any other operator-facing read
+or route, and SHALL NOT let a developer read the record of an instance they
+did not start.
+
+A caller satisfying neither `ADMIN_ROLE` nor the developer-and-starter pair
+SHALL learn nothing about the target instance from a failed attempt: an
+unresolvable instance id and a resolvable instance that is neither theirs
+nor readable by role SHALL both collapse to the same `AuthorizationError`,
+preserving the existing "a role-less caller is rejected before any instance
+state becomes observable to it" guarantee this capability already holds for
+`cancelInstance`.
+
+The requirement above gating `GET /instances/:id/record` behind
+`system:admin` is untouched by this addition: an actor holding neither
+`system:admin` nor `system:developer` still gets `AuthorizationError`, even
+for an instance they themselves started — the "same participant cannot read
+a record" scenario stays true, since that actor holds no `system:developer`
+role either.
+
+#### Scenario: A developer reads the record of an instance they started
+
+- **WHEN** an actor holding `system:developer` but not `system:admin` calls
+  `getInstanceRecord` for an instance whose `startedBy` matches their id
+- **THEN** the call succeeds and returns the merged record
+
+#### Scenario: A developer cannot read a record of an instance they did not start
+
+- **WHEN** an actor holding `system:developer` but not `system:admin` calls
+  `getInstanceRecord` for an instance whose `startedBy` does not match their
+  id
+- **THEN** it throws `AuthorizationError`
+
+#### Scenario: A participant with neither role is still refused, even for their own instance
+
+- **WHEN** an actor holding neither `system:admin` nor `system:developer`
+  calls `getInstanceRecord` for an instance they themselves started
+- **THEN** it throws `AuthorizationError`, unchanged from this capability's
+  existing behavior
 
 ### Requirement: Reading one instance is authorized by relationship to it
 

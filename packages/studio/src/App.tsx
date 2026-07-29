@@ -6,6 +6,8 @@ import { ProcessesScreen } from "./screens/ProcessesScreen.js";
 import { EditScreen } from "./screens/EditScreen.js";
 import { VersionsScreen } from "./screens/VersionsScreen.js";
 import { MigrationPlanScreen } from "./screens/MigrationPlanScreen.js";
+import { ToolsScreen } from "./screens/ToolsScreen.js";
+import { PlayerScreen } from "./screens/PlayerScreen.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 
 /** Mirrors src/auth/authorize.ts::DEVELOPER_ROLE — the server is the enforcement; this is presentational only (studio-app spec's "An authenticated actor without the developer role sees an explanatory empty state"). */
@@ -56,6 +58,9 @@ export function App() {
           >
             Processes
           </button>
+          <button type="button" aria-current={route.name === "tools" ? "page" : undefined} onClick={() => navigate({ name: "tools" })}>
+            Tools
+          </button>
         </nav>
         <div className="studio-header-right">
           <button type="button" onClick={logout}>
@@ -80,6 +85,8 @@ export function App() {
             onUnauthorized={logout}
           />
         )}
+        {route.name === "tools" && <ToolsScreen token={session.token} navigate={navigate} onUnauthorized={logout} />}
+        {route.name === "play" && <PlayerScreen processId={route.processId} token={session.token} navigate={navigate} onUnauthorized={logout} />}
       </ErrorBoundary>
     </div>
   );

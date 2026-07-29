@@ -33,7 +33,7 @@ and TypeScript, with its own `package.json`, `vite.config.ts`, `tsconfig.json`
 and `index.html`, matching the shape of `packages/app`. It SHALL depend on
 `workflow-engine` at compile time only for the types it renders
 (`InstanceRecordElement`, `ActionOutcome`, instance and outbox row shapes), and
-SHALL NOT depend on `form-ui`, on `packages/app`, or on `packages/editor` — the
+SHALL NOT depend on `form-ui` or on `packages/app` — the
 admin area renders records and system state, never step forms.
 
 At runtime it SHALL reach the engine exclusively through the HTTP wrapper. It

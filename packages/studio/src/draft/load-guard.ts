@@ -28,8 +28,8 @@ export function checkDraftShape(value: unknown): LoadGuardIssue[] {
 
   // A file with no recognized process-body key at all (e.g. a published
   // DefinitionVersion wrapper, whose real content sits under `.definition`)
-  // is "not shaped like a process body at all" (editor-draft-io spec) — flag
-  // it instead of silently loading an all-undefined Draft.
+  // is "not shaped like a process body at all" — flag it instead of
+  // silently loading an all-undefined Draft.
   for (const key of Object.keys(value)) {
     if (!KNOWN_KEYS.has(key)) issues.push({ path: key, message: `unrecognized top-level field '${key}' — this may not be a process body` });
   }

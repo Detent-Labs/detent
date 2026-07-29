@@ -11,8 +11,7 @@ by explicit Paths (transitions). This is *not* BPMN token flow.
 A serialized JSON process definition is the one artifact three roles share:
 
 - **Engine** — executes definitions.
-- **Editor** — produces them graphically (`packages/studio`, superseding the
-  `packages/editor` proof of concept).
+- **Editor** — produces them graphically (`packages/studio`).
 - **Hand-authoring** — definitions written directly as JSON (rare).
 
 `src/schema/definition.ts` is that contract, expressed as Zod schemas with TS
@@ -40,11 +39,10 @@ JWT authentication and role-gated authorization, and three frontends
 | `src/http/` | Thin REST/JSON wrapper over `Bun.serve` around the Runtime API Layer, plus the admin and studio route files. Typed-error-to-HTTP-status mapping, configurable CORS. |
 | `src/auth/` | `ActorResolver` seam with two implementations (a non-production dev-header resolver and a production-capable JWT resolver accepting local `auth_users` accounts and JWKS-backed external issuers), login + rate limiting, a user-admin CLI, and the reserved roles (`system:publish`, `system:cancel-any`, `system:admin`, `system:developer`). |
 | `src/handlers/` | `http.request` — the one shipped action handler; a vendor-neutral REST call with engine-set idempotency and outbox-aligned retry semantics. |
-| `packages/studio/` | Process Studio, the developer's product: server-persisted drafts, canvas editing (drag-to-connect), the structural panels as inspector, a replacing JSON surface, publish, published versions with a JSON diff, and migration-plan authoring. Tools + Player are the remaining piece. |
+| `packages/studio/` | Process Studio, the developer's product: server-persisted drafts, canvas editing (drag-to-connect), the structural panels as inspector, a replacing JSON surface, publish, published versions with a JSON diff, migration-plan authoring, a registry/CEL-scratchpad Tools screen, and a Player beside the merged instance record. |
 | `packages/admin/` | The operator's product: all-instances list, merged transition/event record with cancel, outbox with dead-letter retry/discard, pending timers, user administration. |
 | `packages/app/` | The participant's product: Login / My-tasks inbox / Task / Start-a-process. |
 | `packages/form-ui/` | Source-only shared step-form renderer, so what an author previews is what a participant gets. |
-| `packages/editor/` | The original structural editor — a proof of concept for the editing half only (file-based drafts, read-only Mermaid graph, no publish). Superseded by `packages/studio`; deleted once `studio-tools-and-player` lands. |
 | `examples/expense-approval.json` | Complete Capture → Review → Book example. |
 | `examples/subprocess-*.json` | A loan-application parent calling a credit-check subprocess (child) — spawn, `child.outcome` routing, return writeback. |
 | `test/` | `bun:test` suites; each invariant ships a test that rejects a violating definition. |

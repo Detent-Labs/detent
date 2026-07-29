@@ -8,7 +8,7 @@ interface Props {
   placeholder?: string;
 }
 
-/** Raw CEL text entry — no non-CEL condition-builder abstraction (spec: editor-structural-panels). */
+/** Raw CEL text entry — no non-CEL condition-builder abstraction. */
 export function ExpressionInput({ value, onChange, placeholder }: Props) {
   return (
     <input

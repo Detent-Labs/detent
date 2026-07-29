@@ -45,6 +45,7 @@ import {
   handleGetMigrationPlan,
   handlePutMigrationPlan,
   handleGetOrphanKeys,
+  handleGetRegistry,
 } from "./studio-routes.js";
 import type { HttpResult } from "./errors.js";
 
@@ -281,6 +282,9 @@ export function createServer(
     if (req.method === "OPTIONS" && parts.length === 5 && parts[0] === "processes" && parts[2] === "versions" && parts[4] === "orphan-keys") {
       return preflight("GET");
     }
+    if (req.method === "OPTIONS" && parts.length === 1 && parts[0] === "registry") {
+      return preflight("GET");
+    }
 
     // POST /auth/login
     if (loginSecret && req.method === "POST" && parts.length === 2 && parts[0] === "auth" && parts[1] === "login") {
@@ -397,6 +401,10 @@ export function createServer(
     // PUT /migration-plans/:processId/:fromVersion/:toVersion
     if (req.method === "PUT" && parts.length === 4 && parts[0] === "migration-plans") {
       return toRes(await handlePutMigrationPlan(parts[1]!, parts[2]!, parts[3]!, req, resolver, db));
+    }
+    // GET /registry
+    if (req.method === "GET" && parts.length === 1 && parts[0] === "registry") {
+      return toRes(await handleGetRegistry(req, resolver, registry, dataSourceRegistry));
     }
 
     return toRes({ status: 404, body: { error: { type: "not-found", message: `no route: ${req.method} ${url.pathname}` } } });

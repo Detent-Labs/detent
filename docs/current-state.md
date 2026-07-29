@@ -348,63 +348,6 @@ Stage-by-stage status is in `ROADMAP.md`.
   lock, matching every other caller's transactional granularity.
   `createDefinitionStore` gained `resolveLatest(processId)` (newest published
   version) alongside `resolveBody`/`resolveLatestByContract`.
-- Editor (`packages/editor`, a Bun workspace package that reaches the engine
-  only through its `exports` map — no file moves, the boundary is `exports`,
-  not directory layout): a structural editor plus an auto-layouted
-  **read-only** graph view (Mermaid); canvas editing (drag-to-connect) is out
-  of scope here — it exists in `packages/studio` instead (see the Process
-  Studio entries below). Panels (`src/panels/`) cover the field
-  catalog, data sources, steps (incl. per-step view), paths, timers, actions,
-  and the subprocess contract, editing an editor-owned **Draft model**
-  (`src/draft/`) — a structural superset of `AuthoredProcessBody` (refs and
-  required parts optional) so a mid-edit process has a representable state;
-  the editor mints prefixed UUIDv4 ids, authors work only with `key`/`label`.
-  Live validation reuses the engine's own publish-time validators unmodified
-  (the `definition.ts` refinements, `validateProcessBody` CEL checks,
-  `checkActionRegistry`, `validateDurations`), mapping located issues onto the
-  owning panel/graph entity; a check needing external state a locally-loaded
-  file can't supply (cross-process validation, registry) renders as "not
-  checked" rather than a false pass. File-based draft I/O
-  (`src/draft/file-io.ts`, `io.ts`) covers load/save of `.draft.json` and
-  export of a validated authored `ProcessBody`, plus **Import**: accepts a
-  published `DefinitionVersion` wrapper or a raw `ProcessBody` and converts it
-  to a Draft (no provenance retained — a subsequent Export is a fresh,
-  unpublished body). No server, no DB, no HTTP API, no `publishBody` call —
-  publishing stays engine-side. UI-chrome i18n (`src/i18n/catalog.ts`) is a
-  plain `t(key)` lookup over a fixed English catalog — no locale state, no
-  switcher, no persistence (collapsed from an earlier locale-provider +
-  switcher design as a ponytail-audit cut: the locale space never grew past
-  one). It is unrelated to **content locale** — `ProcessBody`/`Step`/
-  `FieldDef`/`FieldOption` `label`/`description` are `LocalizedText`
-  (`Record<LocaleCode, string>`, **BREAKING** schema change from plain
-  `string`), with a required `ProcessBody.baseLocale` and a structural
-  invariant that every `LocalizedText` value has a non-empty base-locale
-  entry; `resolveLocalizedText(value, locale, baseLocale)` is the pure
-  fallback-to-base lookup, used by both `GraphView` node labels and the
-  editor's `LocalizedTextInput` panels. `Path`/`Timer`/`Plugin` `description`
-  stay plain `string` (authoring-facing, not participant-facing). The graph
-  view (`src/graph/GraphView.tsx`, `mapping.ts`, `mermaid.ts`) renders
-  through **Mermaid** (`editor-graph-mermaid`, which replaced the original
-  `@xyflow/react` + `elkjs` implementation — neither dependency remains):
-  `draftToGraph` builds a locale-resolved `DraftGraph`, `generateMermaidDsl`
-  emits a `flowchart LR` DSL from it, and `mermaid.render()` returns an SVG
-  assigned via `innerHTML` — safe because `securityLevel: "strict"` (Mermaid's
-  default, set explicitly) runs the SVG through DOMPurify internally, which
-  matters since node labels are author-entered. Validation issues surface as a
-  `⚠ N` label badge plus `style`/`linkStyle` red stroke, edges addressed
-  positionally by emission index since `linkStyle` has no id form. Node ids
-  swap `-` for `_` (Mermaid ids are word characters; the mapping is 1:1 and
-  reversible because ids never contain underscores). Mermaid regenerates the
-  whole SVG on every render — no incremental diffing the way React Flow's
-  node/edge arrays had — so `@panzoom/panzoom` supplies pan/zoom and the
-  current transform is captured before the old SVG is discarded and reapplied
-  to the new one, preserving the viewport across a structural edit or a
-  content-locale switch. The exception is the first render of a given load,
-  which fits to the viewport instead (`computeFitTransform`, pure and
-  unit-testable, capped at scale 1); the gate resets on reload/import via the
-  `loadGeneration` counter in `DraftProvider`'s reducer state, not only on
-  first mount. Read-only needs no explicit disabling here: a rendered Mermaid
-  SVG carries no drag or delete affordance of its own.
 - HTTP wrapper (`src/http/`, `test/http.test.ts`, roadmap #5b): a thin REST/JSON
   adapter over the Runtime API Layer via `Bun.serve`. `createServer` returns a
   plain `fetch(req): Promise<Response>` (testable with `new Request(...)`, no
@@ -452,26 +395,13 @@ Stage-by-stage status is in `ROADMAP.md`.
   `ActorResolver` will need the allowlist mode this change built, not the
   wildcard, so it is that change's job to add the credentials header, not
   this one's. The devcontainer's `app` service sets
-  `CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176`
-  (`pin-frontend-dev-ports`): the four frontend dev servers, each pinned to
+  `CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174,http://localhost:5175`
+  (`pin-frontend-dev-ports`): the three frontend dev servers, each pinned to
   its own port in its `vite.config.ts` (`app` 5173, `admin` 5174, `studio`
-  5175, `editor` 5176, each with `strictPort: true` so a taken port fails
-  startup instead of silently sliding to the next free one), so all four can
+  5175, each with `strictPort: true` so a taken port fails
+  startup instead of silently sliding to the next free one), so all three can
   run at once against one engine, in any start order, with no configuration
   edit.
-- Player/Preview UI (`packages/editor/src/player/`, roadmap #5c): lets a human
-  drive a real process instance end-to-end through the browser, against the
-  HTTP wrapper — a Structure/Player toggle in `App.tsx` switches between the
-  existing read-only graph view and this screen. `client.ts` is a thin HTTP
-  client (create instance / get view / submit) carrying `X-Actor-Id`/
-  `X-Actor-Roles` headers per the dev resolver's convention. `store.tsx`
-  (`PlayerProvider`) holds the connection (server URL + actor, persisted to
-  `localStorage`) and drives the instance lifecycle; `editableFieldIds`/
-  `filterToEditable` enforce client-side the same visible-non-readonly-
-  non-group field-set boundary `submitAndTransition` enforces server-side, so a
-  submission is pre-filtered rather than rejected. `FieldInput.tsx` renders a
-  field by its resolved type; `PlayerView.tsx` composes view + submit +
-  available paths into the screen.
 - Auth/Actor-Resolution + Assignment/Claim-Enforcement (roadmap #5d): activates
   the previously-declared-but-inert `Step.assignment` field. `src/auth/resolve.ts`
   defines the `ActorResolver` extension point (`(credential) -> Promise<Actor>`)
@@ -565,7 +495,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   plan's immutable, permanently-retained `fieldMap`, reconstructable from the existing
   `cause: "migration"` `HistoryEntry` plus that plan.
 - Data-source resolution (`src/engine/registry.ts`, `registry-check.ts`,
-  `definitions.ts`, `src/runtime/api.ts`, `src/http/`, `packages/editor/src/player/`):
+  `definitions.ts`, `src/runtime/api.ts`, `src/http/`):
   closes the "Decided, not yet built" gap on `field.dataSource` — runtime
   resolution into an actual `FieldOption[]` list, consumed by both view
   rendering and submission validation. A new `DataSourceRegistry` (`type ->
@@ -722,15 +652,10 @@ Stage-by-stage status is in `ROADMAP.md`.
   actor"). The CORS preflight
   `Access-Control-Allow-Headers` list gained `Authorization` (alongside the
   existing `Content-Type, X-Actor-Id, X-Actor-Roles`) so a browser can
-  actually send a bearer token cross-origin. The Player
-  (`packages/editor/src/player/`) connection form is now a login form (server
-  URL + email + password): `client.ts::login` calls `POST /auth/login` and
-  `store.tsx` persists `{serverUrl, token}` to `localStorage` (replacing the
-  old `{serverUrl, actorId, actorRoles}` shape) instead of actor fields, sends
-  `Authorization: Bearer <token>` on every call, and treats any `401`
-  (`PlayerClientError.status === 401`) as an invalid session — discarding the
-  token and returning to the login screen, which is also how an 8-hour expiry
-  surfaces, since the Player tracks no client-side lifetime. **Authorization
+  actually send a bearer token cross-origin. Every frontend's session client
+  treats any `401` as an invalid session — discarding the token and returning
+  to its login screen, which is also how an 8-hour expiry surfaces, since no
+  frontend tracks a client-side lifetime. **Authorization
   was still out of scope as of this change** — every authenticated actor kept
   today's permissions (any account could publish, cancel any instance) — see
   the next entry for the deliberate follow-up that closed it.
@@ -908,8 +833,9 @@ Stage-by-stage status is in `ROADMAP.md`.
   controls.
 - Process Studio — shell and drafts (`packages/studio`, `src/engine/drafts.ts`,
   `src/http/studio-routes.ts`, `studio-shell-and-drafts`): the developer's
-  substrate — stage 11's first of five changes; `packages/editor` stays
-  untouched and functional until the last one deletes it. A new reserved role
+  substrate — stage 11's first of five changes; `packages/editor` stayed
+  untouched and functional until `studio-tools-and-player`, the last of the
+  five, deleted it. A new reserved role
   `DEVELOPER_ROLE = "system:developer"` (`src/auth/authorize.ts`) gates every
   studio route and implies nothing else — publishing still separately requires
   `system:publish`. A new table, `drafts` (`src/engine/store.ts::initSchema`):
@@ -948,9 +874,10 @@ Stage-by-stage status is in `ROADMAP.md`.
   role-gated-empty-state shell follow `packages/admin`'s pattern exactly
   (`system:developer` in place of `system:admin`) — presentational only, the
   server-side `requireRole` is the enforcement. The editor's `draft/`,
-  `panels/`, `i18n/` and `registry/` are copied into `packages/studio/src`
-  (`packages/editor` untouched, a deliberate duplication window closed only
-  when change 5 deletes the editor): the file-persistence pieces
+  `panels/`, `i18n/` and `registry/` were copied into `packages/studio/src`
+  (`packages/editor` untouched at the time, a deliberate duplication window
+  closed when `studio-tools-and-player`, change 5, deleted the editor): the
+  file-persistence pieces
   (`file-io.ts`, `file-system-access.d.ts`, `load-guard.ts`,
   `panels/FileToolbar.tsx`, and `io.ts`'s Draft-round-trip/import functions,
   which depended on the dropped load guard) are removed, and `FileToolbar` is
@@ -962,9 +889,8 @@ Stage-by-stage status is in `ROADMAP.md`.
   revision/layout — never a silent retry, never a merge. `draft/ids.ts` gained
   a seventh minter, `process`, over the contract's `processId` schema. Live
   validation is unchanged: the engine's own publish-time chain imported
-  through the exports map at compile time, exactly as
-  `packages/editor/src/draft/validation.ts` already did, and it never blocks
-  saving. The process list (`screens/processListLogic.ts`, a pure module
+  through the exports map at compile time, exactly as `packages/editor`'s own
+  now-deleted `draft/validation.ts` already did, and it never blocks saving. The process list (`screens/processListLogic.ts`, a pure module
   following `packages/app/src/screens/inboxLogic.ts`) merges
   `GET /processes` with `GET /drafts` into one row per process id — draft-only,
   published-only, or both — with new/open/discard actions; "New process"
@@ -1004,8 +930,9 @@ Stage-by-stage status is in `ROADMAP.md`.
   client-side BFS-depth-from-`initialStep` traversal (depth → column, order →
   row) — rendered only, never written back until the step is actually
   dragged, so an unrelated save doesn't invent layout rows. `@panzoom/panzoom`
-  (already a dependency of `packages/editor`'s read-only graph view) drives
-  pan/zoom and a "fit to view" control; every node and edge `<g>` carries
+  (already a dependency of `packages/editor`'s read-only graph view, before
+  that package was deleted) drives pan/zoom and a "fit to view" control;
+  every node and edge `<g>` carries
   Panzoom's own `panzoom-exclude` class — found live during implementation
   (a real browser check via `playwright-cli`, not just `bun:test`, which
   can't see DOM event ordering): without it, Panzoom's native down-handler,
@@ -1021,8 +948,9 @@ Stage-by-stage status is in `ROADMAP.md`.
   `src/http/errors.ts`, `packages/studio/src/panels/DraftToolbar.tsx`,
   `packages/studio/src/screens/{VersionsScreen,MigrationPlanScreen}.tsx`,
   `studio-lifecycle`): stage 11's fourth of five changes. Closes the gap the
-  prior two changes left open — a Studio draft could only be published via
-  `packages/editor`'s export path plus a manual `POST /processes` call.
+  prior two changes left open — a Studio draft could previously only be
+  published via `packages/editor`'s export path plus a manual `POST /processes`
+  call.
   `POST /drafts/:processId/publish` publishes the *persisted* draft
   server-side, never a client-supplied body, requiring both
   `DEVELOPER_ROLE` and `PUBLISH_ROLE` (neither implies the other); it is the
@@ -1098,8 +1026,83 @@ Stage-by-stage status is in `ROADMAP.md`.
   `replace()` path — the one Load/Import already used — not a new mutation
   surface. `test/draftJsonLogic.test.ts` and `test/load-guard.test.ts` cover
   the pure modules; the textarea/toggle wiring is untested, per this repo's
-  existing convention. Tools/Player (`studio-tools-and-player`, which also
-  deletes `packages/editor`) is the only remaining piece of stage 11.
+  existing convention. Tools and Player, stage 11's last piece, are DONE — see
+  the "Process Studio — tools and Player" entry below.
+- Process Studio — tools and Player (`src/cel/check.ts`, `src/runtime/api.ts`,
+  `src/http/routes.ts`, `src/http/studio-routes.ts`, `src/http/server.ts`,
+  `packages/studio/src/screens/{ToolsScreen,PlayerScreen}.tsx`,
+  `packages/studio/src/screens/{toolsScratchpadLogic,playerLogic}.ts`,
+  `packages/studio/src/api/{client,types}.ts`, `studio-tools-and-player`):
+  stage 11's fifth and last change. Closes the stage's remaining gap and
+  deletes `packages/editor` outright — every capability it alone provided
+  is retired (no replacement); every capability it shared with
+  `packages/studio` already had an independent copy there.
+
+  Adds two screens. The **Tools** screen (`/tools`) shows the running
+  server's registered plugin type names — action-handler types and
+  data-source types, nothing more (no `configSchema`, no config values) —
+  via a new `GET /registry` route (`DEVELOPER_ROLE`-gated, unprefixed like
+  the other studio-only routes), and a static CEL scratchpad: an expression
+  checked against a chosen field catalog (a published version, fetched via
+  the existing version-body route, or the current draft), parsed and
+  type-checked client-side through a new `workflow-engine/cel/check` export,
+  `checkAgainstFields`. That export needed a small refactor first:
+  `buildEnv` took a whole `ProcessBody` when it only ever read `.fields`, so
+  it now takes `fields: FieldDef[]` directly, letting the scratchpad build an
+  environment from a stand-alone catalog instead of a full body.
+
+  The **Player** screen (`/processes/:processId/play`) drives a real
+  instance through the Runtime API Layer (create, view, submit, claim,
+  release), reusing `packages/form-ui` for step forms, and shows the
+  instance's merged transition/event record beside it. This is not a
+  file-for-file port of `packages/editor`'s Player, which had its own
+  standalone server-URL-plus-login connection — a leftover from before
+  Studio had any shared session at all. Studio already has one shared,
+  logged-in session for everything else, so `packages/app`'s
+  `TaskScreen`/`api/client.ts` — which already calls the same routes over
+  that same shared-session model — served as the template instead:
+  `packages/studio/src/api/client.ts` gained `createInstance`,
+  `getInstanceView`, `submitPath`, `claimStep`, `releaseClaim`, and
+  `getInstanceRecord`, reusing the package's existing `request()`/
+  `StudioClientError`, and `form-ui` became a new dependency of
+  `packages/studio` (it had none before Player existed) — including the
+  `form-ui/form-ui.css` import at the Player's own entry point that
+  `packages/editor`'s Player never had, leaving its forms unstyled; Studio's
+  Player closes that gap rather than reproducing it.
+
+  Showing the merged record beside Player needed an authorization change,
+  not just a new route: `getInstanceRecord` (`src/runtime/api.ts`) gained an
+  `actor` parameter and a second, additive access path mirroring
+  `cancelInstance`'s existing starter bypass for `system:cancel-any` —
+  `ADMIN_ROLE` tried first (no instance load needed, this query never joins
+  on `instances`), and on `AuthorizationError` a fallback that loads the
+  instance and permits the read only when the actor holds `DEVELOPER_ROLE`
+  and `instance.startedBy` matches, collapsing "doesn't exist" and "not
+  mine" into the same opaque `AuthorizationError`. `handleInstanceRecord`
+  (`src/http/routes.ts`) dropped its own unconditional `requireRole(actor,
+  ADMIN_ROLE)` and passes the resolved actor through instead. Strictly
+  additive: an `ADMIN_ROLE` caller sees no change, and a plain participant
+  with neither role still gets `403` even for an instance they started,
+  unchanged.
+
+  Verified end-to-end in a real browser (`playwright-cli`, not just
+  `bun:test`): logged in as a `system:developer` test user, authored and
+  published a process through Studio's own JSON view, drove the CEL
+  scratchpad against a valid and an invalid expression, and drove Player
+  through create → submit → completed, confirming the merged record
+  renders and the new developer-record-read authorization holds against a
+  live server.
+
+  `packages/editor` (`src/`, `test/`, config, Playwright setup) is deleted.
+  Twelve capability specs that described only its internals are retired
+  with no replacement (superseded by an existing `packages/studio`
+  capability, or a pure engineering-hygiene constraint with no subject left
+  once the package is gone). The devcontainer's `postCreateCommand` no
+  longer installs Playwright — `packages/editor/test/graph-view-rendering.test.tsx`
+  was the only consumer (`mermaid-isomorphic` needing a real headless
+  Chromium for `SVGTextElement.getBBox()`), and `studio-canvas`'s own SVG
+  rendering is deliberately untested per this repo's existing convention, so
+  no remaining package needs it.
 <!-- antislop: allow sentence-length run-ons -->
 - Authorize the instance-read and assignment-less submit paths
   (`src/runtime/api.ts`, `authorize-instance-access`): closes the gap left by

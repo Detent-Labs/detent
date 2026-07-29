@@ -5,10 +5,9 @@ import { resolveAddLocaleAttempt } from "../../draft/localized-text";
 
 /**
  * Which locale of the *authored process content* is currently shown/edited —
- * unrelated to the editor's own fixed-English UI-chrome text (see
- * editor-i18n). Its option set is derived per-Draft (every locale already
- * used, plus whichever one is currently selected), not a fixed platform
- * list.
+ * unrelated to the app's own fixed-English UI-chrome text. Its option set is
+ * derived per-Draft (every locale already used, plus whichever one is
+ * currently selected), not a fixed platform list.
  */
 export function ContentLocaleSwitcher() {
   const { contentLocale, setContentLocale, usedLocales } = useDraft();

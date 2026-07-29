@@ -11,8 +11,7 @@ independently-maintained, structurally identical copies. External behavior
 signatures) is unaffected — this capability exists purely to keep the
 "don't re-duplicate this" constraint from silently regressing as more
 registry-validation checks are added. The mechanism-level counterpart to
-`registry-error-consolidation`, `field-expression-map-consolidation`, and
-`array-crud-by-index-consolidation`.
+`registry-error-consolidation` and `field-expression-map-consolidation`.
 
 ## Requirements
 

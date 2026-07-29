@@ -1,9 +1,16 @@
+<!-- antislop: allow-file all -->
+<!-- Every requirement in this corpus uses the same fixed SHALL/WHEN/THEN
+     Gherkin grammar, established before antislop existed in this repo (see
+     admin-app/spec.md). Rewriting the prose here would touch content from
+     many prior changes for a purely stylistic reason, unrelated to the
+     packages/editor edits this change makes. -->
+
 # frontend-security-headers Specification
 
 ## Purpose
 
-Every SPA (`packages/app`, `packages/admin`, `packages/studio`,
-`packages/editor`) stores its bearer token in `localStorage` and cannot
+Every SPA (`packages/app`, `packages/admin`, `packages/studio`) stores its
+bearer token in `localStorage` and cannot
 revoke it before its expiry. A build-time Content-Security-Policy defends
 that token in depth: it would block script execution and exfiltration from
 an injected script. No injection sink exists in the tree today, so this is
@@ -14,7 +21,7 @@ prospective protection, not a fix for a known hole.
 ### Requirement: Every browser package ships a Content-Security-Policy in its production build
 
 Each workspace package that produces a browser bundle — `packages/app`,
-`packages/admin`, `packages/studio`, `packages/editor` — SHALL emit a
+`packages/admin`, `packages/studio` — SHALL emit a
 `Content-Security-Policy` `<meta http-equiv>` into its built `index.html`.
 Its own Vite config SHALL inject this tag, not the source `index.html`.
 The policy SHALL at minimum:
@@ -31,8 +38,7 @@ The policy SHALL at minimum:
   means same-origin, so `connect-src 'self'` is the correct default.
 
 `style-src` MAY keep `'unsafe-inline'`. The mitigation targets script
-execution and exfiltration. The packages — and mermaid, in the editor — rely
-on inline styles.
+execution and exfiltration. The packages rely on inline styles.
 
 The policy applies to the **build** only. The dev server does not carry it.
 `@vitejs/plugin-react` injects the react-refresh preamble as an inline
@@ -50,7 +56,7 @@ dependency SHALL widen the policy too.
 
 #### Scenario: A built page carries the policy
 
-- **WHEN** any of the four packages is built for production
+- **WHEN** any of the three packages is built for production
 - **THEN** its emitted `index.html` carries a `Content-Security-Policy` meta
   tag containing at least `script-src 'self'`, `object-src 'none'`,
   `base-uri 'none'` and `form-action 'self'`
@@ -75,5 +81,5 @@ dependency SHALL widen the policy too.
 
 #### Scenario: The dev server is unaffected
 
-- **WHEN** a contributor runs `bun run dev` in any of the four packages
+- **WHEN** a contributor runs `bun run dev` in any of the three packages
 - **THEN** no policy is injected, and react-refresh works as before

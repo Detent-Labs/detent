@@ -3,9 +3,9 @@ import { t } from "../i18n/catalog";
 import { createExampleRegistry } from "../registry/exampleRegistry";
 
 /**
- * Toggles the injected `Registry` `checkActionRegistry` runs against (task
- * 4.2 / editor-live-validation's "Registry becomes available mid-session"
- * scenario). See `registry/exampleRegistry.ts` for why this is a built-in
+ * Toggles the injected `Registry` `checkActionRegistry` runs against, so
+ * the registry can become available mid-session rather than only at load.
+ * See `registry/exampleRegistry.ts` for why this is a built-in
  * example rather than an author-authored one in v1.
  */
 export function RegistryPanel() {

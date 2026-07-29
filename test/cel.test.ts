@@ -1,14 +1,15 @@
 import { test, expect } from "bun:test";
 import { readFileSync } from "node:fs";
-import { validateProcessBody, validateMigrationSpec, checkSubprocessChildRefs, parseExpression, celType, type CelIssue } from "../src/cel/check.js";
+import { validateProcessBody, validateMigrationSpec, checkSubprocessChildRefs, parseExpression, checkAgainstFields, celType, type CelIssue } from "../src/cel/check.js";
 import { evalTransforms } from "../src/cel/eval.js";
 import { compileProcessBody } from "../src/schema/compile.js";
-import { instance as instanceSchema, baseFieldType, type ProcessBody, type MigrationSpec, type Instance } from "../src/schema/definition.js";
+import { instance as instanceSchema, baseFieldType, type ProcessBody, type MigrationSpec, type Instance, type FieldDef } from "../src/schema/definition.js";
 
 // Minimal ProcessBody builders. validateProcessBody reads only fields /
 // dataSources / workflow.steps, so these cast loosely on purpose — the full
 // structural invariants are exercised by validate.test.ts, not here.
 const field = (key: string, type: string) => ({ id: `field_${key}`, key, label: { en: key }, type });
+const fieldDef = (key: string, type: string): FieldDef => field(key, type) as unknown as FieldDef;
 
 const body = (opts: {
   fields?: ReturnType<typeof field>[];
@@ -331,6 +332,28 @@ test("every base field type has a CEL-type mapping", () => {
 test("parseExpression flags syntax but not unknown vars", () => {
   expect(parseExpression("data.x == 1").ok).toBe(true);
   expect(parseExpression("data.x >").ok).toBe(false);
+});
+
+// Studio Tools CEL scratchpad's entry point — parse + type-check against a
+// stand-alone field catalog, data/instance/actor scope only.
+test("checkAgainstFields accepts an expression that type-checks against the given catalog", () => {
+  const result = checkAgainstFields("data.amount > 10.0", [fieldDef("amount", "number")]);
+  expect(result.ok).toBe(true);
+});
+
+test("checkAgainstFields rejects a reference to a field outside the given catalog", () => {
+  const result = checkAgainstFields("data.not_declared == 1", [fieldDef("amount", "number")]);
+  expect(result.ok).toBe(false);
+});
+
+test("checkAgainstFields resolves instance and actor, not just data", () => {
+  expect(checkAgainstFields("instance.status == 'running'", []).ok).toBe(true);
+  expect(checkAgainstFields("actor.id == 'x'", []).ok).toBe(true);
+});
+
+test("checkAgainstFields rejects a syntax error the same way validateProcessBody does", () => {
+  const result = checkAgainstFields("data.x >", []);
+  expect(result.ok).toBe(false);
 });
 
 // ---- migration transforms (cel-expressions delta) ----------------------------

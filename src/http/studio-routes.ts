@@ -190,3 +190,18 @@ export async function handleGetOrphanKeys(processId: string, versionRaw: string,
     return { status: 200, body: scan };
   });
 }
+
+/**
+ * Read-only view of the running server's two plugin registries: registered
+ * action-handler types and data-source types, by name only. No
+ * `HandlerDef`/`DataSourceHandlerDef` detail beyond the map keys crosses the
+ * HTTP boundary — `configSchema` stays a publish-time server-side check, not
+ * something the Tools screen renders.
+ */
+export async function handleGetRegistry(req: Request, resolver: ActorResolver, registry: Registry, dataSourceRegistry: DataSourceRegistry): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    requireRole(actor, DEVELOPER_ROLE);
+    return { status: 200, body: { actionTypes: [...registry.keys()], dataSourceTypes: [...dataSourceRegistry.keys()] } };
+  });
+}

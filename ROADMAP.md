@@ -206,7 +206,7 @@ capability of its own.
    Out of scope, deliberately: case history view, notifications, attachments,
    comments, delegation, and a dedicated `groups` assignment filter (distinct
    from `Step.assignment.candidates`, which already matches by id or role).
-10. Admin area: IN PROGRESS (design approved 2026-07-27, see
+10. Admin area: DONE (design approved 2026-07-27, see
     `docs/superpowers/specs/2026-07-27-admin-developer-area-design.md`). The
     operator's product: `packages/app` serves the participant,
     `packages/studio` (stage 11) the developer, `packages/admin` the operator.
@@ -216,9 +216,8 @@ capability of its own.
     Same boundaries as the other frontends: runtime access through the
     HTTP wrapper only, no direct database reads. One new reserved role,
     `system:admin`, checked directly like the two from stage 8.
-    Delivery is three OpenSpec changes:
-    `admin-shell-and-ops` (DONE), `admin-users` (DONE),
-    `admin-migration-run` (NOT STARTED).
+    Delivery is three OpenSpec changes, all DONE:
+    `admin-shell-and-ops`, `admin-users`, `admin-migration-run`.
     `admin-shell-and-ops` is DONE (see `docs/current-state.md`'s "Admin area
     (operations)" entry): `packages/admin` scaffolding and login/shell, one new
     engine module `src/engine/admin-queries.ts` for the reads that had no API
@@ -253,8 +252,11 @@ capability of its own.
     gains a `/users` screen: list plus a disable/enable toggle, the disable
     action behind a confirmation naming that non-revocation caveat so an
     operator doesn't mistake it for an immediate lockout.
-    Still to come (`admin-migration-run`): `POST /admin/migrations/run`
-    reusing the existing migration engine path.
+    `admin-migration-run` is DONE: `POST /admin/migrations/run`
+    (`src/http/admin-routes.ts`, `system:admin`-gated) wraps `migrateInstances`
+    unchanged, and `packages/admin` gained a Migrations screen to run an
+    already-registered plan and see the migrated/skipped/conflicted/failed
+    result grouped by bucket.
     The design's original **Processes** and **Tools** areas were reassigned to
     stage 11 — authoring belongs to the developer, operating to the operator —
     which also moves `GET /admin/registry`, `POST /admin/migrations/plans` and
@@ -270,12 +272,12 @@ capability of its own.
     which `verifyLogin` already honours and `admin-users` now exposes over
     HTTP, is the correct mechanism), and live
     updates (refresh control plus refetch-on-focus, as in stage 9).
-11. Process Studio: IN PROGRESS (design approved 2026-07-27, see
+11. Process Studio: DONE (design approved 2026-07-27, see
     `docs/superpowers/specs/2026-07-27-process-studio-design.md`). The
     developer's product, `packages/studio`, and one new reserved role,
     `system:developer`. It supersedes stage 4's `packages/editor`, which was a
-    proof of concept for the editing half only: it holds a draft in a file on
-    one machine, renders the graph read-only, and cannot publish. Six routes
+    proof of concept for the editing half only: it held a draft in a file on
+    one machine, rendered the graph read-only, and could not publish. Six routes
     plus login — process list, editing over three surfaces (canvas primary,
     the carried-over panels as inspector, a replacing JSON view), published
     versions with a JSON diff, Player beside the merged instance record,
@@ -301,9 +303,9 @@ capability of its own.
     (the instance record already answers "why is it parked"), multi-environment
     transport as a product feature, a standalone validator screen, and live
     collaboration.
-    Delivery is five OpenSpec changes, only the first with scaffolding:
+    Delivery is five OpenSpec changes, all DONE:
     `studio-shell-and-drafts`, `studio-canvas`, `studio-json-view`,
-    `studio-lifecycle`, `studio-tools-and-player` (the last deletes
+    `studio-lifecycle`, `studio-tools-and-player` (the last deleted
     `packages/editor`).
 
     **Process Studio — shell and drafts: DONE** (`studio-shell-and-drafts`).
@@ -411,9 +413,38 @@ capability of its own.
     inline error; empty/whitespace text is treated as a valid empty draft
     (`{}`), matching `migrationPlanLogic.ts`'s existing convention. Reuses the
     Draft model's existing `replace()` path — the one Load/Import already
-    used — not a new mutation surface. Tools/Player remains the only NOT
-    STARTED piece of this stage (`studio-tools-and-player`, which also
-    deletes `packages/editor`).
+    used — not a new mutation surface. Tools/Player is now DONE too, see
+    below.
+
+    **Process Studio — tools and Player: DONE** (`studio-tools-and-player`).
+    Closes stage 11's last gap and deletes `packages/editor` outright. Adds
+    two screens: a Tools screen (`/tools`) showing the running server's
+    registered action-handler and data-source type names (`GET /registry`,
+    a new `system:developer`-gated route in `src/http/studio-routes.ts`) and
+    a static CEL scratchpad checking an ad-hoc expression against a chosen
+    field catalog (a published version or the current draft), parsed and
+    type-checked client-side through a new `workflow-engine/cel/check`
+    export, `checkAgainstFields`; and a Player screen
+    (`/processes/:processId/play`) driving a real instance through the
+    Runtime API Layer, shown beside the instance's merged transition/event
+    record. Player is not a file-for-file port of `packages/editor`'s
+    Player, which had its own standalone serverUrl/login connection: Studio
+    already has one shared, logged-in session, so `packages/app`'s
+    `TaskScreen`/`api/client.ts` — which already calls the same Runtime API
+    Layer routes over that same shared-session model — served as the
+    template instead. Showing the merged record beside Player needed a real
+    authorization change, not just a new route: `getInstanceRecord`
+    (`src/runtime/api.ts`) gained an `actor` parameter and a second,
+    additive access path mirroring `cancelInstance`'s existing starter
+    bypass — `system:admin`, or `system:developer` together with
+    `instance.startedBy === actor.id` — so a developer can read the record
+    of an instance their own Player session created, without gaining
+    `system:admin`; a plain participant is still refused even for an
+    instance they started, unchanged. `packages/editor` (`src/`, `test/`,
+    config, Playwright setup) is deleted; 12 capability specs that described
+    only its internals are retired with no replacement, and the
+    devcontainer's `postCreateCommand` no longer installs Playwright, since
+    no remaining package needed it.
 12. Unified shell (consolidate app/admin/studio): NOT STARTED, deliberately
     deferred — no urgency, raised 2026-07-28 as a "someday" question, not a
     committed stage. Today `packages/app`, `packages/admin`, and
