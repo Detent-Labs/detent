@@ -10,6 +10,7 @@ import { createRegistry, createDataSourceRegistry } from "../src/engine/registry
 import { createDefinitionStore } from "../src/engine/definitions.js";
 import { migrateInstances } from "../src/engine/migration.js";
 import { createServer } from "../src/http/server.js";
+import { devHeaderResolver } from "../src/auth/resolve.js";
 import { DEVELOPER_ROLE, PUBLISH_ROLE } from "../src/auth/authorize.js";
 import type { Actor } from "../src/cel/eval.js";
 import type { ProcessId } from "../src/schema/definition.js";
@@ -17,7 +18,7 @@ import type { ProcessId } from "../src/schema/definition.js";
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
 const dataSourceReg = createDataSourceRegistry();
-const fetch = createServer(dataSourceReg, reg);
+const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
 beforeAll(async () => {
   if (DB) await initSchema();

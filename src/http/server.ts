@@ -128,22 +128,49 @@ export function parseAuthIssuers(raw: string | undefined): IssuerConfig[] | unde
   });
 }
 
+/** Minimum `AUTH_JWT_SECRET` length in encoded bytes: the HS256 (HMAC-SHA-256) output size, per RFC 7518 §3.2. */
+const MIN_JWT_SECRET_BYTES = 32;
+
 /**
  * Select the server's `ActorResolver` from `AUTH_JWT_SECRET` /
  * `AUTH_ISSUERS`: the JWT resolver if either is set, `devHeaderResolver`
  * otherwise. The two are never active simultaneously.
+ *
+ * Selecting `devHeaderResolver` when neither is set requires
+ * `ALLOW_INSECURE_DEV_AUTH=1` — without it, startup fails loudly rather than
+ * silently trusting unsigned `X-Actor-*` headers (design.md "Warn loudly and
+ * return, rather than warn-only or throw-only").
  */
-export function resolveAuthResolver(env: { AUTH_JWT_SECRET?: string; AUTH_ISSUERS?: string }): ActorResolver {
+export function resolveAuthResolver(env: {
+  AUTH_JWT_SECRET?: string;
+  AUTH_ISSUERS?: string;
+  ALLOW_INSECURE_DEV_AUTH?: string;
+}): ActorResolver {
   const issuers = parseAuthIssuers(env.AUTH_ISSUERS);
-  if (!env.AUTH_JWT_SECRET && !issuers) return devHeaderResolver;
+  if (!env.AUTH_JWT_SECRET && !issuers) {
+    if (env.ALLOW_INSECURE_DEV_AUTH === "1") {
+      console.warn(
+        "AUTH DISABLED: no AUTH_JWT_SECRET or AUTH_ISSUERS configured. Trusting X-Actor-Id / X-Actor-Roles headers verbatim because ALLOW_INSECURE_DEV_AUTH=1 is set. Do not run this way against real data.",
+      );
+      return devHeaderResolver;
+    }
+    throw new Error(
+      "No authentication configured: set AUTH_JWT_SECRET or AUTH_ISSUERS, or set ALLOW_INSECURE_DEV_AUTH=1 to explicitly start without authentication",
+    );
+  }
+  if (env.AUTH_JWT_SECRET && new TextEncoder().encode(env.AUTH_JWT_SECRET).length < MIN_JWT_SECRET_BYTES) {
+    throw new Error(
+      `AUTH_JWT_SECRET must encode to at least ${MIN_JWT_SECRET_BYTES} bytes (HS256 requires a key at least as long as its hash output) — generate one with \`openssl rand -base64 32\``,
+    );
+  }
   return jwtResolver({ localSecret: env.AUTH_JWT_SECRET, issuers });
 }
 
 /**
- * `resolver` defaults to the non-production dev header resolver
- * (`devHeaderResolver`): documented as unsuitable for a deployment real user
- * data ever reaches, but it makes the trust boundary explicit and swappable
- * rather than an implicit "any actor accepted" default.
+ * `resolver` has no default: every caller must pass one explicitly, so no
+ * call site can reach `devHeaderResolver` — the non-production dev header
+ * resolver — by omission. `startHttpServer`'s own parameter default calls
+ * `resolveAuthResolver`, which selects it only under an explicit opt-in flag.
  *
  * `registry` backs the publish route (`POST /processes`): a body that
  * publishes here is a body this same server can execute, since it is
@@ -166,7 +193,7 @@ export function createServer(
   dataSourceRegistry: DataSourceRegistry,
   registry: Registry,
   db: SQL = sql,
-  resolver: ActorResolver = devHeaderResolver,
+  resolver: ActorResolver,
   allowedOrigins: AllowedOrigins = undefined,
   loginSecret: string | undefined = undefined,
 ): (req: Request) => Promise<Response> {
@@ -372,7 +399,11 @@ export function startHttpServer(
   registry: Registry,
   dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
-  resolver: ActorResolver = resolveAuthResolver({ AUTH_JWT_SECRET: process.env.AUTH_JWT_SECRET, AUTH_ISSUERS: process.env.AUTH_ISSUERS }),
+  resolver: ActorResolver = resolveAuthResolver({
+    AUTH_JWT_SECRET: process.env.AUTH_JWT_SECRET,
+    AUTH_ISSUERS: process.env.AUTH_ISSUERS,
+    ALLOW_INSECURE_DEV_AUTH: process.env.ALLOW_INSECURE_DEV_AUTH,
+  }),
 ): { stop: () => void } {
   const allowedOrigins = parseAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS);
   const fetch = createServer(dataSourceRegistry, registry, db, resolver, allowedOrigins, process.env.AUTH_JWT_SECRET);

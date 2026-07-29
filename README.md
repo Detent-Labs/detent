@@ -67,6 +67,20 @@ bun test              # bun:test suites
 bun run typecheck     # tsc --noEmit (Bun does not typecheck)
 ```
 
+### Authentication configuration
+
+`bun run serve` refuses to start unless you configure authentication. Set one
+of these three:
+
+- `AUTH_JWT_SECRET` — a local HS256 signing key, at least 32 bytes encoded
+  (`openssl rand -base64 32`)
+- `AUTH_ISSUERS` — a JSON array of `{iss, jwksUrl, audience, rolesClaim}`, to
+  accept externally-issued tokens
+- `ALLOW_INSECURE_DEV_AUTH=1` — an explicit opt-out for local development
+  only. It trusts `X-Actor-Id`/`X-Actor-Roles` headers verbatim, with no
+  identity check at all. Never set this where real user data is reachable.
+  The devcontainer sets it for you (`.devcontainer/docker-compose.yml`).
+
 Changes go through OpenSpec (`openspec/`) — propose → specs/tasks → implement →
 verify → archive. See `CLAUDE.md` for the full contract rules and invariants.
 

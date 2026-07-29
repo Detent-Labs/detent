@@ -14,7 +14,7 @@ import { createRegistry, createDataSourceRegistry } from "../src/engine/registry
 import { PUBLISH_ROLE, ADMIN_ROLE } from "../src/auth/authorize.js";
 
 const DB = !!process.env.DATABASE_URL;
-const SECRET = "auth-server-test-secret";
+const SECRET = "auth-server-test-secret-0123456789"; // >= 32 encoded bytes, required by resolveAuthResolver
 const reg = createRegistry();
 const dataSourceReg = createDataSourceRegistry();
 
@@ -29,8 +29,37 @@ beforeEach(async () => {
 // resolveAuthResolver / parseAuthIssuers
 // ============================================================
 
-test("no auth env keeps the dev resolver", () => {
-  expect(resolveAuthResolver({})).toBe(devHeaderResolver);
+test("no auth env and no flag fails startup", () => {
+  expect(() => resolveAuthResolver({})).toThrow();
+});
+
+test("ALLOW_INSECURE_DEV_AUTH=1 selects the dev resolver, with no other auth env set, and warns loudly", () => {
+  // Plain reassignment, not a mocking library — this repo has no mocking of
+  // the system under test anywhere, and that stays true here: only the
+  // console output is captured, no collaborator of resolveAuthResolver is
+  // replaced.
+  const originalWarn = console.warn;
+  let warned: unknown;
+  console.warn = (msg: unknown) => {
+    warned = msg;
+  };
+  try {
+    expect(resolveAuthResolver({ ALLOW_INSECURE_DEV_AUTH: "1" })).toBe(devHeaderResolver);
+  } finally {
+    console.warn = originalWarn;
+  }
+  expect(typeof warned).toBe("string");
+  expect(warned as string).toContain("X-Actor-Id");
+  expect(warned as string).toContain("X-Actor-Roles");
+  expect((warned as string).toLowerCase()).toContain("disabled");
+});
+
+test("AUTH_JWT_SECRET shorter than 32 encoded bytes fails startup", () => {
+  expect(() => resolveAuthResolver({ AUTH_JWT_SECRET: "a".repeat(31) })).toThrow();
+});
+
+test("AUTH_JWT_SECRET of exactly 32 encoded bytes is accepted", () => {
+  expect(resolveAuthResolver({ AUTH_JWT_SECRET: "a".repeat(32) })).not.toBe(devHeaderResolver);
 });
 
 test("AUTH_JWT_SECRET alone activates the JWT resolver", () => {

@@ -8,6 +8,7 @@ import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { createServer } from "../src/http/server.js";
+import { devHeaderResolver } from "../src/auth/resolve.js";
 import { ADMIN_ROLE } from "../src/auth/authorize.js";
 import { createUser } from "../src/auth/users.js";
 import type { Actor } from "../src/cel/eval.js";
@@ -15,7 +16,7 @@ import type { Actor } from "../src/cel/eval.js";
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
 const dataSourceReg = createDataSourceRegistry();
-const fetch = createServer(dataSourceReg, reg);
+const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
 beforeAll(async () => {
   if (DB) await initSchema();

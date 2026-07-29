@@ -83,6 +83,17 @@ user SHALL all produce the same generic failure, so that no caller can learn
 from a login response which email addresses exist or which accounts are
 disabled.
 
+Indistinguishability SHALL hold for the response *time* as well as the
+response *value*. `verifyLogin` SHALL therefore perform exactly one password
+verification on every path, including the no-row path. When no row matches,
+it SHALL verify the submitted password against a process-lifetime dummy
+argon2id hash.
+
+This dummy hash comes from a random value with the same cost parameters as a
+stored hash. Verification then fails regardless. `verifyLogin` SHALL NOT
+return before this verification. That early-return shape made an unknown
+email roughly two orders of magnitude faster than a known one.
+
 #### Scenario: A disabled user cannot log in
 
 - **WHEN** `verifyLogin` is called with the correct password of a user whose
@@ -94,6 +105,13 @@ disabled.
 - **WHEN** the login route is called with an email that exists in no row, and
   separately with an existing email and a wrong password
 - **THEN** both responses are the same generic `401` with the same body
+
+#### Scenario: An unknown email still performs a password verification
+
+- **WHEN** `verifyLogin` is called with an email that matches no row
+- **THEN** a password verification against the dummy hash is performed before
+  it returns, so the unknown-email path does no less work than the
+  known-email path
 
 ### Requirement: POST /auth/login issues an 8-hour locally-signed token
 
@@ -205,26 +223,56 @@ passed to `verifyLogin` SHALL remain the request's original, unmodified
 ### Requirement: Rate-limit tracking has a bounded memory footprint
 
 The tracking map SHALL NOT grow without bound in response to distinct
-submitted email values, since the map is populated before any check of
-whether the corresponding account exists. When the map already holds
-`MAX_TRACKED_EMAILS` distinct entries and a login request arrives for an
-email not already tracked, the engine SHALL NOT add a new entry for it and
-SHALL instead let that request proceed to `verifyLogin` untracked, rather
-than evicting an existing entry or growing past the cap.
+submitted email values. `checkAndRecordAttempt` populates the map before any
+check of whether the corresponding account exists.
 
-#### Scenario: Tracking stops growing at capacity
+Before deciding on capacity, `checkAndRecordAttempt` SHALL remove every entry
+whose window started more than `WINDOW_MS` ago. Such an entry carries no
+information — it would reset on its next use. Removing it therefore costs
+nothing, and it reclaims the slots an intermittent caller left behind.
 
-- **WHEN** the tracking map already holds `MAX_TRACKED_EMAILS` distinct
-  entries
-- **THEN** a login attempt for a not-yet-tracked email is not added to the
-  map and is evaluated by `verifyLogin` as if no rate limiting existed for
-  that request
+This sweep SHALL run only on the path where a not-yet-tracked email meets a
+full map. It does not run on every request. It SHALL also stay inside the
+same synchronous, `await`-free function. This keeps check and increment
+atomic against concurrent requests for one email.
+
+If the sweep still leaves the map full of live windows, a login request for
+a not-yet-tracked email SHALL be **refused**. It SHALL receive the same
+`429` an over-limit email gets, not be admitted untracked. Refusing is the
+safe direction.
+
+Admitting untracked requests at capacity would let an unauthenticated caller
+disable the brute-force control for every account. An attacker needs only
+enough distinct email values to do this, silently and permanently. Refusing
+is bounded instead by the window: it resolves itself within `WINDOW_MS`. The
+caller it affects can also see it happen.
+
+#### Scenario: Expired entries are reclaimed before capacity is judged
+
+- **WHEN** the tracking map holds `MAX_TRACKED_EMAILS` entries of which some
+  windows have expired, and a login attempt arrives for a not-yet-tracked
+  email
+- **THEN** the expired entries are removed and the new email is tracked
+  normally, subject to the ordinary 5-per-15-minutes rule
+
+#### Scenario: A map full of live windows refuses new emails
+
+- **WHEN** the tracking map holds `MAX_TRACKED_EMAILS` entries whose windows
+  are all still live, and a login attempt arrives for a not-yet-tracked email
+- **THEN** the response is `429` with the existing `rate-limited` error type,
+  and `verifyLogin` is not called
 
 #### Scenario: Already-tracked emails are unaffected by capacity
 
 - **WHEN** the tracking map is at `MAX_TRACKED_EMAILS` capacity
 - **THEN** login attempts for emails already present in the map continue to
   be rate-limited normally
+
+#### Scenario: A flood cannot permanently disable the control
+
+- **WHEN** a caller fills the map with distinct email values and then stops
+- **THEN** after `WINDOW_MS` those entries no longer count toward capacity,
+  and the next not-yet-tracked email is admitted and tracked
 
 ### Requirement: Users are administered from a CLI, never over HTTP
 
