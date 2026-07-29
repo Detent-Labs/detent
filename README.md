@@ -65,13 +65,22 @@ dev container (`.devcontainer/`), never on the host.
 bun install
 DATABASE_URL=postgres://postgres:postgres@db:5432/workflow_engine bun test   # bun:test suites
 bun run typecheck                                                            # tsc --noEmit (Bun does not typecheck)
+bun run check                                                                # both, in one command
 ```
 
 Set `DATABASE_URL`. The database-backed suites carry `test.skipIf(!DATABASE_URL)`
 at over 500 sites — the majority of the suite. Without it they skip silently,
 not loudly. A bare `bun test` then reports a pass count that omits most of what
-the suite tests. CI (`.github/workflows/ci.yml`) fails the job outright when
-the variable is unset, for the same reason.
+the suite tests. Inside the dev container the variable is already set, which is
+the second reason to run there.
+
+Nothing runs on a hosted CI service. `.githooks/pre-push` is the gate instead.
+It runs `bun run check` in the dev container and blocks the push unless both
+the typecheck and the suite pass. Arm it once per clone.
+
+```bash
+git config core.hooksPath .githooks
+```
 
 `bun run serve` creates the database schema on startup if it is missing.
 Pointing it at an empty Postgres needs no separate setup step. Every DDL
