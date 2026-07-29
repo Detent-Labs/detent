@@ -15,7 +15,13 @@ function findFieldById(fields: DraftField[] | undefined, id: string): DraftField
   return undefined;
 }
 
-export type IssueSource = "zod" | "cel" | "registry" | "duration";
+// "structural" covers src/schema/compile.ts's CompileValidationError — the six
+// harden-publish-validation write-path checks (unknown keys, the reserved
+// action prefix, uncompilable/over-long patterns, unresolved
+// outputMapping/contract field ids, non-identifier field keys, over-long
+// authored strings), all reported in the same {loc, value, message} shape as
+// "duration".
+export type IssueSource = "zod" | "cel" | "registry" | "duration" | "structural";
 export type EntityType = "process" | "field" | "dataSource" | "step" | "path" | "timer" | "action" | "contract";
 
 export interface EditorIssue {

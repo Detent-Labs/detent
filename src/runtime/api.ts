@@ -358,20 +358,55 @@ function optionValuesValid(options: FieldOption[] | undefined, value: Literal): 
   return typeof value === "string" && allowed.has(value);
 }
 
-function checkConstraints(validation: FieldDef["validation"], value: Literal): ("min" | "max" | "minLength" | "maxLength" | "pattern")[] {
+// Compiled pattern cache, keyed by the immutable published body a pattern was
+// declared in, then by the pattern source itself. A published body never
+// changes, which is what makes it a sound cache key — the same property
+// definitionHash relies on. A pattern reaching this cache is known to compile:
+// the publish-time compile pass rejects one that does not
+// (src/schema/compile.ts::checkPatterns), so construction failure here is no
+// longer an expected condition.
+const patternCache = new WeakMap<ProcessBody, Map<string, RegExp>>();
+
+function compiledPattern(body: ProcessBody, pattern: string): RegExp {
+  let forBody = patternCache.get(body);
+  if (!forBody) {
+    forBody = new Map();
+    patternCache.set(body, forBody);
+  }
+  let re = forBody.get(pattern);
+  if (!re) {
+    re = new RegExp(pattern);
+    forBody.set(pattern, re);
+  }
+  return re;
+}
+
+/**
+ * `pattern` is evaluated only when this value's length constraints raised no
+ * violation: a value already rejected on length is going to be rejected
+ * regardless, so running a pattern — which may backtrack catastrophically and
+ * which JavaScript cannot time out — against an over-long, submitter-supplied
+ * string is unnecessary work with an unbounded worst case.
+ */
+function checkConstraints(
+  body: ProcessBody,
+  validation: FieldDef["validation"],
+  value: Literal,
+): ("min" | "max" | "minLength" | "maxLength" | "pattern")[] {
   const violations: ("min" | "max" | "minLength" | "maxLength" | "pattern")[] = [];
   if (!validation) return violations;
   if (typeof value === "number") {
     if (validation.min !== undefined && value < validation.min) violations.push("min");
     if (validation.max !== undefined && value > validation.max) violations.push("max");
   }
+  let lengthOk = true;
   if (typeof value === "string" || Array.isArray(value)) {
     const len = value.length;
-    if (validation.minLength !== undefined && len < validation.minLength) violations.push("minLength");
-    if (validation.maxLength !== undefined && len > validation.maxLength) violations.push("maxLength");
+    if (validation.minLength !== undefined && len < validation.minLength) { violations.push("minLength"); lengthOk = false; }
+    if (validation.maxLength !== undefined && len > validation.maxLength) { violations.push("maxLength"); lengthOk = false; }
   }
-  if (typeof value === "string" && validation.pattern !== undefined) {
-    if (!new RegExp(validation.pattern).test(value)) violations.push("pattern");
+  if (typeof value === "string" && validation.pattern !== undefined && lengthOk) {
+    if (!compiledPattern(body, validation.pattern).test(value)) violations.push("pattern");
   }
   return violations;
 }
@@ -427,7 +462,7 @@ async function validateSubmissionData(
     if (!optionValuesValid(rf.options, value)) {
       issues.push({ kind: "invalid-option", fieldId: fieldId as FieldId });
     }
-    for (const constraint of checkConstraints(rf.field.validation, value)) {
+    for (const constraint of checkConstraints(body, rf.field.validation, value)) {
       issues.push({ kind: "constraint", fieldId: fieldId as FieldId, constraint });
     }
     const rule = rf.field.validation?.rule;
