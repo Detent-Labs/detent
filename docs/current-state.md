@@ -329,9 +329,13 @@ Stage-by-stage status is in `ROADMAP.md`.
   `ActorResolver` will need the allowlist mode this change built, not the
   wildcard, so it is that change's job to add the credentials header, not
   this one's. The devcontainer's `app` service sets
-  `CORS_ALLOWED_ORIGINS=http://localhost:5173` (the editor's Vite dev
-  server) so the documented Player-against-engine workflow needs no extra
-  reading.
+  `CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176`
+  (`pin-frontend-dev-ports`): the four frontend dev servers, each pinned to
+  its own port in its `vite.config.ts` (`app` 5173, `admin` 5174, `studio`
+  5175, `editor` 5176, each with `strictPort: true` so a taken port fails
+  startup instead of silently sliding to the next free one), so all four can
+  run at once against one engine, in any start order, with no configuration
+  edit.
 - Player/Preview UI (`packages/editor/src/player/`, roadmap #5c): lets a human
   drive a real process instance end-to-end through the browser, against the
   HTTP wrapper — a Structure/Player toggle in `App.tsx` switches between the

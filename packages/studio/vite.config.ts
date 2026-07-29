@@ -32,4 +32,5 @@ export function contentSecurityPolicy(): Plugin {
 
 export default defineConfig({
   plugins: [react(), contentSecurityPolicy()],
+  server: { port: 5175, strictPort: true },
 });
