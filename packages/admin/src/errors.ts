@@ -23,6 +23,8 @@ export function describeError(error: ClientError, status?: number): string {
       return "Not found.";
     case "conflict":
       return "This was changed elsewhere. Refresh and try again.";
+    case "migration-plan":
+      return "No migration plan is registered for that version pair.";
     case "internal":
       return status === undefined
         ? "Could not reach the server. Check your connection and try again."

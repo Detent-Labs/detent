@@ -4,6 +4,7 @@ import type {
   InstanceRecordPage,
   InstanceView,
   LoginResponse,
+  MigrationResult,
   OutboxPage,
   OutboxRow,
   PendingTimerPage,
@@ -45,6 +46,8 @@ async function parseErrorBody(res: Response): Promise<ClientError> {
       return { type: "not-found", message };
     case "conflict":
       return { type: "conflict", message };
+    case "migration-plan":
+      return { type: "migration-plan", message };
     default:
       return { type: "internal", message };
   }
@@ -172,4 +175,13 @@ export async function disableUser(userId: string, token: string): Promise<UserSu
 export async function enableUser(userId: string, token: string): Promise<UserSummary> {
   const res = await request(`/admin/users/${encodeURIComponent(userId)}/enable`, token, { method: "POST" });
   return (await res.json()) as UserSummary;
+}
+
+export async function runMigration(processId: string, fromVersion: number, toVersion: number, token: string): Promise<MigrationResult> {
+  const res = await request("/admin/migrations/run", token, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ processId, fromVersion, toVersion }),
+  });
+  return (await res.json()) as MigrationResult;
 }

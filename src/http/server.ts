@@ -33,6 +33,7 @@ import {
   handleAdminListUsers,
   handleAdminDisableUser,
   handleAdminEnableUser,
+  handleAdminRunMigration,
 } from "./admin-routes.js";
 import {
   handleListDrafts,
@@ -259,6 +260,9 @@ export function createServer(
     if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "admin" && parts[1] === "users" && parts[3] === "enable") {
       return preflight("POST");
     }
+    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "admin" && parts[1] === "migrations" && parts[2] === "run") {
+      return preflight("POST");
+    }
     if (req.method === "OPTIONS" && parts.length === 1 && parts[0] === "drafts") {
       return preflight("GET");
     }
@@ -353,6 +357,10 @@ export function createServer(
     // POST /admin/users/:id/enable
     if (req.method === "POST" && parts.length === 4 && parts[0] === "admin" && parts[1] === "users" && parts[3] === "enable") {
       return toRes(await handleAdminEnableUser(parts[2]!, req, resolver, db));
+    }
+    // POST /admin/migrations/run
+    if (req.method === "POST" && parts.length === 3 && parts[0] === "admin" && parts[1] === "migrations" && parts[2] === "run") {
+      return toRes(await handleAdminRunMigration(req, resolver, db));
     }
     // GET /drafts (list)
     if (req.method === "GET" && parts.length === 1 && parts[0] === "drafts") {

@@ -6,6 +6,7 @@ export type Route =
   | { name: "outbox" }
   | { name: "timers" }
   | { name: "users" }
+  | { name: "migrations" }
   | { name: "login" };
 
 /** Pure — testable without a DOM. An unrecognized path falls back to the instances list rather than a dead end. */
@@ -14,6 +15,7 @@ export function matchRoute(path: string): Route {
   if (path === "/outbox") return { name: "outbox" };
   if (path === "/timers") return { name: "timers" };
   if (path === "/users") return { name: "users" };
+  if (path === "/migrations") return { name: "migrations" };
   const instanceMatch = /^\/instances\/([^/]+)$/.exec(path);
   if (instanceMatch) return { name: "instance", instanceId: decodeURIComponent(instanceMatch[1]!) };
   return { name: "instances" };
@@ -31,6 +33,8 @@ export function routePath(route: Route): string {
       return "/timers";
     case "users":
       return "/users";
+    case "migrations":
+      return "/migrations";
     case "login":
       return "/login";
   }

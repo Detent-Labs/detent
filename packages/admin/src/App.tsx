@@ -7,6 +7,7 @@ import { InstanceScreen } from "./screens/InstanceScreen.js";
 import { OutboxScreen } from "./screens/OutboxScreen.js";
 import { TimersScreen } from "./screens/TimersScreen.js";
 import { UsersScreen } from "./screens/UsersScreen.js";
+import { MigrationsScreen } from "./screens/MigrationsScreen.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 
 /** Mirrors src/auth/authorize.ts::ADMIN_ROLE — the server is the enforcement; this is presentational only (admin-app spec's "An actor without the admin role sees an explanatory empty state"). */
@@ -62,6 +63,9 @@ export function App() {
           <button type="button" aria-current={route.name === "users" ? "page" : undefined} onClick={() => navigate({ name: "users" })}>
             Users
           </button>
+          <button type="button" aria-current={route.name === "migrations" ? "page" : undefined} onClick={() => navigate({ name: "migrations" })}>
+            Migrations
+          </button>
         </nav>
         <div className="admin-header-right">
           <button type="button" onClick={logout}>
@@ -78,6 +82,7 @@ export function App() {
         {route.name === "outbox" && <OutboxScreen token={session.token} onUnauthorized={logout} />}
         {route.name === "timers" && <TimersScreen token={session.token} navigate={navigate} onUnauthorized={logout} />}
         {route.name === "users" && <UsersScreen token={session.token} onUnauthorized={logout} />}
+        {route.name === "migrations" && <MigrationsScreen token={session.token} onUnauthorized={logout} />}
       </ErrorBoundary>
     </div>
   );
