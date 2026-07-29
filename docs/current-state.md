@@ -963,3 +963,40 @@ Stage-by-stage status is in `ROADMAP.md`.
   the pure modules; the textarea/toggle wiring is untested, per this repo's
   existing convention. Tools/Player (`studio-tools-and-player`, which also
   deletes `packages/editor`) is the only remaining piece of stage 11.
+<!-- antislop: allow sentence-length run-ons -->
+- Authorize the instance-read and assignment-less submit paths
+  (`src/runtime/api.ts`, `authorize-instance-access`): closes the gap left by
+  `admin-shell-and-ops`, which gated the instance **list** (`scope=all`,
+  `GET /instances/:id/record`) but left the stronger single-instance read,
+  `GET /instances/:id`, open to any authenticated caller holding the id.
+  `getInstanceView` now authorizes `actor` against the loaded instance before
+  resolving anything: `ADMIN_ROLE`, `instance.startedBy`, the current step's
+  claimant, or an eligible candidate on the current step's assignment
+  (`isEligibleCandidate`, imported from `engine/transition.ts` — the same
+  predicate `claimStep` uses, so the read and claim predicates cannot drift).
+  Access follows the *current* step, not history: a candidate on a step the
+  instance has since left loses the read once it advances, mirroring
+  `scope=mine`. Load-failure handling mirrors `cancelInstance`'s existing
+  two-path shape: an `ADMIN_ROLE` caller loads directly, so a missing
+  instance (or any other load failure, e.g. a pin mismatch) still surfaces as
+  today's plain not-found/500; every other caller loads inside a `try` whose
+  `catch` collapses into `AuthorizationError`, so a nonexistent instance and
+  one the caller has no relationship to are indistinguishable (403,
+  `type: "authorization"`) — this also means a non-admin caller no longer
+  sees the raw 500 a corrupted pin previously produced; that fault now reads
+  as 403 too. No HTTP-layer change: `handleGetInstanceView` already resolved
+  the actor and passed it through, and `AuthorizationError` was already
+  mapped to 403. **BREAKING** for any caller reading an instance it has no
+  relationship to; the remedy is the same as `admin-shell-and-ops`'s —
+  grant `system:admin` via `cli.ts set-roles`.
+
+  `submitAndTransition` gained a floor for the assignment-less case:
+  previously a step with no declared `Step.assignment` accepted a submission
+  from any authenticated actor (`if (instance.assignment) { ... }` had no
+  `else`). Now, when the current step declares no assignment, the actor must
+  be `instance.startedBy` or carry `ADMIN_ROLE`, or the call throws
+  `AuthorizationError` before any field validation runs — the same floor as
+  the read side, deliberately weaker than the claimant rule since starter and
+  operator are the only relationships an assignment-less step defines. A step
+  that needs open-to-many submission should declare an `assignment` with a
+  candidate list instead of relying on the previously-unenforced omission.

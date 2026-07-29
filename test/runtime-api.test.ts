@@ -23,6 +23,7 @@ import {
   PinMismatch,
   type InstanceRecordElement,
 } from "../src/runtime/api.js";
+import { ADMIN_ROLE, AuthorizationError } from "../src/auth/authorize.js";
 import type { ProcessBody, ProcessId, PathId, InstanceId, FieldId, Instance, StepId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
@@ -308,6 +309,34 @@ const cascadeLoopBody = (): ProcessBody =>
     },
   }) as unknown as ProcessBody;
 
+/**
+ * step_a (assigned: candidates ["approver", "user_id_candidate"]) --(path_ab,
+ * manual, guardless)--> step_b (terminal, no assignment). Fixture for
+ * getInstanceView's relationship-authorization arms: claimant, candidate by
+ * id, candidate by role, and the "access follows the current step" scenario.
+ */
+const assignedViewBody = (): ProcessBody =>
+  ({
+    key: "assigned_view_body",
+    label: { en: "Assigned View Body" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          assignment: { strategy: { type: "static", config: { candidates: ["approver", "user_id_candidate"] } } },
+          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
 const pid = (n: string) => n as ProcessId;
 
 // ============================================================
@@ -454,6 +483,99 @@ test.skipIf(!DB)("getInstanceView on a running subprocess wait-state has no avai
   expect(view.status).toBe("running");
   expect(view.step.type).toBe("subprocess");
   expect(view.availablePaths).toEqual([]);
+});
+
+// ============================================================
+// getInstanceView — relationship authorization
+// ============================================================
+
+test.skipIf(!DB)("getInstanceView succeeds for the starter", async () => {
+  const PID = pid("proc_view_auth_starter");
+  await publishBody(PID, assignedViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
+  expect(view.step.key).toBe("a");
+});
+
+test.skipIf(!DB)("getInstanceView succeeds for the current claimant", async () => {
+  const PID = pid("proc_view_auth_claimant");
+  await publishBody(PID, assignedViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  const claimant: Actor = { id: "user_claimant", roles: ["approver"] };
+  await claimStep(created.instanceId, claimant);
+
+  const view = await getInstanceView(created.instanceId, claimant, dataSourceReg);
+  expect(view.step.key).toBe("a");
+});
+
+test.skipIf(!DB)("getInstanceView succeeds for an eligible candidate by id, unclaimed", async () => {
+  const PID = pid("proc_view_auth_cand_id");
+  await publishBody(PID, assignedViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  const candidateById: Actor = { id: "user_id_candidate", roles: [] };
+
+  const view = await getInstanceView(created.instanceId, candidateById, dataSourceReg);
+  expect(view.step.key).toBe("a");
+});
+
+test.skipIf(!DB)("getInstanceView succeeds for an eligible candidate by role, unclaimed", async () => {
+  const PID = pid("proc_view_auth_cand_role");
+  await publishBody(PID, assignedViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  const candidateByRole: Actor = { id: "user_role_candidate", roles: ["approver"] };
+
+  const view = await getInstanceView(created.instanceId, candidateByRole, dataSourceReg);
+  expect(view.step.key).toBe("a");
+});
+
+test.skipIf(!DB)("getInstanceView succeeds for an ADMIN_ROLE actor with no other relationship", async () => {
+  const PID = pid("proc_view_auth_admin");
+  await publishBody(PID, assignedViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  const admin: Actor = { id: "user_admin_view", roles: [ADMIN_ROLE] };
+
+  const view = await getInstanceView(created.instanceId, admin, dataSourceReg);
+  expect(view.step.key).toBe("a");
+});
+
+test.skipIf(!DB)("getInstanceView rejects an unrelated authenticated actor", async () => {
+  const PID = pid("proc_view_auth_unrelated");
+  await publishBody(PID, assignedViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  const outsider: Actor = { id: "user_outsider", roles: [] };
+
+  let raised: unknown;
+  try {
+    await getInstanceView(created.instanceId, outsider, dataSourceReg);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(AuthorizationError);
+});
+
+test.skipIf(!DB)("getInstanceView rejects an actor whose candidacy was on a step the instance has since left", async () => {
+  const PID = pid("proc_view_auth_past_candidate");
+  await publishBody(PID, assignedViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  const pastCandidate: Actor = { id: "user_id_candidate", roles: [] };
+  const claimant: Actor = { id: "user_claimant2", roles: ["approver"] };
+
+  // pastCandidate could read the view while step_a is current...
+  await getInstanceView(created.instanceId, pastCandidate, dataSourceReg);
+
+  // ...but not once the instance has moved on to step_b, which declares no
+  // assignment, and pastCandidate is neither the starter nor ADMIN_ROLE.
+  await claimStep(created.instanceId, claimant);
+  await submitAndTransition(created.instanceId, "path_ab" as PathId, {} as Instance["data"], claimant, dataSourceReg);
+
+  let raised: unknown;
+  try {
+    await getInstanceView(created.instanceId, pastCandidate, dataSourceReg);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(AuthorizationError);
 });
 
 // ============================================================
@@ -761,9 +883,14 @@ test.skipIf(!DB)("a pin mismatch throws PinMismatch (via getInstanceView on a re
   // Corrupt the persisted pin so it no longer matches the published body's hash.
   await sql`UPDATE instances SET body = jsonb_set(body, '{definitionHash}', '"deadbeef"'::jsonb) WHERE instance_id = ${created.instanceId}`;
 
+  // ADMIN_ROLE: a non-admin caller's load failure (a pin mismatch included)
+  // now collapses into AuthorizationError — see the "getInstanceView —
+  // relationship authorization" section above. The admin path still loads
+  // directly, so it alone still surfaces the real PinMismatch this test pins.
+  const adminActor: Actor = { id: "user_admin_pin", roles: [ADMIN_ROLE] };
   let raised: unknown;
   try {
-    await getInstanceView(created.instanceId, actor, dataSourceReg);
+    await getInstanceView(created.instanceId, adminActor, dataSourceReg);
   } catch (e) {
     raised = e;
   }
