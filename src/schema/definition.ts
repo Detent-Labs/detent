@@ -300,6 +300,41 @@ export function collectFieldsDeep(fields: FieldDef[]): FieldDef[] {
   return out;
 }
 
+/**
+ * Expected JS shape per BaseFieldType. Shared by the submission validator
+ * (`src/runtime/api.ts`, a participant's value) and the outbox writeback check
+ * (`src/engine/outbox.ts`, a handler's `Action.output` value) — one type rule
+ * for "does this value match this field's declared type", not a copy per
+ * caller. Exhaustive over BaseFieldType: a future member missing here is a
+ * compile error.
+ */
+const JS_TYPE: Record<BaseFieldType, string> = {
+  string: "string",
+  date: "string",
+  datetime: "string",
+  select: "string",
+  reference: "string",
+  number: "number",
+  boolean: "boolean",
+  multiselect: "string[]",
+  file: "any", // opaque / unreachable (group refs are excluded before this is called)
+  group: "any",
+};
+
+/** True if `value`'s JS shape matches `fieldType`'s declared shape. A plugin type is opaque and always accepted. */
+export function typeMatches(fieldType: FieldDef["type"], value: Literal): boolean {
+  if (typeof fieldType !== "string") return true; // plugin type: opaque, accept
+  const expected = JS_TYPE[fieldType];
+  if (expected === "any") return true;
+  if (expected === "string[]") return Array.isArray(value) && value.every((v) => typeof v === "string");
+  return typeof value === expected;
+}
+
+/** The expected-type label `typeMatches` checks against, for a diagnostic message. */
+export function expectedTypeLabel(fieldType: FieldDef["type"]): string {
+  return typeof fieldType !== "string" ? "any" : JS_TYPE[fieldType];
+}
+
 // ============================================================
 // Data sources: plugin, never inlined, referenced by id.
 // ============================================================
@@ -785,6 +820,13 @@ export const actionOutcome = z.object({
   // Set when a terminal instance suppressed the writeback: the handler ran
   // (status still reflects its outcome) but no value was written into data.
   suppressed: z.boolean().optional(),
+  // Target FieldIds whose Action.output value did not match the field's
+  // declared type: the entry was dropped (not written), the rest of the patch
+  // still applied, and the delivery still counts as succeeded — the remote
+  // side did its work. Distinct from `suppressed` (a whole patch withheld
+  // because the instance was not running or had migrated): a drop is per
+  // entry and happens even against a running, current-version instance.
+  droppedTargets: z.array(fieldId).optional(),
 });
 export type ActionOutcome = z.infer<typeof actionOutcome>;
 
@@ -951,6 +993,19 @@ export const instanceEvent = z.discriminatedUnion("kind", [
     ...instanceEventEnvelope,
     kind: z.literal("instance.faulted"),
     payload: z.object({ stepId, reason: instanceFaultedReason }).strict(),
+  }),
+  // A subprocess inputMapping or outputMapping entry raised, or its result
+  // could not be made JSON-safe: evaluation is total per entry (mirroring
+  // migration transforms), so the entry left its target field unwritten
+  // rather than failing the spawn or the return. No transition, no actions
+  // enqueued — the migration.skipped shape, not the timer.fired one. Recorded
+  // on the PARENT — both mappings evaluate over the parent's context — with
+  // the parent's own `version`/`transitionSeq` in force, in the same
+  // transaction as the spawn's or the return's own commit.
+  z.object({
+    ...instanceEventEnvelope,
+    kind: z.literal("mapping.entry-dropped"),
+    payload: z.object({ fieldId, direction: z.enum(["input", "output"]), reason: migrationTransformDroppedReason }).strict(),
   }),
 ]);
 export type InstanceEvent = z.infer<typeof instanceEvent>;

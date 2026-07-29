@@ -126,6 +126,21 @@ Stage-by-stage status is in `ROADMAP.md`.
   `subprocess.outcome-unmatched` event rather than lost silently. Reachable in
   practice: an independently cancelled child returns the reserved `"cancelled"`
   outcome, which a parent is not obliged to guard.
+  Both `inputMapping` and `outputMapping` evaluation (`evalFieldMap`,
+  `src/cel/eval.ts`) is total per entry, matching migration `transforms`
+  rather than throwing for the whole map: an entry whose expression raises —
+  most often reading a parent field the instance never wrote, the ordinary
+  shape for an optional field, since the field catalog has no notion of
+  "always written" — or whose value cannot be made JSON-safe leaves its
+  target unwritten while every other entry still applies, recorded as a
+  `mapping.entry-dropped` event on the parent (both mappings evaluate over
+  its context) in the same transaction as the spawn's or the return's own
+  commit. `Action.output`'s own map evaluation (`evalOutput`) deliberately
+  keeps the old fail-fast behavior instead: a raise there means the handler's
+  actual return shape does not match what the action declared, closer to a
+  bug than an unset optional field, and the outbox delivery already has its
+  own separate drop mechanism for the adjacent case — a value that evaluates
+  fine but does not fit its target field's declared type (below).
   `child.data` exposes the child's full data (re-keyed fieldId→key) at runtime, not
   filtered to `contract.outputFields` — deliberately: only the CEL *surface* is
   confined to declared outputs (`checkSubprocessChildRefs`, roadmap #1), not the
@@ -166,9 +181,33 @@ Stage-by-stage status is in `ROADMAP.md`.
   than an instance silently at rest on an all-automatic step. `outbox.ts`
   (transactional outbox: at-least-once delivery, result
   writeback, retry/dead-letter, stale-claim reclaim; a writeback applies only to a
-  running instance). `resolution.ts` (re-resolves automatic paths after an async
-  writeback, so a parked wait-state takes its result-driven path; claim/CAS with a
-  lease). `timers.ts` + `duration.ts` (first-class timers: arm both `duration` and
+  running instance). Every claim, completed or abandoned, costs one delivery
+  attempt: the tx1 claim UPDATE itself increments `attempts` (`RETURNING
+  attempts` then IS the post-increment value), so a delivery that never
+  reaches the tx2 mark (a killed worker, a lease-expiry reclaim) still moves
+  the row toward its dead-letter cap. `drainOutbox` races `deliverFn` against
+  a deadline derived from the claim lease (`Promise.race`, cleared on
+  settlement) — a hung handler becomes an ordinary transient failure with
+  backoff rather than stalling the pass (and, since the worker awaits the
+  whole batch and `pollForever` awaits the whole tick, every row behind it and
+  every future poll). The race does not cancel the handler; releasing the
+  underlying resource is the handler's own job (`http.request`'s own timeout
+  does this for the shipped handler). Before writing a patch entry, the
+  worker resolves the target field's declared type (via an injected
+  `resolveBody`, keyed off the row's `field_version`) and checks the value
+  with the same `typeMatches` rule (`src/schema/definition.ts`, shared with
+  the submission validator) a participant's own submission faces; a
+  mismatching entry is dropped — not written, not retried, since the
+  delivery itself already succeeded — and recorded in the `ActionOutcome`'s
+  `droppedTargets`, distinct from `suppressed` (a whole-patch fact about
+  instance state, not a per-entry one). `resolution.ts` (re-resolves
+  automatic paths after an async writeback, so a parked wait-state takes its
+  result-driven path; claim/CAS with a lease). A re-resolution failure — a
+  parse error, a resolver miss or throw — leaves the row `claimed` rather
+  than requeueing it to `pending`: an immediate requeue would make it
+  selectable again on the next pass, a write loop at the poll interval;
+  the claim's own lease-expiry predicate is the retry cadence instead, reused
+  rather than duplicated. `timers.ts` + `duration.ts` (first-class timers: arm both `duration` and
   `deadline` timers at entry, `next_timer_at` poll scheduler, fire-once via OCC. A
   `deadline` is evaluated once at entry over the guard context with `SYSTEM_ACTOR`
   and parsed by `instantFromValue`, which accepts a strict ISO-8601 whitelist only —
@@ -177,7 +216,15 @@ Stage-by-stage status is in `ROADMAP.md`.
   24-char output check keep `fireAt` lexically sortable, which `minFireAt` relies on.
   The deadline branch is total — an unresolvable or non-instant deadline omits that
   timer rather than failing the entry. The duration branch cannot fail the entry for a
-  published body, since the grammar and the magnitude bound are enforced at publish).
+  published body, since the grammar and the magnitude bound are enforced at publish.
+  A scan-pass failure — a corrupt row, a resolver miss, a resolver throw — pushes
+  that instance's `next_timer_at` out by a bounded interval (one minute), predicated
+  on the value the pass itself observed so a concurrent re-arm is not clobbered
+  (the predicated `UPDATE` matches zero rows when it fires). Without this a failing
+  instance is re-selected every poll forever, and — since the scan is capped and
+  ordered by `next_timer_at` — enough such rows starve every instance behind them.
+  A "no due timer on this instance" outcome does not push; that is a normal result
+  of the scan, not a failure).
   `registry.ts`, `registry-check.ts` (publish-time action-registry validation —
   see "Extensibility" in `CLAUDE.md`),
   `idempotency.ts`. `src/cel/eval.ts` evaluates guards at runtime (total: a runtime
@@ -399,6 +446,18 @@ Stage-by-stage status is in `ROADMAP.md`.
   `host.ts` specifically to avoid an import cycle, since the handler needs
   `PermanentError` from `outbox.ts` and `outbox.ts` already imports from
   `registry.ts`.
+- `http.request`'s timeout now always applies (`bound-async-delivery`):
+  `HTTP_DEFAULT_TIMEOUT_MS`, a module constant well under the outbox's
+  `CLAIM_LEASE_MS`, applies when the action declares none. The default
+  `fetch` is never unbounded. The abort now stays armed across the response
+  body read too; previously the timer cleared in a `finally` around only the
+  `fetch()` call, so a target that sent headers and then stalled could still
+  hang the handler. The response is also read against a byte budget
+  (`HTTP_MAX_RESPONSE_BYTES`). A declared `content-length` over the cap is
+  refused before any read; an unlabelled body is refused once the running
+  total crosses it; either is a `PermanentError`. The response lands in
+  `instance.data` via `Action.output`, so an unbounded read is an unbounded
+  write.
 - Reconcile in-flight action writebacks across a migration (`src/engine/migration.ts`,
   `src/engine/outbox.ts`): closes what was previously a "Decided, not yet built" gap.
   `migrateOne`'s in-flight-actions check now blocks only a `claimed` outbox row with

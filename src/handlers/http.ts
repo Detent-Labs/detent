@@ -13,6 +13,25 @@ import type { HandlerContext, HandlerDef } from "../engine/registry.js";
 export const HTTP_ACTION_TYPE = "http.request";
 
 /**
+ * Applied when the action declares no `timeout` of its own. Set well under
+ * CLAIM_LEASE_MS so this bound fires first in the ordinary case, producing a
+ * specific AbortError rather than the outbox's own less-specific deadline
+ * rejection (see outbox.ts::drainOutbox and design.md's "Bound delivery with
+ * the claim lease"). The outbox's race is the backstop that applies
+ * regardless of what a handler does; this is the handler actually releasing
+ * its socket.
+ */
+export const HTTP_DEFAULT_TIMEOUT_MS = 5_000;
+
+/**
+ * The response is persisted into `instance.data` via Action.output, so an
+ * unbounded read is an unbounded write into jsonb. Sized generously for an
+ * ordinary structured API response, not for a document/file transfer — an
+ * `http.request` action is not a file-download primitive.
+ */
+export const HTTP_MAX_RESPONSE_BYTES = 1_048_576; // 1 MiB
+
+/**
  * Reserved: the engine, not the author, sets this header's value
  * (`ctx.idempotencyKey`) on every request, so a cooperating target can dedupe
  * a retried delivery. Authoring it in `config.headers` is a publish error —
@@ -54,47 +73,85 @@ function buildHeaders(config: z.infer<typeof httpConfigSchema>, idempotencyKey: 
   return headers;
 }
 
+/**
+ * Read a response body against a byte budget rather than trusting
+ * response.json()/text() to buffer an arbitrary amount. A declared
+ * `content-length` over the limit is refused before any read; an unlabelled
+ * (e.g. chunked) body is refused as soon as the running total crosses it. Both
+ * are permanent failures — a target that returns more than the cap will do so
+ * again — so they must not consume a retry the way a transient failure does.
+ */
+async function readBoundedBody(response: Response): Promise<unknown> {
+  const contentType = response.headers.get("content-type") ?? "";
+  const declared = response.headers.get("content-length");
+  if (declared !== null && Number(declared) > HTTP_MAX_RESPONSE_BYTES) {
+    throw new PermanentError(`http.request response exceeds size limit: content-length ${declared} > ${HTTP_MAX_RESPONSE_BYTES}`);
+  }
+  if (!response.body) return contentType.includes("application/json") ? undefined : "";
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > HTTP_MAX_RESPONSE_BYTES) {
+      await reader.cancel().catch(() => {});
+      throw new PermanentError(`http.request response exceeds size limit: ${HTTP_MAX_RESPONSE_BYTES} bytes`);
+    }
+    chunks.push(value);
+  }
+  const text = Buffer.concat(chunks).toString("utf-8");
+  return contentType.includes("application/json") ? JSON.parse(text) : text;
+}
+
 async function httpHandler(ctx: HandlerContext): Promise<HttpActionResult> {
   const config = httpConfigSchema.parse(ctx.config);
   const headers = buildHeaders(config, ctx.idempotencyKey);
 
-  const controller = ctx.action.timeout ? new AbortController() : undefined;
-  const timeoutHandle = ctx.action.timeout
-    ? setTimeout(() => controller!.abort(), durationMs(ctx.action.timeout))
-    : undefined;
+  // A timeout always applies — the action's declared value overrides the
+  // engine default rather than deciding whether one exists at all, so the
+  // default fetch is never unbounded. The AbortController is built
+  // unconditionally for the same reason.
+  const controller = new AbortController();
+  const timeoutMs = ctx.action.timeout ? durationMs(ctx.action.timeout) : HTTP_DEFAULT_TIMEOUT_MS;
+  const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
 
-  let response: Response;
   try {
-    response = await fetch(config.url, {
+    const response = await fetch(config.url, {
       method: config.method,
       headers,
       body: config.body !== undefined ? JSON.stringify(config.body) : undefined,
-      signal: controller?.signal,
+      signal: controller.signal,
     });
+
+    if (response.status === 429 || response.status >= 500) {
+      throw new Error(`http.request transient failure: ${response.status} ${response.statusText}`);
+    }
+    // Only a genuine 2xx counts as success — anything else (1xx, 3xx, or the
+    // remaining 4xx) is permanent. fetch() follows redirects by default and
+    // never surfaces 1xx as a final status, so this branch is unreachable
+    // today; it's here so the check reads the same as the spec ("any 2xx"),
+    // not because either case is currently reachable.
+    if (response.status < 200 || response.status >= 300) {
+      throw new PermanentError(`http.request permanent failure: ${response.status} ${response.statusText}`);
+    }
+
+    const responseHeaders: Record<string, string> = {};
+    response.headers.forEach((value, key) => {
+      responseHeaders[key] = value;
+    });
+    // The body read happens inside this try, with the abort still armed: a
+    // target that sends headers and then stalls on the body is aborted just
+    // like one that never sends headers at all — clearing the timer in a
+    // `finally` around only the fetch() call would leave this read unbounded.
+    const body = await readBoundedBody(response);
+
+    return { status: response.status, headers: responseHeaders, body };
   } finally {
-    if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+    clearTimeout(timeoutHandle);
   }
-
-  if (response.status === 429 || response.status >= 500) {
-    throw new Error(`http.request transient failure: ${response.status} ${response.statusText}`);
-  }
-  // Only a genuine 2xx counts as success — anything else (1xx, 3xx, or the
-  // remaining 4xx) is permanent. fetch() follows redirects by default and
-  // never surfaces 1xx as a final status, so this branch is unreachable
-  // today; it's here so the check reads the same as the spec ("any 2xx"),
-  // not because either case is currently reachable.
-  if (response.status < 200 || response.status >= 300) {
-    throw new PermanentError(`http.request permanent failure: ${response.status} ${response.statusText}`);
-  }
-
-  const responseHeaders: Record<string, string> = {};
-  response.headers.forEach((value, key) => {
-    responseHeaders[key] = value;
-  });
-  const contentType = response.headers.get("content-type") ?? "";
-  const body = contentType.includes("application/json") ? await response.json() : await response.text();
-
-  return { status: response.status, headers: responseHeaders, body };
 }
 
 export const httpHandlerDef: HandlerDef = {

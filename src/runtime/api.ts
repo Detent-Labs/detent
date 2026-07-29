@@ -30,7 +30,7 @@ import {
 import { buildGuardContext, evalGuard, type Actor } from "../cel/eval.js";
 import { requireRole, CANCEL_ANY_ROLE, ADMIN_ROLE, AuthorizationError } from "../auth/authorize.js";
 import { definitionHash } from "../schema/hash.js";
-import { instance as instanceSchema, historyEntry as historyEntrySchema, instanceEvent as instanceEventSchema, collectFieldsDeep } from "../schema/definition.js";
+import { instance as instanceSchema, historyEntry as historyEntrySchema, instanceEvent as instanceEventSchema, collectFieldsDeep, typeMatches, expectedTypeLabel } from "../schema/definition.js";
 import { resolveDataSource, type DataSourceRegistry } from "../engine/registry.js";
 import type {
   ProcessId,
@@ -47,7 +47,6 @@ import type {
   StepType,
   LocalizedText,
   LocaleCode,
-  BaseFieldType,
   FieldDef,
   FieldOption,
   DataSourceDef,
@@ -325,32 +324,6 @@ function findStep(body: ProcessBody, stepId: string): Step {
 // ============================================================
 // Submission validation
 // ============================================================
-
-/** Expected JS shape per BaseFieldType, mirroring check.ts::celType's mapping. Exhaustive over BaseFieldType: a future member missing here is a compile error. */
-const JS_TYPE: Record<BaseFieldType, string> = {
-  string: "string",
-  date: "string",
-  datetime: "string",
-  select: "string",
-  reference: "string",
-  number: "number",
-  boolean: "boolean",
-  multiselect: "string[]",
-  file: "any", // opaque / unreachable (group refs are excluded before this is called)
-  group: "any",
-};
-
-function typeMatches(fieldType: FieldDef["type"], value: Literal): boolean {
-  if (typeof fieldType !== "string") return true; // plugin type: opaque, accept
-  const expected = JS_TYPE[fieldType];
-  if (expected === "any") return true;
-  if (expected === "string[]") return Array.isArray(value) && value.every((v) => typeof v === "string");
-  return typeof value === expected;
-}
-
-function expectedTypeLabel(fieldType: FieldDef["type"]): string {
-  return typeof fieldType !== "string" ? "any" : JS_TYPE[fieldType];
-}
 
 function optionValuesValid(options: FieldOption[] | undefined, value: Literal): boolean {
   if (!options || options.length === 0) return true;

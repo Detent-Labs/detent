@@ -437,6 +437,16 @@ const outcomeUnmatchedEvents = async (instanceId: string): Promise<{ transitionS
     event: (typeof x.event === "string" ? JSON.parse(x.event) : x.event) as Record<string, unknown>,
   }));
 };
+// The mapping.entry-dropped events of one instance, insertion order.
+const mappingDroppedEvents = async (instanceId: string): Promise<{ transitionSeq: number; event: Record<string, unknown> }[]> => {
+  const r = (await sql`SELECT transition_seq, event FROM instance_events
+    WHERE instance_id = ${instanceId} AND kind = 'mapping.entry-dropped'
+    ORDER BY id`) as { transition_seq: number; event: unknown }[];
+  return r.map((x) => ({
+    transitionSeq: Number(x.transition_seq),
+    event: (typeof x.event === "string" ? JSON.parse(x.event) : x.event) as Record<string, unknown>,
+  }));
+};
 const outboxAt = async (instanceId: string, seq: number): Promise<{ action_id: string; event_id: string | null }[]> =>
   (await sql`SELECT action_id, event_id FROM outbox WHERE instance_id = ${instanceId} AND transition_seq = ${seq}`) as
     { action_id: string; event_id: string | null }[];
@@ -508,6 +518,44 @@ test.skipIf(!DB)("the child outcome and data return to the parent, driving it of
   expect(p!.currentStepId as string).toBe("step_p_approved"); // 500 <= 1000 -> approved
   expect(dataField(p, "field_p_result")).toBe("approved"); // child.outcome
   expect(dataField(p, "field_p_back")).toBe(500); // child.data.amount
+  expect(await mappingDroppedEvents(parent.instanceId)).toHaveLength(0); // every entry evaluated: no drop recorded
+});
+
+test.skipIf(!DB)("an inputMapping entry over an unwritten parent field is dropped, not fatal to the spawn or the return", async () => {
+  const { registry } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry, dataSourceReg);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry, dataSourceReg);
+  const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
+  // field_p_amount deliberately left unset: inputMapping's `data.amount` raises.
+
+  await drainOutbox(sql, registry); // spawn only
+  const childId = subprocessChildId(parent.instanceId, 1, "step_p_sub");
+  const child = await loadInstance(childId);
+  expect(child).toBeDefined();
+  expect(dataField(child, "field_c_amount")).toBeUndefined(); // omitted, not defaulted to anything
+
+  const afterSpawn = await mappingDroppedEvents(parent.instanceId);
+  expect(afterSpawn).toHaveLength(1);
+  expect(afterSpawn[0].event.payload).toEqual({ fieldId: "field_c_amount", direction: "input", reason: "expression-raised" });
+  expect(afterSpawn[0].transitionSeq).toBe(parent.transitionSeq); // the parent's own seq, not advanced by the spawn
+
+  // The unset amount also means the child's own guard (data.amount > 1000.0)
+  // raises -> false (guard totality) -> the guardless default path taken ->
+  // "approved". Its outputMapping then reads child.data.amount, which is also
+  // unwritten on the child (the drop above never wrote it there either) -> a
+  // SECOND, independent drop, this time on the return / output side.
+  await drainAll(registry); // child terminal -> return -> parent advance
+  const p = await loadInstance(parent.instanceId);
+  expect(p!.status).toBe("completed");
+  expect(p!.currentStepId as string).toBe("step_p_approved");
+  expect(dataField(p, "field_p_result")).toBe("approved"); // this entry evaluated fine
+  expect(dataField(p, "field_p_back")).toBeUndefined(); // this one was dropped, not written
+
+  const events = await mappingDroppedEvents(parent.instanceId);
+  expect(events).toHaveLength(2);
+  const byDirection = Object.fromEntries(events.map((e) => [(e.event.payload as { direction: string }).direction, e.event.payload]));
+  expect(byDirection.input).toEqual({ fieldId: "field_c_amount", direction: "input", reason: "expression-raised" });
+  expect(byDirection.output).toEqual({ fieldId: "field_p_back", direction: "output", reason: "expression-raised" });
 });
 
 test.skipIf(!DB)("a rejected child routes the parent down the rejected path", async () => {
@@ -548,7 +596,7 @@ test.skipIf(!DB)("a return interrupted after its first hop is durably resumed by
     const step = parentBody.workflow.steps.find((s) => s.id === "step_p_sub")!;
     const childData = buildGuardContext(cv.definition, child!, SYSTEM_ACTOR).data;
     const childNs = { outcome: "approved", data: childData };
-    const patch = evalFieldMap(step.subprocess!.outputMapping, { ...buildGuardContext(parentBody, p, SYSTEM_ACTOR), child: childNs });
+    const { patch } = evalFieldMap(step.subprocess!.outputMapping, { ...buildGuardContext(parentBody, p, SYSTEM_ACTOR), child: childNs });
     await tx`UPDATE instances SET body = jsonb_set(body, '{data}', coalesce(body->'data', '{}'::jsonb) || ((${[patch]}::jsonb) -> 0))
       WHERE instance_id = ${parent.instanceId}`;
     const parked: Instance = { ...p, data: { ...p.data, ...patch } as Instance["data"] };

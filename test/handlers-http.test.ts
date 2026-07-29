@@ -10,6 +10,8 @@ import {
   httpConfigSchema,
   HTTP_ACTION_TYPE,
   IDEMPOTENCY_HEADER,
+  HTTP_DEFAULT_TIMEOUT_MS,
+  HTTP_MAX_RESPONSE_BYTES,
 } from "../src/handlers/http.js";
 import { deliver, PermanentError, type ClaimedRow } from "../src/engine/outbox.js";
 import { createRegistry, register, type HandlerContext } from "../src/engine/registry.js";
@@ -158,7 +160,7 @@ test("a response delayed past the action timeout aborts and rejects transiently"
   );
 });
 
-test("no declared timeout imposes no handler-level bound", async () => {
+test("no declared timeout still succeeds for a response faster than the engine default", async () => {
   await withServer(
     async () => {
       await new Promise((r) => setTimeout(r, 100));
@@ -167,6 +169,84 @@ test("no declared timeout imposes no handler-level bound", async () => {
     async (url) => {
       const result = await httpHandlerDef.handler(ctxFor({ url, method: "GET" }));
       expect((result as { body: unknown }).body).toEqual({ waited: true });
+    },
+  );
+});
+
+test(
+  "no declared timeout is still bounded by the engine default, against a target that never responds",
+  async () => {
+    await withServer(
+      () => new Promise<Response>(() => {}), // never resolves: no response at all
+      async (url) => {
+        const start = Date.now();
+        const err = await rejects(httpHandlerDef.handler(ctxFor({ url, method: "GET" })));
+        expect(err).not.toBeInstanceOf(PermanentError);
+        expect(Date.now() - start).toBeLessThan(HTTP_DEFAULT_TIMEOUT_MS + 2000); // bounded, not open-ended
+      },
+    );
+  },
+  HTTP_DEFAULT_TIMEOUT_MS + 5000, // bun test's own per-test timeout, given the deliberate wait
+);
+
+test("a hang during the body read is aborted too, not only a hang before headers", async () => {
+  // Headers flush (status 200, valid Content-Type), then the stream never
+  // closes: clearing the abort timer in a `finally` around only the fetch()
+  // call would leave this read unbounded.
+  const server = Bun.serve({
+    port: 0,
+    fetch: () =>
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode("{"));
+            // deliberately never enqueue further or close
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+  });
+  try {
+    const err = await rejects(
+      httpHandlerDef.handler(ctxFor({ url: `http://localhost:${server.port}`, method: "GET" }, { timeout: "PT0.1S" })),
+    );
+    expect(err).not.toBeInstanceOf(PermanentError);
+  } finally {
+    server.stop(true);
+  }
+});
+
+// --- response size cap ----------------------------------------------------------
+
+test("a response whose content-length exceeds the size limit is refused as a permanent failure", async () => {
+  const overSize = "x".repeat(HTTP_MAX_RESPONSE_BYTES + 1000);
+  await withServer(
+    () => new Response(overSize, { status: 200, headers: { "Content-Type": "text/plain" } }),
+    async (url) => {
+      const err = await rejects(httpHandlerDef.handler(ctxFor({ url })));
+      expect(err).toBeInstanceOf(PermanentError);
+    },
+  );
+});
+
+test("an over-size response dead-letters via deliver(), the classification the outbox worker acts on", async () => {
+  const overSize = "x".repeat(HTTP_MAX_RESPONSE_BYTES + 1000);
+  await withServer(
+    () => new Response(overSize, { status: 200, headers: { "Content-Type": "text/plain" } }),
+    async (url) => {
+      const reg = createRegistry();
+      register(reg, HTTP_ACTION_TYPE, httpHandlerDef);
+      const row: ClaimedRow = {
+        idempotency_key: "idem_oversize",
+        instance_id: "inst_1",
+        transition_seq: 1,
+        action: action({ url }),
+        attempts: 0,
+        event_id: null,
+        field_version: 1,
+      };
+      const err = await rejects(deliver(row, reg));
+      expect(err).toBeInstanceOf(PermanentError); // -> outbox dead-letters, never retries, writes no data
     },
   );
 });

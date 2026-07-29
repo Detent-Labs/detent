@@ -20,6 +20,22 @@ function parseInstance(raw: unknown): Instance {
 }
 
 /**
+ * Push an instance out of the due scan by a bounded interval, predicated on the
+ * `next_timer_at` value this pass observed. The predicate is what makes it safe:
+ * a concurrent `fireTimer` or a step entry that re-armed the timer has already
+ * changed `next_timer_at`, so a stale push matches zero rows and clobbers
+ * nothing. One minute is long enough that a stuck row stops being a 2 Hz write
+ * loop and short enough that a transient fault self-heals within a human's
+ * attention span — not tuned, and does not need to be. Failures here are
+ * swallowed by the caller's own boundary: a push that cannot land leaves the
+ * row exactly where it already is, no worse than before this existed.
+ */
+async function pushOutOfScan(db: SQL, instanceId: string, observedNextTimerAt: unknown): Promise<void> {
+  await db`UPDATE instances SET next_timer_at = now() + interval '1 minute'
+    WHERE instance_id = ${instanceId} AND next_timer_at = ${observedNextTimerAt}`;
+}
+
+/**
  * One scheduler pass. For each running instance whose `next_timer_at` has elapsed,
  * fire the earliest unfired timer whose `fireAt` is in the past. Returns the number
  * of timers fired. At most one timer per instance per pass — a further due timer is
@@ -27,10 +43,10 @@ function parseInstance(raw: unknown): Instance {
  * timer moves the instance).
  */
 export async function drainTimers(db: SQL = sql, resolveBody: ResolveBody = () => undefined): Promise<number> {
-  const dueRows = (await db`SELECT instance_id, body FROM instances
+  const dueRows = (await db`SELECT instance_id, body, next_timer_at FROM instances
     WHERE (body->>'status') = 'running' AND next_timer_at IS NOT NULL AND next_timer_at <= now()
     ORDER BY next_timer_at
-    LIMIT 100`) as { instance_id: string; body: unknown }[];
+    LIMIT 100`) as { instance_id: string; body: unknown; next_timer_at: unknown }[];
 
   const nowMs = Date.now();
   let fired = 0;
@@ -38,12 +54,22 @@ export async function drainTimers(db: SQL = sql, resolveBody: ResolveBody = () =
     // The whole per-instance body — parse, resolve, due-timer selection, and the
     // fire — is inside the boundary. The scan is ORDER BY next_timer_at, so a
     // corrupt row with the earliest due time would otherwise re-throw at the head
-    // of every pass and block every instance behind it. A skip leaves
-    // next_timer_at due, so a later pass retries — as for a lost firing race.
+    // of every pass and block every instance behind it.
+    //
+    // A skip alone is not enough: next_timer_at stays due, so an unprocessable
+    // instance would be re-selected on every pass — a permanent write loop, and,
+    // at a hundred such instances, a batch no other instance can enter. A
+    // resolver miss and a caught error therefore also push the row out of the
+    // scan for a bounded interval; a "no due timer on this instance" outcome
+    // does NOT push — that is a normal result of the scan, not a failure, and
+    // pushing it would delay a timer this same read already knows is due.
     try {
       const inst = parseInstance(row.body);
       const body = await resolveBody(inst.processId, inst.version);
-      if (!body) continue; // resolver miss: leave for a later pass
+      if (!body) {
+        await pushOutOfScan(db, row.instance_id, row.next_timer_at); // resolver miss: leave for a later pass
+        continue;
+      }
       const dueTimer = (inst.timers ?? [])
         .filter((t) => !t.fired && new Date(t.fireAt).getTime() <= nowMs)
         .sort((a, b) => ((a.fireAt as string) < (b.fireAt as string) ? -1 : 1))[0];
@@ -52,7 +78,8 @@ export async function drainTimers(db: SQL = sql, resolveBody: ResolveBody = () =
       fired++;
     } catch {
       // A lost OCC race (ConcurrencyConflict), a parse/resolve failure, or any
-      // per-instance error: skip and continue; next_timer_at stays due.
+      // per-instance error: push the row out and continue.
+      await pushOutOfScan(db, row.instance_id, row.next_timer_at).catch(() => {});
     }
   }
   return fired;
