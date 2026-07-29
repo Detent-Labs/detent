@@ -41,6 +41,10 @@ const en = {
   "error.concurrencyConflict": "This case moved on while you were working on it. Reloading.",
   "error.authorization": "You're not allowed to do that.",
   "error.generic": "Something went wrong.",
+  "error.network": "Could not reach the server. Check your connection and try again.",
+  "error.serverError": "The server hit an error. Try again.",
+  "error.retry": "Retry",
+  "error.failed": "Failed",
 } as const;
 
 const de: Record<keyof typeof en, string> = {
@@ -84,6 +88,10 @@ const de: Record<keyof typeof en, string> = {
   "error.concurrencyConflict": "Der Vorgang wurde inzwischen weiterbewegt. Wird neu geladen.",
   "error.authorization": "Das dürfen Sie nicht.",
   "error.generic": "Etwas ist schiefgelaufen.",
+  "error.network": "Der Server war nicht erreichbar. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+  "error.serverError": "Der Server hat einen Fehler gemeldet. Versuchen Sie es erneut.",
+  "error.retry": "Erneut versuchen",
+  "error.failed": "Fehlgeschlagen",
 };
 
 const catalog: Record<UiLocale, Record<keyof typeof en, string>> = { en, de };

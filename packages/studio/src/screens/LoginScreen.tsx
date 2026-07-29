@@ -2,6 +2,7 @@ import { useState } from "react";
 import { login, StudioClientError } from "../api/client.js";
 import { persistSession } from "../session.js";
 import type { Session } from "../session.js";
+import { describeCaughtError } from "../errors.js";
 
 interface LoginScreenProps {
   onLoggedIn: (session: Session) => void;
@@ -12,18 +13,24 @@ export function LoginScreen({ onLoggedIn }: LoginScreenProps) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [error, setError] = useState<string | undefined>(undefined);
 
   const submit = async () => {
     setLoading(true);
     setFailed(false);
+    setError(undefined);
     try {
       const result = await login(email, password);
       const session: Session = { token: result.token, actorId: result.actor.id, roles: result.actor.roles };
       persistSession(session);
       onLoggedIn(session);
     } catch (err) {
-      if (err instanceof StudioClientError) setFailed(true);
-      else throw err;
+      // A 401 here is a credential answer — there is no session yet to have
+      // expired, so it means "wrong email or password", not session expiry.
+      // Anything else (network down, 5xx) is a different failure and must
+      // say so rather than reusing the wrong-credentials copy.
+      if (err instanceof StudioClientError && err.status === 401) setFailed(true);
+      else setError(describeCaughtError(err));
     } finally {
       setLoading(false);
     }
@@ -51,6 +58,7 @@ export function LoginScreen({ onLoggedIn }: LoginScreenProps) {
           Sign in
         </button>
         {failed && <p className="studio-error">Incorrect email or password.</p>}
+        {error && <p className="studio-error">{error}</p>}
       </form>
     </main>
   );

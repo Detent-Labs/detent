@@ -7,6 +7,7 @@ import { InstanceScreen } from "./screens/InstanceScreen.js";
 import { OutboxScreen } from "./screens/OutboxScreen.js";
 import { TimersScreen } from "./screens/TimersScreen.js";
 import { UsersScreen } from "./screens/UsersScreen.js";
+import { ErrorBoundary } from "./ErrorBoundary.js";
 
 /** Mirrors src/auth/authorize.ts::ADMIN_ROLE — the server is the enforcement; this is presentational only (admin-app spec's "An actor without the admin role sees an explanatory empty state"). */
 const ADMIN_ROLE = "system:admin";
@@ -69,11 +70,15 @@ export function App() {
         </div>
       </header>
 
-      {route.name === "instances" && <InstancesScreen token={session.token} navigate={navigate} onUnauthorized={logout} />}
-      {route.name === "instance" && <InstanceScreen instanceId={route.instanceId} token={session.token} navigate={navigate} onUnauthorized={logout} />}
-      {route.name === "outbox" && <OutboxScreen token={session.token} onUnauthorized={logout} />}
-      {route.name === "timers" && <TimersScreen token={session.token} navigate={navigate} onUnauthorized={logout} />}
-      {route.name === "users" && <UsersScreen token={session.token} onUnauthorized={logout} />}
+      {/* Backstop for render-time throws only — see ErrorBoundary.tsx. Keyed on
+          the route so navigating away from a tripped screen recovers it. */}
+      <ErrorBoundary key={route.name}>
+        {route.name === "instances" && <InstancesScreen token={session.token} navigate={navigate} onUnauthorized={logout} />}
+        {route.name === "instance" && <InstanceScreen instanceId={route.instanceId} token={session.token} navigate={navigate} onUnauthorized={logout} />}
+        {route.name === "outbox" && <OutboxScreen token={session.token} onUnauthorized={logout} />}
+        {route.name === "timers" && <TimersScreen token={session.token} navigate={navigate} onUnauthorized={logout} />}
+        {route.name === "users" && <UsersScreen token={session.token} onUnauthorized={logout} />}
+      </ErrorBoundary>
     </div>
   );
 }

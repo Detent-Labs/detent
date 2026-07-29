@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { DraftProvider, useDraft } from "../draft/store.js";
 import { draftFields } from "../draft/fields.js";
 import type { Draft } from "../draft/types.js";
@@ -19,6 +19,7 @@ import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
 import { CanvasView } from "../canvas/CanvasView.js";
 import type { Point } from "../canvas/geometry.js";
 import { JsonView } from "../panels/JsonView.js";
+import { describeCaughtError } from "../errors.js";
 
 interface EditScreenProps {
   processId: string;
@@ -132,30 +133,63 @@ function EditorArea({ processId, token, initialRevision, initialLayout, navigate
   );
 }
 
-export function EditScreen({ processId, token, navigate, onUnauthorized }: EditScreenProps) {
-  const [record, setRecord] = useState<DraftRecord | undefined | "loading">("loading");
+/** `record`'s own discriminated shape (not `DraftRecord | undefined | "loading"`
+ * before this change) — a load failure now moves to `"error"` explicitly
+ * instead of leaving the `"loading"` sentinel in place forever with no
+ * indication anything went wrong and no way forward (spa-error-reporting
+ * spec: "A screen never renders a permanent loading state after a failure"). */
+type EditLoadState =
+  | { kind: "loading" }
+  | { kind: "not-found" }
+  | { kind: "error"; message: string }
+  | { kind: "loaded"; record: DraftRecord };
 
-  useEffect(() => {
+export function EditScreen({ processId, token, navigate, onUnauthorized }: EditScreenProps) {
+  const [state, setState] = useState<EditLoadState>({ kind: "loading" });
+
+  const load = useCallback(() => {
     let cancelled = false;
-    setRecord("loading");
+    setState({ kind: "loading" });
     getDraft(processId, token)
       .then((r) => {
-        if (!cancelled) setRecord(r);
+        if (cancelled) return;
+        setState(r ? { kind: "loaded", record: r } : { kind: "not-found" });
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        if (e instanceof StudioClientError && e.status === 401) onUnauthorized();
-        else throw e;
+        if (e instanceof StudioClientError && e.status === 401) {
+          onUnauthorized();
+          return;
+        }
+        setState({ kind: "error", message: describeCaughtError(e) });
       });
     return () => {
       cancelled = true;
     };
   }, [processId, token, onUnauthorized]);
 
-  if (record === "loading") {
+  useEffect(() => load(), [load]);
+
+  if (state.kind === "loading") {
     return <main className="studio-screen">Loading…</main>;
   }
-  if (record === undefined) {
+  if (state.kind === "error") {
+    return (
+      <main className="studio-screen">
+        <button type="button" className="studio-back" onClick={() => navigate({ name: "processes" })}>
+          ← Back to processes
+        </button>
+        <div className="studio-error-banner" role="alert">
+          <span className="studio-error-banner-stamp">{t("error.failed")}</span>
+          <span className="studio-error-banner-message">{state.message}</span>
+          <button type="button" onClick={() => load()}>
+            {t("error.retry")}
+          </button>
+        </div>
+      </main>
+    );
+  }
+  if (state.kind === "not-found") {
     return (
       <main className="studio-screen">
         <button type="button" className="studio-back" onClick={() => navigate({ name: "processes" })}>
@@ -167,12 +201,12 @@ export function EditScreen({ processId, token, navigate, onUnauthorized }: EditS
   }
 
   return (
-    <DraftProvider initial={record.body as Draft}>
+    <DraftProvider initial={state.record.body as Draft}>
       <EditorArea
         processId={processId}
         token={token}
-        initialRevision={record.revision}
-        initialLayout={record.layout}
+        initialRevision={state.record.revision}
+        initialLayout={state.record.layout}
         navigate={navigate}
         onUnauthorized={onUnauthorized}
       />

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { resolveText } from "form-ui";
 import { createInstance, listProcesses } from "../api/client.js";
 import { AppClientError } from "../api/client.js";
+import { describeCaughtError } from "../errors.js";
 import { t } from "../i18n/catalog.js";
 import type { UiLocale } from "../i18n/locale.js";
 import type { ProcessSummary } from "../api/types.js";
@@ -17,14 +18,24 @@ interface StartScreenProps {
 export function StartScreen({ token, locale, navigate, onUnauthorized }: StartScreenProps) {
   const [processes, setProcesses] = useState<ProcessSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingList, setLoadingList] = useState(false);
+  const [error, setError] = useState<string | undefined>(undefined);
 
-  useEffect(() => {
-    void listProcesses(token)
+  const load = useCallback(() => {
+    setLoadingList(true);
+    setError(undefined);
+    return listProcesses(token)
       .then(setProcesses)
       .catch((err) => {
         if (err instanceof AppClientError && err.status === 401) onUnauthorized();
-      });
-  }, [token, onUnauthorized]);
+        else setError(describeCaughtError(err, locale));
+      })
+      .finally(() => setLoadingList(false));
+  }, [token, onUnauthorized, locale]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const start = async (processId: string) => {
     setLoading(true);
@@ -33,7 +44,7 @@ export function StartScreen({ token, locale, navigate, onUnauthorized }: StartSc
       navigate({ name: "task", instanceId: created.instanceId });
     } catch (err) {
       if (err instanceof AppClientError && err.status === 401) onUnauthorized();
-      else throw err;
+      else setError(describeCaughtError(err, locale));
     } finally {
       setLoading(false);
     }
@@ -42,7 +53,16 @@ export function StartScreen({ token, locale, navigate, onUnauthorized }: StartSc
   return (
     <main className="app-screen app-start">
       <h1>{t(locale, "start.title")}</h1>
-      {processes.length === 0 && <p className="app-empty">{t(locale, "start.empty")}</p>}
+      {error && (
+        <div className="app-error-banner" role="alert">
+          <span className="app-error-banner-stamp">{t(locale, "error.failed")}</span>
+          <span className="app-error-banner-message">{error}</span>
+          <button type="button" onClick={() => void load()} disabled={loadingList}>
+            {t(locale, "error.retry")}
+          </button>
+        </div>
+      )}
+      {processes.length === 0 && !loadingList && !error && <p className="app-empty">{t(locale, "start.empty")}</p>}
       <ul className="app-process-list">
         {processes.map((p) => (
           <li key={p.processId}>

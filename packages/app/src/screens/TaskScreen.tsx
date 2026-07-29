@@ -75,7 +75,12 @@ export function TaskScreen({ instanceId, token, locale, navigate, onUnauthorized
           }
           return;
         }
-        throw err;
+        // Every network path wraps its failure as AppClientError (api/client.ts),
+        // so a value that isn't one is unexpected — but this screen still must
+        // not rethrow it out of an async callback (spa-error-reporting spec:
+        // no non-401 error escapes unhandled). Report it the same way every
+        // other case in this catch already does, via the existing outcome shape.
+        setOutcome({ kind: "explain", message: t(locale, "error.generic") });
       } finally {
         setLoading(false);
       }

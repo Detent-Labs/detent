@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useReducer, useState } from "react";
 import { useDraft } from "../draft/store.js";
 import { t } from "../i18n/catalog.js";
 import { saveDraft, getDraft, deleteDraft, publishDraft, StudioClientError } from "../api/client.js";
 import { applySaveResult, applyReload, type DraftSaveState } from "../screens/draftSaveLogic.js";
 import { isDirty } from "../screens/publishGateLogic.js";
+import { savedBodyReducer, initialSavedBody } from "../screens/draftToolbarState.js";
+import { describeCaughtError } from "../errors.js";
 import type { Draft } from "../draft/types.js";
 import type { PublishResult } from "../api/types.js";
 
@@ -27,8 +29,11 @@ export function DraftToolbar({ processId, token, saveState, onSaveState, onDisca
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The body last known to be persisted — initialized from the just-loaded draft (nothing
-  // edited yet, so "current" already equals "saved"), then advanced on every successful save.
-  const [savedBody, setSavedBody] = useState<Draft>(() => structuredClone(draft));
+  // edited yet, so "current" already equals "saved"), then advanced on every successful save
+  // and on every reload (see draftToolbarState.ts — one reducer, so both writes express the
+  // same rule instead of a copy of it that's easy to forget to update in step, as reload's
+  // originally was).
+  const [savedBody, dispatchSavedBody] = useReducer(savedBodyReducer, draft, initialSavedBody);
   const [publishing, setPublishing] = useState(false);
   const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
 
@@ -41,7 +46,7 @@ export function DraftToolbar({ processId, token, saveState, onSaveState, onDisca
         onUnauthorized();
         return;
       }
-      setError(e instanceof Error ? e.message : t("draftToolbar.operationFailed"));
+      setError(describeCaughtError(e));
     }
   };
 
@@ -50,7 +55,7 @@ export function DraftToolbar({ processId, token, saveState, onSaveState, onDisca
     setSaving(true);
     try {
       const result = await saveDraft(processId, { body: draft, layout: saveState.layout, revision: saveState.revision }, token);
-      if (result) setSavedBody(structuredClone(draft));
+      if (result) dispatchSavedBody({ kind: "saved", body: draft });
       onSaveState(applySaveResult(saveState, result));
       return result !== undefined;
     } finally {
@@ -89,7 +94,13 @@ export function DraftToolbar({ processId, token, saveState, onSaveState, onDisca
     withUnauthorized(async () => {
       const record = await getDraft(processId, token);
       if (!record) return; // draft was discarded elsewhere — nothing to reload into
-      replace(record.body as Draft);
+      const body = record.body as Draft;
+      replace(body);
+      // A reload is by definition the point where current and saved coincide
+      // (design.md) — without this, savedBody keeps pointing at the discarded
+      // local edits, so a draft byte-identical to the server's reads as dirty
+      // for the rest of the session and Publish always prompts to save first.
+      dispatchSavedBody({ kind: "reloaded", body });
       onSaveState(applyReload({ revision: record.revision, layout: record.layout }));
     });
 

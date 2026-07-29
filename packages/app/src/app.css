@@ -298,6 +298,71 @@ h2 {
   gap: var(--space-2);
 }
 
+/*
+ * Error banner: a failed request reported where the data it would have
+ * shown normally sits, not a toast. Reuses the rotated-stamp motif
+ * .app-stamp already establishes rather than inventing a second visual
+ * language. Distinct from the plain .app-error caption TaskScreen already
+ * uses for an inline outcome message — this one is for a list/action that
+ * failed outright and needs a retry, not a short explanatory line.
+ */
+.app-error-banner {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  border: 1.5px solid var(--color-danger);
+  border-radius: 2px;
+  padding: var(--space-2) var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.app-error-banner-stamp {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-danger);
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  padding: 0.1rem 0.4rem;
+  transform: rotate(-2deg);
+}
+
+.app-error-banner-message {
+  flex: 1;
+  color: var(--color-text);
+}
+
+.app-error-banner button {
+  flex: none;
+}
+
+/* Full-screen fallback for a render-time throw the ErrorBoundary catches — see ErrorBoundary.tsx for what this does and does not cover. */
+.app-boundary-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  min-height: 60vh;
+  text-align: center;
+}
+
+.app-boundary-stamp {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-danger);
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  padding: 0.2rem 0.7rem;
+  transform: rotate(-2deg);
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
