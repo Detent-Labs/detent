@@ -99,6 +99,14 @@ a CEL reference to one is a publish error (the engine resolves none). One extra 
 mapping and is never visible to guards. Use ONE CEL library for both the editor
 (parse) and the engine (evaluate) so there is no semantic drift.
 
+`@marcbachmann/cel-js` pins an exact version in `package.json` (no caret) for
+that reason. Guard evaluation is total: an evaluation error becomes `false`,
+never a throw. The transform path degrades to a recorded drop instead. An
+evaluation-semantics change in the library therefore does not crash; it
+silently reroutes or parks already-published, immutable bodies. An upgrade
+is a deliberate, reviewed commit that re-runs `test/cel.test.ts`, never an
+incidental `bun update`.
+
 **Data vs presentation.** Fields are defined once in a process-wide catalog.
 Each step carries a flat `view` that references catalog fields and overrides
 per-step presentation (visible / required / readonly / order / group). The

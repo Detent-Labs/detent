@@ -63,9 +63,15 @@ dev container (`.devcontainer/`), never on the host.
 
 ```bash
 bun install
-bun test              # bun:test suites
-bun run typecheck     # tsc --noEmit (Bun does not typecheck)
+DATABASE_URL=postgres://postgres:postgres@db:5432/workflow_engine bun test   # bun:test suites
+bun run typecheck                                                            # tsc --noEmit (Bun does not typecheck)
 ```
+
+Set `DATABASE_URL`. The database-backed suites carry `test.skipIf(!DATABASE_URL)`
+at over 500 sites — the majority of the suite. Without it they skip silently,
+not loudly. A bare `bun test` then reports a pass count that omits most of what
+the suite tests. CI (`.github/workflows/ci.yml`) fails the job outright when
+the variable is unset, for the same reason.
 
 ### Authentication configuration
 

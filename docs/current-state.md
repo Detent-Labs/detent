@@ -536,9 +536,11 @@ Stage-by-stage status is in `ROADMAP.md`.
   (and `POST /auth/login`'s response) discloses nothing about which accounts
   exist. `src/auth/login.ts::handleLogin` is the one HTTP entry point: email +
   password in, an 8-hour `iss: "bps"` token out; there is no registration,
-  password-reset, MFA, refresh or revocation. Users are administered only from
-  `src/auth/cli.ts` (`add-user` / `set-roles` / `set-password`) — no HTTP
-  route creates, modifies or lists them. The resolver-credential seam changed
+  password-reset, MFA, refresh or revocation. `src/auth/cli.ts` (`add-user` /
+  `set-roles` / `set-password`) is the only path to create a user, assign its
+  roles, or change its password. Listing users and disabling/enabling them
+  moved to HTTP. See the "Admin area (user administration)" entry below. The
+  resolver-credential seam changed
   shape: `ActorResolver`'s credential is now the request's `Headers` directly
   (`devHeaderResolver` reads `X-Actor-Id`/`X-Actor-Roles` off them itself),
   not a resolver-specific object `routes.ts::extractCredential` used to
@@ -959,3 +961,20 @@ Stage-by-stage status is in `ROADMAP.md`.
   the pure modules; the textarea/toggle wiring is untested, per this repo's
   existing convention. Tools/Player (`studio-tools-and-player`, which also
   deletes `packages/editor`) is the only remaining piece of stage 11.
+- CI (`.github/workflows/ci.yml`, `add-ci-and-dependency-hygiene`): one job,
+  triggered on every push and pull request, runs against a real `postgres:16`
+  service using the devcontainer's credentials (`postgres`/`postgres`,
+  database `workflow_engine`). Four steps run in order: install with the
+  frozen lockfile, a guard requiring `DATABASE_URL`, typecheck, then test.
+  The guard step matters most. Without it, a misconfigured job still prints a
+  green `bun test` result. It silently skips the 500+ database-backed test
+  sites that make up most of the suite. Bun installs at the Dockerfile's
+  pinned version, so CI and a local run cannot drift apart.
+<!-- antislop: allow sentence-length -->
+- Dependency-manifest fixes ride along in the same change. `zod` now lives in
+  the root's `dependencies`, not `devDependencies` as before. Six modules
+  under `src/` import it as a value, and the public schema export reaches
+  it. `packages/app` now declares it as a dependency of its own.
+  `packages/form-ui` declares it as a peer dependency, matching how it
+  already declares react. `@marcbachmann/cel-js` now pins an exact version
+  instead of a caret range — see `CLAUDE.md`'s one-CEL-library rule for why.
