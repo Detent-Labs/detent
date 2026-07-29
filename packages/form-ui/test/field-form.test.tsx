@@ -174,14 +174,99 @@ describe("FieldForm: dataSource-bound field", () => {
 });
 
 describe("FieldForm: per-field validation errors", () => {
-  it("attaches a matching issue beside its field", () => {
+  it("attaches a matching issue beside its field, as a localized message rather than the raw kind", () => {
     const issuesByField = new Map<string, SubmissionIssue[]>([["f1", [{ kind: "required-missing", fieldId: "f1" }]]]);
     const html = renderFields([{ field: baseField({ id: "f1" }), value: undefined, required: false, readonly: false }], {}, issuesByField);
-    expect(html).toContain("required-missing");
+    expect(html).toContain("form-ui-field-issues");
+    expect(html).toContain("This field is required.");
+    expect(html).not.toContain(">required-missing<");
+  });
+
+  it("falls back to the raw kind when it has no catalog entry", () => {
+    const issuesByField = new Map<string, SubmissionIssue[]>([["f1", [{ kind: "some-future-kind", fieldId: "f1" }]]]);
+    const html = renderFields([{ field: baseField({ id: "f1" }), value: undefined, required: false, readonly: false }], {}, issuesByField);
+    expect(html).toContain("some-future-kind");
   });
 
   it("renders no issue list when there are no issues for a field", () => {
     const html = renderFields([{ field: baseField({ id: "f1" }), value: undefined, required: false, readonly: false }]);
     expect(html).not.toContain("form-ui-field-issues");
+  });
+
+  it("puts the issue list as a sibling of the label, not nested inside it", () => {
+    const issuesByField = new Map<string, SubmissionIssue[]>([["f1", [{ kind: "required-missing", fieldId: "f1" }]]]);
+    const html = renderFields([{ field: baseField({ id: "f1" }), value: undefined, required: false, readonly: false }], {}, issuesByField);
+    const labelClose = html.indexOf("</label>");
+    const ulOpen = html.indexOf("<ul");
+    expect(labelClose).toBeGreaterThan(-1);
+    expect(ulOpen).toBeGreaterThan(labelClose);
+  });
+
+  it("gives the issue list an id matching the control's aria-describedby", () => {
+    const issuesByField = new Map<string, SubmissionIssue[]>([["f1", [{ kind: "required-missing", fieldId: "f1" }]]]);
+    const html = renderFields([{ field: baseField({ id: "f1" }), value: undefined, required: false, readonly: false }], {}, issuesByField);
+    expect(html).toContain('id="f1-issues"');
+    expect(html).toContain('aria-describedby="f1-issues"');
+  });
+});
+
+describe("FieldForm: required and invalid state conveyed programmatically", () => {
+  it("carries aria-required when the field is required", () => {
+    const html = renderFields([{ field: baseField({ id: "f1" }), value: undefined, required: true, readonly: false }]);
+    expect(html).toContain('aria-required="true"');
+  });
+
+  it("carries no aria-required when the field is not required", () => {
+    const html = renderFields([{ field: baseField({ id: "f1" }), value: undefined, required: false, readonly: false }]);
+    expect(html).not.toContain("aria-required");
+  });
+
+  it("never sets the native required attribute (the engine, not the browser, is the validator)", () => {
+    const html = renderFields([{ field: baseField({ id: "f1" }), value: undefined, required: true, readonly: false }]);
+    expect(html).not.toMatch(/\brequired=""/);
+    expect(html).not.toMatch(/\brequired\s/);
+  });
+
+  it("carries aria-invalid when issues are attached", () => {
+    const issuesByField = new Map<string, SubmissionIssue[]>([["f1", [{ kind: "required-missing", fieldId: "f1" }]]]);
+    const html = renderFields([{ field: baseField({ id: "f1" }), value: undefined, required: false, readonly: false }], {}, issuesByField);
+    expect(html).toContain('aria-invalid="true"');
+  });
+
+  it("carries no aria-invalid when there are no issues", () => {
+    const html = renderFields([{ field: baseField({ id: "f1" }), value: undefined, required: false, readonly: false }]);
+    expect(html).not.toContain("aria-invalid");
+  });
+
+  it("covers the group branch: a required, invalid group member gets the same attributes", () => {
+    const issuesByField = new Map<string, SubmissionIssue[]>([["f_child", [{ kind: "required-missing", fieldId: "f_child" }]]]);
+    const html = renderFields(
+      [
+        { field: baseField({ id: "f_group", key: "grp", type: "group" }), value: undefined, required: false, readonly: false },
+        {
+          field: baseField({ id: "f_child", key: "child", type: "string", label: { en: "Child" } }),
+          value: undefined,
+          required: true,
+          readonly: false,
+          group: "grp",
+        },
+      ],
+      {},
+      issuesByField,
+    );
+    expect(html).toContain('aria-required="true"');
+    expect(html).toContain('aria-invalid="true"');
+    expect(html).toContain('id="f_child-issues"');
+  });
+
+  it("covers the free-text fallback branch", () => {
+    const issuesByField = new Map<string, SubmissionIssue[]>([["f1", [{ kind: "required-missing", fieldId: "f1" }]]]);
+    const html = renderFields(
+      [{ field: baseField({ id: "f1", type: "reference" }), value: undefined, required: true, readonly: false }],
+      {},
+      issuesByField,
+    );
+    expect(html).toContain('aria-required="true"');
+    expect(html).toContain('aria-invalid="true"');
   });
 });

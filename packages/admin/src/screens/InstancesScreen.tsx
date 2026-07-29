@@ -107,8 +107,17 @@ export function InstancesScreen({ token, navigate, onUnauthorized }: InstancesSc
           </thead>
           <tbody>
             {items.map((item) => (
-              <tr key={item.instanceId} className="admin-row-clickable" onClick={() => navigate({ name: "instance", instanceId: item.instanceId })}>
-                <td>{labelText(item.processLabel, item.processBaseLocale)}</td>
+              <tr key={item.instanceId}>
+                <td>
+                  <button
+                    type="button"
+                    className="admin-row-link"
+                    aria-label={`Open instance: ${labelText(item.processLabel, item.processBaseLocale)} — ${labelText(item.stepLabel, item.processBaseLocale)} (${item.status})`}
+                    onClick={() => navigate({ name: "instance", instanceId: item.instanceId })}
+                  >
+                    {labelText(item.processLabel, item.processBaseLocale)}
+                  </button>
+                </td>
                 <td>{labelText(item.stepLabel, item.processBaseLocale)}</td>
                 <td>
                   <span className={`admin-badge admin-badge-${item.status}`}>{item.status}</span>
