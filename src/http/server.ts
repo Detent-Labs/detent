@@ -6,7 +6,7 @@
  * this file, not `routes.ts`/`errors.ts`. See design.md "Framework choice".
  */
 import { SQL } from "bun";
-import { sql } from "../engine/store.js";
+import { sql, initSchema } from "../engine/store.js";
 import { startEngine, createDefaultDataSourceRegistry } from "../engine/host.js";
 import { createRegistry, type Registry, type DataSourceRegistry } from "../engine/registry.js";
 import { devHeaderResolver, type ActorResolver } from "../auth/resolve.js";
@@ -395,7 +395,14 @@ export function createServer(
   };
 }
 
-export function startHttpServer(
+/**
+ * Async so the schema is created — `await initSchema(db)` — before
+ * `Bun.serve` starts accepting requests; a fire-and-forget call here would
+ * let requests race the DDL against a fresh database. Every statement in
+ * `initSchema` is `CREATE ... IF NOT EXISTS`, so this is a no-op against a
+ * database that already has the schema.
+ */
+export async function startHttpServer(
   registry: Registry,
   dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
@@ -404,7 +411,8 @@ export function startHttpServer(
     AUTH_ISSUERS: process.env.AUTH_ISSUERS,
     ALLOW_INSECURE_DEV_AUTH: process.env.ALLOW_INSECURE_DEV_AUTH,
   }),
-): { stop: () => void } {
+): Promise<{ stop: () => void }> {
+  await initSchema(db);
   const allowedOrigins = parseAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS);
   const fetch = createServer(dataSourceRegistry, registry, db, resolver, allowedOrigins, process.env.AUTH_JWT_SECRET);
   const port = Number(process.env.PORT ?? 3000);
@@ -420,5 +428,8 @@ export function startHttpServer(
 }
 
 if (import.meta.main) {
-  startHttpServer(createRegistry(), createDefaultDataSourceRegistry());
+  startHttpServer(createRegistry(), createDefaultDataSourceRegistry()).catch((err) => {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  });
 }

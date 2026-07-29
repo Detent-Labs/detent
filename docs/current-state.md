@@ -959,3 +959,21 @@ Stage-by-stage status is in `ROADMAP.md`.
   the pure modules; the textarea/toggle wiring is untested, per this repo's
   existing convention. Tools/Player (`studio-tools-and-player`, which also
   deletes `packages/editor`) is the only remaining piece of stage 11.
+<!-- antislop: allow sentence-length -->
+- Schema bootstrap and two missing indexes (`src/engine/store.ts`,
+  `src/http/server.ts`, `src/auth/cli.ts`,
+  `fix-schema-bootstrap-and-indexes`): `startHttpServer` now awaits
+  `initSchema(db)` before `Bun.serve` starts accepting requests, and is now
+  `async`. `bun run serve` against an empty Postgres now works, with no
+  separate setup step. `src/auth/cli.ts` calls `initSchema()` the same way
+  before dispatching a command. `add-user` now works against a fresh
+  database too. The shared client throws at construction when
+  `DATABASE_URL` is unset, naming the variable. That replaces the previous
+  deferred failure on whichever query ran first. `initSchema` gained two
+  indexes beside their siblings. `history_entries_instance_idx
+  (instance_id, transition_seq)` mirrors the index `instance_events`
+  already had; `outbox.ts::appendOutcome` and `api.ts::getInstanceRecord`
+  read it. `instances_parent_idx ((body->'parent'->>'instanceId'))` is a
+  B-tree expression index; `transition.ts::sweepCancelledChildren` and
+  `migration.ts::migrateOne` read it. Both close a sequential-scan gap the
+  function's other jsonb-nested predicates already had an index for.
