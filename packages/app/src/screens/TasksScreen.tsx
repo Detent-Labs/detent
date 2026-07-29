@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { listMyTasks } from "../api/client.js";
 import { AppClientError } from "../api/client.js";
+import { describeCaughtError } from "../errors.js";
 import { t } from "../i18n/catalog.js";
 import type { UiLocale } from "../i18n/locale.js";
 import type { InstanceSummary } from "../api/types.js";
@@ -32,38 +33,41 @@ export function TasksScreen({ token, actorId, locale, navigate, onUnauthorized }
   const [items, setItems] = useState<InstanceSummary[]>([]);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | undefined>(undefined);
   const [processFilter, setProcessFilter] = useState<string | "all">("all");
   const [sort, setSort] = useState<SortKey>("waiting");
   const [group, setGroup] = useState<GroupKey>("none");
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(undefined);
     try {
       const page = await listMyTasks(token, { limit: 200 });
       setItems(page.items);
       setCursor(page.cursor);
     } catch (err) {
       if (err instanceof AppClientError && err.status === 401) onUnauthorized();
-      else throw err;
+      else setError(describeCaughtError(err, locale));
     } finally {
       setLoading(false);
     }
-  }, [token, onUnauthorized]);
+  }, [token, onUnauthorized, locale]);
 
   const loadMore = useCallback(async () => {
     if (!cursor) return;
     setLoading(true);
+    setError(undefined);
     try {
       const page = await listMyTasks(token, { limit: 200, cursor });
       setItems((prev) => [...prev, ...page.items]);
       setCursor(page.cursor);
     } catch (err) {
       if (err instanceof AppClientError && err.status === 401) onUnauthorized();
-      else throw err;
+      else setError(describeCaughtError(err, locale));
     } finally {
       setLoading(false);
     }
-  }, [token, cursor, onUnauthorized]);
+  }, [token, cursor, onUnauthorized, locale]);
 
   useEffect(() => {
     void load();
@@ -102,7 +106,17 @@ export function TasksScreen({ token, actorId, locale, navigate, onUnauthorized }
         </button>
       </div>
 
-      {visible.length === 0 && !loading && <p className="app-empty">{t(locale, "tasks.empty")}</p>}
+      {error && (
+        <div className="app-error-banner" role="alert">
+          <span className="app-error-banner-stamp">{t(locale, "error.failed")}</span>
+          <span className="app-error-banner-message">{error}</span>
+          <button type="button" onClick={() => void load()} disabled={loading}>
+            {t(locale, "error.retry")}
+          </button>
+        </div>
+      )}
+
+      {visible.length === 0 && !loading && !error && <p className="app-empty">{t(locale, "tasks.empty")}</p>}
 
       {groups.map((g, gi) => (
         <section key={g.processId ?? gi} className="app-task-group">

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { listUsers, disableUser, enableUser, AdminClientError } from "../api/client.js";
 import type { UserSummary } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
+import { describeCaughtError } from "../errors.js";
 
 interface UsersScreenProps {
   token: string;
@@ -14,17 +15,19 @@ const DISABLE_CONFIRM =
 export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
   const [items, setItems] = useState<UserSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | undefined>(undefined);
   const [busyId, setBusyId] = useState<string | undefined>(undefined);
   const { reloadToken, refresh } = useRefresh();
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(undefined);
     try {
       const page = await listUsers(token);
       setItems(page.items);
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else throw err;
+      else setError(describeCaughtError(err));
     } finally {
       setLoading(false);
     }
@@ -43,7 +46,7 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
       refresh();
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else throw err;
+      else setError(describeCaughtError(err));
     } finally {
       setBusyId(undefined);
     }
@@ -59,7 +62,17 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
         </button>
       </div>
 
-      {items.length === 0 && !loading && <p className="admin-empty">No users.</p>}
+      {error && (
+        <div className="admin-error-banner" role="alert">
+          <span className="admin-error-banner-stamp">Failed</span>
+          <span className="admin-error-banner-message">{error}</span>
+          <button type="button" onClick={refresh} disabled={loading}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {items.length === 0 && !loading && !error && <p className="admin-empty">No users.</p>}
 
       {items.length > 0 && (
         <table className="admin-table">

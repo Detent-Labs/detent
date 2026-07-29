@@ -14,6 +14,7 @@ import { IssueList } from "./panels/shared/IssueList";
 import { LocalizedTextInput } from "./panels/shared/LocalizedTextInput";
 import { ContentLocaleSwitcher } from "./panels/shared/ContentLocaleSwitcher";
 import { GraphView } from "./graph/GraphView";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 function ProcessHeader() {
   const { draft, mutate } = useDraft();
@@ -75,15 +76,22 @@ export function App() {
           Player
         </button>
       </nav>
+      {/* One boundary per subtree (render-time throws only — see ErrorBoundary.tsx)
+          so a crash in one mode doesn't take down the other, which stays
+          mounted-but-hidden under the toggle above. */}
       <div hidden={mode !== "structure"}>
-        <DraftProvider>
-          <Editor />
-        </DraftProvider>
+        <ErrorBoundary>
+          <DraftProvider>
+            <Editor />
+          </DraftProvider>
+        </ErrorBoundary>
       </div>
       <div hidden={mode !== "player"}>
-        <PlayerProvider>
-          <PlayerView />
-        </PlayerProvider>
+        <ErrorBoundary>
+          <PlayerProvider>
+            <PlayerView />
+          </PlayerProvider>
+        </ErrorBoundary>
       </div>
     </>
   );

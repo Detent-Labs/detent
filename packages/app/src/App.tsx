@@ -7,6 +7,7 @@ import { LoginScreen } from "./screens/LoginScreen.js";
 import { TasksScreen } from "./screens/TasksScreen.js";
 import { TaskScreen } from "./screens/TaskScreen.js";
 import { StartScreen } from "./screens/StartScreen.js";
+import { ErrorBoundary } from "./ErrorBoundary.js";
 
 export function App() {
   const { route, navigate } = useRoute();
@@ -59,11 +60,15 @@ export function App() {
         </div>
       </header>
 
-      {route.name === "tasks" && (
-        <TasksScreen token={session.token} actorId={session.actorId} locale={locale} navigate={navigate} onUnauthorized={logout} />
-      )}
-      {route.name === "task" && <TaskScreen instanceId={route.instanceId} token={session.token} locale={locale} navigate={navigate} onUnauthorized={logout} />}
-      {route.name === "start" && <StartScreen token={session.token} locale={locale} navigate={navigate} onUnauthorized={logout} />}
+      {/* Backstop for render-time throws only — see ErrorBoundary.tsx. Keyed on
+          the route so navigating away from a tripped screen recovers it. */}
+      <ErrorBoundary key={route.name} locale={locale}>
+        {route.name === "tasks" && (
+          <TasksScreen token={session.token} actorId={session.actorId} locale={locale} navigate={navigate} onUnauthorized={logout} />
+        )}
+        {route.name === "task" && <TaskScreen instanceId={route.instanceId} token={session.token} locale={locale} navigate={navigate} onUnauthorized={logout} />}
+        {route.name === "start" && <StartScreen token={session.token} locale={locale} navigate={navigate} onUnauthorized={logout} />}
+      </ErrorBoundary>
     </div>
   );
 }

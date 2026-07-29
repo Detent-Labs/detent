@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { listVersions, getVersionBody, getDraft, StudioClientError } from "../api/client.js";
 import type { VersionSummary } from "../api/types.js";
 import { selectVersion, canDiff, diffJson, type VersionSelection, type DiffEntry } from "./versionDiffLogic.js";
 import type { Route } from "../routing.js";
+import { describeCaughtError } from "../errors.js";
+import { t } from "../i18n/catalog.js";
 
 interface VersionsScreenProps {
   processId: string;
@@ -18,11 +20,17 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
   const [selection, setSelection] = useState<VersionSelection>({});
   const [diff, setDiff] = useState<DiffEntry[] | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+  // Diff-action failures (shown next to the diff controls) — distinct from
+  // loadError below (the versions list itself failed to load), since
+  // conflating the two would gate the list's empty state on an unrelated
+  // diff failure and vice versa.
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | undefined>(undefined);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     let cancelled = false;
     setLoading(true);
+    setLoadError(undefined);
     Promise.all([listVersions(processId, token), getDraft(processId, token)])
       .then(([vs, draft]) => {
         if (cancelled) return;
@@ -31,8 +39,11 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        if (e instanceof StudioClientError && e.status === 401) onUnauthorized();
-        else throw e;
+        if (e instanceof StudioClientError && e.status === 401) {
+          onUnauthorized();
+          return;
+        }
+        setLoadError(describeCaughtError(e));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -41,6 +52,8 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
       cancelled = true;
     };
   }, [processId, token, onUnauthorized]);
+
+  useEffect(() => load(), [load]);
 
   const runDiff = async (a: unknown, b: unknown) => {
     setError(null);
@@ -64,7 +77,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
         onUnauthorized();
         return;
       }
-      setError(e instanceof Error ? e.message : "diff failed");
+      setError(describeCaughtError(e));
     }
   };
 
@@ -80,7 +93,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
         onUnauthorized();
         return;
       }
-      setError(e instanceof Error ? e.message : "diff failed");
+      setError(describeCaughtError(e));
     }
   };
 
@@ -90,10 +103,19 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
         ← Back to process
       </button>
       <h1>Versions</h1>
+      {loadError && (
+        <div className="studio-error-banner" role="alert">
+          <span className="studio-error-banner-stamp">{t("error.failed")}</span>
+          <span className="studio-error-banner-message">{loadError}</span>
+          <button type="button" onClick={() => load()} disabled={loading}>
+            {t("error.retry")}
+          </button>
+        </div>
+      )}
       {loading ? (
         <p className="studio-empty">Loading…</p>
       ) : versions.length === 0 ? (
-        <p className="studio-empty">No published versions yet.</p>
+        !loadError && <p className="studio-empty">No published versions yet.</p>
       ) : (
         <>
           <table className="studio-table">

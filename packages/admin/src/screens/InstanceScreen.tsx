@@ -3,6 +3,7 @@ import { cancelInstance, getInstanceRecord, getInstanceView, listPendingTimers, 
 import type { InstanceRecordElement, InstanceView, PendingTimer, VersionSummary } from "../api/types.js";
 import type { Route } from "../routing.js";
 import { useRefresh } from "../useRefresh.js";
+import { describeCaughtError } from "../errors.js";
 import { labelText } from "./instancesLogic.js";
 
 interface InstanceScreenProps {
@@ -57,11 +58,13 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
   const [recordCursor, setRecordCursor] = useState<string | undefined>(undefined);
   const [timer, setTimer] = useState<PendingTimer | undefined>(undefined);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | undefined>(undefined);
   const [cancelling, setCancelling] = useState(false);
   const { reloadToken, refresh } = useRefresh();
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(undefined);
     try {
       const v = await getInstanceView(instanceId, token);
       setView(v);
@@ -78,7 +81,7 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
       setBaseLocale(processes.find((p) => p.processId === v.processId)?.baseLocale);
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else throw err;
+      else setError(describeCaughtError(err));
     } finally {
       setLoading(false);
     }
@@ -87,13 +90,14 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
   const loadMoreRecord = useCallback(async () => {
     if (!recordCursor) return;
     setLoading(true);
+    setError(undefined);
     try {
       const rec = await getInstanceRecord(instanceId, token, { limit: RECORD_PAGE_LIMIT, cursor: recordCursor });
       setRecord((prev) => [...prev, ...rec.items]);
       setRecordCursor(rec.cursor);
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else throw err;
+      else setError(describeCaughtError(err));
     } finally {
       setLoading(false);
     }
@@ -110,7 +114,7 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
       refresh();
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else throw err;
+      else setError(describeCaughtError(err));
     } finally {
       setCancelling(false);
     }
@@ -122,7 +126,17 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
         <button type="button" className="admin-back" onClick={() => navigate({ name: "instances" })}>
           ← Instances
         </button>
-        {loading ? <p>Loading…</p> : <p className="admin-empty">Instance not found.</p>}
+        {loading && <p>Loading…</p>}
+        {!loading && error && (
+          <div className="admin-error-banner" role="alert">
+            <span className="admin-error-banner-stamp">Failed</span>
+            <span className="admin-error-banner-message">{error}</span>
+            <button type="button" onClick={refresh}>
+              Retry
+            </button>
+          </div>
+        )}
+        {!loading && !error && <p className="admin-empty">Instance not found.</p>}
       </main>
     );
   }
@@ -183,8 +197,18 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
         Refresh
       </button>
 
+      {error && (
+        <div className="admin-error-banner" role="alert">
+          <span className="admin-error-banner-stamp">Failed</span>
+          <span className="admin-error-banner-message">{error}</span>
+          <button type="button" onClick={refresh} disabled={loading}>
+            Retry
+          </button>
+        </div>
+      )}
+
       <h2>Record</h2>
-      {record.length === 0 && !loading && <p className="admin-empty">No history yet.</p>}
+      {record.length === 0 && !loading && !error && <p className="admin-empty">No history yet.</p>}
       <ul className="admin-timeline">
         {record.map((el, i) => {
           const d = describeElement(el);
