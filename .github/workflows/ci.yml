@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      # Same credentials the devcontainer's compose file uses
+      # (.devcontainer/docker-compose.yml), pointed at the postgres service
+      # below instead of the devcontainer's `db` host.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/workflow_engine
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: workflow_engine
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Bun version pinned to .devcontainer/Dockerfile's BUN_VERSION, so CI
+      # and local runs cannot drift apart.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.11"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # The DB-backed suites are `test.skipIf(!DATABASE_URL)` at 546+ sites —
+      # the majority of the suite. Without the variable `bun test` still
+      # exits 0, silently skipping them and reporting a meaningless green.
+      # This step turns that gap into a workflow failure instead of a
+      # quietly-incomplete pass.
+      - name: Guard DATABASE_URL is set
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL is unset — the database-backed test suites would silently skip instead of running." >&2
+            exit 1
+          fi
+
+      # Bun does not typecheck; a type error passes `bun test` cleanly, so
+      # this is its own step.
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun test
