@@ -1000,3 +1000,23 @@ Stage-by-stage status is in `ROADMAP.md`.
   operator are the only relationships an assignment-less step defines. A step
   that needs open-to-many submission should declare an `assignment` with a
   candidate list instead of relying on the previously-unenforced omission.
+
+<!-- antislop: allow sentence-length -->
+- Schema bootstrap and two missing indexes (`src/engine/store.ts`,
+  `src/http/server.ts`, `src/auth/cli.ts`,
+  `fix-schema-bootstrap-and-indexes`): `startHttpServer` now awaits
+  `initSchema(db)` before `Bun.serve` starts accepting requests, and is now
+  `async`. `bun run serve` against an empty Postgres now works, with no
+  separate setup step. `src/auth/cli.ts` calls `initSchema()` the same way
+  before dispatching a command. `add-user` now works against a fresh
+  database too. The shared client is a `Proxy` that constructs the real
+  client and throws, naming `DATABASE_URL`, on first use rather than at
+  module load — module-scope imports of `sql`/`initSchema` stay safe without
+  the variable set, which ~30 test files rely on. `initSchema` gained two
+  indexes beside their siblings. `history_entries_instance_idx
+  (instance_id, transition_seq)` mirrors the index `instance_events`
+  already had; `outbox.ts::appendOutcome` and `api.ts::getInstanceRecord`
+  read it. `instances_parent_idx ((body->'parent'->>'instanceId'))` is a
+  B-tree expression index; `transition.ts::sweepCancelledChildren` and
+  `migration.ts::migrateOne` read it. Both close a sequential-scan gap the
+  function's other jsonb-nested predicates already had an index for.

@@ -67,6 +67,18 @@ bun test              # bun:test suites
 bun run typecheck     # tsc --noEmit (Bun does not typecheck)
 ```
 
+`bun run serve` creates the database schema on startup if it is missing.
+Pointing it at an empty Postgres needs no separate setup step. Every DDL
+statement is `CREATE ... IF NOT EXISTS`, so this is a no-op against a
+database that already has the schema. Set `DATABASE_URL` before starting the
+process; without it, the process fails immediately and names the variable.
+
+On a deployment with meaningful existing data volume, create the two indexes
+`initSchema` adds ahead of the deploy, using `CREATE INDEX CONCURRENTLY`.
+Match the definitions in `src/engine/store.ts::initSchema` exactly. That way
+the startup call finds both indexes already there and skips them —
+`CREATE INDEX` inside `initSchema` blocks startup on a large table.
+
 ### Authentication configuration
 
 `bun run serve` refuses to start unless you configure authentication. Set one

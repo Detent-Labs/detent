@@ -53,11 +53,41 @@ is the very first thing a new deployment does — before any server has
 necessarily started — and it currently fails with a relation error. One
 `await` there makes the bootstrap sequence work in either order.
 
-**Throw at boot for a missing `DATABASE_URL`, rather than lazily.** The
+<!-- antislop: allow sentence-length run-ons passive-voice long-words filler synonym-rotation -->
+
+**Throw naming `DATABASE_URL` on first use, not at module load.** The
 current `process.env.DATABASE_URL ?? ""` produces a connection error on the
 first query, in whatever request happened to arrive first, with no mention of
-the variable. A boot-time check names it. The check belongs where the client
-is constructed, so every entry point — server, CLI, scripts — inherits it.
+the variable. `sql` is now a `Proxy` that constructs the real client — and
+throws, naming the variable, if it is unset — the first time anything calls
+or reads a property off it.
+
+<!-- antislop: allow sentence-length run-ons passive-voice long-words filler synonym-rotation -->
+
+An eager `export const sql = new SQL(requireDatabaseUrl())`, thrown from a
+plain top-level assignment, was the first attempt and was rejected: it fails
+the moment any module *imports* `store.js`, not the moment anything tries to
+use the client. Roughly 30 `bun:test` suites import `sql`/`initSchema` at
+module scope unconditionally and gate their tests with `test.skipIf(!DB)` —
+skip, not import failure, is the existing contract those suites are
+written to (see CLAUDE.md). An eager throw broke every one of them when
+`DATABASE_URL` is unset: 11 fail / 5 errors instead of a clean skip,
+confirmed by running the full suite both ways. Bun's static-import linking
+surfaces a throwing module-level initializer as a cascading
+`ReferenceError: Cannot access '<binding>' before initialization` in
+unrelated modules, not a contained failure in the throwing file — this
+gap is worse than it sounds from the description alone.
+
+<!-- antislop: allow sentence-length run-ons passive-voice long-words filler synonym-rotation -->
+
+The deferred version keeps the stated goal — a named, boot-time-clear
+failure for the two entry points that matter (server, CLI) — because
+section 1 makes `initSchema` the very first thing both of them do. Their
+first DB call, not their module load, is now "boot" in effect, so the
+observable behavior at those entry points is unchanged: fail immediately,
+before serving a request or running a command, naming the variable. A
+script or module that imports `store.js` without ever calling
+`sql`/`initSchema` no longer pays for a `DATABASE_URL` it never uses.
 
 **Mirror the sibling index exactly for `history_entries`.**
 `(instance_id, transition_seq)` covers both readers: `appendOutcome`'s

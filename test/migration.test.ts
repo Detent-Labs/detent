@@ -1339,6 +1339,24 @@ test.skipIf(!DB)("schema init is idempotent and leaves the definitions relation 
   expect(cols.map((c) => c.column_name).sort()).toEqual(["body", "definition_hash", "process_id", "published_at", "status", "version"]);
 });
 
+test.skipIf(!DB)("schema init creates the history_entries and instances parent indexes, unchanged by a second run", async () => {
+  await initSchema();
+  const before = (await sql`
+    SELECT indexname FROM pg_indexes
+    WHERE indexname IN ('history_entries_instance_idx', 'instances_parent_idx')
+    ORDER BY indexname
+  `) as { indexname: string }[];
+  expect(before.map((r) => r.indexname)).toEqual(["history_entries_instance_idx", "instances_parent_idx"]);
+
+  await initSchema(); // second run must not throw or duplicate either index
+  const after = (await sql`
+    SELECT indexname FROM pg_indexes
+    WHERE indexname IN ('history_entries_instance_idx', 'instances_parent_idx')
+    ORDER BY indexname
+  `) as { indexname: string }[];
+  expect(after).toEqual(before);
+});
+
 // =============================================================================
 // 7. Orphan-key inspection: findOrphanKeys.
 // =============================================================================
