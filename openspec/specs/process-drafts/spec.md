@@ -62,11 +62,18 @@ is a trust boundary: `body` SHALL be a JSON object (not an array, scalar or
 integer. A violation SHALL raise `RequestShapeError` (HTTP 400) and SHALL
 leave any stored draft untouched.
 
+The envelope check SHALL additionally bound the serialized size of `body` and
+`layout` together, raising `RequestShapeError` when it is exceeded. The
+previous rationale for having no draft-specific bound — that `POST /processes`
+accepts an author-supplied body without one from the same class of role-gated
+caller — no longer holds: the HTTP server now declares a
+`maxRequestBodySize` that applies to both. The draft bound exists so that the
+limit survives a caller that does not arrive over HTTP, since `drafts.ts` is a
+module boundary in its own right.
+
 The engine SHALL NOT cross-check a process id carried inside the body against
 the route parameter — `ProcessBody` declares no `processId` field, so there is
-nothing to compare. The engine SHALL NOT impose a draft-specific payload size
-limit, since `POST /processes` accepts an author-supplied body without one
-from the same class of role-gated caller.
+nothing to compare.
 
 Correctness SHALL be enforced where it already is: live in the studio's
 editing surface against the engine's own validators, and unconditionally at
@@ -96,6 +103,18 @@ No engine path other than `drafts.ts` SHALL read `drafts.body`.
 - **WHEN** a save supplies `revision` as a negative number, a non-integer or a
   non-number
 - **THEN** it raises `RequestShapeError` and the stored draft is unchanged
+
+#### Scenario: An over-size draft is refused
+
+- **WHEN** a save supplies a `body`/`layout` pair whose serialized size
+  exceeds the declared bound
+- **THEN** it raises `RequestShapeError` and the stored draft is unchanged
+
+#### Scenario: A realistic draft is unaffected by the bound
+
+- **WHEN** a draft of the size a real process definition reaches is saved
+- **THEN** it is stored normally — the bound is sized to the largest
+  plausible legitimate draft, not to typical ones
 
 ### Requirement: Layout is stored beside the body and never affects the definition hash
 
