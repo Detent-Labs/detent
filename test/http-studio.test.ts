@@ -6,7 +6,7 @@
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
-import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
+import { createRegistry, createDataSourceRegistry, register, registerDataSource } from "../src/engine/registry.js";
 import { createDefinitionStore } from "../src/engine/definitions.js";
 import { migrateInstances } from "../src/engine/migration.js";
 import { createServer } from "../src/http/server.js";
@@ -18,6 +18,8 @@ import type { ProcessId } from "../src/schema/definition.js";
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
 const dataSourceReg = createDataSourceRegistry();
+register(reg, "http.request", { handler: async () => undefined });
+registerDataSource(dataSourceReg, "static", { resolve: async () => [] });
 const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
 beforeAll(async () => {
@@ -466,4 +468,38 @@ test("OPTIONS preflight on the orphan-keys route returns 204 permitting GET", as
   const res = await fetch(new Request("http://x/processes/proc_x/versions/1/orphan-keys", { method: "OPTIONS" }));
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
+});
+
+test("OPTIONS preflight on the registry route returns 204 permitting GET", async () => {
+  const res = await fetch(new Request("http://x/registry", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
+});
+
+// ============================================================
+// GET /registry
+// ============================================================
+
+test.skipIf(!DB)("GET /registry lists the registered action and data-source type names for a developer", async () => {
+  const res = await fetch(authedReq("http://x/registry", "GET", developer));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { actionTypes: string[]; dataSourceTypes: string[] };
+  expect(body.actionTypes).toContain("http.request");
+  expect(body.dataSourceTypes).toContain("static");
+});
+
+test.skipIf(!DB)("GET /registry exposes only type names, no configSchema or config detail", async () => {
+  const res = await fetch(authedReq("http://x/registry", "GET", developer));
+  const body = (await res.json()) as Record<string, unknown>;
+  expect(Object.keys(body).sort()).toEqual(["actionTypes", "dataSourceTypes"]);
+});
+
+test.skipIf(!DB)("GET /registry without system:developer maps to 403", async () => {
+  const res = await fetch(authedReq("http://x/registry", "GET", bystander));
+  expect(res.status).toBe(403);
+});
+
+test("GET /registry with no resolvable credential is 401", async () => {
+  const res = await fetch(new Request("http://x/registry"));
+  expect(res.status).toBe(401);
 });

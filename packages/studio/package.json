@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@panzoom/panzoom": "^4.6.0",
+    "form-ui": "file:../form-ui",
     "immer": "^11.1.15",
     "react": "^18",
     "react-dom": "^18",

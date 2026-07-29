@@ -8,6 +8,10 @@ import type {
   PublishResult,
   MigrationPlan,
   OrphanKeyScan,
+  RegistryInfo,
+  InstanceView,
+  InstanceRecordPage,
+  SubmissionIssue,
 } from "./types.js";
 
 /** Same-origin by default (the app is deployed alongside its API); override
@@ -23,7 +27,7 @@ export class StudioClientError extends Error {
 }
 
 async function parseErrorBody(res: Response): Promise<ClientError> {
-  let parsed: { error?: { type?: string; message?: string } } | undefined;
+  let parsed: { error?: { type?: string; message?: string; issues?: unknown[] } } | undefined;
   try {
     parsed = (await res.json()) as typeof parsed;
   } catch {
@@ -44,6 +48,22 @@ async function parseErrorBody(res: Response): Promise<ClientError> {
       return { type: "draft-conflict", message };
     case "migration-plan":
       return { type: "migration-plan", message };
+    case "validation":
+      return { type: "validation", issues: (err.issues ?? []) as SubmissionIssue[] };
+    case "already-claimed":
+      return { type: "already-claimed", message };
+    case "not-a-candidate":
+      return { type: "not-a-candidate", message };
+    case "not-claimed":
+      return { type: "not-claimed", message };
+    case "not-claimant":
+      return { type: "not-claimant", message };
+    case "not-assigned":
+      return { type: "not-assigned", message };
+    case "guard-refused":
+      return { type: "guard-refused", message };
+    case "concurrency-conflict":
+      return { type: "concurrency-conflict" };
     default:
       return { type: "internal", message };
   }
@@ -159,4 +179,55 @@ export async function putMigrationPlan(processId: string, fromVersion: number, t
 export async function getOrphanKeys(processId: string, version: number, token: string): Promise<OrphanKeyScan> {
   const res = await request(`/processes/${encodeURIComponent(processId)}/versions/${version}/orphan-keys`, token);
   return (await res.json()) as OrphanKeyScan;
+}
+
+/** The running server's registered action-handler and data-source type names (studio-tools spec). */
+export async function getRegistry(token: string): Promise<RegistryInfo> {
+  const res = await request("/registry", token);
+  return (await res.json()) as RegistryInfo;
+}
+
+// ============================================================
+// Player (studio-player spec) — same Runtime API Layer routes
+// packages/app's TaskScreen already calls.
+// ============================================================
+
+export async function createInstance(processId: string, token: string): Promise<{ instanceId: string }> {
+  const res = await request(`/processes/${encodeURIComponent(processId)}/instances`, token, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  return (await res.json()) as { instanceId: string };
+}
+
+export async function getInstanceView(instanceId: string, token: string): Promise<InstanceView> {
+  const res = await request(`/instances/${encodeURIComponent(instanceId)}`, token);
+  return (await res.json()) as InstanceView;
+}
+
+export async function submitPath(instanceId: string, pathId: string, data: Record<string, unknown>, token: string): Promise<void> {
+  await request(`/instances/${encodeURIComponent(instanceId)}/submit`, token, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ pathId, data }),
+  });
+}
+
+export async function claimStep(instanceId: string, token: string): Promise<void> {
+  await request(`/instances/${encodeURIComponent(instanceId)}/claim`, token, { method: "POST" });
+}
+
+export async function releaseClaim(instanceId: string, token: string): Promise<void> {
+  await request(`/instances/${encodeURIComponent(instanceId)}/release`, token, { method: "POST" });
+}
+
+/** The merged transition/event record beside the Player (studio-player spec). Authorized either by `system:admin` or, additively, by `system:developer` plus having started the instance (authorization spec). */
+export async function getInstanceRecord(instanceId: string, token: string, opts: { limit?: number; cursor?: string } = {}): Promise<InstanceRecordPage> {
+  const params = new URLSearchParams();
+  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
+  if (opts.cursor !== undefined) params.set("cursor", opts.cursor);
+  const qs = params.toString();
+  const res = await request(`/instances/${encodeURIComponent(instanceId)}/record${qs ? `?${qs}` : ""}`, token);
+  return (await res.json()) as InstanceRecordPage;
 }

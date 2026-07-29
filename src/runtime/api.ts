@@ -28,7 +28,7 @@ import {
   isEligibleCandidate,
 } from "../engine/transition.js";
 import { buildGuardContext, evalGuard, type Actor } from "../cel/eval.js";
-import { requireRole, CANCEL_ANY_ROLE, ADMIN_ROLE, AuthorizationError } from "../auth/authorize.js";
+import { requireRole, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, AuthorizationError } from "../auth/authorize.js";
 import { definitionHash } from "../schema/hash.js";
 import { NotFoundError, InstanceNotRunningError } from "../errors.js";
 import { encodeCursor, decodeCursor } from "../pagination.js";
@@ -779,12 +779,34 @@ export async function listInstances(
  * instance has written nothing, so its record is an empty sequence, not an
  * error — matching `findOrphanKeys`'s and `listInstances`'s choice not to
  * invent a not-found case for a filter that simply matches nothing.
+ *
+ * Authorization mirrors `cancelInstance`'s two-path shape: `ADMIN_ROLE` is
+ * tried first and needs no instance load at all (this query never joins on
+ * `instances`); only the fallback — the caller is `DEVELOPER_ROLE` and
+ * started the instance themselves — needs `loadInstanceForRead` to learn
+ * `startedBy`. A caller satisfying neither collapses "doesn't exist" and
+ * "not mine" into the same opaque `AuthorizationError`.
  */
 export async function getInstanceRecord(
   instanceId: InstanceId,
+  actor: Actor,
   page: { limit?: number; cursor?: string } = {},
   db: SQL = sql,
 ): Promise<Page<InstanceRecordElement>> {
+  try {
+    requireRole(actor, ADMIN_ROLE);
+  } catch (err) {
+    if (!(err instanceof AuthorizationError)) throw err;
+    let instance: Instance;
+    try {
+      ({ instance } = await loadInstanceForRead(instanceId, db));
+    } catch {
+      throw new AuthorizationError(`actor '${actor.id}' may not read the record of instance '${instanceId}'`);
+    }
+    if (!actor.roles.includes(DEVELOPER_ROLE) || instance.startedBy !== actor.id) {
+      throw new AuthorizationError(`actor '${actor.id}' may not read the record of instance '${instanceId}'`);
+    }
+  }
   const limit = Math.min(page.limit ?? DEFAULT_RECORD_LIMIT, MAX_RECORD_LIMIT);
   const [cursorSeqRaw, cursorAt, cursorId] = page.cursor ? decodeCursor(page.cursor, 3) : [undefined, undefined, undefined];
   const cursorSeq = cursorSeqRaw !== undefined ? Number(cursorSeqRaw) : null;

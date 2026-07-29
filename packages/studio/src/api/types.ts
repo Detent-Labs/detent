@@ -1,6 +1,7 @@
-import type { LocalizedText, LocaleCode } from "workflow-engine/schema";
+import type { LocalizedText, LocaleCode, HistoryEntry, InstanceEvent } from "workflow-engine/schema";
+import type { ResolvedViewField, AvailablePath, SubmissionIssue } from "form-ui";
 
-export type { LocalizedText, LocaleCode };
+export type { LocalizedText, LocaleCode, HistoryEntry, InstanceEvent, ResolvedViewField, AvailablePath, SubmissionIssue };
 
 export interface Actor {
   id: string;
@@ -77,6 +78,31 @@ export interface OrphanKeyScan {
   unreadable: string[];
 }
 
+/** GET /registry's response: the running server's registered plugin type names, nothing more (studio-tools spec). */
+export interface RegistryInfo {
+  actionTypes: string[];
+  dataSourceTypes: string[];
+}
+
+/** Mirrors src/runtime/api.ts::InstanceView (studio-player spec). */
+export interface InstanceView {
+  instanceId: string;
+  processId: string;
+  version: number;
+  status: "running" | "completed" | "cancelled" | "faulted";
+  step: { id: string; key: string; label: LocalizedText; type: string };
+  fields: ResolvedViewField[];
+  availablePaths: AvailablePath[];
+}
+
+/** Mirrors src/runtime/api.ts::InstanceRecordElement. */
+export type InstanceRecordElement = { kind: "transition"; entry: HistoryEntry } | { kind: "event"; event: InstanceEvent };
+
+export interface InstanceRecordPage {
+  items: InstanceRecordElement[];
+  cursor?: string;
+}
+
 export type ClientError =
   | { type: "authorization"; message: string }
   | { type: "actor-resolution"; message: string }
@@ -84,4 +110,12 @@ export type ClientError =
   | { type: "not-found"; message: string }
   | { type: "draft-conflict"; message: string }
   | { type: "migration-plan"; message: string }
+  | { type: "validation"; issues: SubmissionIssue[] }
+  | { type: "already-claimed"; message: string }
+  | { type: "not-a-candidate"; message: string }
+  | { type: "not-claimed"; message: string }
+  | { type: "not-claimant"; message: string }
+  | { type: "not-assigned"; message: string }
+  | { type: "guard-refused"; message: string }
+  | { type: "concurrency-conflict" }
   | { type: "internal"; message: string };

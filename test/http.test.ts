@@ -20,7 +20,7 @@ import { ConcurrencyConflict } from "../src/engine/transition.js";
 import { createServer } from "../src/http/server.js";
 import { mapError } from "../src/http/errors.js";
 import { devHeaderResolver, type ActorResolver } from "../src/auth/resolve.js";
-import { PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE } from "../src/auth/authorize.js";
+import { PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE } from "../src/auth/authorize.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
@@ -208,6 +208,8 @@ const user1: Actor = { id: "user_1", roles: [] };
 const admin: Actor = { id: "user_admin", roles: [PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE] };
 /** Neither the reserved role nor (in these tests) the instance's starter — a plain third party. */
 const bystander: Actor = { id: "user_bystander", roles: [] };
+/** system:developer, no system:admin — for the record route's developer-and-starter bypass. */
+const developer: Actor = { id: "user_developer", roles: [DEVELOPER_ROLE] };
 
 // ============================================================
 // Happy path per route
@@ -1182,6 +1184,27 @@ test.skipIf(!DB)("GET /instances/:instanceId/record without system:admin maps to
   expect(res.status).toBe(403);
   const body = (await res.json()) as { error: { type: string } };
   expect(body.error.type).toBe("authorization");
+});
+
+test.skipIf(!DB)("GET /instances/:instanceId/record succeeds for the instance's own developer starter, without system:admin", async () => {
+  const PID = pid("proc_http_record_developer");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", developer))).json()) as { instanceId: string };
+  await fetch(jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", developer, { pathId: "path_ab", data: { field_amount: 10 } }));
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/record`, "GET", developer));
+  expect(res.status).toBe(200);
+  const page = (await res.json()) as { items: { kind: string }[] };
+  expect(page.items.length).toBeGreaterThan(0);
+});
+
+test.skipIf(!DB)("GET /instances/:instanceId/record is refused for a developer who did not start the instance", async () => {
+  const PID = pid("proc_http_record_developer_not_starter");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/record`, "GET", developer));
+  expect(res.status).toBe(403);
 });
 
 test.skipIf(!DB)("GET /instances/:instanceId/record with no resolvable credential is 401, whether or not the instance exists", async () => {

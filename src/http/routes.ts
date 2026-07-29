@@ -212,11 +212,10 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
 export async function handleInstanceRecord(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
-    requireRole(actor, ADMIN_ROLE);
     const url = new URL(req.url);
     const limit = parseLimit(url);
     const cursor = url.searchParams.get("cursor") ?? undefined;
-    const page = await getInstanceRecord(instanceId as InstanceId, { limit, cursor }, db);
+    const page = await getInstanceRecord(instanceId as InstanceId, actor, { limit, cursor }, db);
     return { status: 200, body: page };
   });
 }

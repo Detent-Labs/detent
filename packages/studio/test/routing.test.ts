@@ -27,6 +27,14 @@ describe("matchRoute", () => {
     });
   });
 
+  it("resolves the tools route", () => {
+    expect(matchRoute("/tools")).toEqual({ name: "tools" });
+  });
+
+  it("resolves a play route, decoding the process id", () => {
+    expect(matchRoute("/processes/proc_abc%20123/play")).toEqual({ name: "play", processId: "proc_abc 123" });
+  });
+
   it("falls back to the process list for an unrecognized path", () => {
     expect(matchRoute("/nowhere")).toEqual({ name: "processes" });
   });
@@ -40,6 +48,8 @@ describe("routePath", () => {
       { name: "edit" as const, processId: "proc_1" },
       { name: "versions" as const, processId: "proc_1" },
       { name: "migrate" as const, processId: "proc_1", from: "1", to: "2" },
+      { name: "tools" as const },
+      { name: "play" as const, processId: "proc_1" },
     ];
     for (const route of routes) expect(matchRoute(routePath(route))).toEqual(route);
   });

@@ -54,7 +54,7 @@ typecheck`, SHALL run the engine's own check and every workspace member's
   and reports no errors
 
 #### Scenario: A workspace member's type error fails the root command
-- **WHEN** `packages/editor` (or any other workspace member) has a type
+- **WHEN** `packages/studio` (or any other workspace member) has a type
   error
 - **THEN** running `bun run typecheck` from the repo root fails, even if
   the engine package's own `src`/`test` types are clean
@@ -71,7 +71,6 @@ contributors and machines:
 | `packages/app` | 5173 |
 | `packages/admin` | 5174 |
 | `packages/studio` | 5175 |
-| `packages/editor` | 5176 |
 
 Pinning alone is not sufficient: without a strict-port setting Vite silently
 serves on the next free port when the configured one is taken, which
@@ -81,14 +80,14 @@ see and act on.
 
 #### Scenario: Starting one dev server
 
-- **WHEN** a contributor runs `bun run dev` in any one of the four frontend
+- **WHEN** a contributor runs `bun run dev` in any one of the three frontend
   packages
 - **THEN** the dev server listens on that package's assigned port, and on no
   other port
 
 #### Scenario: Starting every dev server together
 
-- **WHEN** a contributor runs `bun run dev` in all four frontend packages, in
+- **WHEN** a contributor runs `bun run dev` in all three frontend packages, in
   any order
 - **THEN** each serves on its own assigned port, and no package's port
   depends on which package was started first
@@ -115,7 +114,7 @@ removed, the allowlist SHALL be updated in the same change.
 
 #### Scenario: Any frontend calls the engine from a browser
 
-- **WHEN** a browser on any of the four assigned dev origins issues a
+- **WHEN** a browser on any of the three assigned dev origins issues a
   cross-origin request to the engine running in the devcontainer
 - **THEN** the response carries `Access-Control-Allow-Origin` echoing that
   origin, along with `Vary: Origin`

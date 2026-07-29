@@ -20,8 +20,8 @@ interface Props {
 
 /**
  * Trigger type and automatic-path priority are surfaced directly, never
- * abstracted away (spec: editor-structural-panels, "wait-state and
- * guard-priority concepts").
+ * abstracted away — the wait-state and guard-priority concepts stay
+ * visible to the author.
  */
 export function PathsPanel({ paths, steps, fields, onChange }: Props) {
   const list = paths ?? [];

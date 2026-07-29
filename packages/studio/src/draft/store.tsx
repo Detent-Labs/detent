@@ -20,8 +20,8 @@ interface DraftContextValue {
   loadedChildren: Record<string, ProcessBody>;
   setChildForStep: (stepId: string, childBody: ProcessBody | undefined) => void;
   /** Which locale of the *authored process content* (label/description
-   * text) is currently shown/edited — independent of the editor's own
-   * fixed-English UI-chrome text (see editor-i18n). Ephemeral editor
+   * text) is currently shown/edited — independent of the app's own
+   * fixed-English UI-chrome text. Ephemeral editor
    * state, not persisted with the Draft. */
   contentLocale: string;
   setContentLocale: (locale: string) => void;
@@ -107,9 +107,9 @@ export function DraftProvider({ children, initial }: { children: ReactNode; init
  * The one way any panel is allowed to change the Draft (task 3.8): every
  * mutation goes through this hook's `mutate`, never through independent
  * component state that happens to shadow part of the Draft. Also the one
- * place `validation` is read from, so every panel sees the same issue list
- * (editor-live-validation spec: panels and the future graph view read off
- * one validation pass, not independently derived ones).
+ * place `validation` is read from, so every panel sees the same issue list:
+ * panels and the canvas read off one validation pass, not independently
+ * derived ones.
  */
 export function useDraft(): DraftContextValue {
   const ctx = useContext(DraftContext);

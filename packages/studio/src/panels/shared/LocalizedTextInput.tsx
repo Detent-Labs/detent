@@ -9,8 +9,8 @@ interface Props {
 }
 
 /** Edits one locale entry of a LocalizedText value at a time, bound to the
- * Draft's current content locale — independent of the editor's own
- * UI-chrome locale (editor-structural-panels spec). Writes only the
+ * Draft's current content locale — independent of the app's own
+ * UI-chrome locale. Writes only the
  * current locale's key, leaving every other locale entry untouched. */
 export function LocalizedTextInput({ value, onChange, placeholder, disabled }: Props) {
   const { contentLocale } = useDraft();

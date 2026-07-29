@@ -110,7 +110,7 @@ function contractFieldSchema(fields: FieldDef[], ids: readonly string[] | undefi
  * delivery — re-invoking the external handler on each retry before dead-lettering.
  */
 function buildEnv(
-  body: ProcessBody,
+  fields: FieldDef[],
   opts: { result: boolean; child: boolean; actor: boolean; childDataSchema?: Record<string, string> },
 ): Environment {
   const env = new Environment({ unlistedVariablesAreDyn: false });
@@ -119,7 +119,7 @@ function buildEnv(
     return env;
   }
   env
-    .registerVariable({ name: "data", schema: dataSchema(body.fields) })
+    .registerVariable({ name: "data", schema: dataSchema(fields) })
     .registerVariable({ name: "instance", schema: { ...INSTANCE_SCHEMA } });
   // `actor` is registered everywhere except the migration transform site: a
   // migration is one operator action over a whole population, so admitting `actor`
@@ -285,7 +285,7 @@ export function validateProcessBody(body: ProcessBody): CelIssue[] {
       // Every ordinary site resolves `actor`; only the migration entry point,
       // which builds its own environment, withholds it — so the cache key stays
       // two-dimensional and no cached environment changes meaning.
-      e = buildEnv(body, { result, child, actor: true });
+      e = buildEnv(body.fields, { result, child, actor: true });
       cache.set(k, e);
     }
     return e;
@@ -314,7 +314,7 @@ export function checkSubprocessChildRefs(body: ProcessBody, stepIndex: number, c
   if (!step?.subprocess) return [];
 
   const childDataSchema = contractFieldSchema(childBody.fields, childBody.contract?.outputFields);
-  const env = buildEnv(body, { result: false, child: true, actor: true, childDataSchema });
+  const env = buildEnv(body.fields, { result: false, child: true, actor: true, childDataSchema });
   const sloc = `steps[${stepIndex}]`;
   const issues: CelIssue[] = [];
 
@@ -360,7 +360,7 @@ function fieldTypeById(fields: FieldDef[], id: string): BaseFieldType | object |
  */
 export function validateMigrationSpec(spec: MigrationSpec, fromBody: ProcessBody, toBody: ProcessBody): CelIssue[] {
   const issues: CelIssue[] = [];
-  const env = buildEnv(fromBody, { result: false, child: false, actor: false });
+  const env = buildEnv(fromBody.fields, { result: false, child: false, actor: false });
   for (const [fid, expr] of Object.entries(spec.transforms ?? {})) {
     if (!expr) continue;
     const loc = `migration.transforms.${fid}`;
@@ -413,4 +413,17 @@ export function parseExpression(src: string): { ok: true } | { ok: false; messag
   } catch (err) {
     return { ok: false, message: (err as Error).message };
   }
+}
+
+/**
+ * Parse + type-check one ad-hoc expression against a stand-alone field
+ * catalog — the Studio Tools CEL scratchpad's one entry point
+ * (`studio-tools` spec). Scope is `data`/`instance`/`actor`, the same as a
+ * guard's; no `result` or `child`, since a scratchpad expression is checked
+ * in isolation, not at a specific authored site with its own scope rules.
+ */
+export function checkAgainstFields(src: string, fields: FieldDef[]): { ok: true } | { ok: false; message: string } {
+  const env = buildEnv(fields, { result: false, child: false, actor: true });
+  const issue = checkSite(env, { src, loc: "scratchpad" });
+  return issue ? { ok: false, message: issue.message } : { ok: true };
 }

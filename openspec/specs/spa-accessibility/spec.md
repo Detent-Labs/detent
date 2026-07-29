@@ -3,8 +3,8 @@
 ## Purpose
 
 Governs keyboard and assistive-technology access across the browser packages
-(`packages/app`, `packages/admin`, `packages/studio`, `packages/editor`). The
-rules here are cross-package: they hold wherever a screen offers navigation, a
+(`packages/app`, `packages/admin`, `packages/studio`). The rules here are
+cross-package: they hold wherever a screen offers navigation, a
 disclosure, or a graphical surface, rather than belonging to any one app's
 capability. Per-control rendering detail that lives inside the shared form
 renderer belongs to `form-ui`; the canvas's own parity rule belongs to

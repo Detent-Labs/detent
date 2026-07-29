@@ -25,13 +25,14 @@ import {
   InstanceNotRunningError,
   type InstanceRecordElement,
 } from "../src/runtime/api.js";
-import { ADMIN_ROLE, AuthorizationError } from "../src/auth/authorize.js";
+import { ADMIN_ROLE, DEVELOPER_ROLE, AuthorizationError } from "../src/auth/authorize.js";
 import { RequestShapeError } from "../src/errors.js";
 import type { ProcessBody, ProcessId, PathId, InstanceId, FieldId, Instance, StepId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
 const DB = !!process.env.DATABASE_URL;
 const actor: Actor = { id: "user_1", roles: [] };
+const recordAdmin: Actor = { id: "user_admin_record_reader", roles: [ADMIN_ROLE] };
 const cel = (src: string) => ({ lang: "cel", src });
 const reg = createRegistry();
 const dataSourceReg = createDataSourceRegistry();
@@ -1292,7 +1293,7 @@ test.skipIf(!DB)("listInstances with a stale but well-formed cursor is a legitim
 test.skipIf(!DB)("getInstanceRecord with a malformed cursor raises RequestShapeError", async () => {
   let raised: unknown;
   try {
-    await getInstanceRecord("inst_does_not_exist" as InstanceId, { cursor: "%%%" });
+    await getInstanceRecord("inst_does_not_exist" as InstanceId, recordAdmin, { cursor: "%%%" });
   } catch (e) {
     raised = e;
   }
@@ -1347,7 +1348,7 @@ test.skipIf(!DB)("getInstanceRecord merges transitions and events, ordered by tr
 
   const seqOf = (el: InstanceRecordElement): number => (el.kind === "transition" ? el.entry.transitionSeq : el.event.transitionSeq);
 
-  const page = await getInstanceRecord(created.instanceId);
+  const page = await getInstanceRecord(created.instanceId, recordAdmin);
   expect(page.items.length).toBeGreaterThan(0);
   expect(page.items[0]!.kind).toBe("transition");
   for (let i = 1; i < page.items.length; i++) {
@@ -1384,7 +1385,7 @@ test.skipIf(!DB)("getInstanceRecord orders two events sharing one transitionSeq 
     });
   });
 
-  const page = await getInstanceRecord(created.instanceId);
+  const page = await getInstanceRecord(created.instanceId, recordAdmin);
   const events = page.items.filter((i): i is Extract<InstanceRecordElement, { kind: "event" }> => i.kind === "event");
   expect(events.length).toBe(2);
   expect((events[0]!.event.payload as { reason: string }).reason).toBe("pending-actions");
@@ -1392,7 +1393,7 @@ test.skipIf(!DB)("getInstanceRecord orders two events sharing one transitionSeq 
 });
 
 test.skipIf(!DB)("getInstanceRecord of an unknown instance is an empty sequence, not an error", async () => {
-  const page = await getInstanceRecord("inst_does_not_exist" as InstanceId);
+  const page = await getInstanceRecord("inst_does_not_exist" as InstanceId, recordAdmin);
   expect(page.items).toEqual([]);
 });
 
@@ -1406,17 +1407,57 @@ test.skipIf(!DB)("getInstanceRecord pages, and the second page continues in the 
     cur = await submitAndTransition(cur.instanceId, "path_self" as PathId, { field_approved: false } as unknown as Instance["data"], actor, dataSourceReg);
   }
 
-  const full = await getInstanceRecord(created.instanceId, { limit: 100 });
+  const full = await getInstanceRecord(created.instanceId, recordAdmin, { limit: 100 });
   expect(full.items.length).toBe(3);
 
-  const page1 = await getInstanceRecord(created.instanceId, { limit: 2 });
+  const page1 = await getInstanceRecord(created.instanceId, recordAdmin, { limit: 2 });
   expect(page1.items.length).toBe(2);
   expect(page1.cursor).toBeDefined();
-  const page2 = await getInstanceRecord(created.instanceId, { limit: 2, cursor: page1.cursor });
+  const page2 = await getInstanceRecord(created.instanceId, recordAdmin, { limit: 2, cursor: page1.cursor });
   expect(page2.items.length).toBe(1);
   expect(page2.cursor).toBeUndefined();
   const combined = [...page1.items, ...page2.items];
   const fullKeys = full.items.map((it) => (it.kind === "transition" ? it.entry.id : it.event.id));
   const combinedKeys = combined.map((it) => (it.kind === "transition" ? it.entry.id : it.event.id));
   expect(combinedKeys).toEqual(fullKeys);
+});
+
+test.skipIf(!DB)("getInstanceRecord succeeds for a developer who started the instance, without ADMIN_ROLE", async () => {
+  const PID = pid("proc_record_developer_starter");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const developer: Actor = { id: "user_dev_record", roles: [DEVELOPER_ROLE] };
+  const created = await createProcessInstance(PID, developer, dataSourceReg);
+  await submitAndTransition(created.instanceId, "path_x" as PathId, {} as Instance["data"], developer, dataSourceReg);
+
+  const page = await getInstanceRecord(created.instanceId, developer);
+  expect(page.items.length).toBeGreaterThan(0);
+});
+
+test.skipIf(!DB)("getInstanceRecord is refused for a developer who did not start the instance", async () => {
+  const PID = pid("proc_record_developer_not_starter");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  const developer: Actor = { id: "user_dev_not_starter", roles: [DEVELOPER_ROLE] };
+
+  let raised: unknown;
+  try {
+    await getInstanceRecord(created.instanceId, developer);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(AuthorizationError);
+});
+
+test.skipIf(!DB)("getInstanceRecord is refused for a plain participant, even for an instance they started", async () => {
+  const PID = pid("proc_record_plain_starter");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+
+  let raised: unknown;
+  try {
+    await getInstanceRecord(created.instanceId, actor);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(AuthorizationError);
 });

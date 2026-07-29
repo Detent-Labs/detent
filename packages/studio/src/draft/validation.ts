@@ -28,7 +28,7 @@ export interface ValidationResult {
 
 /**
  * Runs the engine's own, unmodified publish-time validators against the
- * Draft — no second rule set (editor-live-validation spec). Zod gates
+ * Draft — no second rule set. Zod gates
  * everything else: `validateProcessBody`/`checkActionRegistry`/
  * `validateDurations` are written against a structurally-complete
  * `ProcessBody` (they walk `body.workflow.steps` etc. unconditionally), so

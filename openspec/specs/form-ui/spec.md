@@ -2,16 +2,16 @@
 
 ## Purpose
 
-Shared step-form rendering (`packages/form-ui`), consumed by both the
-editor's Player and the end-user app (`packages/app`) so that what an author
-previews is exactly what a participant gets. Owns everything visible *inside*
-a step form: field rendering per resolved `BaseFieldType`, groups/order/
-required/readonly presentation, per-field validation error display, the
-path-submit buttons, and their shared stylesheet. Source-only workspace
-package (an `exports` map pointing at `.tsx`, no build step), depending on
-`workflow-engine` for `LocalizedText`/field types but on neither consuming
-app, so the dependency direction (`app → form-ui → workflow-engine`,
-`editor → form-ui`) cannot invert.
+Shared step-form rendering (`packages/form-ui`), consumed by both
+`packages/studio`'s Player and the end-user app (`packages/app`) so that what
+an author previews is exactly what a participant gets. Owns everything
+visible *inside* a step form: field rendering per resolved `BaseFieldType`,
+groups/order/required/readonly presentation, per-field validation error
+display, the path-submit buttons, and their shared stylesheet. Source-only
+workspace package (an `exports` map pointing at `.tsx`, no build step),
+depending on `workflow-engine` for `LocalizedText`/field types but on neither
+consuming app, so the dependency direction (`app → form-ui → workflow-engine`,
+`studio → form-ui`) cannot invert.
 
 ## Requirements
 
@@ -21,13 +21,13 @@ app, so the dependency direction (`app → form-ui → workflow-engine`,
 directly at its `.tsx`/`.ts` source files, the same convention the engine
 package uses for its own exports — no bundling or compilation step between
 editing a source file and a consumer seeing the change. It SHALL depend on
-neither `packages/app` nor `packages/editor`, so the dependency direction
-(`app → form-ui → workflow-engine`, `editor → form-ui`) cannot be inverted.
+neither `packages/app` nor `packages/studio`, so the dependency direction
+(`app → form-ui → workflow-engine`, `studio → form-ui`) cannot be inverted.
 
 #### Scenario: form-ui has no application dependency
 
 - **WHEN** `packages/form-ui`'s `package.json` dependencies are inspected
-- **THEN** neither `packages/app` nor `packages/editor` appears among them
+- **THEN** neither `packages/app` nor `packages/studio` appears among them
 
 #### Scenario: A source edit is visible without a build step
 
@@ -262,15 +262,13 @@ end-user app passes its active locale).
 ### Requirement: form-ui ships one stylesheet for both consumers
 
 `form-ui` SHALL ship the CSS for everything it renders (fields, groups,
-validation errors, path buttons) as part of the package, so both the editor's
-Player and the end-user app CAN render forms with identical structure and
-identical styling — a shared component tree without a shared stylesheet would
-still let the two apps' rendering drift visually. Currently only the
-end-user app imports it (`packages/app/src/main.tsx`); the editor's Player
-renders the same `form-ui` component tree without importing
-`form-ui/form-ui.css` anywhere in `packages/editor`, so the Player's forms
-are presently unstyled — the package satisfies its half of this requirement,
-the editor does not yet satisfy the other.
+validation errors, path buttons) as part of the package, so both
+`packages/studio`'s Player and the end-user app CAN render forms with
+identical structure and identical styling — a shared component tree without
+a shared stylesheet would still let the two apps' rendering drift visually.
+Both consumers SHALL import `form-ui/form-ui.css`: the end-user app at
+`packages/app/src/main.tsx`, and `packages/studio`'s Player at its own entry
+point.
 
 #### Scenario: The end-user app imports the shared stylesheet
 
@@ -279,7 +277,7 @@ the editor does not yet satisfy the other.
 
 #### Scenario: Both consumers import the same stylesheet
 
-- **WHEN** `packages/editor` and `packages/app` each render a step form via
+- **WHEN** `packages/studio` and `packages/app` each render a step form via
   `form-ui`
 - **THEN** both import the same `form-ui`-provided stylesheet, not two
   independently maintained copies

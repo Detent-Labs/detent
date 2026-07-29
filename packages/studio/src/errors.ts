@@ -26,6 +26,24 @@ export function describeError(error: ClientError, status?: number): string {
       return t("error.draftConflict");
     case "migration-plan":
       return t("error.migrationPlan");
+    case "already-claimed":
+      return t("error.alreadyClaimed");
+    case "not-a-candidate":
+      return t("error.notACandidate");
+    case "not-claimed":
+      return t("error.notClaimed");
+    case "not-claimant":
+      return t("error.notClaimant");
+    case "not-assigned":
+      return t("error.notAssigned");
+    case "guard-refused":
+      return t("error.guardRefused");
+    case "concurrency-conflict":
+      return t("error.concurrencyConflict");
+    case "validation":
+      // form-ui's Player attaches these per-field instead — a caller reaching
+      // this case generically (not the expected path) still gets a message.
+      return t("error.requestShape");
     case "internal":
       return status === undefined ? t("error.network") : t("error.serverError");
   }

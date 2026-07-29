@@ -9,7 +9,7 @@ explicit Paths (transitions). This is NOT BPMN token flow.
 
 Three roles share one artifact, the serialized JSON process definition:
 - Engine: executes definitions (the executor).
-- Editor: produces definitions graphically (`packages/editor`).
+- Editor: produces definitions graphically (`packages/studio`).
 - Hand-authoring: definitions written directly as JSON (rare).
 
 The serialized JSON definition is the contract between engine and editor.
@@ -50,16 +50,15 @@ test/                      bun:test suites; tests run inside the container
 docs/current-state.md      per-subsystem descriptive counterpart to this file
 packages/studio/           Process Studio, the developer's product: server-persisted drafts, canvas
                             editing, panels-as-inspector, JSON surface, publish, versions+diff,
-                            migration-plan authoring (React + Vite; HTTP wrapper + exports map)
+                            migration-plan authoring, a registry/CEL-scratchpad Tools screen, and a
+                            Player beside the merged instance record (React + Vite; HTTP wrapper + exports map)
 packages/admin/            operator's product: instances, merged record, outbox, timers, users
                             (React + Vite; talks to the engine only over the HTTP wrapper)
 packages/app/              end-user app: participant-facing Login/My-tasks/Task/Start-a-process screens
                             (React + Vite; workspace package, talks to the engine only over the HTTP wrapper)
 packages/form-ui/          shared step-form renderer (source-only, no build step); consumed by both
-                            packages/editor's Player and packages/app, so what an author previews is
+                            packages/studio's Player and packages/app, so what an author previews is
                             what a participant gets
-packages/editor/           the original structural editor + read-only Mermaid graph — a proof of concept
-                            superseded by packages/studio; deleted when studio-tools-and-player lands
 ```
 
 ## The contract: load-bearing rules
@@ -341,12 +340,12 @@ See `ROADMAP.md` for stage-by-stage status (DONE/NOT STARTED) and what each stag
 ## Codebase memory (knowledge graph)
 The repo is indexed into codebase-memory-mcp (`full` mode, covering the engine,
 the Runtime API Layer, the HTTP/auth layers, and every frontend package
-(`packages/studio`, `packages/admin`, `packages/app`, `packages/form-ui`,
-`packages/editor`); `packages/*/{dist,node_modules}` excluded). Resolve the `project` arg via `list_projects` (match on root_path);
+(`packages/studio`, `packages/admin`, `packages/app`, `packages/form-ui`);
+`packages/*/{dist,node_modules}` excluded). Resolve the `project` arg via `list_projects` (match on root_path);
 the slug is machine-specific, never hardcode it. Entry points: `search_graph`
 (find symbols), `get_code_snippet` (read a body), `trace_path` (callers/callees,
 `mode=calls|data_flow|cross_service` — useful for tracing across the
-engine↔runtime↔editor/app boundary, e.g. `packages/editor` or `packages/app` ->
+engine↔runtime↔studio/app boundary, e.g. `packages/studio` or `packages/app` ->
 `workflow-engine` exports -> `src/engine/`), `query_graph` (Cypher), `get_architecture`,
 `search_code` (graph-augmented text search). Real call chains exist now — prefer
 the graph over Read/grep for "who calls X" / "what does Y touch" questions that
@@ -357,7 +356,7 @@ change lands.
 
 ## Conventions
 - TypeScript strict, ESM.
-- **UI work in `packages/editor`, `packages/app`, `packages/admin`,
+- **UI work in `packages/app`, `packages/admin`,
   `packages/studio`, or `packages/form-ui` goes through the design skills
   first.** Before implementing or reshaping any screen or component, invoke
   `/frontend-design:frontend-design` for visual direction; for UI/UX work

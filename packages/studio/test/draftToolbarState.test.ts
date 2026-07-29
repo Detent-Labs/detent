@@ -5,10 +5,9 @@ import type { Draft } from "../src/draft/types.js";
 
 /**
  * `DraftToolbar` has no interactive DOM test environment to render through
- * (this repo's only "component tests" — packages/form-ui/test/field-form.test.tsx,
- * packages/editor/test/*-rendering.test.tsx — use react-dom/server's
- * renderToStaticMarkup, which never fires an event or re-renders on state
- * change), so a real click-through conflict -> reload -> publish sequence
+ * (this repo's only "component tests" — packages/form-ui/test/field-form.test.tsx —
+ * use react-dom/server's renderToStaticMarkup, which never fires an event or
+ * re-renders on state change), so a real click-through conflict -> reload -> publish sequence
  * can't be driven directly. This is the documented fallback
  * (render-frontend-error-states design.md, task 6.4): the savedBody
  * transition is extracted into savedBodyReducer, and this test drives it

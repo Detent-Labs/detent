@@ -2,9 +2,9 @@
 
 ## Purpose
 
-Every SPA (`packages/app`, `packages/admin`, `packages/studio`,
-`packages/editor`) reaches the engine only over the HTTP wrapper, so every
-screen has a request that can fail. This capability governs what the user sees
+Every SPA (`packages/app`, `packages/admin`, `packages/studio`) reaches the
+engine only over the HTTP wrapper, so every screen has a request that can
+fail. This capability governs what the user sees
 when one does: a named failure state instead of an empty result, an indefinite
 `Loading…`, or a blank page. It covers the browser packages' rendering of
 failure; the wire shape of the errors themselves belongs to `http-wrapper`.

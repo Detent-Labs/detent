@@ -20,7 +20,7 @@ interface Props {
 
 /**
  * Shared across step onEntry/onExit/onCancel, path onPath, and timer
- * onFire.actions positions (spec: editor-structural-panels task 3.6). Never
+ * onFire.actions positions. Never
  * mutates in place — always calls `onChange` with a full new array so the
  * caller's own immer recipe stays the single source of the write.
  */

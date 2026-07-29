@@ -6,8 +6,9 @@ The developer's frontend, `packages/studio`: a workspace package mirroring
 `packages/app`'s shape (React 18, Vite 6, own build/typecheck, a hand-written
 History-API routing hook, `session.ts` for the JWT under its own storage
 key), reusing the existing login mechanism, with a role-aware shell, a
-process list merging published and draft state, and the carried-over panel
-editing surface from `packages/editor` wired to the draft routes instead of
+process list merging published and draft state, and the panel editing
+surface (originally carried over from `packages/editor`, now deleted, and
+independent of it since) wired to the draft routes instead of
 file persistence — reaching the engine exclusively through the HTTP wrapper
 at runtime and through the package's `exports` map at compile time only. See
 the `process-drafts` capability for the server-side store and routes this
@@ -30,7 +31,7 @@ feature with no endpoint behind it.
 
 Routing SHALL be a hand-written History-API hook following
 `packages/app/src/routing.ts`, with no router dependency. This change SHALL NOT
-modify `packages/editor`, `packages/app` or `packages/form-ui`.
+modify `packages/app` or `packages/form-ui`.
 
 #### Scenario: No direct data access
 
@@ -38,11 +39,24 @@ modify `packages/editor`, `packages/app` or `packages/form-ui`.
 - **THEN** it imports no database client and no engine module by deep path,
   only the exports-map entry points and its own HTTP client
 
-#### Scenario: The editor is untouched
+### Requirement: The shell routes to Tools and Player alongside the process list
 
-- **WHEN** this change is applied
-- **THEN** `packages/editor` still builds, typechecks and runs exactly as
-  before
+Studio's shell SHALL offer navigation to `/tools` (see the `studio-tools`
+capability) and to a per-process Player at `/processes/:processId/play` (see
+the `studio-player` capability), reachable the same way the process list
+already is — behind the shell's `system:developer` presentational check, with
+every route it calls enforcing the role authoritatively.
+
+#### Scenario: Tools is reachable from the shell
+
+- **WHEN** an authenticated actor holding `system:developer` uses the shell's
+  navigation
+- **THEN** a link to `/tools` is present and renders the Tools screen
+
+#### Scenario: Player is reachable from a process's edit context
+
+- **WHEN** an authenticated actor holding `system:developer` opens a process
+- **THEN** a link to that process's Player screen is present
 
 ### Requirement: Studio authenticates with the existing login and session mechanism
 

@@ -189,7 +189,8 @@ mutation logic SHALL change — only how its accordion is driven.
 The canvas SHALL support panning by dragging empty canvas space and zooming
 via scroll/wheel input, and SHALL offer a "fit to view" control that frames
 every step. This SHALL reuse `@panzoom/panzoom`, the same library
-`packages/editor`'s read-only graph view already uses for the same purpose.
+`packages/editor`'s read-only graph view used for the same purpose before
+`packages/editor` was deleted.
 
 #### Scenario: Fit to view frames all steps
 
