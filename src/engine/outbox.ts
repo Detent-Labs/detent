@@ -18,7 +18,9 @@ import { resolve, type Registry } from "./registry.js";
 import { pollForever } from "./poll.js";
 import { durationMs } from "./duration.js";
 import { evalOutput } from "../cel/eval.js";
-import type { Action, ActionOutcome } from "../schema/definition.js";
+import { collectFieldsDeep, typeMatches, type FieldId, type FieldDef, type Literal } from "../schema/definition.js";
+import type { Action, ActionOutcome, ProcessId } from "../schema/definition.js";
+import type { ResolveBody } from "./resolution.js";
 
 export const MAX_ATTEMPTS = 5;
 const BACKOFF_BASE_MS = 1000;
@@ -97,6 +99,22 @@ export const deliver: DeliverFn = async (row, registry) => {
 
 const parseAction = (a: unknown): Action => (typeof a === "string" ? JSON.parse(a) : a) as Action;
 
+/** A promise that rejects after `ms` — raced against a delivery so a hung handler cannot hang the drain pass. */
+function rejectAfter(ms: number): { promise: Promise<never>; clear: () => void } {
+  let handle: ReturnType<typeof setTimeout>;
+  const promise = new Promise<never>((_, reject) => {
+    handle = setTimeout(() => reject(new Error(`delivery exceeded the claim lease (${ms}ms)`)), ms);
+  });
+  return { promise, clear: () => clearTimeout(handle) };
+}
+
+/** Flatten a field catalog to fieldId -> FieldDef, for the writeback type check. */
+function fieldTypeById(fields: FieldDef[]): Map<string, FieldDef> {
+  const m = new Map<string, FieldDef>();
+  for (const f of collectFieldsDeep(fields)) m.set(f.id, f);
+  return m;
+}
+
 /**
  * Append one ActionOutcome to the runtime record that enqueued the action.
  *
@@ -111,7 +129,7 @@ const parseAction = (a: unknown): Action => (typeof a === "string" ? JSON.parse(
 async function appendOutcome(
   tx: SQL,
   row: ClaimedRow,
-  o: { status: ActionOutcome["status"]; attempts: number; suppressed?: boolean },
+  o: { status: ActionOutcome["status"]; attempts: number; suppressed?: boolean; droppedTargets?: FieldId[] },
 ): Promise<void> {
   const outcome: ActionOutcome = {
     actionId: row.action.id,
@@ -121,6 +139,7 @@ async function appendOutcome(
     attempts: o.attempts,
     at: new Date().toISOString(),
     ...(o.suppressed ? { suppressed: true } : {}),
+    ...(o.droppedTargets && o.droppedTargets.length > 0 ? { droppedTargets: o.droppedTargets } : {}),
   };
   if (row.event_id !== null && row.event_id !== undefined) {
     await tx`UPDATE instance_events
@@ -136,18 +155,31 @@ async function appendOutcome(
 /**
  * One drain pass. Claim due rows (fresh `pending` plus `claimed` rows past their
  * lease) `FOR UPDATE SKIP LOCKED`, commit the claim, then for each: run the
- * handler off the lock, and in a CAS-gated second transaction apply the writeback
- * + outcome + delivered mark. Returns the count delivered this pass.
+ * handler off the lock (raced against the claim lease, so a hung handler cannot
+ * hang the pass), and in a CAS-gated second transaction apply the writeback +
+ * outcome + delivered mark. Returns the count delivered this pass.
+ *
+ * `resolveBody` resolves the process body a row's `field_version` pins, so the
+ * writeback can be type-checked against the field it targets. Defaults to a
+ * miss (`() => undefined`), the same "inert until wired" default the timer and
+ * resolution workers use: a miss just skips the check for that row rather than
+ * blocking delivery, so the feature composes with every existing caller that
+ * has no store to wire in.
  */
 export async function drainOutbox(
   db: SQL = sql,
   registry: Registry = new Map(),
   deliverFn: DeliverFn = deliver,
   leaseMs: number = CLAIM_LEASE_MS,
+  resolveBody: ResolveBody = () => undefined,
 ): Promise<number> {
-  // tx1: atomically claim due rows (and re-lease stale claims). The single UPDATE
-  // is its own transaction, so the lock is released as soon as it returns.
-  const claimed = (await db`UPDATE outbox SET status = 'claimed', claimed_at = now()
+  // tx1: atomically claim due rows (and re-lease stale claims), incrementing
+  // attempts in the same UPDATE. RETURNING attempts then yields the
+  // post-increment value, so every claim — completed or abandoned — costs one
+  // attempt and the dead-letter cap is reachable even for a delivery that never
+  // reaches tx2 (a killed worker, a lease-expiry reclaim). The single UPDATE is
+  // its own transaction, so the lock is released as soon as it returns.
+  const claimed = (await db`UPDATE outbox SET status = 'claimed', claimed_at = now(), attempts = outbox.attempts + 1
     WHERE idempotency_key IN (
       SELECT idempotency_key FROM outbox
       WHERE (status = 'pending' AND next_attempt_at <= now())
@@ -168,18 +200,34 @@ export async function drainOutbox(
    // here could race the aborted tx2.
    try {
     const row: ClaimedRow = { ...raw, action: parseAction(raw.action) };
-    const attempts = row.attempts + 1;
+    // The claim UPDATE already incremented this; row.attempts IS the
+    // post-claim count, not one less than it.
+    const attempts = row.attempts;
 
-    // Run the handler off the lock. patch === undefined marks a failure;
-    // permanent distinguishes a dead-letter from a transient retry.
+    // Run the handler off the lock, raced against the claim lease: a delivery
+    // still running past its lease holds a row a peer may already have
+    // reclaimed, so completing it is unsound regardless — the race turns that
+    // into an ordinary transient failure instead of hanging this pass (and,
+    // since drainOutbox awaits the whole batch, every later row and every
+    // future poll tick) forever. Promise.race does NOT cancel deliverFn's
+    // work; releasing the underlying resource (e.g. an HTTP request) is the
+    // handler's own responsibility (see http.ts's own timeout, set well under
+    // the lease so it fires first in the ordinary case). Every state write
+    // below happens on this racing path, so the abandoned continuation —
+    // whatever it eventually resolves or rejects with — writes nothing.
+    // patch === undefined marks a failure; permanent distinguishes a
+    // dead-letter from a transient retry.
     let patch: Record<string, unknown> | undefined;
     let permanent = false;
     let failureMessage: string | undefined;
+    const deadline = rejectAfter(leaseMs);
     try {
-      patch = await deliverFn(row, registry);
+      patch = await Promise.race([deliverFn(row, registry), deadline.promise]);
     } catch (e) {
       permanent = e instanceof PermanentError;
       failureMessage = e instanceof Error ? e.message : String(e);
+    } finally {
+      deadline.clear();
     }
 
     // tx2: CAS on the claimed state. A reclaimed-then-late peer whose row is
@@ -191,12 +239,45 @@ export async function drainOutbox(
           RETURNING idempotency_key`) as unknown[];
         if (cas.length === 0) return; // already delivered by a peer
 
+        // Resolve the field catalog the writeback can be checked against: the
+        // process body pinned to this row's field_version (the version this
+        // row was enqueued against — the same value the writeback UPDATE
+        // below folds on). A resolver miss, or an instance row that has
+        // vanished, just skips the check for this row.
+        let fieldsById: Map<string, FieldDef> | undefined;
+        if (Object.keys(patch).length > 0) {
+          const pidRows = (await tx`SELECT body->>'processId' AS process_id FROM instances WHERE instance_id = ${row.instance_id}`) as
+            { process_id: string | null }[];
+          const processId = pidRows[0]?.process_id;
+          if (processId) {
+            const body = await resolveBody(processId as ProcessId, row.field_version);
+            if (body) fieldsById = fieldTypeById(body.fields);
+          }
+        }
+
         // Writeback, gated on running in the same UPDATE (no TOCTOU). Only a
         // running instance accepts a write; completed/cancelled/faulted are
         // data-immutable and suppress. fieldId is a validated field_<uuid>, so the
         // path array literal is injection-safe.
         let affected = 0;
+        const droppedTargets: FieldId[] = [];
         for (const [fid, val] of Object.entries(patch)) {
+          // A handler-supplied value faces the same type rule a participant's
+          // submitted value does (typeMatches, shared with api.ts). A
+          // mismatch — e.g. a number field handed a string — is dropped, not
+          // written: writing it would leave `data` in a state the submission
+          // validator would reject, and a guard reading that field (type-
+          // checked as the declared type at publish) would raise at
+          // evaluation and park the instance with no fault event, the
+          // silent-forever failure publish-time validation exists to
+          // prevent. An unresolved field (no store wired, or the field is
+          // not in the catalog) is not checked — see the resolver-miss note
+          // above.
+          const field = fieldsById?.get(fid);
+          if (field && !typeMatches(field.type, val as Literal)) {
+            droppedTargets.push(fid as FieldId);
+            continue;
+          }
           // [val]->0 wraps any JSON value as a proper jsonb value (a bare param
           // would land as a jsonb scalar string). fieldId is a validated
           // field_<uuid>, so the path array literal is injection-safe.
@@ -222,8 +303,15 @@ export async function drainOutbox(
             RETURNING instance_id`) as unknown[];
           affected += r.length;
         }
-        const suppressed = Object.keys(patch).length > 0 && affected === 0;
-        await appendOutcome(tx, row, { status: "succeeded", attempts, suppressed });
+        // Suppression is a fact about the WHOLE patch (a terminal or migrated
+        // instance rejected every write); a drop is a fact about ONE entry
+        // (its value did not fit the field). A patch whose entries were all
+        // dropped attempted zero UPDATEs and so must not also read as
+        // suppressed — that would misreport a type mismatch as an
+        // instance-state race.
+        const eligible = Object.keys(patch).length - droppedTargets.length;
+        const suppressed = eligible > 0 && affected === 0;
+        await appendOutcome(tx, row, { status: "succeeded", attempts, suppressed, droppedTargets });
         delivered++;
       } else if (permanent || attempts >= maxAttemptsFor(row.action)) {
         const cas = (await tx`UPDATE outbox SET status = 'dead-letter', attempts = ${attempts}, last_error = ${failureMessage ?? null}
@@ -252,6 +340,7 @@ export function startOutboxWorker(
   db: SQL = sql,
   registry: Registry = new Map(),
   intervalMs = 500,
+  resolveBody: ResolveBody = () => undefined,
 ): { stop: () => void } {
-  return pollForever(() => drainOutbox(db, registry), intervalMs);
+  return pollForever(() => drainOutbox(db, registry, deliver, CLAIM_LEASE_MS, resolveBody), intervalMs);
 }

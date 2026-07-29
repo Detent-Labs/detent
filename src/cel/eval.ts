@@ -101,33 +101,31 @@ export function buildTransformContext(fromBody: ProcessBody, snapshot: Instance)
   return { data, instance: projectInstance(snapshot) };
 }
 
-/** A `transforms` entry that produced no value for its target field, and why. */
-export type TransformDrop = { fieldId: FieldId; reason: MigrationTransformDroppedReason };
+/** A total-per-entry map evaluation dropped its target field, and why. Shared shape for `evalTransforms` and `evalFieldMap`. */
+export type MapEntryDrop = { fieldId: FieldId; reason: MigrationTransformDroppedReason };
+/** @deprecated name kept for external references predating the shared shape; identical to `MapEntryDrop`. */
+export type TransformDrop = MapEntryDrop;
 
 /**
- * Evaluate a migration spec's `transforms` over a pre-migration snapshot, returning
- * a target-FieldId → JSON-safe value patch. Total per entry (unlike evalFieldMap):
- * a transform that raises — most often reading a field the mid-flight instance never
- * wrote — leaves its target unwritten and does not fail the migration, matching guard
- * totality. Values pass through `coerceJson`, so a CEL `int` (bigint) becomes a
- * number; a bigint left in the payload would make the instance fail `instance.parse`
- * on its next read.
+ * Evaluate a target-FieldId → CEL expression map over `ctx`, total per entry:
+ * an expression that raises, or whose value cannot be made JSON-safe, leaves
+ * its target unwritten rather than failing the whole map — matching guard
+ * totality. Values pass through `coerceJson`, so a CEL `int` (bigint) becomes
+ * a number; a bigint left in the payload would make the instance fail
+ * `instance.parse` on its next read.
  *
  * The two total-failure points are distinguished in `drops`, mirroring
  * `armStepTimers`'s `{ armed, drops }`: an `evaluate()` throw is
  * `"expression-raised"`, a `coerceJson()` throw (a result too large to
- * represent as a JSON-safe number) is `"value-out-of-range"`. The caller
- * records each as a `migration.transform-dropped` event.
+ * represent as a JSON-safe number) is `"value-out-of-range"`.
  */
-export function evalTransforms(
-  spec: MigrationSpec,
-  fromBody: ProcessBody,
-  snapshot: Instance,
-): { patch: Record<string, unknown>; drops: TransformDrop[] } {
-  const ctx = buildTransformContext(fromBody, snapshot);
+function evalMapTotal(
+  entries: [string, Expression | undefined][],
+  ctx: Record<string, unknown>,
+): { patch: Record<string, unknown>; drops: MapEntryDrop[] } {
   const patch: Record<string, unknown> = {};
-  const drops: TransformDrop[] = [];
-  for (const [fid, expr] of Object.entries(spec.transforms ?? {})) {
+  const drops: MapEntryDrop[] = [];
+  for (const [fid, expr] of entries) {
     if (!expr) continue;
     let value: unknown;
     try {
@@ -143,6 +141,19 @@ export function evalTransforms(
     }
   }
   return { patch, drops };
+}
+
+/**
+ * Evaluate a migration spec's `transforms` over a pre-migration snapshot, returning
+ * a target-FieldId → JSON-safe value patch. The caller records each drop as a
+ * `migration.transform-dropped` event.
+ */
+export function evalTransforms(
+  spec: MigrationSpec,
+  fromBody: ProcessBody,
+  snapshot: Instance,
+): { patch: Record<string, unknown>; drops: TransformDrop[] } {
+  return evalMapTotal(Object.entries(spec.transforms ?? {}), buildTransformContext(fromBody, snapshot));
 }
 
 /**
@@ -198,31 +209,56 @@ function coerceJson(v: unknown): unknown {
  * Evaluate an Action.output map (target FieldId -> CEL over `result`) against a
  * handler's `result`, returning a fieldId -> JSON value patch. Values are
  * coerced JSON-safe (bigint -> number).
+ *
+ * Deliberately does NOT adopt `evalFieldMap`'s total/drop semantics: a drop
+ * here re-throws, preserving the pre-existing fail-fast behavior (the outbox
+ * treats the throw as an ordinary delivery failure — retry, eventually
+ * dead-letter). Two reasons. First, the case totality exists for does not
+ * apply here: a subprocess mapping legitimately reads a PARENT field the
+ * instance may never have written (an optional field is normal), but an
+ * Action.output expression reads only `result` — the handler's own return
+ * value — so a raise means the handler's actual return shape does not match
+ * what the action declared, a bug worth surfacing loudly. Second, the outbox
+ * writeback this feeds already has its own drop mechanism for the adjacent
+ * failure — a value that evaluates fine but does not fit its target field's
+ * declared type (the type check in outbox.ts, recorded in the
+ * `ActionOutcome`) — and growing a second, silent one here for "the
+ * expression didn't evaluate at all" would just obscure which one fired.
  */
 export function evalOutput(
   outputMap: Partial<Record<string, Expression>> | undefined,
   result: unknown,
 ): Record<string, unknown> {
-  return evalFieldMap(outputMap, buildOutputContext(result));
+  const { patch, drops } = evalFieldMap(outputMap, buildOutputContext(result));
+  if (drops.length > 0) {
+    const first = drops[0]!;
+    throw new Error(`Action.output entry for field ${first.fieldId} could not be evaluated (${first.reason})`);
+  }
+  return patch;
 }
 
 /**
  * Evaluate a target-FieldId -> CEL map against a supplied context, returning a
- * fieldId -> JSON-safe value patch (bigint -> number). The caller builds the
- * context, so this serves both the subprocess `inputMapping` (evaluated over the
- * parent's data/instance/actor, targets keyed by child fieldId) and
- * `outputMapping` (evaluated over the parent context plus the `child` namespace,
- * targets keyed by parent fieldId). Unlike a guard, a mapping is not total: an
- * unresolved reference throws, surfacing an authoring error rather than silently
- * dropping the field.
+ * fieldId -> JSON-safe value patch (bigint -> number) plus any per-entry
+ * drops. The caller builds the context, so this serves both the subprocess
+ * `inputMapping` (evaluated over the parent's data/instance/actor, targets
+ * keyed by child fieldId) and `outputMapping` (evaluated over the parent
+ * context plus the `child` namespace, targets keyed by parent fieldId), as
+ * well as `evalOutput` above.
+ *
+ * Total per entry, matching `evalTransforms`: an entry whose expression
+ * raises — most often a subprocess mapping reading a parent field the
+ * instance never wrote, the same shape a guard already tolerates — or whose
+ * value cannot be made JSON-safe leaves its target unwritten rather than
+ * failing the whole map. Nothing at publish can distinguish a field that is
+ * *declared* from one that is *always written* (the catalog has no such
+ * notion; requiredness lives per-step in the view), so fatality here would
+ * punish a legitimate authoring shape. The subprocess caller records each
+ * drop as a `mapping.entry-dropped` event.
  */
 export function evalFieldMap(
   map: Partial<Record<string, Expression>> | undefined,
   ctx: Record<string, unknown>,
-): Record<string, unknown> {
-  const patch: Record<string, unknown> = {};
-  for (const [fid, expr] of Object.entries(map ?? {})) {
-    if (expr) patch[fid] = coerceJson(evaluate(expr.src, ctx));
-  }
-  return patch;
+): { patch: Record<string, unknown>; drops: MapEntryDrop[] } {
+  return evalMapTotal(Object.entries(map ?? {}), ctx);
 }

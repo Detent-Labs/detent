@@ -8,7 +8,7 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { executeManualTransition, fireTimer, ConcurrencyConflict } from "../src/engine/transition.js";
-import { drainOutbox, MAX_ATTEMPTS, type DeliverFn } from "../src/engine/outbox.js";
+import { drainOutbox, MAX_ATTEMPTS, CLAIM_LEASE_MS, type DeliverFn } from "../src/engine/outbox.js";
 import { createRegistry, register, createDataSourceRegistry } from "../src/engine/registry.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { idempotencyKey } from "../src/engine/idempotency.js";
@@ -679,4 +679,163 @@ test.skipIf(!DB)("a later success clears a previously recorded error", async () 
   r = await rows(inst.instanceId);
   expect(r[0].status).toBe("delivered");
   expect(r[0].last_error).toBeNull();
+});
+
+// --- delivery deadline: a hung handler cannot hang the pass -------------------
+
+test.skipIf(!DB)("a handler that never settles is raced against the lease: the pass completes and the row backs off", async () => {
+  const body = threeActionBody();
+  const inst = await create();
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  // A real never-resolving promise, not a mock — Promise.race must actually
+  // race it, not merely branch on a flag.
+  const hang: DeliverFn = () => new Promise<Record<string, unknown>>(() => {});
+
+  const start = Date.now();
+  expect(await drainOutbox(sql, reg, hang, 50)).toBe(0); // raced out, nothing delivered
+  expect(Date.now() - start).toBeLessThan(2000); // bounded by the (short) lease, not hung
+
+  const r = await rows(inst.instanceId);
+  expect(r.every((x) => x.status === "pending")).toBe(true); // ordinary transient failure, not a new terminal state
+  expect(r.every((x) => x.attempts === 1)).toBe(true); // the claim itself counted the attempt
+  expect(r.every((x) => new Date(x.next_attempt_at as string).getTime() > Date.now())).toBe(true); // backed off
+
+  // The pass having completed, a later drain still runs — proving the worker
+  // itself was never stuck, only this one delivery.
+  await makeDue(inst.instanceId);
+  expect(await drainOutbox(sql, reg, okDeliver)).toBe(3);
+});
+
+test.skipIf(!DB)("unrelated rows, including an engine-internal spawn row, are delivered in the presence of a hung row", async () => {
+  const insertRow = (instanceId: string, actionId: string, actionType: string) =>
+    sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
+      VALUES (${"idem_" + actionId}, ${instanceId}, ${1}, ${actionId}, ${{ id: actionId, type: actionType, config: {} }})`;
+  // Ordered ahead (earlier created_at) of the row below — drainOutbox's claim
+  // scan is ORDER BY created_at, so without the deadline race this hung row
+  // would never let the loop reach the one after it.
+  await insertRow("inst_hang_1", "action_hang", "hang");
+  await insertRow("inst_spawn_1", "action_spawn_1", "core.spawnSubprocess");
+
+  const seam: DeliverFn = async (row) =>
+    row.action.type === "hang" ? await new Promise<Record<string, unknown>>(() => {}) : {};
+
+  expect(await drainOutbox(sql, reg, seam, 50)).toBe(1); // only the row behind the hung one
+  const statuses = (await sql`SELECT instance_id, status FROM outbox WHERE instance_id IN (${"inst_hang_1"}, ${"inst_spawn_1"})`) as
+    { instance_id: string; status: string }[];
+  const byId = Object.fromEntries(statuses.map((r) => [r.instance_id, r.status]));
+  expect(byId.inst_spawn_1).toBe("delivered"); // reached and delivered in the same pass
+  expect(byId.inst_hang_1).toBe("pending"); // backed off, not stuck
+});
+
+test.skipIf(!DB)("a claim that never reaches tx2 still costs an attempt (crashed worker / lease-expiry reclaim)", async () => {
+  const body = threeActionBody();
+  const inst = await create();
+  await executeManualTransition(inst, "path_ab", body, actor); // 3 rows, attempts=0, pending
+
+  // Simulate MAX_ATTEMPTS-1 claims that never reach tx2 — a worker dying right
+  // after the claim UPDATE, or a lease expiring mid-delivery and a peer
+  // reclaiming: applying the SAME UPDATE drainOutbox's own tx1 performs,
+  // standing in for a claim event this test never otherwise witnesses.
+  for (let i = 1; i < MAX_ATTEMPTS; i++) {
+    await sql`UPDATE outbox SET status = 'claimed', claimed_at = now() - interval '1 hour', attempts = attempts + 1
+      WHERE instance_id = ${inst.instanceId}`;
+  }
+  const before = await rows(inst.instanceId);
+  expect(before.every((x) => x.attempts === MAX_ATTEMPTS - 1 && x.status === "claimed")).toBe(true);
+
+  // A real drain reclaims the stale claim — its own tx1 increment lands
+  // attempts at MAX_ATTEMPTS — and dead-letters immediately on the failed
+  // delivery, rather than retrying further: the cap was reachable purely from
+  // claim-time increments, none of which reflect a delivery that ever ran.
+  expect(await drainOutbox(sql, reg, boom)).toBe(0);
+  const after = await rows(inst.instanceId);
+  expect(after.every((x) => x.status === "dead-letter" && x.attempts === MAX_ATTEMPTS)).toBe(true);
+});
+
+test.skipIf(!DB)("a row whose handler hangs on every attempt eventually dead-letters, via the deadline race each time", async () => {
+  const body = threeActionBody();
+  const inst = await create();
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  const hang: DeliverFn = () => new Promise<Record<string, unknown>>(() => {});
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    await makeDue(inst.instanceId); // bypass backoff to drive escalation
+    await drainOutbox(sql, reg, hang, 20); // each pass races out at the (short) lease
+  }
+  const r = await rows(inst.instanceId);
+  expect(r.every((x) => x.status === "dead-letter" && x.attempts === MAX_ATTEMPTS)).toBe(true);
+});
+
+// --- writeback type check --------------------------------------------------
+
+test.skipIf(!DB)("a handler value that doesn't match its target field's declared type is dropped, not written; delivery still succeeds", async () => {
+  const pid = "proc_typecheck" as Instance["processId"];
+  const typedBody: ProcessBody = {
+    key: "typecheck", baseLocale: "en", label: { en: "Typecheck" }, fields: [
+      { id: "field_n", key: "n", label: { en: "N" }, type: "number" },
+    ],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }] },
+        {
+          id: "step_b", key: "b", label: { en: "B" }, type: "task", // non-terminal: stays 'running', isolating the drop from terminal suppression
+          onEntry: [actOut("set_n", "setter", "field_n", "result.val")],
+          paths: [{ id: "path_bc", key: "bc", to: "step_c", trigger: "manual" }],
+        },
+        { id: "step_c", key: "c", label: { en: "C" }, type: "task", terminal: true },
+      ],
+    },
+  } as unknown as ProcessBody;
+  const pv = await publishBody(pid, typedBody, reg, dataSourceReg);
+  const store = createDefinitionStore(sql);
+  const inst = await createInstance(pv.definition, { processId: pid, version: pv.version });
+  await executeManualTransition(inst, "path_ab", pv.definition, actor);
+
+  const stringDeliver: DeliverFn = async () => ({ field_n: "5" }); // wrong type: a string for a number field
+  expect(await drainOutbox(sql, reg, stringDeliver, CLAIM_LEASE_MS, store.resolveBody)).toBe(1); // delivered, not retried
+  expect((await instData(inst.instanceId)).field_n).toBeUndefined(); // dropped, not written
+
+  const o = await outcomes(inst.instanceId);
+  expect(o).toHaveLength(1);
+  expect(o[0]).toMatchObject({ status: "succeeded" }); // the side effect already happened
+  expect(o[0].suppressed).toBeUndefined(); // a drop is not a suppression — the instance IS running, current version
+  expect(o[0].droppedTargets).toEqual(["field_n"]);
+});
+
+test.skipIf(!DB)("a mixed patch writes its conforming entries and drops only the mismatched one", async () => {
+  const pid = "proc_typecheck_mixed" as Instance["processId"];
+  const typedBody: ProcessBody = {
+    key: "typecheck_mixed", baseLocale: "en", label: { en: "Typecheck Mixed" }, fields: [
+      { id: "field_n", key: "n", label: { en: "N" }, type: "number" },
+      { id: "field_s", key: "s", label: { en: "S" }, type: "string" },
+    ],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }] },
+        {
+          id: "step_b", key: "b", label: { en: "B" }, type: "task", // non-terminal: stays 'running' so the writeback is not suppressed
+          onEntry: [{ id: "action_mix", type: "setter", config: {}, output: { field_n: { lang: "cel", src: "result.n" }, field_s: { lang: "cel", src: "result.s" } } } as unknown as Action],
+          paths: [{ id: "path_bc", key: "bc", to: "step_c", trigger: "manual" }],
+        },
+        { id: "step_c", key: "c", label: { en: "C" }, type: "task", terminal: true },
+      ],
+    },
+  } as unknown as ProcessBody;
+  const pv = await publishBody(pid, typedBody, reg, dataSourceReg);
+  const store = createDefinitionStore(sql);
+  const inst = await createInstance(pv.definition, { processId: pid, version: pv.version });
+  await executeManualTransition(inst, "path_ab", pv.definition, actor);
+
+  const mixedDeliver: DeliverFn = async () => ({ field_n: "not a number", field_s: "fine" });
+  expect(await drainOutbox(sql, reg, mixedDeliver, CLAIM_LEASE_MS, store.resolveBody)).toBe(1);
+  const data = await instData(inst.instanceId);
+  expect(data.field_n).toBeUndefined(); // dropped
+  expect(data.field_s).toBe("fine"); // written
+
+  const o = await outcomes(inst.instanceId);
+  expect(o[0].droppedTargets).toEqual(["field_n"]);
+  expect(o[0].suppressed).toBeUndefined(); // one entry landed: not a whole-patch suppression
 });
