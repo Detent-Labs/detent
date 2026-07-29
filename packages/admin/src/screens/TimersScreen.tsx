@@ -3,6 +3,7 @@ import { listPendingTimers, AdminClientError } from "../api/client.js";
 import type { PendingTimer } from "../api/types.js";
 import type { Route } from "../routing.js";
 import { useRefresh } from "../useRefresh.js";
+import { describeCaughtError } from "../errors.js";
 import { isOverdue } from "./timersLogic.js";
 
 interface TimersScreenProps {
@@ -17,17 +18,19 @@ export function TimersScreen({ token, navigate, onUnauthorized }: TimersScreenPr
   const [items, setItems] = useState<PendingTimer[]>([]);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | undefined>(undefined);
   const { reloadToken, refresh } = useRefresh();
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(undefined);
     try {
       const page = await listPendingTimers(token, { limit: PAGE_LIMIT });
       setItems(page.items);
       setCursor(page.cursor);
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else throw err;
+      else setError(describeCaughtError(err));
     } finally {
       setLoading(false);
     }
@@ -36,13 +39,14 @@ export function TimersScreen({ token, navigate, onUnauthorized }: TimersScreenPr
   const loadMore = useCallback(async () => {
     if (!cursor) return;
     setLoading(true);
+    setError(undefined);
     try {
       const page = await listPendingTimers(token, { limit: PAGE_LIMIT, cursor });
       setItems((prev) => [...prev, ...page.items]);
       setCursor(page.cursor);
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else throw err;
+      else setError(describeCaughtError(err));
     } finally {
       setLoading(false);
     }
@@ -62,7 +66,17 @@ export function TimersScreen({ token, navigate, onUnauthorized }: TimersScreenPr
         </button>
       </div>
 
-      {items.length === 0 && !loading && <p className="admin-empty">No pending timers.</p>}
+      {error && (
+        <div className="admin-error-banner" role="alert">
+          <span className="admin-error-banner-stamp">Failed</span>
+          <span className="admin-error-banner-message">{error}</span>
+          <button type="button" onClick={refresh} disabled={loading}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {items.length === 0 && !loading && !error && <p className="admin-empty">No pending timers.</p>}
 
       {items.length > 0 && (
         <table className="admin-table">

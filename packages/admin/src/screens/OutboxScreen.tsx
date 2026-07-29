@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { discardOutboxRow, listOutbox, retryOutboxRow, AdminClientError } from "../api/client.js";
 import type { OutboxRow } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
+import { describeCaughtError } from "../errors.js";
 
 interface OutboxScreenProps {
   token: string;
@@ -20,11 +21,13 @@ export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
   const [statusFilter, setStatusFilter] = useState("");
   const [instanceIdFilter, setInstanceIdFilter] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | undefined>(undefined);
   const [busyKey, setBusyKey] = useState<string | undefined>(undefined);
   const { reloadToken, refresh } = useRefresh();
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(undefined);
     try {
       const page = await listOutbox(token, {
         status: statusFilter ? [statusFilter] : undefined,
@@ -36,7 +39,7 @@ export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
       setCounts(page.counts);
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else throw err;
+      else setError(describeCaughtError(err));
     } finally {
       setLoading(false);
     }
@@ -45,6 +48,7 @@ export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
   const loadMore = useCallback(async () => {
     if (!cursor) return;
     setLoading(true);
+    setError(undefined);
     try {
       const page = await listOutbox(token, {
         status: statusFilter ? [statusFilter] : undefined,
@@ -56,7 +60,7 @@ export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
       setCursor(page.cursor);
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else throw err;
+      else setError(describeCaughtError(err));
     } finally {
       setLoading(false);
     }
@@ -74,7 +78,7 @@ export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
       refresh();
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else throw err;
+      else setError(describeCaughtError(err));
     } finally {
       setBusyKey(undefined);
     }
@@ -87,7 +91,7 @@ export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
       refresh();
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else throw err;
+      else setError(describeCaughtError(err));
     } finally {
       setBusyKey(undefined);
     }
@@ -120,7 +124,17 @@ export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
         </button>
       </div>
 
-      {items.length === 0 && !loading && <p className="admin-empty">No outbox rows match these filters.</p>}
+      {error && (
+        <div className="admin-error-banner" role="alert">
+          <span className="admin-error-banner-stamp">Failed</span>
+          <span className="admin-error-banner-message">{error}</span>
+          <button type="button" onClick={refresh} disabled={loading}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {items.length === 0 && !loading && !error && <p className="admin-empty">No outbox rows match these filters.</p>}
 
       {items.length > 0 && (
         <table className="admin-table">

@@ -1,4 +1,5 @@
 import type { ClientError } from "./api/types.js";
+import { AppClientError } from "./api/client.js";
 import { t } from "./i18n/catalog.js";
 import type { UiLocale } from "./i18n/locale.js";
 
@@ -37,4 +38,24 @@ export function describeError(error: Exclude<ClientError, { type: "validation" }
     case "internal":
       return { kind: "explain", message: error.message || t(locale, "error.generic") };
   }
+}
+
+/**
+ * Reduces any caught value to display text for screens that don't need
+ * `describeError`'s outcome-kind machinery (TasksScreen, StartScreen,
+ * LoginScreen — none of them drive a claim state machine). Deliberately
+ * separate from `describeError` rather than a thin wrapper over it: unlike
+ * that function (TaskScreen's existing template, not rewritten by this
+ * change), this one never reads `error.message` — the server does not
+ * guarantee that string is safe to show, and after
+ * `correct-api-error-responses` an unexpected 500 sends none at all.
+ */
+export function describeCaughtError(err: unknown, locale: UiLocale): string {
+  if (err instanceof AppClientError) {
+    if (err.error.type === "internal") {
+      return err.status === undefined ? t(locale, "error.network") : t(locale, "error.serverError");
+    }
+    if (err.error.type === "authorization") return t(locale, "error.authorization");
+  }
+  return t(locale, "error.generic");
 }
