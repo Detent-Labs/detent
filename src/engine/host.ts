@@ -65,7 +65,7 @@ export function startEngine(
   // dispatch core.spawnSubprocess / core.returnSubprocess like any other action.
   registerSubprocessHandlers(registry, db, resolveBody, resolveLatestByContract);
   const workers = [
-    startOutboxWorker(db, registry),
+    startOutboxWorker(db, registry, 500, resolveBody),
     startResolutionWorker(db, resolveBody),
     startTimerScheduler(db, resolveBody),
   ];

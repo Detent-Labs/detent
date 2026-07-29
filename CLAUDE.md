@@ -99,6 +99,18 @@ a CEL reference to one is a publish error (the engine resolves none). One extra 
 mapping and is never visible to guards. Use ONE CEL library for both the editor
 (parse) and the engine (evaluate) so there is no semantic drift.
 
+A guard is total: a runtime error is not a match, not a throw. The most
+common cause is a field the instance has not written yet. The path is not
+taken (the wait-state idiom).
+
+A subprocess `inputMapping`/`outputMapping` entry now agrees with that rule
+instead of contradicting it. A raising entry leaves its target unwritten. It
+does not fail the spawn or the return (see "Runtime record" below,
+`mapping.entry-dropped`). `Action.output`'s own map is the one exception, on
+purpose: it reads only `result`. A raise there means the handler's return
+does not match the action's contract. That is worth failing loudly on, not
+an unset optional field.
+
 **Data vs presentation.** Fields are defined once in a process-wide catalog.
 Each step carries a flat `view` that references catalog fields and overrides
 per-step presentation (visible / required / readonly / order / group). The
@@ -116,6 +128,14 @@ results are written back into `data` via `Action.output` (keyed by target
 FieldId, value CEL over `result`); the handler returns, the engine writes.
 Timers are first-class on the step; fire time is computed at entry and persisted.
 A timer-forced transition bypasses its target path's guard.
+
+Before an `Action.output` value lands in `data`, the outbox checks it against
+the target field's declared type — the same rule a participant's own
+submission faces. A mismatching entry is dropped, not written, and named in
+the `ActionOutcome`'s `droppedTargets`. The delivery still counts as
+succeeded, since the side effect already happened. Delivery itself is
+bounded by the outbox's own deadline, derived from its claim lease, no
+matter what the handler does. One hung delivery cannot stop the worker.
 
 **Paths.** A path has `trigger: manual | automatic` and an optional `guard`.
 A step's paths must be all-manual or all-automatic, never mixed. Among two or
@@ -174,7 +194,7 @@ no step change get a sibling record, `InstanceEvent` (append-only, `evt_` ids): 
 discriminated union over `kind` with a kind-specific payload, carrying the instance,
 the `version` and the `transitionSeq` **in force**. An event never advances the
 sequence, so several may share one and share it with a transition; they order by
-`at`. Nine kinds exist — `timer.fired` (a reminder fired: actions enqueued, no
+`at`. Ten kinds exist — `timer.fired` (a reminder fired: actions enqueued, no
 transition), `timer.unarmed` (a declared timer produced no `fireAt` at entry, with
 the reason), `migration.skipped` (an instance left on its source version, with the
 reason), `subprocess.spawn-enqueued` (creation at a subprocess initial step
@@ -186,16 +206,21 @@ could not be made JSON-safe, so its target field went unwritten; the `version` i
 carries is the TARGET version, since the `fieldId` it names is declared there),
 `assignment.claimed` (an actor claimed an unclaimed, assignment-bearing step;
 payload `{actorId}`), `assignment.released` (the claimant released their
-claim on the current step; payload `{actorId}`), and `instance.faulted` (an
+claim on the current step; payload `{actorId}`), `instance.faulted` (an
 automatic cascade re-entered a step it already entered and was parked `faulted`;
-payload `{stepId, reason}`, `stepId` the repeated step). The latter three are not
+payload `{stepId, reason}`, `stepId` the repeated step), and `mapping.entry-dropped`
+(a subprocess `inputMapping`/`outputMapping` entry raised, or its result could not
+be made JSON-safe, so its target field went unwritten; payload `{fieldId,
+direction, reason}`, `direction` `"input"` or `"output"`; recorded on the PARENT,
+since both mappings evaluate over its context, in the same transaction as the
+spawn's or the return's own commit). The latter four are not
 transition-shaped either — no step change, so no HistoryEntry and no
 `transitionSeq` advance, the same reasoning as `migration.skipped`; the flip and
 the event for `instance.faulted` commit in one transaction, guarded by the same
 OCC predicate, so a `faulted` instance cannot exist without its event.
 Kinds are added additively; the record shape is settled. A kind that enqueues
 actions carries their `ActionOutcome`s — `timer.fired` and
-`subprocess.spawn-enqueued` do, the other seven enqueue nothing and so must not
+`subprocess.spawn-enqueued` do, the other eight enqueue nothing and so must not
 invite a reader to expect outcomes.
 
 An `ActionOutcome` attaches to the record that **enqueued** the action, carried on the

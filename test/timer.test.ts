@@ -690,4 +690,81 @@ test.skipIf(!DB)("an unparseable row at the head of the timer scan does not bloc
 
   // The poison sits at the head of ORDER BY next_timer_at; the good timer still fires.
   expect(await drainTimers(sql, () => body)).toBe(1);
+  // The poison row's parse failure hit the catch boundary, which pushes it out
+  // of the scan too — not just isolates it for this one pass.
+  const poisonNext = await nextTimerAt("inst_poison");
+  expect(poisonNext).not.toBe("2019-01-01T00:00:00.000Z" as unknown);
+  expect(new Date(poisonNext!).getTime()).toBeGreaterThan(Date.now());
+});
+
+// --- progress marker: a failing instance leaves the due scan -----------------
+
+test.skipIf(!DB)("a failing timer instance is pushed out of the scan and not reselected on the next pass", async () => {
+  const body = waitTimerBody(reminderTimer);
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor); // arms timer_r1
+  await sql`UPDATE instances SET
+    body = jsonb_set(body, '{timers,0,fireAt}', '"2020-01-01T00:00:00.000Z"'::jsonb),
+    next_timer_at = '2020-01-01T00:00:00.000Z'
+    WHERE instance_id = ${inst.instanceId}`;
+
+  const before = await nextTimerAt(inst.instanceId);
+  // A resolver miss exercises the "resolver miss" push path (distinct from the
+  // generic catch boundary the poison-row test above exercises).
+  expect(await drainTimers(sql, () => undefined)).toBe(0);
+  const after = await nextTimerAt(inst.instanceId);
+  expect(after).not.toBe(before); // pushed out of the scan
+  expect(new Date(after!).getTime()).toBeGreaterThan(Date.now());
+
+  // A second pass, with a working resolver, does not reselect it: its
+  // next_timer_at is no longer due, even though the timer's own fireAt (2020)
+  // still is — proving the push, not the fireAt, is what kept it out.
+  expect(await drainTimers(sql, () => body)).toBe(0);
+});
+
+test.skipIf(!DB)("a transient fault heals on its own once the pushed interval elapses", async () => {
+  const body = waitTimerBody(reminderTimer);
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+  await sql`UPDATE instances SET
+    body = jsonb_set(body, '{timers,0,fireAt}', '"2020-01-01T00:00:00.000Z"'::jsonb),
+    next_timer_at = '2020-01-01T00:00:00.000Z'
+    WHERE instance_id = ${inst.instanceId}`;
+
+  expect(await drainTimers(sql, () => undefined)).toBe(0); // resolver miss: pushed out ~1 minute
+  // Simulate the interval having elapsed (no operator action taken): backdate
+  // the pushed next_timer_at into the past, as a later real pass would find it.
+  await sql`UPDATE instances SET next_timer_at = now() - interval '1 second' WHERE instance_id = ${inst.instanceId}`;
+
+  // The cause (an unresolvable body) has cleared — a working resolver is now
+  // supplied, standing in for the definition becoming resolvable again — and
+  // the timer fires without any operator intervening on the row itself.
+  expect(await drainTimers(sql, () => body)).toBe(1);
+  expect((await readInst(inst.instanceId)).currentStepId).toBe("step_wait"); // reminder: doesn't move
+  expect(await nextTimerAt(inst.instanceId)).toBeNull(); // fired, no other timer
+});
+
+test.skipIf(!DB)("a concurrently re-armed timer is not clobbered by the push", async () => {
+  const body = waitTimerBody(reminderTimer);
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+  await sql`UPDATE instances SET
+    body = jsonb_set(body, '{timers,0,fireAt}', '"2020-01-01T00:00:00.000Z"'::jsonb),
+    next_timer_at = '2020-01-01T00:00:00.000Z'
+    WHERE instance_id = ${inst.instanceId}`;
+
+  const REARMED = "2099-01-01T00:00:00.000Z";
+  // Stands in for "something else re-armed next_timer_at between this pass's
+  // read and its push" — the resolver call is awaited in exactly that window —
+  // then reports a miss, so drainTimers still attempts the push.
+  const rearmingResolver = async () => {
+    await sql`UPDATE instances SET next_timer_at = ${REARMED} WHERE instance_id = ${inst.instanceId}`;
+    return undefined;
+  };
+  expect(await drainTimers(sql, rearmingResolver)).toBe(0);
+
+  // The push's predicate (next_timer_at equal to the STALE 2020 value this
+  // pass observed) matched zero rows once the concurrent re-arm landed first,
+  // so the newly armed time stands, not "now + 1 minute".
+  expect(await nextTimerIso(inst.instanceId)).toBe(REARMED);
 });

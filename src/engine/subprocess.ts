@@ -97,13 +97,34 @@ export function makeSpawnHandler(
       childBody = spawnedBody;
 
       // Seed the child from inputMapping (parent context; targets keyed by child fieldId).
-      const childData = evalFieldMap(spec.inputMapping, buildGuardContext(parentBody, parent, SYSTEM_ACTOR)) as Instance["data"];
+      // A raising entry — most often reading a parent field the instance never
+      // wrote, the ordinary case for an optional field — is total: it is
+      // omitted rather than failing the spawn, and recorded on the PARENT.
+      const { patch: childData, drops: inputDrops } = evalFieldMap(spec.inputMapping, buildGuardContext(parentBody, parent, SYSTEM_ACTOR));
+      const droppedAt = new Date().toISOString();
+      const dropEvents: InstanceEvent[] = inputDrops.map((d) => ({
+        id: newInstanceEventId(),
+        instanceId: parent.instanceId,
+        transitionSeq: parent.transitionSeq,
+        version: parent.version,
+        kind: "mapping.entry-dropped",
+        payload: { fieldId: d.fieldId, direction: "input", reason: d.reason },
+        at: droppedAt,
+      }));
 
-      child = await createInstance(
-        childBody,
-        { processId: spec.processId, version: childVersion, instanceId: childId, data: childData, parent: { instanceId: parentId, stepId: subprocessStepId as StepId } },
-        db,
-      );
+      // The drop events land on the parent in the same transaction as the
+      // child's creation: withTransaction nests as a savepoint inside
+      // createInstance's own transaction when `db` is already one (see
+      // store.ts::withTransaction), so both commit or roll back together.
+      child = await withTransaction(db, async (tx) => {
+        const created = await createInstance(
+          childBody,
+          { processId: spec.processId, version: childVersion, instanceId: childId, data: childData as Instance["data"], parent: { instanceId: parentId, stepId: subprocessStepId as StepId } },
+          tx,
+        );
+        for (const event of dropEvents) await appendInstanceEvent(tx, event);
+        return created;
+      });
     }
 
     // Run the child to rest — it may immediately reach a terminal outcome, which
@@ -185,7 +206,23 @@ export function makeReturnHandler(
       const child = { outcome: childOutcome, data: buildGuardContext(childBody, childInst, SYSTEM_ACTOR).data };
 
       // outputMapping: parent context + child namespace -> parent data patch.
-      const patch = evalFieldMap(step.subprocess.outputMapping, { ...buildGuardContext(parentBody, parent, SYSTEM_ACTOR), child });
+      // Total per entry, like inputMapping: a raising entry is omitted, not
+      // fatal, and recorded on the parent in this same locked transaction.
+      const { patch, drops: outputDrops } = evalFieldMap(step.subprocess.outputMapping, { ...buildGuardContext(parentBody, parent, SYSTEM_ACTOR), child });
+      if (outputDrops.length > 0) {
+        const droppedAt = new Date().toISOString();
+        for (const d of outputDrops) {
+          await appendInstanceEvent(tx, {
+            id: newInstanceEventId(),
+            instanceId: parent.instanceId,
+            transitionSeq: parent.transitionSeq,
+            version: parent.version,
+            kind: "mapping.entry-dropped",
+            payload: { fieldId: d.fieldId, direction: "output", reason: d.reason },
+            at: droppedAt,
+          });
+        }
+      }
 
       // Persist the writeback into parent data. The `currentStepId` gate is
       // redundant under the lock and kept as a belt — it costs nothing.
