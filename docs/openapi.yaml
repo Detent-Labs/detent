@@ -5,8 +5,9 @@ info:
   description: >-
     The customer-facing HTTP surface of the workflow/BPM engine: login,
     process publish/list/versions, and the full instance lifecycle
-    (create, view, submit, claim/release/delegate, comment, cancel, and
-    the audit record). Excludes `admin/*`, `drafts/*`, `migration-plans/*`,
+    (create, view, submit, claim/release/delegate, comment, attach a
+    file, cancel, and the audit record). Excludes `admin/*`, `drafts/*`,
+    `migration-plans/*`,
     and `registry`, which serve the operator (`packages/admin`) and
     developer (`packages/studio`) frontends directly, not a customer
     integration.
@@ -586,6 +587,149 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
+  /instances/{instanceId}/attachments:
+    post:
+      tags: [instances]
+      operationId: uploadInstanceAttachment
+      summary: Upload a file attachment to an instance
+      description: >-
+        No reserved-role requirement; the same participant-visibility
+        rule as `GET /instances/{instanceId}` governs who may upload.
+        Visible independent of claim state. `dataBase64` is the file's
+        bytes, base64-encoded — there is no multipart upload path.
+        `filename`/`contentType` are capped at 255 characters each; the
+        decoded payload is capped at `MAX_ATTACHMENT_BYTES`
+        (environment-configured, default 5 MB).
+      parameters:
+        - $ref: "#/components/parameters/instanceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttachmentUploadRequest"
+      responses:
+        "201":
+          description: Created. The response body never carries the file's bytes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstanceAttachment"
+        "400":
+          description: >-
+            Request body is not valid JSON; is missing `filename`,
+            `contentType`, or `dataBase64`; `filename`/`contentType`
+            exceeds 255 characters; or the decoded payload exceeds
+            `MAX_ATTACHMENT_BYTES`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: The actor is neither admin, starter, claimant, nor an eligible candidate.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: The instance does not exist. Also covers any unrecognized server-side failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    get:
+      tags: [instances]
+      operationId: listInstanceAttachments
+      summary: List an instance's attachments, oldest first
+      description: >-
+        Same participant-visibility rule as uploading. Metadata only —
+        no item carries the file's bytes; fetch those from
+        `GET /instances/{instanceId}/attachments/{attachmentId}`.
+      parameters:
+        - $ref: "#/components/parameters/instanceId"
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstanceAttachmentPage"
+        "400":
+          description: An invalid `limit` value.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: The actor is neither admin, starter, claimant, nor an eligible candidate.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: The instance does not exist. Also covers any unrecognized server-side failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /instances/{instanceId}/attachments/{attachmentId}:
+    get:
+      tags: [instances]
+      operationId: downloadInstanceAttachment
+      summary: Download one attachment's raw bytes
+      description: >-
+        Same participant-visibility rule as uploading. Unlike every
+        other route in this document, a successful response is not a
+        JSON envelope: the body is the raw file, with `Content-Type`
+        set to the attachment's stored `contentType`.
+      parameters:
+        - $ref: "#/components/parameters/instanceId"
+        - $ref: "#/components/parameters/attachmentId"
+      responses:
+        "200":
+          description: OK. The raw file bytes, not a JSON envelope.
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: The actor is neither admin, starter, claimant, nor an eligible candidate.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: >-
+            The attachment does not exist, or belongs to a different
+            instance than `instanceId`. Also covers any unrecognized
+            server-side failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
   /instances/{instanceId}/cancel:
     post:
       tags: [instances]
@@ -707,6 +851,12 @@ components:
         type: string
     instanceId:
       name: instanceId
+      in: path
+      required: true
+      schema:
+        type: string
+    attachmentId:
+      name: attachmentId
       in: path
       required: true
       schema:
@@ -931,6 +1081,55 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/InstanceComment"
+        cursor:
+          type: string
+      required: [items]
+
+    AttachmentUploadRequest:
+      type: object
+      properties:
+        filename:
+          type: string
+          minLength: 1
+          maxLength: 255
+        contentType:
+          type: string
+          minLength: 1
+          maxLength: 255
+        dataBase64:
+          type: string
+          minLength: 1
+          description: The file's bytes, base64-encoded.
+      required: [filename, contentType, dataBase64]
+
+    InstanceAttachment:
+      type: object
+      description: Metadata only — never the file's bytes.
+      properties:
+        id:
+          type: string
+        instanceId:
+          type: string
+        actorId:
+          type: string
+        filename:
+          type: string
+        contentType:
+          type: string
+        sizeBytes:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, instanceId, actorId, filename, contentType, sizeBytes, createdAt]
+
+    InstanceAttachmentPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InstanceAttachment"
         cursor:
           type: string
       required: [items]

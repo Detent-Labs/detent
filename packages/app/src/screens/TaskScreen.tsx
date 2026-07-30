@@ -1,13 +1,38 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FieldForm, PathButtons, filterToEditable } from "form-ui";
 import type { SubmissionIssue } from "form-ui";
-import { cancelInstance, claim, delegate, getInstanceView, listComments, postComment, release, submitPath } from "../api/client.js";
+import {
+  cancelInstance,
+  claim,
+  delegate,
+  downloadAttachment,
+  getInstanceView,
+  listAttachments,
+  listComments,
+  postComment,
+  release,
+  submitPath,
+  uploadAttachment,
+} from "../api/client.js";
 import { AppClientError } from "../api/client.js";
 import { describeError, type ErrorOutcome } from "../errors.js";
 import { t } from "../i18n/catalog.js";
 import type { UiLocale } from "../i18n/locale.js";
-import type { InstanceComment, InstanceView } from "../api/types.js";
+import type { InstanceAttachment, InstanceComment, InstanceView } from "../api/types.js";
 import type { Route } from "../routing.js";
+
+/** `FileReader.readAsDataURL`'s result is `data:<mime>;base64,<data>` — only the part after the comma is the base64 payload the upload route expects. */
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.slice(result.indexOf(",") + 1));
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 
 interface TaskScreenProps {
   instanceId: string;
@@ -27,6 +52,8 @@ export function TaskScreen({ instanceId, token, locale, navigate, onUnauthorized
   const [validationIssues, setValidationIssues] = useState<SubmissionIssue[]>([]);
   const [comments, setComments] = useState<InstanceComment[]>([]);
   const [commentText, setCommentText] = useState("");
+  const [attachments, setAttachments] = useState<InstanceAttachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const applyView = useCallback((next: InstanceView) => {
     setView(next);
@@ -96,11 +123,17 @@ export function TaskScreen({ instanceId, token, locale, navigate, onUnauthorized
     setComments(page.items);
   }, [instanceId, token]);
 
+  const loadAttachments = useCallback(async () => {
+    const page = await listAttachments(instanceId, token);
+    setAttachments(page.items);
+  }, [instanceId, token]);
+
   useEffect(() => {
     void withErrorHandling(async () => {
       const fresh = await getInstanceView(instanceId, token);
       applyView(fresh);
       await loadComments();
+      await loadAttachments();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instanceId]);
@@ -143,6 +176,27 @@ export function TaskScreen({ instanceId, token, locale, navigate, onUnauthorized
       await postComment(instanceId, commentText, token);
       setCommentText("");
       await loadComments();
+    });
+
+  const doUploadAttachment = () =>
+    withErrorHandling(async () => {
+      const file = fileInputRef.current?.files?.[0];
+      if (!file) return;
+      const dataBase64 = await readFileAsBase64(file);
+      await uploadAttachment(instanceId, file.name, file.type || "application/octet-stream", dataBase64, token);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      await loadAttachments();
+    });
+
+  const doDownloadAttachment = (attachment: InstanceAttachment) =>
+    withErrorHandling(async () => {
+      const blob = await downloadAttachment(instanceId, attachment.id, token);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = attachment.filename;
+      a.click();
+      URL.revokeObjectURL(url);
     });
 
   const fieldIds = new Set(view?.fields.map((f) => f.field.id) ?? []);
@@ -248,6 +302,26 @@ export function TaskScreen({ instanceId, token, locale, navigate, onUnauthorized
               />
               <button type="button" disabled={loading || !commentText.trim()} onClick={() => void doPostComment()}>
                 {t(locale, "task.commentSubmit")}
+              </button>
+            </div>
+          </section>
+
+          <section className="app-task-attachments">
+            <h2>{t(locale, "task.attachmentsHeading")}</h2>
+            <ul>
+              {attachments.map((a) => (
+                <li key={a.id}>
+                  <span>{a.filename}</span>
+                  <button type="button" disabled={loading} onClick={() => void doDownloadAttachment(a)}>
+                    {t(locale, "task.attachmentDownloadLabel")}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="app-task-attachment-form">
+              <input ref={fileInputRef} type="file" disabled={loading} />
+              <button type="button" disabled={loading} onClick={() => void doUploadAttachment()}>
+                {t(locale, "task.attachmentUploadLabel")}
               </button>
             </div>
           </section>

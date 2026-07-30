@@ -115,6 +115,23 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     created_at timestamptz NOT NULL DEFAULT now()
   )`;
   await db`CREATE INDEX IF NOT EXISTS instance_comments_instance_idx ON instance_comments (instance_id, created_at, id)`;
+  // File attachments, deliberately outside the history_entries/instance_events
+  // audit backbone, the same reasoning instance_comments already applies: an
+  // attachment's bytes can carry personal data, unlike those two relations'
+  // structural-facts-only content. size_bytes is a 32-bit integer, capping at
+  // roughly 2.1 GB — far above any sane MAX_ATTACHMENT_BYTES, but a ceiling a
+  // future operator raising that cap should know about.
+  await db`CREATE TABLE IF NOT EXISTS instance_attachments (
+    id text PRIMARY KEY,
+    instance_id text NOT NULL,
+    actor_id text NOT NULL,
+    filename text NOT NULL,
+    content_type text NOT NULL,
+    size_bytes integer NOT NULL,
+    data bytea NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`;
+  await db`CREATE INDEX IF NOT EXISTS instance_attachments_instance_idx ON instance_attachments (instance_id, created_at, id)`;
   // Outbox: one row per enqueued trigger action. idempotency_key (PK) makes
   // re-enqueuing a replayed transition conflict instead of duplicating.
   await db`CREATE TABLE IF NOT EXISTS outbox (

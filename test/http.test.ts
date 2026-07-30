@@ -35,7 +35,7 @@ beforeAll(async () => {
   if (DB) await initSchema();
 });
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_comments, definitions`;
+  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_comments, instance_attachments, definitions`;
 });
 
 // ============================================================
@@ -728,6 +728,22 @@ test("wildcard config: OPTIONS preflight on the comments route returns 204 with 
   expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles, Authorization");
 });
 
+test("wildcard config: OPTIONS preflight on the attachments collection route returns 204 with CORS headers, without uploading or listing", async () => {
+  const res = await corsFetch(new Request("http://x/instances/inst_x/attachments", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles, Authorization");
+});
+
+test("wildcard config: OPTIONS preflight on the attachment item route returns 204 with CORS headers, without downloading", async () => {
+  const res = await corsFetch(new Request("http://x/instances/inst_x/attachments/attachment_x", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles, Authorization");
+});
+
 test("allowlist config: an allowed-origin preflight echoes that origin", async () => {
   const req = withOrigin(new Request("http://x/instances/inst_x", { method: "OPTIONS" }), ALLOWED_ORIGIN);
   const res = await allowlistFetch(req);
@@ -912,6 +928,132 @@ test.skipIf(!DB)("an actor with no relation to the instance gets 403 on both com
   expect(postRes.status).toBe(403);
   const listRes = await fetch(authedReq(`http://x/instances/${created.instanceId}/comments`, "GET", bystander));
   expect(listRes.status).toBe(403);
+});
+
+// ============================================================
+// Attachment routes
+// ============================================================
+
+test.skipIf(!DB)("POST /instances/:instanceId/attachments succeeds for an eligible candidate and returns 201 without data", async () => {
+  const PID = pid("proc_http_attachment_post");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const dataBase64 = Buffer.from("receipt total: 42").toString("base64");
+  const res = await fetch(
+    jsonReq(`http://x/instances/${created.instanceId}/attachments`, "POST", user1, { filename: "receipt.txt", contentType: "text/plain", dataBase64 }),
+  );
+  expect(res.status).toBe(201);
+  const body = (await res.json()) as { actorId: string; filename: string; contentType: string; sizeBytes: number; data?: unknown };
+  expect(body.actorId).toBe("user_1");
+  expect(body.filename).toBe("receipt.txt");
+  expect(body.contentType).toBe("text/plain");
+  expect(body.sizeBytes).toBe(Buffer.from("receipt total: 42").length);
+  expect(body.data).toBeUndefined();
+});
+
+test.skipIf(!DB)("GET /instances/:instanceId/attachments returns 200 with metadata only", async () => {
+  const PID = pid("proc_http_attachment_list");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  const dataBase64 = Buffer.from("a file").toString("base64");
+  await fetch(jsonReq(`http://x/instances/${created.instanceId}/attachments`, "POST", user1, { filename: "a.txt", contentType: "text/plain", dataBase64 }));
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/attachments`, "GET", user1));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { items: { filename: string; data?: unknown }[] };
+  expect(body.items).toHaveLength(1);
+  expect(body.items[0]!.filename).toBe("a.txt");
+  expect(body.items[0]!.data).toBeUndefined();
+});
+
+test.skipIf(!DB)("GET /instances/:instanceId/attachments/:attachmentId returns 200 with the raw bytes and content-type", async () => {
+  const PID = pid("proc_http_attachment_download");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  const dataBase64 = Buffer.from("receipt total: 42").toString("base64");
+  const uploaded = (await (
+    await fetch(jsonReq(`http://x/instances/${created.instanceId}/attachments`, "POST", user1, { filename: "receipt.txt", contentType: "text/plain", dataBase64 }))
+  ).json()) as { id: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/attachments/${uploaded.id}`, "GET", user1));
+  expect(res.status).toBe(200);
+  expect(res.headers.get("content-type")).toBe("text/plain");
+  expect(await res.text()).toBe("receipt total: 42");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/attachments over MAX_ATTACHMENT_BYTES maps to 400 request-shape", async () => {
+  const PID = pid("proc_http_attachment_oversized");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const oversized = Buffer.alloc(5 * 1024 * 1024 + 1);
+  const dataBase64 = oversized.toString("base64");
+  const res = await fetch(
+    jsonReq(`http://x/instances/${created.instanceId}/attachments`, "POST", user1, { filename: "big.bin", contentType: "application/octet-stream", dataBase64 }),
+  );
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/attachments with an over-length filename maps to 400 request-shape", async () => {
+  const PID = pid("proc_http_attachment_longname");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const dataBase64 = Buffer.from("x").toString("base64");
+  const res = await fetch(
+    jsonReq(`http://x/instances/${created.instanceId}/attachments`, "POST", user1, { filename: "x".repeat(256), contentType: "text/plain", dataBase64 }),
+  );
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/attachments with an over-length contentType maps to 400 request-shape", async () => {
+  const PID = pid("proc_http_attachment_longtype");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const dataBase64 = Buffer.from("x").toString("base64");
+  const res = await fetch(
+    jsonReq(`http://x/instances/${created.instanceId}/attachments`, "POST", user1, { filename: "a.txt", contentType: "x".repeat(256), dataBase64 }),
+  );
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("an actor with no relation to the instance gets 403 on all three attachment routes", async () => {
+  const PID = pid("proc_http_attachment_403");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  const dataBase64 = Buffer.from("visible to candidate").toString("base64");
+  const uploaded = (await (
+    await fetch(jsonReq(`http://x/instances/${created.instanceId}/attachments`, "POST", user1, { filename: "a.txt", contentType: "text/plain", dataBase64 }))
+  ).json()) as { id: string };
+
+  const postRes = await fetch(jsonReq(`http://x/instances/${created.instanceId}/attachments`, "POST", bystander, { filename: "b.txt", contentType: "text/plain", dataBase64 }));
+  expect(postRes.status).toBe(403);
+  const listRes = await fetch(authedReq(`http://x/instances/${created.instanceId}/attachments`, "GET", bystander));
+  expect(listRes.status).toBe(403);
+  const getRes = await fetch(authedReq(`http://x/instances/${created.instanceId}/attachments/${uploaded.id}`, "GET", bystander));
+  expect(getRes.status).toBe(403);
+});
+
+test.skipIf(!DB)("downloading an attachment id that belongs to a different instance maps to 500", async () => {
+  const PID = pid("proc_http_attachment_wronginstance");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const instA = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  const instB = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  const dataBase64 = Buffer.from("belongs to B").toString("base64");
+  const uploadedOnB = (await (
+    await fetch(jsonReq(`http://x/instances/${instB.instanceId}/attachments`, "POST", user1, { filename: "b.txt", contentType: "text/plain", dataBase64 }))
+  ).json()) as { id: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${instA.instanceId}/attachments/${uploadedOnB.id}`, "GET", user1));
+  expect(res.status).toBe(500);
 });
 
 // ============================================================
