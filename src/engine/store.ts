@@ -103,6 +103,18 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   )`;
   await db`CREATE INDEX IF NOT EXISTS instance_events_instance_idx ON instance_events (instance_id, transition_seq)`;
   await db`CREATE INDEX IF NOT EXISTS instance_events_kind_idx ON instance_events (kind)`;
+  // Free-text comments, deliberately outside the history_entries/instance_events
+  // audit backbone (see persistence spec's "Instance comments are persisted
+  // independently of the audit-trail relations"): a comment's text can carry
+  // personal data, unlike those two relations' structural-facts-only content.
+  await db`CREATE TABLE IF NOT EXISTS instance_comments (
+    id text PRIMARY KEY,
+    instance_id text NOT NULL,
+    actor_id text NOT NULL,
+    text text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`;
+  await db`CREATE INDEX IF NOT EXISTS instance_comments_instance_idx ON instance_comments (instance_id, created_at, id)`;
   // Outbox: one row per enqueued trigger action. idempotency_key (PK) makes
   // re-enqueuing a replayed transition conflict instead of duplicating.
   await db`CREATE TABLE IF NOT EXISTS outbox (

@@ -45,6 +45,21 @@ export interface InstanceView {
   availablePaths: AvailablePath[];
 }
 
+// Not `Comment` — that name collides with the DOM's own `Comment` node
+// interface, in scope in this package's browser TypeScript config.
+export interface InstanceComment {
+  id: string;
+  instanceId: string;
+  actorId: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface CommentPage {
+  items: InstanceComment[];
+  cursor?: string;
+}
+
 export interface ProcessSummary {
   processId: string;
   version: number;

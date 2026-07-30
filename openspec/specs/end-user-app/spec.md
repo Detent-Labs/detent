@@ -11,10 +11,11 @@ here). Four screens — Login, My tasks (inbox), Task, Start a process — over 
 small hand-written History-API routing hook, talking to the engine only
 through the HTTP wrapper. Step forms render through the shared `form-ui`
 package, so what an author previews in the editor's Player is what a
-participant gets. Out of scope for v1: case history view, notifications,
-attachments, comments, and a dedicated `groups` assignment filter (distinct
-from `Step.assignment.candidates`, which already matches by an actor's id
-or any of their roles — see `instance-query`).
+participant gets. The Task screen also shows a comment thread. Out of scope
+for v1: case history view, notifications, attachments, and a dedicated
+`groups` assignment filter (distinct from `Step.assignment.candidates`,
+which already matches by an actor's id or any of their roles — see
+`instance-query`).
 
 ## Requirements
 
@@ -323,3 +324,31 @@ rather than a generic failure message:
 - **WHEN** a submission fails due to a concurrent transition (OCC conflict)
 - **THEN** the app reloads the instance view and reports that the task moved
   on
+
+### Requirement: Task screen shows a comment thread with a post form
+
+The task screen SHALL show a comment thread beside the field form,
+fetched via `GET /instances/:id/comments`, listing each comment's
+`actorId` and `createdAt`, oldest first. It SHALL provide a text box and a
+submit button that calls `POST /instances/:id/comments` and, on success,
+refetches the thread. This thread SHALL be visible to any actor who can
+open the task screen at all, independent of claim state.
+
+#### Scenario: Opening a task loads its comment thread
+
+- **WHEN** a user opens `/tasks/:instanceId` for a task they may view
+- **THEN** the screen issues `GET /instances/:id/comments` and renders the
+  returned comments oldest first
+
+#### Scenario: Posting a comment refreshes the thread
+
+- **WHEN** a user submits non-empty text in the comment box
+- **THEN** `POST /instances/:id/comments` is called and, on success, the
+  thread refetches and shows the new comment
+
+#### Scenario: The comment thread is visible before claiming
+
+- **WHEN** a user opens an unclaimed, assignment-bearing task they are an
+  eligible candidate for
+- **THEN** the comment thread renders and accepts a new comment, with no
+  claim required first

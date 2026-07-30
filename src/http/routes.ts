@@ -18,6 +18,8 @@ import {
   listInstances,
   getInstanceRecord,
   cancelInstance,
+  postComment,
+  listComments,
   type InstanceListFilter,
 } from "../runtime/api.js";
 import { publishBody, listProcesses, listVersions } from "../engine/definitions.js";
@@ -43,6 +45,15 @@ const createInstanceBodySchema = z.object({
 });
 const delegateBodySchema = z.object({
   toActorId: z.string().min(1),
+});
+// 10,000 characters is a round, generous bound for a free-text note — see
+// design.md "Text validation lives at the HTTP boundary only" for why it has
+// no narrower precedent to match (the MAX_*_LENGTH constants in
+// schema/compile.ts bound authored process-definition strings, a different
+// concern from runtime user text).
+const MAX_COMMENT_LENGTH = 10_000;
+const commentBodySchema = z.object({
+  text: z.string().trim().min(1).max(MAX_COMMENT_LENGTH),
 });
 const submitBodySchema = z.object({
   pathId: z.string(),
@@ -161,6 +172,26 @@ export async function handleDelegate(instanceId: string, req: Request, resolver:
     const body = await parseJsonBody(req, delegateBodySchema);
     const updated = await delegateClaim(instanceId as InstanceId, actor, body.toActorId, db);
     return { status: 200, body: updated };
+  });
+}
+
+export async function handlePostComment(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    const body = await parseJsonBody(req, commentBodySchema);
+    const created = await postComment(instanceId as InstanceId, actor, body.text, db);
+    return { status: 201, body: created };
+  });
+}
+
+export async function handleListComments(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    const url = new URL(req.url);
+    const limit = parseLimit(url);
+    const cursor = url.searchParams.get("cursor") ?? undefined;
+    const page = await listComments(instanceId as InstanceId, actor, { limit, cursor }, db);
+    return { status: 200, body: page };
   });
 }
 

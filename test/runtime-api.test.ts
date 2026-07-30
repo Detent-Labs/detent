@@ -1259,6 +1259,30 @@ test.skipIf(!DB)("listInstances pages through more instances than the limit, cov
   expect(seen.length).toBe(created.length);
 });
 
+// Deterministic, not a timing race: forces both rows into one millisecond,
+// at different microsecond offsets, via a raw UPDATE after creation. Bun's
+// Postgres driver truncates a timestamptz to millisecond precision when
+// converting it to a JS Date; building the pagination cursor from that
+// truncated Date (rather than created_at::text) let a boundary row's true,
+// later-within-the-millisecond value stop comparing "less than" its own
+// rounded-down cursor, silently dropping it from the walk. See
+// fix-instance-list-cursor-precision's design.md.
+test.skipIf(!DB)("listInstances pages correctly when two instances share a millisecond", async () => {
+  const PID = pid("proc_list_same_ms");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const older = await createProcessInstance(PID, actor, dataSourceReg);
+  const newer = await createProcessInstance(PID, actor, dataSourceReg);
+  await sql`UPDATE instances SET created_at = '2026-01-01 00:00:00.100001+00' WHERE instance_id = ${older.instanceId}`;
+  await sql`UPDATE instances SET created_at = '2026-01-01 00:00:00.100999+00' WHERE instance_id = ${newer.instanceId}`;
+
+  const page1 = await listInstances({ processId: PID }, { limit: 1 });
+  expect(page1.items.map((it) => it.instanceId)).toEqual([newer.instanceId]);
+  expect(page1.cursor).toBeDefined();
+
+  const page2 = await listInstances({ processId: PID }, { limit: 1, cursor: page1.cursor });
+  expect(page2.items.map((it) => it.instanceId)).toEqual([older.instanceId]);
+});
+
 test.skipIf(!DB)("listInstances with a malformed cursor raises RequestShapeError, not an uncaught SyntaxError or Postgres cast error", async () => {
   let raised: unknown;
   try {

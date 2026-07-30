@@ -172,6 +172,14 @@ the same walk.
 - **AND** the next page is read with that cursor
 - **THEN** no summary from the first page appears again
 
+#### Scenario: Two instances created within the same millisecond page correctly
+
+<!-- antislop: allow passive-voice -->
+- **WHEN** two instances were created within the same millisecond of each other
+- **AND** the read is called with `limit: 1`, returning the newer one and a cursor
+- **AND** the next page is read with that cursor
+- **THEN** the older instance is returned on the second page, not dropped from the walk
+
 ### Requirement: Read one instance's append-only record
 
 The Runtime API Layer SHALL expose a read returning one instance's runtime
