@@ -806,23 +806,36 @@ capability of its own.
     already-flagged session/login/routing duplication, unaffected by this
     design). No OpenSpec change yet — implementation is tracked separately
     from this design.
-22. HTTP API documentation: design DONE, implementation NOT STARTED (see
+22. HTTP API documentation: DONE (`add-http-api-documentation`; design at
     `docs/superpowers/specs/2026-07-30-http-api-documentation-design.md`).
-    Raised 2026-07-28. The HTTP wrapper (`src/http/`) has no published
+    Raised 2026-07-28. The HTTP wrapper (`src/http/`) had no published
     contract document, needed once a customer's own system integrates
     against the engine directly instead of only through the three shipped
-    frontends. Documentation only, no engine change. Scope is the Runtime
-    API Layer routes a customer would actually call (auth login, process
-    create/list/versions/publish, instance create/get/list/submit/claim/
-    release/cancel/record, livez/readyz); `admin`/`drafts`/
-    `migration-plans`/`registry` stay out, since those serve
-    `packages/admin`/`packages/studio` themselves, not a customer
-    integration. The deliverable is one hand-written OpenAPI 3.0 file,
-    `docs/openapi.yaml`, not a generator: the repo has no
-    schema-to-OpenAPI tool today, and adding one for a doc-only task on
-    about 15 routes costs more than hand-writing them, since a generator
-    would still need hand-authoring for response shapes, error mappings,
-    and auth requirements. No OpenSpec change for a docs-only deliverable.
+    frontends. Documentation only, no engine change. Delivered as
+    `docs/openapi.yaml`, one hand-written OpenAPI 3.0 file covering the
+    Runtime API Layer routes a customer would actually call: auth login,
+    process create/list/versions/publish, and the full instance lifecycle
+    — create/get/list/submit/claim/release/delegate/comments/cancel/record.
+    `admin`/`drafts`/`migration-plans`/`registry` stay out, since those
+    serve `packages/admin`/`packages/studio` themselves, not a customer
+    integration. Not a generator: the repo has no schema-to-OpenAPI tool
+    today, and adding one for a doc-only task on 16 routes costs more than
+    hand-writing them, since a generator would still need hand-authoring
+    for response shapes, error mappings, and auth requirements.
+    A source review against the codebase, done while implementing this
+    stage, corrected the approved design on three points before
+    transcription started: the design's route list predated
+    `POST /instances/:id/delegate` and the two `.../comments` routes
+    (Roadmap #23a/b), both now included; the design listed 404 among the
+    statuses every route documents, but `src/http/errors.ts` never maps a
+    specific route to 404 (a not-found instance or process returns 500 by
+    design, and 404 stays reserved for an unmatched path); and
+    `POST /auth/login` does not route through `errors.ts` at all —
+    `src/auth/login.ts` builds its own 400/401 responses and a 429 for its
+    per-email rate limit, a status no other route returns. Delivered
+    through an OpenSpec change, departing from the design's own "no
+    OpenSpec change" note for a docs-only deliverable — the same
+    deliberate departure Roadmap #14c already took for the same reason.
 23. Extended task collaboration: design DONE for all three sub-projects,
     a and b DONE, c implementation NOT STARTED. Raised 2026-07-28. Stage 9
     explicitly excluded attachments, comments, and delegation from the
