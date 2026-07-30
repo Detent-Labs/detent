@@ -707,12 +707,47 @@ capability of its own.
     already covers account-level requests), and data portability/export.
     No OpenSpec change yet — implementation is tracked separately from
     this design.
-21. Reporting & analytics: NOT STARTED, deliberately deferred — raised
-    2026-07-28. The admin area (stage 10) is operations-focused (instances,
-    outbox, timers); a process owner wants cycle time, bottleneck, and SLA
-    views instead — a distinct audience from stage 10's operator, kept as
-    its own stage rather than folded into admin since the consumer and the
-    data shape both differ. No OpenSpec change yet.
+21. Reporting & analytics: design DONE, implementation NOT STARTED. Raised
+    2026-07-28. Design approved 2026-07-30 (see
+    `docs/superpowers/specs/2026-07-30-reporting-analytics-design.md`). The
+    admin area (stage 10) is operations-focused (instances, outbox,
+    timers); a process owner wants cycle time, bottleneck, and SLA views
+    instead — a distinct audience from stage 10's operator, kept as its own
+    stage rather than folded into admin since the consumer and the data
+    shape both differ. The design closes that gap with a fourth product on
+    the same engine, `packages/reporting` (new), gated by a new reserved
+    role, `system:reports`, implying nothing else (no publish, no user
+    administration, no migration run). Three views, each scoped to one
+    selected process, mirroring Studio's process-first Versions/Migration
+    screens: **Cycle-Time** (p50/p90/p99 total duration plus a per-step
+    average dwell time, both restricted to `completed` instances, since a
+    cancelled or faulted instance did not finish its normal path);
+    **Bottleneck** (steps ranked by median dwell time, computed over every
+    instance regardless of status since a step's own speed is observable
+    the moment an instance has passed through it, plus a live, unfiltered
+    count of `running` instances currently parked in each step); and
+    **SLA** (a per-step breach rate, derived from the existing `timer.fired`
+    `InstanceEvent` against a `timerId -> stepId` map resolved per version
+    via the unchanged `resolveBody`, never a threshold typed into the UI —
+    a step with no declared reminder/escalation timer carries no SLA and is
+    absent from the view). Cycle-Time's per-step breakdown and Bottleneck
+    share one primitive: a per-instance timeline of `(stepId, enteredAt)`
+    built from `instances.startedAt` plus every `HistoryEntry.toStepId`/
+    `at` in `transitionSeq` order, aggregated by step `id` across every
+    published version of the process, since `id` is the stable reference
+    anchor across versions per CLAUDE.md's "Identity" contract, the same
+    key migration already re-maps by. Every view computes fresh on each
+    request, no cache, no background aggregation job, matching the
+    precedent `admin-queries.ts` and `/metrics` (stage 15) already set, and
+    every view carries a date-range filter (default: last 30 days,
+    adjustable) bounded by `instances.startedAt`. Deliberately out of
+    scope: a cross-process dashboard (a step id, and therefore a bottleneck
+    or an SLA breach, means nothing across processes), configurable SLA
+    thresholds, precomputed or scheduled aggregation, editing anything, and
+    a shared shell with `app`/`admin`/`studio` (stage 12's
+    already-flagged session/login/routing duplication, unaffected by this
+    design). No OpenSpec change yet — implementation is tracked separately
+    from this design.
 22. HTTP API documentation: NOT STARTED, deliberately deferred — raised
     2026-07-28. The HTTP wrapper (`src/http/`) has no published OpenAPI/
     contract document; needed once a customer integrates against it
