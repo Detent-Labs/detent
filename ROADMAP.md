@@ -466,7 +466,13 @@ capability of its own.
        deploys that are currently independent — so it's a deliberate call,
        not a default.
     Neither step has an OpenSpec change yet; write one (starting with 12a)
-    when this actually gets scheduled.
+    when this actually gets scheduled. Re-brainstormed 2026-07-30:
+    confirmed still no committed trigger, so no design was produced.
+    Revisit step (a) when a second real deployment specifically asks for
+    single sign-on across app/admin/studio, or when the three duplicated
+    session/login/routing modules cause an actual cross-package bug rather
+    than only added file count. Revisit step (b) only if (a) ships and the
+    remaining duplication still costs real maintenance effort.
 13. i18n extensions (content-translation UI; UI-chrome white-label overrides):
     NOT STARTED, deliberately deferred — raised 2026-07-28 as a brainstorm, not
     a committed stage. Two independent sub-projects, not one change:
@@ -499,9 +505,14 @@ capability of its own.
        packages continues the dedup question stage 12 already flagged as
        "someday" — not resolved here.
     Neither sub-project has an OpenSpec change yet; write one when either
-    actually gets scheduled.
+    actually gets scheduled. Re-brainstormed 2026-07-30: confirmed still
+    no committed trigger for either, so no design was produced. Revisit
+    (a) once a process actually ships in two or more locales and the gaps
+    become hard to find by hand. Revisit (b) once a specific customer asks
+    for its own UI-chrome wording, not before.
 14. Deployment & operations readiness: IN PROGRESS. Sub-projects (a) and
-    (b) DONE, (c) NOT STARTED. Raised 2026-07-28 as a "someday" question
+    (b) DONE, (c) design DONE, implementation NOT STARTED. Raised 2026-07-28
+    as a "someday" question
     while sketching what shipping to a real customer needs beyond stages
     1–13. Today the only run path is the devcontainer. Three independent
     sub-projects, split out and ordered 2026-07-30 (each brainstormed and
@@ -546,12 +557,27 @@ capability of its own.
        the image. A repo-root `.dockerignore` keeps `node_modules`, `.git`,
        `.devcontainer`, `docs`, and test directories out of every build
        context.
-    c. A documented backup/restore runbook for the Postgres schema. Pure
-       packaging/ops documentation, no engine schema change implied.
-       Independent of (a) and (b) — sequenced last because it caps off the
-       "deployment readiness" story, not because it depends on either.
-    No OpenSpec change yet for sub-project (c); write one when it is
-    brainstormed.
+    c. A documented backup/restore runbook for the Postgres schema: design
+       DONE (see
+       `docs/superpowers/specs/2026-07-30-backup-restore-runbook-design.md`).
+       Pure packaging/ops documentation. No engine or schema change.
+       Independent of (a) and (b); sequenced last because it caps off the
+       "deployment readiness" story, not because it depends on either. One
+       Postgres database backs an entire environment (the existing
+       environment-separation convention), so a whole-database `pg_dump -Fc`
+       is the backup unit, not a per-table one. Restore stops the engine
+       first, since the outbox worker and timer scheduler both write to the
+       database continuously, then runs `pg_restore --clean --if-exists`,
+       then restarts the engine and checks `GET /readyz` (Stage 14a) to
+       confirm the restore worked. No new engine code and no new script:
+       `pg_dump`/`pg_restore` already do this job. Deliberately out of
+       scope: automated backup scheduling (deployment-specific), point-in-
+       time recovery/WAL archiving (no stated recovery-point requirement
+       needs it yet), and backup-file encryption (delegated to the
+       deployment's existing storage/ops tooling). The deliverable is
+       `docs/runbooks/backup-restore.md`; no OpenSpec change for a
+       docs-only task. Stage 14 (a, b, c) is fully DONE once that file
+       lands.
 15. Observability: NOT STARTED, deliberately deferred — raised 2026-07-28.
     No structured logging convention, no metrics, no tracing today; outbox
     backlog, timer latency, and `faulted`-instance rate are only visible by
@@ -774,19 +800,39 @@ capability of its own.
     already-flagged session/login/routing duplication, unaffected by this
     design). No OpenSpec change yet — implementation is tracked separately
     from this design.
-22. HTTP API documentation: NOT STARTED, deliberately deferred — raised
-    2026-07-28. The HTTP wrapper (`src/http/`) has no published OpenAPI/
-    contract document; needed once a customer integrates against it
-    directly rather than only through the shipped frontends. Documentation
-    only, no engine change. No OpenSpec change yet.
-23. Extended task collaboration: NOT STARTED, deliberately deferred — raised
-    2026-07-28. Stage 9 explicitly excluded attachments, comments, and
-    delegation from the end-user app; classic BPM-suite expectations that
-    may resurface as a customer ask rather than a committed direction. No
-    OpenSpec change yet.
+22. HTTP API documentation: design DONE, implementation NOT STARTED (see
+    `docs/superpowers/specs/2026-07-30-http-api-documentation-design.md`).
+    Raised 2026-07-28. The HTTP wrapper (`src/http/`) has no published
+    contract document, needed once a customer's own system integrates
+    against the engine directly instead of only through the three shipped
+    frontends. Documentation only, no engine change. Scope is the Runtime
+    API Layer routes a customer would actually call (auth login, process
+    create/list/versions/publish, instance create/get/list/submit/claim/
+    release/cancel/record, livez/readyz); `admin`/`drafts`/
+    `migration-plans`/`registry` stay out, since those serve
+    `packages/admin`/`packages/studio` themselves, not a customer
+    integration. The deliverable is one hand-written OpenAPI 3.0 file,
+    `docs/openapi.yaml`, not a generator: the repo has no
+    schema-to-OpenAPI tool today, and adding one for a doc-only task on
+    about 15 routes costs more than hand-writing them, since a generator
+    would still need hand-authoring for response shapes, error mappings,
+    and auth requirements. No OpenSpec change for a docs-only deliverable.
+23. Extended task collaboration: NOT STARTED, deliberately deferred —
+    raised 2026-07-28. Stage 9 explicitly excluded attachments, comments,
+    and delegation from the end-user app; classic BPM-suite expectations
+    that may resurface as a customer ask rather than a committed
+    direction. Re-brainstormed 2026-07-30: confirmed still speculative, no
+    design produced. Revisit only once a specific customer asks for one of
+    attachments, comments, or delegation; building ahead of that ask would
+    be pure speculation. No OpenSpec change yet.
 24. Multi-tenancy: NOT STARTED, deliberately deferred — raised 2026-07-28.
     Today's convention is one deployment/database per customer (see stage
     11's environment-separation note). A shared-infrastructure SaaS model
-    would need tenant isolation this convention doesn't provide — this is a
-    business-model decision to make first, not a technical default to build
-    toward speculatively. No OpenSpec change yet.
+    would need tenant isolation this convention doesn't provide; this is a
+    business-model decision to make first, not a technical default to
+    build toward speculatively. Re-brainstormed 2026-07-30: confirmed
+    still a business decision, not a technical one, so no design was
+    produced. A future technical design (a tenant id on every row, an
+    isolation model, per-tenant quotas) is worth doing only after that
+    business decision picks shared infrastructure over today's
+    per-customer deployment convention. No OpenSpec change yet.
