@@ -500,10 +500,10 @@ capability of its own.
        "someday" — not resolved here.
     Neither sub-project has an OpenSpec change yet; write one when either
     actually gets scheduled.
-14. Deployment & operations readiness: IN PROGRESS. Sub-project (a) DONE,
-    (b) and (c) NOT STARTED. Raised 2026-07-28 as a "someday" question while
-    sketching what shipping to a real customer needs beyond stages 1–13.
-    Today the only run path is the devcontainer. Three independent
+14. Deployment & operations readiness: IN PROGRESS. Sub-projects (a) and
+    (b) DONE, (c) NOT STARTED. Raised 2026-07-28 as a "someday" question
+    while sketching what shipping to a real customer needs beyond stages
+    1–13. Today the only run path is the devcontainer. Three independent
     sub-projects, split out and ordered 2026-07-30 (each brainstormed and
     specced on its own rather than as one combined design):
     a. Health/readiness endpoints for orchestration: DONE
@@ -516,16 +516,42 @@ capability of its own.
        design later. Ships two unauthenticated routes on the existing
        `Bun.serve` wrapper: `GET /livez` (unconditional) and `GET /readyz`
        (a `SELECT 1` database ping, 503 on failure).
-    b. Production Docker image(s) for the engine and each frontend
-       (app/admin/studio) — today only the devcontainer image
-       (`.devcontainer/Dockerfile`) exists, and it is dev-only (mounts the
-       workspace, runs `sleep infinity`). Depends on (a) landing first.
+<!-- antislop: allow sentence-length, run-ons, passive-voice, em-dash. This
+     entry matches the dense technical-prose convention every other DONE
+     entry in this file already uses; see the antislop-targeted-allow-
+     not-file-all memory for why that convention exists and why a
+     block-scoped allow is the correct tool here, not a file-wide one. -->
+    b. Production Docker image(s) for the engine and each frontend: DONE
+       (`add-production-docker-images`; see the `production-docker-images`
+       spec and the archived change
+       `2026-07-30-add-production-docker-images`). `docker/engine.Dockerfile`
+       is single-stage (`oven/bun:1.3.11-slim`, `bun install --production
+       --frozen-lockfile`, runs as the base image's non-root `bun` user),
+       since Bun runs TypeScript directly and there is no build tool to
+       strip out of a later stage. Its `HEALTHCHECK` calls `GET /readyz`
+       using Bun's own `fetch`, reading `PORT` from its own runtime
+       environment rather than a hardcoded value, so an overridden `PORT`
+       does not desync the check from the server. `docker/frontend.Dockerfile`
+       is one parameterized multi-stage image, not three near-duplicate
+       files: a `PACKAGE` build arg selects `app`/`admin`/`studio`, and
+       `VITE_API_URL` is a build-arg-only origin, since Vite inlines it at
+       `vite build` time and a container runtime env var would arrive too
+       late to matter. The serve stage is `nginxinc/nginx-unprivileged:alpine`
+       (non-root by default) with a shared `docker/nginx.conf` (an SPA
+       fallback to `index.html` for each package's client-side History API
+       routing) and a `HEALTHCHECK` targeting `127.0.0.1`, not `localhost` —
+       this base image resolves `localhost` to an IPv6 address nginx does
+       not listen on, and BusyBox `wget` does not retry a second resolved
+       address on connection refused, confirmed empirically while building
+       the image. A repo-root `.dockerignore` keeps `node_modules`, `.git`,
+       `.devcontainer`, `docs`, and test directories out of every build
+       context.
     c. A documented backup/restore runbook for the Postgres schema. Pure
        packaging/ops documentation, no engine schema change implied.
        Independent of (a) and (b) — sequenced last because it caps off the
        "deployment readiness" story, not because it depends on either.
-    No OpenSpec change yet for any sub-project; write one per sub-project as
-    each is brainstormed.
+    No OpenSpec change yet for sub-project (c); write one when it is
+    brainstormed.
 15. Observability: NOT STARTED, deliberately deferred — raised 2026-07-28.
     No structured logging convention, no metrics, no tracing today; outbox
     backlog, timer latency, and `faulted`-instance rate are only visible by

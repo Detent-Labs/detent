@@ -1,3 +1,9 @@
+<!-- antislop: allow-file synonym-rotation -->
+<!-- The pre-existing "Develop" section's "create the two indexes"
+     (database indexes) and the "Deploy" section's repeated "build"
+     (container images) name unrelated concepts that happen to share this
+     rule's synonym bucket. Rewriting either to dodge the rule would make
+     the wrong section read worse for a false-positive cross-reference. -->
 # SummitBPS
 
 A headless, API-first workflow / BPM engine in TypeScript. It executes
@@ -108,6 +114,53 @@ of these three:
 
 Changes go through OpenSpec (`openspec/`) — propose → specs/tasks → implement →
 verify → archive. See `CLAUDE.md` for the full contract rules and invariants.
+
+## Deploy
+
+Four production images exist: one for the engine, one for each frontend
+(`app`, `admin`, `studio`). `docker/engine.Dockerfile` and
+`docker/frontend.Dockerfile` build them. The devcontainer uses neither one;
+it stays dev-only.
+
+```bash
+# Engine
+docker build -f docker/engine.Dockerfile -t workflow-engine .
+
+# One frontend at a time -- PACKAGE selects app, admin, or studio.
+# VITE_API_URL is a build arg only: Vite inlines it at build time, so a
+# container runtime env var set later has no effect on the result.
+docker build -f docker/frontend.Dockerfile \
+  --build-arg PACKAGE=app \
+  --build-arg VITE_API_URL=https://api.example.com \
+  -t app .
+```
+
+The engine image reads its configuration from the container runtime
+environment. These are the same variables `bun run serve` already reads
+locally: `DATABASE_URL`, one of `AUTH_JWT_SECRET`/`AUTH_ISSUERS`, and
+optionally `CORS_ALLOWED_ORIGINS` and `PORT`. It never sets
+`ALLOW_INSECURE_DEV_AUTH` itself. A deployment that omits both auth
+variables fails to start immediately. It names the missing variable,
+exactly as `bun run serve` already does locally, instead of falling back
+to an insecure default.
+
+```bash
+docker run -p 3000:3000 \
+  -e DATABASE_URL=postgres://user:pass@host:5432/workflow_engine \
+  -e AUTH_JWT_SECRET=$(openssl rand -base64 32) \
+  workflow-engine
+```
+
+Each frontend image serves its built assets over nginx on port 8080. A
+client-side routing fallback means a direct load of a deep URL still
+resolves. Run it with a plain port mapping:
+
+```bash
+docker run -p 8080:8080 app
+```
+
+Both images declare a `HEALTHCHECK`: the engine calls `GET /readyz`, each
+frontend requests its served root.
 
 ## License
 
