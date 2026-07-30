@@ -567,12 +567,37 @@ capability of its own.
     SMTP integration testing, the same "real dependency, not a mock"
     pattern the DB-backed suites already use against `db`. No OpenSpec
     change yet.
-17. Escalation pattern: NOT STARTED, deliberately deferred — raised
-    2026-07-28, depends on stage 16 landing first. Timers are already
-    first-class, but there is no documented recipe for "SLA breached →
-    notify a manager / reassign" — today every customer would reinvent it
-    per process. A documented pattern (and maybe a reusable subprocess
-    example), not a new engine capability. No OpenSpec change yet.
+17. Escalation pattern: design DONE, implementation NOT STARTED. Raised
+    2026-07-28. Design approved 2026-07-30 (see
+    `docs/superpowers/specs/2026-07-30-escalation-pattern-design.md`). Timers
+    are already first-class, but there was no documented recipe for "SLA
+    breached → notify a manager / reassign" — today every customer would
+    reinvent it per process. The design drops the originally-scoped
+    dependency on stage 16 (Notifications): the pattern names an action
+    position ("attach a notifying action here"), not a specific handler, so
+    it works today with `http.request` (roadmap #5e) and will work
+    identically with `notification.email` once stage 16 ships. No new
+    engine capability. Two independent timers on a step with a human
+    `assignment` — a non-forcing reminder (`onFire.actions`, existing) and a
+    longer, forcing escalation timer (`onFire.targetPath`) whose target is an
+    ordinary step with a *different* `assignment` (the escalation tier) and
+    its own `onEntry` notify action. A step's paths stay all-manual or
+    all-automatic (existing invariant), so a forced path into an escalation
+    step must match the trigger type of its sibling paths. The design
+    specifies a concrete extension of `examples/expense-approval.json`
+    (`review`'s existing reminder timer gains a sibling escalation timer
+    forcing a transition to a new `escalated_review` step, assigned to a new
+    `finance-manager` role, with an `http.request` notify action), appended
+    so every index-based reference in the six dependent test files
+    (`test/validate.test.ts`, `test/compile-validation.test.ts`,
+    `test/cel.test.ts`, `test/cancel.test.ts`, `test/http.test.ts`,
+    `test/runtime-api.test.ts`) stays correct. Deliberately out of scope:
+    chained/multi-tier escalation and a generic reusable escalation
+    subprocess (both documented as possible future extensions, not built
+    here), and resolving the notification recipient to the actual assignee
+    (stays static config, per the stage 16 decision). No OpenSpec change
+    yet — implementation (JSON edit + recomputed `definitionHash` + new
+    end-to-end test) is tracked separately from this design.
 18. Environment promotion: NOT STARTED, deliberately deferred — raised
     2026-07-28. Stage 11 explicitly excluded multi-environment transport as
     a product feature, and version numbers are environment-local
