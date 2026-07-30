@@ -598,13 +598,36 @@ capability of its own.
     (stays static config, per the stage 16 decision). No OpenSpec change
     yet — implementation (JSON edit + recomputed `definitionHash` + new
     end-to-end test) is tracked separately from this design.
-18. Environment promotion: NOT STARTED, deliberately deferred — raised
-    2026-07-28. Stage 11 explicitly excluded multi-environment transport as
-    a product feature, and version numbers are environment-local
-    (`definitionHash` is the only identity that carries across a boundary —
-    see stage 11). Without an export/import path for process definitions
-    between databases, moving a definition from staging to production is a
-    manual rebuild. Touches Studio. No OpenSpec change yet.
+18. Environment promotion: design DONE, implementation NOT STARTED. Raised
+    2026-07-28. Design approved 2026-07-30 (see
+    `docs/superpowers/specs/2026-07-30-environment-promotion-design.md`).
+    Stage 11 explicitly excluded multi-environment transport as a product
+    feature, and version numbers are environment-local (`definitionHash` is
+    the only identity that carries across a boundary — see stage 11).
+    Without an export/import path for process definitions between
+    databases, moving a definition from staging to production was a manual
+    rebuild. The design closes that gap with a pure `packages/studio` UI
+    addition: no new engine capability, no new HTTP route, no schema
+    change. Export downloads a published version as a `.json` file
+    (`{processId, version, definitionHash, body}`) from the existing
+    Versions screen; import reads that file back on the process list
+    screen of the target environment and publishes it through the
+    existing, unchanged `POST /processes { processId, body }` route. File
+    transport only — no live network link or stored credentials between
+    environments, keeping promotion an explicit, human-triggered action
+    like publish and migration already are. Import republishes under the
+    source's exact `processId` (Studio mints it client-side, not the
+    server), the same fix `scripts/seed.ts` already applies by hand for
+    `proc_credit_check`, so subprocess references stay valid once the
+    referenced child has itself been promoted — no reference rewriting
+    needed, and re-promoting an already-promoted version is a safe no-op
+    via `publishBody`'s existing hash-idempotent check. Deliberately out of
+    scope: a direct environment-to-environment network push, automatic
+    dependency-graph bundling (subprocess children are promoted separately,
+    child-first, same order `scripts/seed.ts` uses), promoting drafts
+    instead of published versions, promoting migration plans/users/roles/
+    instance data, and a cross-database diff before import. No OpenSpec
+    change yet — implementation is tracked separately from this design.
 <!-- antislop: allow sentence-length, run-ons, passive-voice. This entry
      matches the dense technical-prose convention every other DONE entry in
      this file already uses; see the antislop-targeted-allow-not-file-all
