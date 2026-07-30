@@ -84,9 +84,15 @@ export async function listOutbox(
   const [cursorCreatedAt, cursorKey] = page.cursor ? decodeCursor(page.cursor, 2) : [undefined, undefined];
   const statusArr = filter.status && filter.status.length > 0 ? db.array(filter.status, "TEXT") : null;
 
+  // created_at::text (created_at_cursor) carries Postgres's full microsecond
+  // precision, unlike the driver's own Date conversion of the plain
+  // created_at column, which is only millisecond-precise. See
+  // fix-instance-list-cursor-precision's design.md — the same fix
+  // listInstances and listComments already apply.
   const rows = (await db`
     SELECT idempotency_key, instance_id, transition_seq, action_id, action->>'type' AS action_type,
-           status, attempts, next_attempt_at, created_at, claimed_at, last_error
+           status, attempts, next_attempt_at, created_at, claimed_at, last_error,
+           created_at::text AS created_at_cursor
     FROM outbox
     WHERE (${statusArr}::text[] IS NULL OR status = ANY(${statusArr}))
       AND (${filter.instanceId ?? null}::text IS NULL OR instance_id = ${filter.instanceId ?? null})
@@ -96,13 +102,13 @@ export async function listOutbox(
       )
     ORDER BY created_at DESC, idempotency_key DESC
     LIMIT ${limit + 1}
-  ` as unknown) as Parameters<typeof toOutboxRow>[0][];
+  ` as unknown) as (Parameters<typeof toOutboxRow>[0] & { created_at_cursor: string })[];
 
   const hasMore = rows.length > limit;
   const pageRows = rows.slice(0, limit);
   const items = pageRows.map(toOutboxRow);
   const last = pageRows[pageRows.length - 1];
-  const cursor = hasMore && last ? encodeCursor([new Date(last.created_at).toISOString(), last.idempotency_key]) : undefined;
+  const cursor = hasMore && last ? encodeCursor([last.created_at_cursor, last.idempotency_key]) : undefined;
   return { items, cursor };
 }
 
@@ -120,8 +126,13 @@ export async function listPendingTimers(page: { limit?: number; cursor?: string 
   const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
   const [cursorTime, cursorId] = page.cursor ? decodeCursor(page.cursor, 2) : [undefined, undefined];
 
+  // next_timer_at::text (next_timer_at_cursor) carries Postgres's full
+  // microsecond precision, unlike the driver's own Date conversion of the
+  // plain next_timer_at column, which is only millisecond-precise. See
+  // fix-instance-list-cursor-precision's design.md — the same fix
+  // listInstances and listComments already apply.
   const rows = (await db`
-    SELECT instance_id, body, next_timer_at FROM instances
+    SELECT instance_id, body, next_timer_at, next_timer_at::text AS next_timer_at_cursor FROM instances
     WHERE (body->>'status') = 'running' AND next_timer_at IS NOT NULL
       AND (
         ${cursorTime ?? null}::timestamptz IS NULL
@@ -129,7 +140,7 @@ export async function listPendingTimers(page: { limit?: number; cursor?: string 
       )
     ORDER BY next_timer_at ASC, instance_id ASC
     LIMIT ${limit + 1}
-  ` as unknown) as { instance_id: string; body: unknown; next_timer_at: string | Date }[];
+  ` as unknown) as { instance_id: string; body: unknown; next_timer_at: string | Date; next_timer_at_cursor: string }[];
 
   const hasMore = rows.length > limit;
   const pageRows = rows.slice(0, limit);
@@ -144,7 +155,7 @@ export async function listPendingTimers(page: { limit?: number; cursor?: string 
     };
   });
   const last = pageRows[pageRows.length - 1];
-  const cursor = hasMore && last ? encodeCursor([new Date(last.next_timer_at).toISOString(), last.instance_id]) : undefined;
+  const cursor = hasMore && last ? encodeCursor([last.next_timer_at_cursor, last.instance_id]) : undefined;
   return { items, cursor };
 }
 

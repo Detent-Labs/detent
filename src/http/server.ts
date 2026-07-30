@@ -19,6 +19,8 @@ import {
   handleClaim,
   handleRelease,
   handleDelegate,
+  handlePostComment,
+  handleListComments,
   handleListInstances,
   handleInstanceRecord,
   handleCancel,
@@ -246,6 +248,9 @@ export function createServer(
     if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "instances" && parts[2] === "delegate") {
       return preflight("POST");
     }
+    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "instances" && parts[2] === "comments") {
+      return preflight("GET, POST");
+    }
     if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "instances" && parts[2] === "record") {
       return preflight("GET");
     }
@@ -335,6 +340,14 @@ export function createServer(
     // POST /instances/:instanceId/delegate
     if (req.method === "POST" && parts.length === 3 && parts[0] === "instances" && parts[2] === "delegate") {
       return toRes(await handleDelegate(parts[1]!, req, resolver, db));
+    }
+    // POST /instances/:instanceId/comments
+    if (req.method === "POST" && parts.length === 3 && parts[0] === "instances" && parts[2] === "comments") {
+      return toRes(await handlePostComment(parts[1]!, req, resolver, db));
+    }
+    // GET /instances/:instanceId/comments
+    if (req.method === "GET" && parts.length === 3 && parts[0] === "instances" && parts[2] === "comments") {
+      return toRes(await handleListComments(parts[1]!, req, resolver, db));
     }
     // GET /instances/:instanceId/record
     if (req.method === "GET" && parts.length === 3 && parts[0] === "instances" && parts[2] === "record") {

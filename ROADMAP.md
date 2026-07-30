@@ -824,12 +824,13 @@ capability of its own.
     would still need hand-authoring for response shapes, error mappings,
     and auth requirements. No OpenSpec change for a docs-only deliverable.
 23. Extended task collaboration: design DONE for all three sub-projects,
-    implementation NOT STARTED. Raised 2026-07-28. Stage 9 explicitly
-    excluded attachments, comments, and delegation from the end-user app.
-    Re-brainstormed 2026-07-30, at the user's direction, into three
-    designs instead of staying deferred: delegation first, since it sits
-    closest to the existing engine core, then comments, then attachments.
-    a. Task delegation: design DONE (see
+    a and b DONE, c implementation NOT STARTED. Raised 2026-07-28. Stage 9
+    explicitly excluded attachments, comments, and delegation from the
+    end-user app. Re-brainstormed 2026-07-30, at the user's direction, into
+    three designs instead of staying deferred: delegation first, since it
+    sits closest to the existing engine core, then comments, then
+    attachments.
+    a. Task delegation: DONE (`add-task-delegation`; design at
        `docs/superpowers/specs/2026-07-30-task-delegation-design.md`). A
        new `delegateClaim(instanceId, actor, toActorId, db)` sits next to
        the existing `claimStep`/`releaseClaim` (Roadmap #5d) and reuses
@@ -841,18 +842,41 @@ capability of its own.
        it, added to the same discriminated union as the other nine kinds.
        `POST /instances/:id/delegate` and a "Delegate to" action on
        `packages/app`'s Task screen expose it.
-    b. Instance comments: design DONE (see
+    b. Instance comments: DONE (`add-instance-comments`; design at
        `docs/superpowers/specs/2026-07-30-instance-comments-design.md`). A
-       new table, `instance_comments` (`instanceId`, `actorId`, `text`,
-       `createdAt`), not `InstanceEvent`: comment text is free-form and can
-       carry personal data, which would break Roadmap #20's approved
-       design, resting on `HistoryEntry`/`InstanceEvent` carrying only
-       structural facts, never a field value. `POST`/`GET
-       /instances/:id/comments` reuse the existing instance-visibility
-       rule, no new permission tier. Roadmap #20's `redactInstance` gains a
-       required addition once both land: delete `instance_comments` rows
-       for a redacted instance, the same erasure guarantee it already
-       gives `instances.body.data`.
+       new table, `instance_comments` (`id`, `instanceId`, `actorId`,
+       `text`, `createdAt`), not `InstanceEvent`: comment text is
+       free-form and can carry personal data, which would break Roadmap
+       #20's approved design, resting on `HistoryEntry`/`InstanceEvent`
+       carrying only structural facts, never a field value.
+       `postComment`/`listComments` (`src/runtime/api.ts`) reuse
+       `getInstanceView`'s participant-facing visibility rule, not
+       `getInstanceRecord`'s narrower audit-trail one, via a new shared
+       `loadInstanceForActor` helper the two functions now both call; no
+       new permission tier. `POST`/`GET /instances/:id/comments` expose
+       them, text capped at a new `MAX_COMMENT_LENGTH` (10,000
+       characters), enforced only at the HTTP boundary — `postComment`
+       itself trusts it, the same division of labour `delegateClaim`
+       already applies to `toActorId`. `packages/app`'s Task screen gains
+       a comment thread beside the field form, visible independent of
+       claim state. This change adds no new capability spec; it extends
+       four existing ones (`persistence`, `runtime-api`, `http-wrapper`,
+       `end-user-app`) instead, the same shape (a) already used.
+       Implementing this surfaced and fixed a real pagination bug in its
+       own new `listComments` cursor (Bun's Postgres driver returns
+       `timestamptz` as a millisecond-precision `Date`, so building a
+       keyset cursor from it silently lost the sub-millisecond precision
+       Postgres itself still compares on, reintroducing the boundary row
+       on the next page) by encoding the cursor from `created_at::text`
+       instead. `fix-instance-list-cursor-precision` closed the
+       identical latent bug in `listInstances` (Roadmap #6,
+       `instance-query`) the same way. There, DESC ordering made the
+       symptom worse than a duplicate: any instance sharing a
+       millisecond with the page boundary silently vanished from the
+       walk instead of reappearing.
+       Roadmap #20's `redactInstance` gains a required addition once both
+       land: delete `instance_comments` rows for a redacted instance, the
+       same erasure guarantee it already gives `instances.body.data`.
     c. Instance attachments: design DONE (see
        `docs/superpowers/specs/2026-07-30-instance-attachments-design.md`).
        A new table, `instance_attachments`, stores file bytes as Postgres
@@ -863,8 +887,7 @@ capability of its own.
        same `redactInstance` addition (b) needs applies here too.
     Each spec's own Non-goals section stays authoritative; none of the
     three touches `definitions`, `history_entries`, or `instance_events`.
-    No OpenSpec change yet for any of the three; implementation is tracked
-    separately.
+    No OpenSpec change yet for (c); implementation is tracked separately.
 24. Multi-tenancy: design DONE, implementation NOT STARTED (see
     `docs/superpowers/specs/2026-07-30-multi-tenancy-design.md`). Raised
     2026-07-28, deferred twice as a business decision. Re-brainstormed

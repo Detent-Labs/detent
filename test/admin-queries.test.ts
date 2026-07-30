@@ -125,6 +125,25 @@ test.skipIf(!DB)("listOutbox pages through more rows than the limit", async () =
   expect(cursor).toBeUndefined();
 });
 
+// Deterministic, not a timing race: forces both rows into one millisecond,
+// at different microsecond offsets, via a raw UPDATE after insertion. See
+// fix-instance-list-cursor-precision's design.md — listOutbox orders
+// descending, the same direction as listInstances, so the pre-fix symptom
+// is a silently dropped row, not a duplicate.
+test.skipIf(!DB)("listOutbox pages correctly when two rows share a millisecond", async () => {
+  await insertRow({ key: "same_ms_older", status: "pending" });
+  await insertRow({ key: "same_ms_newer", status: "pending" });
+  await sql`UPDATE outbox SET created_at = '2026-01-01 00:00:00.100001+00' WHERE idempotency_key = 'same_ms_older'`;
+  await sql`UPDATE outbox SET created_at = '2026-01-01 00:00:00.100999+00' WHERE idempotency_key = 'same_ms_newer'`;
+
+  const page1 = await listOutbox({}, { limit: 1 }, sql);
+  expect(page1.items.map((it) => it.idempotencyKey)).toEqual(["same_ms_newer"]);
+  expect(page1.cursor).toBeDefined();
+
+  const page2 = await listOutbox({}, { limit: 1, cursor: page1.cursor }, sql);
+  expect(page2.items.map((it) => it.idempotencyKey)).toEqual(["same_ms_older"]);
+});
+
 test.skipIf(!DB)("listOutbox with a malformed cursor raises RequestShapeError, not an uncaught SyntaxError or Postgres cast error", async () => {
   let raised: unknown;
   try {
@@ -238,6 +257,29 @@ test.skipIf(!DB)("listPendingTimers orders ascending, excluding non-running and 
   expect(ids).toEqual([overdue.instanceId, future.instanceId]);
   expect(ids).not.toContain(noTimer.instanceId);
   expect(ids).not.toContain(notRunning.instanceId);
+});
+
+// Deterministic, not a timing race: forces both instances' next_timer_at
+// into one millisecond, at different microsecond offsets. See
+// fix-instance-list-cursor-precision's design.md — listPendingTimers
+// orders ascending, the same direction as listComments, so the pre-fix
+// symptom is a duplicated boundary row, not a dropped one.
+test.skipIf(!DB)("listPendingTimers pages correctly when two timers share a millisecond", async () => {
+  const P = pid();
+  const v = await publishBody(P, waitBody("timers_ms"), reg, dataSourceReg);
+  const body = (await createDefinitionStore(sql).resolveBody(P, v.version))!;
+
+  const older = await createInstance(body, { processId: P, version: v.version }, sql);
+  const newer = await createInstance(body, { processId: P, version: v.version }, sql);
+  await sql`UPDATE instances SET next_timer_at = '2026-01-01 00:00:00.100001+00' WHERE instance_id = ${older.instanceId}`;
+  await sql`UPDATE instances SET next_timer_at = '2026-01-01 00:00:00.100999+00' WHERE instance_id = ${newer.instanceId}`;
+
+  const page1 = await listPendingTimers({ limit: 1 }, sql);
+  expect(page1.items.map((it) => it.instanceId)).toEqual([older.instanceId]);
+  expect(page1.cursor).toBeDefined();
+
+  const page2 = await listPendingTimers({ limit: 1, cursor: page1.cursor }, sql);
+  expect(page2.items.map((it) => it.instanceId)).toEqual([newer.instanceId]);
 });
 
 // ============================================================

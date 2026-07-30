@@ -1,4 +1,4 @@
-import type { ClientError, InstancePage, InstanceView, LoginResponse, ProcessSummary, SubmissionIssue } from "./types.js";
+import type { ClientError, CommentPage, InstanceComment, InstancePage, InstanceView, LoginResponse, ProcessSummary, SubmissionIssue } from "./types.js";
 
 /** Same-origin by default (the app is deployed alongside its API); override
  * for local dev against the devcontainer's server via VITE_API_URL. */
@@ -97,6 +97,23 @@ export async function delegate(instanceId: string, toActorId: string, token: str
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ toActorId }),
   });
+}
+
+export async function postComment(instanceId: string, text: string, token: string): Promise<InstanceComment> {
+  const res = await request(`/instances/${encodeURIComponent(instanceId)}/comments`, token, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  return (await res.json()) as InstanceComment;
+}
+
+export async function listComments(instanceId: string, token: string, cursor?: string): Promise<CommentPage> {
+  const params = new URLSearchParams();
+  if (cursor !== undefined) params.set("cursor", cursor);
+  const qs = params.toString();
+  const res = await request(`/instances/${encodeURIComponent(instanceId)}/comments${qs ? `?${qs}` : ""}`, token);
+  return (await res.json()) as CommentPage;
 }
 
 export async function submitPath(instanceId: string, pathId: string, data: Record<string, unknown>, token: string): Promise<void> {

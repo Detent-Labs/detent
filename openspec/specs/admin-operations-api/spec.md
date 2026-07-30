@@ -92,6 +92,15 @@ The read SHALL be exposed as `GET /admin/outbox`, translating `status`
 - **THEN** the response carries two rows and a cursor, and requesting the same
   route with that cursor carries the following rows
 
+#### Scenario: Two rows created within the same millisecond page correctly
+
+- **WHEN** two outbox rows were created within the same millisecond of each
+  other
+- **AND** the read is called with `limit: 1`, returning the newer one and a
+  cursor
+- **THEN** the older row is returned on the second page, not dropped from the
+  walk
+
 ### Requirement: Outbox rows are countable by status
 
 `admin-queries.ts` SHALL expose `countOutboxByStatus(db)` returning a count per
@@ -232,6 +241,15 @@ The read SHALL be exposed as `GET /admin/timers`, accepting `limit` and
 
 - **WHEN** a completed or cancelled instance still carries a `next_timer_at`
 - **THEN** it does not appear in the listing
+
+#### Scenario: Two timers armed within the same millisecond page correctly
+
+- **WHEN** two running instances have `next_timer_at` values within the same
+  millisecond of each other
+- **AND** the read is called with `limit: 1`, returning the more-overdue one
+  and a cursor
+- **THEN** the other instance is returned on the second page, not duplicated
+  from the first
 
 ### Requirement: The operator routes live in their own file
 

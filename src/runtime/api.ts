@@ -157,6 +157,17 @@ export type Page<T> = { items: T[]; cursor?: string };
 
 export type InstanceRecordElement = { kind: "transition"; entry: HistoryEntry } | { kind: "event"; event: InstanceEvent };
 
+// Not `Comment` — that name collides with the DOM's own `Comment` node
+// interface, in scope wherever a caller's TypeScript config includes the
+// `DOM` lib (e.g. packages/app).
+export type InstanceComment = {
+  id: string;
+  instanceId: InstanceId;
+  actorId: string;
+  text: string;
+  createdAt: string;
+};
+
 const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 200;
 const DEFAULT_RECORD_LIMIT = 100;
@@ -529,39 +540,48 @@ export async function createProcessInstance(
 }
 
 /**
+ * Loads an instance and authorizes `actor` to read it: `ADMIN_ROLE`, the
+ * instance's starter, the current step's claimant, or an eligible candidate
+ * on the current step's assignment (`isEligibleCandidate`, shared with
+ * `claimStep` so the two predicates cannot drift). Load-failure handling
+ * mirrors `cancelInstance`: an `ADMIN_ROLE` caller loads directly (a missing
+ * instance surfaces as today's not-found); every other caller loads inside a
+ * `try` whose `catch` collapses into `AuthorizationError`, so a nonexistent
+ * instance and one the caller may not read are indistinguishable.
+ *
+ * Shared by `getInstanceView`, `postComment`, and `listComments` — every
+ * Runtime API Layer read that uses this participant-facing visibility rule,
+ * as opposed to `getInstanceRecord`'s narrower audit-trail one.
+ */
+async function loadInstanceForActor(instanceId: InstanceId, actor: Actor, db: SQL): Promise<{ instance: Instance; body: ProcessBody }> {
+  if (actor.roles.includes(ADMIN_ROLE)) {
+    return loadInstanceForRead(instanceId, db);
+  }
+  let instance: Instance;
+  let body: ProcessBody;
+  try {
+    ({ instance, body } = await loadInstanceForRead(instanceId, db));
+  } catch {
+    throw new AuthorizationError(`actor '${actor.id}' may not read instance '${instanceId}'`);
+  }
+  if (
+    instance.startedBy !== actor.id &&
+    instance.assignment?.claimedBy !== actor.id &&
+    !isEligibleCandidate(actor, instance.assignment?.candidates ?? [])
+  ) {
+    throw new AuthorizationError(`actor '${actor.id}' may not read instance '${instanceId}'`);
+  }
+  return { instance, body };
+}
+
+/**
  * Resolve a display-ready view of an instance: its current step, resolved
  * fields, and currently available manual paths — for an instance in any
  * status. Uses the ordinary (unlocked) rehydrate path: a view is read-only,
  * so there is no concurrent writeback for it to race.
- *
- * Authorizes `actor` against the loaded instance before resolving anything:
- * `ADMIN_ROLE`, the instance's starter, the current step's claimant, or an
- * eligible candidate on the current step's assignment (`isEligibleCandidate`,
- * shared with `claimStep` so the two predicates cannot drift). Load-failure
- * handling mirrors `cancelInstance`: an `ADMIN_ROLE` caller loads directly (a
- * missing instance surfaces as today's not-found); every other caller loads
- * inside a `try` whose `catch` collapses into `AuthorizationError`, so a
- * nonexistent instance and one the caller may not read are indistinguishable.
  */
 export async function getInstanceView(instanceId: InstanceId, actor: Actor, registry: DataSourceRegistry, db: SQL = sql): Promise<InstanceView> {
-  let instance: Instance;
-  let body: ProcessBody;
-  if (actor.roles.includes(ADMIN_ROLE)) {
-    ({ instance, body } = await loadInstanceForRead(instanceId, db));
-  } else {
-    try {
-      ({ instance, body } = await loadInstanceForRead(instanceId, db));
-    } catch {
-      throw new AuthorizationError(`actor '${actor.id}' may not read instance '${instanceId}'`);
-    }
-    if (
-      instance.startedBy !== actor.id &&
-      instance.assignment?.claimedBy !== actor.id &&
-      !isEligibleCandidate(actor, instance.assignment?.candidates ?? [])
-    ) {
-      throw new AuthorizationError(`actor '${actor.id}' may not read instance '${instanceId}'`);
-    }
-  }
+  const { instance, body } = await loadInstanceForActor(instanceId, actor, db);
   const step = findStep(body, instance.currentStepId as string);
   return {
     instanceId: instance.instanceId,
@@ -750,8 +770,17 @@ export async function listInstances(
   const statusArr = filter.status && filter.status.length > 0 ? db.array(filter.status, "TEXT") : null;
   const assignedToRolesArr = filter.assignedToRoles && filter.assignedToRoles.length > 0 ? db.array(filter.assignedToRoles, "TEXT") : null;
 
+  // created_at::text (created_at_cursor) carries Postgres's full microsecond
+  // precision, unlike the driver's own Date conversion of the plain
+  // created_at column, which is only millisecond-precise. Building the
+  // cursor from the lossy Date value let a boundary row's true,
+  // sub-millisecond-earlier timestamp stop comparing "less than" its own
+  // rounded-down cursor, silently dropping it (and any row between the
+  // rounded cursor and the true boundary value) from the walk — see
+  // fix-instance-list-cursor-precision's design.md. Encoding from the
+  // lossless text avoids that entirely, the same fix listComments applies.
   const rows = (await db`
-    SELECT instance_id, body, created_at FROM instances
+    SELECT instance_id, body, created_at, created_at::text AS created_at_cursor FROM instances
     WHERE (${filter.processId ?? null}::text IS NULL OR body->>'processId' = ${filter.processId ?? null})
       AND (${statusArr}::text[] IS NULL OR body->>'status' = ANY(${statusArr}))
       AND (${filter.currentStepId ?? null}::text IS NULL OR body->>'currentStepId' = ${filter.currentStepId ?? null})
@@ -771,14 +800,14 @@ export async function listInstances(
       )
     ORDER BY created_at DESC, instance_id DESC
     LIMIT ${limit + 1}
-  ` as unknown) as { instance_id: string; body: unknown; created_at: string }[];
+  ` as unknown) as { instance_id: string; body: unknown; created_at: string; created_at_cursor: string }[];
 
   const hasMore = rows.length > limit;
   const pageRows = rows.slice(0, limit);
   const store = getStore(db);
   const items = await Promise.all(pageRows.map((r) => toSummary(parseInstance(r.body), r.created_at, store)));
   const last = pageRows[pageRows.length - 1];
-  const cursor = hasMore && last ? encodeCursor([new Date(last.created_at).toISOString(), last.instance_id]) : undefined;
+  const cursor = hasMore && last ? encodeCursor([last.created_at_cursor, last.instance_id]) : undefined;
   return { items, cursor };
 }
 
@@ -851,5 +880,77 @@ export async function getInstanceRecord(
   });
   const last = pageRows[pageRows.length - 1];
   const cursor = hasMore && last ? encodeCursor([String(last.transition_seq), last.at, last.id]) : undefined;
+  return { items, cursor };
+}
+
+/**
+ * Post a free-text comment on an instance. Uses `loadInstanceForActor`'s
+ * visibility rule — the same one `getInstanceView` applies — not
+ * `getInstanceRecord`'s narrower audit-trail one, since a comment thread sits
+ * beside the field view, not the record.
+ *
+ * `text` is trusted as already validated non-empty and within bound by the
+ * caller (the HTTP wrapper's Zod schema): the same division of labour
+ * `delegateClaim` already applies to `toActorId`. This function performs no
+ * independent length or emptiness check.
+ */
+export async function postComment(instanceId: InstanceId, actor: Actor, text: string, db: SQL = sql): Promise<InstanceComment> {
+  const { instance } = await loadInstanceForActor(instanceId, actor, db);
+  const id = `comment_${crypto.randomUUID()}`;
+  const rows = (await db`
+    INSERT INTO instance_comments (id, instance_id, actor_id, text)
+    VALUES (${id}, ${instance.instanceId}, ${actor.id}, ${text})
+    RETURNING id, instance_id, actor_id, text, created_at
+  ` as unknown) as { id: string; instance_id: string; actor_id: string; text: string; created_at: Date }[];
+  const row = rows[0]!;
+  return { id: row.id, instanceId: row.instance_id as InstanceId, actorId: row.actor_id, text: row.text, createdAt: row.created_at.toISOString() };
+}
+
+/**
+ * List an instance's comments, oldest first, keyset-paginated by
+ * `(created_at, id)` ascending — the reverse order `listInstances` and
+ * `getInstanceRecord` sort in, matching a comment thread's natural reading
+ * order. Applies the same visibility rule `postComment` applies.
+ */
+export async function listComments(
+  instanceId: InstanceId,
+  actor: Actor,
+  page: { limit?: number; cursor?: string } = {},
+  db: SQL = sql,
+): Promise<Page<InstanceComment>> {
+  await loadInstanceForActor(instanceId, actor, db);
+  const limit = Math.min(page.limit ?? DEFAULT_RECORD_LIMIT, MAX_RECORD_LIMIT);
+  const [cursorCreatedAt, cursorId] = page.cursor ? decodeCursor(page.cursor, 2) : [undefined, undefined];
+
+  // `created_at::text` (`created_at_cursor` below) carries Postgres's full
+  // microsecond precision, unlike the driver's own `Date` conversion of the
+  // plain `created_at` column, which is only millisecond-precise. Building
+  // the cursor from the lossy `Date` value let the boundary row's true,
+  // sub-millisecond-later timestamp compare greater than its own rounded
+  // cursor on the next page, reintroducing that same row — confirmed via a
+  // failing pagination test during this change's implementation. Encoding
+  // from the lossless text avoids that entirely.
+  const rows = (await db`
+    SELECT id, instance_id, actor_id, text, created_at, created_at::text AS created_at_cursor FROM instance_comments
+    WHERE instance_id = ${instanceId}
+      AND (
+        ${cursorCreatedAt ?? null}::timestamptz IS NULL
+        OR (created_at, id) > (${cursorCreatedAt ?? null}::timestamptz, ${cursorId ?? null})
+      )
+    ORDER BY created_at ASC, id ASC
+    LIMIT ${limit + 1}
+  ` as unknown) as { id: string; instance_id: string; actor_id: string; text: string; created_at: Date; created_at_cursor: string }[];
+
+  const hasMore = rows.length > limit;
+  const pageRows = rows.slice(0, limit);
+  const items: InstanceComment[] = pageRows.map((r) => ({
+    id: r.id,
+    instanceId: r.instance_id as InstanceId,
+    actorId: r.actor_id,
+    text: r.text,
+    createdAt: r.created_at.toISOString(),
+  }));
+  const last = pageRows[pageRows.length - 1];
+  const cursor = hasMore && last ? encodeCursor([last.created_at_cursor, last.id]) : undefined;
   return { items, cursor };
 }

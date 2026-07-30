@@ -35,7 +35,7 @@ beforeAll(async () => {
   if (DB) await initSchema();
 });
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions`;
+  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_comments, definitions`;
 });
 
 // ============================================================
@@ -720,6 +720,14 @@ test("wildcard config: OPTIONS preflight on the delegate route returns 204 with 
   expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles, Authorization");
 });
 
+test("wildcard config: OPTIONS preflight on the comments route returns 204 with CORS headers, without posting or listing", async () => {
+  const res = await corsFetch(new Request("http://x/instances/inst_x/comments", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles, Authorization");
+});
+
 test("allowlist config: an allowed-origin preflight echoes that origin", async () => {
   const req = withOrigin(new Request("http://x/instances/inst_x", { method: "OPTIONS" }), ALLOWED_ORIGIN);
   const res = await allowlistFetch(req);
@@ -842,6 +850,68 @@ test.skipIf(!DB)("POST /instances/:instanceId/delegate with a missing toActorId 
   expect(res.status).toBe(400);
   const body = (await res.json()) as { error: { type: string } };
   expect(body.error.type).toBe("request-shape");
+});
+
+// ============================================================
+// Comment routes
+// ============================================================
+
+test.skipIf(!DB)("POST /instances/:instanceId/comments succeeds for an eligible candidate and returns 201", async () => {
+  const PID = pid("proc_http_comment_post");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/comments`, "POST", user1, { text: "checked the amount" }));
+  expect(res.status).toBe(201);
+  const body = (await res.json()) as { actorId: string; text: string };
+  expect(body.actorId).toBe("user_1");
+  expect(body.text).toBe("checked the amount");
+});
+
+test.skipIf(!DB)("GET /instances/:instanceId/comments returns 200 with the posted comment", async () => {
+  const PID = pid("proc_http_comment_list");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(jsonReq(`http://x/instances/${created.instanceId}/comments`, "POST", user1, { text: "a note" }));
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/comments`, "GET", user1));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { items: { text: string }[] };
+  expect(body.items).toHaveLength(1);
+  expect(body.items[0]!.text).toBe("a note");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/comments with empty text maps to 400 request-shape", async () => {
+  const PID = pid("proc_http_comment_empty");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/comments`, "POST", user1, { text: "   " }));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/comments with over-length text maps to 400 request-shape", async () => {
+  const PID = pid("proc_http_comment_toolong");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/comments`, "POST", user1, { text: "x".repeat(10_001) }));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("an actor with no relation to the instance gets 403 on both comment routes", async () => {
+  const PID = pid("proc_http_comment_403");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const postRes = await fetch(jsonReq(`http://x/instances/${created.instanceId}/comments`, "POST", bystander, { text: "should not land" }));
+  expect(postRes.status).toBe(403);
+  const listRes = await fetch(authedReq(`http://x/instances/${created.instanceId}/comments`, "GET", bystander));
+  expect(listRes.status).toBe(403);
 });
 
 // ============================================================

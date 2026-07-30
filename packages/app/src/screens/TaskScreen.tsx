@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { FieldForm, PathButtons, filterToEditable } from "form-ui";
 import type { SubmissionIssue } from "form-ui";
-import { cancelInstance, claim, delegate, getInstanceView, release, submitPath } from "../api/client.js";
+import { cancelInstance, claim, delegate, getInstanceView, listComments, postComment, release, submitPath } from "../api/client.js";
 import { AppClientError } from "../api/client.js";
 import { describeError, type ErrorOutcome } from "../errors.js";
 import { t } from "../i18n/catalog.js";
 import type { UiLocale } from "../i18n/locale.js";
-import type { InstanceView } from "../api/types.js";
+import type { InstanceComment, InstanceView } from "../api/types.js";
 import type { Route } from "../routing.js";
 
 interface TaskScreenProps {
@@ -25,6 +25,8 @@ export function TaskScreen({ instanceId, token, locale, navigate, onUnauthorized
   const [loading, setLoading] = useState(false);
   const [outcome, setOutcome] = useState<ErrorOutcome | undefined>(undefined);
   const [validationIssues, setValidationIssues] = useState<SubmissionIssue[]>([]);
+  const [comments, setComments] = useState<InstanceComment[]>([]);
+  const [commentText, setCommentText] = useState("");
 
   const applyView = useCallback((next: InstanceView) => {
     setView(next);
@@ -89,10 +91,16 @@ export function TaskScreen({ instanceId, token, locale, navigate, onUnauthorized
     [applyView, instanceId, locale, navigate, onUnauthorized, token],
   );
 
+  const loadComments = useCallback(async () => {
+    const page = await listComments(instanceId, token);
+    setComments(page.items);
+  }, [instanceId, token]);
+
   useEffect(() => {
     void withErrorHandling(async () => {
       const fresh = await getInstanceView(instanceId, token);
       applyView(fresh);
+      await loadComments();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instanceId]);
@@ -127,6 +135,14 @@ export function TaskScreen({ instanceId, token, locale, navigate, onUnauthorized
     withErrorHandling(async () => {
       await cancelInstance(instanceId, token);
       navigate({ name: "tasks" });
+    });
+
+  const doPostComment = () =>
+    withErrorHandling(async () => {
+      if (!commentText.trim()) return;
+      await postComment(instanceId, commentText, token);
+      setCommentText("");
+      await loadComments();
     });
 
   const fieldIds = new Set(view?.fields.map((f) => f.field.id) ?? []);
@@ -210,6 +226,31 @@ export function TaskScreen({ instanceId, token, locale, navigate, onUnauthorized
           </div>
 
           {claimedByMe && <PathButtons paths={view.availablePaths} onSubmit={(pathId) => void doSubmit(pathId)} loading={loading} />}
+
+          <section className="app-task-comments">
+            <h2>{t(locale, "task.commentsHeading")}</h2>
+            <ul>
+              {comments.map((c) => (
+                <li key={c.id}>
+                  <span className="app-task-comment-meta">
+                    {c.actorId} · {new Date(c.createdAt).toLocaleString()}
+                  </span>
+                  <p>{c.text}</p>
+                </li>
+              ))}
+            </ul>
+            <div className="app-task-comment-form">
+              <textarea
+                value={commentText}
+                disabled={loading}
+                placeholder={t(locale, "task.commentPlaceholder")}
+                onChange={(e) => setCommentText(e.target.value)}
+              />
+              <button type="button" disabled={loading || !commentText.trim()} onClick={() => void doPostComment()}>
+                {t(locale, "task.commentSubmit")}
+              </button>
+            </div>
+          </section>
         </>
       )}
     </main>
