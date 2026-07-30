@@ -534,19 +534,39 @@ capability of its own.
     see stage 11). Without an export/import path for process definitions
     between databases, moving a definition from staging to production is a
     manual rebuild. Touches Studio. No OpenSpec change yet.
-19. Database seed data: NOT STARTED, deliberately deferred — raised
-    2026-07-28. A fresh database (devcontainer spin-up, or any new
-    environment) starts completely empty — no example process, no demo
-    user, no sample instances. CLAUDE.md already documents recreating demo
-    state by hand after `bun test`'s `beforeEach` truncation wipes it; a
-    seed script (e.g. `bun run seed`, publishing `examples/*.json` and
-    provisioning a demo account per reserved role via `src/auth/cli.ts`)
-    would replace that manual step and give a new developer or environment
-    something to look at immediately. Needs to be idempotent — safe to
-    re-run against an already-seeded database without duplicating rows.
-    Ranked ahead of the items below: it is not customer-facing like 14–18,
-    but it is cheap and the pain it fixes is already recurring. No
-    OpenSpec change yet.
+<!-- antislop: allow sentence-length, run-ons, passive-voice. This entry
+     matches the dense technical-prose convention every other DONE entry in
+     this file already uses; see the antislop-targeted-allow-not-file-all
+     memory for why that convention exists and why a block-scoped allow is
+     the correct tool here, not a file-wide one. -->
+19. Database seed data: DONE (`add-database-seed-data`; see the
+    `database-seed-script` spec and the archived change
+    `2026-07-30-add-database-seed-data`). `scripts/seed.ts`, wired to `bun
+    run seed`, publishes the three `examples/*.json` bodies: `credit_check`
+    first, under its literal pinned `processId` (`proc_credit_check`),
+    since `subprocess-loan-parent.json` hardcodes that exact reference and
+    a script-minted id would break the cross-process pin; then
+    `loan_application` and `expense_approval`, each resolved to a stable
+    `processId` by looking up an existing process's `key` first
+    (`listProcesses`) so a re-run reuses it instead of minting a new one.
+    It also provisions one demo account per reserved role
+    (`system:publish`, `system:cancel-any`, `system:admin`,
+    `system:developer`), looked up by email first so a re-run updates
+    roles and password instead of hitting `auth_users.email`'s unique
+    constraint. Idempotent by construction, not by a marker table: a
+    re-run reports "already up to date" for every process and "updated"
+    for every user, with zero duplicate rows, verified against a live
+    database rather than only by test. Deliberately does not gate on
+    `NODE_ENV` or any other environment signal — nothing in the repo reads
+    one today, and no production deployment path exists yet (stage 14) to
+    define what such a signal would mean; the accepted mitigation stays
+    that the script never runs on its own, and its own output states the
+    accounts are for local development only. Calls `src/auth/users.ts` and
+    `src/engine/definitions.ts::publishBody` directly rather than
+    `src/auth/cli.ts`, unlike this stage's original sketch guessed: the
+    CLI is a thin argv-parsing wrapper over those same functions, so an
+    in-process script calling them directly avoids a needless
+    subprocess-spawn and string-argv round trip.
 20. Data retention & deletion policy: NOT STARTED, deliberately deferred —
     raised 2026-07-28. The runtime record is append-only by design (see
     "Runtime record" in CLAUDE.md) and nothing is ever archived or deleted

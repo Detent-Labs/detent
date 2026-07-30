@@ -1,0 +1,110 @@
+/**
+ * Roadmap #19: idempotent seed script. Publishes the repo's example process
+ * definitions and provisions one demo user per reserved role, so a fresh
+ * devcontainer database has something to look at instead of nothing.
+ *
+ * Reserved for seed data — do not reuse for an unrelated process: the keys
+ * `expense_approval`, `loan_application`, `credit_check`, and the literal
+ * processId `proc_credit_check` (pinned by `examples/subprocess-loan-parent.json`'s
+ * subprocess reference, so `credit_check` always publishes under that exact id,
+ * never a script-minted one).
+ *
+ * Demo account passwords are fixed and known. This is for local development
+ * only — never point this script at a shared or production database.
+ *
+ * Run inside the devcontainer (DATABASE_URL must be set):
+ *   bun run seed
+ */
+import { readFileSync } from "node:fs";
+import { sql, initSchema } from "../src/engine/store.js";
+import { publishBody, listProcesses, listVersions } from "../src/engine/definitions.js";
+import { createDefaultRegistry, createDefaultDataSourceRegistry } from "../src/engine/host.js";
+import { register } from "../src/engine/registry.js";
+import { createUser, listUsers, setRoles, setPassword } from "../src/auth/users.js";
+import { PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE } from "../src/auth/authorize.js";
+import type { ProcessId, ProcessBody } from "../src/schema/definition.js";
+
+const DEMO_PASSWORD = "seed-demo-password";
+
+const DEMO_USERS: { role: string; emailSuffix: string }[] = [
+  { role: PUBLISH_ROLE, emailSuffix: "publish" },
+  { role: CANCEL_ANY_ROLE, emailSuffix: "cancel-any" },
+  { role: ADMIN_ROLE, emailSuffix: "admin" },
+  { role: DEVELOPER_ROLE, emailSuffix: "developer" },
+];
+
+const EXAMPLES: { path: string; fixedProcessId?: ProcessId }[] = [
+  // credit_check first: the parent's subprocess reference pins this literal id.
+  { path: "../examples/subprocess-credit-check-child.json", fixedProcessId: "proc_credit_check" as ProcessId },
+  { path: "../examples/subprocess-loan-parent.json" },
+  { path: "../examples/expense-approval.json" },
+];
+
+function readExampleBody(path: string): ProcessBody {
+  const raw = JSON.parse(readFileSync(new URL(path, import.meta.url), "utf-8"));
+  return (raw.definition ?? raw) as ProcessBody;
+}
+
+async function resolveProcessId(key: string): Promise<ProcessId> {
+  const existing = await listProcesses(sql);
+  const match = existing.find((p) => p.key === key);
+  return match ? match.processId : (`proc_${crypto.randomUUID()}` as ProcessId);
+}
+
+async function seedProcess(
+  registry: ReturnType<typeof createDefaultRegistry>,
+  dataSourceReg: ReturnType<typeof createDefaultDataSourceRegistry>,
+  example: { path: string; fixedProcessId?: ProcessId },
+): Promise<void> {
+  const body = readExampleBody(example.path);
+  const processId = example.fixedProcessId ?? (await resolveProcessId(body.key));
+  const versionsBefore = await listVersions(processId, sql);
+  const published = await publishBody(processId, body, registry, dataSourceReg, sql);
+  const isNew = versionsBefore.length === 0 || !versionsBefore.some((v) => v.definitionHash === published.definitionHash);
+  console.log(`- ${body.key} (${processId}): ${isNew ? "published" : "already up to date"} at v${published.version}`);
+}
+
+async function seedUser(demo: { role: string; emailSuffix: string }): Promise<void> {
+  const email = `demo-${demo.emailSuffix}@example.test`;
+  const users = await listUsers(sql);
+  const existing = users.find((u) => u.email === email);
+  if (existing) {
+    await setRoles(email, [demo.role], sql);
+    await setPassword(email, DEMO_PASSWORD, sql);
+    console.log(`- ${email}: updated (role ${demo.role})`);
+  } else {
+    await createUser(email, DEMO_PASSWORD, [demo.role], sql);
+    console.log(`- ${email}: created (role ${demo.role})`);
+  }
+}
+
+async function main() {
+  await initSchema();
+
+  const registry = createDefaultRegistry();
+  // Dummy handlers, sufficient for publish-time registry validation only —
+  // mirrors scripts/demo-expense-approval.ts, since expense-approval.json
+  // references action types no real handler ships for yet (roadmap #5e).
+  register(registry, "notify.email", { handler: async () => ({}) });
+  register(registry, "accounting.postInvoice", { handler: async () => ({ status: "booked" }) });
+  const dataSourceReg = createDefaultDataSourceRegistry();
+
+  console.log("Processes:");
+  for (const example of EXAMPLES) {
+    await seedProcess(registry, dataSourceReg, example);
+  }
+
+  console.log("\nDemo users (local development only, fixed password):");
+  for (const demo of DEMO_USERS) {
+    await seedUser(demo);
+  }
+
+  console.log("\nDone.");
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
