@@ -50,3 +50,19 @@ export class InstanceNotRunningError extends Error {
     this.name = "InstanceNotRunningError";
   }
 }
+
+/**
+ * Redaction targeted an instance whose status is `running`. The mirror image
+ * of `InstanceNotRunningError`: most operations refuse a non-running
+ * instance, this one refuses a running one, so it needs its own type rather
+ * than an inverted reuse of that one.
+ */
+export class InstanceRunningError extends Error {
+  constructor(
+    readonly instanceId: string,
+    readonly status: string,
+  ) {
+    super(`instance ${instanceId} is running (status: ${status})`);
+    this.name = "InstanceRunningError";
+  }
+}

@@ -44,6 +44,7 @@ export interface InstanceView {
   version: number;
   status: InstanceStatus;
   step: { id: string; key: string; label: LocalizedText; type: string };
+  redactedAt?: string;
 }
 
 /** Mirrors src/runtime/api.ts::InstanceRecordElement. */

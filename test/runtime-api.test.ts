@@ -25,6 +25,7 @@ import {
   InstanceNotRunningError,
   type InstanceRecordElement,
 } from "../src/runtime/api.js";
+import { redactInstance } from "../src/engine/retention.js";
 import { ADMIN_ROLE, DEVELOPER_ROLE, AuthorizationError } from "../src/auth/authorize.js";
 import { RequestShapeError } from "../src/errors.js";
 import type { ProcessBody, ProcessId, PathId, InstanceId, FieldId, Instance, StepId } from "../src/schema/definition.js";
@@ -471,6 +472,26 @@ test.skipIf(!DB)("getInstanceView on a cancelled instance still resolves, with n
   const view = await getInstanceView(cancelled.instanceId, actor, dataSourceReg);
   expect(view.status).toBe("cancelled");
   expect(view.availablePaths).toEqual([]);
+});
+
+test.skipIf(!DB)("getInstanceView omits redactedAt before redaction and returns it after", async () => {
+  const PID = pid("proc_view_redacted");
+  await publishBody(PID, cascadeBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  const result = await submitAndTransition(
+    created.instanceId,
+    "path_ab" as PathId,
+    { field_decision: "approve" } as unknown as Instance["data"],
+    actor, dataSourceReg,
+  );
+  expect(result.status).toBe("completed");
+
+  const before = await getInstanceView(result.instanceId, actor, dataSourceReg);
+  expect(before.redactedAt).toBeUndefined();
+
+  await redactInstance(result.instanceId, sql);
+  const after = await getInstanceView(result.instanceId, actor, dataSourceReg);
+  expect(after.redactedAt).toBeDefined();
 });
 
 test.skipIf(!DB)("getInstanceView on a running subprocess wait-state has no available paths", async () => {

@@ -1041,5 +1041,8 @@ export const instance = z.object({
   // Optional only for instances that predate this field — nothing ever wrote
   // it for them, so a reader falls back to startedAt for those.
   currentStepEnteredAt: timestamp.optional(),
+  // Set once by redactInstance; absent means not redacted, same as an
+  // instance that predates this field.
+  redactedAt: timestamp.optional(),
 });
 export type Instance = z.infer<typeof instance>;
