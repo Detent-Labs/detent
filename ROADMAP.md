@@ -758,11 +758,11 @@ capability of its own.
     `auth_users.email` erasure (stage 10's disable-not-delete decision
     already covers account-level requests), and data portability/export.
     No OpenSpec change yet — implementation is tracked separately from
-    this design. **Addendum, 2026-07-30**: Stage 23b and 23c's designs
-    (instance comments, instance attachments) each add a table that can
-    carry personal data outside `instances.body.data`. `redactInstance`'s
+    this design. **Addendum, 2026-07-30**: Stage 23b and 23c (instance
+    comments, instance attachments, both now DONE) each added a table that
+    can carry personal data outside `instances.body.data`. `redactInstance`'s
     implementation must also clear `instance_comments` and
-    `instance_attachments` rows for a redacted instance once those land.
+    `instance_attachments` rows for a redacted instance.
     This does not change the design above; it only extends its existing
     scope to two tables this design predates.
 21. Reporting & analytics: design DONE, implementation NOT STARTED. Raised
@@ -836,8 +836,8 @@ capability of its own.
     through an OpenSpec change, departing from the design's own "no
     OpenSpec change" note for a docs-only deliverable — the same
     deliberate departure Roadmap #14c already took for the same reason.
-23. Extended task collaboration: design DONE for all three sub-projects,
-    a and b DONE, c implementation NOT STARTED. Raised 2026-07-28. Stage 9
+23. Extended task collaboration: DONE. Sub-projects (a), (b), and (c) all
+    DONE. Raised 2026-07-28. Stage 9
     explicitly excluded attachments, comments, and delegation from the
     end-user app. Re-brainstormed 2026-07-30, at the user's direction, into
     three designs instead of staying deferred: delegation first, since it
@@ -887,20 +887,26 @@ capability of its own.
        symptom worse than a duplicate: any instance sharing a
        millisecond with the page boundary silently vanished from the
        walk instead of reappearing.
-       Roadmap #20's `redactInstance` gains a required addition once both
-       land: delete `instance_comments` rows for a redacted instance, the
-       same erasure guarantee it already gives `instances.body.data`.
-    c. Instance attachments: design DONE (see
+       Roadmap #20's `redactInstance` needs a required addition: delete
+       `instance_comments` rows for a redacted instance, the same erasure
+       guarantee it already gives `instances.body.data`.
+    c. Instance attachments: DONE (`add-instance-attachments`; design at
        `docs/superpowers/specs/2026-07-30-instance-attachments-design.md`).
        A new table, `instance_attachments`, stores file bytes as Postgres
        `bytea`, not object storage: no new dependency, works identically
        on-premise and in SaaS, and reuses the Roadmap #14c backup/restore
-       runbook unchanged. A `MAX_ATTACHMENT_BYTES` environment variable
-       caps upload size, following the `DATABASE_URL`-style convention. The
-       same `redactInstance` addition (b) needs applies here too.
+       runbook unchanged. `uploadAttachment`/`listAttachments`/
+       `getAttachment` (`src/runtime/api.ts`) use instance-scoped lookup,
+       matching (b)'s `loadInstanceForActor` visibility rule. Three HTTP
+       routes expose them, including a non-JSON binary response for
+       download. `MAX_ATTACHMENT_BYTES` defaults to 5 MB, staying under the
+       existing `MAX_REQUEST_BODY_SIZE` once base64 overhead is accounted
+       for, following the `DATABASE_URL`-style environment-variable
+       convention. `packages/app`'s Task screen gains an upload/list/
+       download section, and `docs/openapi.yaml` documents the new routes.
+       The same `redactInstance` addition (b) needs applies here too.
     Each spec's own Non-goals section stays authoritative; none of the
     three touches `definitions`, `history_entries`, or `instance_events`.
-    No OpenSpec change yet for (c); implementation is tracked separately.
 24. Multi-tenancy: design DONE, implementation NOT STARTED (see
     `docs/superpowers/specs/2026-07-30-multi-tenancy-design.md`). Raised
     2026-07-28, deferred twice as a business decision. Re-brainstormed
