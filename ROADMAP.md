@@ -500,26 +500,72 @@ capability of its own.
        "someday" — not resolved here.
     Neither sub-project has an OpenSpec change yet; write one when either
     actually gets scheduled.
-14. Deployment & operations readiness: NOT STARTED, deliberately deferred —
-    raised 2026-07-28 as a "someday" question while sketching what shipping
-    to a real customer needs beyond stages 1–13. Today the only run path is
-    the devcontainer. Missing: a production Docker image (or images) for the
-    engine and each frontend, health/readiness endpoints for orchestration,
-    and a documented backup/restore runbook for the Postgres schema (no
-    engine schema change implied — this is packaging and ops documentation).
-    No OpenSpec change yet.
+14. Deployment & operations readiness: IN PROGRESS. Sub-project (a) DONE,
+    (b) and (c) NOT STARTED. Raised 2026-07-28 as a "someday" question while
+    sketching what shipping to a real customer needs beyond stages 1–13.
+    Today the only run path is the devcontainer. Three independent
+    sub-projects, split out and ordered 2026-07-30 (each brainstormed and
+    specced on its own rather than as one combined design):
+    a. Health/readiness endpoints for orchestration: DONE
+       (`add-health-readiness-endpoints`; see
+       `docs/superpowers/specs/2026-07-30-health-readiness-endpoints-design.md`).
+       Smallest sub-project, sequenced first because it is a prerequisite for
+       (b): a production Docker image's `HEALTHCHECK` and a k8s-style
+       liveness/readiness probe both need an endpoint to call, so designing
+       the image around one that does not exist yet would just reopen that
+       design later. Ships two unauthenticated routes on the existing
+       `Bun.serve` wrapper: `GET /livez` (unconditional) and `GET /readyz`
+       (a `SELECT 1` database ping, 503 on failure).
+    b. Production Docker image(s) for the engine and each frontend
+       (app/admin/studio) — today only the devcontainer image
+       (`.devcontainer/Dockerfile`) exists, and it is dev-only (mounts the
+       workspace, runs `sleep infinity`). Depends on (a) landing first.
+    c. A documented backup/restore runbook for the Postgres schema. Pure
+       packaging/ops documentation, no engine schema change implied.
+       Independent of (a) and (b) — sequenced last because it caps off the
+       "deployment readiness" story, not because it depends on either.
+    No OpenSpec change yet for any sub-project; write one per sub-project as
+    each is brainstormed.
 15. Observability: NOT STARTED, deliberately deferred — raised 2026-07-28.
     No structured logging convention, no metrics, no tracing today; outbox
     backlog, timer latency, and `faulted`-instance rate are only visible by
-    hand through the admin area. A real deployment needs at least metrics
-    plus a logging convention before an operator can tell the system is
-    healthy without watching the UI. No OpenSpec change yet.
+    hand through the admin area. Design approved 2026-07-30 (see
+    `docs/superpowers/specs/2026-07-30-observability-design.md`), scoped
+    during brainstorming to exactly the two things the roadmap names —
+    metrics and a logging convention, deliberately not tracing — following
+    stage 14a's dependency-free precedent: a hand-rolled structured-JSON
+    logger (`src/log.ts`, a process-wide `LOG_LEVEL` threshold, existing
+    `console.*` call sites converted) and an unauthenticated `GET /metrics`
+    Prometheus-text endpoint computed fresh from the database on every
+    scrape, exposing exactly the three signals named above — outbox
+    backlog by status (reusing `countOutboxByStatus`), timer overdue
+    count/max lag, and faulted-instance count (two new reads added to
+    `src/engine/admin-queries.ts`). Generic HTTP request metrics and any
+    metrics/logging library are out of scope; see the design's non-goals
+    for the full reasoning. No OpenSpec change yet.
 16. Notifications: NOT STARTED, deliberately deferred — raised 2026-07-28.
     Stage 9 excluded notifications from the end-user app on purpose; an
     inbox-only model without email/webhook on assignment or reminder is a
-    gap for customers used to being pushed to, not polling. Likely shape: a
-    new action-handler type on the existing action registry (mirroring
-    `http.request`, roadmap #5e), not a new schema concept. No OpenSpec
+    gap for customers used to being pushed to, not polling. Design approved
+    2026-07-30 (see `docs/superpowers/specs/2026-07-30-notifications-design.md`):
+    one new action-handler type, `notification.email`, on the existing
+    action registry (mirroring `http.request`, roadmap #5e), not a new
+    schema concept — the five existing action positions already cover
+    "notify on assignment" (a step's `onEntry`) and "notify on reminder" (a
+    timer's `onFire.actions`). Recipients are static config (`config.to`, a
+    literal address list, exactly like `http.request`'s `config.url`), not
+    resolved to the assignee — that needs a new actor-id/role to
+    `auth_users.email` lookup nothing in the engine does today, and stays a
+    deliberate follow-on. Webhook notification is already covered by
+    `http.request` at the same five positions, so it stays a documented
+    recipe rather than new code. The handler speaks SMTP directly (`Bun.connect`
+    plus TLS, no new npm dependency), keeping it as vendor-neutral as
+    `http.request` is for webhooks; connection details
+    (`SMTP_HOST`/`PORT`/`USER`/`PASSWORD`/`FROM`) come from the environment,
+    never the process body, matching the `DATABASE_URL`/`AUTH_JWT_SECRET`
+    convention. The devcontainer gains a `mailpit` service for real
+    SMTP integration testing, the same "real dependency, not a mock"
+    pattern the DB-backed suites already use against `db`. No OpenSpec
     change yet.
 17. Escalation pattern: NOT STARTED, deliberately deferred — raised
     2026-07-28, depends on stage 16 landing first. Timers are already
