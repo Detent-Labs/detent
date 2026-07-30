@@ -758,7 +758,13 @@ capability of its own.
     `auth_users.email` erasure (stage 10's disable-not-delete decision
     already covers account-level requests), and data portability/export.
     No OpenSpec change yet — implementation is tracked separately from
-    this design.
+    this design. **Addendum, 2026-07-30**: Stage 23b and 23c's designs
+    (instance comments, instance attachments) each add a table that can
+    carry personal data outside `instances.body.data`. `redactInstance`'s
+    implementation must also clear `instance_comments` and
+    `instance_attachments` rows for a redacted instance once those land.
+    This does not change the design above; it only extends its existing
+    scope to two tables this design predates.
 21. Reporting & analytics: design DONE, implementation NOT STARTED. Raised
     2026-07-28. Design approved 2026-07-30 (see
     `docs/superpowers/specs/2026-07-30-reporting-analytics-design.md`). The
@@ -817,22 +823,72 @@ capability of its own.
     about 15 routes costs more than hand-writing them, since a generator
     would still need hand-authoring for response shapes, error mappings,
     and auth requirements. No OpenSpec change for a docs-only deliverable.
-23. Extended task collaboration: NOT STARTED, deliberately deferred —
-    raised 2026-07-28. Stage 9 explicitly excluded attachments, comments,
-    and delegation from the end-user app; classic BPM-suite expectations
-    that may resurface as a customer ask rather than a committed
-    direction. Re-brainstormed 2026-07-30: confirmed still speculative, no
-    design produced. Revisit only once a specific customer asks for one of
-    attachments, comments, or delegation; building ahead of that ask would
-    be pure speculation. No OpenSpec change yet.
-24. Multi-tenancy: NOT STARTED, deliberately deferred — raised 2026-07-28.
-    Today's convention is one deployment/database per customer (see stage
-    11's environment-separation note). A shared-infrastructure SaaS model
-    would need tenant isolation this convention doesn't provide; this is a
-    business-model decision to make first, not a technical default to
-    build toward speculatively. Re-brainstormed 2026-07-30: confirmed
-    still a business decision, not a technical one, so no design was
-    produced. A future technical design (a tenant id on every row, an
-    isolation model, per-tenant quotas) is worth doing only after that
-    business decision picks shared infrastructure over today's
-    per-customer deployment convention. No OpenSpec change yet.
+23. Extended task collaboration: design DONE for all three sub-projects,
+    implementation NOT STARTED. Raised 2026-07-28. Stage 9 explicitly
+    excluded attachments, comments, and delegation from the end-user app.
+    Re-brainstormed 2026-07-30, at the user's direction, into three
+    designs instead of staying deferred: delegation first, since it sits
+    closest to the existing engine core, then comments, then attachments.
+    a. Task delegation: design DONE (see
+       `docs/superpowers/specs/2026-07-30-task-delegation-design.md`). A
+       new `delegateClaim(instanceId, actor, toActorId, db)` sits next to
+       the existing `claimStep`/`releaseClaim` (Roadmap #5d) and reuses
+       their `updateAssignment` helper unchanged. The calling actor must
+       hold the current claim; the delegate becomes the new claimant
+       without joining the permanent candidate pool, so a release lets the
+       original candidates reclaim the step. A new `InstanceEvent` kind,
+       `assignment.delegated`, payload `{fromActorId, toActorId}`, records
+       it, added to the same discriminated union as the other nine kinds.
+       `POST /instances/:id/delegate` and a "Delegate to" action on
+       `packages/app`'s Task screen expose it.
+    b. Instance comments: design DONE (see
+       `docs/superpowers/specs/2026-07-30-instance-comments-design.md`). A
+       new table, `instance_comments` (`instanceId`, `actorId`, `text`,
+       `createdAt`), not `InstanceEvent`: comment text is free-form and can
+       carry personal data, which would break Roadmap #20's approved
+       design, resting on `HistoryEntry`/`InstanceEvent` carrying only
+       structural facts, never a field value. `POST`/`GET
+       /instances/:id/comments` reuse the existing instance-visibility
+       rule, no new permission tier. Roadmap #20's `redactInstance` gains a
+       required addition once both land: delete `instance_comments` rows
+       for a redacted instance, the same erasure guarantee it already
+       gives `instances.body.data`.
+    c. Instance attachments: design DONE (see
+       `docs/superpowers/specs/2026-07-30-instance-attachments-design.md`).
+       A new table, `instance_attachments`, stores file bytes as Postgres
+       `bytea`, not object storage: no new dependency, works identically
+       on-premise and in SaaS, and reuses the Roadmap #14c backup/restore
+       runbook unchanged. A `MAX_ATTACHMENT_BYTES` environment variable
+       caps upload size, following the `DATABASE_URL`-style convention. The
+       same `redactInstance` addition (b) needs applies here too.
+    Each spec's own Non-goals section stays authoritative; none of the
+    three touches `definitions`, `history_entries`, or `instance_events`.
+    No OpenSpec change yet for any of the three; implementation is tracked
+    separately.
+24. Multi-tenancy: design DONE, implementation NOT STARTED (see
+    `docs/superpowers/specs/2026-07-30-multi-tenancy-design.md`). Raised
+    2026-07-28, deferred twice as a business decision. Re-brainstormed
+    2026-07-30 once that decision was made: the engine must support both a
+    shared SaaS deployment and today's on-premise, per-customer
+    deployment, from one codebase. Two isolation models were considered
+    and rejected: a row-level `tenant_id` column on every table (cheapest,
+    but one missed `WHERE` clause leaks one tenant's data into another's
+    response) and schema-per-tenant (stronger, but one shared migration
+    run still couples every tenant together). The recommended model is one
+    database per tenant, reusing Roadmap #11's existing
+    environment-separation convention exactly: on-premise stays one
+    deployment, one `DATABASE_URL`, one tenant, unchanged; SaaS runs many
+    tenant databases behind one shared `Bun.serve` process, with a new
+    control-plane `tenants` table (`id`, `key`, `name`, `databaseUrl`) the
+    only new shared state. No table gains a `tenant_id` column and no
+    query gains a tenant filter, since every route handler already takes a
+    `db` argument the server resolves per request in SaaS mode; `auth_users`
+    needs no change either, since each tenant's database already carries
+    its own. Tenant resolution reuses Stage 7's existing multi-resolver
+    JWT-`iss` dispatch. Provisioning a new tenant is a CLI action mirroring
+    `src/auth/cli.ts`, not self-service. One environment variable (a
+    control-plane connection string) turns SaaS mode on; unset, the server
+    behaves exactly as it does today. Deliberately out of scope: cross-
+    tenant billing/usage dashboards, self-service signup, forced migration
+    of an on-premise deployment into the SaaS control plane, and per-
+    tenant quotas. No OpenSpec change yet.
