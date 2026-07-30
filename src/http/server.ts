@@ -47,6 +47,7 @@ import {
   handleGetOrphanKeys,
   handleGetRegistry,
 } from "./studio-routes.js";
+import { handleLivez, handleReadyz } from "./health.js";
 import type { HttpResult } from "./errors.js";
 
 /**
@@ -205,6 +206,19 @@ export function createServer(
     const origin = req.headers.get("Origin");
     const toRes = (result: HttpResult) => toResponse(result, allowedOrigins, origin);
     const preflight = (methods: string) => preflightResponse(methods, allowedOrigins, origin);
+
+    // GET /livez, GET /readyz: unauthenticated, no CORS handling — an
+    // orchestrator's health probe is not a browser request. `toResponse`
+    // is called with `undefined` origin config here, not `toRes`, so
+    // neither route ever carries an Access-Control-* header, regardless of
+    // the server's own CORS configuration (http-wrapper spec, "livez/readyz
+    // ignore the CORS configuration").
+    if (req.method === "GET" && parts.length === 1 && parts[0] === "livez") {
+      return toResponse(await handleLivez(), undefined, null);
+    }
+    if (req.method === "GET" && parts.length === 1 && parts[0] === "readyz") {
+      return toResponse(await handleReadyz(db), undefined, null);
+    }
 
     // CORS preflight for every route below
     if (loginSecret && req.method === "OPTIONS" && parts.length === 2 && parts[0] === "auth" && parts[1] === "login") {
