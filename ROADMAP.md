@@ -720,51 +720,64 @@ capability of its own.
      stages 17/18 both end on verbatim); see the antislop-targeted-allow-
      not-file-all memory for why that convention exists and why a
      block-scoped allow is the correct tool here, not a file-wide one. -->
-20. Data retention & deletion policy: design DONE, implementation NOT
-    STARTED. Raised 2026-07-28. Design approved 2026-07-30 (see
+20. Data retention & deletion policy: DONE (`add-data-retention-deletion`;
+    design at
     `docs/superpowers/specs/2026-07-30-data-retention-deletion-design.md`).
+    Raised 2026-07-28, design approved 2026-07-30, implemented 2026-07-31.
     The runtime record is append-only by design (see "Runtime record" in
-    CLAUDE.md), and nothing is ever archived or deleted today, so storage
-    grows unbounded and a GDPR erasure request had no defined answer
-    against an append-only audit trail. The design treats both problems
-    as one policy: a retention period counted from an instance's
-    completion triggers automatic clearing, and the same clearing runs
-    early, on demand, for one instance, when an erasure request arrives
-    first. A schema read settled where personal data actually lives:
-    `HistoryEntry` and `InstanceEvent` carry only structural facts (step
-    ids, path ids, opaque actor ids, field ids inside `ActionOutcome`),
-    never a field value, so the append-only audit trail needs no change
-    at all. The only place a participant's submitted field values live
-    is `instances.body.data`, one non-historized object overwritten in
-    place at every writeback. Redaction clears that one field to `{}`
-    and stamps a new nullable `instances.redacted_at` column, matching a
-    new `Instance.redactedAt` in the schema; no `history_entries`/
-    `instance_events` row is ever touched. A new `redactInstance`
-    (`src/engine/retention.ts`) refuses a `running` instance
-    unconditionally, whether the trigger is automatic or manual, since
-    live `data` is still read by guards and actions. An automatic sweep
-    runs only when an operator sets `DATA_RETENTION_DAYS` in the
-    environment; there is no default value, a deliberate departure from
-    the `DATABASE_URL` convention, since a default would start an
-    existing deployment erasing data the moment this code ships, with no
-    operator opting in. When active, the sweep covers
-    `completed`/`cancelled` instances past the window and excludes
-    `faulted` ones, which stay an anomaly an operator may still need to
-    inspect. A new `system:admin`-gated route, `POST
-    /admin/instances/:id/redact`, covers the manual case for
+    CLAUDE.md), and nothing was ever archived or deleted before this
+    stage, so storage grew unbounded and a GDPR erasure request had no
+    defined answer against an append-only audit trail. The design treats
+    both problems as one policy: a retention period counted from an
+    instance's completion triggers automatic clearing, and the same
+    clearing runs early, on demand, for one instance, when an erasure
+    request arrives first. A schema read settled where personal data
+    actually lives: `HistoryEntry` and `InstanceEvent` carry only
+    structural facts (step ids, path ids, opaque actor ids, field ids
+    inside `ActionOutcome`), never a field value, so the append-only audit
+    trail needed no change at all. The only place a participant's
+    submitted field values live is `instances.body.data`, one
+    non-historized object overwritten in place at every writeback.
+    Redaction clears that one field to `{}` and stamps a new nullable
+    `instances.redacted_at` column, matching a new `Instance.redactedAt`
+    in the schema; no `history_entries`/`instance_events` row is ever
+    touched. `redactInstance` (`src/engine/retention.ts`) refuses a
+    `running` instance unconditionally, whether the trigger is automatic
+    or manual, since live `data` is still read by guards and actions, and
+    is idempotent (a second call against an already-redacted instance is
+    a no-op). It also deletes that instance's `instance_comments` and
+    `instance_attachments` rows in the same transaction, per the
+    2026-07-30 addendum below. An automatic sweep
+    (`startRetentionSweep`/`sweepRetention`) runs only when an operator
+    sets `DATA_RETENTION_DAYS` to a positive integer; there is no default
+    value, a deliberate departure from the `DATABASE_URL` convention,
+    since a default would start an existing deployment erasing data the
+    moment this code ships, with no operator opting in. An invalid-but-set
+    value fails engine startup outright rather than silently leaving the
+    sweep off, so a misconfiguration can't masquerade as "retention is
+    active." When active, the sweep runs hourly, keyset-paginates eligible
+    instances in batches of 500 (mirroring `migrateInstances`'s own
+    pagination), and covers `completed`/`cancelled` instances past the
+    window while excluding `faulted` ones, which stay an anomaly an
+    operator may still need to inspect. A `system:admin`-gated route,
+    `POST /admin/instances/:id/redact`, covers the manual case for
     `completed`/`cancelled`/`faulted` instances, matching every other
-    destructive admin action. Deliberately out of scope: per-process
-    retention configuration, erasure of a running instance,
-    `auth_users.email` erasure (stage 10's disable-not-delete decision
-    already covers account-level requests), and data portability/export.
-    No OpenSpec change yet — implementation is tracked separately from
-    this design. **Addendum, 2026-07-30**: Stage 23b and 23c (instance
-    comments, instance attachments, both now DONE) each added a table that
-    can carry personal data outside `instances.body.data`. `redactInstance`'s
-    implementation must also clear `instance_comments` and
-    `instance_attachments` rows for a redacted instance.
-    This does not change the design above; it only extends its existing
-    scope to two tables this design predates.
+    destructive admin action; `packages/admin`'s instance detail screen
+    gained a "Redact data" action and a redacted-on-`<date>` badge, backed
+    by a new `redactedAt` field on `InstanceView`
+    (`src/runtime/api.ts::getInstanceView`). `docs/openapi.yaml`
+    deliberately does not document the new route: its own scope statement
+    excludes every `admin/*` route, the same exclusion
+    `/admin/migrations/run` already falls under. Deliberately out of
+    scope: per-process retention configuration, erasure of a running
+    instance, `auth_users.email` erasure (stage 10's disable-not-delete
+    decision already covers account-level requests), and data
+    portability/export. **Addendum, 2026-07-30**: Stage 23b and 23c
+    (instance comments, instance attachments, both DONE) each added a
+    table that can carry personal data outside `instances.body.data`;
+    `redactInstance`'s implementation (above) covers both. This did not
+    change the design; it only extended its existing scope to two tables
+    the design predates.
 21. Reporting & analytics: design DONE, implementation NOT STARTED. Raised
     2026-07-28. Design approved 2026-07-30 (see
     `docs/superpowers/specs/2026-07-30-reporting-analytics-design.md`). The
