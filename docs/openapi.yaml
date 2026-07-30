@@ -1,0 +1,1122 @@
+openapi: 3.0.3
+info:
+  title: "Workflow/BPM Engine: Runtime API"
+  version: "1.0.0"
+  description: >-
+    The customer-facing HTTP surface of the workflow/BPM engine: login,
+    process publish/list/versions, and the full instance lifecycle
+    (create, view, submit, claim/release/delegate, comment, cancel, and
+    the audit record). Excludes `admin/*`, `drafts/*`, `migration-plans/*`,
+    and `registry`, which serve the operator (`packages/admin`) and
+    developer (`packages/studio`) frontends directly, not a customer
+    integration.
+
+    Every route runs through the Runtime API Layer (`src/runtime/api.ts`).
+    An unauthenticated request to any route below `POST /auth/login`,
+    `GET /livez`, and `GET /readyz` gets 401. A request lacking a required
+    reserved role gets 403. A malformed request body gets 400 (request
+    shape) or 422 (field-level validation).
+servers:
+  - url: /
+    description: Path-relative — point this at the deployment's own origin.
+security:
+  - bearerAuth: []
+tags:
+  - name: auth
+    description: Login and token issuance.
+  - name: processes
+    description: Publish and discover process definitions.
+  - name: instances
+    description: Create, drive, and read process instances.
+  - name: health
+    description: Unauthenticated liveness/readiness probes for orchestration.
+
+paths:
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Log in with email and password
+      description: >-
+        Registered only when `AUTH_JWT_SECRET` is set. Returns an 8-hour
+        JWT. Repeated failed attempts for one email are rate-limited
+        before the credential check runs.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          description: Request body is not valid JSON, or is missing `email`/`password`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Unknown email, wrong password, or a disabled account. One generic message for all three, by design.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "429":
+          description: Too many failed attempts for this email within the rate-limit window. No other route in this document returns 429.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /processes:
+    post:
+      tags: [processes]
+      operationId: publishProcess
+      summary: Publish a process definition
+      description: Requires the `system:publish` role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishRequest"
+      responses:
+        "200":
+          description: Published (or, on an identical re-publish, the existing version, hash-idempotent).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishResponse"
+        "400":
+          description: Request body is not valid JSON, or is missing `processId`/`body`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: The actor lacks the `system:publish` role.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          description: The definition fails schema, CEL, registry, or cross-process validation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssuesErrorEnvelope"
+        "500":
+          description: An unrecognized server-side failure. Body carries no message.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    get:
+      tags: [processes]
+      operationId: listProcesses
+      summary: List every process with at least one published version
+      description: No reserved-role requirement. Each entry describes that process's newest published version.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProcessSummary"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /processes/{processId}/versions:
+    get:
+      tags: [processes]
+      operationId: listProcessVersions
+      summary: List published versions of one process
+      description: No reserved-role requirement.
+      parameters:
+        - $ref: "#/components/parameters/processId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VersionSummary"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /processes/{processId}/instances:
+    post:
+      tags: [instances]
+      operationId: createInstance
+      summary: Create an instance of a process
+      description: No reserved-role requirement. Omit `version` to use the latest published version.
+      parameters:
+        - $ref: "#/components/parameters/processId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInstanceRequest"
+      responses:
+        "201":
+          description: Created (and run to rest — an all-automatic path from the initial step, if any, has already fired).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instance"
+        "400":
+          description: Request body is not valid JSON, or does not match the expected shape.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          description: Seed `data` fails field-level validation against the initial step.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssuesErrorEnvelope"
+        "500":
+          description: The process, or the requested version, has no published body. Also covers any unrecognized server-side failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /instances:
+    get:
+      tags: [instances]
+      operationId: listInstances
+      summary: List instances
+      description: >-
+        `scope=mine` is open to any authenticated actor and is derived
+        from that actor's id/roles. `scope=all`, and an omitted `scope`
+        alike, require the `system:admin` role.
+      parameters:
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [mine, all]
+          description: Omitted means `all`.
+        - name: processId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/InstanceStatus"
+        - name: currentStepId
+          in: query
+          schema:
+            type: string
+        - name: startedBy
+          in: query
+          schema:
+            type: string
+        - name: claimedBy
+          in: query
+          schema:
+            type: string
+        - name: assignedTo
+          in: query
+          schema:
+            type: string
+          description: Rejected (400) when combined with `scope=mine`.
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstanceSummaryPage"
+        "400":
+          description: An invalid `limit`/`status` value, or `scope=mine` combined with `assignedTo`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: "`scope=all` (or an omitted `scope`) without the `system:admin` role."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /instances/{instanceId}:
+    get:
+      tags: [instances]
+      operationId: getInstanceView
+      summary: Resolve a display-ready view of one instance
+      description: >-
+        No reserved-role requirement. Visible to `system:admin`, the
+        instance's starter, the current step's claimant, or an eligible
+        assignment candidate.
+      parameters:
+        - $ref: "#/components/parameters/instanceId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstanceView"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: The actor is neither admin, starter, claimant, nor an eligible candidate.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: The instance does not exist. Also covers any unrecognized server-side failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /instances/{instanceId}/submit:
+    post:
+      tags: [instances]
+      operationId: submitInstance
+      summary: Submit field data and trigger a manual transition
+      description: No reserved-role requirement; the claimant, or an eligible candidate on an unclaimed step, may submit.
+      parameters:
+        - $ref: "#/components/parameters/instanceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitRequest"
+      responses:
+        "200":
+          description: >-
+            The updated instance. On an automatic-cascade loop
+            (`AutomaticCascadeLoop`) this is still 200: the submit and
+            transition already committed, and the body is the resulting
+            (now-`faulted`) view, not an error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instance"
+        "400":
+          description: Request body is not valid JSON, or does not match the expected shape.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: The actor is not the claimant, or not an eligible candidate on an unclaimed step.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: The named path's guard refused the transition, the instance is not running, or a concurrent write lost the optimistic-concurrency race.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          description: Submitted `data` fails field-level validation against the current step.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssuesErrorEnvelope"
+
+  /instances/{instanceId}/claim:
+    post:
+      tags: [instances]
+      operationId: claimInstance
+      summary: Claim the instance's current step
+      description: No reserved-role requirement; the actor must be an eligible, unclaimed candidate.
+      parameters:
+        - $ref: "#/components/parameters/instanceId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instance"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: The actor is not an eligible candidate, or the step is already claimed by someone else.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: The instance is not running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /instances/{instanceId}/release:
+    post:
+      tags: [instances]
+      operationId: releaseInstance
+      summary: Release the current claim on the instance's current step
+      description: No reserved-role requirement; the actor must hold the current claim.
+      parameters:
+        - $ref: "#/components/parameters/instanceId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instance"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: The actor is not the step's current claimant.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: The instance is not running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /instances/{instanceId}/delegate:
+    post:
+      tags: [instances]
+      operationId: delegateInstance
+      summary: Delegate the current claim to another actor
+      description: >-
+        No reserved-role requirement; the actor must hold the current
+        claim. The delegate becomes the new claimant without joining the
+        permanent candidate pool.
+      parameters:
+        - $ref: "#/components/parameters/instanceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DelegateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instance"
+        "400":
+          description: Request body is not valid JSON, or is missing `toActorId`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: The actor is not the step's current claimant.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: The instance is not running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /instances/{instanceId}/comments:
+    post:
+      tags: [instances]
+      operationId: postInstanceComment
+      summary: Post a comment on an instance
+      description: >-
+        No reserved-role requirement; the same participant-visibility
+        rule as `GET /instances/{instanceId}` governs who may post.
+        Visible independent of claim state. `text` is capped at 10,000
+        characters.
+      parameters:
+        - $ref: "#/components/parameters/instanceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommentRequest"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstanceComment"
+        "400":
+          description: Request body is not valid JSON, is missing `text`, or `text` is empty or over 10,000 characters.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: The actor is neither admin, starter, claimant, nor an eligible candidate.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: The instance does not exist. Also covers any unrecognized server-side failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    get:
+      tags: [instances]
+      operationId: listInstanceComments
+      summary: List comments on an instance, oldest first
+      description: Same participant-visibility rule as posting a comment.
+      parameters:
+        - $ref: "#/components/parameters/instanceId"
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstanceCommentPage"
+        "400":
+          description: An invalid `limit` value.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: The actor is neither admin, starter, claimant, nor an eligible candidate.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: The instance does not exist. Also covers any unrecognized server-side failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /instances/{instanceId}/cancel:
+    post:
+      tags: [instances]
+      operationId: cancelInstance
+      summary: Cancel a running instance
+      description: >-
+        Requires the `system:cancel-any` role, or that the actor started
+        the instance (`startedBy === actor.id`).
+      parameters:
+        - $ref: "#/components/parameters/instanceId"
+      responses:
+        "200":
+          description: OK. A no-op (still 200) on an instance that is not running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instance"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: The actor holds neither `system:cancel-any` nor starter status on this instance.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /instances/{instanceId}/record:
+    get:
+      tags: [instances]
+      operationId: getInstanceRecord
+      summary: Read the merged transition/event audit record of an instance
+      description: >-
+        Requires the `system:admin` role, or `system:developer` together
+        with `startedBy === actor.id` (a developer may read the record of
+        an instance their own Player session created).
+      parameters:
+        - $ref: "#/components/parameters/instanceId"
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstanceRecordPage"
+        "400":
+          description: An invalid `limit` value.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: The actor holds neither `system:admin` nor `system:developer` plus starter status on this instance.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /livez:
+    get:
+      tags: [health]
+      operationId: livez
+      summary: Liveness probe
+      description: Unconditional. No auth, no CORS handling.
+      security: []
+      responses:
+        "200":
+          description: The process is up.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /readyz:
+    get:
+      tags: [health]
+      operationId: readyz
+      summary: Readiness probe
+      description: "A `SELECT 1` database ping. No auth, no CORS handling."
+      security: []
+      responses:
+        "200":
+          description: The database is reachable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+        "503":
+          description: The database ping failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    processId:
+      name: processId
+      in: path
+      required: true
+      schema:
+        type: string
+    instanceId:
+      name: instanceId
+      in: path
+      required: true
+      schema:
+        type: string
+    limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+      description: A non-positive-integer value is rejected with 400.
+    cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+      description: An opaque page cursor returned by a previous call.
+
+  schemas:
+    Actor:
+      type: object
+      properties:
+        id:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+      required: [id, roles]
+
+    InstanceStatus:
+      type: string
+      enum: [running, completed, cancelled, faulted]
+
+    LocalizedText:
+      type: object
+      description: "Locale code (e.g. `en`, `de-CH`) to display string."
+      additionalProperties:
+        type: string
+
+    AssignmentState:
+      type: object
+      properties:
+        candidates:
+          type: array
+          items:
+            type: string
+        claimedBy:
+          type: string
+        claimedAt:
+          type: string
+          format: date-time
+      required: [candidates]
+
+    Instance:
+      type: object
+      properties:
+        instanceId:
+          type: string
+        processId:
+          type: string
+        version:
+          type: integer
+        definitionHash:
+          type: string
+        currentStepId:
+          type: string
+        transitionSeq:
+          type: integer
+        data:
+          type: object
+          additionalProperties: true
+          description: Flat, keyed by field id.
+        assignment:
+          type: object
+          allOf:
+            - $ref: "#/components/schemas/AssignmentState"
+          nullable: true
+        status:
+          $ref: "#/components/schemas/InstanceStatus"
+        startedAt:
+          type: string
+          format: date-time
+        startedBy:
+          type: string
+        currentStepEnteredAt:
+          type: string
+          format: date-time
+      required: [instanceId, processId, version, definitionHash, currentStepId, transitionSeq, data, status, startedAt]
+
+    ResolvedViewField:
+      type: object
+      properties:
+        field:
+          type: object
+          description: The field's catalog definition (see `src/schema/definition.ts`'s `fieldDef`).
+        value:
+          description: The field's current value, or absent.
+        required:
+          type: boolean
+        readonly:
+          type: boolean
+        group:
+          type: string
+        options:
+          type: array
+          items:
+            type: object
+      required: [field, required, readonly]
+
+    AvailablePath:
+      type: object
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+        label:
+          type: string
+      required: [id, key]
+
+    InstanceView:
+      type: object
+      properties:
+        instanceId:
+          type: string
+        processId:
+          type: string
+        version:
+          type: integer
+        status:
+          $ref: "#/components/schemas/InstanceStatus"
+        step:
+          type: object
+          properties:
+            id:
+              type: string
+            key:
+              type: string
+            label:
+              $ref: "#/components/schemas/LocalizedText"
+            type:
+              type: string
+          required: [id, key, label, type]
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResolvedViewField"
+        availablePaths:
+          type: array
+          items:
+            $ref: "#/components/schemas/AvailablePath"
+      required: [instanceId, processId, version, status, step, fields, availablePaths]
+
+    InstanceSummary:
+      type: object
+      properties:
+        instanceId:
+          type: string
+        processId:
+          type: string
+        version:
+          type: integer
+        status:
+          $ref: "#/components/schemas/InstanceStatus"
+        currentStepId:
+          type: string
+        transitionSeq:
+          type: integer
+        assignment:
+          type: object
+          allOf:
+            - $ref: "#/components/schemas/AssignmentState"
+          nullable: true
+        startedBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        currentStepEnteredAt:
+          type: string
+          format: date-time
+        processLabel:
+          $ref: "#/components/schemas/LocalizedText"
+        stepLabel:
+          $ref: "#/components/schemas/LocalizedText"
+        processBaseLocale:
+          type: string
+      required: [instanceId, processId, version, status, currentStepId, transitionSeq, createdAt, processLabel, stepLabel, processBaseLocale]
+
+    InstanceSummaryPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InstanceSummary"
+        cursor:
+          type: string
+      required: [items]
+
+    InstanceComment:
+      type: object
+      properties:
+        id:
+          type: string
+        instanceId:
+          type: string
+        actorId:
+          type: string
+        text:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, instanceId, actorId, text, createdAt]
+
+    InstanceCommentPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InstanceComment"
+        cursor:
+          type: string
+      required: [items]
+
+    InstanceRecordElement:
+      type: object
+      description: >-
+        A `HistoryEntry` (`kind` is `transition`) or an `InstanceEvent`
+        (`kind` is `event`). See CLAUDE.md's "Runtime record" section.
+      properties:
+        kind:
+          type: string
+          enum: [transition, event]
+        entry:
+          type: object
+          description: Present when `kind` is `transition`.
+        event:
+          type: object
+          description: Present when `kind` is `event`.
+      required: [kind]
+
+    InstanceRecordPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InstanceRecordElement"
+        cursor:
+          type: string
+      required: [items]
+
+    ProcessSummary:
+      type: object
+      properties:
+        processId:
+          type: string
+        version:
+          type: integer
+        definitionHash:
+          type: string
+        status:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+        key:
+          type: string
+        label:
+          $ref: "#/components/schemas/LocalizedText"
+        baseLocale:
+          type: string
+      required: [processId, version, definitionHash, status, publishedAt, key, label, baseLocale]
+
+    VersionSummary:
+      type: object
+      properties:
+        version:
+          type: integer
+        definitionHash:
+          type: string
+        status:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+      required: [version, definitionHash, status, publishedAt]
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required: [email, password]
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: 'An 8-hour token whose `iss` claim is `"bps"`.'
+        expiresAt:
+          type: string
+          format: date-time
+        actor:
+          $ref: "#/components/schemas/Actor"
+      required: [token, expiresAt, actor]
+
+    PublishRequest:
+      type: object
+      properties:
+        processId:
+          type: string
+          description: The caller decides identity — the same `processId` across two calls is a new version of one process.
+        body:
+          type: object
+          description: A `ProcessBody` (see `src/schema/definition.ts`), validated server-side against the server's own registry.
+      required: [processId, body]
+
+    PublishResponse:
+      type: object
+      properties:
+        processId:
+          type: string
+        version:
+          type: integer
+        definitionHash:
+          type: string
+        status:
+          type: string
+      required: [processId, version, definitionHash, status]
+
+    CreateInstanceRequest:
+      type: object
+      properties:
+        version:
+          type: integer
+          minimum: 1
+          description: Omit for the latest published version.
+        data:
+          type: object
+          additionalProperties: true
+          description: Seed values for the initial step's fields.
+
+    SubmitRequest:
+      type: object
+      properties:
+        pathId:
+          type: string
+        data:
+          type: object
+          additionalProperties: true
+          default: {}
+      required: [pathId]
+
+    DelegateRequest:
+      type: object
+      properties:
+        toActorId:
+          type: string
+          minLength: 1
+      required: [toActorId]
+
+    CommentRequest:
+      type: object
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 10000
+      required: [text]
+
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, unavailable]
+      required: [status]
+
+    ErrorEnvelope:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              type: string
+            message:
+              type: string
+          required: [type]
+      required: [error]
+
+    IssuesErrorEnvelope:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              type: string
+            issues:
+              type: array
+              items:
+                type: object
+          required: [type, issues]
+      required: [error]
