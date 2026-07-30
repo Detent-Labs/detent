@@ -14,6 +14,7 @@ import {
   submitAndTransition,
   claimStep,
   releaseClaim,
+  delegateClaim,
   listInstances,
   getInstanceRecord,
   cancelInstance,
@@ -39,6 +40,9 @@ import { z } from "zod";
 const createInstanceBodySchema = z.object({
   version: z.number().int().positive().optional(),
   data: z.record(z.unknown()).optional(),
+});
+const delegateBodySchema = z.object({
+  toActorId: z.string().min(1),
 });
 const submitBodySchema = z.object({
   pathId: z.string(),
@@ -147,6 +151,15 @@ export async function handleRelease(instanceId: string, req: Request, resolver: 
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     const updated = await releaseClaim(instanceId as InstanceId, actor, db);
+    return { status: 200, body: updated };
+  });
+}
+
+export async function handleDelegate(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    const body = await parseJsonBody(req, delegateBodySchema);
+    const updated = await delegateClaim(instanceId as InstanceId, actor, body.toActorId, db);
     return { status: 200, body: updated };
   });
 }

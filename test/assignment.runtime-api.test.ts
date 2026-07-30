@@ -9,7 +9,7 @@ import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { NotAssignedError, NotACandidateError, AlreadyClaimedError, NotClaimedError, NotClaimantError } from "../src/engine/transition.js";
-import { createProcessInstance, claimStep, releaseClaim, submitAndTransition, cancelInstance, InstanceNotRunningError } from "../src/runtime/api.js";
+import { createProcessInstance, claimStep, releaseClaim, delegateClaim, submitAndTransition, cancelInstance, InstanceNotRunningError } from "../src/runtime/api.js";
 import { AuthorizationError, ADMIN_ROLE } from "../src/auth/authorize.js";
 import type { ProcessBody, ProcessId, PathId, InstanceEvent } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
@@ -167,6 +167,72 @@ test.skipIf(!DB)("two concurrent releaseClaim calls by the claimant resolve to e
 });
 
 // ============================================================
+// delegateClaim
+// ============================================================
+
+test.skipIf(!DB)("delegateClaim succeeds for the claimant, rejects a non-claimant", async () => {
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+  await claimStep(inst.instanceId, candidate);
+  await rejectsWith(delegateClaim(inst.instanceId, roleActor, outsider.id), NotClaimantError);
+  const delegated = await delegateClaim(inst.instanceId, candidate, outsider.id);
+  expect(delegated.assignment?.claimedBy).toBe(outsider.id);
+
+  const delegatedEvents = (await eventsOf(inst.instanceId)).filter((e) => e.kind === "assignment.delegated");
+  expect(delegatedEvents).toHaveLength(1);
+  expect(delegatedEvents[0]!.payload).toEqual({ fromActorId: candidate.id, toActorId: outsider.id });
+  // The assignment-claim-release-consolidation spec's timestamp-agreement
+  // scenario: claimedAt and the event's at come from the same instant.
+  expect(delegatedEvents[0]!.at).toBe(delegated.assignment!.claimedAt!);
+});
+
+test.skipIf(!DB)("a second delegation supersedes the first", async () => {
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+  const finalDelegate: Actor = { id: "user_4", roles: [] };
+  await claimStep(inst.instanceId, candidate);
+  await delegateClaim(inst.instanceId, candidate, outsider.id);
+
+  const redelegated = await delegateClaim(inst.instanceId, outsider, finalDelegate.id);
+  expect(redelegated.assignment?.claimedBy).toBe(finalDelegate.id);
+
+  // The first delegate (outsider) no longer holds the claim, so its own
+  // former holder (candidate) and outsider itself are both non-claimants now.
+  await rejectsWith(delegateClaim(inst.instanceId, outsider, candidate.id), NotClaimantError);
+  await rejectsWith(releaseClaim(inst.instanceId, outsider), NotClaimantError);
+
+  const delegatedEvents = (await eventsOf(inst.instanceId)).filter((e) => e.kind === "assignment.delegated");
+  expect(delegatedEvents).toHaveLength(2);
+  // `eventsOf` orders by `id` (a random UUID, not `at`), so find by content
+  // rather than assume array position reflects delegation order.
+  const secondDelegation = delegatedEvents.find((e) => (e.payload as { fromActorId: string }).fromActorId === outsider.id);
+  expect(secondDelegation?.payload).toEqual({ fromActorId: outsider.id, toActorId: finalDelegate.id });
+});
+
+test.skipIf(!DB)("delegateClaim succeeds even when the target is not an eligible candidate", async () => {
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+  await claimStep(inst.instanceId, candidate);
+  // outsider is not in step_a's candidate list (["approver", "user_1"]).
+  const delegated = await delegateClaim(inst.instanceId, candidate, outsider.id);
+  expect(delegated.assignment?.claimedBy).toBe(outsider.id);
+  expect(delegated.assignment?.candidates).toEqual(["approver", "user_1"]);
+});
+
+test.skipIf(!DB)("a delegate does not join the candidate pool, so only the originals can reclaim after a release", async () => {
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+  await claimStep(inst.instanceId, candidate);
+  await delegateClaim(inst.instanceId, candidate, outsider.id);
+  await rejectsWith(releaseClaim(inst.instanceId, candidate), NotClaimantError); // candidate no longer holds it
+  const released = await releaseClaim(inst.instanceId, outsider);
+  expect(released.assignment?.claimedBy).toBeUndefined();
+  await rejectsWith(claimStep(inst.instanceId, outsider), NotACandidateError); // the delegate never joined
+  const reclaimed = await claimStep(inst.instanceId, roleActor); // an original candidate can
+  expect(reclaimed.assignment?.claimedBy).toBe(roleActor.id);
+});
+
+// ============================================================
 // InstanceNotRunningError: claim/release against a non-running instance
 // ============================================================
 //
@@ -204,6 +270,23 @@ test.skipIf(!DB)("releaseClaim against a cancelled instance throws InstanceNotRu
   let raised: unknown;
   try {
     await releaseClaim(inst.instanceId, candidate);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(InstanceNotRunningError);
+  expect((raised as InstanceNotRunningError).status).toBe("cancelled");
+});
+
+test.skipIf(!DB)("delegateClaim against a cancelled instance throws InstanceNotRunningError instead of no-op succeeding", async () => {
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+  await claimStep(inst.instanceId, candidate);
+  const cancelled = await cancelInstance(inst.instanceId, candidate);
+  expect(cancelled.status).toBe("cancelled");
+
+  let raised: unknown;
+  try {
+    await delegateClaim(inst.instanceId, candidate, outsider.id);
   } catch (e) {
     raised = e;
   }

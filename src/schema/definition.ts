@@ -982,6 +982,15 @@ export const instanceEvent = z.discriminatedUnion("kind", [
     kind: z.literal("assignment.released"),
     payload: z.object({ actorId: z.string() }).strict(),
   }),
+  // The claimant delegated their claim to a named target actor. Not a
+  // transition (no step change), so no HistoryEntry and no transitionSeq
+  // advance — the migration.skipped shape, not the timer.fired one. The
+  // target does not join `assignment.candidates`.
+  z.object({
+    ...instanceEventEnvelope,
+    kind: z.literal("assignment.delegated"),
+    payload: z.object({ fromActorId: z.string(), toActorId: z.string() }).strict(),
+  }),
   // An advance cascade re-entered a step it had already entered and was
   // stopped, parking the instance `faulted`. Not a transition (no step
   // change) — the migration.skipped shape, not the timer.fired one: no

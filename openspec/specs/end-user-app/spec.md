@@ -1,3 +1,4 @@
+<!-- antislop: allow-file passive-voice -->
 # end-user-app
 
 ## Purpose
@@ -11,9 +12,9 @@ small hand-written History-API routing hook, talking to the engine only
 through the HTTP wrapper. Step forms render through the shared `form-ui`
 package, so what an author previews in the editor's Player is what a
 participant gets. Out of scope for v1: case history view, notifications,
-attachments, comments, delegation, and a dedicated `groups` assignment
-filter (distinct from `Step.assignment.candidates`, which already matches by
-an actor's id or any of their roles — see `instance-query`).
+attachments, comments, and a dedicated `groups` assignment filter (distinct
+from `Step.assignment.candidates`, which already matches by an actor's id
+or any of their roles — see `instance-query`).
 
 ## Requirements
 
@@ -204,6 +205,34 @@ step changes as part of the submission.
 - **WHEN** a user submits an available path successfully
 - **THEN** the app navigates back to `/` with no separate release step
   required
+
+### Requirement: Claimed tasks offer a Delegate-to action
+
+The task screen SHALL offer a "Delegate to" control whenever the current
+user holds the claim. It is a text input for a target actor id, plus a
+submit action calling `POST /instances/:id/delegate`. On success the
+form returns to its claimed presentation, with the new claimant
+reflected. The current user can no longer submit or release the task,
+once delegated away.
+
+#### Scenario: The claimant delegates to another actor
+
+- **WHEN** a user who holds the claim enters a target actor id and submits
+  the Delegate-to control
+- **THEN** `POST /instances/:id/delegate` is called and, on success, the
+  claim moves to the named actor
+
+#### Scenario: A delegated-away task no longer belongs to the delegator
+
+- **WHEN** a user who just delegated their claim away re-opens the same
+  task
+- **THEN** the form reflects an unclaimed-by-them state, with no Release
+  or path-submit action available to them
+
+#### Scenario: The Delegate-to control is unavailable before claiming
+
+- **WHEN** a user opens an unclaimed, assignment-bearing task
+- **THEN** no Delegate-to control is shown until the task is claimed
 
 ### Requirement: Start-a-process screen creates on selection
 

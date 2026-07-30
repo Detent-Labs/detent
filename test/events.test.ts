@@ -49,6 +49,12 @@ const faulted = () => ({
   },
 });
 
+const delegated = () => ({
+  ...fired(),
+  kind: "assignment.delegated",
+  payload: { fromActorId: "user_1", toActorId: "user_2" },
+});
+
 describe("InstanceEvent", () => {
   it("accepts both declared kinds", () => {
     expect(instanceEvent.safeParse(fired()).success).toBe(true);
@@ -118,6 +124,15 @@ describe("InstanceEvent", () => {
     const e = faulted();
     expect(instanceEvent.safeParse(e).success).toBe(true);
     expect(instanceEvent.safeParse({ ...e, payload: { ...e.payload, reason: "unknown-cause" } }).success).toBe(false);
+  });
+
+  it("accepts assignment.delegated and rejects a payload missing either actor id", () => {
+    const e = delegated();
+    expect(instanceEvent.safeParse(e).success).toBe(true);
+    const { fromActorId: _fromActorId, ...missingFrom } = e.payload;
+    expect(instanceEvent.safeParse({ ...e, payload: missingFrom }).success).toBe(false);
+    const { toActorId: _toActorId, ...missingTo } = e.payload;
+    expect(instanceEvent.safeParse({ ...e, payload: missingTo }).success).toBe(false);
   });
 
   it("rejects a missing version", () => {

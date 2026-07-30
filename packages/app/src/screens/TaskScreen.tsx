@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { FieldForm, PathButtons, filterToEditable } from "form-ui";
 import type { SubmissionIssue } from "form-ui";
-import { cancelInstance, claim, getInstanceView, release, submitPath } from "../api/client.js";
+import { cancelInstance, claim, delegate, getInstanceView, release, submitPath } from "../api/client.js";
 import { AppClientError } from "../api/client.js";
 import { describeError, type ErrorOutcome } from "../errors.js";
 import { t } from "../i18n/catalog.js";
@@ -20,6 +20,7 @@ interface TaskScreenProps {
 export function TaskScreen({ instanceId, token, locale, navigate, onUnauthorized }: TaskScreenProps) {
   const [view, setView] = useState<InstanceView | undefined>(undefined);
   const [claimedByMe, setClaimedByMe] = useState(false);
+  const [delegateTarget, setDelegateTarget] = useState("");
   const [formValues, setFormValues] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(false);
   const [outcome, setOutcome] = useState<ErrorOutcome | undefined>(undefined);
@@ -108,6 +109,13 @@ export function TaskScreen({ instanceId, token, locale, navigate, onUnauthorized
       setClaimedByMe(false);
     });
 
+  const doDelegate = () =>
+    withErrorHandling(async () => {
+      await delegate(instanceId, delegateTarget, token);
+      setClaimedByMe(false); // the claim moved to the delegate, not to this user
+      setDelegateTarget("");
+    });
+
   const doSubmit = (pathId: string) =>
     withErrorHandling(async () => {
       if (!view) return;
@@ -181,6 +189,20 @@ export function TaskScreen({ instanceId, token, locale, navigate, onUnauthorized
               <button type="button" disabled={loading} onClick={() => void doRelease()}>
                 {t(locale, "task.release")}
               </button>
+            )}
+            {claimedByMe && (
+              <span className="app-task-delegate">
+                <input
+                  type="text"
+                  value={delegateTarget}
+                  disabled={loading}
+                  placeholder={t(locale, "task.delegateToPlaceholder")}
+                  onChange={(e) => setDelegateTarget(e.target.value)}
+                />
+                <button type="button" disabled={loading || !delegateTarget} onClick={() => void doDelegate()}>
+                  {t(locale, "task.delegateSubmit")}
+                </button>
+              </span>
             )}
             <button type="button" disabled={loading} onClick={() => void doDiscard()}>
               {t(locale, "task.discardCase")}

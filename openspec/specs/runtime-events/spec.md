@@ -1,3 +1,4 @@
+<!-- antislop: allow-file passive-voice -->
 # runtime-events Specification
 
 ## Purpose
@@ -8,11 +9,12 @@ required), so these have nowhere to go in it. Together the two records are the a
 backbone: they interleave by instant and correlate by `transitionSeq`, which an event
 records but never advances.
 
-Ten kinds are defined, added additively while the record shape stays settled.
-This table is the canonical enumeration; three of the ten (`assignment.claimed`,
-`assignment.released`, `instance.faulted`) are owned in detail by other
-capabilities' specs (`assignment-claim-release-consolidation`,
-`automatic-transitions`) and are listed here only for completeness:
+Eleven kinds are defined, added additively while the record shape stays settled.
+This table is the canonical enumeration; four of the eleven (`assignment.claimed`,
+`assignment.released`, `assignment.delegated`, `instance.faulted`) are owned in
+detail by other capabilities' specs (`assignment-claim-release-consolidation`,
+`assignment-claim-enforcement`, `automatic-transitions`) and are listed here
+only for completeness:
 
 | kind | fact recorded | enqueues actions |
 | --- | --- | --- |
@@ -25,6 +27,7 @@ capabilities' specs (`assignment-claim-release-consolidation`,
 | `mapping.entry-dropped` | a subprocess `inputMapping`/`outputMapping` entry raised or produced a non-JSON-safe value, with the direction and reason | no |
 | `assignment.claimed` | an actor claimed an unclaimed, assignment-bearing step | no |
 | `assignment.released` | the claimant released their claim on the current step | no |
+| `assignment.delegated` | the current claimant delegated their claim to a named target actor | no |
 | `instance.faulted` | an automatic cascade re-entered a step it already entered, parking the instance | no |
 
 A kind that enqueues actions carries their `ActionOutcome`s; a kind that enqueues
@@ -410,4 +413,24 @@ legitimate authoring shape.
 #### Scenario: The event carries no action outcomes
 
 - **WHEN** a `mapping.entry-dropped` event is recorded
+- **THEN** it carries no `actions` field, since no actions were enqueued
+
+### Requirement: A claim delegation is recorded as an event
+
+The event union SHALL gain an `assignment.delegated` kind. The current
+claimant of a step triggers it by delegating the claim to a named target
+actor. Its payload SHALL carry `fromActorId` (the delegating actor) and
+`toActorId` (the new claimant). Delegation is not a transition, so this
+event, like `assignment.claimed` and `assignment.released`, SHALL NOT
+advance `transitionSeq` and SHALL enqueue no actions.
+
+#### Scenario: A delegation is recorded
+
+- **WHEN** the current claimant delegates a step's claim to a target actor
+- **THEN** an `assignment.delegated` event naming both actor ids is
+  recorded, and the instance's `transitionSeq` is unchanged
+
+#### Scenario: The event carries no action outcomes
+
+- **WHEN** an `assignment.delegated` event is recorded
 - **THEN** it carries no `actions` field, since no actions were enqueued

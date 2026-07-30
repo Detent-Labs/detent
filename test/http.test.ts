@@ -712,6 +712,14 @@ test("wildcard config: OPTIONS preflight on the release route returns 204 with C
   expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles, Authorization");
 });
 
+test("wildcard config: OPTIONS preflight on the delegate route returns 204 with CORS headers, without delegating", async () => {
+  const res = await corsFetch(new Request("http://x/instances/inst_x/delegate", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
+  expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, X-Actor-Id, X-Actor-Roles, Authorization");
+});
+
 test("allowlist config: an allowed-origin preflight echoes that origin", async () => {
   const req = withOrigin(new Request("http://x/instances/inst_x", { method: "OPTIONS" }), ALLOWED_ORIGIN);
   const res = await allowlistFetch(req);
@@ -798,6 +806,44 @@ test.skipIf(!DB)("POST /instances/:instanceId/release by a non-claimant maps to 
   expect(body.error.type).toBe("not-claimant");
 });
 
+test.skipIf(!DB)("POST /instances/:instanceId/delegate succeeds for the claimant and returns 200", async () => {
+  const PID = pid("proc_http_delegate");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+
+  const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/delegate`, "POST", user1, { toActorId: "outsider" }));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { assignment: { claimedBy: string } };
+  expect(body.assignment.claimedBy).toBe("outsider");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/delegate by a non-claimant maps to 403 not-claimant", async () => {
+  const PID = pid("proc_http_delegate_403");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+
+  const res = await fetch(
+    jsonReq(`http://x/instances/${created.instanceId}/delegate`, "POST", { id: "approver_2", roles: ["approver"] }, { toActorId: "outsider" }),
+  );
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("not-claimant");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/delegate with a missing toActorId maps to 400 request-shape", async () => {
+  const PID = pid("proc_http_delegate_400");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+
+  const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/delegate`, "POST", user1, {}));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
 // ============================================================
 // InstanceNotRunningError -> 409 (submit/claim/release against a non-running instance)
 // ============================================================
@@ -859,6 +905,19 @@ test.skipIf(!DB)("releasing a claim on a cancelled instance maps to 409 instance
   await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", admin));
 
   const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/release`, "POST", user1));
+  expect(res.status).toBe(409);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("instance-not-running");
+});
+
+test.skipIf(!DB)("delegating a claim on a cancelled instance maps to 409 instance-not-running", async () => {
+  const PID = pid("proc_http_delegate_cancelled");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", admin));
+
+  const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/delegate`, "POST", user1, { toActorId: "outsider" }));
   expect(res.status).toBe(409);
   const body = (await res.json()) as { error: { type: string } };
   expect(body.error.type).toBe("instance-not-running");

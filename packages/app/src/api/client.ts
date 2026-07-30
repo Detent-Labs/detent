@@ -91,6 +91,14 @@ export async function release(instanceId: string, token: string): Promise<void> 
   await request(`/instances/${encodeURIComponent(instanceId)}/release`, token, { method: "POST" });
 }
 
+export async function delegate(instanceId: string, toActorId: string, token: string): Promise<void> {
+  await request(`/instances/${encodeURIComponent(instanceId)}/delegate`, token, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ toActorId }),
+  });
+}
+
 export async function submitPath(instanceId: string, pathId: string, data: Record<string, unknown>, token: string): Promise<void> {
   await request(`/instances/${encodeURIComponent(instanceId)}/submit`, token, {
     method: "POST",
