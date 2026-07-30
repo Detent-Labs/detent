@@ -510,9 +510,8 @@ capability of its own.
     (a) once a process actually ships in two or more locales and the gaps
     become hard to find by hand. Revisit (b) once a specific customer asks
     for its own UI-chrome wording, not before.
-14. Deployment & operations readiness: IN PROGRESS. Sub-projects (a) and
-    (b) DONE, (c) design DONE, implementation NOT STARTED. Raised 2026-07-28
-    as a "someday" question
+14. Deployment & operations readiness: DONE. Sub-projects (a), (b), and (c)
+    all DONE. Raised 2026-07-28 as a "someday" question
     while sketching what shipping to a real customer needs beyond stages
     1–13. Today the only run path is the devcontainer. Three independent
     sub-projects, split out and ordered 2026-07-30 (each brainstormed and
@@ -557,8 +556,8 @@ capability of its own.
        the image. A repo-root `.dockerignore` keeps `node_modules`, `.git`,
        `.devcontainer`, `docs`, and test directories out of every build
        context.
-    c. A documented backup/restore runbook for the Postgres schema: design
-       DONE (see
+    c. A documented backup/restore runbook for the Postgres schema: DONE
+       (`docs/runbooks/backup-restore.md`; design at
        `docs/superpowers/specs/2026-07-30-backup-restore-runbook-design.md`).
        Pure packaging/ops documentation. No engine or schema change.
        Independent of (a) and (b); sequenced last because it caps off the
@@ -567,17 +566,18 @@ capability of its own.
        environment-separation convention), so a whole-database `pg_dump -Fc`
        is the backup unit, not a per-table one. Restore stops the engine
        first, since the outbox worker and timer scheduler both write to the
-       database continuously, then runs `pg_restore --clean --if-exists`,
-       then restarts the engine and checks `GET /readyz` (Stage 14a) to
-       confirm the restore worked. No new engine code and no new script:
-       `pg_dump`/`pg_restore` already do this job. Deliberately out of
-       scope: automated backup scheduling (deployment-specific), point-in-
-       time recovery/WAL archiving (no stated recovery-point requirement
-       needs it yet), and backup-file encryption (delegated to the
-       deployment's existing storage/ops tooling). The deliverable is
-       `docs/runbooks/backup-restore.md`; no OpenSpec change for a
-       docs-only task. Stage 14 (a, b, c) is fully DONE once that file
-       lands.
+       database continuously, then runs `pg_restore --clean --if-exists -d
+       <target> <dump-file>`, then restarts the engine and checks `GET
+       /readyz` (Stage 14a) to confirm the restore worked. No new engine
+       code and no new script: `pg_dump`/`pg_restore` already do this job.
+       Deliberately out of scope: automated backup scheduling
+       (deployment-specific), point-in-time recovery/WAL archiving (no
+       stated recovery-point requirement needs it yet), and backup-file
+       encryption (delegated to the deployment's existing storage/ops
+       tooling). Delivered as OpenSpec change `backup-restore-runbook`,
+       departing from the design's own "no OpenSpec change" note — a
+       deliberate choice for this docs-only task, not a default for future
+       ones of the same shape. Stage 14 (a, b, c) is fully DONE.
 15. Observability: NOT STARTED, deliberately deferred — raised 2026-07-28.
     No structured logging convention, no metrics, no tracing today; outbox
     backlog, timer latency, and `faulted`-instance rate are only visible by
