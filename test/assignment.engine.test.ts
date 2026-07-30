@@ -10,6 +10,7 @@ import {
   executeManualTransition,
   claimStep,
   releaseClaim,
+  delegateClaim,
   NotAssignedError,
   NotACandidateError,
   AlreadyClaimedError,
@@ -166,6 +167,52 @@ test.skipIf(!DB)("releaseClaim succeeds for the claimant, rejects a non-claimant
   expect(releasedEvent!.version).toBe(released.version);
   expect(releasedEvent!.transitionSeq).toBe(released.transitionSeq); // not advanced
   expect((releasedEvent as unknown as { payload: { actorId: string } }).payload).toEqual({ actorId: candidate.id });
+});
+
+test.skipIf(!DB)("delegateClaim succeeds for the claimant, rejects a non-claimant, and leaves candidates untouched", async () => {
+  const body = loopBody();
+  const inst = await createInstance(body, { processId: "proc_assign" as Instance["processId"], version: 1 });
+  const onB = await executeManualTransition(inst, "path_ab", body, candidate);
+  await claimStep(onB.instanceId, candidate);
+
+  await rejectsWith(delegateClaim(onB.instanceId, roleActor, outsider.id), NotClaimantError);
+
+  const delegated = await delegateClaim(onB.instanceId, candidate, outsider.id);
+  expect(delegated.assignment?.claimedBy).toBe(outsider.id);
+  expect(delegated.assignment?.claimedAt).toBeDefined();
+  expect(delegated.assignment?.candidates).toEqual(["role_x", "user_1"]); // unchanged
+
+  const events = await eventsOf(onB.instanceId);
+  const delegatedEvent = events.find((e) => e.kind === "assignment.delegated");
+  expect(delegatedEvent).toBeDefined();
+  expect(delegatedEvent!.instanceId).toBe(onB.instanceId);
+  expect(delegatedEvent!.version).toBe(delegated.version);
+  expect(delegatedEvent!.transitionSeq).toBe(delegated.transitionSeq); // not advanced
+  expect(delegatedEvent!.at).toBe(delegated.assignment!.claimedAt!); // same instant, computed once
+  expect((delegatedEvent as unknown as { payload: { fromActorId: string; toActorId: string } }).payload).toEqual({
+    fromActorId: candidate.id,
+    toActorId: outsider.id,
+  });
+});
+
+test.skipIf(!DB)("delegateClaim against a non-running instance is a silent no-op", async () => {
+  const body = loopBody();
+  const inst = await createInstance(body, { processId: "proc_assign" as Instance["processId"], version: 1 });
+  const onB = await executeManualTransition(inst, "path_ab", body, candidate);
+  const claimed = await claimStep(onB.instanceId, candidate);
+  // A direct status flip, not `cancelInstance` — that routes through the
+  // cancel-sink step, which this suite's hand-built, uncompiled bodies don't
+  // carry (only `compileProcessBody` injects it). Flipping `status` alone is
+  // enough to exercise the no-op path, without pulling compilation into an
+  // otherwise engine-level test.
+  await sql`UPDATE instances SET body = jsonb_set(body, '{status}', '"cancelled"') WHERE instance_id = ${claimed.instanceId}`;
+
+  const unchanged = await delegateClaim(claimed.instanceId, candidate, outsider.id);
+  expect(unchanged.status).toBe("cancelled");
+  expect(unchanged.assignment?.claimedBy).toBe(candidate.id); // no guard or write ran
+
+  const events = await eventsOf(claimed.instanceId);
+  expect(events.some((e) => e.kind === "assignment.delegated")).toBe(false);
 });
 
 test.skipIf(!DB)("two actors racing to claim the same unclaimed step resolve to exactly one winner", async () => {

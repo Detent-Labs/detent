@@ -849,8 +849,16 @@ async function loadForClaim(tx: SQL, instanceId: string): Promise<Instance> {
   return instanceSchema.parse(typeof rows[0].body === "string" ? JSON.parse(rows[0].body) : rows[0].body);
 }
 
+/** The kind/payload pairs `updateAssignment` may append — one union member
+ * per caller, so each caller's payload shape is checked against its own
+ * kind rather than widened to a common shape. */
+type AssignmentEventSpec =
+  | { kind: "assignment.claimed"; payload: { actorId: string } }
+  | { kind: "assignment.released"; payload: { actorId: string } }
+  | { kind: "assignment.delegated"; payload: { fromActorId: string; toActorId: string } };
+
 /**
- * Shared claim/release sequence: row-lock (the same pattern
+ * Shared claim/release/delegate sequence: row-lock (the same pattern
  * `submitAndTransition` uses to guard against a concurrent writeback),
  * no-op on a non-running instance (matching every other transition entry
  * point's — `cancelInstance`, `commitManualTransition`, … — non-running
@@ -864,18 +872,17 @@ async function loadForClaim(tx: SQL, instanceId: string): Promise<Instance> {
  */
 async function updateAssignment(
   instanceId: string,
-  actor: Actor,
   db: SQL,
   guard: (assignment: AssignmentState | null | undefined) => void,
   computeNext: (assignment: AssignmentState, at: string) => AssignmentState,
-  eventKind: "assignment.claimed" | "assignment.released",
+  eventSpec: AssignmentEventSpec,
 ): Promise<Instance> {
   return withTransaction(db, async (tx) => {
     const inst = await loadForClaim(tx, instanceId);
     // Deliberately a no-op, not a throw — same reasoning as
     // commitManualTransition's. The runtime-API wrappers (`claimStep`/
-    // `releaseClaim` in `runtime/api.ts`) detect this no-op after the fact
-    // and reject the caller-initiated request themselves.
+    // `releaseClaim`/`delegateClaim` in `runtime/api.ts`) detect this no-op
+    // after the fact and reject the caller-initiated request themselves.
     if (inst.status !== "running") return inst;
 
     guard(inst.assignment);
@@ -889,8 +896,7 @@ async function updateAssignment(
       instanceId: inst.instanceId,
       transitionSeq: inst.transitionSeq,
       version: inst.version,
-      kind: eventKind,
-      payload: { actorId: actor.id },
+      ...eventSpec,
       at,
     };
     await appendInstanceEvent(tx, event);
@@ -902,7 +908,6 @@ async function updateAssignment(
 export async function claimStep(instanceId: string, actor: Actor, db: SQL = sql): Promise<Instance> {
   return updateAssignment(
     instanceId,
-    actor,
     db,
     (assignment) => {
       if (!assignment) throw new NotAssignedError(instanceId);
@@ -910,7 +915,7 @@ export async function claimStep(instanceId: string, actor: Actor, db: SQL = sql)
       if (!isEligibleCandidate(actor, assignment.candidates)) throw new NotACandidateError(instanceId, actor.id);
     },
     (assignment, at) => ({ candidates: assignment.candidates, claimedBy: actor.id, claimedAt: at }),
-    "assignment.claimed",
+    { kind: "assignment.claimed", payload: { actorId: actor.id } },
   );
 }
 
@@ -922,12 +927,31 @@ export async function claimStep(instanceId: string, actor: Actor, db: SQL = sql)
 export async function releaseClaim(instanceId: string, actor: Actor, db: SQL = sql): Promise<Instance> {
   return updateAssignment(
     instanceId,
-    actor,
     db,
     (assignment) => {
       if (!assignment || assignment.claimedBy !== actor.id) throw new NotClaimantError(instanceId, actor.id);
     },
     (assignment) => ({ candidates: assignment.candidates }),
-    "assignment.released",
+    { kind: "assignment.released", payload: { actorId: actor.id } },
+  );
+}
+
+/**
+ * Delegate a claim on the current step of a running instance to a named
+ * actor. Row-locks, requires the calling actor currently holds the claim
+ * (same guard `releaseClaim` uses). The candidate list is untouched — the
+ * delegate does not join it, so releasing returns the step to the
+ * original candidates, not to the delegate. Not a transition — same shape
+ * as `claimStep`/`releaseClaim`. A no-op on a non-running instance.
+ */
+export async function delegateClaim(instanceId: string, actor: Actor, toActorId: string, db: SQL = sql): Promise<Instance> {
+  return updateAssignment(
+    instanceId,
+    db,
+    (assignment) => {
+      if (!assignment || assignment.claimedBy !== actor.id) throw new NotClaimantError(instanceId, actor.id);
+    },
+    (assignment, at) => ({ candidates: assignment.candidates, claimedBy: toActorId, claimedAt: at }),
+    { kind: "assignment.delegated", payload: { fromActorId: actor.id, toActorId } },
   );
 }

@@ -16,6 +16,7 @@ import {
   resolveAutomatic,
   claimStep as engineClaimStep,
   releaseClaim as engineReleaseClaim,
+  delegateClaim as engineDelegateClaim,
   cancelInstance as engineCancelInstance,
   GuardRefused,
   ConcurrencyConflict,
@@ -669,6 +670,19 @@ export async function claimStep(instanceId: InstanceId, actor: Actor, db: SQL = 
  */
 export async function releaseClaim(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<Instance> {
   const updated = await engineReleaseClaim(instanceId, actor, db);
+  if (updated.status !== "running") throw new InstanceNotRunningError(updated.instanceId, updated.status);
+  return updated;
+}
+
+/**
+ * Delegate a claim on the current step of a running instance to a named
+ * actor. Thin delegation to the engine implementation — see
+ * `engine/transition.ts::delegateClaim`. Same non-running detection as
+ * `claimStep`/`releaseClaim`, for the same reason. `toActorId` is not
+ * checked against `assignment.candidates` or any account directory.
+ */
+export async function delegateClaim(instanceId: InstanceId, actor: Actor, toActorId: string, db: SQL = sql): Promise<Instance> {
+  const updated = await engineDelegateClaim(instanceId, actor, toActorId, db);
   if (updated.status !== "running") throw new InstanceNotRunningError(updated.instanceId, updated.status);
   return updated;
 }

@@ -29,6 +29,7 @@ function deriveFromRecord(items: InstanceRecordElement[]): { transitionSeq?: num
     if (el.kind === "transition") transitionSeq = el.entry.transitionSeq;
     if (el.kind === "event" && el.event.kind === "assignment.claimed") claimedBy = el.event.payload.actorId;
     if (el.kind === "event" && el.event.kind === "assignment.released") claimedBy = null;
+    if (el.kind === "event" && el.event.kind === "assignment.delegated") claimedBy = el.event.payload.toActorId;
   }
   return { transitionSeq, claimedBy };
 }
