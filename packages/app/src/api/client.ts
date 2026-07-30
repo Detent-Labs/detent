@@ -1,4 +1,4 @@
-import type { ClientError, CommentPage, InstanceComment, InstancePage, InstanceView, LoginResponse, ProcessSummary, SubmissionIssue } from "./types.js";
+import type { AttachmentPage, ClientError, CommentPage, InstanceAttachment, InstanceComment, InstancePage, InstanceView, LoginResponse, ProcessSummary, SubmissionIssue } from "./types.js";
 
 /** Same-origin by default (the app is deployed alongside its API); override
  * for local dev against the devcontainer's server via VITE_API_URL. */
@@ -114,6 +114,29 @@ export async function listComments(instanceId: string, token: string, cursor?: s
   const qs = params.toString();
   const res = await request(`/instances/${encodeURIComponent(instanceId)}/comments${qs ? `?${qs}` : ""}`, token);
   return (await res.json()) as CommentPage;
+}
+
+export async function uploadAttachment(instanceId: string, filename: string, contentType: string, dataBase64: string, token: string): Promise<InstanceAttachment> {
+  const res = await request(`/instances/${encodeURIComponent(instanceId)}/attachments`, token, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ filename, contentType, dataBase64 }),
+  });
+  return (await res.json()) as InstanceAttachment;
+}
+
+export async function listAttachments(instanceId: string, token: string, cursor?: string): Promise<AttachmentPage> {
+  const params = new URLSearchParams();
+  if (cursor !== undefined) params.set("cursor", cursor);
+  const qs = params.toString();
+  const res = await request(`/instances/${encodeURIComponent(instanceId)}/attachments${qs ? `?${qs}` : ""}`, token);
+  return (await res.json()) as AttachmentPage;
+}
+
+/** Returns the raw file as a `Blob` — the caller already has `filename` from the listed `InstanceAttachment` to name the saved file with. */
+export async function downloadAttachment(instanceId: string, attachmentId: string, token: string): Promise<Blob> {
+  const res = await request(`/instances/${encodeURIComponent(instanceId)}/attachments/${encodeURIComponent(attachmentId)}`, token);
+  return res.blob();
 }
 
 export async function submitPath(instanceId: string, pathId: string, data: Record<string, unknown>, token: string): Promise<void> {

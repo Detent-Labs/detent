@@ -20,6 +20,9 @@ import {
   cancelInstance,
   postComment,
   listComments,
+  uploadAttachment,
+  listAttachments,
+  getAttachment,
   type InstanceListFilter,
 } from "../runtime/api.js";
 import { publishBody, listProcesses, listVersions } from "../engine/definitions.js";
@@ -29,7 +32,7 @@ import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, PUBLISH_ROLE, ADMIN_ROLE } from "../auth/authorize.js";
 import type { Registry, DataSourceRegistry } from "../engine/registry.js";
 import type { Instance, PathId, ProcessId, InstanceId, StepId, ProcessBody } from "../schema/definition.js";
-import { mapError, RequestShapeError, type HttpResult, type ErrorContext } from "./errors.js";
+import { mapError, RequestShapeError, type HttpResult, type HttpBinaryResult, type ErrorContext } from "./errors.js";
 import { z } from "zod";
 
 /**
@@ -54,6 +57,19 @@ const delegateBodySchema = z.object({
 const MAX_COMMENT_LENGTH = 10_000;
 const commentBodySchema = z.object({
   text: z.string().trim().min(1).max(MAX_COMMENT_LENGTH),
+});
+// 5 MB, not the source design's original 10 MB: base64-encoded that stays
+// near 6.7 MB, comfortably under server.ts's MAX_REQUEST_BODY_SIZE (8 MiB).
+// Raising this past roughly three-quarters of MAX_REQUEST_BODY_SIZE makes
+// uploads fail at the Bun.serve layer instead of with this route's own
+// RequestShapeError — see design.md's "MAX_ATTACHMENT_BYTES must stay under
+// MAX_REQUEST_BODY_SIZE" (add-instance-attachments).
+const MAX_ATTACHMENT_BYTES = Number(process.env.MAX_ATTACHMENT_BYTES ?? 5 * 1024 * 1024);
+const MAX_ATTACHMENT_NAME_LENGTH = 255;
+const attachmentBodySchema = z.object({
+  filename: z.string().min(1).max(MAX_ATTACHMENT_NAME_LENGTH),
+  contentType: z.string().min(1).max(MAX_ATTACHMENT_NAME_LENGTH),
+  dataBase64: z.string().min(1),
 });
 const submitBodySchema = z.object({
   pathId: z.string(),
@@ -88,8 +104,19 @@ function errorContext(req: Request): ErrorContext {
   return { method: req.method, path: new URL(req.url).pathname };
 }
 
-/** Runs `fn`, mapping any thrown error via `mapError` with `req`'s method/path attached. Every handler but `handleSubmit` uses this — it alone needs a non-error branch on `AutomaticCascadeLoop`. */
-async function guarded(req: Request, fn: () => Promise<HttpResult>): Promise<HttpResult> {
+/**
+ * Runs `fn`, mapping any thrown error via `mapError` with `req`'s
+ * method/path attached. Every handler but `handleSubmit` uses this — it
+ * alone needs a non-error branch on `AutomaticCascadeLoop`.
+ *
+ * Generic over its success type `T`: every existing caller still infers
+ * `T = HttpResult`, so their behavior is unchanged. `handleGetAttachment`
+ * alone instantiates it with `T = HttpBinaryResult`, since a file download
+ * cannot return a JSON-only `HttpResult` on success — see design.md's
+ * "guarded becomes generic to return either shape" (add-instance-attachments).
+ * A thrown error always still maps to a plain `HttpResult`.
+ */
+async function guarded<T>(req: Request, fn: () => Promise<T>): Promise<T | HttpResult> {
   try {
     return await fn();
   } catch (err) {
@@ -192,6 +219,50 @@ export async function handleListComments(instanceId: string, req: Request, resol
     const cursor = url.searchParams.get("cursor") ?? undefined;
     const page = await listComments(instanceId as InstanceId, actor, { limit, cursor }, db);
     return { status: 200, body: page };
+  });
+}
+
+export async function handleUploadAttachment(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    const body = await parseJsonBody(req, attachmentBodySchema);
+    const data = Buffer.from(body.dataBase64, "base64");
+    if (data.length > MAX_ATTACHMENT_BYTES) {
+      throw new RequestShapeError(`attachment exceeds the ${MAX_ATTACHMENT_BYTES}-byte limit once decoded`);
+    }
+    const created = await uploadAttachment(
+      instanceId as InstanceId,
+      actor,
+      { filename: body.filename, contentType: body.contentType, data, sizeBytes: data.length },
+      db,
+    );
+    return { status: 201, body: created };
+  });
+}
+
+export async function handleListAttachments(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    const url = new URL(req.url);
+    const limit = parseLimit(url);
+    const cursor = url.searchParams.get("cursor") ?? undefined;
+    const page = await listAttachments(instanceId as InstanceId, actor, { limit, cursor }, db);
+    return { status: 200, body: page };
+  });
+}
+
+/** Returns `HttpBinaryResult` on success — never a JSON envelope — or a plain `HttpResult` on error, via `guarded`'s `catch` branch. See errors.ts's `HttpBinaryResult` doc comment. */
+export async function handleGetAttachment(
+  instanceId: string,
+  attachmentId: string,
+  req: Request,
+  resolver: ActorResolver,
+  db: SQL = sql,
+): Promise<HttpBinaryResult | HttpResult> {
+  return guarded(req, async (): Promise<HttpBinaryResult> => {
+    const actor = await resolveActor(req, resolver);
+    const attachment = await getAttachment(instanceId as InstanceId, attachmentId, actor, db);
+    return { status: 200, contentType: attachment.contentType, data: attachment.data };
   });
 }
 

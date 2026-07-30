@@ -60,6 +60,23 @@ export interface CommentPage {
   cursor?: string;
 }
 
+// Metadata only — never file bytes, which `downloadAttachment` fetches
+// separately as a `Blob`.
+export interface InstanceAttachment {
+  id: string;
+  instanceId: string;
+  actorId: string;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+export interface AttachmentPage {
+  items: InstanceAttachment[];
+  cursor?: string;
+}
+
 export interface ProcessSummary {
   processId: string;
   version: number;

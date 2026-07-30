@@ -43,6 +43,15 @@ import { RequestShapeError, NotFoundError, InstanceNotRunningError } from "../er
 
 export type HttpResult = { status: number; body: unknown };
 
+/**
+ * The one route whose success response is not JSON: an attachment download.
+ * `handleGetAttachment` alone returns this, on success; its own errors still
+ * map to a plain `HttpResult` through `mapError` like every other route. See
+ * `add-instance-attachments`'s design.md, "The download route breaks the
+ * JSON-only response envelope".
+ */
+export type HttpBinaryResult = { status: number; contentType: string; data: Uint8Array };
+
 /** Method and path of the request being mapped, threaded in so the fallback's log entry is actionable — a stack with no request is not. */
 export type ErrorContext = { method: string; path: string };
 

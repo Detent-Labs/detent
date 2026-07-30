@@ -21,6 +21,9 @@ import {
   handleDelegate,
   handlePostComment,
   handleListComments,
+  handleUploadAttachment,
+  handleListAttachments,
+  handleGetAttachment,
   handleListInstances,
   handleInstanceRecord,
   handleCancel,
@@ -51,7 +54,7 @@ import {
   handleGetRegistry,
 } from "./studio-routes.js";
 import { handleLivez, handleReadyz } from "./health.js";
-import type { HttpResult } from "./errors.js";
+import type { HttpResult, HttpBinaryResult } from "./errors.js";
 
 /**
  * `undefined` = no origins allowed (no CORS headers emitted); `"*"` = the
@@ -90,6 +93,18 @@ function toResponse({ status, body }: HttpResult, allowed: AllowedOrigins, reque
   return new Response(JSON.stringify(body), {
     status,
     headers: { "content-type": "application/json", ...corsHeaders(allowed, requestOrigin) },
+  });
+}
+
+/** True for `handleGetAttachment`'s success shape, `HttpBinaryResult` — the one route response that is not a JSON envelope. See errors.ts's `HttpBinaryResult` doc comment. */
+function isBinaryResult(result: HttpBinaryResult | HttpResult): result is HttpBinaryResult {
+  return "contentType" in result;
+}
+
+function toBinaryResponse({ status, contentType, data }: HttpBinaryResult, allowed: AllowedOrigins, requestOrigin: string | null): Response {
+  return new Response(data, {
+    status,
+    headers: { "content-type": contentType, ...corsHeaders(allowed, requestOrigin) },
   });
 }
 
@@ -251,6 +266,12 @@ export function createServer(
     if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "instances" && parts[2] === "comments") {
       return preflight("GET, POST");
     }
+    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "instances" && parts[2] === "attachments") {
+      return preflight("GET, POST");
+    }
+    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "instances" && parts[2] === "attachments") {
+      return preflight("GET");
+    }
     if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "instances" && parts[2] === "record") {
       return preflight("GET");
     }
@@ -348,6 +369,23 @@ export function createServer(
     // GET /instances/:instanceId/comments
     if (req.method === "GET" && parts.length === 3 && parts[0] === "instances" && parts[2] === "comments") {
       return toRes(await handleListComments(parts[1]!, req, resolver, db));
+    }
+    // POST /instances/:instanceId/attachments
+    if (req.method === "POST" && parts.length === 3 && parts[0] === "instances" && parts[2] === "attachments") {
+      return toRes(await handleUploadAttachment(parts[1]!, req, resolver, db));
+    }
+    // GET /instances/:instanceId/attachments
+    if (req.method === "GET" && parts.length === 3 && parts[0] === "instances" && parts[2] === "attachments") {
+      return toRes(await handleListAttachments(parts[1]!, req, resolver, db));
+    }
+    // GET /instances/:instanceId/attachments/:attachmentId — not through the
+    // shared `toRes`: a successful download is `HttpBinaryResult`, not JSON.
+    // See design.md's "server.ts's shared toRes cannot handle this one route
+    // unchanged" (add-instance-attachments).
+    if (req.method === "GET" && parts.length === 4 && parts[0] === "instances" && parts[2] === "attachments") {
+      const result = await handleGetAttachment(parts[1]!, parts[3]!, req, resolver, db);
+      if (isBinaryResult(result)) return toBinaryResponse(result, allowedOrigins, origin);
+      return toRes(result);
     }
     // GET /instances/:instanceId/record
     if (req.method === "GET" && parts.length === 3 && parts[0] === "instances" && parts[2] === "record") {
