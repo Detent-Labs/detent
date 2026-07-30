@@ -661,13 +661,52 @@ capability of its own.
     CLI is a thin argv-parsing wrapper over those same functions, so an
     in-process script calling them directly avoids a needless
     subprocess-spawn and string-argv round trip.
-20. Data retention & deletion policy: NOT STARTED, deliberately deferred —
-    raised 2026-07-28. The runtime record is append-only by design (see
-    "Runtime record" in CLAUDE.md) and nothing is ever archived or deleted
-    today, so storage grows unbounded and a GDPR erasure request has no
-    defined answer against an append-only audit trail. This needs a
-    deliberate policy decision before any code — not a default to build
-    around. No OpenSpec change yet.
+<!-- antislop: allow sentence-length, run-ons, passive-voice, em-dash. This
+     entry matches the dense technical-prose convention every other DONE/
+     design-DONE entry in this file already uses (including the closing
+     "No OpenSpec change yet — implementation is tracked separately" phrase
+     stages 17/18 both end on verbatim); see the antislop-targeted-allow-
+     not-file-all memory for why that convention exists and why a
+     block-scoped allow is the correct tool here, not a file-wide one. -->
+20. Data retention & deletion policy: design DONE, implementation NOT
+    STARTED. Raised 2026-07-28. Design approved 2026-07-30 (see
+    `docs/superpowers/specs/2026-07-30-data-retention-deletion-design.md`).
+    The runtime record is append-only by design (see "Runtime record" in
+    CLAUDE.md), and nothing is ever archived or deleted today, so storage
+    grows unbounded and a GDPR erasure request had no defined answer
+    against an append-only audit trail. The design treats both problems
+    as one policy: a retention period counted from an instance's
+    completion triggers automatic clearing, and the same clearing runs
+    early, on demand, for one instance, when an erasure request arrives
+    first. A schema read settled where personal data actually lives:
+    `HistoryEntry` and `InstanceEvent` carry only structural facts (step
+    ids, path ids, opaque actor ids, field ids inside `ActionOutcome`),
+    never a field value, so the append-only audit trail needs no change
+    at all. The only place a participant's submitted field values live
+    is `instances.body.data`, one non-historized object overwritten in
+    place at every writeback. Redaction clears that one field to `{}`
+    and stamps a new nullable `instances.redacted_at` column, matching a
+    new `Instance.redactedAt` in the schema; no `history_entries`/
+    `instance_events` row is ever touched. A new `redactInstance`
+    (`src/engine/retention.ts`) refuses a `running` instance
+    unconditionally, whether the trigger is automatic or manual, since
+    live `data` is still read by guards and actions. An automatic sweep
+    runs only when an operator sets `DATA_RETENTION_DAYS` in the
+    environment; there is no default value, a deliberate departure from
+    the `DATABASE_URL` convention, since a default would start an
+    existing deployment erasing data the moment this code ships, with no
+    operator opting in. When active, the sweep covers
+    `completed`/`cancelled` instances past the window and excludes
+    `faulted` ones, which stay an anomaly an operator may still need to
+    inspect. A new `system:admin`-gated route, `POST
+    /admin/instances/:id/redact`, covers the manual case for
+    `completed`/`cancelled`/`faulted` instances, matching every other
+    destructive admin action. Deliberately out of scope: per-process
+    retention configuration, erasure of a running instance,
+    `auth_users.email` erasure (stage 10's disable-not-delete decision
+    already covers account-level requests), and data portability/export.
+    No OpenSpec change yet — implementation is tracked separately from
+    this design.
 21. Reporting & analytics: NOT STARTED, deliberately deferred — raised
     2026-07-28. The admin area (stage 10) is operations-focused (instances,
     outbox, timers); a process owner wants cycle time, bottleneck, and SLA
