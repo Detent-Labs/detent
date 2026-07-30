@@ -250,6 +250,13 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // cardinality, and the parent id alone reduces the scan to a handful of
   // rows. Readers: transition.ts::sweepCancelledChildren, migration.ts::migrateOne.
   await db`CREATE INDEX IF NOT EXISTS instances_parent_idx ON instances ((body->'parent'->>'instanceId'))`;
+  // Set once by redactInstance (src/engine/retention.ts); NULL means not
+  // redacted, the same convention every other additive instances column uses.
+  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS redacted_at timestamptz`;
+  // The retention sweep's selection query filters on this column first (most
+  // rows are NULL forever, so a partial index stays small), then checks
+  // status/currentStepEnteredAt in memory over the reduced row set.
+  await db`CREATE INDEX IF NOT EXISTS instances_redacted_idx ON instances (redacted_at) WHERE redacted_at IS NULL`;
   // Project-local user accounts (src/auth/users.ts). user_id is the value used
   // as Actor.id — the same convention as assignment.candidates/claimedBy.
   await db`CREATE TABLE IF NOT EXISTS auth_users (

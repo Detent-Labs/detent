@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { cancelInstance, getInstanceRecord, getInstanceView, listPendingTimers, listProcesses, listVersions, AdminClientError } from "../api/client.js";
+import { cancelInstance, redactInstance, getInstanceRecord, getInstanceView, listPendingTimers, listProcesses, listVersions, AdminClientError } from "../api/client.js";
 import type { InstanceRecordElement, InstanceView, PendingTimer, VersionSummary } from "../api/types.js";
 import type { Route } from "../routing.js";
 import { useRefresh } from "../useRefresh.js";
@@ -12,6 +12,8 @@ interface InstanceScreenProps {
   token: string;
   onUnauthorized: () => void;
 }
+
+const REDACT_CONFIRM = "This permanently clears the instance's submitted field data, comments, and attachments. The transition and event history stays visible. This cannot be undone. Continue?";
 
 const RECORD_PAGE_LIMIT = 200;
 // ponytail: no per-instance timer read exists over HTTP (GET /admin/timers has
@@ -61,6 +63,7 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [cancelling, setCancelling] = useState(false);
+  const [redacting, setRedacting] = useState(false);
   const { reloadToken, refresh } = useRefresh();
 
   const load = useCallback(async () => {
@@ -118,6 +121,20 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
       else setError(describeCaughtError(err));
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const doRedact = async () => {
+    if (!window.confirm(REDACT_CONFIRM)) return;
+    setRedacting(true);
+    try {
+      await redactInstance(instanceId, token);
+      refresh();
+    } catch (err) {
+      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
+      else setError(describeCaughtError(err));
+    } finally {
+      setRedacting(false);
     }
   };
 
@@ -187,11 +204,24 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
           <dt>Armed timer</dt>
           <dd>{timer ? new Date(timer.nextTimerAt).toLocaleString() : "none"}</dd>
         </div>
+        {view.redactedAt && (
+          <div>
+            <dt>Data redaction</dt>
+            <dd>
+              <span className="admin-badge admin-badge-redacted">Data redacted on {new Date(view.redactedAt).toLocaleString()}</span>
+            </dd>
+          </div>
+        )}
       </dl>
 
       {view.status === "running" && (
         <button type="button" onClick={() => void doCancel()} disabled={cancelling}>
           Cancel instance
+        </button>
+      )}
+      {view.status !== "running" && (
+        <button type="button" onClick={() => void doRedact()} disabled={redacting || !!view.redactedAt}>
+          Redact data
         </button>
       )}
       <button type="button" onClick={refresh} disabled={loading}>

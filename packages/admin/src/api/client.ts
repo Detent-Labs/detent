@@ -117,6 +117,10 @@ export async function cancelInstance(instanceId: string, token: string): Promise
   await request(`/instances/${encodeURIComponent(instanceId)}/cancel`, token, { method: "POST" });
 }
 
+export async function redactInstance(instanceId: string, token: string): Promise<void> {
+  await request(`/admin/instances/${encodeURIComponent(instanceId)}/redact`, token, { method: "POST" });
+}
+
 export async function listVersions(processId: string, token: string): Promise<VersionSummary[]> {
   const res = await request(`/processes/${encodeURIComponent(processId)}/versions`, token);
   return (await res.json()) as VersionSummary[];

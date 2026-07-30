@@ -11,7 +11,8 @@ import { sql } from "../engine/store.js";
 import { listOutbox, countOutboxByStatus, listPendingTimers, requeueOutboxRow, discardOutboxRow, getOutboxRow, type OutboxListFilter } from "../engine/admin-queries.js";
 import { listUsers, setDisabled } from "../auth/users.js";
 import { migrateInstances } from "../engine/migration.js";
-import type { ProcessId } from "../schema/definition.js";
+import { redactInstance } from "../engine/retention.js";
+import type { ProcessId, InstanceId } from "../schema/definition.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, ADMIN_ROLE } from "../auth/authorize.js";
@@ -157,5 +158,15 @@ export async function handleAdminRunMigration(req: Request, resolver: ActorResol
     const toVersion = parseVersionField(body.toVersion, "toVersion");
     const result = await migrateInstances(body.processId as ProcessId, fromVersion, toVersion, db);
     return { status: 200, body: result };
+  });
+}
+
+/** Wraps `redactInstance` unchanged. `InstanceRunningError`/`NotFoundError` fall through to `mapError`. */
+export async function handleAdminRedactInstance(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    requireRole(actor, ADMIN_ROLE);
+    const updated = await redactInstance(instanceId as InstanceId, db);
+    return { status: 200, body: updated };
   });
 }

@@ -39,7 +39,7 @@ import { DurationValidationError, CompileValidationError } from "../schema/compi
 import { DraftConflictError } from "../engine/drafts.js";
 import { MigrationPlanError } from "../engine/migration.js";
 import { ZodError } from "zod";
-import { RequestShapeError, NotFoundError, InstanceNotRunningError } from "../errors.js";
+import { RequestShapeError, NotFoundError, InstanceNotRunningError, InstanceRunningError } from "../errors.js";
 
 export type HttpResult = { status: number; body: unknown };
 
@@ -55,7 +55,7 @@ export type HttpBinaryResult = { status: number; contentType: string; data: Uint
 /** Method and path of the request being mapped, threaded in so the fallback's log entry is actionable — a stack with no request is not. */
 export type ErrorContext = { method: string; path: string };
 
-export { RequestShapeError, NotFoundError, InstanceNotRunningError };
+export { RequestShapeError, NotFoundError, InstanceNotRunningError, InstanceRunningError };
 
 type IssuesMapping = { ctor: new (...args: any[]) => Error & { issues: unknown }; status: number; type: string };
 type MessageMapping = { ctor: new (...args: any[]) => Error; status: number; type: string };
@@ -76,6 +76,7 @@ const MESSAGE_ERRORS: MessageMapping[] = [
   { ctor: CrossProcessValidationError, status: 422, type: "cross-process-validation" },
   { ctor: GuardRefused, status: 409, type: "guard-refused" },
   { ctor: InstanceNotRunningError, status: 409, type: "instance-not-running" },
+  { ctor: InstanceRunningError, status: 409, type: "instance-running" },
   { ctor: PinMismatch, status: 500, type: "internal" },
   { ctor: NotFoundError, status: 500, type: "internal" },
   { ctor: ActorResolutionError, status: 401, type: "actor-resolution" },

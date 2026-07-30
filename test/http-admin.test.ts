@@ -409,3 +409,86 @@ test("OPTIONS preflight on the admin migrations run route returns 204 permitting
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
 });
+
+test("OPTIONS preflight on the admin instance redact route returns 204 permitting POST", async () => {
+  const res = await fetch(new Request("http://x/admin/instances/inst_x/redact", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
+});
+
+// ============================================================
+// POST /admin/instances/:id/redact
+// ============================================================
+
+const redactReq = (instanceId: string, actor: Actor) =>
+  new Request(`http://x/admin/instances/${instanceId}/redact`, {
+    method: "POST",
+    headers: { "X-Actor-Id": actor.id, ...(actor.roles.length > 0 ? { "X-Actor-Roles": actor.roles.join(",") } : {}) },
+  });
+
+const setInstanceStatus = (id: string, status: string) => sql`UPDATE instances SET body = body || ${{ status }}::jsonb WHERE instance_id = ${id}`;
+
+test.skipIf(!DB)("POST /admin/instances/:id/redact with no resolvable credential maps to 401", async () => {
+  const res = await fetch(new Request("http://x/admin/instances/inst_x/redact", { method: "POST" }));
+  expect(res.status).toBe(401);
+});
+
+test.skipIf(!DB)("POST /admin/instances/:id/redact without system:admin maps to 403 and redacts nothing", async () => {
+  const p = migrationPid();
+  await publishMigrationVersions(p, 1);
+  const inst = await createRunningInstance(p, 1);
+  await setInstanceStatus(inst.instanceId, "completed");
+
+  const res = await fetch(redactReq(inst.instanceId, bystander));
+  expect(res.status).toBe(403);
+  expect((await loadInstance(inst.instanceId)).redactedAt).toBeUndefined();
+});
+
+test.skipIf(!DB)("POST /admin/instances/:id/redact on a completed instance succeeds and clears data", async () => {
+  const p = migrationPid();
+  await publishMigrationVersions(p, 1);
+  const inst = await createRunningInstance(p, 1);
+  await setInstanceStatus(inst.instanceId, "completed");
+
+  const res = await fetch(redactReq(inst.instanceId, admin));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { data: Record<string, unknown> };
+  expect(body.data).toEqual({});
+  expect((await loadInstance(inst.instanceId)).redactedAt).toBeDefined();
+});
+
+test.skipIf(!DB)("POST /admin/instances/:id/redact works on cancelled and faulted instances too", async () => {
+  for (const status of ["cancelled", "faulted"]) {
+    const p = migrationPid();
+    await publishMigrationVersions(p, 1);
+    const inst = await createRunningInstance(p, 1);
+    await setInstanceStatus(inst.instanceId, status);
+
+    const res = await fetch(redactReq(inst.instanceId, admin));
+    expect(res.status).toBe(200);
+  }
+});
+
+test.skipIf(!DB)("POST /admin/instances/:id/redact on a running instance maps to 409 instance-running", async () => {
+  const p = migrationPid();
+  await publishMigrationVersions(p, 1);
+  const inst = await createRunningInstance(p, 1);
+
+  const res = await fetch(redactReq(inst.instanceId, admin));
+  expect(res.status).toBe(409);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("instance-running");
+  expect((await loadInstance(inst.instanceId)).redactedAt).toBeUndefined();
+});
+
+test.skipIf(!DB)("POST /admin/instances/:id/redact is idempotent on a re-call", async () => {
+  const p = migrationPid();
+  await publishMigrationVersions(p, 1);
+  const inst = await createRunningInstance(p, 1);
+  await setInstanceStatus(inst.instanceId, "cancelled");
+
+  const first = await fetch(redactReq(inst.instanceId, admin));
+  expect(first.status).toBe(200);
+  const second = await fetch(redactReq(inst.instanceId, admin));
+  expect(second.status).toBe(200);
+});

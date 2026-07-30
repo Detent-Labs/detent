@@ -94,6 +94,9 @@ export type InstanceView = {
   step: { id: StepId; key: string; label: LocalizedText; type: StepType };
   fields: ResolvedViewField[];
   availablePaths: AvailablePath[];
+  // Absent unless redactInstance has run. packages/admin's instance detail
+  // screen uses this to show/disable the redact action and its badge.
+  redactedAt?: string;
 };
 
 export type SubmissionIssue =
@@ -603,6 +606,7 @@ export async function getInstanceView(instanceId: InstanceId, actor: Actor, regi
     step: { id: step.id, key: step.key, label: step.label, type: step.type },
     fields: await resolveFields(body, step, instance, actor, registry),
     availablePaths: instance.status === "running" ? resolveAvailablePaths(body, step, instance, actor) : [],
+    redactedAt: instance.redactedAt,
   };
 }
 
