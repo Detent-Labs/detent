@@ -555,8 +555,8 @@ capability of its own.
     timer's `onFire.actions`). Recipients are static config (`config.to`, a
     literal address list, exactly like `http.request`'s `config.url`), not
     resolved to the assignee — that needs a new actor-id/role to
-    `auth_users.email` lookup nothing in the engine does today, and stays a
-    deliberate follow-on. Webhook notification is already covered by
+    `auth_users.email` lookup that nothing in the engine does today, and
+    stays a deliberate follow-on. Webhook notification is already covered by
     `http.request` at the same five positions, so it stays a documented
     recipe rather than new code. The handler speaks SMTP directly (`Bun.connect`
     plus TLS, no new npm dependency), keeping it as vendor-neutral as
