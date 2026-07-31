@@ -24,6 +24,22 @@ duplicate process row or a duplicate user row.
 - **THEN** the second run reports the same process and user counts as the
   first run, and adds no duplicate row
 
+### Requirement: The script refuses to run without an explicit opt-in.
+The seed script SHALL read the `SEED_ALLOW` environment variable. Without
+a value, the script SHALL exit non-zero and write nothing to the
+database. The demo accounts carry a fixed, published password, and one of
+them holds `system:admin`. The person who runs the script therefore names
+the target database as a development one.
+
+`add-database-seed-data` accepted a weaker mitigation. The script never
+runs on its own. No production deployment path existed then. Roadmap #14
+shipped one.
+
+#### Scenario: Running without the opt-in
+- **WHEN** a contributor runs `bun run seed` with no `SEED_ALLOW` value
+- **THEN** the script exits non-zero, and writes no process version and
+  no demo user
+
 ### Requirement: Example processes publish in dependency order.
 The seed script SHALL publish `examples/subprocess-credit-check-child.json`
 before `examples/subprocess-loan-parent.json`. It SHALL reuse the fixed

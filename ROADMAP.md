@@ -791,10 +791,14 @@ capability of its own.
     for every user, with zero duplicate rows, verified against a live
     database rather than only by test. Deliberately does not gate on
     `NODE_ENV` or any other environment signal — nothing in the repo reads
-    one today, and no production deployment path exists yet (stage 14) to
-    define what such a signal would mean; the accepted mitigation stays
-    that the script never runs on its own, and its own output states the
-    accounts are for local development only. Calls `src/auth/users.ts` and
+    one today. The original mitigation (the script never runs on its own)
+    rested on there being no production deployment path yet; stage 14
+    shipped one, so 2026-08-01 replaced it with an explicit opt-in: an
+    unset `SEED_ALLOW` aborts before `initSchema`, writing nothing. Five
+    fixed-password accounts, one of them `system:admin`, were otherwise a
+    mistyped `DATABASE_URL` away from a real database. The script's own
+    output still states the accounts are for local development only.
+    Calls `src/auth/users.ts` and
     `src/engine/definitions.ts::publishBody` directly rather than
     `src/auth/cli.ts`, unlike this stage's original sketch guessed: the
     CLI is a thin argv-parsing wrapper over those same functions, so an
