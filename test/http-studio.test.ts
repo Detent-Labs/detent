@@ -503,3 +503,47 @@ test("GET /registry with no resolvable credential is 401", async () => {
   const res = await fetch(new Request("http://x/registry"));
   expect(res.status).toBe(401);
 });
+
+// ============================================================
+// PUT /drafts/:processId — baseVersion passthrough
+// ============================================================
+
+test.skipIf(!DB)("a PUT carrying baseVersion stamps it and the GET reports it", async () => {
+  // The route-level half of the seeding path: drafts.ts is covered directly in
+  // drafts.test.ts, but nothing there proves handleSaveDraft forwards the field.
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", publisher, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  const published = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
+  expect(published.status).toBe(200);
+  await fetch(authedReq(`http://x/drafts/${processId}`, "DELETE", developer));
+
+  const put = await fetch(
+    authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: authoredBody("seeded"), layout: {}, revision: 0, baseVersion: 1 }),
+  );
+  expect(put.status).toBe(200);
+  expect(((await put.json()) as { baseVersion: number | null }).baseVersion).toBe(1);
+
+  const got = await fetch(authedReq(`http://x/drafts/${processId}`, "GET", developer));
+  expect(((await got.json()) as { baseVersion: number | null }).baseVersion).toBe(1);
+});
+
+test.skipIf(!DB)("a PUT with a malformed baseVersion maps to 400 and writes nothing", async () => {
+  const processId = pid();
+  const res = await fetch(
+    authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: authoredBody("v1"), layout: {}, revision: 0, baseVersion: 0 }),
+  );
+  expect(res.status).toBe(400);
+  expect(((await res.json()) as { error: { type: string } }).error.type).toBe("request-shape");
+
+  const rows = (await sql`SELECT 1 FROM drafts WHERE process_id = ${processId}`) as unknown[];
+  expect(rows.length).toBe(0);
+});
+
+test.skipIf(!DB)("a PUT with an unresolvable baseVersion maps to 400", async () => {
+  const processId = pid();
+  const res = await fetch(
+    authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: authoredBody("v1"), layout: {}, revision: 0, baseVersion: 9 }),
+  );
+  expect(res.status).toBe(400);
+  expect(((await res.json()) as { error: { type: string } }).error.type).toBe("request-shape");
+});

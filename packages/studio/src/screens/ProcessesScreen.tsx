@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { listProcesses, listDrafts, saveDraft, deleteDraft, StudioClientError } from "../api/client.js";
-import { deriveProcessRows, type ProcessRow } from "./processListLogic.js";
+import { listProcesses, listDrafts, saveDraft, deleteDraft, getVersionBody, StudioClientError } from "../api/client.js";
+import { deriveProcessRows, seedVersionFor, seededDraftInput, type ProcessRow } from "./processListLogic.js";
 import { mintId } from "../draft/ids.js";
 import type { Route } from "../routing.js";
 import { describeCaughtError } from "../errors.js";
@@ -35,9 +35,16 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
     void load();
   }, [load]);
 
-  const createDraft = async (processId: string) => {
+  /**
+   * `seededDraftInput` decides the body and throws if the published version
+   * cannot be read, so the `saveDraft` below never runs on a failed seed —
+   * writing an empty draft over a version the author wanted to continue from is
+   * the bug this path exists to remove.
+   */
+  const createDraft = async (processId: string, seedVersion?: number) => {
     try {
-      await saveDraft(processId, { body: {}, layout: {}, revision: 0 }, token);
+      const input = await seededDraftInput(seedVersion, (v) => getVersionBody(processId, v, token));
+      await saveDraft(processId, input, token);
       navigate({ name: "edit", processId });
     } catch (err) {
       if (err instanceof StudioClientError && err.status === 401) onUnauthorized();
@@ -113,7 +120,7 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
                       </button>
                     </>
                   ) : (
-                    <button type="button" onClick={() => void createDraft(row.processId)}>
+                    <button type="button" onClick={() => void createDraft(row.processId, seedVersionFor(row))}>
                       Create draft
                     </button>
                   )}
