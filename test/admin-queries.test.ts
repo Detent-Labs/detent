@@ -10,7 +10,16 @@ import { publishBody, createDefinitionStore } from "../src/engine/definitions.js
 import { createRegistry, register, createDataSourceRegistry } from "../src/engine/registry.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { registerMigrationPlan, migrateInstances } from "../src/engine/migration.js";
-import { listOutbox, countOutboxByStatus, listPendingTimers, requeueOutboxRow, discardOutboxRow, getOutboxRow } from "../src/engine/admin-queries.js";
+import {
+  listOutbox,
+  countOutboxByStatus,
+  listPendingTimers,
+  requeueOutboxRow,
+  discardOutboxRow,
+  getOutboxRow,
+  getTimerLagStats,
+  countInstancesByStatus,
+} from "../src/engine/admin-queries.js";
 import { RequestShapeError } from "../src/errors.js";
 import type { ProcessBody, Instance, MigrationSpec } from "../src/schema/definition.js";
 
@@ -188,6 +197,56 @@ test.skipIf(!DB)("countOutboxByStatus reports a count per present status, absent
   const counts = await countOutboxByStatus(sql);
   expect(counts).toEqual({ pending: 3, "dead-letter": 1 });
   expect(counts.delivered).toBeUndefined();
+});
+
+// ============================================================
+// getTimerLagStats
+// ============================================================
+
+test.skipIf(!DB)("getTimerLagStats reports zero when nothing is overdue", async () => {
+  const stats = await getTimerLagStats(sql);
+  expect(stats).toEqual({ overdueCount: 0, maxLagSeconds: 0 });
+});
+
+test.skipIf(!DB)("getTimerLagStats counts overdue running instances and reports the oldest lag, excluding non-running and future timers", async () => {
+  const P = pid();
+  const v = await publishBody(P, waitBody("lag"), reg, dataSourceReg);
+  const body = (await createDefinitionStore(sql).resolveBody(P, v.version))!;
+
+  const oldest = await createInstance(body, { processId: P, version: v.version }, sql);
+  const newer = await createInstance(body, { processId: P, version: v.version }, sql);
+  const future = await createInstance(body, { processId: P, version: v.version }, sql);
+  const notRunning = await createInstance(body, { processId: P, version: v.version }, sql);
+
+  await sql`UPDATE instances SET next_timer_at = now() - interval '2 hours' WHERE instance_id = ${oldest.instanceId}`;
+  await sql`UPDATE instances SET next_timer_at = now() - interval '1 hour' WHERE instance_id = ${newer.instanceId}`;
+  await sql`UPDATE instances SET next_timer_at = now() + interval '1 hour' WHERE instance_id = ${future.instanceId}`;
+  await sql`UPDATE instances SET next_timer_at = now() - interval '3 hours', body = jsonb_set(body, '{status}', '"completed"'::jsonb)
+    WHERE instance_id = ${notRunning.instanceId}`;
+
+  const stats = await getTimerLagStats(sql);
+  expect(stats.overdueCount).toBe(2);
+  expect(stats.maxLagSeconds).toBeGreaterThanOrEqual(2 * 3600 - 5);
+});
+
+// ============================================================
+// countInstancesByStatus
+// ============================================================
+
+test.skipIf(!DB)("countInstancesByStatus reports a count per present status, absent statuses simply absent", async () => {
+  const P = pid();
+  const v = await publishBody(P, waitBody("status_counts"), reg, dataSourceReg);
+  const body = (await createDefinitionStore(sql).resolveBody(P, v.version))!;
+
+  await createInstance(body, { processId: P, version: v.version }, sql);
+  await createInstance(body, { processId: P, version: v.version }, sql);
+  const faulted = await createInstance(body, { processId: P, version: v.version }, sql);
+  await sql`UPDATE instances SET body = jsonb_set(body, '{status}', '"faulted"'::jsonb) WHERE instance_id = ${faulted.instanceId}`;
+
+  const counts = await countInstancesByStatus(sql);
+  expect(counts.running).toBe(2);
+  expect(counts.faulted).toBe(1);
+  expect(counts.completed).toBeUndefined();
 });
 
 // ============================================================

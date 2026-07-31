@@ -5,7 +5,7 @@
  * terminal suppression. DB-backed parts skip when DATABASE_URL is unset — a skip
  * is visible, a false green is not.
  */
-import { test, expect, beforeAll, beforeEach } from "bun:test";
+import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { executeManualTransition, fireTimer, ConcurrencyConflict } from "../src/engine/transition.js";
 import { drainOutbox, MAX_ATTEMPTS, CLAIM_LEASE_MS, type DeliverFn } from "../src/engine/outbox.js";
@@ -342,12 +342,26 @@ test.skipIf(!DB)("a row that keeps failing exhausts attempts and dead-letters", 
   const inst = await create();
   await executeManualTransition(inst, "path_ab", body, actor);
 
+  // add-observability: drainOutbox's dead-letter branch (src/engine/outbox.ts)
+  // calls log.error, one JSON line per row it dead-letters, on console.error.
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
     await makeDue(inst.instanceId); // bypass backoff to drive escalation
     await drainOutbox(sql, reg, boom);
   }
   const r = await rows(inst.instanceId);
   expect(r.every((x) => x.status === "dead-letter" && x.attempts === MAX_ATTEMPTS)).toBe(true);
+
+  const deadLetterLogs = errorSpy.mock.calls.map((c) => JSON.parse(c[0] as string)).filter((l) => l.msg === "outbox row dead-lettered");
+  errorSpy.mockRestore();
+  expect(deadLetterLogs).toHaveLength(3); // one per action on this step (x1, p1, e1)
+  for (const entry of deadLetterLogs) {
+    expect(entry.level).toBe("error");
+    expect(entry.instanceId).toBe(inst.instanceId);
+    expect(["x1", "p1", "e1"]).toContain(entry.actionType);
+    expect(entry.attempts).toBe(MAX_ATTEMPTS);
+    expect(entry.lastError).toBe("delivery failed");
+  }
 
   await makeDue(inst.instanceId);
   expect(await drainOutbox(sql, reg, okDeliver)).toBe(0); // dead-letter rows are excluded

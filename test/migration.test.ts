@@ -6,7 +6,7 @@
  * Postgres and skip when DATABASE_URL is unset — a skip is visible, a false green is
  * not.
  */
-import { test, expect, beforeAll, beforeEach } from "bun:test";
+import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { startInstance, executeManualTransition, claimStep } from "../src/engine/transition.js";
@@ -551,7 +551,18 @@ test.skipIf(!DB)("6.4 a skipped instance produces an event and no history entry"
   } as unknown as ProcessBody;
   await twoVersions(p, v1, v2, {} as MigrationSpec);
   const inst = await mkInstance(p, 1);
+
+  // add-observability: appendSkip's log.warn call (src/engine/migration.ts)
+  // writes through console.log as one JSON line, alongside the
+  // migration.skipped event this test already checks.
+  const logSpy = spyOn(console, "log").mockImplementation(() => {});
   await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  const skipLogs = logSpy.mock.calls.map((c) => JSON.parse(c[0] as string)).filter((l) => l.msg === "instance migration skipped");
+  logSpy.mockRestore();
+  expect(skipLogs).toHaveLength(1);
+  expect(skipLogs[0]).toMatchObject({ level: "warn", instanceId: inst.instanceId, fromVersion: 1, toVersion: 2 });
+  expect(typeof skipLogs[0].reason).toBe("string");
+
   expect(await historyOf(inst.instanceId)).toHaveLength(0);
   const evts = await eventsOf(inst.instanceId);
   expect(evts).toHaveLength(1);

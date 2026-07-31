@@ -118,6 +118,44 @@ export async function countOutboxByStatus(db: SQL = sql): Promise<Record<string,
   return Object.fromEntries(rows.map((r) => [r.status, r.n]));
 }
 
+export type TimerLagStats = { overdueCount: number; maxLagSeconds: number };
+
+/**
+ * Overdue-timer count and the lag (in seconds) of the most-overdue one, among
+ * `running` instances with `next_timer_at` set. Mirrors `listPendingTimers`'s
+ * `(body->>'status') = 'running' AND next_timer_at IS NOT NULL` filter so this
+ * stays backed by `instances_timer_idx` instead of a full table scan.
+ * `COALESCE(..., 0)` covers the case where nothing is overdue: an empty
+ * `FILTER` aggregates to SQL `NULL`, not `0`.
+ */
+export async function getTimerLagStats(db: SQL = sql): Promise<TimerLagStats> {
+  const [row] = (await db`
+    SELECT
+      count(*) FILTER (WHERE next_timer_at < now())::int AS overdue_count,
+      COALESCE(EXTRACT(EPOCH FROM (now() - min(next_timer_at) FILTER (WHERE next_timer_at < now()))), 0)::float8 AS max_lag_seconds
+    FROM instances
+    WHERE (body->>'status') = 'running' AND next_timer_at IS NOT NULL
+  `) as { overdue_count: number; max_lag_seconds: number }[];
+  return { overdueCount: row!.overdue_count, maxLagSeconds: row!.max_lag_seconds };
+}
+
+/**
+ * One count per distinct `body->>'status'` value present across `instances`.
+ * A general shape, not a single-purpose faulted-only query, mirroring
+ * `countOutboxByStatus`. Unlike that query, this one has no matching
+ * functional index (`instances_selection_idx` is a composite on
+ * `(processId, version, status)`, not usable by a bare `GROUP BY status`), so
+ * it scans the whole table — acceptable at today's scale; see design.md's
+ * Risks section if scrape load ever makes this measurable.
+ */
+export async function countInstancesByStatus(db: SQL = sql): Promise<Record<string, number>> {
+  const rows = (await db`SELECT body->>'status' AS status, count(*)::int AS n FROM instances GROUP BY body->>'status'`) as {
+    status: string;
+    n: number;
+  }[];
+  return Object.fromEntries(rows.map((r) => [r.status, r.n]));
+}
+
 /**
  * Running instances whose `next_timer_at` is set, ordered ascending so the
  * most overdue comes first, keyset-paged on `(next_timer_at, instance_id)`.

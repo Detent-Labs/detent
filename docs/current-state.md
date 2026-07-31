@@ -1356,3 +1356,47 @@ Stage-by-stage status is in `ROADMAP.md`.
   which closes the older hazard recorded in CLAUDE.md. No existing engine or
   test file changed. The two new files under `test/` are the preload and its
   own suite: the failures were never in the suite.
+
+- Observability (`src/log.ts`, `src/http/metrics.ts`, `add-observability`,
+  roadmap #15): a structured-logging convention and a `GET /metrics`
+  endpoint. Before this, an operator could see outbox backlog, timer lag,
+  and faulted-instance rate only by hand. The admin area's Operations
+  screens (roadmap #10) were the only way.
+
+  `log.info`/`log.warn`/`log.error` each emit one JSON line
+  (`{ts, level, msg, ...context}`) to stdout (`info`/`warn`) or stderr
+  (`error`). A process-wide `LOG_LEVEL` threshold gates emission (`debug` <
+  `info` < `warn` < `error`, default `info`), read once at module load. No
+  dependency: the shape is a few lines, the repo's existing convention for
+  something that size. Three existing `console.*` sites now convert:
+  `errors.ts::mapError`'s unhandled-error fallback, `server.ts`'s startup
+  banner, and its dev-resolver warning. Three new sites land at points an
+  operator previously had to find by hand: `outbox.ts::drainOutbox`'s
+  dead-letter branch, `transition.ts::markFaulted`, and
+  `migration.ts::appendSkip`.
+
+  `GET /metrics` (`src/http/metrics.ts::handleMetrics`) returns Prometheus
+  text-exposition format, computed fresh from the database on every
+  scrape. That is the same no-in-process-aggregation principle
+  `/readyz`'s DB ping already uses. It keeps the endpoint correct across
+  multiple independently scraped server instances.
+
+  Three gauges. `workflow_outbox_backlog{status}` reuses
+  `countOutboxByStatus` unchanged. `workflow_timer_overdue_count` and
+  `workflow_timer_lag_seconds` come from a new `getTimerLagStats`. It
+  mirrors `listPendingTimers`'s running-instances filter, so it stays
+  backed by `instances_timer_idx`. `workflow_instances_faulted` comes
+  from a new, general-shaped `countInstancesByStatus`. No functional
+  index covers its `GROUP BY`, so it scans the whole `instances` table on
+  every call. Acceptable at today's scale; see the change's design.md
+  Risks section. Registered unauthenticated in `server.ts`, alongside
+  `/livez`/`/readyz`, ahead of every auth-dependent route.
+
+  Returns `HttpBinaryResult`, not `HttpResult`. `server.ts`'s shared
+  `toResponse` always `JSON.stringify`s an `HttpResult` body. That would
+  corrupt exposition text, so `/metrics` reuses the same non-JSON
+  response type attachment download already established. On a query
+  failure the handler never throws. It reports 503 with an empty body
+  instead, the same signal `/readyz` gives a failed DB ping. That beats a
+  crash, and it beats a false all-zero 200 that would read as "healthy,
+  nothing overdue".
