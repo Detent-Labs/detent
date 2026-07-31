@@ -1170,6 +1170,7 @@ test.skipIf(!DB)("happy path through expense-approval.json settles the async 'bo
   const expenseReg = createRegistry();
   register(expenseReg, "accounting.postInvoice", { handler: async () => ({ status: "booked" }) });
   register(expenseReg, "notify.email", { handler: async () => ({}) });
+  register(expenseReg, "http.request", { handler: async () => ({}) });
   const expenseFetch = createServer(dataSourceReg, expenseReg, sql, devHeaderResolver);
 
   const PID = pid("proc_http_expense");
