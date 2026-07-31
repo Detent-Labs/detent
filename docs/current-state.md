@@ -1400,3 +1400,56 @@ Stage-by-stage status is in `ROADMAP.md`.
   instead, the same signal `/readyz` gives a failed DB ping. That beats a
   crash, and it beats a false all-zero 200 that would read as "healthy,
   nothing overdue".
+
+<!-- antislop: allow sentence-length run-ons passive-voice -->
+- Environment promotion (`packages/studio/src/screens/promotionExportLogic.ts`,
+  `promotionImportLogic.ts`, `add-environment-promotion`, roadmap #18): moves a
+  published definition between environments as a file. Studio-only. No engine
+  change, no new route, no schema change, no new dependency.
+
+  The Versions screen exports one published version as
+  `{processId, version, definitionHash, body}`, downloaded through `Blob` plus
+  `URL.createObjectURL`. The process list imports such a file with a native
+  `<input type="file">` and `FileReader`, shows a `<dialog>` preview, and
+  publishes on confirm through the new
+  `api/client.ts::publishProcess` and the unchanged `POST /processes`.
+
+  `body` is the COMPILED body, exported and re-published verbatim. This is the
+  load-bearing detail. `publishBody` always calls `compileProcessBody`. That
+  pass returns an already-compiled body unchanged. The target therefore
+  recomputes the source's own `definitionHash`, and a contracted child keeps
+  its `contractRef`. `processListLogic.ts::seededDraftInput`, one function above
+  the import action, does the opposite: a draft must be authored-shape, since
+  the panels and `authoredProcessBody` both reject the injected cancel sink.
+  The export module names that asymmetry in a `ponytail:` comment, because
+  stripping here would still reach the same hash and so would fail no test.
+
+  Import republishes under the source's exact `processId` and rewrites no
+  reference, so a subprocess reference stays valid once its child is promoted.
+  Order is manual and child-first, the order `scripts/seed.ts` already uses. A
+  parent promoted first fails the unchanged `validateCrossProcess`.
+
+  The preview warns when a DIFFERENT process in the target already publishes
+  under the incoming `key`. Nothing enforces key uniqueness: `definitions` is
+  keyed `(process_id, version)` and `key` lives in the jsonb body. Two
+  processes can therefore share one key, and nothing deletes a published
+  process. The warning never blocks, and reads the process list the screen
+  already loaded, so it costs no request and compares against no remote
+  environment.
+
+  This change also taught Studio's client the six publish-time rejections.
+  `src/http/errors.ts` maps registry, CEL, duration, compile, schema and
+  cross-process errors to 422 with located detail, but
+  `client.ts::parseErrorBody` handled none of them. All six fell through into
+  `internal` and reached the developer as "The server hit an error. Try
+  again.". Two new `ClientError` variants carry them now:
+  `publish-validation` (the normalized `{loc, message}` issues five of them
+  raise) and `cross-process-validation` (the sixth's message).
+  `errors.ts::describeError` shows both. That is the one place it reads server
+  text. These strings come from the publish chain's own validators, and they
+  name a location in a body the reading developer supplied. The existing
+  Publish action hit the identical wall and gains the same detail.
+
+  A refused publish renders INSIDE the dialog, which stays open. `showModal()`
+  puts the dialog in the browser's top layer. The browser dims everything on
+  the screen behind it and takes it out of reach.

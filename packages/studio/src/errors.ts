@@ -44,6 +44,17 @@ export function describeError(error: ClientError, status?: number): string {
       // form-ui's Player attaches these per-field instead — a caller reaching
       // this case generically (not the expected path) still gets a message.
       return t("error.requestShape");
+    // The one place `message`/`issues` ARE shown. The caveat above holds for a
+    // participant-facing string; these six come from the publish chain's own
+    // validators, address a developer, and name the exact location in a body
+    // that developer supplied. Reducing them to "the server hit an error"
+    // leaves the only actionable detail on the floor.
+    case "publish-validation":
+      return error.issues.length === 0
+        ? t("error.publishRejected")
+        : `${t("error.publishRejected")}\n${error.issues.map((i) => (i.loc === "" ? i.message : `${i.loc}: ${i.message}`)).join("\n")}`;
+    case "cross-process-validation":
+      return `${t("error.crossProcess")}\n${error.message}`;
     case "internal":
       return status === undefined ? t("error.network") : t("error.serverError");
   }

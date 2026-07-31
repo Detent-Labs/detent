@@ -4,6 +4,7 @@ import type { VersionSummary } from "../api/types.js";
 import type { ProcessBody } from "workflow-engine/schema";
 import { stripCompiledContent } from "workflow-engine/schema/strip-compiled";
 import { selectVersion, canDiff, diffJson, type VersionSelection, type DiffEntry } from "./versionDiffLogic.js";
+import { buildPromotionFile, promotionFilename } from "./promotionExportLogic.js";
 import type { Route } from "../routing.js";
 import { describeCaughtError } from "../errors.js";
 import { t } from "../i18n/catalog.js";
@@ -13,6 +14,21 @@ interface VersionsScreenProps {
   token: string;
   navigate: (route: Route) => void;
   onUnauthorized: () => void;
+}
+
+/**
+ * Hands a JSON file to the browser with no dependency: `Blob` plus
+ * `URL.createObjectURL` are native. The revoke waits one macrotask — revoking
+ * in the same tick as the click has historically cancelled the download before
+ * it starts, and an object URL held for one tick costs nothing.
+ */
+function downloadJson(filename: string, payload: unknown): void {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 /** process-version-inspection spec: list published versions, diff any two (or a draft against its base_version). */
@@ -28,6 +44,9 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
   // diff failure and vice versa.
   const [error, setError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
+  // The version currently being fetched for export, so only its own row's
+  // button reports the wait instead of every row going busy at once.
+  const [exporting, setExporting] = useState<number | null>(null);
 
   const load = useCallback(() => {
     let cancelled = false;
@@ -103,6 +122,29 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
     }
   };
 
+  /**
+   * environment-promotion spec: writes the version out as a file another
+   * environment's Studio can import. The body goes into the file exactly as
+   * `getVersionBody` returned it — compiled, cancel sink included. See
+   * `promotionExportLogic` for why it must not be stripped first.
+   */
+  const exportVersion = async (v: VersionSummary) => {
+    setError(null);
+    setExporting(v.version);
+    try {
+      const body = await getVersionBody(processId, v.version, token);
+      downloadJson(promotionFilename(body, v.version, processId), buildPromotionFile(processId, v, body));
+    } catch (e) {
+      if (e instanceof StudioClientError && e.status === 401) {
+        onUnauthorized();
+        return;
+      }
+      setError(describeCaughtError(e));
+    } finally {
+      setExporting(null);
+    }
+  };
+
   return (
     <main className="studio-screen">
       <button type="button" className="studio-back" onClick={() => navigate({ name: "edit", processId })}>
@@ -132,6 +174,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
                 <th>Published</th>
                 <th>A</th>
                 <th>B</th>
+                <th>Promote</th>
               </tr>
             </thead>
             <tbody>
@@ -157,6 +200,16 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
                       checked={selection.b === v.version}
                       onChange={() => setSelection((s) => selectVersion(s, "b", v.version))}
                     />
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      aria-label={`export version ${v.version} for promotion`}
+                      disabled={exporting !== null}
+                      onClick={() => void exportVersion(v)}
+                    >
+                      {exporting === v.version ? "Exporting…" : "Export"}
+                    </button>
                   </td>
                 </tr>
               ))}
