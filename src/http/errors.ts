@@ -40,6 +40,7 @@ import { DraftConflictError } from "../engine/drafts.js";
 import { MigrationPlanError } from "../engine/migration.js";
 import { ZodError } from "zod";
 import { RequestShapeError, NotFoundError, InstanceNotRunningError, InstanceRunningError } from "../errors.js";
+import { log } from "../log.js";
 
 export type HttpResult = { status: number; body: unknown };
 
@@ -106,7 +107,12 @@ export function mapError(err: unknown, ctx?: ErrorContext): HttpResult {
   // plugin handler's throw, a programming fault. Logged in full server-side
   // — the operator's only trace of it — and disclosed to the client as
   // nothing but the fact that something failed.
-  const where = ctx ? `${ctx.method} ${ctx.path}` : "(unknown request)";
-  console.error(`[http] unhandled error on ${where}:`, err instanceof Error ? (err.stack ?? err.message) : err);
+  log.error("unhandled error", {
+    method: ctx?.method,
+    path: ctx?.path,
+    name: err instanceof Error ? err.name : undefined,
+    message: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : undefined,
+  });
   return { status: 500, body: { error: { type: "internal" } } };
 }

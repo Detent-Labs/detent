@@ -578,23 +578,38 @@ capability of its own.
        departing from the design's own "no OpenSpec change" note — a
        deliberate choice for this docs-only task, not a default for future
        ones of the same shape. Stage 14 (a, b, c) is fully DONE.
-15. Observability: NOT STARTED, deliberately deferred — raised 2026-07-28.
-    No structured logging convention, no metrics, no tracing today; outbox
-    backlog, timer latency, and `faulted`-instance rate are only visible by
-    hand through the admin area. Design approved 2026-07-30 (see
-    `docs/superpowers/specs/2026-07-30-observability-design.md`), scoped
-    during brainstorming to exactly the two things the roadmap names —
-    metrics and a logging convention, deliberately not tracing — following
-    stage 14a's dependency-free precedent: a hand-rolled structured-JSON
-    logger (`src/log.ts`, a process-wide `LOG_LEVEL` threshold, existing
-    `console.*` call sites converted) and an unauthenticated `GET /metrics`
-    Prometheus-text endpoint computed fresh from the database on every
-    scrape, exposing exactly the three signals named above — outbox
-    backlog by status (reusing `countOutboxByStatus`), timer overdue
-    count/max lag, and faulted-instance count (two new reads added to
-    `src/engine/admin-queries.ts`). Generic HTTP request metrics and any
-    metrics/logging library are out of scope; see the design's non-goals
-    for the full reasoning. No OpenSpec change yet.
+<!-- antislop: allow sentence-length run-ons passive-voice em-dash. This
+     entry matches the dense technical-prose convention every other DONE
+     entry in this file already uses; see the antislop-targeted-allow-
+     not-file-all memory for why that convention exists and why a
+     block-scoped allow is the correct tool here, not a file-wide one. -->
+15. Observability: DONE (`add-observability`; design at
+    `docs/superpowers/specs/2026-07-30-observability-design.md`). Raised
+    2026-07-28. No structured logging convention, no metrics, no tracing
+    existed before this; outbox backlog, timer latency, and
+    `faulted`-instance rate were visible only by hand through the admin
+    area. Scoped during brainstorming to exactly the two things the
+    roadmap names — metrics and a logging convention, deliberately not
+    tracing — following stage 14a's dependency-free precedent: a
+    hand-rolled structured-JSON logger (`src/log.ts`, a process-wide
+    `LOG_LEVEL` threshold, existing `console.*` call sites converted) and
+    an unauthenticated `GET /metrics` Prometheus-text endpoint computed
+    fresh from the database on every scrape, exposing exactly the three
+    signals named above — outbox backlog by status (reusing
+    `countOutboxByStatus`), timer overdue count/max lag (a new
+    `getTimerLagStats`), and faulted-instance count (a new, general-shaped
+    `countInstancesByStatus`). Returns `HttpBinaryResult`, not
+    `HttpResult` — the design's original sketch missed that `server.ts`'s
+    shared `toResponse` always `JSON.stringify`s an `HttpResult` body,
+    which would have corrupted the exposition text; caught and fixed
+    during proposal review by reading `server.ts`/`errors.ts` directly,
+    before implementation started. A query failure reports 503 with an
+    empty body rather than a crash or a false all-zero 200. `GET /metrics`
+    is documented in `docs/openapi.yaml` alongside `/livez`/`/readyz`, the
+    same unauthenticated-exception treatment stage 14a's routes already
+    get. Generic HTTP request metrics and any metrics/logging library
+    stayed out of scope; see the design's non-goals for the full
+    reasoning.
 16. Notifications: NOT STARTED, deliberately deferred — raised 2026-07-28.
     Stage 9 excluded notifications from the end-user app on purpose; an
     inbox-only model without email/webhook on assignment or reminder is a

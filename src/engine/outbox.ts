@@ -21,6 +21,7 @@ import { evalOutput } from "../cel/eval.js";
 import { collectFieldsDeep, typeMatches, type FieldId, type FieldDef, type Literal } from "../schema/definition.js";
 import type { Action, ActionOutcome, ProcessId } from "../schema/definition.js";
 import type { ResolveBody } from "./resolution.js";
+import { log } from "../log.js";
 
 export const MAX_ATTEMPTS = 5;
 const BACKOFF_BASE_MS = 1000;
@@ -319,6 +320,13 @@ export async function drainOutbox(
           RETURNING idempotency_key`) as unknown[];
         if (cas.length === 0) return;
         await appendOutcome(tx, row, { status: "dead-letter", attempts });
+        log.error("outbox row dead-lettered", {
+          instanceId: row.instance_id,
+          actionId: row.action.id,
+          actionType: row.action.type,
+          attempts,
+          lastError: failureMessage,
+        });
       } else {
         // Transient: back off and return to pending (drop the lease) for a later drain.
         const backoffMs = backoffMsFor(row.action, attempts);

@@ -14,7 +14,7 @@ info:
 
     Every route runs through the Runtime API Layer (`src/runtime/api.ts`).
     An unauthenticated request to any route below `POST /auth/login`,
-    `GET /livez`, and `GET /readyz` gets 401. A request lacking a required
+    `GET /livez`, `GET /readyz`, and `GET /metrics` gets 401. A request lacking a required
     reserved role gets 403. A malformed request body gets 400 (request
     shape) or 422 (field-level validation).
 servers:
@@ -31,6 +31,8 @@ tags:
     description: Create, drive, and read process instances.
   - name: health
     description: Unauthenticated liveness/readiness probes for orchestration.
+  - name: observability
+    description: Unauthenticated Prometheus scrape target.
 
 paths:
   /auth/login:
@@ -834,6 +836,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /metrics:
+    get:
+      tags: [observability]
+      operationId: metrics
+      summary: Prometheus scrape target
+      description: >-
+        Computed fresh from the database on every request, no in-process
+        aggregation. No auth, no CORS handling. Three gauges:
+        `workflow_outbox_backlog{status}`, `workflow_timer_overdue_count`,
+        `workflow_timer_lag_seconds`, and `workflow_instances_faulted`.
+      security: []
+      responses:
+        "200":
+          description: OK. Prometheus text-exposition format, not a JSON envelope.
+          content:
+            "text/plain; version=0.0.4; charset=utf-8":
+              schema:
+                type: string
+        "503":
+          description: A query against the database failed. Empty body.
+          content:
+            "text/plain; version=0.0.4; charset=utf-8":
+              schema:
+                type: string
 
 components:
   securitySchemes:

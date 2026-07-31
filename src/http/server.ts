@@ -55,7 +55,9 @@ import {
   handleGetRegistry,
 } from "./studio-routes.js";
 import { handleLivez, handleReadyz } from "./health.js";
+import { handleMetrics } from "./metrics.js";
 import type { HttpResult, HttpBinaryResult } from "./errors.js";
+import { log } from "../log.js";
 
 /**
  * `undefined` = no origins allowed (no CORS headers emitted); `"*"` = the
@@ -171,7 +173,7 @@ export function resolveAuthResolver(env: {
   const issuers = parseAuthIssuers(env.AUTH_ISSUERS);
   if (!env.AUTH_JWT_SECRET && !issuers) {
     if (env.ALLOW_INSECURE_DEV_AUTH === "1") {
-      console.warn(
+      log.warn(
         "AUTH DISABLED: no AUTH_JWT_SECRET or AUTH_ISSUERS configured. Trusting X-Actor-Id / X-Actor-Roles headers verbatim because ALLOW_INSECURE_DEV_AUTH=1 is set. Do not run this way against real data.",
       );
       return devHeaderResolver;
@@ -237,6 +239,9 @@ export function createServer(
     }
     if (req.method === "GET" && parts.length === 1 && parts[0] === "readyz") {
       return toResponse(await handleReadyz(db), undefined, null);
+    }
+    if (req.method === "GET" && parts.length === 1 && parts[0] === "metrics") {
+      return toBinaryResponse(await handleMetrics(db), undefined, null);
     }
 
     // CORS preflight for every route below
@@ -524,7 +529,7 @@ export async function startHttpServer(
   const port = Number(process.env.PORT ?? 3000);
   const server = Bun.serve({ fetch, port, maxRequestBodySize: MAX_REQUEST_BODY_SIZE });
   const engine = startEngine(db, registry);
-  console.log(`HTTP server listening on :${server.port}`);
+  log.info("HTTP server listening", { port: server.port });
   return {
     stop: () => {
       server.stop();

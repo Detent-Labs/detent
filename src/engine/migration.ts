@@ -37,6 +37,7 @@ import { armStepTimers, type TimerDrop } from "./duration.js";
 import type { ResolveBody } from "./resolution.js";
 import { sql, newInstanceEventId, appendInstanceEvent, withTransaction } from "./store.js";
 import { CLAIM_LEASE_MS } from "./outbox.js";
+import { log } from "../log.js";
 
 /** A migration plan is invalid, unresolvable, or already frozen. */
 export class MigrationPlanError extends Error {
@@ -338,6 +339,7 @@ async function appendSkip(
     at: new Date().toISOString(),
   };
   await appendInstanceEvent(tx, ev);
+  log.warn("instance migration skipped", { instanceId: inst.instanceId, fromVersion, toVersion, reason });
 }
 
 /**

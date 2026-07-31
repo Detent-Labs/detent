@@ -28,6 +28,7 @@ import { armStepTimers, minFireAt, type TimerDrop } from "./duration.js";
 import { buildGuardContext, evalGuard, SYSTEM_ACTOR, type Actor } from "../cel/eval.js";
 import { CANCEL_SINK_STEP_ID, instance as instanceSchema } from "../schema/definition.js";
 import type { ProcessBody, Instance, HistoryEntry, InstanceEvent, Action, Step, Path, AssignmentState } from "../schema/definition.js";
+import { log } from "../log.js";
 
 /**
  * Re-exported from registry.ts, their home (a leaf module store.ts can import
@@ -685,6 +686,7 @@ async function markFaulted(instance: Instance, repeatedStepId: Step["id"], db: S
       payload: { stepId: repeatedStepId, reason: "automatic-cascade-loop" },
       at: new Date().toISOString(),
     });
+    log.error("instance faulted", { instanceId: instance.instanceId, stepId: repeatedStepId, reason: "automatic-cascade-loop" });
   });
 }
 

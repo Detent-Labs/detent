@@ -37,21 +37,24 @@ test("ALLOW_INSECURE_DEV_AUTH=1 selects the dev resolver, with no other auth env
   // Plain reassignment, not a mocking library — this repo has no mocking of
   // the system under test anywhere, and that stays true here: only the
   // console output is captured, no collaborator of resolveAuthResolver is
-  // replaced.
-  const originalWarn = console.warn;
+  // replaced. `log.warn` (add-observability) writes through `console.log`,
+  // not `console.warn` — see src/log.ts's doc comment.
+  const originalLog = console.log;
   let warned: unknown;
-  console.warn = (msg: unknown) => {
+  console.log = (msg: unknown) => {
     warned = msg;
   };
   try {
     expect(resolveAuthResolver({ ALLOW_INSECURE_DEV_AUTH: "1" })).toBe(devHeaderResolver);
   } finally {
-    console.warn = originalWarn;
+    console.log = originalLog;
   }
   expect(typeof warned).toBe("string");
-  expect(warned as string).toContain("X-Actor-Id");
-  expect(warned as string).toContain("X-Actor-Roles");
-  expect((warned as string).toLowerCase()).toContain("disabled");
+  const parsed = JSON.parse(warned as string);
+  expect(parsed.level).toBe("warn");
+  expect(parsed.msg).toContain("X-Actor-Id");
+  expect(parsed.msg).toContain("X-Actor-Roles");
+  expect((parsed.msg as string).toLowerCase()).toContain("disabled");
 });
 
 test("AUTH_JWT_SECRET shorter than 32 encoded bytes fails startup", () => {

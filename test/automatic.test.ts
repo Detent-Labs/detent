@@ -4,7 +4,7 @@
  * cascade/faulted/creation cases hit Postgres and skip when DATABASE_URL is
  * unset — a skip is visible, a false green is not.
  */
-import { test, expect, beforeAll } from "bun:test";
+import { test, expect, beforeAll, spyOn } from "bun:test";
 import { sql, initSchema, createInstance, withTransaction } from "../src/engine/store.js";
 import {
   selectAutomaticPath,
@@ -169,7 +169,21 @@ test.skipIf(!DB)("a data-independent cascade loop parks the instance faulted and
   ]);
   const i = await createInstance(body, { processId: "proc_1" as Instance["processId"], version: 1 });
 
+  // add-observability: markFaulted's log.error call (src/engine/transition.ts)
+  // writes through console.error as one JSON line — assert its shape here,
+  // alongside the persisted instance.faulted event this same test already checks.
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
   await rejectsWith(executeManualTransition(i, "path_ag", body, actor), AutomaticCascadeLoop);
+  expect(errorSpy).toHaveBeenCalledTimes(1);
+  const loggedFault = JSON.parse(errorSpy.mock.calls[0]![0] as string);
+  errorSpy.mockRestore();
+  expect(loggedFault).toMatchObject({
+    level: "error",
+    msg: "instance faulted",
+    instanceId: i.instanceId,
+    stepId: "step_g",
+    reason: "automatic-cascade-loop",
+  });
 
   // Parked on the last committed step (re-entered step_g), marked faulted, prior hops kept.
   expect(await statusOf(i.instanceId)).toBe("faulted");
