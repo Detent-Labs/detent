@@ -1,7 +1,7 @@
 {
   "processId": "proc_3f8a1c2e-9b4d-4e7a-a1c8-2e5f7b9d0a13",
   "version": 1,
-  "definitionHash": "16da012aabc01f1420f766861186249586045e9562c5d12dbb9b10cf09004ee7",
+  "definitionHash": "95aeeb347e1c2b680c6695c8730c36cf99b65a3712e4e9860fa616817b441bd7",
   "status": "published",
   "publishedAt": "2026-07-18T09:00:00Z",
   "definition": {
@@ -188,6 +188,14 @@
                   }
                 ]
               }
+            },
+            {
+              "id": "timer_dddd4444-0003-4a1c-8e2f-000000000003",
+              "description": "Escalate to a manager if not reviewed after 14 days.",
+              "duration": "P14D",
+              "onFire": {
+                "targetPath": "path_bbbb2222-0007-4a1c-8e2f-000000000007"
+              }
             }
           ],
           "paths": [
@@ -203,6 +211,13 @@
               "key": "reject",
               "label": "Reject",
               "to": "step_aaaa1111-0005-4a1c-8e2f-000000000005",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_bbbb2222-0007-4a1c-8e2f-000000000007",
+              "key": "escalate",
+              "label": "Escalate",
+              "to": "step_aaaa1111-0007-4a1c-8e2f-000000000007",
               "trigger": "manual"
             }
           ]
@@ -353,6 +368,75 @@
               "key": "retry-booking",
               "label": "Retry Booking",
               "to": "step_aaaa1111-0003-4a1c-8e2f-000000000003",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_aaaa1111-0007-4a1c-8e2f-000000000007",
+          "key": "escalated_review",
+          "label": {
+            "en": "Escalated Review"
+          },
+          "type": "task",
+          "description": {
+            "en": "Reached when the original approver did not act within the SLA. Same decision, a different assignee."
+          },
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": ["finance-manager"]
+              }
+            }
+          },
+          "onEntry": [
+            {
+              "id": "action_eeee5555-0003-4a1c-8e2f-000000000003",
+              "type": "http.request",
+              "config": {
+                "url": "https://example.com/hooks/expense-escalated",
+                "method": "POST"
+              },
+              "execution": "async",
+              "idempotencyKey": null,
+              "retry": {
+                "maxAttempts": 3,
+                "backoff": "exponential",
+                "baseDelay": "PT10S"
+              },
+              "timeout": "PT10S"
+            }
+          ],
+          "view": {
+            "fields": [
+              {
+                "ref": "field_1a2b3c4d-0001-4a1c-8e2f-000000000001",
+                "readonly": true
+              },
+              {
+                "ref": "field_1a2b3c4d-0002-4a1c-8e2f-000000000002",
+                "readonly": true
+              },
+              {
+                "ref": "field_1a2b3c4d-0003-4a1c-8e2f-000000000003",
+                "required": true
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_bbbb2222-0008-4a1c-8e2f-000000000008",
+              "key": "approve",
+              "label": "Approve",
+              "to": "step_aaaa1111-0003-4a1c-8e2f-000000000003",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_bbbb2222-0009-4a1c-8e2f-000000000009",
+              "key": "reject",
+              "label": "Reject",
+              "to": "step_aaaa1111-0005-4a1c-8e2f-000000000005",
               "trigger": "manual"
             }
           ]

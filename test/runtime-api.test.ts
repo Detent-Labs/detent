@@ -11,7 +11,8 @@ import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema, withTransaction, appendInstanceEvent, newInstanceEventId } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
-import { executeManualTransition, cancelInstance, ConcurrencyConflict, GuardRefused, AutomaticCascadeLoop } from "../src/engine/transition.js";
+import { executeManualTransition, cancelInstance, fireTimer, ConcurrencyConflict, GuardRefused, AutomaticCascadeLoop } from "../src/engine/transition.js";
+import { compileProcessBody } from "../src/schema/compile.js";
 import {
   createProcessInstance,
   getInstanceView,
@@ -1045,6 +1046,7 @@ test.skipIf(!DB)("happy path: create -> view -> submit -> view against expense-a
   const expenseReg = createRegistry();
   expenseReg.set("accounting.postInvoice", { handler: async () => ({ status: "pending" }) });
   expenseReg.set("notify.email", { handler: async () => ({}) });
+  expenseReg.set("http.request", { handler: async () => ({}) });
 
   const PID = pid("proc_expense_approval");
   await publishBody(PID, authored, expenseReg, dataSourceReg);
@@ -1096,6 +1098,67 @@ test.skipIf(!DB)("happy path: create -> view -> submit -> view against expense-a
   const bookView = await getInstanceView(afterReview.instanceId, demoActor, dataSourceReg);
   expect(bookView.step.key).toBe("book");
   expect(bookView.availablePaths).toEqual([]); // book's paths are automatic
+});
+
+// ============================================================
+// Escalation pattern round trip against the real expense-approval example
+// ============================================================
+
+test.skipIf(!DB)("escalation: an unactioned review escalates to a manager after the SLA timer fires", async () => {
+  const raw = JSON.parse(readFileSync(new URL("../examples/expense-approval.json", import.meta.url), "utf8"));
+  const authored = raw.definition as ProcessBody;
+  const body = compileProcessBody(authored);
+  const expenseReg = createRegistry();
+  expenseReg.set("accounting.postInvoice", { handler: async () => ({ status: "pending" }) });
+  expenseReg.set("notify.email", { handler: async () => ({}) });
+  expenseReg.set("http.request", { handler: async () => ({}) });
+
+  const PID = pid("proc_expense_approval_escalation");
+  await publishBody(PID, authored, expenseReg, dataSourceReg);
+
+  const amountField = "field_1a2b3c4d-0001-4a1c-8e2f-000000000001" as FieldId;
+  const reasonField = "field_1a2b3c4d-0002-4a1c-8e2f-000000000002" as FieldId;
+  const submitPath = "path_bbbb2222-0001-4a1c-8e2f-000000000001" as PathId;
+  const escalationTimerId = "timer_dddd4444-0003-4a1c-8e2f-000000000003";
+  const escalatedReviewStepId = "step_aaaa1111-0007-4a1c-8e2f-000000000007";
+  const escalateActionId = "action_eeee5555-0003-4a1c-8e2f-000000000003";
+
+  const demoActor: Actor = { id: "user_demo", roles: ["employee", "finance-approver"] };
+  const managerActor: Actor = { id: "user_manager", roles: ["finance-manager"] };
+
+  const created = await createProcessInstance(PID, demoActor, dataSourceReg);
+  await claimStep(created.instanceId, demoActor);
+  const afterCapture = await submitAndTransition(
+    created.instanceId,
+    submitPath,
+    { [amountField]: 42, [reasonField]: "Taxi" } as unknown as Instance["data"],
+    demoActor, dataSourceReg,
+  );
+  expect(afterCapture.currentStepId as string).toBe("step_aaaa1111-0002-4a1c-8e2f-000000000002"); // review
+
+  // Simulate the SLA breach by firing the escalation timer directly instead
+  // of waiting 14 days, the same pattern the engine's own timer tests use.
+  const escalated = await fireTimer(afterCapture, escalationTimerId, body);
+  expect(escalated.currentStepId as string).toBe(escalatedReviewStepId);
+  expect(escalated.status).toBe("running");
+
+  // The new finance-manager tier can see and claim the escalated instance.
+  const escalatedView = await getInstanceView(escalated.instanceId, managerActor, dataSourceReg);
+  expect(escalatedView.step.key).toBe("escalated_review");
+  expect(escalatedView.availablePaths.map((p) => p.id)).toEqual([
+    "path_bbbb2222-0008-4a1c-8e2f-000000000008" as PathId,
+    "path_bbbb2222-0009-4a1c-8e2f-000000000009" as PathId,
+  ]);
+  await claimStep(escalated.instanceId, managerActor); // does not throw: eligible candidate
+
+  // escalated_review's onEntry notify action was enqueued — never delivered
+  // here, no outbox worker running, the same resting-state convention the
+  // happy-path test above uses for "book"'s onEntry action.
+  const outboxRows = (await sql`
+    SELECT status FROM outbox WHERE instance_id = ${escalated.instanceId} AND action_id = ${escalateActionId}
+  `) as { status: string }[];
+  expect(outboxRows).toHaveLength(1);
+  expect(outboxRows[0].status).toBe("pending");
 });
 
 // ============================================================
