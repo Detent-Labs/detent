@@ -1,7 +1,7 @@
 {
   "processId": "proc_3f8a1c2e-9b4d-4e7a-a1c8-2e5f7b9d0a13",
   "version": 1,
-  "definitionHash": "95aeeb347e1c2b680c6695c8730c36cf99b65a3712e4e9860fa616817b441bd7",
+  "definitionHash": "2eec7e1e62950988fc3fd972f50899de04df0cfc4b9ed20e894790396c1ee788",
   "status": "published",
   "publishedAt": "2026-07-18T09:00:00Z",
   "definition": {
@@ -397,6 +397,25 @@
               "config": {
                 "url": "https://example.com/hooks/expense-escalated",
                 "method": "POST"
+              },
+              "execution": "async",
+              "idempotencyKey": null,
+              "retry": {
+                "maxAttempts": 3,
+                "backoff": "exponential",
+                "baseDelay": "PT10S"
+              },
+              "timeout": "PT10S"
+            },
+            {
+              "id": "action_eeee5555-0004-4a1c-8e2f-000000000004",
+              "type": "notification.email",
+              "config": {
+                "to": [
+                  "finance-manager@example.com"
+                ],
+                "subject": "Expense approval escalated",
+                "body": "An expense request passed its review SLA and now waits for a finance manager."
               },
               "execution": "async",
               "idempotencyKey": null,

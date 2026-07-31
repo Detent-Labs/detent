@@ -610,7 +610,9 @@ capability of its own.
     get. Generic HTTP request metrics and any metrics/logging library
     stayed out of scope; see the design's non-goals for the full
     reasoning.
-16. Notifications: NOT STARTED, deliberately deferred — raised 2026-07-28.
+16. Notifications: DONE (`add-notifications`, implemented 2026-07-31; see the
+    `notification-email-action-handler` capability spec and the
+    "Notifications" entry under `docs/current-state.md`). Raised 2026-07-28.
     Stage 9 excluded notifications from the end-user app on purpose; an
     inbox-only model without email/webhook on assignment or reminder is a
     gap for customers used to being pushed to, not polling. Design approved
@@ -632,8 +634,52 @@ capability of its own.
     never the process body, matching the `DATABASE_URL`/`AUTH_JWT_SECRET`
     convention. The devcontainer gains a `mailpit` service for real
     SMTP integration testing, the same "real dependency, not a mock"
-    pattern the DB-backed suites already use against `db`. No OpenSpec
-    change yet.
+    pattern the DB-backed suites already use against `db`.
+    Implemented 2026-07-31 as designed, plus five decisions the design did
+    not settle, each found while reviewing the proposal against the code
+    rather than during implementation. **The stage is only half of what its
+    own rationale asked for, and this is not a wording quibble**: a static
+    `config.to` reaches a team or manager mailbox, never the actor a step is
+    assigned to, so "a participant is pushed to instead of polling" stays
+    open. That gap is now measured, not guessed: `HandlerContext` is
+    `{action, config, idempotencyKey, instanceId}` and carries no `db`,
+    because `deliver` runs outside any transaction, so resolving an assignee
+    to `auth_users.email` widens the handler seam itself. It is a stage
+    (#16b), not a follow-up patch. The escalation recipe (#17) is unaffected:
+    an escalation notifies a tier, and a tier is a static address.
+    The other four: the handler returns `{messageId, recipients}` as a
+    declared `result` shape, since `evalOutput` throws a plain (transient)
+    error when an `Action.output` entry cannot read `result`, which would
+    redeliver a message the server already accepted; the `250` on
+    end-of-`DATA` is a point of no return, after which `QUIT`, a socket
+    reset and the session timeout can no longer fail the delivery, because
+    SMTP has no idempotency contract and most receivers ignore `Message-ID`;
+    every `RCPT TO` is checked before `DATA`, so one rejected address aborts
+    with nothing sent rather than duplicating for the accepted addresses on
+    the retry a `4xx` triggers; and an unset `SMTP_FROM` is permanent like an
+    unset `SMTP_HOST`, with no substitute sender, since a synthesized address
+    fails SPF at a real relay. `socket.upgradeTLS` was verified present in
+    the pinned Bun 1.3.11 before the transport decision was accepted.
+    `examples/expense-approval.json` gained a `notification.email` action
+    beside `escalated_review`'s existing `http.request`, so #17's recipe
+    now shows both notifying handlers at one action position. Three
+    hand-built test registries needed the new type, the same ripple #17
+    recorded.
+    **One gap stays open and is not a missing test.** The handler's STARTTLS
+    decisions are covered: it issues `STARTTLS` when the server advertises
+    it, sends no credential before the upgrade, refuses to authenticate in
+    the clear against a server that offers none, and reports a stalled
+    upgrade as `... during TLS handshake` rather than a bare timeout. What
+    is NOT covered is a completed TLS handshake, and no local harness could
+    produce one: Bun refuses a server-side `upgradeTLS` outright ("Use
+    upgradeDuplexToTLS with isServer: true"), and a `node:tls`
+    `TLSSocket({isServer: true})` never handshakes with a Bun client socket
+    in-process — traced to the byte, the client's ClientHello never lands.
+    So the authenticated-relay path, the main production case, is verified
+    by reading only. Closing it needs either a TLS-capable Mailpit (a
+    committed test certificate plus `NODE_EXTRA_CA_CERTS`) or one
+    handshake-only probe against a real public relay. Both are decisions
+    beyond this change.
 17. Escalation pattern: DONE (`add-escalation-pattern`, archived
     2026-07-31). Raised
     2026-07-28. Design approved 2026-07-30 (see

@@ -1,6 +1,8 @@
-# Devcontainer services: the `app` container (Node 22 base + Bun) and a PostgreSQL
-# 16 datastore. The engine reaches Postgres via DATABASE_URL (see openspec/specs
-# persistence). pgdata persists the database across rebuilds.
+# Devcontainer services: the `app` container (Node 22 base + Bun), a PostgreSQL
+# 16 datastore, and a Mailpit SMTP catcher. The engine reaches Postgres via
+# DATABASE_URL (see openspec/specs persistence) and Mailpit via SMTP_HOST/PORT
+# (notification-email-action-handler). pgdata persists the database across
+# rebuilds; caught mail is deliberately not persisted.
 name: workflow-engine
 
 services:
@@ -23,8 +25,15 @@ services:
       # X-Actor-Id / X-Actor-Roles headers verbatim. Devcontainer only — never
       # set this in a deployment that real user data reaches.
       ALLOW_INSECURE_DEV_AUTH: "1"
+      # Mailpit's SMTP listener: no auth, no TLS. The notification.email
+      # handler's end-to-end test skips when SMTP_HOST is unset, the same way
+      # the DB-backed suites skip without DATABASE_URL.
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_FROM: workflow-engine@example.test
     depends_on:
       - db
+      - mailpit
 
   db:
     image: postgres:16
@@ -35,6 +44,13 @@ services:
       POSTGRES_DB: workflow_engine
     volumes:
       - pgdata:/var/lib/postgresql/data
+
+  # Catches every message the notification.email handler sends. Port 1025 is
+  # SMTP, 8025 the web interface — the host binding for the latter lives in
+  # docker-compose.override.yml, like every other published port.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    restart: unless-stopped
 
 volumes:
   pgdata:

@@ -464,6 +464,58 @@ Stage-by-stage status is in `ROADMAP.md`.
   total crosses it; either is a `PermanentError`. The response lands in
   `instance.data` via `Action.output`, so an unbounded read is an unbounded
   write.
+- Notifications (`src/handlers/notification-email.ts`, roadmap #16): a second
+  built-in handler, `notification.email`, registered by `createDefaultRegistry`
+  next to `httpHandlerDef`. No schema change — the five existing action
+  positions already carry it, so "notify on assignment" is a step's `onEntry`
+  and "notify on reminder" a timer's `onFire.actions`. Config is static and
+  publish-validated (`to`, one or more valid addresses; `subject`; plain-text
+  `body`), the same discipline `httpConfigSchema` set. **Recipients are literal
+  addresses, never resolved to the step's assignee**: that lookup needs
+  `auth_users.email` by actor id or role, and `HandlerContext` carries no `db`
+  by design (`deliver` runs outside any transaction), so it is a handler-seam
+  change, not a lookup — see roadmap #16 for what stays open.
+
+  Transport is a hand-written SMTP client on `Bun.connect` plus
+  `socket.upgradeTLS` (STARTTLS on the submission port), with no new npm
+  dependency — the ladder `http.request` climbed with `fetch`. Connection
+  details come from the environment (`SMTP_HOST`, `SMTP_PORT` default 587,
+  `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`), never from the process body. An
+  unset `SMTP_HOST` or `SMTP_FROM` is a `PermanentError` before any socket
+  opens; no sender is substituted, since a synthesized address fails SPF at a
+  real relay and turns a config error into a mid-delivery `5xx`. Credentials
+  against a server advertising no `STARTTLS` are refused permanently rather
+  than sent in the clear. `Message-ID` carries `ctx.idempotencyKey`, the
+  counterpart of `http.request`'s `Idempotency-Key`.
+
+  Two rules exist because SMTP, unlike a webhook, has no idempotency contract
+  and a redelivery is a second real message. First, every `RCPT TO` is checked
+  before `DATA`: one rejected address aborts with nothing sent, since
+  delivering to the accepted ones would duplicate for them on the retry a
+  `4xx` triggers. Second, the `250` on end-of-`DATA` is the point of no
+  return — the result object is built before it, `QUIT` is written without
+  awaiting a reply, and no later failure can fail the delivery. The handler
+  returns `{messageId, recipients}` as the `result` an `Action.output` mapping
+  reads; a shape that could not be read would throw a plain (transient) error
+  from `evalOutput` after the mail was already out.
+
+  `5xx` is permanent; a `4xx`, a connection failure and the session timeout
+  (`SMTP_DEFAULT_TIMEOUT_MS`, under `CLAIM_LEASE_MS`) are transient. The
+  timeout names the step it was waiting on (`... during TLS handshake`), so a
+  stalled upgrade does not read as a bare deadline. The body's line endings
+  are normalized to CRLF before base64, since the encoding carries a bare
+  newline through unchanged and some readers then show a paragraph as one
+  run-on line.
+
+  `examples/expense-approval.json`'s `escalated_review` step carries one
+  beside its existing `http.request`, so the escalation recipe (roadmap #17)
+  shows both notifying handlers at the same action position. The
+  devcontainer runs `mailpit` for real end-to-end tests, the same "real
+  dependency, not a mock" pattern the DB suites use against `db`. The shared
+  compose file publishes no host port for it, matching `db` and the rule that
+  port publishing belongs in the gitignored `docker-compose.override.yml`; the
+  end-to-end test reads messages back over Mailpit's HTTP API inside the
+  compose network, so it never depends on a host binding.
 - Reconcile in-flight action writebacks across a migration (`src/engine/migration.ts`,
   `src/engine/outbox.ts`): closes what was previously a "Decided, not yet built" gap.
   `migrateOne`'s in-flight-actions check now blocks only a `claimed` outbox row with
