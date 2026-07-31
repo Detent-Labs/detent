@@ -14,6 +14,7 @@ import { drainResolutions } from "../src/engine/resolution.js";
 import { drainTimers } from "../src/engine/timers.js";
 import { createRegistry, register, createDataSourceRegistry } from "../src/engine/registry.js";
 import { HTTP_ACTION_TYPE, httpHandlerDef } from "../src/handlers/http.js";
+import { NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef } from "../src/handlers/notification-email.js";
 import { compileProcessBody } from "../src/schema/compile.js";
 import { definitionHash } from "../src/schema/hash.js";
 import type { ProcessBody, ProcessId, Instance, Action } from "../src/schema/definition.js";
@@ -331,6 +332,21 @@ test.skipIf(!DB)("publish rejects an http.request action with method GET and a b
     httpReg,
   );
   expect(err.issues[0]!.type).toBe(HTTP_ACTION_TYPE);
+  expect(await definitionCount()).toBe(0);
+});
+
+// The same integration point for notification.email: handlers-notification-
+// email.test.ts covers the schema and the handler directly, this is the one
+// test that notificationEmailConfigSchema reaches publishBody.
+
+test.skipIf(!DB)("publish rejects a notification.email action with a malformed recipient", async () => {
+  const mailReg = createRegistry();
+  register(mailReg, NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef);
+  const err = await publishRegistryFails(
+    bodyWithActionType(NOTIFICATION_EMAIL_ACTION_TYPE, { to: ["not-an-address"], subject: "s", body: "b" }),
+    mailReg,
+  );
+  expect(err.issues[0]!.type).toBe(NOTIFICATION_EMAIL_ACTION_TYPE);
   expect(await definitionCount()).toBe(0);
 });
 

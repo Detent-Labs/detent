@@ -1047,6 +1047,7 @@ test.skipIf(!DB)("happy path: create -> view -> submit -> view against expense-a
   expenseReg.set("accounting.postInvoice", { handler: async () => ({ status: "pending" }) });
   expenseReg.set("notify.email", { handler: async () => ({}) });
   expenseReg.set("http.request", { handler: async () => ({}) });
+  expenseReg.set("notification.email", { handler: async () => ({}) });
 
   const PID = pid("proc_expense_approval");
   await publishBody(PID, authored, expenseReg, dataSourceReg);
@@ -1112,6 +1113,7 @@ test.skipIf(!DB)("escalation: an unactioned review escalates to a manager after 
   expenseReg.set("accounting.postInvoice", { handler: async () => ({ status: "pending" }) });
   expenseReg.set("notify.email", { handler: async () => ({}) });
   expenseReg.set("http.request", { handler: async () => ({}) });
+  expenseReg.set("notification.email", { handler: async () => ({}) });
 
   const PID = pid("proc_expense_approval_escalation");
   await publishBody(PID, authored, expenseReg, dataSourceReg);
