@@ -149,6 +149,8 @@ const en = {
   "error.notAssigned": "You are not assigned to this step.",
   "error.guardRefused": "The selected path is no longer available. Refresh and try again.",
   "error.concurrencyConflict": "The instance changed concurrently. Refresh and try again.",
+  "error.publishRejected": "The server rejected this definition:",
+  "error.crossProcess": "A subprocess reference could not be resolved:",
   "error.network": "Could not reach the server. Check your connection and try again.",
   "error.serverError": "The server hit an error. Try again.",
   "error.generic": "Something went wrong. Try again.",

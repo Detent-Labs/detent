@@ -12,6 +12,7 @@
   --stamp-blue-600: #2c4a6e;
   --seal-700: #6e7b3f;
   --alert-700: #a23b2e;
+  --ochre-600: #8a6420;
 
   --color-surface: var(--paper-50);
   --color-surface-muted: var(--ledger-100);
@@ -22,6 +23,9 @@
   --color-accent-contrast: #ffffff;
   --color-success: var(--seal-700);
   --color-danger: var(--alert-700);
+  /* Distinct from danger on purpose: the key-collision notice is a caution a
+     developer may knowingly accept, not a refusal. */
+  --color-warning: var(--ochre-600);
 
   --font-display: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
   --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -42,6 +46,7 @@
     --stamp-blue-600: #7ea3cc;
     --seal-700: #9db072;
     --alert-700: #d97362;
+    --ochre-600: #d0a959;
     --color-accent-contrast: #10141a;
   }
 }
@@ -535,4 +540,68 @@ h2 {
     transition: none !important;
     animation: none !important;
   }
+}
+
+/* Environment promotion: the import file control, its result line, and the
+   preview a developer confirms before publishing. */
+.studio-file-label {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.studio-note {
+  color: var(--color-text-muted);
+  min-height: 1.25rem;
+  margin: 0 0 var(--space-2);
+}
+
+.studio-warning {
+  color: var(--color-warning);
+  border-left: 3px solid var(--color-warning);
+  padding-left: var(--space-2);
+}
+
+.studio-dialog {
+  max-width: 34rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: 2px;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  color: var(--color-text);
+  overscroll-behavior: contain;
+}
+
+.studio-dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.studio-dialog-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.studio-dialog-facts dt {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+/* A hash and a process id are both long and unbreakable; without this the
+   grid column stretches the dialog past its max-width. */
+.studio-dialog-facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.studio-dialog-note {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
 }

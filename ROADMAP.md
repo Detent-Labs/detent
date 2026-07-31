@@ -634,7 +634,8 @@ capability of its own.
     SMTP integration testing, the same "real dependency, not a mock"
     pattern the DB-backed suites already use against `db`. No OpenSpec
     change yet.
-17. Escalation pattern: design DONE, implementation NOT STARTED. Raised
+17. Escalation pattern: DONE (`add-escalation-pattern`, archived
+    2026-07-31). Raised
     2026-07-28. Design approved 2026-07-30 (see
     `docs/superpowers/specs/2026-07-30-escalation-pattern-design.md`). Timers
     are already first-class, but there was no documented recipe for "SLA
@@ -665,7 +666,13 @@ capability of its own.
     (stays static config, per the stage 16 decision). No OpenSpec change
     yet — implementation (JSON edit + recomputed `definitionHash` + new
     end-to-end test) is tracked separately from this design.
-18. Environment promotion: design DONE, implementation NOT STARTED. Raised
+    Implemented 2026-07-31 exactly as designed: `examples/expense-approval.json`
+    gained the `escalated_review` step, its `finance-manager` assignment and the
+    sibling forcing timer, plus an end-to-end test in `test/runtime-api.test.ts`
+    and a new `escalation-pattern` capability spec. Two existing happy-path
+    tests whose hand-built registries did not know `http.request` were fixed in
+    the same change.
+18. Environment promotion: DONE (`add-environment-promotion`). Raised
     2026-07-28. Design approved 2026-07-30 (see
     `docs/superpowers/specs/2026-07-30-environment-promotion-design.md`).
     Stage 11 explicitly excluded multi-environment transport as a product
@@ -693,8 +700,27 @@ capability of its own.
     dependency-graph bundling (subprocess children are promoted separately,
     child-first, same order `scripts/seed.ts` uses), promoting drafts
     instead of published versions, promoting migration plans/users/roles/
-    instance data, and a cross-database diff before import. No OpenSpec
-    change yet — implementation is tracked separately from this design.
+    instance data, and a cross-database diff before import.
+    Implemented 2026-07-31. Two pure modules
+    (`packages/studio/src/screens/promotionExportLogic.ts`,
+    `promotionImportLogic.ts`), one new client function `publishProcess`, an
+    Export action per version row, and an import flow on the process list
+    behind a native `<dialog>` preview. The exported `body` is the COMPILED
+    body, shipped and re-published verbatim: `publishBody` always calls
+    `compileProcessBody`, which returns an already-compiled body unchanged, so
+    the target recomputes the source's own `definitionHash`. Stripping it back
+    to the authored shape (what the adjacent `seededDraftInput` must do for a
+    draft) would reach the same hash by a longer road, and is explicitly ruled
+    out in the module. Two additions the approved design did not anticipate,
+    both found while implementing: the import preview warns when a DIFFERENT
+    process in the target already publishes under the incoming `key` (nothing
+    enforces key uniqueness — `definitions` is keyed `(process_id, version)`
+    and `key` lives in the body — and a published process cannot be deleted),
+    and Studio's client learned the six publish-time rejections it had been
+    collapsing into a generic "the server hit an error", which the existing
+    Publish action had hit identically. Verified against two live databases
+    and through a browser: hash carries across, a re-import mints no version,
+    a parent before its child is refused with the server's own message.
 <!-- antislop: allow sentence-length, run-ons, passive-voice. This entry
      matches the dense technical-prose convention every other DONE entry in
      this file already uses; see the antislop-targeted-allow-not-file-all

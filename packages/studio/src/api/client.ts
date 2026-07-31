@@ -7,6 +7,7 @@ import type {
   VersionSummary,
   PublishResult,
   MigrationPlan,
+  PublishIssue,
   OrphanKeyScan,
   RegistryInfo,
   InstanceView,
@@ -24,6 +25,21 @@ export class StudioClientError extends Error {
     super(error.type);
     this.name = "StudioClientError";
   }
+}
+
+/**
+ * Normalizes the two issue shapes a publish rejection can carry: the engine's
+ * own `{loc, message}` and a Zod issue's `{path: (string|number)[], message}`.
+ * Anything unrecognized still yields a row, so a body that fails in a way this
+ * client does not know about is reported rather than silently dropped.
+ */
+function toPublishIssues(raw: unknown): PublishIssue[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((i) => {
+    const issue = i as { loc?: unknown; path?: unknown; message?: unknown };
+    const loc = typeof issue.loc === "string" ? issue.loc : Array.isArray(issue.path) ? issue.path.join(".") : "";
+    return { loc, message: typeof issue.message === "string" ? issue.message : JSON.stringify(i) };
+  });
 }
 
 async function parseErrorBody(res: Response): Promise<ClientError> {
@@ -50,6 +66,14 @@ async function parseErrorBody(res: Response): Promise<ClientError> {
       return { type: "migration-plan", message };
     case "validation":
       return { type: "validation", issues: (err.issues ?? []) as SubmissionIssue[] };
+    case "registry-validation":
+    case "cel-validation":
+    case "duration-validation":
+    case "compile-validation":
+    case "schema-validation":
+      return { type: "publish-validation", kind: err.type, issues: toPublishIssues(err.issues) };
+    case "cross-process-validation":
+      return { type: "cross-process-validation", message };
     case "already-claimed":
       return { type: "already-claimed", message };
     case "not-a-candidate":
@@ -148,6 +172,25 @@ export async function deleteDraft(processId: string, token: string): Promise<voi
 /** Publishes the *persisted* draft server-side — there is nothing for the caller to supply beyond the process id (studio-publish spec). */
 export async function publishDraft(processId: string, token: string): Promise<PublishResult> {
   const res = await request(`/drafts/${encodeURIComponent(processId)}/publish`, token, { method: "POST" });
+  return (await res.json()) as PublishResult;
+}
+
+/**
+ * Publishes a caller-supplied body under a caller-supplied process id — the
+ * import half of environment promotion (environment-promotion spec), and the
+ * only caller of `POST /processes` in Studio. Distinct from `publishDraft`,
+ * which publishes the persisted draft server-side and accepts no body, so it
+ * cannot carry a definition that arrived from another environment.
+ *
+ * `body` goes out exactly as the promotion file carried it. The route needs
+ * `system:publish`, which `system:developer` does not imply.
+ */
+export async function publishProcess(processId: string, body: unknown, token: string): Promise<PublishResult> {
+  const res = await request("/processes", token, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ processId, body }),
+  });
   return (await res.json()) as PublishResult;
 }
 

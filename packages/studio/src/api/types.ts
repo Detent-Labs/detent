@@ -103,6 +103,17 @@ export interface InstanceRecordPage {
   cursor?: string;
 }
 
+/**
+ * One located publish-time defect. `loc` is a path into the body
+ * (`steps[1].timers[0].onFire.actions[0]`); every issue-bearing publish error
+ * the engine raises carries both fields. A Zod issue names its path `path`
+ * instead, normalized on arrival.
+ */
+export interface PublishIssue {
+  loc: string;
+  message: string;
+}
+
 export type ClientError =
   | { type: "authorization"; message: string }
   | { type: "actor-resolution"; message: string }
@@ -111,6 +122,14 @@ export type ClientError =
   | { type: "draft-conflict"; message: string }
   | { type: "migration-plan"; message: string }
   | { type: "validation"; issues: SubmissionIssue[] }
+  // Publish-time rejections. The server maps six distinct error classes here
+  // (registry, CEL, duration, compile, schema, cross-process); five carry
+  // located `issues`, cross-process carries a message. All six reach a
+  // developer publishing or importing a definition, and all six were
+  // previously collapsed into "internal" — which reports "the server hit an
+  // error" for a fixable, precisely-located defect.
+  | { type: "publish-validation"; kind: string; issues: PublishIssue[] }
+  | { type: "cross-process-validation"; message: string }
   | { type: "already-claimed"; message: string }
   | { type: "not-a-candidate"; message: string }
   | { type: "not-claimed"; message: string }
