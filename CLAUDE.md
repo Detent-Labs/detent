@@ -395,19 +395,23 @@ change lands.
   file contend and fail spuriously. Observed, not fully characterised: full runs have
   been stable across many consecutive passes while single-file reruns were not. Read
   a verdict off a *named* test failure, never off a pass count alone.
-- **Running `bun test` wipes whatever manual/demo state was in the devcontainer's
-  Postgres** — the same `beforeEach` truncates that make DB suites reliable
-  (`definitions`, `instances`, `history_entries`, `instance_events`, `outbox`,
-  `auth_users`, ...) run against the one database the running dev server
-  (`bun run serve`) also reads and writes when you're manually exercising the
-  end-user app or editor Player in a browser. There is no separate database for
-  manual/demo use. Observed twice in one session: a demo user (`auth_users`) and
-  a demo process's instances were both silently wiped by a `bun test` run
-  started for unrelated regression verification, mid-demo. If you need durable
-  demo state alongside test runs, recreate it after the last `bun test` run, or
-  set up a dedicated database for manual testing (not yet done — see the
-  `pg-test` container pattern used for host-run tests in memory as a starting
-  point, though that's for tests, not demo persistence).
+- **The suite has its own database. The dev server keeps `DATABASE_URL`'s.**
+  `bunfig.toml`'s `[test] preload` (`test/preload-db.ts`) appends `_test` to
+  the database name for every `bun test` run. It creates that database on
+  demand and prints the name it chose. The split closes two hazards, both of
+  them seen here.
+
+  One: a `bun test` run wipes demo state mid-demo. Its `beforeEach` truncates
+  `definitions`, `instances`, `outbox`, `auth_users` and more.
+
+  Two, and costlier: a running `bun run serve` corrupts test runs. The server
+  starts four background pollers via `startEngine` (`src/http/server.ts:526`).
+  One claims outbox rows every 500 ms. Against a shared database it takes rows
+  the suite is driving. Measured: 3 red runs of 20 with a dev server up, 0 of
+  20 with none.
+
+  Do not point a server or a seed at the `_test` database. Do not remove the
+  preload to "simplify" the setup.
 - **Never mutate, stash, or check out the shared working tree to test something.**
   Mutation testing (revert a line, confirm a named test fails) is the right technique
   and must happen on a copy — the tree usually holds uncommitted work, and a

@@ -1325,3 +1325,34 @@ Stage-by-stage status is in `ROADMAP.md`.
   The call `diffAgainstBase` strips the base for the same reason the seed
   does. An unmodified seeded draft now diffs as "No differences", which
   agrees with publishing it returning the version it came from.
+
+- The suite's own database (`bunfig.toml`, `test/preload-db.ts`,
+  `make-db-suites-deterministic`): a `bun test` run used to share the
+  devcontainer's one Postgres database with `bun run serve`, `bun run seed`
+  and any browser session. That sharing was not benign.
+
+  `src/http/server.ts:526` starts four background pollers through
+  `startEngine` (`src/engine/host.ts:87`). One of them claims outbox rows
+  every 500 ms. Another resolves parked instances, a third fires timers. A dev
+  server left running therefore drove the same tables a test run drove. It
+  took rows the suite was about to claim.
+
+  Measured on one unchanged tree, twenty runs each: three red runs with a dev
+  server up, zero with none. The runs yielded four captured assertions. Three
+  of them read a state that had not advanced (`"running"` where the test expected
+  `"cancelled"` or `"completed"`, `1` where it expected `2`). The fourth,
+  `test/outbox.test.ts:745`, asserts over fully awaited `UPDATE` statements on
+  instance-scoped rows after a `TRUNCATE`. Nothing inside that test can race
+  it, which is what settled the diagnosis.
+
+  A `[test] preload` in `bunfig.toml` now derives `<name>_test` from
+  `DATABASE_URL`, creates it on demand, and prints the name it chose before
+  the first suite. A preload rather than a wrapper script, so it applies to
+  every `bun test` invocation and not only to `bun run test`. An unset
+  `DATABASE_URL` stays unset, so the `test.skipIf(!DB)` suites keep skipping
+  instead of failing on a derived name.
+
+  The split holds in both directions. Demo state now survives a test run,
+  which closes the older hazard recorded in CLAUDE.md. No existing engine or
+  test file changed. The two new files under `test/` are the preload and its
+  own suite: the failures were never in the suite.
