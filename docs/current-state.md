@@ -848,7 +848,8 @@ Stage-by-stage status is in `ROADMAP.md`.
   and the timer worker rehydrate running instances from. `src/engine/drafts.ts`
   exports `getDraft`/`saveDraft`/`listDrafts`/`deleteDraft`; `saveDraft`
   validates only the request's envelope (`body`/`layout` are JSON objects,
-  `revision` a non-negative integer — `RequestShapeError` otherwise, imported
+  `revision` a non-negative integer, and an optional `baseVersion` a positive
+  integer naming a published version — `RequestShapeError` otherwise, imported
   from the new leaf module `src/errors.ts` rather than `src/http/errors.ts`,
   which would have created an import cycle since `http/errors.ts` in turn
   imports `DraftConflictError` from `drafts.ts` for its own 409 mapping) and
@@ -896,6 +897,8 @@ Stage-by-stage status is in `ROADMAP.md`.
   published-only, or both — with new/open/discard actions; "New process"
   mints a `proc_`-prefixed id client-side and issues exactly one
   `PUT /drafts/:processId` at `revision = 0`, no server-side id allocation.
+  (Since `seed-draft-from-published`, "Create draft" on a *published* row no
+  longer writes an empty body — see the seeding entry at the end of this file.)
   Publishing, canvas editing, the JSON surface, and migration planning are not
   part of this change; the existing editor's export path plus `POST
   /processes` remains the only publish path until change 4.
@@ -986,7 +989,10 @@ Stage-by-stage status is in `ROADMAP.md`.
   its `base_version`) via a from-scratch JSON diff
   (`screens/versionDiffLogic.ts::diffJson`) — no diff library exists
   anywhere in the repo to reuse, and none was added, objects recurse
-  key-by-key and everything else (including arrays) compares whole; and a
+  key-by-key and everything else (including arrays) compares whole (since
+  `seed-draft-from-published`, by canonical JSON rather than
+  `JSON.stringify`, and the base body is stripped first — see the seeding
+  entry at the end of this file); and a
   migration-plan authoring screen, a JSON-textarea editor over
   `MigrationSpec` (`screens/migrationPlanLogic.ts`) plus an orphan-key
   dry-run panel — no field-by-field form exists anywhere in the repo for
@@ -1273,3 +1279,49 @@ Stage-by-stage status is in `ROADMAP.md`.
   point past the end of a result set. That is still a legitimate empty
   page, not an error. Only a cursor that could not have come from
   `encodeCursor` gets rejected.
+
+- Seeding a draft from a published version (`seed-draft-from-published`,
+  `packages/studio/src/screens/processListLogic.ts`,
+  `src/schema/strip-compiled.ts`, `src/schema/canonical-json.ts`,
+  `src/engine/drafts.ts`): "Create draft" on a published row used to write
+  `{ body: {}, layout: {}, revision: 0 }`, the same call `+ New process`
+  makes. An author who wanted to change v1 landed on a blank canvas.
+
+  The function `seededDraftInput(seedVersion, readBody)` now decides the
+  body. Without a seed version it stays empty, the new-process case. With
+  one it reads `GET /processes/:id/versions/:v` and strips the result.
+
+  The strip exists because that route answers with the **compiled** body,
+  and a draft holds the authored shape. The function `stripCompiledContent`
+  (`src/schema/strip-compiled.ts`, in the package's `exports` map) inverts
+  what `compileProcessBody` adds past its parse. That is the reserved
+  cancel-sink step, plus the reserved cancel outcome on a contracted
+  process. It sits beside `compile.ts`, so a reader meets the injection and
+  its inverse together. The suite `test/strip-compiled.test.ts` round-trips
+  every definition in `examples/`, so a further injection fails loudly.
+
+  Seeding the compiled body instead would have flagged every seeded draft in
+  `draft/validation.ts`, which parses through `authoredProcessBody`. It
+  would also have let an author edit an engine-owned step into an
+  unpublishable body.
+
+  The write declares its origin. Both `saveDraft` and
+  `PUT /drafts/:processId` take an optional `baseVersion`, checked against
+  `definitions` on the write path. An omitted one leaves the stored column
+  alone. An editing save therefore does not clear what a seed or a publish
+  stamped.
+  Without it a seeded draft carried no base, and the only
+  draft-versus-version comparison in `VersionsScreen` stayed disabled.
+
+  That comparison then had to agree with `definitionHash`. The function
+  `canonicalize` moved out of `hash.ts` into `src/schema/canonical-json.ts`
+  and into the `exports` map, since `hash.ts` imports `node:crypto` and
+  cannot serve a browser bundle.
+
+  Leaves in `diffJson` compare with it, so key order stops reading as a
+  change. A draft read back from a `jsonb`
+  column arrives in Postgres's normalized order, a published body in the
+  read schema's order. Every array of objects used to read as changed.
+  The call `diffAgainstBase` strips the base for the same reason the seed
+  does. An unmodified seeded draft now diffs as "No differences", which
+  agrees with publishing it returning the version it came from.

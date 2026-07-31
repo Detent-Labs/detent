@@ -65,13 +65,24 @@ export async function handleSaveDraft(processId: string, req: Request, resolver:
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, DEVELOPER_ROLE);
-    let parsed: { body?: unknown; layout?: unknown; revision?: unknown };
+    let parsed: { body?: unknown; layout?: unknown; revision?: unknown; baseVersion?: unknown };
     try {
-      parsed = (await req.json()) as { body?: unknown; layout?: unknown; revision?: unknown };
+      parsed = (await req.json()) as { body?: unknown; layout?: unknown; revision?: unknown; baseVersion?: unknown };
     } catch {
       throw new RequestShapeError("request body is not valid JSON");
     }
-    const saved = await saveDraft(processId as ProcessId, { body: parsed.body, layout: parsed.layout, revision: parsed.revision as number, updatedBy: actor.id }, db);
+    const saved = await saveDraft(
+      processId as ProcessId,
+      {
+        body: parsed.body,
+        layout: parsed.layout,
+        revision: parsed.revision as number,
+        updatedBy: actor.id,
+        // `undefined` and an absent key are the same thing here: leave the stored base alone.
+        baseVersion: parsed.baseVersion as number | undefined,
+      },
+      db,
+    );
     return { status: 200, body: saved };
   });
 }

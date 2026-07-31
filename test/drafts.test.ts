@@ -247,3 +247,84 @@ test.skipIf(!DB)("a layout-only change does not mint a new version at the next p
   const rows = (await sql`SELECT version FROM definitions WHERE process_id = ${processId}`) as { version: number }[];
   expect(rows.length).toBe(1);
 });
+
+// ============================================================
+// baseVersion: a save may declare the published version it derives from
+// ============================================================
+
+test.skipIf(!DB)("a save declares its base version", async () => {
+  const processId = pid();
+  const published = await publishBody(processId, validBody("v1"), reg, dataSourceReg, sql);
+
+  const saved = await saveDraft(
+    processId,
+    { body: invalidBody("seeded"), layout: {}, revision: 0, updatedBy: "user_a", baseVersion: published.version },
+    sql,
+  );
+
+  expect(saved.baseVersion).toBe(published.version);
+  const summaries = await listDrafts(sql);
+  expect(summaries.find((s) => s.processId === processId)?.baseVersion).toBe(published.version);
+});
+
+test.skipIf(!DB)("a save without baseVersion preserves the stored base", async () => {
+  const processId = pid();
+  const published = await publishBody(processId, validBody("v1"), reg, dataSourceReg, sql);
+  await saveDraft(
+    processId,
+    { body: invalidBody("seeded"), layout: {}, revision: 0, updatedBy: "user_a", baseVersion: published.version },
+    sql,
+  );
+
+  const edited = await saveDraft(processId, { body: invalidBody("edited"), layout: {}, revision: 0, updatedBy: "user_a" }, sql);
+
+  expect(edited.revision).toBe(1);
+  expect(edited.baseVersion).toBe(published.version);
+});
+
+test.skipIf(!DB)("a baseVersion naming no published version is refused", async () => {
+  const processId = pid();
+  await publishBody(processId, validBody("v1"), reg, dataSourceReg, sql);
+
+  await expectRejects(
+    saveDraft(processId, { body: invalidBody("seeded"), layout: {}, revision: 0, updatedBy: "user_a", baseVersion: 7 }, sql),
+    RequestShapeError,
+  );
+  expect(await getDraft(processId, sql)).toBeUndefined();
+});
+
+test.skipIf(!DB)("a malformed baseVersion is refused and leaves the stored draft unchanged", async () => {
+  const processId = pid();
+  await publishBody(processId, validBody("v1"), reg, dataSourceReg, sql);
+  await saveDraft(processId, { body: invalidBody("v1"), layout: {}, revision: 0, updatedBy: "user_a", baseVersion: 1 }, sql);
+
+  for (const bad of [0, -1, 1.5, "1", null]) {
+    await expectRejects(
+      saveDraft(
+        processId,
+        { body: invalidBody("v2"), layout: {}, revision: 0, updatedBy: "user_b", baseVersion: bad } as never,
+        sql,
+      ),
+      RequestShapeError,
+    );
+  }
+
+  const stored = await getDraft(processId, sql);
+  expect(stored?.revision).toBe(0);
+  expect(stored?.baseVersion).toBe(1);
+  expect((stored?.body as { label: { en: string } }).label.en).toBe("v1");
+});
+
+test.skipIf(!DB)("publishing still stamps its own base version over a seeded one", async () => {
+  const processId = pid();
+  const first = await publishBody(processId, validBody("v1"), reg, dataSourceReg, sql);
+  await saveDraft(
+    processId,
+    { body: invalidBody("seeded"), layout: {}, revision: 0, updatedBy: "user_a", baseVersion: first.version },
+    sql,
+  );
+
+  await markDraftPublished(processId, first.version + 1, sql);
+
+  expect((await getDraft(processId, sql))?.baseVersion).toBe(first.version + 1);
+});

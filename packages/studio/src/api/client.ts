@@ -122,6 +122,8 @@ export interface SaveDraftInput {
   body: unknown;
   layout: Record<string, unknown>;
   revision: number;
+  /** Set only when seeding a draft from a published version; omitted leaves the stored base alone. */
+  baseVersion?: number;
 }
 
 /** `undefined` on a 409 — a save conflict is expected, resolved by the caller via reload, never a thrown control-flow error. */

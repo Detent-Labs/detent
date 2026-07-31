@@ -35,6 +35,13 @@ export type SaveDraftInput = {
   layout: unknown;
   revision: number;
   updatedBy: string;
+  /**
+   * The published version this draft is identical to as of this save — the
+   * studio sends it when seeding a draft from a published version. Omitted
+   * leaves the stored `base_version` alone, so an ordinary editing save does
+   * not clear what a seed or a publish stamped.
+   */
+  baseVersion?: number;
 };
 
 /** A save's expected `revision` no longer matches the stored one, or a create lost the primary-key race. Distinct from `runtime/api.ts::ConcurrencyConflict`, which means an instance `transitionSeq` mismatch to every existing client. */
@@ -104,9 +111,32 @@ function checkEnvelope(input: SaveDraftInput): void {
   if (typeof input.revision !== "number" || !Number.isInteger(input.revision) || input.revision < 0) {
     throw new RequestShapeError("draft revision must be a non-negative integer");
   }
+  if (
+    input.baseVersion !== undefined &&
+    (typeof input.baseVersion !== "number" || !Number.isInteger(input.baseVersion) || input.baseVersion < 1)
+  ) {
+    throw new RequestShapeError("draft baseVersion must be a positive integer");
+  }
   const size = Buffer.byteLength(JSON.stringify(input.body), "utf8") + Buffer.byteLength(JSON.stringify(input.layout), "utf8");
   if (size > MAX_DRAFT_ENVELOPE_BYTES) {
     throw new RequestShapeError(`draft envelope exceeds the ${MAX_DRAFT_ENVELOPE_BYTES}-byte bound`);
+  }
+}
+
+/**
+ * `base_version` is the one part of the envelope that is a reference rather
+ * than opaque client state: the studio's Versions screen dereferences it to
+ * diff a draft against the version it came from. An unresolvable value would
+ * offer a comparison that fails at the point of use, so it is checked on the
+ * write path — where this project puts validation that can tighten. The body
+ * itself stays unparsed.
+ */
+async function checkBaseVersionResolves(processId: ProcessId, baseVersion: number, db: SQL): Promise<void> {
+  const rows = (await db`
+    SELECT 1 FROM definitions WHERE process_id = ${processId} AND version = ${baseVersion} LIMIT 1
+  `) as unknown[];
+  if (rows.length === 0) {
+    throw new RequestShapeError(`draft baseVersion ${baseVersion} is not a published version of '${processId}'`);
   }
 }
 
@@ -127,14 +157,16 @@ export async function getDraft(processId: ProcessId, db: SQL = sql): Promise<Dra
  */
 export async function saveDraft(processId: ProcessId, input: SaveDraftInput, db: SQL = sql): Promise<Draft> {
   checkEnvelope(input);
-  const { body, layout, revision, updatedBy } = input;
+  const { body, layout, revision, updatedBy, baseVersion } = input;
+  if (baseVersion !== undefined) await checkBaseVersionResolves(processId, baseVersion, db);
+  const base = baseVersion ?? null;
 
   if (revision === 0) {
     const existing = (await db`SELECT 1 FROM drafts WHERE process_id = ${processId} LIMIT 1`) as unknown[];
     if (existing.length === 0) {
       const inserted = (await db`
-        INSERT INTO drafts (process_id, body, layout, revision, updated_by, updated_at)
-        VALUES (${processId}, ${body}, ${layout}, 0, ${updatedBy}, now())
+        INSERT INTO drafts (process_id, body, layout, revision, base_version, updated_by, updated_at)
+        VALUES (${processId}, ${body}, ${layout}, 0, ${base}::integer, ${updatedBy}, now())
         ON CONFLICT (process_id) DO NOTHING
         RETURNING process_id, body, layout, revision, base_version, updated_by, updated_at
       ` as unknown) as DraftRow[];
@@ -143,8 +175,12 @@ export async function saveDraft(processId: ProcessId, input: SaveDraftInput, db:
     }
   }
 
+  // COALESCE, not an assignment: an omitted baseVersion must leave a stamped
+  // base_version standing, since every editing save omits it.
   const updated = (await db`
-    UPDATE drafts SET body = ${body}, layout = ${layout}, revision = revision + 1, updated_by = ${updatedBy}, updated_at = now()
+    UPDATE drafts SET body = ${body}, layout = ${layout}, revision = revision + 1,
+      base_version = COALESCE(${base}::integer, base_version),
+      updated_by = ${updatedBy}, updated_at = now()
     WHERE process_id = ${processId} AND revision = ${revision}
     RETURNING process_id, body, layout, revision, base_version, updated_by, updated_at
   ` as unknown) as DraftRow[];

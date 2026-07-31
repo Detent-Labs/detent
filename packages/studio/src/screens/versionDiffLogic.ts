@@ -3,6 +3,8 @@
  * spec), extracted so both are directly testable (studio-app spec's "Studio's testable
  * logic is extracted from its components").
  */
+import { canonicalize } from "workflow-engine/schema/canonical-json";
+
 export interface VersionSelection {
   a?: number;
   b?: number;
@@ -36,6 +38,13 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
  * reported as one "changed" leaf rather than diffed element-by-element — a compiled
  * published body is small enough that array-level noise isn't worth a real array-diff
  * algorithm.
+ *
+ * Leaves compare by canonical JSON, the same rule `definitionHash` defines a body's
+ * identity by: key order is not part of it, so two bodies that hash alike diff as
+ * identical. Plain `JSON.stringify` disagreed with the hash whenever the two sides
+ * came from different sources — a draft read back from a `jsonb` column arrives in
+ * Postgres's normalized key order, a published body in `processBody.parse`'s schema
+ * order, and every array of objects then read as changed.
  */
 export function diffJson(a: unknown, b: unknown, path = ""): DiffEntry[] {
   if (a === b) return [];
@@ -50,6 +59,6 @@ export function diffJson(a: unknown, b: unknown, path = ""): DiffEntry[] {
     }
     return entries;
   }
-  if (JSON.stringify(a) === JSON.stringify(b)) return [];
+  if (canonicalize(a) === canonicalize(b)) return [];
   return [{ path: path || "(root)", kind: "changed", from: a, to: b }];
 }

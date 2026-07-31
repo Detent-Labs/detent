@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { listVersions, getVersionBody, getDraft, StudioClientError } from "../api/client.js";
 import type { VersionSummary } from "../api/types.js";
+import type { ProcessBody } from "workflow-engine/schema";
+import { stripCompiledContent } from "workflow-engine/schema/strip-compiled";
 import { selectVersion, canDiff, diffJson, type VersionSelection, type DiffEntry } from "./versionDiffLogic.js";
 import type { Route } from "../routing.js";
 import { describeCaughtError } from "../errors.js";
@@ -87,7 +89,11 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
     setDiff(undefined);
     try {
       const [draft, baseBody] = await Promise.all([getDraft(processId, token), getVersionBody(processId, baseVersion, token)]);
-      await runDiff(draft?.body, baseBody);
+      // A draft is authored-shape, a published body compiled. Comparing them
+      // raw reports the compile pass's cancel-sink injection as a change the
+      // author neither made nor can act on — it is re-injected at the next
+      // publish. Strip the base so both sides are the same kind of artifact.
+      await runDiff(draft?.body, stripCompiledContent(baseBody as ProcessBody));
     } catch (e) {
       if (e instanceof StudioClientError && e.status === 401) {
         onUnauthorized();
