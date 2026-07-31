@@ -12,8 +12,9 @@
  * Demo account passwords are fixed and known. This is for local development
  * only — never point this script at a shared or production database.
  *
- * Run inside the devcontainer (DATABASE_URL must be set):
- *   bun run seed
+ * Run inside the devcontainer (DATABASE_URL must be set), with the explicit
+ * opt-in that confirms the target is a local database:
+ *   SEED_ALLOW=1 bun run seed
  */
 import { readFileSync } from "node:fs";
 import { sql, initSchema } from "../src/engine/store.js";
@@ -84,6 +85,17 @@ async function seedUser(demo: { role: string; emailSuffix: string }): Promise<vo
 }
 
 async function main() {
+  // Roadmap #19 accepted "the script never runs on its own" as the mitigation
+  // because no production deployment path existed. Stage 14 shipped one, so
+  // this opt-in replaces it: fixed-password accounts, one of them
+  // `system:admin`, are otherwise a mistyped terminal away from a real
+  // database. Not NODE_ENV — nothing else in the repo reads it.
+  if (!process.env.SEED_ALLOW) {
+    throw new Error(
+      "Refusing to seed: set SEED_ALLOW=1 to confirm this database is a local development one. " +
+        "This script creates demo accounts with a fixed, published password.",
+    );
+  }
   await initSchema();
 
   const registry = createDefaultRegistry();

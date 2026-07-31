@@ -26,3 +26,18 @@ test("each demo user has its own email suffix", () => {
   const suffixes = DEMO_USERS.map((u) => u.emailSuffix);
   expect(new Set(suffixes).size).toBe(suffixes.length);
 });
+
+// A subprocess, because the guard lives in `main()` behind `import.meta.main`
+// — importing the module deliberately does not run it. DATABASE_URL is passed
+// through unchanged: the guard throws before initSchema, so a run that reaches
+// the database is itself the failure this asserts against.
+test("the seed refuses to run without SEED_ALLOW", async () => {
+  const proc = Bun.spawn(["bun", "run", "scripts/seed.ts"], {
+    env: { ...process.env, SEED_ALLOW: undefined },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [code, stderr] = await Promise.all([proc.exited, new Response(proc.stderr).text()]);
+  expect(code).not.toBe(0);
+  expect(stderr).toContain("SEED_ALLOW");
+});
