@@ -43,6 +43,12 @@ import {
   handleAdminRedactInstance,
 } from "./admin-routes.js";
 import {
+  handleReportingListProcesses,
+  handleReportingCycleTime,
+  handleReportingBottleneck,
+  handleReportingSla,
+} from "./reporting-routes.js";
+import {
   handleListDrafts,
   handleGetDraft,
   handleSaveDraft,
@@ -451,6 +457,22 @@ export function createServer(
     // POST /admin/instances/:id/redact
     if (req.method === "POST" && parts.length === 4 && parts[0] === "admin" && parts[1] === "instances" && parts[3] === "redact") {
       return toRes(await handleAdminRedactInstance(parts[2]!, req, resolver, db));
+    }
+    // GET /reporting/processes
+    if (req.method === "GET" && parts.length === 2 && parts[0] === "reporting" && parts[1] === "processes") {
+      return toRes(await handleReportingListProcesses(req, resolver, db));
+    }
+    // GET /reporting/:processId/cycle-time
+    if (req.method === "GET" && parts.length === 3 && parts[0] === "reporting" && parts[2] === "cycle-time") {
+      return toRes(await handleReportingCycleTime(parts[1]!, req, resolver, db));
+    }
+    // GET /reporting/:processId/bottleneck
+    if (req.method === "GET" && parts.length === 3 && parts[0] === "reporting" && parts[2] === "bottleneck") {
+      return toRes(await handleReportingBottleneck(parts[1]!, req, resolver, db));
+    }
+    // GET /reporting/:processId/sla
+    if (req.method === "GET" && parts.length === 3 && parts[0] === "reporting" && parts[2] === "sla") {
+      return toRes(await handleReportingSla(parts[1]!, req, resolver, db));
     }
     // GET /drafts (list)
     if (req.method === "GET" && parts.length === 1 && parts[0] === "drafts") {

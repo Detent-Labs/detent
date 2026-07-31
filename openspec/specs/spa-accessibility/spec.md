@@ -3,7 +3,8 @@
 ## Purpose
 
 Governs keyboard and assistive-technology access across the browser packages
-(`packages/app`, `packages/admin`, `packages/studio`). The rules here are
+(`packages/app`, `packages/admin`, `packages/studio`, `packages/reporting`).
+The rules here are
 cross-package: they hold wherever a screen offers navigation, a
 disclosure, or a graphical surface, rather than belonging to any one app's
 capability. Per-control rendering detail that lives inside the shared form

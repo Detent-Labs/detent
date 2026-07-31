@@ -1,4 +1,4 @@
-# Production image for one of the three frontend SPAs (app/admin/studio),
+# Production image for one of the frontend SPAs (app/admin/studio/reporting),
 # selected by the PACKAGE build arg. Genuinely multi-stage: Bun and Vite
 # build the assets, but nginx serves them, and nginx cannot run either.
 FROM oven/bun:1.3.11-slim AS build

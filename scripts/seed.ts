@@ -21,16 +21,21 @@ import { publishBody, listProcesses, listVersions } from "../src/engine/definiti
 import { createDefaultRegistry, createDefaultDataSourceRegistry } from "../src/engine/host.js";
 import { register } from "../src/engine/registry.js";
 import { createUser, listUsers, setRoles, setPassword } from "../src/auth/users.js";
-import { PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE } from "../src/auth/authorize.js";
+import { PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, REPORTS_ROLE } from "../src/auth/authorize.js";
 import type { ProcessId, ProcessBody } from "../src/schema/definition.js";
 
 const DEMO_PASSWORD = "seed-demo-password";
 
-const DEMO_USERS: { role: string; emailSuffix: string }[] = [
+// One per reserved role in src/auth/authorize.ts. A change that adds a
+// reserved role adds its demo user here in the same change, so every
+// role-gated surface is reachable from a seeded database without
+// provisioning an account by hand.
+export const DEMO_USERS: { role: string; emailSuffix: string }[] = [
   { role: PUBLISH_ROLE, emailSuffix: "publish" },
   { role: CANCEL_ANY_ROLE, emailSuffix: "cancel-any" },
   { role: ADMIN_ROLE, emailSuffix: "admin" },
   { role: DEVELOPER_ROLE, emailSuffix: "developer" },
+  { role: REPORTS_ROLE, emailSuffix: "reports" },
 ];
 
 const EXAMPLES: { path: string; fixedProcessId?: ProcessId }[] = [
@@ -102,9 +107,14 @@ async function main() {
   console.log("\nDone.");
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+// Guarded so importing this module (test/seed-demo-users.test.ts reads
+// DEMO_USERS) does not run the seed as a side effect. Same idiom as
+// src/auth/cli.ts and src/http/server.ts.
+if (import.meta.main) {
+  main()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+}

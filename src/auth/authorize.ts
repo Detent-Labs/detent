@@ -4,8 +4,9 @@
  * reserved role on the already-resolved `Actor`. Deliberately separate from
  * `resolve.ts` (credential -> Actor): this only reads `Actor.roles`, which
  * every `ActorResolver` already populates. No policy engine, no role
- * hierarchy — two fixed roles, checked directly, same as
- * `Step.assignment.strategy.type`'s single `"static"` check.
+ * hierarchy — a fixed set of roles, checked directly, same as
+ * `Step.assignment.strategy.type`'s single `"static"` check. No role implies
+ * another.
  */
 import type { Actor } from "../cel/eval.js";
 
@@ -17,6 +18,8 @@ export const CANCEL_ANY_ROLE = "system:cancel-any";
 export const ADMIN_ROLE = "system:admin";
 /** Required for every studio route (`/drafts/*`). Implies nothing else — publishing still separately requires `system:publish`. */
 export const DEVELOPER_ROLE = "system:developer";
+/** Required for every `/reporting/*` route. Implies nothing else: a process owner holding only this cannot publish, administer users, or read the operator's instance list. */
+export const REPORTS_ROLE = "system:reports";
 
 /** The resolved Actor lacks a role an operation requires. Distinct from ActorResolutionError (no valid identity at all). */
 export class AuthorizationError extends Error {

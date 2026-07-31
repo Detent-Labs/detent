@@ -1505,3 +1505,98 @@ Stage-by-stage status is in `ROADMAP.md`.
   A refused publish renders INSIDE the dialog, which stays open. `showModal()`
   puts the dialog in the browser's top layer. The browser dims everything on
   the screen behind it and takes it out of reach.
+
+- `src/engine/reporting.ts`: the process-owner read surface — cycle time,
+  per-step bottlenecks and SLA adherence for ONE process over a date range.
+  Read-only; nothing here writes. Row selection runs in SQL (the in-range
+  instances of one process, then their history entries), aggregation in
+  TypeScript: a SQL window function over `history_entries` cannot see the
+  initial step, since creation writes no HistoryEntry, so the walk would still
+  need a per-version lookup grafted on in application code.
+
+  The shared primitive is a per-instance timeline of `(stepId, enteredAt)`:
+  the initial step at `startedAt`, then every `HistoryEntry.toStepId` at its
+  `at` in `transitionSeq` order. Consecutive pairs yield traversals; the last
+  entry yields none, and no duration is estimated against the wall clock.
+  Traversals aggregate by step `id` across every published version.
+
+  Three engine facts shape the walk. Each was confirmed against the code
+  rather than assumed.
+
+  `migrateOne` calls `planStepEntry` unconditionally. An instance migrated in
+  place therefore gains a `HistoryEntry` whose `toStepId` is the step it
+  already occupies. The walk drops that entry. The rule is scoped to the
+  `migration` cause only: a self-loop path under `user`/`automatic`/`timer`
+  re-arms the step's timers and is a real re-entry.
+
+  `cancelInstance` writes a `HistoryEntry` to the cancel sink. The step held
+  at cancellation therefore has a closing timestamp and yields a real
+  traversal, which counts, since an abandoned wait is time spent. The sink
+  itself yields none and appears in no view.
+
+  `createInstance` sets `status: "completed"` when the initial step is
+  terminal, and writes no HistoryEntry at all. Such an instance contributes
+  no zero to the percentiles.
+
+  Cycle-time reports p50/p90/p99 of total duration by nearest rank, plus the
+  per-step average dwell. Both cover `completed` instances only. The response
+  carries the sample size alongside, because a p99 over four instances must
+  not read as authoritative.
+
+  Bottleneck ranks by median dwell over every in-range instance whatever its
+  status, and adds a date-unfiltered count of `running` instances parked in
+  each step.
+
+  SLA derives a per-step breach rate from BOTH forms in which the engine
+  records a firing. A reminder timer writes a `timer.fired` event, matched to
+  a traversal by equality on `transitionSeq` (an event carries the sequence in
+  force and never advances it, so equality is exact and handles a revisited
+  step). A transition timer writes no event at all: it writes a `HistoryEntry`
+  with `cause: "timer"` whose `pathId` is the timer's `onFire.targetPath`.
+  Recognising only the event form would report zero breaches over a full
+  denominator, for exactly the steps whose SLA escalates.
+
+  A step declaring no timer carries no threshold and is absent from the view.
+  The view accepts no caller-supplied threshold. One breach per traversal,
+  however many of the step's timers fired.
+
+  `createDefinitionStore` is instantiated per call, so `resolveBody` is
+  memoised for the request and nothing survives the response. An instance
+  whose pinned version no longer resolves is counted into
+  `skippedInstances` and reported, not swallowed.
+
+- `src/http/reporting-routes.ts`: four `GET /reporting/*` routes — a process
+  list (reusing `listProcesses` unchanged) and one per view. Kept out of
+  `routes.ts` the same way `admin-routes.ts` and `studio-routes.ts` are. Every
+  handler requires `REPORTS_ROLE` BEFORE resolving the process, so a caller
+  without it gets 403 for a process id that does not exist and cannot probe
+  which ids do. Both range bounds are required and must parse; an absent or
+  malformed bound is 400, since the frontend always sends the range
+  explicitly and the server keeps no default of its own.
+
+- `src/auth/authorize.ts` gains `REPORTS_ROLE = "system:reports"`, the fifth
+  reserved role. It implies nothing and nothing implies it. The seed script
+  provisions one demo user per reserved role, now five;
+  `test/seed-demo-users.test.ts` asserts the pairing, so a sixth role added
+  without its demo user fails.
+
+- `packages/reporting`: the process owner's frontend, the fourth SPA. Same
+  shape as `packages/admin` (React 18, Vite 6, own build/typecheck, a
+  hand-written History-API routing hook, `session.ts` under its own storage
+  key), dev port 5176. It reaches the engine only over `/reporting/*` and
+  `/auth/login`. It imports only the definition-contract types from
+  `workflow-engine/schema`. It does not consume `packages/form-ui`, since it
+  renders aggregated numbers and never a step form. Read-only: it presents no
+  control that changes engine state.
+
+  Its one visual device is `.rep-rule`, a hairline measuring rule whose fill
+  length carries a quantity. All three views bind a different quantity to the
+  same rule. Switching views therefore re-sorts and re-scales one picture
+  rather than showing three unrelated ones. That is the honest picture, since
+  cycle-time's per-step breakdown and bottleneck read the same traversals.
+  Colour appears only in the SLA view, where it means breached, not large.
+  No charting dependency. Every view states its own scope on screen, because
+  the three deliberately differ. The pure view-model modules
+  (`reportingLogic.ts`: duration formatting, the default range, the rule's
+  scale, the ranking) carry the tests; components stay untested, per the
+  existing convention.
