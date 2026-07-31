@@ -31,12 +31,17 @@ Thumbs.db
 # Claude Code (personal, per-machine)
 .claude/settings.json
 .claude/settings.local.json
+.claude/worktrees/
 
 # Local devcontainer overrides (personal, per-machine)
 .devcontainer/docker-compose.override.yml
 
 # temp files
 tmp/
+
+# Regenerated reports (/ponytail-audit, /ponytail-debt)
+PONYTAIL-AUDIT.md
+PONYTAIL-DEBT.md
 
 # Brainstorming companion mockups (per-session, local)
 .superpowers/
