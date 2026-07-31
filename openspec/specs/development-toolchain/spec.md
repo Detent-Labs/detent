@@ -1,3 +1,4 @@
+<!-- antislop: allow-file passive-voice -->
 # development-toolchain
 
 ## Purpose
@@ -189,49 +190,59 @@ removed, the allowlist SHALL be updated in the same change.
 - **THEN** its origin is removed from `CORS_ALLOWED_ORIGINS` in the same
   change that deletes it
 
-### Requirement: Every push and pull request runs the toolchain's checks against a real database
+### Requirement: Every push runs the toolchain's checks against a real database
 
-The repository SHALL carry an automated workflow that, on every push and every
-pull request, installs with the committed lockfile, runs the repo-wide
-typecheck, and runs the full test suite with `DATABASE_URL` pointing at a
-Postgres 16 service using the devcontainer's credentials.
+The repository SHALL carry a `pre-push` hook, under a committed hooks
+directory. It SHALL run the repo-wide typecheck and the full test suite before
+a push leaves the machine. Each clone enables it once, with
+`git config core.hooksPath .githooks`.
 
-The workflow SHALL **fail** if `DATABASE_URL` is unset rather than proceeding.
-This is the load-bearing part: the DB-backed suites are `test.skipIf(!DB)` at
-546 sites — the majority of the suite — so a run without the variable reports
-a pass count that omits most of what was written and looks identical to a
-genuine green. Machine-enforcing the variable is what turns
-`CLAUDE.md`'s bolded convention into a property of the repository.
+The hook SHALL run the checks **inside the devcontainer**, not on the host.
+That placement is what makes the checks meaningful.
 
-The typecheck SHALL be run as its own step, because Bun does not typecheck and
-a type error therefore passes `bun test` cleanly.
+Two properties come with it. `DATABASE_URL` is already set there, so the
+DB-backed suites run instead of skipping. The Bun version is the one
+`BUN_VERSION` pins in `.devcontainer/Dockerfile`, so a push cannot pass under
+a different runtime than the project's.
 
-The Bun version used SHALL be the one the devcontainer pins (`BUN_VERSION` in
-`.devcontainer/Dockerfile`), so CI and local runs cannot drift apart.
+The silent-skip hazard is why placement matters. The DB-backed suites are
+`test.skipIf(!DB)` at hundreds of sites, most of the suite. A run without the
+variable reports a pass count that omits most of what was written. It looks
+identical to a genuine green.
 
-#### Scenario: A pull request runs the full suite
+The hook SHALL refuse to run when the devcontainer is down. It SHALL say how
+to start it. It SHALL NOT fall back to the host. A gate that quietly degrades
+to a weaker environment is the error this rule exists to prevent.
 
-- **WHEN** a pull request is opened or updated
-- **THEN** the workflow installs with the committed lockfile, typechecks the
-  engine and every workspace package, and runs the full test suite against a
-  Postgres 16 service
+The typecheck SHALL be a step of its own. Bun does not typecheck, so a type
+error passes `bun test` cleanly.
 
-#### Scenario: A missing database configuration fails the job
+The repository SHALL NOT carry a hosted-CI workflow for this purpose. The
+owner does not want a hosted service executing this repository. A workflow
+file that never runs reads as coverage it does not provide.
 
-- **WHEN** the workflow runs without `DATABASE_URL` set
-- **THEN** the job fails with an error naming the variable, rather than
-  running a suite that silently skips its database-backed tests
+#### Scenario: A push runs typecheck and the full suite
 
-#### Scenario: A type error fails the job
+- **WHEN** a push is attempted with the devcontainer up
+- **THEN** the hook runs the repo-wide typecheck, then the full test suite,
+  both in the container. The push proceeds only when both pass
+
+#### Scenario: A stopped devcontainer blocks the push
+
+- **WHEN** a push is attempted while the devcontainer is not running
+- **THEN** the hook fails with a message naming the command that starts it,
+  and runs no checks on the host
+
+#### Scenario: A type error blocks the push
 
 - **WHEN** a change introduces a type error that no test exercises
-- **THEN** the typecheck step fails the job
+- **THEN** the typecheck step fails and the push does not proceed
 
-#### Scenario: A lockfile mismatch fails the job
+#### Scenario: The database-backed suites run
 
-- **WHEN** a manifest is edited without regenerating the lockfile
-- **THEN** the frozen-lockfile install fails, rather than resolving a
-  different dependency tree than the one committed
+- **WHEN** the hook runs the suite in the container
+- **THEN** `DATABASE_URL` is set for that run, so the DB-backed suites execute
+  rather than skipping
 
 ### Requirement: A wandering test result counts as a defect
 
