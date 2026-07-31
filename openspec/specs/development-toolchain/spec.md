@@ -128,6 +128,7 @@ contributors and machines:
 | `packages/app` | 5173 |
 | `packages/admin` | 5174 |
 | `packages/studio` | 5175 |
+| `packages/reporting` | 5176 |
 
 Pinning alone is not sufficient: without a strict-port setting Vite silently
 serves on the next free port when the configured one is taken, which
@@ -137,14 +138,14 @@ see and act on.
 
 #### Scenario: Starting one dev server
 
-- **WHEN** a contributor runs `bun run dev` in any one of the three frontend
+- **WHEN** a contributor runs `bun run dev` in any one of the frontend
   packages
 - **THEN** the dev server listens on that package's assigned port, and on no
   other port
 
 #### Scenario: Starting every dev server together
 
-- **WHEN** a contributor runs `bun run dev` in all three frontend packages, in
+- **WHEN** a contributor runs `bun run dev` in every frontend package, in
   any order
 - **THEN** each serves on its own assigned port, and no package's port
   depends on which package was started first
@@ -171,7 +172,7 @@ removed, the allowlist SHALL be updated in the same change.
 
 #### Scenario: Any frontend calls the engine from a browser
 
-- **WHEN** a browser on any of the three assigned dev origins issues a
+- **WHEN** a browser on any of the assigned dev origins issues a
   cross-origin request to the engine running in the devcontainer
 - **THEN** the response carries `Access-Control-Allow-Origin` echoing that
   origin, along with `Vary: Origin`
@@ -183,6 +184,12 @@ removed, the allowlist SHALL be updated in the same change.
 - **THEN** no `Access-Control-Allow-Origin` header is emitted and the browser
   blocks the response, unchanged from the behavior
   `configurable-cors-origins` specifies
+
+#### Scenario: Adding a frontend package
+
+- **WHEN** a frontend workspace package is added
+- **THEN** its assigned dev origin is added to `CORS_ALLOWED_ORIGINS` in the
+  same change that adds it
 
 #### Scenario: Removing a frontend package
 

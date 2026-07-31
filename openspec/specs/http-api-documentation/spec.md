@@ -29,7 +29,17 @@ document. It SHALL describe every route a customer integration can call:
 `GET /instances/:id/comments`, `POST /instances/:id/cancel`,
 `GET /instances/:id/record`, `POST /processes`, `GET /processes`,
 `GET /processes/:id/versions`, `GET /livez`, `GET /readyz`. It SHALL NOT
-document `admin/*`, `drafts/*`, `migration-plans/*`, or `registry`.
+document `admin/*`, `drafts/*`, `migration-plans/*`, `reporting/*`, or
+`registry`.
+
+`reporting/*` falls under the same ground as `admin/*`. It is a role-gated
+surface backing a frontend this repository ships. It is not an integration
+point a customer's own system calls.
+
+This requirement names the exclusion rather than leaving it implicit. A
+reader can then tell the absence is a decision, not an omission. Should a
+customer's own analytics system ever need these numbers, documenting them
+extends this requirement. It does not redesign the routes.
 
 #### Scenario: A customer loads the document into a standard tool
 
@@ -41,7 +51,7 @@ document `admin/*`, `drafts/*`, `migration-plans/*`, or `registry`.
 #### Scenario: An internal-only route is absent
 
 - **WHEN** a reader searches `docs/openapi.yaml` for an `admin/*`,
-  `drafts/*`, `migration-plans/*`, or `registry` path
+  `drafts/*`, `migration-plans/*`, `reporting/*`, or `registry` path
 - **THEN** no such path appears in the document
 
 ### Requirement: Each route documents auth, schema, and errors

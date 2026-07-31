@@ -15,7 +15,7 @@ started, without the reserved role" below.
 Built on top of `actor-resolution`/`jwt-authentication`/`local-user-accounts`:
 those capabilities establish *who* the caller is; this one decides whether
 that identity may perform an administrative, operator-facing, or authoring
-operation. Deliberately minimal — four fixed role strings, checked directly
+operation. Deliberately minimal — five fixed role strings, checked directly
 at each call site that needs one, with no policy engine, role hierarchy, or
 pluggable extension point. See the `http-wrapper` capability for how the
 resulting `403` surfaces over HTTP.
@@ -24,23 +24,24 @@ resulting `403` surfaces over HTTP.
 
 ### Requirement: Reserved role constants gate process-admin operations
 
-The engine SHALL define four reserved role strings in
+The engine SHALL define five reserved role strings in
 `src/auth/authorize.ts`: `PUBLISH_ROLE = "system:publish"`, `CANCEL_ANY_ROLE =
-"system:cancel-any"`, `ADMIN_ROLE = "system:admin"` and `DEVELOPER_ROLE =
-"system:developer"`. These SHALL be the only roles this capability defines; no
-role hierarchy, wildcard, or general permission/policy model SHALL exist — in
-particular no one of them SHALL imply any other. The `system:` prefix is a
-naming convention only, distinguishing these engine-reserved roles from
-free-form business roles a deployment assigns for `Step.assignment` (e.g.
-`"finance-approver"`) — it is not structurally enforced, since `Actor.roles`
-and `auth_users.roles` remain plain `string[]`.
+"system:cancel-any"`, `ADMIN_ROLE = "system:admin"`, `DEVELOPER_ROLE =
+"system:developer"` and `REPORTS_ROLE = "system:reports"`. These SHALL be the
+only roles this capability defines; no role hierarchy, wildcard, or general
+permission/policy model SHALL exist — in particular no one of them SHALL imply
+any other. The `system:` prefix is a naming convention only, distinguishing
+these engine-reserved roles from free-form business roles a deployment assigns
+for `Step.assignment` (e.g. `"finance-approver"`) — it is not structurally
+enforced, since `Actor.roles` and `auth_users.roles` remain plain `string[]`.
 
 #### Scenario: The reserved role constants are exported
 
 - **WHEN** `src/auth/authorize.ts` is inspected for exports
 - **THEN** it exports `PUBLISH_ROLE` with value `"system:publish"`,
   `CANCEL_ANY_ROLE` with value `"system:cancel-any"`, `ADMIN_ROLE` with value
-  `"system:admin"` and `DEVELOPER_ROLE` with value `"system:developer"`
+  `"system:admin"`, `DEVELOPER_ROLE` with value `"system:developer"` and
+  `REPORTS_ROLE` with value `"system:reports"`
 
 #### Scenario: The admin role implies nothing
 
@@ -54,6 +55,20 @@ and `auth_users.roles` remain plain `string[]`.
   ADMIN_ROLE)` is called for an actor whose `roles` is exactly
   `["system:developer"]`
 - **THEN** it throws `AuthorizationError`
+
+#### Scenario: The reports role implies nothing
+
+- **WHEN** `requireRole(actor, PUBLISH_ROLE)`, `requireRole(actor, ADMIN_ROLE)`
+  or `requireRole(actor, DEVELOPER_ROLE)` is called for an actor whose `roles`
+  is exactly `["system:reports"]`
+- **THEN** it throws `AuthorizationError`
+
+#### Scenario: No other reserved role implies the reports role
+
+- **WHEN** `requireRole(actor, REPORTS_ROLE)` is called for an actor whose
+  `roles` is exactly `["system:admin"]`, exactly `["system:developer"]`,
+  exactly `["system:publish"]` or exactly `["system:cancel-any"]`
+- **THEN** it throws `AuthorizationError` in each case
 
 ### Requirement: requireRole throws a distinct error when the actor lacks the role
 
@@ -344,3 +359,38 @@ via the existing `src/auth/cli.ts set-roles`.
 - **WHEN** this change is applied
 - **THEN** every route that existed beforehand requires exactly the roles it
   required beforehand
+
+### Requirement: The reports role gates every reporting route
+
+Every route under the `/reporting/*` prefix SHALL require `REPORTS_ROLE` on
+the resolved `Actor`, before any query runs. The check uses the same direct
+`requireRole` call every other role-gated route surface uses.
+
+An actor lacking the role SHALL receive `403` and no result body, whether or
+not the requested process exists. The check SHALL precede process resolution.
+A caller without the role therefore cannot probe which process ids exist.
+
+#### Scenario: An actor without the reports role is rejected
+
+- **WHEN** an actor whose `roles` does not include `"system:reports"` calls any
+  `/reporting/*` route
+- **THEN** the response is `403` and carries no reporting data
+
+#### Scenario: An actor with the reports role is admitted
+
+- **WHEN** an actor whose `roles` includes `"system:reports"` calls a
+  `/reporting/*` route for an existing process
+- **THEN** the role check passes and the route returns its result
+
+#### Scenario: The role check precedes process resolution
+
+- **WHEN** an actor whose `roles` does not include `"system:reports"` calls a
+  `/reporting/*` route naming a process id that does not exist
+- **THEN** the response is `403`, not `404`
+
+#### Scenario: The reports role grants no operator or authoring access
+
+- **WHEN** an actor whose `roles` is exactly `["system:reports"]` calls any
+  `/admin/*` route, any studio route, `publishBody`, or `cancelInstance` for an
+  instance the actor did not start
+- **THEN** each call is rejected with `AuthorizationError` / `403`

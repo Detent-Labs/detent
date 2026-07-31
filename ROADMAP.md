@@ -865,9 +865,43 @@ capability of its own.
     `redactInstance`'s implementation (above) covers both. This did not
     change the design; it only extended its existing scope to two tables
     the design predates.
-21. Reporting & analytics: design DONE, implementation NOT STARTED. Raised
-    2026-07-28. Design approved 2026-07-30 (see
-    `docs/superpowers/specs/2026-07-30-reporting-analytics-design.md`). The
+21. Reporting & analytics: DONE (`add-reporting-analytics`, implemented
+    2026-08-01; design at
+    `docs/superpowers/specs/2026-07-30-reporting-analytics-design.md`). Raised
+    2026-07-28, design approved 2026-07-30. Two of the approved design's
+    claims did not survive a read of the engine, and the change corrects
+    both rather than building on them. First, the design says a reminder
+    *or escalation* timer firing is already a `timer.fired` event. It is not:
+    `fireTimer` (`src/engine/transition.ts`) writes that event only on the
+    reminder branch, while a transition timer (`onFire.targetPath`, the shape
+    an escalation takes, and the shape Roadmap #17 established as the
+    SLA-breach recipe) calls `commitTransition(..., "timer", ...)` and writes
+    a `HistoryEntry` with `cause: "timer"` and the timer's `targetPath` as
+    its `pathId` — no event at all. Reading only the event form would report a
+    breach rate of zero over a full denominator for exactly the steps whose
+    SLA escalates, so `reporting.ts` recognises both forms, and the test drives
+    `expense-approval.json`'s own two timers. Second, `migrateOne` calls
+    `planStepEntry` unconditionally, so an instance migrated in place gains a
+    `HistoryEntry` whose `toStepId` is the step it already occupies; the
+    timeline walk drops that entry, scoped to the `migration` cause only,
+    since a self-loop path under `user`/`automatic`/`timer` is a real
+    re-entry. Cancellation likewise writes a `HistoryEntry` to the cancel
+    sink, so the step held at cancellation yields a real closing traversal
+    (counted — an abandoned wait is time spent) while the sink itself yields
+    none. Delivered as `src/engine/reporting.ts` (the timeline primitive plus
+    the three views), `src/http/reporting-routes.ts` (four `GET /reporting/*`
+    routes behind the new `REPORTS_ROLE`, checked before process resolution so
+    a caller without it gets 403 rather than 404 for an unknown id), and
+    `packages/reporting` (the fourth frontend). No schema change, no new
+    table, no new index, no write route. A fourth frontend and a fifth
+    reserved role made five existing capabilities factually wrong where they
+    enumerated three packages or four roles; each is corrected in the same
+    change (`frontend-security-headers`, `production-docker-images`,
+    `development-toolchain` — port 5176 and the CORS allowlist —
+    `database-seed-script`, and `http-api-documentation`, where `reporting/*`
+    joins `admin/*` on the internal-only exclusion list). `spa-accessibility`
+    and `spa-error-reporting` needed no delta: their requirements are already
+    count-free, and only their Purpose prose was edited. The
     admin area (stage 10) is operations-focused (instances, outbox,
     timers); a process owner wants cycle time, bottleneck, and SLA views
     instead — a distinct audience from stage 10's operator, kept as its own
@@ -903,9 +937,17 @@ capability of its own.
     or an SLA breach, means nothing across processes), configurable SLA
     thresholds, precomputed or scheduled aggregation, editing anything, and
     a shared shell with `app`/`admin`/`studio` (stage 12's
-    already-flagged session/login/routing duplication, unaffected by this
-    design). No OpenSpec change yet — implementation is tracked separately
-    from this design.
+    already-flagged session/login/routing duplication, which a fourth
+    frontend continues and this change does not resolve). All of it held
+    through implementation. One limitation is worth naming: the timeline
+    walk reads the initial step from the instance's CURRENT pinned version,
+    so an instance migrated onto a version that renamed its initial step
+    names the target's. The engine records no creation-time version, so
+    closing that needs a new persisted fact rather than a smarter walk; it
+    carries a `ponytail:` comment. The unindexed
+    `(body->>'startedAt')::timestamptz` range predicate carries another,
+    naming the one-line index that fixes it when a real deployment measures
+    it as slow.
 22. HTTP API documentation: DONE (`add-http-api-documentation`; design at
     `docs/superpowers/specs/2026-07-30-http-api-documentation-design.md`).
     Raised 2026-07-28. The HTTP wrapper (`src/http/`) had no published

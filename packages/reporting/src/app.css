@@ -1,0 +1,443 @@
+/*
+ * Same token structure and the same primitives as packages/admin/src/app.css —
+ * paper/ledger/ink/stamp/seal — so the four frontends read as one family.
+ *
+ * What this package adds is one device, `.rep-rule`: a hairline measuring rule
+ * whose fill length carries a quantity. admin reports state (categorical, now);
+ * reporting reports time (continuous, accumulated), and that difference is what
+ * earns the rule. All three views bind a different quantity to the same rule,
+ * so switching views re-sorts and re-scales one picture rather than showing
+ * three unrelated ones.
+ */
+
+:root {
+  --paper-50: #eef1f2;
+  --ledger-100: #dce3e0;
+  --ink-900: #1c2230;
+  --slate-500: #56606b;
+  --stamp-blue-600: #2c4a6e;
+  --seal-700: #6e7b3f;
+  --alert-700: #a23b2e;
+
+  --color-surface: var(--paper-50);
+  --color-surface-muted: var(--ledger-100);
+  --color-text: var(--ink-900);
+  --color-text-muted: var(--slate-500);
+  --color-border: var(--ledger-100);
+  --color-accent: var(--stamp-blue-600);
+  --color-accent-contrast: #ffffff;
+  --color-success: var(--seal-700);
+  --color-danger: var(--alert-700);
+
+  --font-display: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2.5rem;
+
+  /* Load-bearing here, not cosmetic: the date-range control is a native
+     `<input type="date">`, and without this its picker chrome and calendar
+     icon stay light-on-light in a dark browser theme. Also fixes scrollbars. */
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper-50: #171b22;
+    --ledger-100: #2a303a;
+    --ink-900: #e9ecef;
+    --slate-500: #9aa5b1;
+    --stamp-blue-600: #7ea3cc;
+    --seal-700: #9db072;
+    --alert-700: #d97362;
+    --color-accent-contrast: #10141a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+button {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  border: none;
+  border-radius: 3px;
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  /* Drops the 300 ms double-tap-zoom delay on touch. */
+  touch-action: manipulation;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+input {
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  padding: var(--space-2);
+  background: var(--color-surface);
+}
+
+h1,
+h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: 1.25rem;
+  margin: 0 0 var(--space-4);
+  /* A process label can be long, and a deep link falls back to a raw id with
+     no spaces in it — neither may push the page into a horizontal scroll. */
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+h2 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin: var(--space-5) 0 var(--space-2);
+}
+
+/* ------------------------------------------------------------------ shell */
+
+.rep-screen {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-3) var(--space-5);
+}
+
+.rep-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.rep-header nav {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.rep-header nav button,
+.rep-header-right button {
+  background: none;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.rep-header nav button[aria-current="page"] {
+  background: var(--color-surface-muted);
+  font-weight: 600;
+}
+
+.rep-header-right {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.rep-login,
+.rep-empty-role,
+.rep-boundary-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.rep-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(20rem, 100%);
+  text-align: left;
+}
+
+.rep-login-form label,
+.rep-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.9rem;
+}
+
+.rep-controls label > span {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+}
+
+.rep-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-end;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* ---------------------------------------------------------------- picker */
+
+.rep-picker {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.rep-picker li {
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* A real control wraps the row's identifying content, so the destination is
+   reachable by keyboard — the row itself carries no click handler. */
+.rep-picker-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  width: 100%;
+  background: none;
+  border: none;
+  border-radius: 2px;
+  padding: var(--space-3) var(--space-2);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rep-picker-item:hover {
+  background: var(--color-surface-muted);
+}
+
+/* min-width:0 lets a long label wrap instead of forcing the row wider. */
+.rep-picker-label {
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.rep-picker-meta {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* ----------------------------------------------------------- percentiles */
+
+.rep-percentiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  margin: 0;
+}
+
+.rep-percentiles dt {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+}
+
+.rep-percentiles dd {
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Deliberately plain and adjacent to the figures: a p99 over four instances
+   must not read as authoritative. */
+.rep-sample {
+  margin: var(--space-2) 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* ------------------------------------------------- the rule (signature) */
+
+.rep-measure {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 12rem;
+}
+
+.rep-rule {
+  flex: 1;
+  min-width: 3rem;
+  height: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: flex-end;
+}
+
+.rep-rule-fill {
+  display: block;
+  height: 0.5rem;
+  background: var(--color-accent);
+  opacity: 0.65;
+}
+
+.rep-rule-fill-danger {
+  background: var(--color-danger);
+  opacity: 0.8;
+}
+
+.rep-figure {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+/* ----------------------------------------------------------------- table */
+
+.rep-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.rep-table th[scope="col"] {
+  text-align: left;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  font-weight: 600;
+}
+
+.rep-table th[scope="row"] {
+  text-align: left;
+  font-weight: 500;
+}
+
+.rep-table td,
+.rep-table th[scope="row"] {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+/* ------------------------------------------------------------------- wip */
+
+.rep-wip {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.rep-wip li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  padding: var(--space-2) var(--space-3);
+}
+
+.rep-wip-count {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------- notes and states */
+
+.rep-scope,
+.rep-empty {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-3);
+  max-width: 46rem;
+}
+
+.rep-empty {
+  border-left: 2px solid var(--color-border);
+  padding-left: var(--space-3);
+}
+
+.rep-error {
+  font-size: 0.9rem;
+  color: var(--color-danger);
+  margin: var(--space-3) 0;
+}
+
+/* The stamp mark, carried over from admin's badge: an outline in the current
+   colour, mono and tracked, so a failure reads as an annotation on the page
+   rather than an alert bar bolted onto it. */
+.rep-stamp {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  padding: 0.1rem 0.4rem;
+}
+
+.rep-stamp-danger {
+  color: var(--color-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

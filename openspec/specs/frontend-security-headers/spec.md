@@ -21,7 +21,7 @@ prospective protection, not a fix for a known hole.
 ### Requirement: Every browser package ships a Content-Security-Policy in its production build
 
 Each workspace package that produces a browser bundle — `packages/app`,
-`packages/admin`, `packages/studio` — SHALL emit a
+`packages/admin`, `packages/studio`, `packages/reporting` — SHALL emit a
 `Content-Security-Policy` `<meta http-equiv>` into its built `index.html`.
 Its own Vite config SHALL inject this tag, not the source `index.html`.
 The policy SHALL at minimum:
@@ -56,7 +56,7 @@ dependency SHALL widen the policy too.
 
 #### Scenario: A built page carries the policy
 
-- **WHEN** any of the three packages is built for production
+- **WHEN** any of the browser packages is built for production
 - **THEN** its emitted `index.html` carries a `Content-Security-Policy` meta
   tag containing at least `script-src 'self'`, `object-src 'none'`,
   `base-uri 'none'` and `form-action 'self'`
@@ -81,5 +81,11 @@ dependency SHALL widen the policy too.
 
 #### Scenario: The dev server is unaffected
 
-- **WHEN** a contributor runs `bun run dev` in any of the three packages
+- **WHEN** a contributor runs `bun run dev` in any of the browser packages
 - **THEN** no policy is injected, and react-refresh works as before
+
+#### Scenario: A newly added browser package is not exempt
+
+- **WHEN** a workspace package that produces a browser bundle is added
+- **THEN** its own Vite config injects the policy in the same change that adds
+  the package, and no build of it ships without one

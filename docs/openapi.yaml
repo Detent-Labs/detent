@@ -7,10 +7,11 @@ info:
     process publish/list/versions, and the full instance lifecycle
     (create, view, submit, claim/release/delegate, comment, attach a
     file, cancel, and the audit record). Excludes `admin/*`, `drafts/*`,
-    `migration-plans/*`,
-    and `registry`, which serve the operator (`packages/admin`) and
-    developer (`packages/studio`) frontends directly, not a customer
-    integration.
+    `migration-plans/*`, `reporting/*`,
+    and `registry`, which serve the operator (`packages/admin`),
+    developer (`packages/studio`) and process-owner (`packages/reporting`)
+    frontends directly, not a customer integration. Each exclusion is named
+    rather than left implicit, so its absence reads as a decision.
 
     Every route runs through the Runtime API Layer (`src/runtime/api.ts`).
     An unauthenticated request to any route below `POST /auth/login`,
