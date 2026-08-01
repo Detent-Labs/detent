@@ -426,4 +426,7 @@ change lands.
 - Comments state facts, not process history. Concise and technically precise.
 - The JSON contract is the foundation. Change the schema (definition.ts / the
   Zod source) deliberately, never as a casual side effect of another task.
+- `docs/authoring-guide.md` teaches the contract to process authors. An
+  OpenSpec change that changes a rule the guide states must change the guide
+  in the same commit.
 - Every invariant that lands ships with a test that rejects a violating input.
