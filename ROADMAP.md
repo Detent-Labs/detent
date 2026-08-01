@@ -1263,3 +1263,58 @@ capability of its own.
     an automatic fallback assignee when resolution yields nobody, re-resolution
     when someone's manager changes mid-instance (delegation already covers the
     one-off case), and the Entra/AD integration itself.
+<!-- antislop: allow sentence-length run-ons passive-voice em-dash. This
+     entry matches the dense technical-prose convention every other entry
+     in this file already uses; see the antislop-targeted-allow-not-file-all
+     memory for why a block-scoped allow is the correct tool here. -->
+26. DB-backed data lists: PROPOSED (`openspec/changes/add-db-data-lists`, all
+    four artifacts complete, `openspec validate --strict` clean; design at
+    `docs/superpowers/specs/2026-08-02-db-data-lists-design.md`). Raised
+    2026-08-02 while working through what a data source actually is today.
+    `"static"` is the only type that ships, and its option list lives in
+    `config.options` inside the immutable, hashed body — so changing one value
+    costs a published version plus a migration for every running instance.
+    Four needs converged on one mechanism: business staff editing lists during
+    operation, several processes sharing a list, an external system feeding the
+    values, and a list holding more entries than belong in a body.
+    Adds a second data source type, `"db.list"`, whose values live in two
+    engine-owned tables (`data_lists`, `data_list_values`) instead of the body.
+    This is the type stage 5e's sibling design (`2026-07-24-data-source-
+    resolution-design.md`) deferred, and the one `CLAUDE.md`'s "Decided, not yet
+    built" list still records as open: a DB-backed type answers the deferred
+    timeout/cache/error questions far more cheaply than an HTTP-backed one —
+    same connection pool, no network, one indexed `SELECT` — which is why it
+    lands first. Stage 25b defers the same speculative semantics for the
+    assignment registry and stays unaffected.
+    Four decisions carry the change. The declaration stays in the body
+    (`config: {listKey}`) and only the values move, so a body remains
+    self-contained for promotion export, version diff and `definitionHash`.
+    `list_key` is flat with no scope column: the body already records which
+    process uses which list, so the admin screen derives usage from
+    `definitions` rather than a second, contradictable notion of ownership —
+    "global vs. process-specific" is the answer to a query, not a column.
+    `DataSourceContext` gains `heldValues: string[]` and the query adds `OR
+    value = ANY(...)`, so a value an operator retires stays visible to exactly
+    the instances holding it; because `optionValuesValid` already reads resolved
+    options, that one mechanism fixes rendering and validation together and
+    changes no validation code. And `PUT /admin/data-lists/:listKey/values`
+    replaces a whole set while deactivating what it omits, so no API path ever
+    deletes a value row and no running instance can lose the label of a value it
+    holds. Publishing deliberately does not read the tables — an existence check
+    would make the same body valid or invalid by table contents and break
+    "an identical re-publish is a no-op" — so the mistyped key is prevented in
+    the studio instead, by a `listKey` picker plus a warning, never an error.
+    Six admin routes behind a new narrow role, `system:datalists`, plus two
+    admin screens; read access also accepts `system:developer` so the studio
+    picker needs no second route. Nothing in `definition.ts` changes.
+    Seven capabilities: `db-data-source-type` and `data-list-administration` are
+    new; `data-source-resolution`, `authorization`, `persistence`, `admin-app`
+    and `studio-app` gain deltas. The task list is cut so the engine-side read
+    path lands and stays green before the routes and screens, which are the
+    larger half of the work.
+    Deliberately out of scope, each with its reason in the design: search and
+    typeahead (a list too large for a dropdown needs its own route, field type
+    and renderer), caching across calls, a change history beyond
+    `updated_at`/`updated_by`, a separate import endpoint (a sync job writes
+    through the values route — it is the same operation), and CEL-readable data
+    sources, which stay a publish error exactly as before.
