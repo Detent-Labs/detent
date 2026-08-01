@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Interactive graph editing on `packages/studio`'s `/processes/:id/edit` screen
+Interactive graph editing on the studio area of `packages/web`'s `/processes/:id/edit` screen
 (see `studio-app`): a hand-rolled SVG canvas, not Mermaid and not a
 graph-editing library, positioning steps by the draft's `layout` and letting
 an author drag to reposition a step or drag-to-connect a path between two
@@ -14,9 +14,7 @@ creation writes through the Draft model's `mutate()`, the same surface
 re-implementing the all-manual-or-all-automatic rule. The canvas adds no
 authoring operation the panels can't already do — it is a faster way to
 position and connect, not a new capability surface.
-
 ## Requirements
-
 ### Requirement: Step nodes are repositioned by dragging, and position persists as draft layout
 
 The canvas SHALL render each step of the loaded draft as a node positioned by
@@ -212,7 +210,7 @@ SHALL remain panel-only.
 
 ### Requirement: Canvas interaction logic is tested as pure functions, independent of rendering
 
-Following the existing convention (`packages/app/src/screens/inboxLogic.ts`),
+Following the existing convention (`packages/web/src/areas/app/screens/inboxLogic.ts`),
 hit-testing, drag-delta computation, the auto-place traversal, and the
 connection-validity predicate SHALL live in pure modules with `bun:test`
 coverage. The SVG/React rendering and pointer-event wiring itself is not
@@ -251,3 +249,4 @@ a profile rather than added speculatively.
 
 - **WHEN** a step is added, removed, or repositioned in the stored layout
 - **THEN** the computations re-run and the canvas reflects the change
+

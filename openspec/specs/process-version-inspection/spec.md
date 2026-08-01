@@ -9,7 +9,7 @@ only metadata (version, hash, status, publishedAt), never a body. The new
 `GET /processes/:processId/versions/:version` route resolves the same
 compiled `ProcessBody` the engine executes (via `resolveBody`, see
 `definition-store`), gated `system:developer` unlike its metadata-only
-sibling. The Studio Versions screen (`packages/studio`, see `studio-app`)
+sibling. The Studio Versions screen (the studio area of `packages/web`, see `studio-app`)
 consumes it to list a process's published versions and render a JSON diff
 between any two, or between the currently open draft and the published
 version it was last published from (`base_version`, see `process-drafts`).

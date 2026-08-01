@@ -12,7 +12,7 @@ screen: author/inspect a `(processId, fromVersion, toVersion)` plan and run a
 read-only orphan-key dry run against a published version before writing
 transforms against it. Deliberately excludes *executing* a plan
 (`migrateInstances`) — that stays `admin-migration-run`'s
-`POST /admin/migrations/run`, an operator action reached from `packages/admin`,
+`POST /admin/migrations/run`, an operator action reached from the admin area of `packages/web`,
 not a developer one.
 
 ## Requirements

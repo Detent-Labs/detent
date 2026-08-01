@@ -3,7 +3,7 @@ import type { SubmissionIssue } from "./types.js";
 
 /**
  * Localized message catalog for `SubmissionIssue.kind`, keyed the way
- * `packages/app/src/errors.ts::describeError` keys transport errors — one
+ * the app area's `errors.ts::describeError` keys transport errors — one
  * message per failure, owned by `form-ui` rather than duplicated in each
  * consumer (design.md: "form-ui owns the issue-message catalog, not its
  * consumers"). The seven kinds below are every kind `submitAndTransition`

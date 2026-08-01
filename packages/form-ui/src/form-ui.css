@@ -1,5 +1,5 @@
 /* ponytail: structural layout only, no visual design yet — real styling
-   lands with the end-user app screens (packages/app), then flows back here
+   lands with the end-user app screens (the app area of packages/web), then flows back here
    so the editor's Player picks it up too. */
 
 .form-ui-field-form {

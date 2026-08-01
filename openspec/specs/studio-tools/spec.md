@@ -9,19 +9,17 @@
 
 ## Purpose
 
-A read-only Tools screen on `packages/studio`: a view of the running
+A read-only Tools screen on the studio area of `packages/web`: a view of the running
 server's two plugin registries (registered action-handler and data-source
 type names, nothing else) and a static CEL scratchpad that parses and
 type-checks an ad-hoc expression against a chosen field catalog. Neither
 writes anything. See `studio-app` for the shell navigation that reaches it,
 and `authorization` for the `system:developer` role every route here
 enforces.
-
 ## Requirements
-
 ### Requirement: A Tools screen lists the running server's registered plugin types
 
-`packages/studio` SHALL offer a `/tools` screen, reachable from the shell
+The studio area SHALL offer a `/studio/tools` screen, reachable from the shell
 alongside the process list, showing the running server's registered
 action-handler types (`Registry`) and data-source types (`DataSourceRegistry`)
 as two plain lists of type-name strings. It SHALL expose nothing beyond the
@@ -55,7 +53,7 @@ NOT imply either exists.
 ### Requirement: GET /registry serves the registered type names, developer-role-gated
 
 The HTTP wrapper SHALL expose a new route, `GET /registry`, unprefixed like
-`packages/studio`'s other developer-only routes (`/drafts`,
+the studio area's other developer-only routes (`/drafts`,
 `/migration-plans/...`). It SHALL require `DEVELOPER_ROLE` on the resolved
 actor and SHALL return `{ actionTypes: string[], dataSourceTypes: string[] }`
 built from the server's live `Registry` and `DataSourceRegistry` — the same
@@ -109,3 +107,4 @@ this catalog", never "what does this expression currently evaluate to".
 - **WHEN** the scratchpad is inspected for an action that runs an expression
   against a running instance's current `data`
 - **THEN** no such action exists; the scratchpad only parses and type-checks
+

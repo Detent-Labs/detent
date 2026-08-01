@@ -1,0 +1,341 @@
+@import "../../shell/tokens.css";
+
+.app-screen {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-3) var(--space-5);
+}
+
+/* Header */
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-header nav {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.app-header nav button,
+.app-header-right button {
+  background: none;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.app-header-right {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+/* Login */
+.app-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.app-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 20rem;
+}
+
+.app-login-form label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.9rem;
+}
+
+/* The signature element: a rotated monospace "stamp" badge, evoking the
+   rubber date-stamp a case is marked with as it moves through steps. */
+.app-stamp {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  padding: 0.1rem 0.4rem;
+  transform: rotate(-2deg);
+}
+
+.app-stamp-mine {
+  color: var(--color-accent);
+}
+
+.app-stamp-open {
+  color: var(--color-text-muted);
+}
+
+.app-stamp-case {
+  color: var(--color-success);
+  margin-bottom: var(--space-3);
+}
+
+/* Controls bar */
+.app-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.app-controls select,
+.app-controls button {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+/* Task list — a ledger, not a card grid: hairline rows, right-aligned
+   waiting time like a ledger's amount column. */
+.app-task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.app-task-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* The row still washes on hover, same as before — every row now carries a
+   real control, so the hover cue no longer needs to be conditional on a
+   clickable-row class. */
+.app-task-row:hover {
+  background: var(--color-surface-muted);
+}
+
+/* The control wrapping the row's identifying content (process + step). Reset
+   to plain text so it reads as part of the ledger row, not a call-to-action
+   button; :focus-visible (below) is what makes it discoverable by keyboard. */
+.app-task-link {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  background: none;
+  border: none;
+  margin: 0;
+  padding: var(--space-1) 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.app-task-link:hover .app-task-step {
+  text-decoration: underline;
+}
+
+.app-task-process {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.app-task-step {
+  font-weight: 600;
+}
+
+.app-task-waiting {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  text-align: right;
+}
+
+.app-empty {
+  color: var(--color-text-muted);
+  padding: var(--space-4) 0;
+}
+
+.app-error {
+  color: var(--color-danger);
+}
+
+.app-load-more {
+  margin-top: var(--space-3);
+}
+
+.app-caveat {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* Task screen */
+.app-task-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+}
+
+.app-task-delegate {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.app-task-comments {
+  margin-top: var(--space-4);
+}
+
+.app-task-comments ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.app-task-comment-meta {
+  display: block;
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+
+.app-task-comment-form {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  margin-top: var(--space-2);
+}
+
+.app-task-comment-form textarea {
+  flex: 1;
+}
+
+.app-task-attachments {
+  margin-top: var(--space-4);
+}
+
+.app-task-attachments ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.app-task-attachments li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.app-task-attachment-form {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin-top: var(--space-2);
+}
+
+/* Start screen */
+.app-process-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/*
+ * Error banner: a failed request reported where the data it would have
+ * shown normally sits, not a toast. Reuses the rotated-stamp motif
+ * .app-stamp already establishes rather than inventing a second visual
+ * language. Distinct from the plain .app-error caption TaskScreen already
+ * uses for an inline outcome message — this one is for a list/action that
+ * failed outright and needs a retry, not a short explanatory line.
+ */
+.app-error-banner {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  border: 1.5px solid var(--color-danger);
+  border-radius: 2px;
+  padding: var(--space-2) var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.app-error-banner-stamp {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-danger);
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  padding: 0.1rem 0.4rem;
+  transform: rotate(-2deg);
+}
+
+.app-error-banner-message {
+  flex: 1;
+  color: var(--color-text);
+}
+
+.app-error-banner button {
+  flex: none;
+}
+
+/* Full-screen fallback for a render-time throw the ErrorBoundary catches — see ErrorBoundary.tsx for what this does and does not cover. */
+.app-boundary-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  min-height: 60vh;
+  text-align: center;
+}
+
+.app-boundary-stamp {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-danger);
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  padding: 0.2rem 0.7rem;
+  transform: rotate(-2deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+@media (max-width: 40rem) {
+  .app-task-row {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+
+  .app-task-waiting {
+    text-align: left;
+  }
+}

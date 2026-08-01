@@ -2,7 +2,7 @@
 
 ## Purpose
 
-A third editing surface on `packages/studio`'s `/processes/:id/edit` screen
+A third editing surface on the studio area of `packages/web`'s `/processes/:id/edit` screen
 (see `studio-app`), alongside Canvas and Panels (`studio-canvas`): a raw,
 pretty-printed JSON view over the draft body, replacing rather than
 two-way-bound. Editing and clicking Apply parses the text, runs it through

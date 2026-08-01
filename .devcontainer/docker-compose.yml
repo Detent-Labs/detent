@@ -18,7 +18,7 @@ services:
       # The three frontend dev servers, each pinned to its own port (see
       # pin-frontend-dev-ports): app 5173, admin 5174, studio 5175.
       # Unset means the HTTP wrapper emits no CORS headers at all.
-      CORS_ALLOWED_ORIGINS: http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
       # No AUTH_JWT_SECRET / AUTH_ISSUERS in this container, so the server
       # would otherwise refuse to start. This flag is the explicit, written-down
       # opt-in for that: it disables authentication entirely, trusting

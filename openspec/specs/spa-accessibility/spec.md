@@ -3,16 +3,14 @@
 ## Purpose
 
 Governs keyboard and assistive-technology access across the browser packages
-(`packages/app`, `packages/admin`, `packages/studio`, `packages/reporting`).
+(`packages/web`).
 The rules here are
 cross-package: they hold wherever a screen offers navigation, a
 disclosure, or a graphical surface, rather than belonging to any one app's
 capability. Per-control rendering detail that lives inside the shared form
 renderer belongs to `form-ui`; the canvas's own parity rule belongs to
 `studio-canvas`.
-
 ## Requirements
-
 ### Requirement: Anything that navigates is a real, focusable control
 
 In every browser package, an element whose activation navigates the user
@@ -31,20 +29,20 @@ clickable but not focusable is the state that hides this defect.
 
 This currently blocks:
 
-- opening **any** task in `packages/app`, which is the whole purpose of that
+- opening **any** task in the app area, which is the whole purpose of that
   app — WCAG 2.1.1 Keyboard, Level A;
-- drilling into any instance or timer in `packages/admin`.
+- drilling into any instance or timer in the admin area.
 
 #### Scenario: A participant opens a task with the keyboard
 
-- **WHEN** a keyboard-only user tabs through the task list in `packages/app`
+- **WHEN** a keyboard-only user tabs through the task list in the app area
   and presses Enter on a task
 - **THEN** that task's screen opens, exactly as a pointer click opens it
 
 #### Scenario: An operator drills into a row with the keyboard
 
 - **WHEN** a keyboard-only user tabs through the instance list or the timer
-  list in `packages/admin` and activates a row
+  list in the admin area and activates a row
 - **THEN** that row's detail opens
 
 #### Scenario: A screen reader announces the destination
@@ -95,3 +93,4 @@ pointer-only panel makes the parity guarantee vacuous.
   dragging
 - **THEN** the corresponding panel affordance is focusable and operable
   without a pointer
+

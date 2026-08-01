@@ -9,21 +9,20 @@
 
 ## Purpose
 
-Every SPA (`packages/app`, `packages/admin`, `packages/studio`) stores its
+Every SPA (`packages/web`) stores its
 bearer token in `localStorage` and cannot
 revoke it before its expiry. A build-time Content-Security-Policy defends
 that token in depth: it would block script execution and exfiltration from
 an injected script. No injection sink exists in the tree today, so this is
 prospective protection, not a fix for a known hole.
-
 ## Requirements
-
 ### Requirement: Every browser package ships a Content-Security-Policy in its production build
 
-Each workspace package that produces a browser bundle — `packages/app`,
-`packages/admin`, `packages/studio`, `packages/reporting` — SHALL emit a
+The one workspace package that produces a browser bundle, `packages/web`,
+SHALL emit a
 `Content-Security-Policy` `<meta http-equiv>` into its built `index.html`.
 Its own Vite config SHALL inject this tag, not the source `index.html`.
+One config now emits one policy covering every area.
 The policy SHALL at minimum:
 
 - forbid script from anywhere but the document's own origin
@@ -38,7 +37,7 @@ The policy SHALL at minimum:
   means same-origin, so `connect-src 'self'` is the correct default.
 
 `style-src` MAY keep `'unsafe-inline'`. The mitigation targets script
-execution and exfiltration. The packages rely on inline styles.
+execution and exfiltration. The areas rely on inline styles.
 
 The policy applies to the **build** only. The dev server does not carry it.
 `@vitejs/plugin-react` injects the react-refresh preamble as an inline
@@ -50,26 +49,27 @@ This is defense in depth for a token in `localStorage`: nothing can revoke it
 before it expires. This is not a response to a known injection sink. None
 exists in the tree today.
 
-A package may later gain a dependency on an external origin — a font, an
+An area may later gain a dependency on an external origin — a font, an
 image host, an analytics endpoint, a second API. The change that adds the
-dependency SHALL widen the policy too.
+dependency SHALL widen the policy too, and the widening applies to every area,
+since one policy covers the whole bundle.
 
 #### Scenario: A built page carries the policy
 
-- **WHEN** any of the browser packages is built for production
+- **WHEN** `packages/web` is built for production
 - **THEN** its emitted `index.html` carries a `Content-Security-Policy` meta
   tag containing at least `script-src 'self'`, `object-src 'none'`,
   `base-uri 'none'` and `form-action 'self'`
 
 #### Scenario: The engine origin is reachable from the built app
 
-- **WHEN** a package is built with `VITE_API_URL` set to the engine's origin
+- **WHEN** the package is built with `VITE_API_URL` set to the engine's origin
 - **THEN** that origin appears in the policy's `connect-src`, and the built
   app's API calls are not blocked by the policy
 
 #### Scenario: A same-origin build needs no extra entry
 
-- **WHEN** a package is built with `VITE_API_URL` unset, so the API client
+- **WHEN** the package is built with `VITE_API_URL` unset, so the API client
   uses a same-origin base
 - **THEN** `connect-src` is `'self'` and no other origin is permitted
 
@@ -79,9 +79,14 @@ dependency SHALL widen the policy too.
   is injected into the DOM
 - **THEN** the browser refuses to execute it under `script-src 'self'`
 
+#### Scenario: A lazily-loaded area chunk is not blocked
+
+- **WHEN** a built page loads an area's chunk through its dynamic import
+- **THEN** the chunk is same-origin and `script-src 'self'` permits it
+
 #### Scenario: The dev server is unaffected
 
-- **WHEN** a contributor runs `bun run dev` in any of the browser packages
+- **WHEN** a contributor runs `bun run dev`
 - **THEN** no policy is injected, and react-refresh works as before
 
 #### Scenario: A newly added browser package is not exempt
@@ -89,3 +94,4 @@ dependency SHALL widen the policy too.
 - **WHEN** a workspace package that produces a browser bundle is added
 - **THEN** its own Vite config injects the policy in the same change that adds
   the package, and no build of it ships without one
+

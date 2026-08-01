@@ -1,0 +1,98 @@
+import { useState } from "react";
+import { matchRoute, routePath, type Route, type ViewName } from "./routing.js";
+import { useAreaRoute } from "../../shell/routing.js";
+import { Chrome } from "../../shell/Chrome.js";
+import { defaultRange, rangeIsValid, type DateRange } from "./screens/reportingLogic.js";
+import { ProcessPickerScreen } from "./screens/ProcessPickerScreen.js";
+import { CycleTimeScreen } from "./screens/CycleTimeScreen.js";
+import { BottleneckScreen } from "./screens/BottleneckScreen.js";
+import { SlaScreen } from "./screens/SlaScreen.js";
+import { DateRangeControl } from "./components.js";
+import type { AreaRootProps } from "../../shell/App.js";
+import "./app.css";
+
+const VIEWS: { name: ViewName; label: string }[] = [
+  { name: "cycle-time", label: "Cycle time" },
+  { name: "bottleneck", label: "Bottlenecks" },
+  { name: "sla", label: "SLA" },
+];
+
+/**
+ * `baseLocale` is not carried per view response, and the picker's summaries are
+ * gone by the time a view renders. English is the seeded base locale for every
+ * example process; a step falls back to its key when the locale is absent, so a
+ * mismatch degrades to a readable name rather than a blank cell.
+ */
+const BASE_LOCALE = "en";
+
+/**
+ * The process-owner area's root. The `system:reports` gate that used to live
+ * here is now the shell's, read from one table (`shell/areas.ts`); the server's
+ * `requireRole` on every `/reporting/*` route stays the enforcement.
+ */
+export function ReportingArea({ session, locale, localPath, go, onLocaleChange, onLogout }: AreaRootProps) {
+  const { route, navigate } = useAreaRoute<Route>("reporting", localPath, matchRoute, routePath, go);
+  // Owned here, so it survives a view switch and a process switch alike.
+  const [range, setRange] = useState<DateRange>(() => defaultRange());
+  // The view responses carry step labels but not the process's own, so the
+  // picker hands it over. A deep link or a reload has no picker to hand it
+  // over, and falls back to the id rather than rendering a blank heading.
+  const [processLabel, setProcessLabel] = useState<string | undefined>();
+
+  const nav = (
+    <nav className="shell-nav">
+      <button type="button" className="rep-home" aria-current={route.name === "picker" ? "page" : undefined} onClick={() => navigate({ name: "picker" })}>
+        Processes
+      </button>
+      {route.name === "view" &&
+        VIEWS.map((v) => (
+          <button
+            key={v.name}
+            type="button"
+            aria-current={route.view === v.name ? "page" : undefined}
+            onClick={() => navigate({ name: "view", view: v.name, processId: route.processId })}
+          >
+            {v.label}
+          </button>
+        ))}
+    </nav>
+  );
+
+  return (
+    <Chrome
+      area="reporting"
+      roles={session.roles}
+      locale={locale}
+      onLocaleChange={onLocaleChange}
+      onLogout={onLogout}
+      onGoToArea={(a) => go(`/${a}`)}
+      nav={nav}
+    >
+      {route.name === "picker" ? (
+        <ProcessPickerScreen
+          token={session.token}
+          onPick={(processId, label) => {
+            setProcessLabel(label);
+            navigate({ name: "view", view: "cycle-time", processId });
+          }}
+        />
+      ) : (
+        <main className="rep-screen">
+          <h1>{processLabel ?? route.processId}</h1>
+          <DateRangeControl range={range} onChange={setRange} />
+          {!rangeIsValid(range) ? (
+            <p className="rep-error" role="alert">
+              The start date must not be after the end date.
+            </p>
+          ) : route.view === "cycle-time" ? (
+            <CycleTimeScreen processId={route.processId} range={range} token={session.token} baseLocale={BASE_LOCALE} />
+          ) : route.view === "bottleneck" ? (
+            <BottleneckScreen processId={route.processId} range={range} token={session.token} baseLocale={BASE_LOCALE} />
+          ) : (
+            <SlaScreen processId={route.processId} range={range} token={session.token} baseLocale={BASE_LOCALE} />
+          )}
+        </main>
+      )}
+    </Chrome>
+  );
+}
