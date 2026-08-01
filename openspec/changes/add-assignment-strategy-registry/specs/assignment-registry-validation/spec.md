@@ -1,5 +1,17 @@
 <!-- antislop: allow-file passive-voice -->
 
+## Purpose
+
+Defines authoring-time validation of a step's `assignment.strategy`. The `type`
+resolves against an injected `AssignmentRegistry`. The `config` is parsed
+against the schema the resolved entry declares. An unregistered type is a
+publish-time issue, never a runtime one, and so is a config the entry's schema
+rejects.
+
+The check reuses the resolve-then-parse loop the action and data-source checks
+already share. No engine code decides a strategy by comparing its type against a
+literal.
+
 ## ADDED Requirements
 
 ### Requirement: Every step's assignment type must resolve in the registry

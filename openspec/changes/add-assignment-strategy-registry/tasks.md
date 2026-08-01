@@ -8,8 +8,11 @@
   `resolveAssignmentStrategy`, mirroring the data-source helpers
 - [ ] 1.3 Define the resolver context type: `{ config, stepId, instance: { id,
   startedBy, data } }`, and the `Promise<string[]>` return
-- [ ] 1.4 Register the built-in `static` entry: schema
-  `{ candidates: string[] }`, resolver returning `config.candidates` verbatim
+- [ ] 1.4 Add `createDefaultAssignmentRegistry` to `src/engine/host.ts`,
+  registering the built-in `static` entry: schema `{ candidates: string[] }`,
+  resolver returning `config.candidates` verbatim. It belongs in `host.ts`
+  beside `createDefaultDataSourceRegistry`, not in `registry.ts`, which stays
+  the leaf module its own doc comment describes
 - [ ] 1.5 Update the `STATIC_ASSIGNMENT_STRATEGY_TYPE` doc comment, which still
   states that no registry resolves it
 
@@ -35,15 +38,26 @@
 
 - [ ] 3.1 Move `resolveStepAssignment` out of `src/engine/transition.ts` into a
   caller-side helper that takes the registry and the resolver context
-- [ ] 3.2 Replace `planStepEntry`'s resolution with a caller-supplied
-  `assignment` override on `StepEntryOpts`, beside `timers`
-- [ ] 3.3 Resolve in `commitTransition` before `planStepEntry`, outside
-  `withTransaction`, and pass the result as that override
-- [ ] 3.4 Skip the resolver call entirely when the caller sets
-  `carryAssignment`, so a migration pays for no lookup
-- [ ] 3.5 Replace the inline `config.candidates` read in `createInstance`
-  (`src/engine/store.ts`) with the same helper, before the write
-- [ ] 3.6 Resolve an unregistered type to an empty list, preserving
+- [ ] 3.2 Replace `planStepEntry`'s resolution with a **required**
+  `assignment: Instance["assignment"] | { carry: true }` field on
+  `StepEntryOpts`. Required, unlike `timers`. A caller that omits it then fails
+  to compile, rather than silently unassigning the step. Fold the existing
+  `carryAssignment` flag into that union, and drop the flag
+- [ ] 3.3 Add the field to `commitTransition`'s `overrides` `Pick`. Update the
+  two doc comments the move invalidates: the `carryAssignment` block on
+  `StepEntryOpts`, and the "four explicit overrides" sentence on `planStepEntry`
+- [ ] 3.4 Resolve in `commitTransition` before `planStepEntry`, outside
+  `withTransaction`, and pass the result in that field
+- [ ] 3.5 Pass `{ carry: true }` from `migration.ts::migrateOne`, which
+  therefore calls no resolver and pays for no lookup
+- [ ] 3.6 Replace the inline `config.candidates` read in `createInstance`
+  (`src/engine/store.ts`) with an `opts.assignment` input. `createInstance`
+  calls no resolver, keeping the persistence-only remit its doc comment states
+- [ ] 3.7 Resolve the child's initial-step candidates in `src/engine/
+  subprocess.ts`'s spawn handler **before** its `withTransaction` opens, and
+  pass the result into `createInstance`. The child body, its initial step and
+  its seed data are all in hand there
+- [ ] 3.8 Resolve an unregistered type to an empty list, preserving
   `createInstance`'s current defensive behaviour
 
 ## 4. Runtime tests
@@ -53,28 +67,47 @@
   calls no resolver
 - [ ] 4.3 A registered resolver returning a promise is awaited, and its list
   lands in `instance.assignment.candidates`
-- [ ] 4.4 `planStepEntry` calls no resolver: a plan built with the override set
+- [ ] 4.4 `planStepEntry` calls no resolver: a plan built with the field set
   produces that exact candidate list
-- [ ] 4.5 A migration with `carryAssignment` runs no resolver, and leaves the
+- [ ] 4.5 A migration passing `{ carry: true }` runs no resolver, and leaves the
   assignment byte-for-byte unchanged
 - [ ] 4.6 An unregistered type at entry yields empty candidates, and the entry
   commits
 - [ ] 4.7 Re-entry via a loop-back path still resolves fresh and clears a prior
   claim
+- [ ] 4.8 A resolver invoked on a transition carrying a `dataPatch` sees the
+  merged value in `ctx.instance.data`, not the pre-submission value
+- [ ] 4.9 A step whose resolved `candidates` is empty rejects every actor at
+  `claimStep`: no fallback assignee is substituted
+- [ ] 4.10 A subprocess spawn onto an assignment-bearing initial step resolves
+  before its transaction opens, and the child carries the resolved candidates
 
 ## 5. Call sites and regression
 
-- [ ] 5.1 Update every `publishBody` caller in `src/http/`, `src/runtime/` and
-  `test/` to pass an assignment registry carrying the `static` entry
-- [ ] 5.2 Run `bun run typecheck`
-- [ ] 5.3 Run the full suite with `DATABASE_URL` set
-- [ ] 5.4 Check the run's skip count, not only its pass count
+- [ ] 5.1 Thread the registry from `src/http/server.ts` (`startHttpServer` and
+  `createServer`, which already take the other two) through
+  `src/runtime/api.ts`, `src/engine/resolution.ts`, `src/engine/timers.ts` and
+  `src/engine/subprocess.ts` to every `commitTransition` and `createInstance`
+  call site
+- [ ] 5.2 Wire `createDefaultAssignmentRegistry` into `server.ts`'s entry point,
+  beside `createDefaultDataSourceRegistry`
+- [ ] 5.3 Update `publishBody`'s two callers, `src/http/routes.ts` and
+  `src/http/studio-routes.ts`, plus the suites in `test/`, to pass an assignment
+  registry carrying the `static` entry
+- [ ] 5.4 Run `bun run typecheck`
+- [ ] 5.5 Run the full suite with `DATABASE_URL` set
+- [ ] 5.6 Check the run's skip count, not only its pass count
 
 ## 6. Documentation
 
 - [ ] 6.1 Correct `CLAUDE.md`: assignment strategy is an extension point, and
   `"static"` is a registered entry rather than a direct check
-- [ ] 6.2 Correct the matching statement in `docs/current-state.md`
+- [ ] 6.2 Correct `docs/current-state.md` at all three sites. One, the
+  not-pluggable paragraph and its ponytail-audit note. Two, the
+  `transition.ts::resolveStepAssignment` location the move invalidates. Three,
+  the authorization section's analogy to the single `"static"` check on
+  `Step.assignment.strategy.type`
 - [ ] 6.3 Update `docs/authoring-guide.md` where it states the rule for authors
-- [ ] 6.4 Record in `CLAUDE.md`'s deferred list that the deadline, the failure
-  classification and the `assignment.unresolved` event belong to change C
+- [ ] 6.4 Record in `CLAUDE.md`'s deferred list that change C owns the deadline,
+  the failure classification and the `assignment.unresolved` event. Name the
+  subprocess-return path that resolves under a row lock there too

@@ -28,9 +28,14 @@ instance. It ships no such strategy, and changes no behaviour.
   hand-written loop and its local schema go away.
 - A resolver answers asynchronously and receives a narrow context:
   `{ config, stepId, instance: { id, startedBy, data } }`.
-- The engine resolves candidates in `commitTransition` and in `createInstance`,
-  before the transaction opens. `planStepEntry` receives the resolved set as a
-  caller-supplied override. It stays pure and synchronous.
+- The engine resolves candidates in `commitTransition`. The subprocess spawn
+  handler resolves before its own transaction opens. No resolver runs inside
+  `createInstance`. It takes the resolved set as an option, the way it already
+  takes seed data. The planner receives that set as a required field, and stays
+  pure and synchronous.
+- One path resolves under an open transaction, named rather than glossed. The
+  subprocess return advances the parent while holding its row lock. See
+  `design.md` § Risks.
 - **No JSON contract change.** `Step.assignment.strategy` already uses the
   generic `plugin` envelope (`definition.ts:427`). No existing definition
   changes and nothing migrates.
@@ -67,19 +72,29 @@ deadline, a failure classification, and an `assignment.unresolved` event. See
 ## Impact
 
 - `src/engine/registry.ts`: `AssignmentStrategyDef`, `AssignmentRegistry`, and
-  its create, register and resolve helpers. The built-in `static` entry.
+  its create, register and resolve helpers. Types and helpers only. The
+  built-in entry lives in `host.ts`, since `registry.ts` stays the leaf module
+  its own doc comment describes.
+- `src/engine/host.ts`: `createDefaultAssignmentRegistry`, holding the built-in
+  `static` entry, beside `createDefaultDataSourceRegistry`.
 - `src/engine/registry-check.ts`: `checkAssignmentRegistry` takes the registry,
   reuses `checkTypedConfig`, and drops `staticAssignmentConfigSchema`.
 - `src/engine/definitions.ts`: `publishBody` takes and forwards the registry.
 - `src/engine/transition.ts`: `resolveStepAssignment` leaves the module.
-  `commitTransition` resolves and passes an override. `planStepEntry` no longer
-  resolves. The claim path stays as it is: it reads candidates, and never
-  resolves them.
-- `src/engine/store.ts`: `createInstance` calls the resolver instead of reading
-  `config.candidates` inline.
-- `src/engine/migration.ts`: unchanged, but its `carryAssignment` flag now also
-  suppresses the resolver call.
-- Callers of `publishBody` in `src/http/`, `src/runtime/` and `test/` pass the
-  registry.
+  `commitTransition` resolves and passes the resolved set. `planStepEntry` no
+  longer resolves, and takes the set as a required field. The claim path stays
+  as it is: it reads candidates, and never resolves them.
+- `src/engine/store.ts`: `createInstance` takes the resolved set as an option
+  instead of reading `config.candidates` inline. It calls no resolver.
+- `src/engine/subprocess.ts`: the spawn handler resolves the child's initial
+  step before its transaction opens. The return handler threads the registry to
+  `executeAutomaticTransition`.
+- `src/engine/migration.ts`: `migrateOne` states the carry case explicitly
+  where it passed `carryAssignment: true`.
+- `src/http/server.ts`: `createServer` and `startHttpServer` take the registry.
+  `src/engine/resolution.ts`, `src/engine/timers.ts` and `src/runtime/api.ts`
+  thread it to `commitTransition` and `createInstance`.
+- `publishBody`'s callers, `src/http/routes.ts` and `src/http/studio-routes.ts`,
+  plus the suites in `test/`, pass the registry.
 - Docs stating that assignment is not an extension point: `CLAUDE.md`,
   `docs/current-state.md`, `docs/authoring-guide.md`.
