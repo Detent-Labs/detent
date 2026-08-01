@@ -343,6 +343,17 @@ See `ROADMAP.md` for stage-by-stage status (DONE/NOT STARTED) and what each stag
   ships. A live type (e.g. an HTTP-backed data source) is deferred until a
   concrete need exists — its timeout/cache/error semantics are open questions
   not worth deciding speculatively.
+- **A publish-time warning for a step with no `assignment`.**
+  `Step.assignment` is optional, and the studio leaves it empty by default.
+  A whole process can therefore publish without one, as `Test-process` did.
+  The starter can then walk their own case through every step, since the
+  assignment-less floor is starter-or-`system:admin`
+  (`api.ts::submitAndTransition`). The instance also reaches no inbox,
+  because `scope=mine` filters on `assignedTo`/`assignedToRoles` alone
+  (`api.ts::listInstances`). Keep it a warning in the studio, never an
+  invariant: a self-service form legitimately has no assignment. The
+  archived `2026-08-01-fix-claim-affordance/design.md` records two adjacent
+  gaps, the studio Player and the inbox predicate.
 
 ## Codebase memory (knowledge graph)
 The repo is indexed into codebase-memory-mcp (`full` mode, covering the engine,

@@ -94,6 +94,12 @@ export type InstanceView = {
   step: { id: StepId; key: string; label: LocalizedText; type: StepType };
   fields: ResolvedViewField[];
   availablePaths: AvailablePath[];
+  // The instance's persisted claim state, in the shape InstanceSummary
+  // carries. Absent when the current step declares no assignment: there is
+  // nothing to claim, which is what a caller rendering claim controls needs
+  // to know. Reported for every status, unlike availablePaths — a completed
+  // instance still shows who held the final claim.
+  assignment?: AssignmentState | null;
   // Absent unless redactInstance has run. The admin area's instance detail
   // screen uses this to show/disable the redact action and its badge.
   redactedAt?: string;
@@ -677,9 +683,13 @@ async function loadInstanceForActor(instanceId: InstanceId, actor: Actor, db: SQ
 
 /**
  * Resolve a display-ready view of an instance: its current step, resolved
- * fields, and currently available manual paths — for an instance in any
- * status. Uses the ordinary (unlocked) rehydrate path: a view is read-only,
- * so there is no concurrent writeback for it to race.
+ * fields, currently available manual paths, and claim state — for an instance
+ * in any status. Uses the ordinary (unlocked) rehydrate path: a view is
+ * read-only, so there is no concurrent writeback for it to race.
+ *
+ * `assignment` costs no extra read: loadInstanceForActor already consults it
+ * to authorize the caller, so every caller reaching this return has passed
+ * the claimant/candidate test against the value it now receives.
  */
 export async function getInstanceView(instanceId: InstanceId, actor: Actor, registry: DataSourceRegistry, db: SQL = sql): Promise<InstanceView> {
   const { instance, body } = await loadInstanceForActor(instanceId, actor, db);
@@ -692,6 +702,7 @@ export async function getInstanceView(instanceId: InstanceId, actor: Actor, regi
     step: { id: step.id, key: step.key, label: step.label, type: step.type },
     fields: await resolveFields(body, step, instance, actor, registry),
     availablePaths: instance.status === "running" ? resolveAvailablePaths(body, step, instance, actor) : [],
+    assignment: instance.assignment,
     redactedAt: instance.redactedAt,
   };
 }

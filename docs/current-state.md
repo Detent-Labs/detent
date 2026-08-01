@@ -333,7 +333,11 @@ Stage-by-stage status is in `ROADMAP.md`.
   against the field catalog and current data into `ResolvedViewField[]` (a
   group-container's own field id is never a valid `data` key, so it is
   reported but excluded from required/readonly resolution) plus
-  `availablePaths` (manual paths whose guard currently holds). `submitAndTransition`
+  `availablePaths` (manual paths whose guard currently holds) plus
+  `assignment` (the instance's claim state, in `InstanceSummary`'s shape;
+  absent when the current step declares none, and reported for every status
+  unlike `availablePaths`, since a caller cannot otherwise tell a claimable
+  step from one with no assignment). `submitAndTransition`
   is the only write path for arbitrary user-submitted `data` anywhere in the
   system: it row-locks the instance (`SELECT ... FOR UPDATE`) for exactly one
   commit — guarding against a concurrent `Action.output` writeback being
