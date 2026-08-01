@@ -304,6 +304,30 @@ A publication is immutable. Read the next chapter before you press it.
 
 ## After publish
 
+Publishing freezes the body. The version, its hash and every rule inside it
+stop changing. A running process rehydrates against exactly that body for the
+rest of its life. Nobody can pull the ground out from under a process that is
+already halfway through.
+
+That is why a change produces a new version. Open a fresh draft, change it,
+publish it. The old version stays, because processes still running on it still
+need it. It survives as long as a single process points at it.
+
+A new version moves nothing. Every running process stays pinned to the version
+it started on. Moving them is a migration, and a migration is a deliberate
+act. One rule applies to every process on one version. There is no per-process
+editing, and there is no accidental upgrade.
+
+Watch the result in Operations. It lists the running processes, and shows four
+things for each one:
+
+- the active step
+- the history
+- the timers waiting to fire
+- the actions queued in the outbox
+
+When something goes wrong, that is where you see it.
+
 ## What this guide is not
 
 This guide teaches one thing: how to think about a process, and how to build
