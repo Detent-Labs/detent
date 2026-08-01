@@ -1186,3 +1186,80 @@ capability of its own.
     tenant billing/usage dashboards, self-service signup, forced migration
     of an on-premise deployment into the SaaS control plane, and per-
     tenant quotas. No OpenSpec change yet.
+<!-- antislop: allow sentence-length run-ons passive-voice em-dash. This
+     entry matches the dense technical-prose convention every other entry
+     in this file already uses; see the antislop-targeted-allow-
+     not-file-all memory for why a block-scoped allow is the correct tool
+     here, not a file-wide one. -->
+25. Per-instance step assignment: design DONE (approved 2026-08-02, see
+    `docs/superpowers/specs/2026-08-02-pluggable-step-assignment-design.md`);
+    change B proposed 2026-08-02, A and C NOT STARTED. Raised 2026-08-01 as a
+    reality check on how a user acquires a role a process names. The answer
+    exposed a deeper gap: `planStepEntry` copies `assignment.strategy.config
+    .candidates` verbatim from the frozen definition onto the instance, so
+    every instance of a definition carries an identical list. That serves
+    "anyone in accounting" and cannot express "the requester's manager". It
+    also cannot scope a shared definition per instance — a company-wide leave
+    request listing `["dept-a:manager", "dept-b:manager"]` lets department B's
+    manager approve department A's request, silently, and puts it in their
+    inbox too (`listInstances` with `scope=mine` queries the same array). No
+    role naming repairs that: any name sits in the immutable body, which knows
+    nothing about the instance. Two independent pieces are missing —
+    organizational facts (`auth_users` holds email, password hash, roles and a
+    disabled flag, no manager and no department) and a path for the answer to
+    reach the step. Three OpenSpec changes:
+    a. Role editing in the admin area: NOT STARTED. `PATCH
+       /admin/users/:userId/roles` behind `system:admin`, over the existing
+       `src/auth/users.ts::setRoles`, plus a control in `packages/web`'s
+       `UsersScreen`. Closes the CLI-only gap stage 10's `admin-users`
+       deliberately left, which becomes untenable once business roles multiply.
+       No contract change; independent of (b).
+    b. Assignment strategy registry: PROPOSED
+       (`openspec/changes/add-assignment-strategy-registry`, all four artifacts
+       complete, `openspec validate --strict` clean). `AssignmentRegistry`
+       becomes a third map beside the action `Registry` and the
+       `DataSourceRegistry`, `publishBody` takes it, `checkAssignmentRegistry`
+       resolves against it (reusing `checkTypedConfig` and deleting its
+       hand-written loop plus `staticAssignmentConfigSchema`), and
+       `commitTransition`/`createInstance` call the registered resolver before
+       the transaction opens — `planStepEntry` receives the resolved set as a
+       caller-supplied override beside `opts.timers` and stays pure and
+       synchronous. `"static"` becomes a registered entry with unchanged
+       behaviour, so the change alters no behaviour at all and needs no
+       migration; `Step.assignment.strategy` already uses the generic `plugin`
+       envelope, so the JSON contract is untouched. The resolver signature is
+       async even though `static` needs no I/O, copying
+       `DataSourceHandlerDef.resolve`'s reasoning. **This contradicts a stated
+       rule**: `CLAUDE.md` and `docs/current-state.md` both record that
+       assignment strategy is not an extension point, and (b) must correct them
+       and `docs/authoring-guide.md` in the same commit. Deferred to (c) after
+       review: a resolution deadline, a failure classification and an
+       `assignment.unresolved` event — `static` cannot fail, so nothing in (b)
+       exercises them, and deciding them here would repeat the speculative
+       timeout/error semantics `CLAUDE.md` already defers for a dynamic data
+       source.
+    c. Manager service: NOT STARTED. One field on the user (manager → person, a
+       pointer, not a tree) edited on the same screen (a) touches, plus a
+       built-in `org.manager-of-starter` strategy resolving the manager of
+       `instance.startedBy`, which every instance already records. This is the
+       first fallible resolver, so it owns the deadline, the failure handling
+       and the `assignment.unresolved` event (b) deferred. A later switch to
+       Entra ID or AD replaces only what the strategy asks internally: a
+       definition names the strategy, never a storage location, and stage 7's
+       JWT resolver already accepts an external issuer. Identity stays
+       consistent because the value written into `candidates` is always the id
+       the person authenticates with; instances created before such a switch
+       keep the old ids, which is a migration concern for the switch itself.
+    Deliberately out of scope across all three, each rejected during
+    brainstorming with its reason recorded in the design: a permission store per
+    process (two instances of one frozen definition would behave differently on
+    data outside the body, breaking versioning, migration pinning and the audit
+    record), a role hierarchy such as `dept-all:manager` implying
+    `dept-a:manager` (hierarchies broaden, the requirement narrows per instance;
+    `src/auth/authorize.ts` already records the no-hierarchy decision, and
+    `isEligibleCandidate` plus the JSONB `?|` inbox filter would both have to
+    expand identically or a step becomes claimable but invisible), a general
+    expression-backed strategy computing candidates by CEL over instance data,
+    an automatic fallback assignee when resolution yields nobody, re-resolution
+    when someone's manager changes mid-instance (delegation already covers the
+    one-off case), and the Entra/AD integration itself.
