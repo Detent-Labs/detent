@@ -41,7 +41,15 @@ export function AppArea({ session, locale, localPath, go, onUnauthorized, onLoca
         <TasksScreen token={session.token} actorId={session.actorId} locale={locale} navigate={navigate} onUnauthorized={onUnauthorized} />
       )}
       {route.name === "task" && (
-        <TaskScreen instanceId={route.instanceId} token={session.token} locale={locale} navigate={navigate} onUnauthorized={onUnauthorized} />
+        <TaskScreen
+          instanceId={route.instanceId}
+          token={session.token}
+          actorId={session.actorId}
+          actorRoles={session.roles}
+          locale={locale}
+          navigate={navigate}
+          onUnauthorized={onUnauthorized}
+        />
       )}
       {route.name === "start" && <StartScreen token={session.token} locale={locale} navigate={navigate} onUnauthorized={onUnauthorized} />}
     </Chrome>

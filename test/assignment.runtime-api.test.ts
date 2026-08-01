@@ -9,7 +9,7 @@ import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { NotAssignedError, NotACandidateError, AlreadyClaimedError, NotClaimedError, NotClaimantError } from "../src/engine/transition.js";
-import { createProcessInstance, claimStep, releaseClaim, delegateClaim, submitAndTransition, cancelInstance, InstanceNotRunningError } from "../src/runtime/api.js";
+import { createProcessInstance, claimStep, releaseClaim, delegateClaim, submitAndTransition, cancelInstance, getInstanceView, InstanceNotRunningError } from "../src/runtime/api.js";
 import { AuthorizationError, ADMIN_ROLE } from "../src/auth/authorize.js";
 import type { ProcessBody, ProcessId, PathId, InstanceEvent } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
@@ -341,4 +341,65 @@ test.skipIf(!DB)("submitAndTransition succeeds for an ADMIN_ROLE actor on a step
   // second arm.
   const updated = await submitAndTransition(inst.instanceId, "path_ab" as PathId, {}, operator, dataSourceReg);
   expect(updated.currentStepId as string).toBe("step_b");
+});
+
+// ============================================================
+// getInstanceView reports the claim state. Without it no caller can tell a
+// claimable step from one that declares no assignment, which is what makes a
+// UI offer a claim the engine then refuses with NotAssignedError.
+// ============================================================
+
+// step_b is terminal AND assigned: nothing forbids that, and it is the only
+// way an instance reaches a non-running status still carrying a claim.
+const terminalAssignedBody = (): ProcessBody =>
+  ({
+    key: "assign_term",
+    label: { en: "Assign Term" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a", key: "a", label: { en: "A" }, type: "task",
+          assignment: { strategy: { type: "static", config: { candidates: ["user_1"] } } },
+          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+        },
+        {
+          id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true,
+          assignment: { strategy: { type: "static", config: { candidates: ["user_1"] } } },
+        },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+test.skipIf(!DB)("getInstanceView carries the assignment on an assignment-bearing step", async () => {
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+  await claimStep(inst.instanceId, candidate);
+  const view = await getInstanceView(inst.instanceId, candidate, dataSourceReg);
+  expect(view.assignment?.candidates).toEqual(["approver", "user_1"]);
+  expect(view.assignment?.claimedBy).toBe(candidate.id);
+  expect(view.assignment?.claimedAt).toBeTruthy();
+});
+
+test.skipIf(!DB)("getInstanceView omits the assignment on a step that declares none", async () => {
+  await publishBody(PID, unassignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+  const view = await getInstanceView(inst.instanceId, candidate, dataSourceReg);
+  expect(view.assignment).toBeUndefined();
+});
+
+test.skipIf(!DB)("getInstanceView still reports the assignment on a completed instance", async () => {
+  await publishBody(PID, terminalAssignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+  await claimStep(inst.instanceId, candidate);
+  const done = await submitAndTransition(inst.instanceId, "path_ab" as PathId, {}, candidate, dataSourceReg);
+  expect(done.status).toBe("completed");
+  const view = await getInstanceView(inst.instanceId, candidate, dataSourceReg);
+  // Unlike availablePaths, the assignment is not emptied for a non-running
+  // instance: an operator reading a closed case still sees who held it.
+  expect(view.status).toBe("completed");
+  expect(view.availablePaths).toEqual([]);
+  expect(view.assignment?.candidates).toEqual(["user_1"]);
 });

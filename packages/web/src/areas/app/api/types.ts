@@ -34,6 +34,7 @@ export interface InstanceView {
   step: { id: string; key: string; label: LocalizedText; type: string };
   fields: ResolvedViewField[];
   availablePaths: AvailablePath[];
+  assignment?: { candidates: string[]; claimedBy?: string; claimedAt?: string } | null;
 }
 
 // Not `Comment` — that name collides with the DOM's own `Comment` node
