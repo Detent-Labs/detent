@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { authoredProcessBody } from "workflow-engine/schema";
 import { deriveProcessRows, seedVersionFor, seededDraftInput } from "../src/areas/studio/screens/processListLogic.js";
 import type { DraftSummary, ProcessSummary } from "../src/areas/studio/api/types.js";
 
@@ -106,11 +107,22 @@ describe("seededDraftInput", () => {
     workflow: { steps: [{ id: "step_a" }, { id: "step_cancel_sink", key: "cancel_sink" }] },
   });
 
-  it("returns an empty draft and no base version without a seed version", async () => {
+  it("returns a base-locale-only draft and no base version without a seed version", async () => {
     let reads = 0;
     const input = await seededDraftInput(undefined, async () => (reads++, compiledBody()));
-    expect(input).toEqual({ body: {}, layout: {}, revision: 0 });
+    expect(input).toEqual({ body: { baseLocale: "en" }, layout: {}, revision: 0 });
     expect(reads).toBe(0);
+  });
+
+  // Publish requires `baseLocale` and no structural panel wrote it before this
+  // seed did, so a process authored only through the panels could never be
+  // published. Parsing the seed itself is the check that keeps it that way.
+  it("seeds a body that reports no missing baseLocale", async () => {
+    const input = await seededDraftInput(undefined, async () => compiledBody());
+    const parsed = authoredProcessBody.safeParse(input.body);
+    expect(parsed.success).toBe(false); // still missing key/label/fields/workflow
+    const paths = parsed.error!.issues.map((i) => i.path.join("."));
+    expect(paths).not.toContain("baseLocale");
   });
 
   it("returns the stripped published body stamped with its version", async () => {

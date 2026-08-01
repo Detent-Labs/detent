@@ -48,12 +48,22 @@ export interface CreateDraftInput {
   baseVersion?: number;
 }
 
+/** The base locale a `+ New process` draft declares. Publish requires
+ * `baseLocale` and this seed is the only place the structural panels can
+ * supply it before the author has typed anything, so without it a process
+ * authored only through those panels could never be published. "en" is what
+ * every other studio reader already falls back to for a draft that declares
+ * nothing (`collectUsedLocales`, `CanvasView`, the store's content locale). */
+const NEW_PROCESS_BASE_LOCALE = "en";
+
 /**
- * The body a new draft starts from. Without a `seedVersion` it is empty, the
- * `+ New process` case. With one, it is that published version read back and
- * stripped of the compile pass's cancel-sink injection, since a draft holds the
- * authored shape — stamped with the version it came from so the Versions screen
- * can diff against it.
+ * The body a new draft starts from. Without a `seedVersion` it declares only
+ * `baseLocale`, the `+ New process` case. With one, it is that published
+ * version read back and stripped of the compile pass's cancel-sink injection,
+ * since a draft holds the authored shape — stamped with the version it came
+ * from so the Versions screen can diff against it. A published body carries
+ * its own `baseLocale` (it could not have reached publish otherwise) and
+ * `stripCompiledContent` does not remove it, so only the no-seed branch seeds.
  *
  * `readBody` rejecting propagates, and the caller must not write in its place:
  * an empty draft over a published version the author wanted to continue from is
@@ -65,7 +75,7 @@ export async function seededDraftInput(
   seedVersion: number | undefined,
   readBody: (version: number) => Promise<unknown>,
 ): Promise<CreateDraftInput> {
-  if (seedVersion === undefined) return { body: {}, layout: {}, revision: 0 };
+  if (seedVersion === undefined) return { body: { baseLocale: NEW_PROCESS_BASE_LOCALE }, layout: {}, revision: 0 };
   const published = (await readBody(seedVersion)) as ProcessBody;
   return { body: stripCompiledContent(published), layout: {}, revision: 0, baseVersion: seedVersion };
 }

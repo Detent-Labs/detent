@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { DraftProvider, useDraft } from "../draft/store.js";
 import { draftFields } from "../draft/fields.js";
+import { resolveBaseLocaleChange } from "./processHeaderLogic.js";
 import type { Draft } from "../draft/types.js";
 import { t } from "../catalog.js";
 import { FieldCatalogPanel } from "../panels/FieldCatalogPanel.js";
@@ -29,7 +30,19 @@ interface EditScreenProps {
 }
 
 function ProcessHeader() {
-  const { draft, mutate } = useDraft();
+  const { draft, mutate, contentLocale, setContentLocale } = useDraft();
+
+  /** Both writes are unconditional: `resolveBaseLocaleChange` owns every
+   * decision, so this wiring carries no branch to get wrong (and re-setting
+   * the content locale to its current value is a React bail-out). */
+  const changeBaseLocale = (typed: string) => {
+    const change = resolveBaseLocaleChange(typed, contentLocale);
+    mutate((d) => {
+      d.baseLocale = change.baseLocale;
+    });
+    setContentLocale(change.contentLocale);
+  };
+
   return (
     <fieldset className="process-header">
       <legend>{t("app.processLegend")}</legend>
@@ -44,6 +57,13 @@ function ProcessHeader() {
             })
           }
         />
+      </label>
+      {/* Before `label`: baseLocale decides which entry of every LocalizedText
+          below it is mandatory, so the declaration precedes the first
+          localized value it governs. */}
+      <label>
+        baseLocale
+        <input type="text" value={draft.baseLocale ?? ""} onChange={(e) => changeBaseLocale(e.target.value)} />
       </label>
       <label>
         label
