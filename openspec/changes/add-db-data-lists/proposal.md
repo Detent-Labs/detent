@@ -36,7 +36,11 @@ centres or departments, do not belong on a release cycle.
 - `authorization`: a new `system:datalists` role, narrow like the existing
   ones and implying none of them.
 - `persistence`: `initSchema` creates `data_lists` and `data_list_values`.
-- `admin-app`: the area gains two screens and their navigation entry.
+- `admin-app`: the area gains two screens and their navigation entry. Area
+  entry admits `system:datalists` beside `system:admin`, and each screen keeps
+  its own role check.
+- `unified-shell`: the area table carries a set of roles per area rather than
+  one, so a data list maintainer reaches `/admin` without `system:admin`.
 - `studio-app`: `DataSourcesPanel` picks a `listKey` from the server, and a
   body pointing at a missing list draws a warning.
 
@@ -50,6 +54,10 @@ centres or departments, do not belong on a release cycle.
   on them. `optionValuesValid` needs no change.
 - `src/http/admin-routes.ts`, `src/http/server.ts`: six routes.
 - `src/auth/authorize.ts`: `DATALISTS_ROLE`.
-- `packages/web/src/areas/admin/`: two screens plus their logic module.
+- `packages/web/src/areas/admin/`: two screens plus their logic module. Their
+  two routes in `routing.ts`. The navigation entry in `root.tsx`. The six
+  calls in `api/client.ts` with their types.
+- `packages/web/src/shell/areas.ts`: `REQUIRED_ROLE` carries a role set per
+  area, and `mayEnter` admits any one of them.
 - `packages/web/src/areas/studio/panels/DataSourcesPanel.tsx`: the picker.
 - No dependency changes. No change to the definition contract.
