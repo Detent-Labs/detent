@@ -445,34 +445,116 @@ capability of its own.
     only its internals are retired with no replacement, and the
     devcontainer's `postCreateCommand` no longer installs Playwright, since
     no remaining package needed it.
-12. Unified shell (consolidate app/admin/studio): NOT STARTED, deliberately
-    deferred — no urgency, raised 2026-07-28 as a "someday" question, not a
-    committed stage. Today `packages/app`, `packages/admin`, and
-    `packages/studio` are three independently-built Vite SPAs, each with its
-    own near-identical `session.ts` (token+actorId in localStorage),
-    `LoginScreen.tsx`, and hand-written `routing.ts` history-API hook — but
-    all three already share one backend, one JWT auth flow (stage 7), and
-    `packages/form-ui` as a common rendering layer, so there's no router or
-    state-management mismatch to reconcile. Two independent, sequenceable
-    steps, not one big-bang merge:
-    a. Shared login/session across the three origins first — smallest change,
-       biggest payoff ("log in once, stay in everywhere"), apps stay
-       separately deployable.
-    b. Only if still wanted later: one shell with role-gated routing
-       (`/admin/*`, `/studio/*`, `/app/*`) replacing the three duplicated
-       session/login/routing modules with one. Tradeoff to weigh before
-       starting this step: one bundle for three audiences (operator/
-       developer/participant) inflates bundle size for all three and couples
-       deploys that are currently independent — so it's a deliberate call,
-       not a default.
-    Neither step has an OpenSpec change yet; write one (starting with 12a)
-    when this actually gets scheduled. Re-brainstormed 2026-07-30:
-    confirmed still no committed trigger, so no design was produced.
-    Revisit step (a) when a second real deployment specifically asks for
-    single sign-on across app/admin/studio, or when the three duplicated
-    session/login/routing modules cause an actual cross-package bug rather
-    than only added file count. Revisit step (b) only if (a) ships and the
-    remaining duplication still costs real maintenance effort.
+12. Unified shell (consolidate app/admin/studio/reporting): NOT STARTED, but
+    the direction is decided as of 2026-08-01 and no longer deferred. It was
+    raised 2026-07-28 as a "someday" question and re-brainstormed 2026-07-30
+    without a trigger; the trigger is now stated — an installation must
+    present itself as one system with one address, not four systems with four
+    ports and four logins. No design document was written by request; this
+    entry carries the design, and the two OpenSpec changes below still have
+    to be written before any code moves.
+    Bestand as of this entry: four independently-built Vite SPAs, not three —
+    `packages/reporting` (stage 21) arrived with the same trio every other
+    package carries, `session.ts`, `routing.ts`, `screens/LoginScreen.tsx`,
+    plus its own `ErrorBoundary.tsx`, `app.css`, `main.tsx`, `index.html` and
+    `vite.config.ts`. Nothing serves the built assets: `src/http/` has no
+    static route, so the four exist only as dev servers on ports 5173-5176
+    and no deployment model exists yet.
+    **Step 12a (shared session across origins) is dropped.** It would build a
+    shared session/login package that the shell then dissolves — the same
+    work twice. The two objections the old entry raised against 12b are
+    answered: bundle size by route-level `React.lazy` (one build, one chunk
+    per area, so a participant never downloads the Studio canvas), and
+    coupled deploys by the delivery rule that an installation always
+    installs everything and gates areas by role. The end state is smaller
+    than today: one `vite.config.ts`, one `index.html`, one `main.tsx`, one
+    `routing.ts`, one `session.ts`, one `LoginScreen`, one `ErrorBoundary`.
+    Of 43 frontend tests, twelve files (4x `session.test.ts`, 4x
+    `routing.test.ts`, 4x `vite-config.test.ts`) become three.
+    Target layout — one package `packages/web` (named `web`, not `ui`, since
+    `form-ui` already exists), the four old packages deleted:
+    `src/main.tsx`; `src/shell/` (prefix routing, session, `LoginScreen`,
+    `ErrorBoundary`, `AreaNav`, chrome CSS); `src/api/` (`API_BASE`,
+    `ClientError`, `parseErrorBody`, authenticated fetch); `src/i18n/`
+    (locale selection and persistence, catalogs stay per area);
+    `src/areas/{app,admin,studio,reporting}/`, each keeping its own
+    `screens/` and its own `api/` route functions and `types.ts`. The
+    `areas/` level is deliberate: it makes "area" the name of the unit that
+    owns one URL prefix, one lazy chunk and one role gate, and it makes the
+    one rule that keeps the merge from tangling expressible as a path
+    pattern — an area never imports from another area, only upward into
+    `shell/`, `api/`, `i18n/`.
+    URL scheme: `/login`; `/app/*`, `/admin/*`, `/studio/*`, `/reporting/*`;
+    `/` redirects by role **client-side** (never a server 302 — the engine
+    must not need to know its own outward address). An unknown prefix
+    redirects to `/`. Role gating mirrors what the HTTP layer already
+    enforces — app needs only a session, admin `system:admin`, studio
+    `system:developer`, reporting `system:reports` — and needs no backend
+    change: `POST /login` already returns `actor: {id, roles}`
+    (`src/auth/login.ts:101`), which today's `session.ts` discards. The
+    consolidated session persists `{token, actorId, roles, expiresAt}`. The
+    gate is display logic only; the server still answers 403 on a direct
+    hit. The area switcher sits inside the account menu on the right of the
+    header next to language and logout, lists only the other permitted
+    areas, and is absent for an actor with one area — a participant sees no
+    trace of the consolidation. Current location shows in the URL prefix and
+    the document title, not as a label in the header.
+    Static serving hooks in as a fallthrough **behind** every API route,
+    at the terminal 404 in `src/http/server.ts:518`, so no prefix is
+    reserved and later API routes need no special case. GET/HEAD only;
+    an existing file under the root is served (`Cache-Control:
+    max-age=31536000, immutable`, since Vite hashes asset names), anything
+    else falls back to `index.html` (`no-cache`) for the history API. Root
+    from `WEB_ROOT`, defaulting relative to `import.meta.dir`; absent
+    directory means the branch is skipped and the engine runs unchanged
+    without a built frontend. The resolved path must stay under the root —
+    a trust boundary, with its own test for `..` and its encoded forms.
+    A reverse proxy in front stays mandatory-possible, which is what forbids
+    absolute URLs in the build (`base: "/"`), forbids the server-side `/`
+    redirect, and is why an absent `WEB_ROOT` has to be a supported
+    configuration. CSP needs no work — the policy is a build-time `<meta>`
+    tag from `vite.config.ts`'s `contentSecurityPolicy()`, and same-origin
+    is already its `connect-src 'self'` default. CORS/`allowedOrigins` stays
+    for dev (Vite on 5173 against the engine via `VITE_API_URL`).
+    Two findings that shape the work and were confirmed against the code:
+    - All four `matchRoute`/`routePath` pairs assume they own `/` (Studio's
+      `routePath({name:"processes"})` returns `"/"`). Under prefixes all four
+      are **rewritten, not moved** — the largest hidden cost, and it falls on
+      every step alike. Route names themselves do not collide: apart from
+      `login`, each name (`tasks`, `instances`, `processes`, `edit`,
+      `migrate`, `tools`, `play`, `outbox`, `timers`, `users`, ...) occurs in
+      exactly one package, so the union type needs no renaming.
+    - Nine type names recur across the four `api/types.ts` (`ClientError`,
+      `LoginResponse`, `ProcessSummary` in all four; `Actor`, `InstanceView`
+      in three; `InstancePage`, `InstanceSummary`, `InstanceRecordPage`,
+      `InstanceRecordElement`, `VersionSummary` in two). Separate modules, so
+      not a compile error — and mostly not a duplication either: each package
+      declares only the fields it reads, off different endpoints with
+      different projections. Only `ClientError`, `LoginResponse` and `Actor`
+      move to `src/api/types.ts`; every domain type stays per area, including
+      pairs that currently look identical.
+    Order (studio second on purpose — it holds the hardest routing case,
+    `/processes/:processId/migrate/:from/:to`, and meeting it while only two
+    areas hang off the shell is far cheaper than meeting it fourth):
+    0. Static serving in the engine — the only backend change, reviewed
+       alone, tested against a fixture directory rather than a real build.
+    1. `packages/web` with `shell/` + `areas/app`, `packages/app` deleted.
+       Carries the prefix-routing contract and the session gaining `roles`.
+    2. `areas/studio`, `src/api/` extracted here (largest client, 278 lines,
+       against app's 166 — a more honest cut than two mid-sized ones).
+    3. `areas/admin`. 4. `areas/reporting`. 5. Cleanup: root scripts,
+       `docs/current-state.md`, CLAUDE.md's repository layout, this entry.
+    Intermediate states stay shippable: `AreaNav` and the `/` redirect list
+    only already-migrated areas, and areas not yet migrated stay reachable on
+    their old Vite port.
+    `packages/form-ui` stays a separate package throughout — it is imported
+    from two sides for the whole migration and must not move. Folding it in
+    as `src/form/` is a separate decision after step 5.
+    Two OpenSpec changes, neither written yet: `serve-web-assets` (step 0)
+    and `consolidate-frontend-shell` (steps 1-5, one change with the task
+    list in the order above, archivable only once all four areas are in). A
+    third change splitting off admin/reporting was considered and rejected:
+    it would carry no spec delta, only more areas under the same capability.
 13. i18n extensions (content-translation UI; UI-chrome white-label overrides):
     NOT STARTED, deliberately deferred — raised 2026-07-28 as a brainstorm, not
     a committed stage. Two independent sub-projects, not one change:
