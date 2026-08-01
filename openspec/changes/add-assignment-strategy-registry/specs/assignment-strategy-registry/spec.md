@@ -45,9 +45,32 @@ I/O. A later strategy that reaches a database or an external directory is then a
 drop-in, not an interface change. This matches `DataSourceHandlerDef.resolve`,
 which is asynchronous for the same reason.
 
-The engine SHALL call a resolver outside any open database transaction. A
-resolver that needs its own database access therefore uses the shared pool, the
-same way `src/auth/users.ts` does.
+The engine SHALL call a resolver outside any open database transaction. One path
+is carved out. The subprocess return advances the parent while holding that
+parent's row lock. It derives the step it enters from the row it read under that
+lock.
+
+Every other path SHALL resolve before its transaction opens. Those paths are a
+manual transition, an automatic cascade hop, and a timer-forced transition. They
+also include a cancellation, a top-level creation, and a subprocess spawn.
+
+A resolver that needs its own database access uses the shared pool, the same way
+`src/auth/users.ts` does. No connection or transaction handle travels in the
+context, on either kind of path.
+
+#### Scenario: A spawn resolves before its transaction opens
+
+- **WHEN** a subprocess spawn creates a child at an assignment-bearing initial
+  step
+- **THEN** the resolver has already answered when that spawn's transaction
+  opens, and the child is written with the resolved candidates
+
+#### Scenario: The subprocess return is the one path holding a lock
+
+- **WHEN** a child returns an outcome that advances the parent off its
+  subprocess step, onto a step with a declared `assignment`
+- **THEN** the parent's candidates resolve while its row lock is held, and no
+  connection or transaction handle reaches the resolver
 
 #### Scenario: A resolver sees the merged submitted data
 

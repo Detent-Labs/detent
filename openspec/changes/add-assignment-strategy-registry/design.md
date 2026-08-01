@@ -32,7 +32,9 @@ abstraction. Both maps already reach `publishBody` as separate arguments.
   core change.
 - No behaviour change whatsoever. `static` is the only registered entry, and it
   resolves exactly what it resolves today.
-- A resolver never runs inside an open database transaction.
+- A resolver runs outside an open database transaction on every path but one.
+  The subprocess return is that one. It is named rather than glossed. See "One
+  path resolves under a lock" below.
 
 **Non-Goals:**
 
@@ -71,14 +73,52 @@ repeatedly, compares its output, and replans. Resolving inside the apply
 transaction is worse again. It would hold a Postgres connection and the
 instance's row lock open for an external call.
 
-`resolveStepAssignment` therefore leaves `transition.ts` and becomes the
-caller-side helper both `commitTransition` and `createInstance` call.
+`resolveStepAssignment` therefore leaves `transition.ts`. It becomes the
+caller-side helper that `commitTransition` and the subprocess spawn handler
+call. `createInstance` calls no resolver. It takes the resolved set as an
+option, the way it already takes seed data and a parent link. That keeps the
+persistence-only remit its own doc comment states. It also lets the spawn
+handler resolve before opening its transaction.
 
-### Skip the resolver when the caller carries the assignment forward
+### One path resolves under a lock
 
-Migration passes `carryAssignment: true`. The caller SHALL check that flag
-before resolving, not after. Resolving and discarding would make every migrated
-instance pay for a lookup whose result is thrown away.
+`store.ts::withTransaction` joins an already-open transaction through a
+savepoint rather than starting a second one. `commitTransition` documents this
+about itself. So "outside the transaction" holds only where the caller passes a
+plain connection.
+
+Two subprocess paths pass a transaction handle instead.
+
+The spawn (`subprocess.ts`) calls `createInstance` inside its own transaction.
+This one is fixed rather than accepted. The child body, its initial step and its
+seed data are all in hand before that transaction opens. The handler therefore
+resolves first, and passes the result in.
+
+The return holds the parent row locked (`SELECT ... FOR UPDATE`) across the
+parent's advance. It derives the parked step and the matched path from the row
+it read under that lock. Hoisting resolution above the lock needs an optimistic
+pre-read plus a sequence re-check on entry. That restructuring buys nothing
+here, because `static` performs no I/O and cannot stall. Change C ships the
+first resolver that can, and owns the fix. Recorded under Risks.
+
+### State the carry case in the type, not in a flag beside it
+
+Migration carries `instance.assignment` forward rather than resolving fresh.
+Once `planStepEntry` stops resolving, an omitted candidate set and a deliberate
+carry look identical to the compiler. The planner cannot tell them apart.
+
+The resolved set therefore reaches the planner as a required field,
+`assignment: Instance["assignment"] | { carry: true }`. It is not an optional
+override beside `timers`. A caller that forgets it fails to compile.
+
+An optional field would instead leave a missed caller silently unassigned. An
+assignment-bearing step with no assignment falls back to the
+starter-or-`system:admin` floor in `api.ts::submitAndTransition`. That widens
+who may act, and it arrives with no compiler diagnostic.
+
+The union also removes the `carryAssignment` flag. One field decides the
+assignment, so no second mechanism can contradict it. Migration passes
+`{ carry: true }`, resolves nothing, and pays for no lookup.
 
 ### A narrow resolver context, and no transaction around the call
 
@@ -95,9 +135,11 @@ copies `DataSourceHandlerDef.resolve`. That signature is asynchronous for
 exactly this reason (`registry.ts:67`). A later I/O-backed type becomes a
 drop-in, not an interface change.
 
-The call sits outside any open transaction. A strategy needing its own database
-access therefore uses the shared pool, the same way `src/auth/users.ts` does. No
-connection or transaction handle travels in the context.
+No connection or transaction handle travels in the context. A strategy needing
+its own database access uses the shared pool, the same way `src/auth/users.ts`
+does. On the one path that resolves under an open transaction, that strategy
+competes with the lock its own caller holds. Change C therefore owns the
+deadline, and the path is named above rather than left implicit.
 
 ### Reuse the existing resolve-then-parse loop
 
@@ -107,6 +149,27 @@ an unregistered type, then parse `config` against the entry's schema.
 `staticAssignmentConfigSchema` both go away.
 
 This change therefore deletes validation code rather than adding any.
+
+### Reversing a recorded audit cut, one change early
+
+`docs/current-state.md` records that an earlier design held assignment
+strategies in a map beside the action registry. A ponytail audit cut it: the
+strategy space never grew past one, so the indirection bought nothing. The note
+sets a condition. Reintroduce a registry only once a second strategy is
+authored.
+
+This change reintroduces it one change ahead of that condition. Change C's
+`org.manager-of-starter` is the second strategy, and it arrives next.
+
+Landing the seam first is deliberate. B changes no behaviour, so the existing
+suite alone reviews it. C changes who may act on a step, and answers to that
+question alone. Folding them together would put an empty refactor and an
+authorization change in one diff. The audit cut is a reason to keep the refactor
+small, not a reason to bundle it.
+
+`CLAUDE.md`, `docs/current-state.md` and `docs/authoring-guide.md` all state
+today that assignment is not an extension point. This change corrects all
+three, in the same commit.
 
 ## Deferred to change C
 
@@ -129,10 +192,24 @@ entry resolves to an empty list rather than raising. That preserves what
 - **An `await` enters the transition path where none was.** → The plan already
   sits outside the transaction. Every caller of `commitTransition` already
   awaits it. `static` resolves without yielding to I/O.
+- **The subprocess return resolves under a row lock.** → Accepted in B, and why
+  the requirement carves that path out. No resolver shipped here performs I/O,
+  so the lock is held no longer than today. A slow or fallible resolver would
+  change that, and change C ships the first one. Change C either bounds the call
+  with the deadline it already owns, or resolves above the lock. That second
+  option needs an optimistic pre-read and a sequence re-check. B leaves the
+  choice open on purpose.
 - **`resolveStepAssignment` moving out of `transition.ts` could miss a caller.**
-  → Every authored entry routes through `commitTransition`, and creation is the
-  one documented exception. Typecheck catches a missed site, since the planner
-  loses the ability to resolve at all.
+  → The resolved set reaches `planStepEntry` as a required field. A missed
+  caller therefore fails to compile. An optional field would not have caught it.
+  The planner would read `undefined` as "no assignment". It would then hand an
+  assignment-bearing step to the starter-or-`system:admin` floor, with no
+  diagnostic.
+- **The registry has to reach every step-entry caller.** → It threads the way
+  the two existing registries already do, from `startHttpServer` down. The chain
+  is longer than theirs. `commitTransition` sits behind `resolution.ts`,
+  `timers.ts`, `subprocess.ts` and `runtime/api.ts`. Task group 5 names each
+  link, and typecheck reports any link that is missed.
 - **The context could prove too narrow for change C.** → Widening it later is
   additive. Guessing at it now would freeze a contract nobody has tested.
 
