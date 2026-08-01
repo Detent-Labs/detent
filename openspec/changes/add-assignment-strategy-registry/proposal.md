@@ -10,26 +10,32 @@ department A's request, silently.
 Assignment is the last plugin position in the body that resolves directly rather
 than through a registry. Actions and data sources already resolve through one.
 This change gives assignment the same seam, so a later strategy can answer per
-instance. It ships no such strategy.
+instance. It ships no such strategy, and changes no behaviour.
 
 ## What Changes
 
-- `Step.assignment.strategy.type` resolves through an `AssignmentRegistry`
-  instead of a direct comparison against the literal `"static"`.
-- `"static"` becomes a registered strategy. It keeps its behaviour, its
+- Add `AssignmentRegistry`, a `type -> def` map beside the action `Registry` and
+  the `DataSourceRegistry`. An entry declares a resolver and may declare a
+  config schema.
+- `Step.assignment.strategy.type` resolves through that map instead of a direct
+  comparison against the literal `"static"`.
+- `"static"` becomes a registered entry. It keeps its behaviour, its
   `{ candidates: string[] }` config schema, and its status as the default.
-- Publish-time validation resolves the type against the injected registry. It
-  parses `config` against the registry entry's declared schema. An unknown type
-  or a violating config stays a publish-time failure.
-- Step entry resolves candidates by calling the registered strategy. A strategy
-  may return a value asynchronously, and may fail.
-- A deadline bounds the resolution. A failed or timed-out resolution commits the
-  transition, leaves `candidates` empty, and records the reason.
-- The event union gains an `assignment.unresolved` kind. It carries the step and
-  the reason.
+- `publishBody` takes the `AssignmentRegistry` as a further argument, beside the
+  two registries it already takes.
+- `checkAssignmentRegistry` switches to the resolve-then-parse loop
+  `checkActionRegistry` and `checkDataSourceRegistry` already share. Its
+  hand-written loop and its local schema go away.
+- A resolver answers asynchronously and receives a narrow context:
+  `{ config, stepId, instance: { id, startedBy, data } }`.
+- The engine resolves candidates in `commitTransition` and in `createInstance`,
+  before the transaction opens. `planStepEntry` receives the resolved set as a
+  caller-supplied override. It stays pure and synchronous.
 - **No JSON contract change.** `Step.assignment.strategy` already uses the
   generic `plugin` envelope (`definition.ts:427`). No existing definition
-  changes, and nothing migrates.
+  changes and nothing migrates.
+- **No behaviour change.** `static` is the only registered entry, and it
+  resolves what it resolves today.
 
 Out of scope, by the approved design:
 
@@ -38,36 +44,41 @@ Out of scope, by the approved design:
 - an expression-backed strategy
 - an automatic fallback assignee
 
+Deferred to change C, which ships the first fallible resolver: a resolution
+deadline, a failure classification, and an `assignment.unresolved` event. See
+`design.md`.
+
 ## Capabilities
 
 ### New Capabilities
 - `assignment-strategy-registry`: the registry mapping an assignment strategy
   type to its config schema and its candidate resolver. Covers the built-in
-  `static` entry, and the deadline that bounds a resolution.
+  `static` entry and the resolver contract.
 
 ### Modified Capabilities
 - `assignment-registry-validation`: the type check resolves against an injected
   registry, rather than comparing directly against `"static"`. The config schema
   comes from the resolved entry, not from a fixed local schema.
-- `assignment-claim-enforcement`: step entry resolves candidates through the
-  registry. Resolution may be asynchronous, and a deadline bounds it. A failure
-  yields empty candidates plus a recorded reason, rather than throwing.
-- `runtime-events`: the union gains an `assignment.unresolved` kind. It enqueues
-  no actions, advances no `transitionSeq`, and writes no HistoryEntry.
+- `assignment-claim-enforcement`: resolution calls the registered resolver
+  before the entry's transaction opens. `planStepEntry` consumes the result as
+  an override rather than resolving. Carrying an assignment forward calls no
+  resolver.
 
 ## Impact
 
-- `src/engine/registry.ts`: the `AssignmentRegistry` type, and the built-in
-  `static` entry.
-- `src/engine/registry-check.ts`: `checkAssignmentRegistry` takes the registry
-  as an argument, and reads the entry's schema.
-- `src/engine/definitions.ts`: `publishBody` passes the registry through.
-- `src/engine/transition.ts`: `planStepEntry` and the claim path call the
-  resolver.
-- `src/engine/store.ts`: creation at an assignment-bearing initial step calls
-  the resolver.
-- `src/schema/definition.ts`: the `assignment.unresolved` event kind only. The
-  authored body's schema does not change.
+- `src/engine/registry.ts`: `AssignmentStrategyDef`, `AssignmentRegistry`, and
+  its create, register and resolve helpers. The built-in `static` entry.
+- `src/engine/registry-check.ts`: `checkAssignmentRegistry` takes the registry,
+  reuses `checkTypedConfig`, and drops `staticAssignmentConfigSchema`.
+- `src/engine/definitions.ts`: `publishBody` takes and forwards the registry.
+- `src/engine/transition.ts`: `resolveStepAssignment` leaves the module.
+  `commitTransition` resolves and passes an override. `planStepEntry` no longer
+  resolves. The claim path stays as it is: it reads candidates, and never
+  resolves them.
+- `src/engine/store.ts`: `createInstance` calls the resolver instead of reading
+  `config.candidates` inline.
+- `src/engine/migration.ts`: unchanged, but its `carryAssignment` flag now also
+  suppresses the resolver call.
 - Callers of `publishBody` in `src/http/`, `src/runtime/` and `test/` pass the
   registry.
 - Docs stating that assignment is not an extension point: `CLAUDE.md`,

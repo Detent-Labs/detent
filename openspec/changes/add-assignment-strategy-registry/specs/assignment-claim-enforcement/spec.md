@@ -2,24 +2,24 @@
 
 ## ADDED Requirements
 
-### Requirement: Assignment candidates are resolved at step entry through the registry
+### Requirement: Assignment candidates are resolved through the registry before the entry commits
 
-`planStepEntry` SHALL, for any step carrying a declared `assignment`, resolve
-its candidates by calling the resolver its `strategy.type` holds in the injected
-`AssignmentRegistry`. It SHALL set `instance.assignment = { candidates,
-claimedBy: undefined, claimedAt: undefined }`. That write belongs to the same
-commit that moves the instance onto the step. A step with no `assignment`
-declared SHALL leave `instance.assignment` unset.
+For any step carrying a declared `assignment`, the engine SHALL resolve its
+candidates through the injected `AssignmentRegistry`. It calls the resolver that
+the step's `strategy.type` holds. The resolved set SHALL reach `planStepEntry`
+as a caller-supplied override. A caller-supplied timer set already travels that
+way. `planStepEntry` SHALL stay pure and synchronous, and SHALL NOT call a
+resolver.
+
+The resolver call SHALL happen before the transaction that commits the entry
+opens. The commit SHALL set `instance.assignment` to that list, with
+`claimedBy` and `claimedAt` unset. A step with no `assignment` declared SHALL
+leave `instance.assignment` unset, and SHALL call no resolver.
 
 Instance creation at an initial step carrying a declared `assignment` SHALL
-resolve candidates the same way, inside the same creation transaction. Creation
-is a step entry. This matches how creation already arms the initial step's
-timers and enqueues a subprocess spawn without routing through `planStepEntry`.
-
-A resolver may return its list asynchronously, so entry SHALL await the
-resolution before committing. A deadline bounds that wait, and a failed
-resolution commits with empty candidates. The `assignment-strategy-registry`
-capability owns both rules.
+resolve candidates the same way, before its own write. Creation is a step entry.
+This matches how creation already arms the initial step's timers without routing
+through `planStepEntry`.
 
 #### Scenario: Entering a step with a declared assignment populates candidates atomically
 
@@ -32,7 +32,7 @@ capability owns both rules.
 
 - **WHEN** a transition commits an instance onto a step with no `assignment`
   field
-- **THEN** `instance.assignment` remains unset
+- **THEN** `instance.assignment` remains unset, and no resolver runs
 
 #### Scenario: Creating an instance at an assignment-bearing initial step populates candidates
 
@@ -41,12 +41,25 @@ capability owns both rules.
 - **THEN** the created instance's `instance.assignment.candidates` reflects the
   strategy's resolved result
 
-#### Scenario: A failed resolution at creation still creates the instance
+#### Scenario: The planner stays free of resolution
 
-- **WHEN** an instance is created at an `initialStep` whose strategy fails to
-  resolve
-- **THEN** the instance is created, its `candidates` is empty, and an
-  `assignment.unresolved` event records the reason
+- **WHEN** `planStepEntry` runs for a step with a declared `assignment`
+- **THEN** it consumes the caller's resolved candidate set, and calls no
+  resolver itself
+
+### Requirement: Carrying an assignment forward calls no resolver
+
+Migration's remap carries `instance.assignment` forward byte-for-byte instead of
+resolving it fresh. The engine SHALL skip the resolver call entirely in that
+case, rather than calling it and discarding the result. A migration therefore
+costs no resolver work, whatever a strategy does internally.
+
+#### Scenario: A migration resolves nothing
+
+- **WHEN** a migration remaps an instance onto a target step with a declared
+  `assignment`
+- **THEN** no resolver runs, and `instance.assignment` is unchanged from what
+  the instance carried before the migration
 
 ## MODIFIED Requirements
 
@@ -55,8 +68,7 @@ capability owns both rules.
 The built-in static strategy (`type: "static"`, a registered entry in the
 `AssignmentRegistry`) SHALL resolve `candidates` as exactly `config.candidates`
 (`config` being `assignment.strategy.config`). That is a flat `string[]` of role
-names and actor ids, with no CEL evaluation and no dynamic lookup. It resolves
-synchronously and never fails.
+names and actor ids, with no CEL evaluation and no dynamic lookup.
 
 `"static"` is no longer the only supported strategy type. It remains the entry
 an author gets by default.
@@ -72,9 +84,9 @@ an author gets by default.
 
 ### Requirement: Assignment candidates are resolved synchronously at step entry
 
-**Reason**: Resolution now calls a registered resolver, which may answer
-asynchronously and may fail. The replacement requirement covers the same
-entry points and adds the await, the deadline and the failure path.
+**Reason**: Resolution now calls a registered resolver, which answers
+asynchronously. The replacement requirement covers the same entry points, and
+moves the call out of `planStepEntry` to keep the planner pure.
 
-**Migration**: None. The registered `static` resolver stays synchronous and
-never fails, so every existing body behaves as before.
+**Migration**: None. The registered `static` resolver returns its configured
+list unchanged, so every existing body behaves as before.

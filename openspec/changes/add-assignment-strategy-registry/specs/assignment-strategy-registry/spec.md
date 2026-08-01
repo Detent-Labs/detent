@@ -5,45 +5,71 @@
 Defines the registry that maps a `Step.assignment.strategy.type` to its config
 schema and its candidate resolver. Assignment then resolves through the same
 seam that actions and data sources already use. Covers the built-in `static`
-entry and the deadline that bounds a resolution.
+entry and the resolver contract a later strategy implements.
 
 ## ADDED Requirements
 
 ### Requirement: An assignment registry maps a strategy type to a config schema and a resolver
 
-The system SHALL provide an `AssignmentRegistry` mapping each supported
-`Step.assignment.strategy.type` to an entry. An entry SHALL declare a config
-schema and a candidate resolver. The schema validates an authored `config` at
-publish. The resolver produces the candidate list at step entry.
+The system SHALL provide an `AssignmentRegistry`, a `type -> def` map. It is a
+sibling of the action `Registry` and the `DataSourceRegistry`, a plain parallel
+structure rather than a shared abstraction. Each entry SHALL declare a candidate
+resolver and MAY declare a config schema. The schema validates an authored
+`config` at publish. The resolver produces the candidate list before a step
+entry commits.
 
-A resolver SHALL receive the strategy's `config` and the instance it resolves
-for. It SHALL return a `string[]` of role names and actor ids in one flat
-namespace. It MAY return that list asynchronously.
-
-The registry is injected, matching the action `Registry`. Nothing in the engine
-SHALL compare a strategy type against a literal.
+The registry is injected, matching how the engine already threads the action
+`Registry` and the `DataSourceRegistry`. No engine code SHALL decide a strategy
+by comparing its type against a literal.
 
 #### Scenario: A registered type resolves to its entry
 
 - **WHEN** a body declares a step assignment whose `strategy.type` is registered
-- **THEN** the engine uses that entry's schema at publish and that entry's
-  resolver at step entry
+- **THEN** the engine uses that entry's schema at publish, and that entry's
+  resolver before step entry
 
-#### Scenario: A resolver returning a promise is awaited
+#### Scenario: An entry declaring no config schema accepts any config
 
-- **WHEN** a registered resolver returns a promise for its candidate list
-- **THEN** the engine awaits it and writes the resolved list to
-  `instance.assignment.candidates`
+- **WHEN** a registered entry declares no config schema
+- **THEN** the engine accepts any `config` for that strategy type
+
+### Requirement: A resolver receives a narrow context and answers asynchronously
+
+A resolver SHALL receive `{ config, stepId, instance }`. `instance` SHALL expose
+`id`, `startedBy`, and the `data` the entering instance will carry, with any
+submitted patch already merged. It SHALL expose nothing else.
+
+A resolver SHALL return a `Promise<string[]>` of role names and actor ids in one
+flat namespace. The signature is asynchronous even for a resolver that needs no
+I/O. A later strategy that reaches a database or an external directory is then a
+drop-in, not an interface change. This matches `DataSourceHandlerDef.resolve`,
+which is asynchronous for the same reason.
+
+The engine SHALL call a resolver outside any open database transaction. A
+resolver that needs its own database access therefore uses the shared pool, the
+same way `src/auth/users.ts` does.
+
+#### Scenario: A resolver sees the merged submitted data
+
+- **WHEN** a participant submits a field patch and transitions onto a step whose
+  strategy resolves candidates
+- **THEN** the resolver's `instance.data` includes that patch
+
+#### Scenario: A resolver receives no field beyond the declared context
+
+- **WHEN** a resolver runs
+- **THEN** its `instance` exposes `id`, `startedBy` and `data`
+- **THEN** its `instance` exposes no other instance field
 
 ### Requirement: The built-in static strategy is a registry entry
 
 The engine SHALL ship `"static"` as a registered entry rather than as a
 hard-coded branch. Its declared config schema SHALL be
 `{ candidates: string[] }`. Its resolver SHALL return `config.candidates`
-verbatim, with no CEL evaluation and no dynamic lookup. It SHALL never fail.
+verbatim, with no CEL evaluation and no dynamic lookup.
 
 `"static"` SHALL remain the strategy an author gets by default. No existing
-published body needs to change.
+published body needs to change, and nothing migrates.
 
 #### Scenario: A static strategy resolves its configured list verbatim
 
@@ -59,50 +85,23 @@ published body needs to change.
 - **THEN** its candidates resolve identically to before, with no migration and
   no re-publish
 
-### Requirement: A deadline bounds every candidate resolution
+### Requirement: An unregistered type at runtime resolves to no candidates
 
-The engine SHALL bound each resolver call by a deadline. A resolver that has not
-returned by the deadline SHALL be abandoned, and the resolution SHALL be treated
-as failed. The deadline SHALL apply to every registered strategy, including one
-that reaches an external system.
-
-A resolver that exceeds its deadline SHALL NOT block the commit that enters the
-step. A hung external directory therefore cannot stop a participant from
-submitting.
-
-#### Scenario: A hanging resolver is abandoned at the deadline
-
-- **WHEN** a registered resolver has not returned by the deadline
-- **THEN** the engine abandons the call, treats the resolution as failed, and
-  commits the step entry
-
-### Requirement: A failed resolution leaves candidates empty and records the reason
-
-A resolution fails when its resolver raises, returns a value that is not a
-`string[]`, or exceeds its deadline. A failed resolution SHALL NOT roll back the
-transition or the creation that triggered it. The commit SHALL proceed. The
-engine SHALL set
-`instance.assignment.candidates` to the empty list. It SHALL record an
-`assignment.unresolved` event naming the step and the reason, in the same
-transaction as the commit.
+Publish-time validation rejects an unregistered strategy type, so a running
+instance cannot normally carry one. Should one reach step entry anyway, the
+engine SHALL resolve it to an empty candidate list rather than raising. This
+preserves the defensive behaviour `createInstance` has today.
 
 An empty candidate list means no actor is an eligible candidate. The engine
 SHALL NOT substitute a fallback assignee.
 
-#### Scenario: A raising resolver still commits the transition
+#### Scenario: An unregistered type at entry yields an empty list
 
-- **WHEN** a resolver raises while an instance enters a step
-- **THEN** the transition commits, `instance.assignment.candidates` is empty,
-  and an `assignment.unresolved` event records the reason
-
-#### Scenario: A resolver returning a non-list is treated as failed
-
-- **WHEN** a resolver returns a value that is not a `string[]`
-- **THEN** the engine treats the resolution as failed, and does not write the
-  returned value to `instance.assignment.candidates`
+- **WHEN** an instance enters a step whose `strategy.type` the injected registry
+  does not hold
+- **THEN** `instance.assignment.candidates` is empty, and the entry commits
 
 #### Scenario: No fallback assignee is substituted
 
-- **WHEN** a resolution fails and leaves `candidates` empty
-- **THEN** no actor satisfies the eligible-candidate check for that step, and
-  the engine assigns the step to nobody
+- **WHEN** a step's resolved `candidates` is empty
+- **THEN** no actor satisfies the eligible-candidate check for that step
