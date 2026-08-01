@@ -94,7 +94,7 @@ export type InstanceView = {
   step: { id: StepId; key: string; label: LocalizedText; type: StepType };
   fields: ResolvedViewField[];
   availablePaths: AvailablePath[];
-  // Absent unless redactInstance has run. packages/admin's instance detail
+  // Absent unless redactInstance has run. The admin area's instance detail
   // screen uses this to show/disable the redact action and its badge.
   redactedAt?: string;
 };
@@ -162,7 +162,7 @@ export type InstanceRecordElement = { kind: "transition"; entry: HistoryEntry } 
 
 // Not `Comment` — that name collides with the DOM's own `Comment` node
 // interface, in scope wherever a caller's TypeScript config includes the
-// `DOM` lib (e.g. packages/app).
+// `DOM` lib (e.g. packages/web).
 export type InstanceComment = {
   id: string;
   instanceId: InstanceId;

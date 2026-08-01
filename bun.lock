@@ -14,38 +14,6 @@
         "typescript": "5.6.2",
       },
     },
-    "packages/admin": {
-      "name": "admin",
-      "dependencies": {
-        "react": "^18",
-        "react-dom": "^18",
-        "workflow-engine": "file:../..",
-      },
-      "devDependencies": {
-        "@types/react": "^18",
-        "@types/react-dom": "^18",
-        "@vitejs/plugin-react": "^4",
-        "typescript": "5.6.2",
-        "vite": "^6",
-      },
-    },
-    "packages/app": {
-      "name": "app",
-      "dependencies": {
-        "form-ui": "file:../form-ui",
-        "react": "^18",
-        "react-dom": "^18",
-        "workflow-engine": "file:../..",
-        "zod": "^3.23.8",
-      },
-      "devDependencies": {
-        "@types/react": "^18",
-        "@types/react-dom": "^18",
-        "@vitejs/plugin-react": "^4",
-        "typescript": "5.6.2",
-        "vite": "^6",
-      },
-    },
     "packages/form-ui": {
       "name": "form-ui",
       "dependencies": {
@@ -61,23 +29,8 @@
         "zod": "^3.23.8",
       },
     },
-    "packages/reporting": {
-      "name": "reporting",
-      "dependencies": {
-        "react": "^18",
-        "react-dom": "^18",
-        "workflow-engine": "file:../..",
-      },
-      "devDependencies": {
-        "@types/react": "^18",
-        "@types/react-dom": "^18",
-        "@vitejs/plugin-react": "^4",
-        "typescript": "5.6.2",
-        "vite": "^6",
-      },
-    },
-    "packages/studio": {
-      "name": "studio",
+    "packages/web": {
+      "name": "web",
       "dependencies": {
         "@panzoom/panzoom": "^4.6.0",
         "form-ui": "file:../form-ui",
@@ -275,10 +228,6 @@
 
     "@vitejs/plugin-react": ["@vitejs/plugin-react@4.7.0", "", { "dependencies": { "@babel/core": "^7.28.0", "@babel/plugin-transform-react-jsx-self": "^7.27.1", "@babel/plugin-transform-react-jsx-source": "^7.27.1", "@rolldown/pluginutils": "1.0.0-beta.27", "@types/babel__core": "^7.20.5", "react-refresh": "^0.17.0" }, "peerDependencies": { "vite": "^4.2.0 || ^5.0.0 || ^6.0.0 || ^7.0.0" } }, "sha512-gUu9hwfWvvEDBBmgtAowQCojwZmJ5mcLn3aufeCsitijs3+f2NsrPtlAWIR6OPiqljl96GVCUbLe0HyqIpVaoA=="],
 
-    "admin": ["admin@workspace:packages/admin"],
-
-    "app": ["app@workspace:packages/app"],
-
     "baseline-browser-mapping": ["baseline-browser-mapping@2.11.0", "", { "bin": { "baseline-browser-mapping": "dist/cli.cjs" } }, "sha512-oCu2wfipvX3AePSgmOuKkIywOu+8n9psz7hXYmk56ghpu3+7KzNIBopaOs4c9BrtdnTtW30unG9GTfHo7EwERQ=="],
 
     "browserslist": ["browserslist@4.28.7", "", { "dependencies": { "baseline-browser-mapping": "^2.10.44", "caniuse-lite": "^1.0.30001806", "electron-to-chromium": "^1.5.393", "node-releases": "^2.0.51", "update-browserslist-db": "^1.2.3" }, "bin": { "browserslist": "cli.js" } }, "sha512-JxV13hNrFxqjOc8alRbq9dK1MM79NEXYpma2B2J4wAtpWS5zIEIKqWPGCl7N4o7Uc7B7itylh7SuDujATRyyTw=="],
@@ -341,8 +290,6 @@
 
     "react-refresh": ["react-refresh@0.17.0", "", {}, "sha512-z6F7K9bV85EfseRCp2bzrpyQ0Gkw1uLoCel9XBVWPg/TjRj94SkJzUTGfOa4bs7iJvBWtQG0Wq7wnI0syw3EBQ=="],
 
-    "reporting": ["reporting@workspace:packages/reporting"],
-
     "rollup": ["rollup@4.62.2", "", { "dependencies": { "@types/estree": "1.0.9" }, "optionalDependencies": { "@rollup/rollup-android-arm-eabi": "4.62.2", "@rollup/rollup-android-arm64": "4.62.2", "@rollup/rollup-darwin-arm64": "4.62.2", "@rollup/rollup-darwin-x64": "4.62.2", "@rollup/rollup-freebsd-arm64": "4.62.2", "@rollup/rollup-freebsd-x64": "4.62.2", "@rollup/rollup-linux-arm-gnueabihf": "4.62.2", "@rollup/rollup-linux-arm-musleabihf": "4.62.2", "@rollup/rollup-linux-arm64-gnu": "4.62.2", "@rollup/rollup-linux-arm64-musl": "4.62.2", "@rollup/rollup-linux-loong64-gnu": "4.62.2", "@rollup/rollup-linux-loong64-musl": "4.62.2", "@rollup/rollup-linux-ppc64-gnu": "4.62.2", "@rollup/rollup-linux-ppc64-musl": "4.62.2", "@rollup/rollup-linux-riscv64-gnu": "4.62.2", "@rollup/rollup-linux-riscv64-musl": "4.62.2", "@rollup/rollup-linux-s390x-gnu": "4.62.2", "@rollup/rollup-linux-x64-gnu": "4.62.2", "@rollup/rollup-linux-x64-musl": "4.62.2", "@rollup/rollup-openbsd-x64": "4.62.2", "@rollup/rollup-openharmony-arm64": "4.62.2", "@rollup/rollup-win32-arm64-msvc": "4.62.2", "@rollup/rollup-win32-ia32-msvc": "4.62.2", "@rollup/rollup-win32-x64-gnu": "4.62.2", "@rollup/rollup-win32-x64-msvc": "4.62.2", "fsevents": "~2.3.2" }, "bin": { "rollup": "dist/bin/rollup" } }, "sha512-RFnrW4lhXA3s3eqHDZvN654g8OTjzRfqpIRJYczCGB6HzphckVAi/Qh4tbPUbRuDi7s1Llv8g/NspLkttY3gTA=="],
 
     "scheduler": ["scheduler@0.23.2", "", { "dependencies": { "loose-envify": "^1.1.0" } }, "sha512-UOShsPwz7NrMUqhR6t0hWjFduvOzbtv7toDH1/hIrfRNIDBnnBWd0CwJTGvTpngVlmwGCdP9/Zl/tVrDqcuYzQ=="],
@@ -350,8 +297,6 @@
     "semver": ["semver@6.3.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA=="],
 
     "source-map-js": ["source-map-js@1.2.1", "", {}, "sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA=="],
-
-    "studio": ["studio@workspace:packages/studio"],
 
     "supports-color": ["supports-color@7.2.0", "", { "dependencies": { "has-flag": "^4.0.0" } }, "sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw=="],
 
@@ -365,20 +310,16 @@
 
     "vite": ["vite@6.4.3", "", { "dependencies": { "esbuild": "^0.25.0", "fdir": "^6.4.4", "picomatch": "^4.0.2", "postcss": "^8.5.3", "rollup": "^4.34.9", "tinyglobby": "^0.2.13" }, "optionalDependencies": { "fsevents": "~2.3.3" }, "peerDependencies": { "@types/node": "^18.0.0 || ^20.0.0 || >=22.0.0", "jiti": ">=1.21.0", "less": "*", "lightningcss": "^1.21.0", "sass": "*", "sass-embedded": "*", "stylus": "*", "sugarss": "*", "terser": "^5.16.0", "tsx": "^4.8.1", "yaml": "^2.4.2" }, "optionalPeers": ["@types/node", "jiti", "less", "lightningcss", "sass", "sass-embedded", "stylus", "sugarss", "terser", "tsx", "yaml"], "bin": { "vite": "bin/vite.js" } }, "sha512-NTKlcQjlAK7MlQoyb6LgaqHc8sso/pVyUJYWMws3jg21uTJw/LddqIFPcPqP6PzpgbIcZyKI85sFE4HBrQDA8A=="],
 
+    "web": ["web@workspace:packages/web"],
+
     "workflow-engine": ["workflow-engine@root:", {}],
 
     "yallist": ["yallist@3.1.1", "", {}, "sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g=="],
 
     "zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
 
-    "app/form-ui": ["form-ui@file:packages/form-ui", { "dependencies": { "workflow-engine": "file:../.." }, "devDependencies": { "@types/react": "^18", "@types/react-dom": "^18" }, "peerDependencies": { "react": "^18", "react-dom": "^18", "zod": "^3.23.8" } }],
+    "web/form-ui": ["form-ui@file:packages/form-ui", { "dependencies": { "workflow-engine": "file:../.." }, "devDependencies": { "@types/react": "^18", "@types/react-dom": "^18" }, "peerDependencies": { "react": "^18", "react-dom": "^18", "zod": "^3.23.8" } }],
 
-    "reporting/workflow-engine": ["workflow-engine@root:", {}],
-
-    "studio/form-ui": ["form-ui@file:packages/form-ui", { "dependencies": { "workflow-engine": "file:../.." }, "devDependencies": { "@types/react": "^18", "@types/react-dom": "^18" }, "peerDependencies": { "react": "^18", "react-dom": "^18", "zod": "^3.23.8" } }],
-
-    "app/form-ui/workflow-engine": ["workflow-engine@file:.", {}],
-
-    "studio/form-ui/workflow-engine": ["workflow-engine@file:.", {}],
+    "web/form-ui/workflow-engine": ["workflow-engine@file:.", {}],
   }
 }

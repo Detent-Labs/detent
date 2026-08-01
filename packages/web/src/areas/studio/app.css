@@ -1,0 +1,610 @@
+@import "../../shell/tokens.css";
+
+/*
+ * Same token structure as the other areas' stylesheets; the tokens themselves
+ * live once, in shell/tokens.css
+ * (primitives -> semantic aliases; components reference only the semantic
+ * layer) so the three frontends read as siblings, not a mismatched pair.
+ */
+
+:root {
+  --paper-50: #eef1f2;
+  --ledger-100: #dce3e0;
+  --ink-900: #1c2230;
+  --slate-500: #56606b;
+  --stamp-blue-600: #2c4a6e;
+  --seal-700: #6e7b3f;
+  --alert-700: #a23b2e;
+  --ochre-600: #8a6420;
+
+  --color-surface: var(--paper-50);
+  --color-surface-muted: var(--ledger-100);
+  --color-text: var(--ink-900);
+  --color-text-muted: var(--slate-500);
+  --color-border: var(--ledger-100);
+  --color-accent: var(--stamp-blue-600);
+  --color-accent-contrast: #ffffff;
+  --color-success: var(--seal-700);
+  --color-danger: var(--alert-700);
+  /* Distinct from danger on purpose: the key-collision notice is a caution a
+     developer may knowingly accept, not a refusal. */
+  --color-warning: var(--ochre-600);
+
+  --font-display: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper-50: #171b22;
+    --ledger-100: #2a303a;
+    --ink-900: #e9ecef;
+    --slate-500: #9aa5b1;
+    --stamp-blue-600: #7ea3cc;
+    --seal-700: #9db072;
+    --alert-700: #d97362;
+    --ochre-600: #d0a959;
+    --color-accent-contrast: #10141a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+button {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  border: none;
+  border-radius: 3px;
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.studio-back {
+  display: block;
+  background: none;
+  color: var(--color-accent);
+  padding: 0;
+  margin-bottom: var(--space-3);
+}
+
+input,
+select {
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  padding: var(--space-2);
+  background: var(--color-surface);
+}
+
+h1,
+h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: 1.25rem;
+  margin: 0 0 var(--space-4);
+}
+
+h2 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+.studio-screen {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-3) var(--space-5);
+}
+
+.studio-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.studio-header nav {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.studio-header-right {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.studio-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.studio-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 20rem;
+}
+
+.studio-login-form label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.9rem;
+}
+
+.studio-empty-role {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.studio-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  align-items: center;
+}
+
+.studio-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.studio-table th {
+  text-align: left;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.studio-table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.studio-empty {
+  color: var(--color-text-muted);
+  padding: var(--space-4) 0;
+}
+
+.studio-error {
+  color: var(--color-danger);
+}
+
+.studio-json-error {
+  white-space: pre-line;
+}
+
+.studio-surface-toggle {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.studio-surface-toggle button[aria-selected="true"] {
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.studio-conflict {
+  border: 1px solid var(--color-danger);
+  border-radius: 4px;
+  padding: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.studio-edit-screen {
+  max-width: none;
+}
+
+.studio-publish-result {
+  color: var(--color-success);
+}
+
+.studio-json-editor {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-1);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  resize: vertical;
+}
+
+.studio-diff {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.studio-diff li {
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.studio-diff code {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+}
+
+.studio-diff-added code:first-child {
+  color: var(--color-success);
+}
+
+.studio-diff-removed code:first-child {
+  color: var(--color-danger);
+}
+
+.canvas-layout {
+  display: flex;
+  gap: var(--space-3);
+  align-items: stretch;
+  height: 32rem;
+}
+
+.canvas-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.canvas-toolbar {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 1;
+  display: flex;
+  gap: var(--space-2);
+}
+
+.canvas-svg {
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  background-color: var(--color-surface-muted);
+  background-image: radial-gradient(var(--color-border) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.canvas-node {
+  cursor: grab;
+}
+
+.canvas-node-rect {
+  fill: var(--color-surface);
+  stroke: var(--color-border);
+  stroke-width: 1.5;
+}
+
+.canvas-node-selected {
+  stroke: var(--color-accent);
+  stroke-width: 2;
+}
+
+.canvas-node-label {
+  font-family: var(--font-body);
+  font-size: 13px;
+  fill: var(--color-text);
+}
+
+.canvas-node-key {
+  font-family: var(--font-display);
+  font-size: 11px;
+  fill: var(--color-text-muted);
+}
+
+.canvas-connect-handle {
+  fill: var(--color-accent);
+  cursor: crosshair;
+}
+
+.canvas-initial-arrow {
+  stroke: var(--color-text-muted);
+  stroke-width: 2;
+  fill: none;
+}
+
+.canvas-edge {
+  fill: none;
+  stroke-width: 1.5;
+}
+
+.canvas-edge-automatic {
+  stroke: var(--color-text-muted);
+}
+
+.canvas-edge-manual {
+  stroke: var(--color-text-muted);
+  stroke-dasharray: 5 4;
+}
+
+.canvas-edge-dragging {
+  stroke: var(--color-accent);
+  stroke-dasharray: 3 3;
+}
+
+.canvas-edge-hitarea {
+  stroke: transparent;
+  stroke-width: 12;
+  cursor: pointer;
+}
+
+.canvas-edge-badge {
+  font-family: var(--font-display);
+  font-size: 10px;
+  fill: var(--color-accent);
+  text-anchor: middle;
+}
+
+.canvas-arrowhead {
+  fill: var(--color-text-muted);
+}
+
+.canvas-terminal-stamp circle {
+  fill: none;
+  stroke: var(--color-success);
+  stroke-width: 1.5;
+}
+
+.canvas-terminal-stamp text {
+  font-family: var(--font-display);
+  font-size: 9px;
+  text-transform: uppercase;
+  text-anchor: middle;
+  fill: var(--color-success);
+}
+
+.canvas-inspector {
+  flex: 0 0 20rem;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: var(--space-3);
+}
+
+.canvas-reject-message {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, -100%);
+  background: var(--color-surface);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+  border-radius: 3px;
+  padding: var(--space-1) var(--space-2);
+  font-size: 0.8rem;
+  pointer-events: none;
+  max-width: 16rem;
+}
+
+/*
+ * Error banner: a failed request reported where the data it would have
+ * shown normally sits, not a toast — this is a developer tool, and a
+ * failure that isn't in the reader's eyeline is the exact bug this class
+ * exists to prevent. Reuses the rotated-stamp motif .canvas-terminal-stamp
+ * already establishes rather than inventing a second visual language.
+ */
+.studio-error-banner {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  border: 1.5px solid var(--color-danger);
+  border-radius: 2px;
+  padding: var(--space-2) var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.studio-error-banner-stamp {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-danger);
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  padding: 0.1rem 0.4rem;
+  transform: rotate(-2deg);
+}
+
+.studio-error-banner-message {
+  flex: 1;
+  color: var(--color-text);
+}
+
+.studio-error-banner button {
+  flex: none;
+}
+
+/* Full-screen fallback for a render-time throw the ErrorBoundary catches — see ErrorBoundary.tsx for what this does and does not cover. */
+.studio-boundary-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  min-height: 60vh;
+  text-align: center;
+}
+
+.studio-boundary-stamp {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-danger);
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  padding: 0.2rem 0.7rem;
+  transform: rotate(-2deg);
+}
+
+/* Step card disclosure header — a real <button> now (spa-accessibility-pass),
+   reset to a full-width bar rather than the default accent pill so it still
+   reads as a header, not a call-to-action. */
+.step-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  background: none;
+  color: inherit;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.step-card-header:hover {
+  background: var(--color-surface-muted);
+}
+
+/* The one deliberate visual addition beyond a plain reset: aria-expanded's
+   state needs a visual counterpart too, not color alone. */
+.step-card-chevron {
+  margin-left: auto;
+  transition: transform 0.15s ease;
+}
+
+.step-card-header[aria-expanded="true"] .step-card-chevron {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Environment promotion: the import file control, its result line, and the
+   preview a developer confirms before publishing. */
+.studio-file-label {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.studio-note {
+  color: var(--color-text-muted);
+  min-height: 1.25rem;
+  margin: 0 0 var(--space-2);
+}
+
+.studio-warning {
+  color: var(--color-warning);
+  border-left: 3px solid var(--color-warning);
+  padding-left: var(--space-2);
+}
+
+.studio-dialog {
+  max-width: 34rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: 2px;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  color: var(--color-text);
+  overscroll-behavior: contain;
+}
+
+.studio-dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.studio-dialog-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.studio-dialog-facts dt {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+/* A hash and a process id are both long and unbreakable; without this the
+   grid column stretches the dialog past its max-width. */
+.studio-dialog-facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.studio-dialog-note {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}

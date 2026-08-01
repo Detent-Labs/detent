@@ -9,7 +9,7 @@ explicit Paths (transitions). This is NOT BPMN token flow.
 
 Three roles share one artifact, the serialized JSON process definition:
 - Engine: executes definitions (the executor).
-- Editor: produces definitions graphically (`packages/studio`).
+- Editor: produces definitions graphically (the studio area of `packages/web`).
 - Hand-authoring: definitions written directly as JSON (rare).
 
 The serialized JSON definition is the contract between engine and editor.
@@ -48,17 +48,22 @@ src/handlers/              action handlers; http.request is the only one shipped
 examples/                  serialized example definitions
 test/                      bun:test suites; tests run inside the container
 docs/current-state.md      per-subsystem descriptive counterpart to this file
-packages/studio/           Process Studio, the developer's product: server-persisted drafts, canvas
-                            editing, panels-as-inspector, JSON surface, publish, versions+diff,
-                            migration-plan authoring, a registry/CEL-scratchpad Tools screen, and a
-                            Player beside the merged instance record (React + Vite; HTTP wrapper + exports map)
-packages/admin/            operator's product: instances, merged record, outbox, timers, users
-                            (React + Vite; talks to the engine only over the HTTP wrapper)
-packages/app/              end-user app: participant-facing Login/My-tasks/Task/Start-a-process screens
-                            (React + Vite; workspace package, talks to the engine only over the HTTP wrapper)
+packages/web/              the ONE browser package (React + Vite). One build, one login, one session,
+                            one address; the engine serves it from WEB_ROOT. Talks to the engine only
+                            over the HTTP wrapper and the exports map.
+  src/shell/                prefix routing, session, LoginScreen, ErrorBoundary, Chrome (header +
+                            account menu + area switcher), area table with each area's role, tokens.css
+  src/api/                  API_BASE, AppClientError, parseErrorBody, request, login, errorText;
+                            ClientError/LoginResponse/Actor in types.ts
+  src/i18n/                 locale selection and persistence; chrome/area catalogs stay per area
+  src/areas/app/            participant: Login is the shell's; My-tasks/Task/Start-a-process here
+  src/areas/admin/          operator: instances, merged record, outbox, timers, users, migrations
+  src/areas/studio/         developer: drafts, canvas editing, panels-as-inspector, JSON surface,
+                            publish, versions+diff, migration-plan authoring, Tools, Player
+  src/areas/reporting/      process owner: cycle time, bottlenecks, SLA
 packages/form-ui/          shared step-form renderer (source-only, no build step); consumed by both
-                            packages/studio's Player and packages/app, so what an author previews is
-                            what a participant gets
+                            the studio area's Player and the app area, so what an author previews is
+                            what a participant gets. Stays its own package.
 ```
 
 ## The contract: load-bearing rules
@@ -342,12 +347,12 @@ See `ROADMAP.md` for stage-by-stage status (DONE/NOT STARTED) and what each stag
 ## Codebase memory (knowledge graph)
 The repo is indexed into codebase-memory-mcp (`full` mode, covering the engine,
 the Runtime API Layer, the HTTP/auth layers, and every frontend package
-(`packages/studio`, `packages/admin`, `packages/app`, `packages/form-ui`);
+(`packages/web`, `packages/form-ui`);
 `packages/*/{dist,node_modules}` excluded). Resolve the `project` arg via `list_projects` (match on root_path);
 the slug is machine-specific, never hardcode it. Entry points: `search_graph`
 (find symbols), `get_code_snippet` (read a body), `trace_path` (callers/callees,
 `mode=calls|data_flow|cross_service` — useful for tracing across the
-engine↔runtime↔studio/app boundary, e.g. `packages/studio` or `packages/app` ->
+engine↔runtime↔web boundary, e.g. `packages/web/src/areas/studio` ->
 `workflow-engine` exports -> `src/engine/`), `query_graph` (Cypher), `get_architecture`,
 `search_code` (graph-augmented text search). Real call chains exist now — prefer
 the graph over Read/grep for "who calls X" / "what does Y touch" questions that
@@ -358,8 +363,7 @@ change lands.
 
 ## Conventions
 - TypeScript strict, ESM.
-- **UI work in `packages/app`, `packages/admin`,
-  `packages/studio`, or `packages/form-ui` goes through the design skills
+- **UI work in `packages/web` or `packages/form-ui` goes through the design skills
   first.** Before implementing or reshaping any screen or component, invoke
   `/frontend-design:frontend-design` for visual direction; for UI/UX work
   also pull in the installed Vercel skills (`web-design-guidelines`,

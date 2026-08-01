@@ -9,22 +9,20 @@
 
 ## Purpose
 
-A Player screen on `packages/studio` that drives a real, running instance
+A Player screen on the studio area of `packages/web` that drives a real, running instance
 through the Runtime API Layer, shown beside that instance's merged
 transition/event record — the developer's own point of difference from
-`packages/admin`'s instance detail, which is the operator's read/cancel view
+the admin area of `packages/web`'s instance detail, which is the operator's read/cancel view
 rather than an authoring aid. Reuses `packages/form-ui` for step forms, the
 same package the end-user app uses, so what a developer previews is what a
 participant gets. See `studio-app` for the shell navigation that reaches it,
 `authorization` for the `system:developer` role and the additive
 developer-record-read exception this screen relies on, and `studio-tools`
 for the sibling read-only Tools screen.
-
 ## Requirements
-
 ### Requirement: A Player screen drives a real instance through the Runtime API Layer
 
-`packages/studio` SHALL offer a `/processes/:processId/play` screen: it
+The studio area SHALL offer a `/studio/processes/:processId/play` screen: it
 creates a new instance (`POST /instances`), opens an existing instance by
 id, renders the current step as a form via `packages/form-ui`, submits only
 the visible, editable fields for the chosen path
@@ -70,7 +68,7 @@ The Player screen SHALL fetch and display the driven instance's merged
 history/event record (`GET /instances/:id/record`) alongside the form,
 refetching it whenever the Player refetches the instance view: a developer
 watches a definition run and sees its full audit trail in the same screen,
-distinct from `packages/admin`'s instance detail, which is the operator's
+distinct from the admin area's instance detail, which is the operator's
 read/cancel view rather than an authoring aid.
 
 Reading the record of an instance the developer did not start still requires
@@ -95,7 +93,7 @@ record browser.
 
 ### Requirement: Player is one of the edit screen's togglable surfaces
 
-`packages/studio`'s edit screen already toggles between Structure (Canvas +
+The studio area's edit screen already toggles between Structure (Canvas +
 Panels) and JSON. Player and Tools are additional, mutually-independent
 navigation destinations, not additional toggle states of the same screen,
 since neither drives a Draft the way Structure/JSON do. Switching to Player
@@ -108,3 +106,4 @@ exactly as it was left.
 - **WHEN** a developer has unsaved edits on a draft, navigates to Player, and
   navigates back to the edit screen
 - **THEN** the unsaved edits are still present, unsaved
+

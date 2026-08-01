@@ -17,9 +17,7 @@ health. It also covers how configuration reaches it: runtime environment
 variables for the engine, build arguments for the frontends. Vite inlines
 its env at build time, so a container runtime env var would arrive too
 late to matter.
-
 ## Requirements
-
 ### Requirement: The engine image runs a production build with no development dependencies
 
 `docker/engine.Dockerfile` SHALL install workspace dependencies with `bun
@@ -104,24 +102,27 @@ non-root user. It SHALL NOT add a separate user for this purpose.
 
 ### Requirement: The frontend image builds exactly one package per invocation
 
-`docker/frontend.Dockerfile` SHALL accept a build argument, `PACKAGE`,
-naming exactly one of `app`, `admin`, `studio`, or `reporting`. A single
-build SHALL build a static bundle for that one package only. A separate
-package SHALL NOT need a separate Dockerfile.
+`docker/frontend.Dockerfile` SHALL build the one workspace package that
+produces a browser bundle, `packages/web`. It SHALL NOT take a build argument
+naming which package to build: exactly one exists, and the four areas it
+contains are not separately buildable.
+
+A single build SHALL produce a static bundle covering every area. A separate
+area SHALL NOT need a separate Dockerfile or a separate image.
 
 #### Scenario: Building the admin package
 
-- **WHEN** `docker build -f docker/frontend.Dockerfile --build-arg
-  PACKAGE=admin .` runs against the repository
-- **THEN** the resulting image contains `packages/admin`'s static assets,
-  and no other package's assets
+- **WHEN** an image is wanted for what used to be `packages/admin`
+- **THEN** `docker build -f docker/frontend.Dockerfile .` builds it with no
+  build argument, and the resulting image contains the admin area along with
+  every other area, because one bundle now covers all of them
 
 #### Scenario: Building the reporting package
 
-- **WHEN** `docker build -f docker/frontend.Dockerfile --build-arg
-  PACKAGE=reporting .` runs against the repository
-- **THEN** the resulting image contains `packages/reporting`'s static assets,
-  and no other package's assets
+- **WHEN** an image is wanted for what used to be `packages/reporting`
+- **THEN** the same argument-free build produces it, and
+  `docker/frontend.Dockerfile` declares no build argument selecting a package
+  or an area
 
 ### Requirement: The build args fix the frontend's API origin, never the container runtime
 
@@ -146,17 +147,24 @@ change without rebuilding the image.
 
 ### Requirement: The frontend image serves the built SPA with a client-side routing fallback
 
-The frontend image SHALL serve its package's built assets through nginx.
+The frontend image SHALL serve the built assets through nginx.
 Nginx SHALL fall back to `index.html` for any request path that matches
-no built file. This SHALL match every package's existing client-side
-History API routing.
+no built file. This SHALL match the shell's client-side
+History API routing, including every area prefix.
 
 #### Scenario: A deep link loads directly
 
 - **WHEN** a browser requests a path the built assets do not contain
-  directly, for example `/processes/abc/edit`
+  directly, for example `/studio/processes/abc/edit`
 - **THEN** the server responds with `index.html`, and the client-side
   router then renders the matching screen
+
+#### Scenario: An area prefix is not a special case
+
+- **WHEN** a browser requests any of `/app`, `/admin`, `/studio` or
+  `/reporting`
+- **THEN** the same fallback serves `index.html`, with no per-area nginx
+  location block
 
 ### Requirement: The frontend image reports its own health
 
@@ -198,3 +206,4 @@ context in this repository.
 - **WHEN** `docker build` runs for the engine image or a frontend image
 - **THEN** the build context sent to the Docker daemon contains no
   `node_modules`, `.git`, `.devcontainer`, `docs`, or test directory
+

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The server-side draft store for the developer's product (`packages/studio`):
+The server-side draft store for the developer's product (the studio area of `packages/web`):
 a dedicated `drafts` table holding one mutable, pre-publish authored process
 body per process, `src/engine/drafts.ts` (get/save/list/delete, with
 revision-checked optimistic concurrency on save), and the

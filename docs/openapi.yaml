@@ -8,8 +8,8 @@ info:
     (create, view, submit, claim/release/delegate, comment, attach a
     file, cancel, and the audit record). Excludes `admin/*`, `drafts/*`,
     `migration-plans/*`, `reporting/*`,
-    and `registry`, which serve the operator (`packages/admin`),
-    developer (`packages/studio`) and process-owner (`packages/reporting`)
+    and `registry`, which serve the operator, developer and process-owner
+    areas of `packages/web`
     frontends directly, not a customer integration. Each exclusion is named
     rather than left implicit, so its absence reads as a decision.
 

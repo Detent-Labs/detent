@@ -1,5 +1,5 @@
 # Production image for one of the frontend SPAs (app/admin/studio/reporting),
-# selected by the PACKAGE build arg. Genuinely multi-stage: Bun and Vite
+# `packages/web`, the one package that produces a bundle. Genuinely multi-stage: Bun and Vite
 # build the assets, but nginx serves them, and nginx cannot run either.
 FROM oven/bun:1.3.11-slim AS build
 
@@ -11,21 +11,19 @@ COPY . .
 # devDependencies the build stage itself needs.
 RUN bun install --frozen-lockfile
 
-ARG PACKAGE
 ARG VITE_API_URL
 ENV VITE_API_URL=${VITE_API_URL}
 
 # Vite inlines VITE_API_URL into the built JavaScript at this step. A
 # container runtime env var set later has no effect on the result.
-RUN bun run --filter "./packages/${PACKAGE}" build
+RUN bun run --filter "./packages/web" build
 
 # nginx-unprivileged: non-root by default, listens on 8080, no manual
 # reconfiguration needed to match the engine image's non-root USER bun.
 FROM nginxinc/nginx-unprivileged:alpine
 
-ARG PACKAGE
 
-COPY --from=build /app/packages/${PACKAGE}/dist /usr/share/nginx/html
+COPY --from=build /app/packages/web/dist /usr/share/nginx/html
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 8080

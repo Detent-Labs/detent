@@ -3,7 +3,7 @@
 ## Purpose
 
 Shared step-form rendering (`packages/form-ui`), consumed by both
-`packages/studio`'s Player and the end-user app (`packages/app`) so that what
+the studio area of `packages/web`'s Player and the end-user app (the app area of `packages/web`) so that what
 an author previews is exactly what a participant gets. Owns everything
 visible *inside* a step form: field rendering per resolved `BaseFieldType`,
 groups/order/required/readonly presentation, per-field validation error
@@ -12,22 +12,24 @@ workspace package (an `exports` map pointing at `.tsx`, no build step),
 depending on `workflow-engine` for `LocalizedText`/field types but on neither
 consuming app, so the dependency direction (`app → form-ui → workflow-engine`,
 `studio → form-ui`) cannot invert.
-
 ## Requirements
-
 ### Requirement: form-ui is a source-only workspace package with no build step
 
 `packages/form-ui` SHALL be a Bun workspace package whose `exports` map points
 directly at its `.tsx`/`.ts` source files, the same convention the engine
 package uses for its own exports — no bundling or compilation step between
-editing a source file and a consumer seeing the change. It SHALL depend on
-neither `packages/app` nor `packages/studio`, so the dependency direction
-(`app → form-ui → workflow-engine`, `studio → form-ui`) cannot be inverted.
+editing a source file and a consumer seeing the change. It SHALL NOT depend on
+`packages/web`, so the dependency direction (`web → form-ui →
+workflow-engine`) cannot be inverted.
+
+`packages/form-ui` SHALL stay its own package. It SHALL NOT move inside
+`packages/web`, because both of its consumers, the app area and the studio
+area's Player, must keep importing one renderer.
 
 #### Scenario: form-ui has no application dependency
 
 - **WHEN** `packages/form-ui`'s `package.json` dependencies are inspected
-- **THEN** neither `packages/app` nor `packages/studio` appears among them
+- **THEN** `packages/web` does not appear among them
 
 #### Scenario: A source edit is visible without a build step
 
@@ -194,8 +196,8 @@ browser-native submission blocking; the engine is the validator, and a native
 block would prevent the submission the server is meant to judge. When in
 doubt, `aria-required` alone is correct.
 
-`form-ui` is deliberately the one renderer shared by `packages/app` and the
-editor Player, so this reaches every participant-facing form at once.
+`form-ui` is deliberately the one renderer shared by the app area and the
+studio area's Player, so this reaches every participant-facing form at once.
 
 #### Scenario: A required field announces that it is required
 
@@ -262,22 +264,23 @@ end-user app passes its active locale).
 ### Requirement: form-ui ships one stylesheet for both consumers
 
 `form-ui` SHALL ship the CSS for everything it renders (fields, groups,
-validation errors, path buttons) as part of the package, so both
-`packages/studio`'s Player and the end-user app CAN render forms with
+validation errors, path buttons) as part of the package, so both the studio
+area's Player and the app area CAN render forms with
 identical structure and identical styling — a shared component tree without
-a shared stylesheet would still let the two apps' rendering drift visually.
-Both consumers SHALL import `form-ui/form-ui.css`: the end-user app at
-`packages/app/src/main.tsx`, and `packages/studio`'s Player at its own entry
-point.
+a shared stylesheet would still let the two areas' rendering drift visually.
+The stylesheet SHALL be imported once, at `packages/web/src/main.tsx`, rather
+than once per consuming area: one bundle now carries both consumers, so a
+second import would be the same sheet twice.
 
 #### Scenario: The end-user app imports the shared stylesheet
 
-- **WHEN** `packages/app`'s entry point is inspected
+- **WHEN** `packages/web`'s entry point is inspected
 - **THEN** it imports `form-ui/form-ui.css`
 
 #### Scenario: Both consumers import the same stylesheet
 
-- **WHEN** `packages/studio` and `packages/app` each render a step form via
-  `form-ui`
-- **THEN** both import the same `form-ui`-provided stylesheet, not two
+- **WHEN** the studio area's Player and the app area each render a step form
+  via `form-ui`
+- **THEN** both are styled by the same `form-ui`-provided stylesheet, not two
   independently maintained copies
+

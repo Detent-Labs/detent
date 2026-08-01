@@ -9,8 +9,8 @@
 
 ## Purpose
 
-The operator-facing frontend, `packages/admin`: a workspace package mirroring
-`packages/app`'s shape (React 18, Vite 6, own build/typecheck, a hand-written
+The operator-facing frontend, the admin area of `packages/web`: a workspace package mirroring
+the app area of `packages/web`'s shape (React 18, Vite 6, own build/typecheck, a hand-written
 History-API routing hook, `session.ts` for the JWT), reusing the existing
 login mechanism, with a role-aware shell, the Operations screens
 (all-instances list, instance detail with the merged record and cancel,
@@ -23,18 +23,20 @@ server-side reads/routes and `admin-user-management` for the users routes
 this frontend calls, and the `authorization` capability for the
 `system:admin` role its shell checks (presentationally) and every `/admin/*`
 route enforces (authoritatively).
-
 ## Requirements
-
 ### Requirement: The admin area is its own workspace package
 
-`packages/admin` SHALL be a Bun workspace package built with React 18, Vite 6
-and TypeScript, with its own `package.json`, `vite.config.ts`, `tsconfig.json`
-and `index.html`, matching the shape of `packages/app`. It SHALL depend on
-`workflow-engine` at compile time only for the types it renders
-(`InstanceRecordElement`, `ActionOutcome`, instance and outbox row shapes), and
-SHALL NOT depend on `form-ui` or on `packages/app` — the
-admin area renders records and system state, never step forms.
+The admin area SHALL live at `packages/web/src/areas/admin`, inside the one
+workspace package that produces a browser bundle (see the `unified-shell`
+capability). It SHALL NOT carry its own `package.json`, `vite.config.ts`,
+`tsconfig.json` or `index.html`: `packages/web` carries one of each for every
+area.
+
+It SHALL depend on `workflow-engine` at compile time only for the types it
+renders (`InstanceRecordElement`, `ActionOutcome`, instance and outbox row
+shapes). It SHALL NOT import `form-ui`, and SHALL NOT import from another
+area's directory — the admin area renders records and system state, never step
+forms.
 
 At runtime it SHALL reach the engine exclusively through the HTTP wrapper. It
 SHALL NOT read the database directly and SHALL NOT import engine runtime
@@ -42,39 +44,54 @@ modules.
 
 #### Scenario: The package builds and typechecks on its own
 
-- **WHEN** `bun run typecheck` and `vite build` are run for `packages/admin`
-- **THEN** both succeed without reaching into another package's sources
+- **WHEN** `bun run typecheck` and `vite build` are run for `packages/web`
+- **THEN** both succeed, and the admin area needs no build of its own
 
 #### Scenario: No form renderer dependency
 
-- **WHEN** `packages/admin/package.json` is inspected
-- **THEN** `form-ui` is not among its dependencies
+- **WHEN** the admin area's sources are inspected
+- **THEN** nothing under it imports `form-ui`
+
+#### Scenario: No cross-area import
+
+- **WHEN** the admin area's sources are inspected
+- **THEN** nothing under it imports from another area's directory
 
 #### Scenario: No direct database access
 
-- **WHEN** the package's sources are inspected for data access
+- **WHEN** the area's sources are inspected for data access
 - **THEN** every engine interaction goes through `fetch` against the HTTP
   wrapper
 
 ### Requirement: Login and session reuse the existing mechanism
 
-The admin area SHALL authenticate through the existing `POST /auth/login`,
-store the returned JWT in `localStorage`, send it as a bearer token on every
-request, and return to the login screen on any 401 — identical to
-`packages/app`. It SHALL NOT introduce a second login mechanism, a refresh
-flow, or a separate token store.
+The admin area SHALL NOT authenticate at all. The shell owns the one login
+screen and the one session (see the `unified-shell` capability): the area
+receives the bearer token, sends it on every request, and reports a 401 upward
+so the shell discards the session and shows the login screen.
 
-Routing SHALL be a hand-written History-API hook adapted from
-`packages/app/src/routing.ts`. No router dependency SHALL be added.
+There SHALL be no second login mechanism, no refresh flow, and no separate
+token store. Reaching the admin area SHALL need no second sign-in for an actor
+already signed in elsewhere in the shell.
+
+Routing within the area SHALL stay a pure matcher and path builder over paths
+relative to the `/admin` prefix, driven by the shell's one History-API hook. No
+router dependency SHALL be added.
 
 #### Scenario: A 401 returns to login
 
 - **WHEN** any request from the admin area answers 401
-- **THEN** the stored token is discarded and the login screen is shown
+- **THEN** the stored session is discarded and the login screen is shown
+
+#### Scenario: No second sign-in
+
+- **WHEN** an actor holding `system:admin` signs in and navigates to `/admin`
+  from another area
+- **THEN** no login screen appears
 
 #### Scenario: No router dependency
 
-- **WHEN** `packages/admin/package.json` is inspected
+- **WHEN** `packages/web/package.json` is inspected
 - **THEN** it lists no routing library
 
 ### Requirement: An actor without the admin role sees an explanatory empty state
@@ -99,15 +116,16 @@ This client-side check SHALL be presentational only; the server-side
 
 ### Requirement: All instances are listable with filters and paging
 
-The `/instances` screen SHALL list every instance via `GET /instances` with
-`scope=all`, exposing the filters `InstanceListFilter` supports — process,
+The `/admin/instances` screen SHALL list every instance via `GET /instances`
+with `scope=all`, exposing the filters `InstanceListFilter` supports — process,
 status, current step, `startedBy`, `claimedBy` — and cursor paging. It SHALL
 NOT filter to the operator's own assignments; that is the participant app's
 view.
 
-Filter and paging state SHALL live in a pure module under `src/screens/` with
-`bun:test` coverage, following `packages/app/src/screens/inboxLogic.ts`.
-Components themselves are not required to be tested.
+Filter and paging state SHALL live in a pure module under the area's
+`screens/` directory with `bun:test` coverage, following
+`packages/web/src/areas/app/screens/inboxLogic.ts`. Components themselves are
+not required to be tested.
 
 #### Scenario: Listing every instance
 
@@ -353,3 +371,4 @@ Operations screen. It SHALL show no live progress during the run, since
 - **WHEN** the Migrations screen is inspected for write actions
 - **THEN** running a registered plan is the only one; no control edits
   instance `data` or forces a step transition directly
+

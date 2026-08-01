@@ -462,7 +462,7 @@ export interface PathTriggerCheckResult {
 
 /** Structural, not `Pick<Path, ...>`: only `guard`'s presence/absence is
  * ever inspected here, never its shape, so this stays satisfied by both a
- * real `Path` and `packages/studio`'s Draft-shaped (all-optional) paths
+ * real `Path` and the studio area's Draft-shaped (all-optional) paths
  * without either side needing a cast. */
 export interface PathTriggerCandidate {
   trigger: PathTrigger;
@@ -475,7 +475,7 @@ export interface PathTriggerCandidate {
  * automatic paths, priority is required and unique when there are two or
  * more, at most one may be guardless (the default), and a default must hold
  * the highest priority. Shared by the step `superRefine` below and by
- * `packages/studio`'s canvas, which checks a would-be path against a step's
+ * the studio area's canvas, which checks a would-be path against a step's
  * existing paths before creating it (see `studio-canvas`).
  */
 export function checkPathTriggerConsistency(paths: PathTriggerCandidate[]): PathTriggerCheckResult {

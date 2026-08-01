@@ -17,7 +17,7 @@ by explicit Paths (transitions). This is *not* BPMN token flow.
 A serialized JSON process definition is the one artifact three roles share:
 
 - **Engine** — executes definitions.
-- **Editor** — produces them graphically (`packages/studio`).
+- **Editor** — produces them graphically (the studio area of `packages/web`).
 - **Hand-authoring** — definitions written directly as JSON (rare).
 
 `src/schema/definition.ts` is that contract, expressed as Zod schemas with TS
@@ -45,9 +45,7 @@ JWT authentication and role-gated authorization, and three frontends
 | `src/http/` | Thin REST/JSON wrapper over `Bun.serve` around the Runtime API Layer, plus the admin and studio route files. Typed-error-to-HTTP-status mapping, configurable CORS. |
 | `src/auth/` | `ActorResolver` seam with two implementations (a non-production dev-header resolver and a production-capable JWT resolver accepting local `auth_users` accounts and JWKS-backed external issuers), login + rate limiting, a user-admin CLI, and the reserved roles (`system:publish`, `system:cancel-any`, `system:admin`, `system:developer`). |
 | `src/handlers/` | `http.request` — the one shipped action handler; a vendor-neutral REST call with engine-set idempotency and outbox-aligned retry semantics. |
-| `packages/studio/` | Process Studio, the developer's product: server-persisted drafts, canvas editing (drag-to-connect), the structural panels as inspector, a replacing JSON surface, publish, published versions with a JSON diff, migration-plan authoring, a registry/CEL-scratchpad Tools screen, and a Player beside the merged instance record. |
-| `packages/admin/` | The operator's product: all-instances list, merged transition/event record with cancel, outbox with dead-letter retry/discard, pending timers, user administration. |
-| `packages/app/` | The participant's product: Login / My-tasks inbox / Task / Start-a-process. |
+| `packages/web/` | The one browser package. `src/shell/` holds prefix routing, the one session and login, the account menu and the area switcher; `src/api/` and `src/i18n/` hold what every area shares; `src/areas/{app,admin,studio,reporting}/` hold the four audiences' screens, one URL prefix, one lazy chunk and one role gate each. An area never imports from another area. |
 | `packages/form-ui/` | Source-only shared step-form renderer, so what an author previews is what a participant gets. |
 | `examples/expense-approval.json` | Complete Capture → Review → Book example. |
 | `examples/subprocess-*.json` | A loan-application parent calling a credit-check subprocess (child) — spawn, `child.outcome` routing, return writeback. |
@@ -117,22 +115,22 @@ verify → archive. See `CLAUDE.md` for the full contract rules and invariants.
 
 ## Deploy
 
-Four production images exist: one for the engine, one for each frontend
-(`app`, `admin`, `studio`). `docker/engine.Dockerfile` and
-`docker/frontend.Dockerfile` build them. The devcontainer uses neither one;
+Two production images exist: one for the engine, one for the frontend.
+`docker/engine.Dockerfile` and `docker/frontend.Dockerfile` build them.
+The engine can also serve the frontend itself from `WEB_ROOT`, which is
+the single-origin alternative to running the nginx image. The devcontainer uses neither one;
 it stays dev-only.
 
 ```bash
 # Engine
 docker build -f docker/engine.Dockerfile -t workflow-engine .
 
-# One frontend at a time -- PACKAGE selects app, admin, or studio.
+# The frontend: one bundle covering every area.
 # VITE_API_URL is a build arg only: Vite inlines it at build time, so a
 # container runtime env var set later has no effect on the result.
 docker build -f docker/frontend.Dockerfile \
-  --build-arg PACKAGE=app \
   --build-arg VITE_API_URL=https://api.example.com \
-  -t app .
+  -t web .
 ```
 
 The engine image reads its configuration from the container runtime

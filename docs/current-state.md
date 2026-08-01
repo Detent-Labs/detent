@@ -147,7 +147,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   `body`+`layout` together: `drafts.ts` is a module boundary a non-HTTP caller
   could also reach.
 
-  `packages/studio/src/draft/validation.ts::runValidation` catches
+  `packages/web/src/areas/studio/draft/validation.ts::runValidation` catches
   `CompileValidationError` alongside the pre-existing `DurationValidationError`.
   It renders the caught issues under a new `"structural"` `IssueSource`.
   Without that catch, the error would propagate uncaught and crash Studio's
@@ -402,6 +402,39 @@ Stage-by-stage status is in `ROADMAP.md`.
   startup instead of silently sliding to the next free one), so all three can
   run at once against one engine, in any start order, with no configuration
   edit.
+
+  **Static assets fall through behind every API route** (`serve-web-assets`,
+  roadmap #12 step 0): `src/http/static.ts::serveWebAsset` is called at
+  `createServer`'s terminal 404, so no URL prefix is reserved for assets and a
+  later API route needs no special case. `GET`/`HEAD` only; every other method
+  keeps the JSON 404 envelope. It resolves no actor — a browser fetches the
+  shell document before it holds a token — and adds no CORS headers, since
+  these assets are same-origin to the API by construction. An existing regular
+  file under the root is served with `Cache-Control: max-age=31536000,
+  immutable` (safe because the build hashes asset filenames); `index.html` is
+  the one exception and always carries `no-cache`, whether it answers as the
+  History-API fallback for an unmatched path or as a direct `/index.html`
+  request, because its name never changes and it names the current hashes.
+  Anything that is not a regular file, including a directory, falls back to the
+  shell; a root holding no `index.html` declines instead of masking the 404.
+  Containment is a whitelist: decode once, resolve with `node:path`, then serve
+  only what stays under the root. Rejecting paths containing `..` would be a
+  blacklist over `%2e%2e`, `%252e%252e` and every future encoding.
+  `test/http-static.test.ts` drives all of it against
+  `test/fixtures/web-root/`, with the traversal cases aimed at the repo's own
+  `package.json` so they fail if containment is removed. `WEB_ROOT` names the
+  directory; `startHttpServer` resolves it once via
+  `static.ts::resolveWebRoot`, defaulting to `packages/web/dist` relative to
+  `import.meta.dir`, and passes `undefined` when the path is absent, is not a
+  directory, or is empty or whitespace-only. That last case is deliberate:
+  `resolve("")` is the process working directory, so an empty variable would
+  otherwise put the whole tree behind the static branch. Then `createServer`
+  has no static branch at all and the engine
+  runs unchanged with no built frontend, which stays supported because a
+  reverse proxy may serve the assets instead. The default is inert until the
+  unified shell produces that directory. One consequence of reserving no
+  prefix: with a root configured, an unmatched `GET` under an API prefix
+  (`/instances/a/b/c/d`) returns the shell document, not a JSON 404.
 - Auth/Actor-Resolution + Assignment/Claim-Enforcement (roadmap #5d): activates
   the previously-declared-but-inert `Step.assignment` field. `src/auth/resolve.ts`
   defines the `ActorResolver` extension point (`(credential) -> Promise<Actor>`)
@@ -789,7 +822,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   depth for the bearer token in `localStorage`. Its 8-hour expiry means
   nothing can revoke it early. There is no known injection sink in the tree
   today.
-- End-user app (`packages/app`, `packages/form-ui`, `add-end-user-app`): the
+- End-user app (the app area of `packages/web`, `packages/form-ui`, `add-end-user-app`): the
   participant-facing frontend — Login, My-tasks (inbox), Task, Start-a-process,
   four screens over a small hand-written History-API routing hook, talking to
   the engine only through the HTTP wrapper. `packages/form-ui` is a new
@@ -811,7 +844,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   "mine" means. Read/query API's `assignedTo`/`assignedToRoles` role-matching
   fix (see that entry above) was found and closed in the same area, during a
   post-launch documentation audit of this stage.
-- Admin area (operations) (`packages/admin`, `src/engine/admin-queries.ts`,
+- Admin area (operations) (the admin area of `packages/web`, `src/engine/admin-queries.ts`,
   `src/http/admin-routes.ts`, `admin-shell-and-ops`): the operator-facing
   frontend and its server surface — stage 10's first of three changes. A new
   reserved role `ADMIN_ROLE = "system:admin"` (`src/auth/authorize.ts`) gates
@@ -839,8 +872,8 @@ Stage-by-stage status is in `ROADMAP.md`.
   (`pending` due, or `claimed` with an expired lease) that never matches it,
   and `migrateInstances` locks and remaps every non-`delivered` row of an
   instance (including a `discarded` one) in `field_version` lock-step, since
-  only a *live-claimed* row blocks migration. `packages/admin` mirrors
-  `packages/app`'s shape (own `package.json`/`vite.config.ts`/`tsconfig.json`,
+  only a *live-claimed* row blocks migration. The admin area mirrored
+  the app area's shape (own `package.json`/`vite.config.ts`/`tsconfig.json`,
   React 18 + Vite 6, a hand-written History-API routing hook, `session.ts` for
   the JWT) but not its code: no `form-ui` dependency (it renders records and
   system state, never step forms), no i18n. Login and session reuse are
@@ -861,7 +894,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   re-run risk), and `/timers` (overdue-first, with overdue classification in a
   tested pure module, `screens/timersLogic.ts`). Every screen refreshes on an
   explicit control plus refetch-on-window-focus; no polling, no websocket.
-- Admin area (user administration) (`packages/admin`, `src/auth/users.ts`,
+- Admin area (user administration) (the admin area of `packages/web`, `src/auth/users.ts`,
   `src/http/admin-routes.ts`, `admin-users`, `admin-user-management`): stage
   10's second of three changes, the one HTTP carve-out from
   `local-user-accounts`'s CLI-only administration. `src/auth/users.ts` gains
@@ -879,11 +912,11 @@ Stage-by-stage status is in `ROADMAP.md`.
   it does not revoke a JWT already issued to them, since token verification
   performs no per-request database lookup (proven by an end-to-end test:
   log in, disable via the new route, the pre-disable token still
-  authenticates, a fresh login attempt then fails). `packages/admin` gains a
+  authenticates, a fresh login attempt then fails). The admin area gained a
   `/users` screen — list plus a disable/enable toggle, the disable action
   behind a confirmation naming that caveat — with no create/password/role
   controls.
-- Process Studio — shell and drafts (`packages/studio`, `src/engine/drafts.ts`,
+- Process Studio — shell and drafts (the studio area of `packages/web`, `src/engine/drafts.ts`,
   `src/http/studio-routes.ts`, `studio-shell-and-drafts`): the developer's
   substrate — stage 11's first of five changes; `packages/editor` stayed
   untouched and functional until `studio-tools-and-player`, the last of the
@@ -919,15 +952,15 @@ Stage-by-stage status is in `ROADMAP.md`.
   `GET /drafts/:processId` (404 when absent), `PUT /drafts/:processId` and
   `DELETE /drafts/:processId`, kept out of `routes.ts` the same way
   `admin-routes.ts` is; `updated_by` always comes from the resolved actor,
-  never the request body. `packages/studio` mirrors `packages/app`'s shape
+  never the request body. The studio area mirrored the app area's shape
   (own `package.json`/`vite.config.ts`/`tsconfig.json`, React 18 + Vite 6, a
   hand-written History-API routing hook, `session.ts` for the JWT under its
-  own storage key) the way `packages/admin` does, plus `immer` and `zod`; no
+  own storage key) the way the admin area did, plus `immer` and `zod`; no
   `form-ui`, `mermaid` or `@panzoom/panzoom` yet. Login and the
-  role-gated-empty-state shell follow `packages/admin`'s pattern exactly
+  role-gated-empty-state shell follow the admin area's pattern exactly
   (`system:developer` in place of `system:admin`) — presentational only, the
   server-side `requireRole` is the enforcement. The editor's `draft/`,
-  `panels/`, `i18n/` and `registry/` were copied into `packages/studio/src`
+  `panels/`, `i18n/` and `registry/` were copied into the studio area's source
   (`packages/editor` untouched at the time, a deliberate duplication window
   closed when `studio-tools-and-player`, change 5, deleted the editor): the
   file-persistence pieces
@@ -944,7 +977,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   validation is unchanged: the engine's own publish-time chain imported
   through the exports map at compile time, exactly as `packages/editor`'s own
   now-deleted `draft/validation.ts` already did, and it never blocks saving. The process list (`screens/processListLogic.ts`, a pure module
-  following `packages/app/src/screens/inboxLogic.ts`) merges
+  following `packages/web/src/areas/app/screens/inboxLogic.ts`) merges
   `GET /processes` with `GET /drafts` into one row per process id — draft-only,
   published-only, or both — with new/open/discard actions; "New process"
   mints a `proc_`-prefixed id client-side and issues exactly one
@@ -954,7 +987,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   Publishing, canvas editing, the JSON surface, and migration planning are not
   part of this change; the existing editor's export path plus `POST
   /processes` remains the only publish path until change 4.
-- Process Studio — canvas (`packages/studio/src/canvas/`, `StepsPanel.tsx`,
+- Process Studio — canvas (`packages/web/src/areas/studio/canvas/`, `StepsPanel.tsx`,
   `EditScreen.tsx`, `src/schema/definition.ts`, `studio-canvas`): stage 11's
   second of five changes. `/processes/:id/edit` becomes canvas-primary: a
   hand-rolled SVG canvas (`CanvasView.tsx`) replaces the stacked-panels-only
@@ -996,12 +1029,12 @@ Stage-by-stage status is in `ROADMAP.md`.
   canvas pan instead. `canvas/geometry.ts` (hit-testing, drag-delta) and
   `canvas/connection.ts` are pure and unit-tested alongside `layout.ts`; the
   SVG/React rendering and pointer wiring itself is not, per this repo's
-  existing convention (`packages/app/src/screens/inboxLogic.ts`). The canvas
+  existing convention (`packages/web/src/areas/app/screens/inboxLogic.ts`). The canvas
   introduces no operation the panels can't already do — deletion and every
   field edit remain panel-only.
 - Process Studio — lifecycle (`src/http/studio-routes.ts`, `src/engine/drafts.ts`,
-  `src/http/errors.ts`, `packages/studio/src/panels/DraftToolbar.tsx`,
-  `packages/studio/src/screens/{VersionsScreen,MigrationPlanScreen}.tsx`,
+  `src/http/errors.ts`, `packages/web/src/areas/studio/panels/DraftToolbar.tsx`,
+  `packages/web/src/areas/studio/screens/{VersionsScreen,MigrationPlanScreen}.tsx`,
   `studio-lifecycle`): stage 11's fourth of five changes. Closes the gap the
   prior two changes left open — a Studio draft could previously only be
   published via `packages/editor`'s export path plus a manual `POST /processes`
@@ -1031,7 +1064,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   unprefixed (studio-only by role check, not by URL, the same convention
   `process-drafts`'s `/drafts` routes already established). `MigrationPlanError`
   gained one `errors.ts` mapping (409, `migration-plan`) shared by all three,
-  since it previously fell through to the generic 500. `packages/studio`
+  since it previously fell through to the generic 500. The studio area
   gained: a Publish action on the edit screen, gated by a dirty-check pure
   module (`screens/publishGateLogic.ts::isDirty`, comparing the in-browser
   draft against the last-saved snapshot) — a `confirm()` prompt offers to
@@ -1054,7 +1087,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   (stays `admin-migration-run`'s future `POST /admin/migrations/run`, an
   operator action) and the registry/CEL-scratchpad tools screen plus Player
   (`studio-tools-and-player`).
-- Process Studio — JSON view (`packages/studio/src/panels/{JsonView,
+- Process Studio — JSON view (`packages/web/src/areas/studio/panels/{JsonView,
   draftJsonLogic}.ts(x)`, `src/draft/load-guard.ts`, `screens/EditScreen.tsx`,
   `studio-json-view`): stage 11's third of five changes, entirely
   client-side — no engine, route or schema change. Adds the third of the edit
@@ -1074,7 +1107,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   Apply, through `parseDraftText` (`panels/draftJsonLogic.ts`, mirroring
   `screens/migrationPlanLogic.ts`'s parse/format shape): `JSON.parse`, then
   `checkDraftShape`, the editor's file-based Load guard ported verbatim to
-  `packages/studio/src/draft/load-guard.ts` rather than reimplemented more
+  `packages/web/src/areas/studio/draft/load-guard.ts` rather than reimplemented more
   weakly — a `Draft` has no remote gate the way a `MigrationSpec` does
   (`replace()` writes straight into the client state every panel
   destructures), so the shape check has to happen here. A parse or shape
@@ -1088,13 +1121,13 @@ Stage-by-stage status is in `ROADMAP.md`.
   the "Process Studio — tools and Player" entry below.
 - Process Studio — tools and Player (`src/cel/check.ts`, `src/runtime/api.ts`,
   `src/http/routes.ts`, `src/http/studio-routes.ts`, `src/http/server.ts`,
-  `packages/studio/src/screens/{ToolsScreen,PlayerScreen}.tsx`,
-  `packages/studio/src/screens/{toolsScratchpadLogic,playerLogic}.ts`,
-  `packages/studio/src/api/{client,types}.ts`, `studio-tools-and-player`):
+  `packages/web/src/areas/studio/screens/{ToolsScreen,PlayerScreen}.tsx`,
+  `packages/web/src/areas/studio/screens/{toolsScratchpadLogic,playerLogic}.ts`,
+  `packages/web/src/areas/studio/api/{client,types}.ts`, `studio-tools-and-player`):
   stage 11's fifth and last change. Closes the stage's remaining gap and
   deletes `packages/editor` outright — every capability it alone provided
   is retired (no replacement); every capability it shared with
-  `packages/studio` already had an independent copy there.
+  the studio area already had an independent copy there.
 
   Adds two screens. The **Tools** screen (`/tools`) shows the running
   server's registered plugin type names — action-handler types and
@@ -1116,14 +1149,14 @@ Stage-by-stage status is in `ROADMAP.md`.
   file-for-file port of `packages/editor`'s Player, which had its own
   standalone server-URL-plus-login connection — a leftover from before
   Studio had any shared session at all. Studio already has one shared,
-  logged-in session for everything else, so `packages/app`'s
+  logged-in session for everything else, so the app area's
   `TaskScreen`/`api/client.ts` — which already calls the same routes over
   that same shared-session model — served as the template instead:
-  `packages/studio/src/api/client.ts` gained `createInstance`,
+  `packages/web/src/areas/studio/api/client.ts` gained `createInstance`,
   `getInstanceView`, `submitPath`, `claimStep`, `releaseClaim`, and
   `getInstanceRecord`, reusing the package's existing `request()`/
   `StudioClientError`, and `form-ui` became a new dependency of
-  `packages/studio` (it had none before Player existed) — including the
+  the studio area (it had none before Player existed) — including the
   `form-ui/form-ui.css` import at the Player's own entry point that
   `packages/editor`'s Player never had, leaving its forms unstyled; Studio's
   Player closes that gap rather than reproducing it.
@@ -1153,7 +1186,7 @@ Stage-by-stage status is in `ROADMAP.md`.
 
   `packages/editor` (`src/`, `test/`, config, Playwright setup) is deleted.
   Twelve capability specs that described only its internals are retired
-  with no replacement (superseded by an existing `packages/studio`
+  with no replacement (superseded by an existing studio-area
   capability, or a pure engineering-hygiene constraint with no subject left
   once the package is gone). The devcontainer's `postCreateCommand` no
   longer installs Playwright — `packages/editor/test/graph-view-rendering.test.tsx`
@@ -1236,7 +1269,7 @@ Stage-by-stage status is in `ROADMAP.md`.
 - Dependency-manifest fixes ride along in the same change. `zod` now lives in
   the root's `dependencies`, not `devDependencies` as before. Six modules
   under `src/` import it as a value, and the public schema export reaches
-  it. `packages/app` now declares it as a dependency of its own.
+  it. `packages/web` declares it as a dependency of its own.
   `packages/form-ui` declares it as a peer dependency, matching how it
   already declares react. `@marcbachmann/cel-js` now pins an exact version
   instead of a caret range — see `CLAUDE.md`'s one-CEL-library rule for why.
@@ -1333,7 +1366,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   `encodeCursor` gets rejected.
 
 - Seeding a draft from a published version (`seed-draft-from-published`,
-  `packages/studio/src/screens/processListLogic.ts`,
+  `packages/web/src/areas/studio/screens/processListLogic.ts`,
   `src/schema/strip-compiled.ts`, `src/schema/canonical-json.ts`,
   `src/engine/drafts.ts`): "Create draft" on a published row used to write
   `{ body: {}, layout: {}, revision: 0 }`, the same call `+ New process`
@@ -1454,7 +1487,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   nothing overdue".
 
 <!-- antislop: allow sentence-length run-ons passive-voice -->
-- Environment promotion (`packages/studio/src/screens/promotionExportLogic.ts`,
+- Environment promotion (`packages/web/src/areas/studio/screens/promotionExportLogic.ts`,
   `promotionImportLogic.ts`, `add-environment-promotion`, roadmap #18): moves a
   published definition between environments as a file. Studio-only. No engine
   change, no new route, no schema change, no new dependency.
@@ -1580,8 +1613,9 @@ Stage-by-stage status is in `ROADMAP.md`.
   `test/seed-demo-users.test.ts` asserts the pairing, so a sixth role added
   without its demo user fails.
 
-- `packages/reporting`: the process owner's frontend, the fourth SPA. Same
-  shape as `packages/admin` (React 18, Vite 6, own build/typecheck, a
+- Reporting (the reporting area of `packages/web`): the process owner's
+  frontend. It arrived as the fourth SPA, same
+  shape as the admin area (React 18, Vite 6, own build/typecheck, a
   hand-written History-API routing hook, `session.ts` under its own storage
   key), dev port 5176. It reaches the engine only over `/reporting/*` and
   `/auth/login`. It imports only the definition-contract types from
@@ -1600,3 +1634,66 @@ Stage-by-stage status is in `ROADMAP.md`.
   (`reportingLogic.ts`: duration formatting, the default range, the rule's
   scale, the ranking) carry the tests; components stay untested, per the
   existing convention.
+- Unified shell (`packages/web`, `consolidate-frontend-shell`, roadmap #12
+  steps 1-5): the four SPAs became one package. One `vite.config.ts`, one
+  `index.html`, one `main.tsx`, one routing module, one session, one
+  `LoginScreen`, one `ErrorBoundary`. `packages/app`, `packages/admin`,
+  `packages/studio` and `packages/reporting` are deleted; `packages/form-ui`
+  stays its own package, since both the app area and the studio area's Player
+  import it.
+
+  `src/shell/` owns what the four each owned a copy of. `session.ts` holds one
+  key, `web.session`, carrying `{token, actorId, roles, expiresAt}`. The expiry
+  is recorded and never consulted: `end-user-app` requires that the frontend
+  run no client-side expiry check and treat a `401` as the sole end-of-session
+  signal, so storing the value keeps that requirement intact. The four old keys
+  are not read and not migrated. `areas.ts` is the one table of area to
+  revealing role (app needs only a session, admin `system:admin`, studio
+  `system:developer`, reporting `system:reports`), and it drives the switcher,
+  the `/` redirect and the direct-hit guard alike, so they cannot disagree. The
+  gate is display logic; the engine still answers 403.
+
+  Routing is the load-bearing part. The shell splits the first path segment off
+  as the area, hands only the remainder to that area's own `matchRoute`, and
+  prepends the prefix to what that area's own `routePath` returns
+  (`areaHref(area, "/")` is the bare prefix, never a trailing slash). Each
+  area's pair therefore moved **verbatim**, minus its `login` case; ROADMAP.md
+  item 12 had assumed all four would be rewritten, and Studio's
+  `/studio/processes/:processId/migrate/:from/:to` needed no attention at all.
+  `useAreaRoute(area, localPath, match, toPath, go)` binds an area's pair to
+  the shell's one History-API hook.
+
+  `src/api/` holds `API_BASE`, `AppClientError`, `parseErrorBody`, `request`,
+  `login` and `errorText`, plus `ClientError`, `LoginResponse`, `Actor` and
+  `PublishIssue`. `ClientError` is the union of **every** server error type,
+  not a lowest common denominator: the four packages each mapped only the
+  subset their own screens could provoke and collapsed the rest into
+  `internal`, which is why they looked like one type wearing four names. A
+  fetch that never reached the server is `network`, distinct from `internal`.
+  Each area keeps its own describer with a `default` branch, and its own route
+  functions and domain types, which stay per area because they are projections
+  of different endpoints.
+
+  `packages/web/test/boundaries.test.ts` enforces the one structural rule by
+  scanning source: no file under `src/areas/<a>/` imports from
+  `src/areas/<b>/`, and no class name is defined in two areas' stylesheets
+  (measured before the merge: 153 classes, zero collisions, since each area
+  already prefixes its own). Each area is a dynamic import, so the build emits
+  one chunk per area and a participant loading `/app` never downloads the
+  Studio canvas.
+
+  One collision surfaced only against the real build: `/admin/outbox`,
+  `/admin/timers` and `/admin/users` are each both an admin screen and a `GET`
+  admin route, so `serve-web-assets`' "assets sit behind every API route" rule
+  answered a reload of those three with `401` JSON. `src/http/server.ts` now
+  offers a **navigation** request to the web root BEFORE route matching
+  (`static.ts::isNavigationRequest`: `Sec-Fetch-Mode: navigate`, falling back to
+  an `Accept` naming `text/html` when no `Sec-Fetch-*` is sent). A page's own
+  `fetch` never carries that mode, so the area's request for `/admin/outbox`
+  still reaches the admin route. An API caller that asks for HTML gets the
+  shell; that is the deliberate cost.
+
+  The engine serves the result from `WEB_ROOT`, whose default
+  (`packages/web/dist`) stops being inert here. `docker/frontend.Dockerfile`
+  survives as the nginx alternative, minus its `PACKAGE` build argument, since
+  exactly one package now produces a bundle.

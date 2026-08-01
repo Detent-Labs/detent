@@ -10,6 +10,7 @@ import { sql, initSchema } from "../engine/store.js";
 import { startEngine, createDefaultDataSourceRegistry } from "../engine/host.js";
 import { createRegistry, type Registry, type DataSourceRegistry } from "../engine/registry.js";
 import { devHeaderResolver, type ActorResolver } from "../auth/resolve.js";
+import { serveWebAsset, resolveWebRoot, isNavigationRequest } from "./static.js";
 import { jwtResolver, type IssuerConfig } from "../auth/jwt.js";
 import { handleLogin } from "../auth/login.js";
 import {
@@ -219,6 +220,11 @@ export function resolveAuthResolver(env: {
  * when it is set, so there is no state in which the login route is reachable
  * without a signing key (jwt-authentication spec, "no login without a key").
  */
+/**
+ * `webRoot` is the directory a built frontend is served from, `undefined` for
+ * none — then there is no static branch and every unmatched request keeps the
+ * JSON 404. `startHttpServer` sources it from `WEB_ROOT` via `resolveWebRoot`.
+ */
 export function createServer(
   dataSourceRegistry: DataSourceRegistry,
   registry: Registry,
@@ -226,6 +232,7 @@ export function createServer(
   resolver: ActorResolver,
   allowedOrigins: AllowedOrigins = undefined,
   loginSecret: string | undefined = undefined,
+  webRoot: string | undefined = undefined,
 ): (req: Request) => Promise<Response> {
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
@@ -233,6 +240,17 @@ export function createServer(
     const origin = req.headers.get("Origin");
     const toRes = (result: HttpResult) => toResponse(result, allowedOrigins, origin);
     const preflight = (methods: string) => preflightResponse(methods, allowedOrigins, origin);
+
+    // A browser navigation is answered from the web root BEFORE route matching,
+    // because an area's URL prefix can collide with an API prefix: the admin
+    // area's /admin/outbox, /admin/timers and /admin/users screens have exactly
+    // the paths of three GET admin routes. Only navigations take this path, so
+    // an API caller's own fetch still reaches the route, unchanged. See
+    // `static.ts::isNavigationRequest`.
+    if (webRoot !== undefined && isNavigationRequest(req)) {
+      const shell = serveWebAsset(req, url, webRoot);
+      if (shell) return shell;
+    }
 
     // GET /livez, GET /readyz: unauthenticated, no CORS handling — an
     // orchestrator's health probe is not a browser request. `toResponse`
@@ -515,6 +533,14 @@ export function createServer(
       return toRes(await handleGetRegistry(req, resolver, registry, dataSourceRegistry));
     }
 
+    // Static assets fall through here, behind every API route, so no URL prefix
+    // is reserved and a later API route needs no special case. GET/HEAD only;
+    // a decline keeps the JSON 404 below. See `static.ts`.
+    if (webRoot !== undefined) {
+      const asset = serveWebAsset(req, url, webRoot);
+      if (asset) return asset;
+    }
+
     return toRes({ status: 404, body: { error: { type: "not-found", message: `no route: ${req.method} ${url.pathname}` } } });
   };
 }
@@ -547,11 +573,12 @@ export async function startHttpServer(
 ): Promise<{ stop: () => void }> {
   await initSchema(db);
   const allowedOrigins = parseAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS);
-  const fetch = createServer(dataSourceRegistry, registry, db, resolver, allowedOrigins, process.env.AUTH_JWT_SECRET);
+  const webRoot = resolveWebRoot(process.env.WEB_ROOT);
+  const fetch = createServer(dataSourceRegistry, registry, db, resolver, allowedOrigins, process.env.AUTH_JWT_SECRET, webRoot);
   const port = Number(process.env.PORT ?? 3000);
   const server = Bun.serve({ fetch, port, maxRequestBodySize: MAX_REQUEST_BODY_SIZE });
   const engine = startEngine(db, registry);
-  log.info("HTTP server listening", { port: server.port });
+  log.info("HTTP server listening", { port: server.port, webRoot: webRoot ?? null });
   return {
     stop: () => {
       server.stop();

@@ -1,0 +1,148 @@
+/*
+ * Shell chrome. The direction is the one the areas already established: a case
+ * register, not a dashboard — paper ledger and rubber date-stamp. Nothing here
+ * invents a palette; every value comes from the semantic aliases in
+ * tokens.css.
+ *
+ * The one new element the consolidation needs is the register tab: the open
+ * area's name, set in the stamp voice (mono, letter-spaced, accent-coloured)
+ * on the header's leading edge, the way a divider tab names the section of a
+ * ledger you have open. It is why the header carries no separate "you are
+ * here" label — the tab and the URL prefix say it.
+ */
+@import "./tokens.css";
+
+.shell {
+  min-height: 100vh;
+}
+
+.shell-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+}
+
+.shell-tab {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-accent-contrast);
+  background: var(--color-accent);
+  padding: var(--space-1) var(--space-2);
+  /* Cut corners on the leading edge: a tab slotted into the register, not a pill. */
+  clip-path: polygon(0 0, 100% 0, calc(100% - 0.4rem) 100%, 0 100%);
+  padding-right: calc(var(--space-2) + 0.4rem);
+}
+
+.shell-nav {
+  display: flex;
+  gap: var(--space-2);
+  flex: 1;
+}
+
+.shell-account {
+  position: relative;
+  margin-left: auto;
+}
+
+.shell-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-1));
+  z-index: 1;
+  min-width: 12rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
+}
+
+.shell-menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: 0.85rem;
+}
+
+.shell-menu-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+.shell-menu-label {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+}
+
+.shell-menu-logout {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-2);
+}
+
+.shell-screen {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-3);
+}
+
+.shell-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.shell-login-form label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.85rem;
+}
+
+.shell-error {
+  color: var(--color-danger);
+}
+
+.shell-empty,
+.shell-boundary-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-3);
+  color: var(--color-text-muted);
+}
+
+.shell-boundary-stamp {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-danger);
+}
+
+@media (max-width: 30rem) {
+  .shell-header {
+    flex-wrap: wrap;
+  }
+
+  .shell-nav {
+    order: 3;
+    flex-basis: 100%;
+  }
+}

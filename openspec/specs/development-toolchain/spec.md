@@ -5,9 +5,7 @@
 
 Defines the project's standard runtime, package manager, test runner, and
 typecheck tool, and how contributors install, test, and typecheck the project.
-
 ## Requirements
-
 ### Requirement: Bun is the standard toolchain
 The project SHALL use Bun as its runtime, package manager, and test runner,
 across a Bun workspace rooted at the repository root. Dependencies MUST be
@@ -111,7 +109,7 @@ typecheck`, SHALL run the engine's own check and every workspace member's
   and reports no errors
 
 #### Scenario: A workspace member's type error fails the root command
-- **WHEN** `packages/studio` (or any other workspace member) has a type
+- **WHEN** `packages/web` (or any other workspace member) has a type
   error
 - **THEN** running `bun run typecheck` from the repo root fails, even if
   the engine package's own `src`/`test` types are clean
@@ -125,10 +123,11 @@ contributors and machines:
 
 | package | port |
 |---|---|
-| `packages/app` | 5173 |
-| `packages/admin` | 5174 |
-| `packages/studio` | 5175 |
-| `packages/reporting` | 5176 |
+| `packages/web` | 5173 |
+
+Exactly one package ships a dev server, so exactly one port is assigned. The
+rule stays stated per package rather than as a single constant, because it is
+what a second browser package would have to satisfy.
 
 Pinning alone is not sufficient: without a strict-port setting Vite silently
 serves on the next free port when the configured one is taken, which
@@ -138,21 +137,19 @@ see and act on.
 
 #### Scenario: Starting one dev server
 
-- **WHEN** a contributor runs `bun run dev` in any one of the frontend
-  packages
-- **THEN** the dev server listens on that package's assigned port, and on no
-  other port
+- **WHEN** a contributor runs `bun run dev` in the frontend package
+- **THEN** the dev server listens on its assigned port, and on no other port
 
 #### Scenario: Starting every dev server together
 
-- **WHEN** a contributor runs `bun run dev` in every frontend package, in
-  any order
-- **THEN** each serves on its own assigned port, and no package's port
-  depends on which package was started first
+- **WHEN** a contributor starts every frontend dev server, which is now one
+- **THEN** every area is reachable under its prefix on that one port, in any
+  order, with no second dev server to start and so no start-order dependence
+  left to have
 
 #### Scenario: An occupied port fails loudly
 
-- **WHEN** a package's assigned port is already in use by another process
+- **WHEN** the assigned port is already in use by another process
 - **THEN** that dev server exits with a port-in-use error instead of binding
   a different port
 
@@ -161,7 +158,8 @@ see and act on.
 The devcontainer's `CORS_ALLOWED_ORIGINS` value SHALL list the
 `http://localhost:<port>` origin of every frontend package's dev server, so
 each of them can call the engine's HTTP wrapper from a browser without any
-per-contributor configuration edit. The value MUST use the allowlist form
+per-contributor configuration edit. With one browser package, that is one
+origin. The value MUST use the allowlist form
 (a comma-separated origin list) that `configurable-cors-origins` already
 specifies, not the `*` wildcard: the wildcard would work today but is
 mutually exclusive with the credentialed CORS a future cookie-backed
@@ -172,7 +170,7 @@ removed, the allowlist SHALL be updated in the same change.
 
 #### Scenario: Any frontend calls the engine from a browser
 
-- **WHEN** a browser on any of the assigned dev origins issues a
+- **WHEN** a browser on the assigned dev origin issues a
   cross-origin request to the engine running in the devcontainer
 - **THEN** the response carries `Access-Control-Allow-Origin` echoing that
   origin, along with `Vary: Origin`
@@ -288,14 +286,13 @@ is source-only and is compiled by its consumer. A package SHALL NOT rely on
 workspace hoisting to supply a runtime import it does not declare, and a
 runtime import SHALL NOT be declared as a `devDependency`.
 
-This is currently violated in one direction each way: `zod` is a
-`devDependency` of the root while six modules under `src/` import it as a
-value and the public `exports` map exposes entry points that all reach it; and
-`packages/app` and `packages/form-ui` import it while declaring it nowhere.
-The consequence is not theoretical — `bun install --production`, or a slim
-engine image, yields `Cannot find module "zod"` on the first import of the
-schema module, and the failure would first appear in whichever change builds
-that image rather than in the change that mis-declared it.
+The rule exists because the failure is not theoretical: `bun install
+--production`, or a slim engine image, yields `Cannot find module "zod"` on the
+first import of the schema module, and the failure would first appear in
+whichever change builds that image rather than in the change that mis-declared
+it. `zod` is the case that produced the rule, in both directions — a root
+`devDependency` behind a public `exports` map, and browser packages importing
+it while declaring it nowhere.
 
 Dependencies whose behavior the contract depends on SHALL be pinned exactly,
 following the treatment `typescript` already gets. `@marcbachmann/cel-js` is
@@ -371,3 +368,4 @@ therefore never depends on a host binding.
   unset
 - **THEN** the end-to-end send test skips, and the config-validation and
   failure-classification tests still run
+

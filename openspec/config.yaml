@@ -26,26 +26,34 @@ context: |
   OpenSpec change (propose -> specs/tasks -> implement -> verify -> archive),
   never a direct edit.
 
-  Beyond the engine, a Bun workspace (`packages/*`) adds four packages, one
-  per audience. `packages/studio`: Process Studio, the developer's product —
-  server-persisted drafts (the `drafts` table, optimistic concurrency on a
-  `revision` column), a canvas-primary edit screen (drag-to-move,
-  drag-to-connect) with the structural panels as inspector and a replacing
-  JSON surface, publish, published versions with a JSON diff, migration-plan
-  authoring, a registry/CEL-scratchpad Tools screen, and a Player beside the
-  merged instance record; gated by `system:developer`. `packages/admin`:
-  the operator's product — all-instances list, merged transition/event
-  record with cancel, outbox with dead-letter retry/discard, pending timers,
-  user administration; gated by `system:admin`. `packages/app`: the
-  participant-facing end-user app (Login / My-tasks inbox / Task /
-  Start-a-process screens over `scope=mine`-derived inbox filtering and JWT
-  auth). `packages/form-ui`: a source-only, no-build field-form renderer
-  shared by Studio's Player and the end-user app, so what an author
-  previews is what a participant gets. All four reach the engine only
-  through the HTTP wrapper or the engine package's `exports` map — none
-  author-or-run definitions in-process except via those boundaries.
-  `packages/editor`, the original structural-editor proof of concept, is
-  deleted — superseded by `packages/studio`.
+  Beyond the engine, a Bun workspace (`packages/*`) adds two browser
+  packages. `packages/web` is the ONE package that produces a bundle: one
+  build, one login, one session, one address, which the engine serves from
+  `WEB_ROOT`. Its `src/shell/` owns prefix routing, the session, the login
+  screen, the error boundary and the header's account menu with the area
+  switcher; `src/api/` and `src/i18n/` hold what every area shares; and
+  `src/areas/{app,admin,studio,reporting}/` hold the four audiences, each
+  with one URL prefix, one lazy chunk and one role gate. An area never
+  imports from another area — only upward into `shell/`, `api/`, `i18n/`.
+  The studio area is Process Studio, the developer's product: server-persisted
+  drafts (the `drafts` table, optimistic concurrency on a `revision` column),
+  a canvas-primary edit screen (drag-to-move, drag-to-connect) with the
+  structural panels as inspector and a replacing JSON surface, publish,
+  published versions with a JSON diff, migration-plan authoring, a
+  registry/CEL-scratchpad Tools screen, and a Player beside the merged
+  instance record; gated by `system:developer`. The admin area is the
+  operator's product — all-instances list, merged transition/event record
+  with cancel, outbox with dead-letter retry/discard, pending timers, user
+  administration; gated by `system:admin`. The app area is participant-facing
+  (My-tasks inbox / Task / Start-a-process over `scope=mine`-derived inbox
+  filtering and JWT auth). The reporting area is the process owner's — cycle
+  time, bottlenecks, SLA; gated by `system:reports`. `packages/form-ui` is a
+  source-only, no-build field-form renderer shared by the studio area's Player
+  and the app area, so what an author previews is what a participant gets; it
+  stays its own package. Both reach the engine only through the HTTP wrapper
+  or the engine package's `exports` map — neither authors-or-runs definitions
+  in-process except via those boundaries. `packages/editor`, the original
+  structural-editor proof of concept, is deleted.
 
   `src/runtime/api.ts` (the Runtime API Layer) is the in-process boundary
   that actually runs an instance — `createProcessInstance`,

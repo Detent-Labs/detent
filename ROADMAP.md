@@ -445,14 +445,29 @@ capability of its own.
     only its internals are retired with no replacement, and the
     devcontainer's `postCreateCommand` no longer installs Playwright, since
     no remaining package needed it.
-12. Unified shell (consolidate app/admin/studio/reporting): NOT STARTED, but
-    the direction is decided as of 2026-08-01 and no longer deferred. It was
+12. Unified shell (consolidate app/admin/studio/reporting): DONE
+    (`serve-web-assets` for step 0, `consolidate-frontend-shell` for steps
+    1-5, both archived 2026-08-01). One package, `packages/web`, one build,
+    one login, one address; the engine serves it from `WEB_ROOT`. See the
+    `unified-shell` and `web-asset-serving` capabilities, and the "Unified
+    shell" entry in `docs/current-state.md`.
+    Four things in the plan below were wrong against the code and were
+    corrected while building it. The four route tables are NOT rewritten: the
+    shell strips the prefix inbound and prepends it outbound, so each area's
+    `matchRoute`/`routePath` moved verbatim minus its `login` case, and
+    Studio's migrate route needed no attention. Three of four sessions already
+    carried `roles`. `ClientError` was never one type wearing four names, so it
+    moved up as the union of every server error type. And an area prefix can
+    collide with an API prefix: `/admin/outbox`, `/admin/timers` and
+    `/admin/users` name both a screen and a `GET` admin route, so a browser
+    navigation is now answered from the web root BEFORE route matching.
+    The plan as it stood follows, for the record. It was
     raised 2026-07-28 as a "someday" question and re-brainstormed 2026-07-30
     without a trigger; the trigger is now stated — an installation must
     present itself as one system with one address, not four systems with four
     ports and four logins. No design document was written by request; this
-    entry carries the design, and the two OpenSpec changes below still have
-    to be written before any code moves.
+    entry carries the design, and the two OpenSpec changes below carried it
+    into code.
     Bestand as of this entry: four independently-built Vite SPAs, not three —
     `packages/reporting` (stage 21) arrived with the same trio every other
     package carries, `session.ts`, `routing.ts`, `screens/LoginScreen.tsx`,
@@ -536,10 +551,19 @@ capability of its own.
     Order (studio second on purpose — it holds the hardest routing case,
     `/processes/:processId/migrate/:from/:to`, and meeting it while only two
     areas hang off the shell is far cheaper than meeting it fourth):
-    0. Static serving in the engine — the only backend change, reviewed
-       alone, tested against a fixture directory rather than a real build.
+    0. Static serving in the engine — DONE (`serve-web-assets`). The only
+       backend change, reviewed alone, tested against a fixture directory
+       rather than a real build. `src/http/static.ts` falls through behind
+       every API route at `createServer`'s terminal 404; `WEB_ROOT` names the
+       directory and defaults, inertly for now, to `packages/web/dist`.
     1. `packages/web` with `shell/` + `areas/app`, `packages/app` deleted.
-       Carries the prefix-routing contract and the session gaining `roles`.
+       DONE. Carries the prefix-routing contract and the session gaining
+       `roles`. Two findings above were corrected against the code while
+       building it: the four route tables are NOT rewritten (the shell strips
+       the prefix on the way in and prepends it on the way out, so each area's
+       `matchRoute`/`routePath` moves verbatim minus its `login` case, and
+       Studio's migrate route needed no attention), and three of the four
+       sessions already carried `roles` — only `packages/app` discarded them.
     2. `areas/studio`, `src/api/` extracted here (largest client, 278 lines,
        against app's 166 — a more honest cut than two mid-sized ones).
     3. `areas/admin`. 4. `areas/reporting`. 5. Cleanup: root scripts,
@@ -550,11 +574,11 @@ capability of its own.
     `packages/form-ui` stays a separate package throughout — it is imported
     from two sides for the whole migration and must not move. Folding it in
     as `src/form/` is a separate decision after step 5.
-    Two OpenSpec changes, neither written yet: `serve-web-assets` (step 0)
-    and `consolidate-frontend-shell` (steps 1-5, one change with the task
-    list in the order above, archivable only once all four areas are in). A
-    third change splitting off admin/reporting was considered and rejected:
-    it would carry no spec delta, only more areas under the same capability.
+    Two OpenSpec changes, both archived 2026-08-01: `serve-web-assets`
+    (step 0) and `consolidate-frontend-shell` (steps 1-5, one change with the
+    task list in the order above). A third change splitting off
+    admin/reporting was considered and rejected: it would carry no spec
+    delta, only more areas under the same capability.
 13. i18n extensions (content-translation UI; UI-chrome white-label overrides):
     NOT STARTED, deliberately deferred — raised 2026-07-28 as a brainstorm, not
     a committed stage. Two independent sub-projects, not one change:
