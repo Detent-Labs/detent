@@ -71,18 +71,22 @@ matches the opt-in strictness an action handler already has.
 
 ### Requirement: checkAssignmentRegistry is invoked at publish, alongside checkActionRegistry
 
-`publishBody` SHALL invoke `checkAssignmentRegistry(body, registry)` at the
-same placement as every other publish-time check. That placement is
+`publishBody` SHALL invoke `checkAssignmentRegistry(body, assignmentRegistry)`
+at the same placement as every other publish-time check. That placement is
 after the hash-hit no-op return, on the compiled body, alongside
 `checkActionRegistry`, and before CEL and cross-process validation. A violation
 SHALL throw
 `AssignmentRegistryValidationError` carrying every located issue, collected
 rather than failing on the first found. This matches `RegistryValidationError`.
 
-The assignment strategy entries SHALL travel on the process's existing injected
-`Registry`. They sit beside its action handler entries. `publishBody` therefore
-keeps taking one registry argument. The check resolves against that argument. It
-never compares against a literal.
+`publishBody` SHALL take the process's `AssignmentRegistry` as a further
+argument, beside the action `Registry` and the `DataSourceRegistry` it already
+takes. The check resolves against that argument. It never compares against a
+literal.
+
+The check SHALL reuse the shared resolve-then-parse loop that
+`checkActionRegistry` and `checkDataSourceRegistry` already share. Only the
+resolve function and the entity label differ.
 
 #### Scenario: An identical re-publish of an already-stored body stays a no-op
 
