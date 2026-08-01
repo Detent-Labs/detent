@@ -616,6 +616,13 @@ are alternatives, never combined.
 The response SHALL carry the page of summaries and the next cursor, with the
 cursor absent on the last page.
 
+`scope=all` SHALL set `instance-query`'s `includeDegraded` filter, since that
+scope already requires `ADMIN_ROLE`. An instance whose summary cannot be
+produced then comes back as a degraded item, per that capability's own
+requirement. `scope=mine` SHALL NOT set it. An instance whose summary cannot
+be produced under that scope is absent from the page instead. No degraded
+item represents it, and the response still carries no error over it.
+
 #### Scenario: Listing with no query parameters
 
 - **WHEN** `GET /instances` is requested with a resolvable credential holding
@@ -683,6 +690,25 @@ cursor absent on the last page.
 
 - **WHEN** `GET /instances` (with or without query parameters) is requested with no resolvable credential
 - **THEN** the response is 401 and no listing read is performed
+
+#### Scenario: An admin-scoped listing surfaces a degraded item
+
+- **WHEN** `GET /instances` (or `?scope=all`) is requested with a resolvable
+  credential holding `system:admin`
+- **AND** one matched instance's summary cannot be produced
+- **THEN** the response is 200
+- **AND** that instance's item is a degraded summary
+- **AND** every other instance in the page returns as a normal summary
+
+#### Scenario: A scope=mine listing never surfaces a degraded item
+
+- **WHEN** `GET /instances?scope=mine` is requested with a resolvable
+  credential
+- **AND** one instance among that actor's own assignments has a summary that
+  cannot be produced
+- **THEN** the response is 200
+- **AND** that instance is absent from the page
+- **AND** no item in the page is a degraded summary
 
 ### Requirement: Read an instance's record over HTTP
 

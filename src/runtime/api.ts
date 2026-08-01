@@ -141,6 +141,31 @@ export type InstanceSummary = {
 };
 
 /**
+ * Stands in for an `InstanceSummary` a page's caller opted into seeing
+ * (`InstanceListFilter.includeDegraded`) when the instance's summary could
+ * not be produced — its pinned `(processId, version)` has no resolvable
+ * published body, or its `currentStepId` is absent from that body's steps.
+ * Omits every field that needs a resolved body (`processLabel`, `stepLabel`,
+ * `processBaseLocale`); `degraded: true` is the discriminant against
+ * `InstanceSummary`, which never carries that field. See design.md
+ * "A sibling type, not a widened InstanceSummary".
+ */
+export type DegradedInstanceSummary = {
+  degraded: true;
+  instanceId: InstanceId;
+  processId: ProcessId;
+  version: number;
+  status: InstanceStatus;
+  currentStepId: StepId;
+  transitionSeq: number;
+  startedBy?: string;
+  createdAt: string;
+  reason: "missing-definition" | "current-step-not-in-body";
+};
+
+export type InstanceSummaryItem = InstanceSummary | DegradedInstanceSummary;
+
+/**
  * Filters combine conjunctively; `assignedTo` alone is a disjunction (see design.md).
  * `assignedToRoles` extends the unclaimed-candidate half of that disjunction to role
  * membership, not just literal id — `assignment.candidates` holds whichever of the two
@@ -154,6 +179,12 @@ export type InstanceListFilter = {
   claimedBy?: string;
   assignedTo?: string;
   assignedToRoles?: string[];
+  // Not a query filter: set by the caller's own authorization context (see
+  // http-wrapper's `scope=all` / `ADMIN_ROLE` check), never from raw client
+  // input. True degrades an unresolvable instance's item instead of omitting
+  // it — see toSummary/listInstances and design.md "Gate visibility with an
+  // includeDegraded filter field".
+  includeDegraded?: boolean;
 };
 
 export type Page<T> = { items: T[]; cursor?: string };
@@ -188,11 +219,25 @@ const MAX_LIST_LIMIT = 200;
 const DEFAULT_RECORD_LIMIT = 100;
 const MAX_RECORD_LIMIT = 500;
 
+/**
+ * The instance's `currentStepId` is not among its pinned body's steps — a
+ * structural mismatch, not a not-found condition (see findStep). Local to
+ * this module: unlike `NotFoundError`, nothing outside `listInstances`
+ * catches it, so it does not belong in `src/errors.ts`, which exists to
+ * break import cycles between modules that throw and modules that map.
+ */
+class StepNotInBodyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StepNotInBodyError";
+  }
+}
+
 async function toSummary(inst: Instance, createdAt: string, store: DefinitionStore): Promise<InstanceSummary> {
   const body = await store.resolveBody(inst.processId, inst.version);
   if (!body) throw new NotFoundError(`no published body for process ${inst.processId} version ${inst.version}`);
   const step = body.workflow.steps.find((s) => s.id === inst.currentStepId);
-  if (!step) throw new Error(`current step not in body: ${inst.currentStepId}`); // structural mismatch, not a not-found condition — see findStep
+  if (!step) throw new StepNotInBodyError(`current step not in body: ${inst.currentStepId}`);
   return {
     instanceId: inst.instanceId,
     processId: inst.processId,
@@ -208,6 +253,47 @@ async function toSummary(inst: Instance, createdAt: string, store: DefinitionSto
     stepLabel: step.label,
     processBaseLocale: body.baseLocale,
   };
+}
+
+function toDegradedSummary(inst: Instance, createdAt: string, reason: DegradedInstanceSummary["reason"]): DegradedInstanceSummary {
+  return {
+    degraded: true,
+    instanceId: inst.instanceId,
+    processId: inst.processId,
+    version: inst.version,
+    status: inst.status,
+    currentStepId: inst.currentStepId,
+    transitionSeq: inst.transitionSeq,
+    startedBy: inst.startedBy,
+    createdAt: new Date(createdAt).toISOString(),
+    reason,
+  };
+}
+
+/**
+ * `toSummary`'s two known failure causes — a missing published body, or a
+ * `currentStepId` absent from it — never fail the page. `includeDegraded`
+ * decides how: true degrades the item, false or absent omits it from
+ * `items` entirely (see design.md "Gate visibility with an includeDegraded
+ * filter field"). Any other exception rethrows and still fails the whole
+ * `listInstances` call — only these two already-understood causes get this
+ * treatment.
+ */
+async function toSummaryItem(
+  inst: Instance,
+  createdAt: string,
+  store: DefinitionStore,
+  includeDegraded: boolean | undefined,
+): Promise<InstanceSummaryItem | undefined> {
+  try {
+    return await toSummary(inst, createdAt, store);
+  } catch (err) {
+    let reason: DegradedInstanceSummary["reason"];
+    if (err instanceof NotFoundError) reason = "missing-definition";
+    else if (err instanceof StepNotInBodyError) reason = "current-step-not-in-body";
+    else throw err;
+    return includeDegraded ? toDegradedSummary(inst, createdAt, reason) : undefined;
+  }
 }
 
 // ============================================================
@@ -780,7 +866,7 @@ export async function listInstances(
   filter: InstanceListFilter = {},
   page: { limit?: number; cursor?: string } = {},
   db: SQL = sql,
-): Promise<Page<InstanceSummary>> {
+): Promise<Page<InstanceSummaryItem>> {
   const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
   const [cursorCreatedAt, cursorInstanceId] = page.cursor ? decodeCursor(page.cursor, 2) : [undefined, undefined];
   const statusArr = filter.status && filter.status.length > 0 ? db.array(filter.status, "TEXT") : null;
@@ -821,7 +907,10 @@ export async function listInstances(
   const hasMore = rows.length > limit;
   const pageRows = rows.slice(0, limit);
   const store = getStore(db);
-  const items = await Promise.all(pageRows.map((r) => toSummary(parseInstance(r.body), r.created_at, store)));
+  const resolved = await Promise.all(
+    pageRows.map((r) => toSummaryItem(parseInstance(r.body), r.created_at, store, filter.includeDegraded)),
+  );
+  const items = resolved.filter((item): item is InstanceSummaryItem => item !== undefined);
   const last = pageRows[pageRows.length - 1];
   const cursor = hasMore && last ? encodeCursor([last.created_at_cursor, last.instance_id]) : undefined;
   return { items, cursor };

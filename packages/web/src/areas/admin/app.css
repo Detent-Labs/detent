@@ -302,7 +302,8 @@ h2 {
 .admin-badge-faulted,
 .admin-badge-dead-letter,
 .admin-badge-overdue,
-.admin-badge-disabled {
+.admin-badge-disabled,
+.admin-badge-degraded {
   color: var(--color-danger);
 }
 
