@@ -25,6 +25,8 @@ import {
   NotFoundError,
   InstanceNotRunningError,
   type InstanceRecordElement,
+  type InstanceSummary,
+  type DegradedInstanceSummary,
 } from "../src/runtime/api.js";
 import { redactInstance } from "../src/engine/retention.js";
 import { ADMIN_ROLE, DEVELOPER_ROLE, AuthorizationError } from "../src/auth/authorize.js";
@@ -1205,7 +1207,7 @@ test.skipIf(!DB)("listInstances resolves processLabel/stepLabel from the pinned 
   await createProcessInstance(PID, actor, dataSourceReg);
 
   const page = await listInstances({ processId: PID });
-  const item = page.items[0]!;
+  const item = page.items[0]! as InstanceSummary;
   expect(item.processLabel).toEqual({ en: "Two Paths Body" });
   expect(item.stepLabel).toEqual({ en: "A" });
   expect(item.processBaseLocale).toBe("en");
@@ -1219,14 +1221,14 @@ test.skipIf(!DB)("listInstances' currentStepEnteredAt reflects the current step'
   const created = await createProcessInstance(PID, actor, dataSourceReg);
 
   const beforePage = await listInstances({ processId: PID });
-  const before = beforePage.items[0]!;
+  const before = beforePage.items[0]! as InstanceSummary;
   expect(before.currentStepEnteredAt).toBeDefined();
 
   await new Promise((r) => setTimeout(r, 5));
   await submitAndTransition(created.instanceId, "path_x" as PathId, {} as Instance["data"], actor, dataSourceReg);
 
   const afterPage = await listInstances({ processId: PID });
-  const after = afterPage.items[0]!;
+  const after = afterPage.items[0]! as InstanceSummary;
   expect(after.currentStepEnteredAt).toBeDefined();
   expect(new Date(after.currentStepEnteredAt!).getTime()).toBeGreaterThan(new Date(before.currentStepEnteredAt!).getTime());
 });
@@ -1444,6 +1446,94 @@ test.skipIf(!DB)("an instance created after a listInstances page was read does n
   const seenIds = [...page1.items, ...page2.items].map((i) => i.instanceId);
   expect(new Set(seenIds).size).toBe(seenIds.length); // no duplicate across the two pages
   expect(seenIds).toContain(first.instanceId);
+});
+
+// ------------------------------------------------------------
+// listInstances: degrade-vs-omit for an unresolvable instance
+// ------------------------------------------------------------
+
+test.skipIf(!DB)("listInstances degrades an item with includeDegraded when its pinned version has no published body", async () => {
+  const PID = pid("proc_list_degraded_missing_body");
+  const v1 = await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const orphan = await createProcessInstance(PID, actor, dataSourceReg);
+  const ok = await createProcessInstance(PID, actor, dataSourceReg);
+  // No version 2 was ever published for PID — simulates the out-of-band data
+  // drift proposal.md describes, not a supported engine operation.
+  await sql`UPDATE instances SET body = jsonb_set(body, '{version}', to_jsonb(${v1.version + 1})) WHERE instance_id = ${orphan.instanceId}`;
+
+  const page = await listInstances({ processId: PID, includeDegraded: true });
+  expect(page.items).toHaveLength(2);
+  const degraded = page.items.find((i) => i.instanceId === orphan.instanceId) as DegradedInstanceSummary;
+  expect(degraded.degraded).toBe(true);
+  expect(degraded.reason).toBe("missing-definition");
+  expect(degraded.processId).toBe(PID);
+  const okItem = page.items.find((i) => i.instanceId === ok.instanceId)!;
+  expect((okItem as { processLabel?: unknown }).processLabel).toBeDefined();
+});
+
+test.skipIf(!DB)("listInstances degrades an item with includeDegraded when its currentStepId is absent from its pinned body", async () => {
+  const PID = pid("proc_list_degraded_bad_step");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const bad = await createProcessInstance(PID, actor, dataSourceReg);
+  await sql`UPDATE instances SET body = jsonb_set(body, '{currentStepId}', '"step_ghost"') WHERE instance_id = ${bad.instanceId}`;
+
+  const page = await listInstances({ processId: PID, includeDegraded: true });
+  const degraded = page.items.find((i) => i.instanceId === bad.instanceId) as DegradedInstanceSummary;
+  expect(degraded.degraded).toBe(true);
+  expect(degraded.reason).toBe("current-step-not-in-body");
+});
+
+test.skipIf(!DB)("listInstances omits, rather than degrades, an unresolvable instance when includeDegraded is unset", async () => {
+  const PID = pid("proc_list_omit_missing_body");
+  const v1 = await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const orphan = await createProcessInstance(PID, actor, dataSourceReg);
+  const ok = await createProcessInstance(PID, actor, dataSourceReg);
+  await sql`UPDATE instances SET body = jsonb_set(body, '{version}', to_jsonb(${v1.version + 1})) WHERE instance_id = ${orphan.instanceId}`;
+
+  const page = await listInstances({ processId: PID });
+  expect(page.items.map((i) => i.instanceId)).toEqual([ok.instanceId]);
+  expect(page.items.some((i) => "degraded" in i)).toBe(false);
+});
+
+test.skipIf(!DB)("listInstances still fails the whole request on an exception unrelated to the two known causes", async () => {
+  const PID = pid("proc_list_unrelated_exception");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, actor, dataSourceReg); // resolves and caches v1 — untouched
+  // A second, distinct version, never resolved by anything above, so its
+  // cache entry is empty. Corrupting it (not v1) rules out a cache hit
+  // masking the corruption — `resolveBody` must actually read this row.
+  const v2 = await publishBody(PID, { ...twoPathsBody(), label: { en: "V2" } }, reg, dataSourceReg);
+  await sql`UPDATE definitions SET body = body - 'workflow' WHERE process_id = ${PID} AND version = ${v2.version}`;
+  await sql`UPDATE instances SET body = jsonb_set(body, '{version}', to_jsonb(${v2.version})) WHERE instance_id = ${inst.instanceId}`;
+
+  let raised: unknown;
+  try {
+    await listInstances({ processId: PID, includeDegraded: true });
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeDefined();
+  expect(raised).not.toBeInstanceOf(NotFoundError);
+});
+
+test.skipIf(!DB)("a degraded summary carries identity fields but no label fields", async () => {
+  const PID = pid("proc_list_degraded_shape");
+  const v1 = await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const orphan = await createProcessInstance(PID, actor, dataSourceReg);
+  await sql`UPDATE instances SET body = jsonb_set(body, '{version}', to_jsonb(${v1.version + 1})) WHERE instance_id = ${orphan.instanceId}`;
+
+  const page = await listInstances({ processId: PID, includeDegraded: true });
+  const degraded = page.items.find((i) => i.instanceId === orphan.instanceId) as DegradedInstanceSummary;
+  expect(degraded.instanceId).toBe(orphan.instanceId);
+  expect(degraded.processId).toBe(PID);
+  expect(degraded.version).toBe(v1.version + 1);
+  expect(degraded.status).toBe("running");
+  expect(degraded.currentStepId).toBe("step_a" as StepId);
+  expect(degraded.transitionSeq).toBeDefined();
+  expect(degraded.createdAt).toBeDefined();
+  expect((degraded as unknown as { processLabel?: unknown }).processLabel).toBeUndefined();
+  expect((degraded as unknown as { stepLabel?: unknown }).stepLabel).toBeUndefined();
+  expect((degraded as unknown as { processBaseLocale?: unknown }).processBaseLocale).toBeUndefined();
 });
 
 // ============================================================

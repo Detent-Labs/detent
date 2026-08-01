@@ -1075,13 +1075,50 @@ components:
           type: string
       required: [instanceId, processId, version, status, currentStepId, transitionSeq, createdAt, processLabel, stepLabel, processBaseLocale]
 
+    DegradedInstanceSummary:
+      description: >-
+        Stands in for an InstanceSummary the engine could not resolve —
+        its pinned (processId, version) has no published body, or its
+        currentStepId is absent from that body's steps. Only appears when
+        the request is authorized to see every instance (scope=all); a
+        scope=mine request never returns one for a caller's own instance,
+        it is simply absent from items instead.
+      type: object
+      properties:
+        degraded:
+          type: boolean
+          enum: [true]
+        instanceId:
+          type: string
+        processId:
+          type: string
+        version:
+          type: integer
+        status:
+          $ref: "#/components/schemas/InstanceStatus"
+        currentStepId:
+          type: string
+        transitionSeq:
+          type: integer
+        startedBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          enum: [missing-definition, current-step-not-in-body]
+      required: [degraded, instanceId, processId, version, status, currentStepId, transitionSeq, createdAt, reason]
+
     InstanceSummaryPage:
       type: object
       properties:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/InstanceSummary"
+            oneOf:
+              - $ref: "#/components/schemas/InstanceSummary"
+              - $ref: "#/components/schemas/DegradedInstanceSummary"
         cursor:
           type: string
       required: [items]

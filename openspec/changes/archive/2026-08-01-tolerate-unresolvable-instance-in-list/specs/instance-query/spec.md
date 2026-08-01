@@ -1,18 +1,12 @@
-# instance-query
+<!-- antislop: allow-file all -->
+<!--
+  This delta copies the existing "List instance summaries with filters"
+  requirement verbatim, per the MODIFIED-requirements workflow, and extends
+  it in its established WHEN/THEN scenario convention. See
+  admin-app/spec.md for the same file-wide allowance on the same grounds.
+-->
 
-## Purpose
-
-Runtime-level discovery over persisted instances: filtered, keyset-paginated
-listing of instance summaries (the participant-inbox / process-monitoring
-surface), and reading one instance's append-only record (its `HistoryEntry`
-and `InstanceEvent` rows merged into a single chronologically ordered
-sequence). Lives in the Runtime API Layer (`src/runtime/api.ts`), alongside
-`createProcessInstance`/`getInstanceView`/`submitAndTransition`/`claimStep`/
-`releaseClaim` — it resolves nothing the engine internals own, only reads
-what they already persist. Exposed over HTTP by the `http-wrapper`
-capability's `GET /instances` and `GET /instances/:instanceId/record` routes.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: List instance summaries with filters
 
@@ -49,24 +43,22 @@ id only, identically for a claimed or an unclaimed instance.
 With no filters the read SHALL return every instance, subject to paging. The
 read SHALL NOT scope results to the calling actor implicitly.
 
-A matched instance's summary can fail to resolve. This happens when its
-pinned `(processId, version)` has no resolvable published body, or when its
-`currentStepId` is absent from that body's steps. The read SHALL NOT fail
-the whole page over a failure like this. Every other instance in the same
-page SHALL resolve and return normally.
+If a matched instance's summary cannot be produced, because its pinned
+`(processId, version)` has no resolvable published body, or because its
+`currentStepId` is absent from that body's steps, the read SHALL NOT fail
+the whole page over it. Every other instance in the same page SHALL resolve
+and return normally regardless.
 
-The read SHALL accept one further filter, `includeDegraded`. A query
-parameter does not expose it. See the `http-wrapper` capability for how a
-caller sets it. When `includeDegraded` is true, the failed item SHALL come
-back as a degraded summary: `instanceId`, `processId`, `version`, `status`,
+The read SHALL accept one further filter, `includeDegraded`, not exposed as
+a query parameter (see the `http-wrapper` capability for how a caller sets
+it). When `includeDegraded` is true, the failed item SHALL come back as a
+degraded summary: `instanceId`, `processId`, `version`, `status`,
 `currentStepId`, `transitionSeq`, `startedBy`, `createdAt`, and a failure
-reason.
-
-A degraded summary SHALL NOT carry `processLabel`, `stepLabel`, or
-`processBaseLocale`. When `includeDegraded` is false or absent, the read
-SHALL omit the failed item from the page instead. Omitting it SHALL NOT
-reduce the page below its requested `limit` by requesting extra rows to
-compensate. The page may come back shorter than `limit` even when more
+reason. A degraded summary SHALL NOT carry `processLabel`, `stepLabel`, or
+`processBaseLocale`. When `includeDegraded` is false or absent, the failed
+item SHALL be omitted from the page instead. Omitting it SHALL NOT reduce
+the page below its requested `limit` by requesting extra rows to
+compensate; the page may come back shorter than `limit` even when more
 matching instances exist.
 
 #### Scenario: Listing every instance
@@ -179,95 +171,3 @@ matching instances exist.
 - **AND** that instance is absent from `items`
 - **AND** no item in the page is a degraded summary
 - **AND** every other matched instance returns as a normal summary
-
-### Requirement: Instance listing is keyset-paginated in a stable order
-
-The listing read SHALL order results newest-first by creation time, tie-broken
-by `instanceId`, and SHALL page by keyset cursor rather than by offset — the
-same technique `migrateInstances` and `findOrphanKeys` use. It SHALL accept a
-`limit` (with a documented default and an enforced maximum) and an opaque
-`cursor`, and SHALL return the cursor to pass for the next page, absent when
-the page is the last one.
-
-Because runtime ids are UUIDv4 and not time-sortable, instance creation time
-SHALL be persisted as its own column rather than inferred from the id.
-`currentStepEnteredAt` SHALL likewise be persisted (as part of the instance
-record, alongside `currentStepId`), written at step entry, rather than derived
-from the runtime record at read time.
-
-Paging SHALL be stable under concurrent writes in the sense that an instance
-already returned on an earlier page is never returned again on a later page of
-the same walk.
-
-#### Scenario: Paging through more instances than the limit
-
-- **WHEN** five instances exist and the read is called with `limit: 2`
-- **THEN** two summaries and a cursor are returned
-- **AND** passing that cursor returns the next two, then the last one with no cursor
-- **AND** the five summaries across the three pages are distinct and cover every instance
-
-#### Scenario: Results are newest-first
-
-- **WHEN** three instances are created in sequence
-- **AND** the read is called with no filters
-- **THEN** the most recently created instance is first
-
-#### Scenario: A limit above the maximum is capped
-
-- **WHEN** the read is called with a `limit` above the enforced maximum
-- **THEN** at most the maximum number of summaries is returned
-
-#### Scenario: An instance created after the walk started does not disturb it
-
-- **WHEN** a page has been read with `limit: 2` and a cursor returned
-- **AND** a new instance is created
-- **AND** the next page is read with that cursor
-- **THEN** no summary from the first page appears again
-
-#### Scenario: Two instances created within the same millisecond page correctly
-
-<!-- antislop: allow passive-voice -->
-- **WHEN** two instances were created within the same millisecond of each other
-- **AND** the read is called with `limit: 1`, returning the newer one and a cursor
-- **AND** the next page is read with that cursor
-- **THEN** the older instance is returned on the second page, not dropped from the walk
-
-### Requirement: Read one instance's append-only record
-
-The Runtime API Layer SHALL expose a read returning one instance's runtime
-record as a single chronologically ordered sequence merging its `HistoryEntry`
-rows and its `InstanceEvent` rows. Each returned element SHALL be
-discriminated so a consumer can tell a transition from an event without
-inspecting its shape.
-
-Ordering SHALL be by `transitionSeq` ascending, then by `at` ascending — the
-rule the runtime record already defines, since an event never advances the
-sequence and may therefore share one with a transition and with other events.
-The merge SHALL be performed by this read, not left to its callers.
-
-Reading the record of an unknown instance SHALL return an empty sequence
-rather than an error; the record is append-only and an unknown instance has
-written nothing.
-
-#### Scenario: Transitions and events are returned merged and ordered
-
-- **WHEN** an instance has transitioned twice and recorded an event at the second sequence
-- **THEN** the read returns three elements
-- **AND** they are ordered by `transitionSeq` then `at`
-- **AND** each is tagged as a history entry or an instance event
-
-#### Scenario: Several events sharing one sequence order by time
-
-- **WHEN** two events are recorded at the same `transitionSeq`
-- **THEN** the one with the earlier `at` is returned first
-
-#### Scenario: An unknown instance has an empty record
-
-- **WHEN** the read is called with an instance id that does not exist
-- **THEN** an empty sequence is returned and no error is raised
-
-#### Scenario: The record read is paginated
-
-- **WHEN** an instance's record is longer than the requested `limit`
-- **THEN** a page of that length and a cursor are returned
-- **AND** the cursor yields the following elements in the same order

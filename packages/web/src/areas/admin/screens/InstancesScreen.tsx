@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { listInstances, AdminClientError } from "../api/client.js";
-import type { InstanceSummary } from "../api/types.js";
+import type { DegradedInstanceSummary, InstanceSummaryItem } from "../api/types.js";
 import type { Route } from "../routing.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
@@ -14,8 +14,13 @@ interface InstancesScreenProps {
 
 const PAGE_LIMIT = 50;
 
+/** True for the item shape `listInstances` returns in place of a summary it could not resolve — see instance-query's degraded-summary requirement. */
+function isDegraded(item: InstanceSummaryItem): item is DegradedInstanceSummary {
+  return "degraded" in item;
+}
+
 export function InstancesScreen({ token, navigate, onUnauthorized }: InstancesScreenProps) {
-  const [items, setItems] = useState<InstanceSummary[]>([]);
+  const [items, setItems] = useState<InstanceSummaryItem[]>([]);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -106,27 +111,42 @@ export function InstancesScreen({ token, navigate, onUnauthorized }: InstancesSc
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => (
-              <tr key={item.instanceId}>
-                <td>
-                  <button
-                    type="button"
-                    className="admin-row-link"
-                    aria-label={`Open instance: ${labelText(item.processLabel, item.processBaseLocale)} — ${labelText(item.stepLabel, item.processBaseLocale)} (${item.status})`}
-                    onClick={() => navigate({ name: "instance", instanceId: item.instanceId })}
-                  >
-                    {labelText(item.processLabel, item.processBaseLocale)}
-                  </button>
-                </td>
-                <td>{labelText(item.stepLabel, item.processBaseLocale)}</td>
-                <td>
-                  <span className={`admin-badge admin-badge-${item.status}`}>{item.status}</span>
-                </td>
-                <td>{item.startedBy ?? "—"}</td>
-                <td>{item.assignment?.claimedBy ?? "—"}</td>
-                <td>{new Date(item.createdAt).toLocaleString()}</td>
-              </tr>
-            ))}
+            {items.map((item) =>
+              isDegraded(item) ? (
+                <tr key={item.instanceId}>
+                  <td>{item.processId}</td>
+                  <td>
+                    <span className="admin-badge admin-badge-degraded">{item.reason}</span>
+                  </td>
+                  <td>
+                    <span className={`admin-badge admin-badge-${item.status}`}>{item.status}</span>
+                  </td>
+                  <td>{item.startedBy ?? "—"}</td>
+                  <td>—</td>
+                  <td>{new Date(item.createdAt).toLocaleString()}</td>
+                </tr>
+              ) : (
+                <tr key={item.instanceId}>
+                  <td>
+                    <button
+                      type="button"
+                      className="admin-row-link"
+                      aria-label={`Open instance: ${labelText(item.processLabel, item.processBaseLocale)} — ${labelText(item.stepLabel, item.processBaseLocale)} (${item.status})`}
+                      onClick={() => navigate({ name: "instance", instanceId: item.instanceId })}
+                    >
+                      {labelText(item.processLabel, item.processBaseLocale)}
+                    </button>
+                  </td>
+                  <td>{labelText(item.stepLabel, item.processBaseLocale)}</td>
+                  <td>
+                    <span className={`admin-badge admin-badge-${item.status}`}>{item.status}</span>
+                  </td>
+                  <td>{item.startedBy ?? "—"}</td>
+                  <td>{item.assignment?.claimedBy ?? "—"}</td>
+                  <td>{new Date(item.createdAt).toLocaleString()}</td>
+                </tr>
+              ),
+            )}
           </tbody>
         </table>
       )}

@@ -22,8 +22,28 @@ export interface InstanceSummary {
   processBaseLocale: LocaleCode;
 }
 
+/**
+ * Mirrors src/runtime/api.ts::DegradedInstanceSummary — stands in for an
+ * `InstanceSummary` the engine could not resolve. Only ever appears in an
+ * admin-scoped `InstancePage`; `scope=mine` never returns one.
+ */
+export interface DegradedInstanceSummary {
+  degraded: true;
+  instanceId: string;
+  processId: string;
+  version: number;
+  status: InstanceStatus;
+  currentStepId: string;
+  transitionSeq: number;
+  startedBy?: string;
+  createdAt: string;
+  reason: "missing-definition" | "current-step-not-in-body";
+}
+
+export type InstanceSummaryItem = InstanceSummary | DegradedInstanceSummary;
+
 export interface InstancePage {
-  items: InstanceSummary[];
+  items: InstanceSummaryItem[];
   cursor?: string;
 }
 

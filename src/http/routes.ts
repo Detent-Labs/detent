@@ -316,6 +316,10 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
       claimedBy: url.searchParams.get("claimedBy") ?? undefined,
       assignedTo: scope === "mine" ? actor.id : assignedTo,
       assignedToRoles: scope === "mine" ? actor.roles : undefined,
+      // scope=all already required ADMIN_ROLE above — reusing that check
+      // instead of adding a second one. See design.md "Gate visibility with
+      // an includeDegraded filter field".
+      includeDegraded: scope === "all",
     };
     const limit = parseLimit(url);
     const cursor = url.searchParams.get("cursor") ?? undefined;

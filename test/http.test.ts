@@ -1429,6 +1429,43 @@ test.skipIf(!DB)("GET /instances with no resolvable credential is still 401, reg
 });
 
 // ============================================================
+// includeDegraded visibility follows scope (see instance-query's
+// "List instance summaries with filters" and http-wrapper's "List instances
+// over HTTP" MODIFIED requirements)
+// ============================================================
+
+test.skipIf(!DB)("GET /instances?scope=mine never surfaces a degraded item, even for the caller's own unresolvable instance", async () => {
+  const PID = pid("proc_http_scope_mine_no_degraded");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+  // No such version was ever published — out-of-band data drift, per proposal.md.
+  await sql`UPDATE instances SET body = jsonb_set(body, '{version}', to_jsonb(99)) WHERE instance_id = ${created.instanceId}`;
+
+  const res = await fetch(authedReq("http://x/instances?scope=mine", "GET", user1));
+  expect(res.status).toBe(200);
+  const page = (await res.json()) as { items: Record<string, unknown>[] };
+  expect(page.items.some((i) => i.instanceId === created.instanceId)).toBe(false);
+  expect(page.items.some((i) => i.degraded === true)).toBe(false);
+});
+
+test.skipIf(!DB)("GET /instances (admin scope) surfaces a degraded item for the same unresolvable instance", async () => {
+  const PID = pid("proc_http_scope_all_degraded");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await sql`UPDATE instances SET body = jsonb_set(body, '{version}', to_jsonb(99)) WHERE instance_id = ${created.instanceId}`;
+
+  const res = await fetch(authedReq("http://x/instances", "GET", admin));
+  expect(res.status).toBe(200);
+  const page = (await res.json()) as { items: Record<string, unknown>[] };
+  const degraded = page.items.find((i) => i.instanceId === created.instanceId);
+  expect(degraded).toBeDefined();
+  expect(degraded?.degraded).toBe(true);
+  expect(degraded?.reason).toBe("missing-definition");
+  expect(degraded?.processLabel).toBeUndefined();
+});
+
+// ============================================================
 // GET /instances/:instanceId/record
 // ============================================================
 
