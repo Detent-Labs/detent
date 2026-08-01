@@ -8,16 +8,9 @@ process version.
 
 ### Requirement: The engine stores data lists in two tables
 
-`initSchema` SHALL create `data_lists` and `data_list_values`.
-
-`data_lists` SHALL carry `list_key` as its primary key, a `label`, an
-optional `description`, `updated_at`, and `updated_by`. A list SHALL exist
-with no values.
-
-`data_list_values` SHALL carry `list_key`, `value`, a `label` holding a
-`LocalizedText`, an `active` flag defaulting to true, a `sort_order`,
-`updated_at`, and `updated_by`. Its primary key SHALL be
-`(list_key, value)`, and `list_key` SHALL reference `data_lists`.
+The values of a `"db.list"` data source SHALL live in `data_lists` and
+`data_list_values`, not in the process body. The `persistence` capability owns
+the shape of both relations. A list SHALL exist with no values.
 
 #### Scenario: A list exists before it has values
 - **WHEN** a caller creates a row in `data_lists` and adds no values

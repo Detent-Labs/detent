@@ -1,3 +1,45 @@
+## MODIFIED Requirements
+
+<!-- antislop: allow-file passive-voice sentence-length run-ons frozen-verbs em-dash synonym-rotation -->
+<!-- The block below reproduces the wording of the requirement it replaces,
+     which archive needs in full. Rewriting the carried-over prose would lose
+     the match against openspec/specs/admin-app/spec.md. Only the two-role
+     entry rule and its scenarios change. -->
+
+### Requirement: An actor without the admin role sees an explanatory empty state
+
+After a successful login, the shell SHALL read the roles carried by the login
+response and, when neither `system:admin` nor `system:datalists` is present,
+SHALL render a single explanatory screen stating that the account lacks the
+operator role — not a partially populated UI, and not a redirect back to login
+(the credential is valid).
+
+An actor who holds exactly one of the two SHALL enter the area and reach the
+screens that role gates. The operations screens SHALL stay behind
+`system:admin`, and the data list screens behind `system:datalists`. A screen
+the actor's role does not gate SHALL show the same explanatory state rather
+than a partially populated UI.
+
+This client-side check SHALL be presentational only; the server-side
+`requireRole` on every `/admin/*` route remains the enforcement.
+
+#### Scenario: A participant logs into the admin area
+
+- **WHEN** an actor whose roles include neither `system:admin` nor
+  `system:datalists` logs in
+- **THEN** the explanatory screen is shown and no operations screen is reachable
+
+#### Scenario: An operator logs in
+
+- **WHEN** an actor holding `system:admin` logs in
+- **THEN** the operations screens are reachable
+
+#### Scenario: A data list maintainer reaches only their screens
+
+- **WHEN** an actor holding `system:datalists` and not `system:admin` logs in
+- **THEN** the data list screens are reachable and the operations screens show
+  the explanatory state
+
 ## ADDED Requirements
 
 ### Requirement: A Data lists screen maintains value lists

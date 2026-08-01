@@ -31,6 +31,21 @@ I/O-backed handler type is a drop-in rather than an interface change.
 - **WHEN** `resolveDataSource` is called with a type never registered
 - **THEN** it returns `undefined`
 
+### Requirement: A built-in "static" data source handler echoes a configured option list
+
+The engine SHALL ship a built-in `"static"` data source handler, registered
+by `createDefaultDataSourceRegistry` (`src/engine/host.ts`), whose
+`configSchema` requires `{ options: FieldOption[] }` and whose `resolve`
+returns exactly `ctx.config.options` unchanged. The handler SHALL ignore
+`ctx.heldValues`: a static option list holds no notion of a retired value.
+`"static"` is no longer the only data source type shipped; see the
+`db-data-source-type` capability.
+
+#### Scenario: The static handler echoes its configured options
+- **WHEN** the `"static"` handler's `resolve` is called with `{ config: {
+  options: [...] } }`
+- **THEN** it returns exactly that `options` array
+
 #### Scenario: The static handler ignores heldValues
 - **WHEN** the `"static"` handler resolves with `heldValues` present
 - **THEN** it returns exactly its configured `options`

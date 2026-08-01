@@ -108,6 +108,21 @@ nothing about each other. Staff who maintain cost centres must not gain the
 power to cancel instances. Read access also accepts `system:developer`. That
 is what lets the studio picker work without a second route.
 
+### The admin area admits two roles rather than moving the screens
+
+The screens live in the admin area, and the shell gates that area on one role.
+A maintainer holding only `system:datalists` would therefore reach nothing. The
+shell's area table gains a role set per area, and the admin area lists
+`system:admin` and `system:datalists`. Area entry becomes the weaker gate, and
+each screen keeps its own check.
+
+Alternative considered: a fifth area for data lists. Rejected on cost. It buys
+an area entry, a URL prefix, a lazy chunk and a switcher entry. The two
+screens sit beside the instance list an operator already reads.
+
+Alternative considered: grant maintainers `system:admin`. Rejected for the
+reason the narrow role exists at all.
+
 ## Risks / Trade-offs
 
 - [One `SELECT` per view resolution] → The bound keeps a list at 500 rows,
@@ -123,6 +138,25 @@ is what lets the studio picker work without a second route.
   `"static"` ignores it. No existing handler changes.
 - [A body can name a missing list] → The delete guard blocks the only API
   path. Only direct SQL remains. The canary `Error` names the key.
+- [The reference scan over `definitions` carries no index] → The delete guard
+  and the usage report read every published body. Nothing prunes
+  `definitions`. That scan grows with the number of published versions.
+  Both readers are admin routes, on no instance path. The standing rule in
+  `persistence` covers each predicate the engine queries hot paths on, so it
+  does not reach them. Revisit with an index over the body's data sources when
+  a measurement asks for one.
+- [`"db.list"` resolution carries no deadline of its own] → It inherits the
+  `Bun.sql` connection timeout. `DataSourceHandlerDef.resolve` carries no
+  deadline seam. `resolveFields` sits under `getInstanceView`,
+  `submitAndTransition` and `createProcessInstance`. A later deadline widens
+  `DataSourceContext`, the same additive move `heldValues` makes here. This is
+  a deferral rather than a door that closes. The timeout question stays open
+  for an I/O-backed type that leaves the database.
+- [A label change rewrites how history renders] → The instance stores the
+  value key, and rendering reads the current label. An operator who renames a
+  value changes how an old step reads back. The stored key stays stable and
+  correct. A label snapshot per history entry would widen `HistoryEntry`,
+  which this change rules out.
 
 ## Migration Plan
 
