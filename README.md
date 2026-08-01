@@ -28,6 +28,9 @@ immutable and instances pin `{ processId, version, definitionHash }`.
 
 All conditions are CEL (`{ lang: "cel", src }`) — pure, total, no `now()`.
 
+New to the vocabulary? `docs/authoring-guide.md` explains what a Step, a Path
+and an Action are. It also gives the order in which to build a process.
+
 ## Status
 
 Schema, validation, a working engine, a Runtime API Layer, an HTTP wrapper with
