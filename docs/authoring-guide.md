@@ -189,6 +189,119 @@ For a worked pair, read `examples/subprocess-loan-parent.json` and
 
 ## Building a process
 
+Ten steps, in the order the model forces. A path needs two steps before you
+can draw it. A guard needs a field before it can read one. Follow the order
+and you never have to go back.
+
+Everything here happens in Studio, on a draft. A draft is private and
+changeable. Nothing you do to a draft affects a running process.
+
+### 1. Open a draft
+
+Studio lists your processes. Open one, or start a new one. The draft toolbar
+along the top carries **Save**, **Discard draft** and **Publish**. It also
+tells you whether you have unsaved changes.
+
+The screen has two tabs, **Structure** and **JSON**. Structure is the panels
+described below. JSON is the same draft as raw text, which helps when you want
+to read the whole body at once.
+
+### 2. Define the field catalog
+
+Open the **Field catalog** panel and declare every field the process needs.
+Do this first, because a view, a guard and an action output all reference a
+field.
+
+Give each field a key that matches `/^[a-z_][a-z0-9_]*$/`. A guard reads it as
+`data.<key>`, and the key must survive that.
+
+Does a select field take its options from somewhere else? Declare that source
+in the **Data sources** panel. Then point the field at it.
+
+### 3. Add the steps
+
+Open the **Steps** panel. Add one step per state. Mark the initial step. Mark
+the terminal steps.
+
+Name states, not activities. `Review` is a state. `Send the email` is not, and
+it belongs in an action.
+
+### 4. Compose the view for each step
+
+Select a step and build its view. Add the catalog fields this step shows, and
+override each one: visible, required, readonly, its position, its group.
+
+A terminal step usually shows a readonly summary. A step early in the process
+usually demands the fields it collects.
+
+### 5. Draw the paths
+
+Select a step and open its **Paths** section. Add one path per exit, and pick
+its target step.
+
+Decide manual or automatic for the whole step at once, because a step must not
+mix them. Choose manual when a person decides. Choose automatic when the data
+decides.
+
+Write the guard of an automatic path as a CEL expression over `data`. Give
+every automatic path on the step a distinct priority, and remember that the
+lowest number goes first. If you want a default, leave its guard empty and
+give it the highest number.
+
+Do you want the process to wait for an answer from outside? Give the step one
+automatic path per answer, and no default. Nothing matches until the answer
+arrives, so the process waits.
+
+### 6. Attach actions and timers
+
+Add actions where the engine should do something. An action sits on entry to a
+step, on exit from it, or on a path. Pick the type from the registered
+handlers, which the **Action registry** panel lists. Then fill in its config.
+
+Remember the order. `onExit` runs first, then `onPath`, then `onEntry`.
+
+Add timers in the **Timers** section of a step. A timer with a target path
+forces that transition. A timer without one is a reminder, and it only runs
+its actions.
+
+Never leave a wait-state without a timer. A step that waits for an answer that
+never arrives waits forever.
+
+### 7. Set assignment
+
+For every step a person must act on, set the **assignment strategy** and list
+the candidates. A step nobody acts on needs no assignment.
+
+Assign by role, not by person. A person leaves the company, and the process
+outlives them.
+
+### 8. Declare a contract, if another process will call this one
+
+Open the **Contract** panel. Name the input fields, the output fields and the
+outcomes. Then bind every terminal step to an outcome.
+
+Skip this step when nothing calls your process.
+
+### 9. Run it in the Player
+
+The Player runs your draft. Fill in the forms as a participant would and walk
+the process to a terminal step. Walk it again down a different path.
+
+Find the mistakes here, where a fix costs one change. After you publish, a fix
+costs a new version and a migration.
+
+### 10. Publish
+
+Press **Publish**. Studio verifies the whole body first. It refuses anything
+that breaks a rule. Four examples:
+
+- a guard that does not parse
+- an unreachable outcome
+- an unknown action type
+- a step with no exit
+
+A publication is immutable. Read the next chapter before you press it.
+
 ## After publish
 
 ## What this guide is not
