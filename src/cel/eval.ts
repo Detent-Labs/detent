@@ -103,8 +103,6 @@ export function buildTransformContext(fromBody: ProcessBody, snapshot: Instance)
 
 /** A total-per-entry map evaluation dropped its target field, and why. Shared shape for `evalTransforms` and `evalFieldMap`. */
 export type MapEntryDrop = { fieldId: FieldId; reason: MigrationTransformDroppedReason };
-/** @deprecated name kept for external references predating the shared shape; identical to `MapEntryDrop`. */
-export type TransformDrop = MapEntryDrop;
 
 /**
  * Evaluate a target-FieldId → CEL expression map over `ctx`, total per entry:
@@ -152,7 +150,7 @@ export function evalTransforms(
   spec: MigrationSpec,
   fromBody: ProcessBody,
   snapshot: Instance,
-): { patch: Record<string, unknown>; drops: TransformDrop[] } {
+): { patch: Record<string, unknown>; drops: MapEntryDrop[] } {
   return evalMapTotal(Object.entries(spec.transforms ?? {}), buildTransformContext(fromBody, snapshot));
 }
 
