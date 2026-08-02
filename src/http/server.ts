@@ -48,6 +48,12 @@ import {
   handleAdminEnableUser,
   handleAdminRunMigration,
   handleAdminRedactInstance,
+  handleAdminListDataLists,
+  handleAdminCreateDataList,
+  handleAdminGetDataList,
+  handleAdminUpdateDataList,
+  handleAdminPutDataListValues,
+  handleAdminDeleteDataList,
 } from "./admin-routes.js";
 import {
   handleReportingListProcesses,
@@ -348,6 +354,15 @@ export function createServer(
     if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "admin" && parts[1] === "instances" && parts[3] === "redact") {
       return preflight("POST");
     }
+    if (req.method === "OPTIONS" && parts.length === 2 && parts[0] === "admin" && parts[1] === "data-lists") {
+      return preflight("GET, POST");
+    }
+    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "admin" && parts[1] === "data-lists" && parts[3] === "values") {
+      return preflight("PUT");
+    }
+    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "admin" && parts[1] === "data-lists") {
+      return preflight("GET, PUT, DELETE");
+    }
     if (req.method === "OPTIONS" && parts.length === 1 && parts[0] === "drafts") {
       return preflight("GET");
     }
@@ -483,6 +498,30 @@ export function createServer(
     if (req.method === "POST" && parts.length === 4 && parts[0] === "admin" && parts[1] === "instances" && parts[3] === "redact") {
       return toRes(await handleAdminRedactInstance(parts[2]!, req, resolver, db));
     }
+    // GET /admin/data-lists
+    if (req.method === "GET" && parts.length === 2 && parts[0] === "admin" && parts[1] === "data-lists") {
+      return toRes(await handleAdminListDataLists(req, resolver, db));
+    }
+    // POST /admin/data-lists
+    if (req.method === "POST" && parts.length === 2 && parts[0] === "admin" && parts[1] === "data-lists") {
+      return toRes(await handleAdminCreateDataList(req, resolver, db));
+    }
+    // PUT /admin/data-lists/:listKey/values
+    if (req.method === "PUT" && parts.length === 4 && parts[0] === "admin" && parts[1] === "data-lists" && parts[3] === "values") {
+      return toRes(await handleAdminPutDataListValues(parts[2]!, req, resolver, db));
+    }
+    // GET /admin/data-lists/:listKey
+    if (req.method === "GET" && parts.length === 3 && parts[0] === "admin" && parts[1] === "data-lists") {
+      return toRes(await handleAdminGetDataList(parts[2]!, req, resolver, db));
+    }
+    // PUT /admin/data-lists/:listKey
+    if (req.method === "PUT" && parts.length === 3 && parts[0] === "admin" && parts[1] === "data-lists") {
+      return toRes(await handleAdminUpdateDataList(parts[2]!, req, resolver, db));
+    }
+    // DELETE /admin/data-lists/:listKey
+    if (req.method === "DELETE" && parts.length === 3 && parts[0] === "admin" && parts[1] === "data-lists") {
+      return toRes(await handleAdminDeleteDataList(parts[2]!, req, resolver, db));
+    }
     // GET /reporting/processes
     if (req.method === "GET" && parts.length === 2 && parts[0] === "reporting" && parts[1] === "processes") {
       return toRes(await handleReportingListProcesses(req, resolver, db));
@@ -596,7 +635,7 @@ export async function startHttpServer(
 }
 
 if (import.meta.main) {
-  startHttpServer(createRegistry(), createDefaultDataSourceRegistry()).catch((err) => {
+  startHttpServer(createRegistry(), createDefaultDataSourceRegistry(sql)).catch((err) => {
     console.error(err instanceof Error ? err.message : String(err));
     process.exit(1);
   });

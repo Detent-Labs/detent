@@ -10,12 +10,19 @@ export const AREAS = ["app", "admin", "studio", "reporting"] as const;
 
 export type Area = (typeof AREAS)[number];
 
-/** The role an actor needs to see the area, or `undefined` when a session is enough. */
-const REQUIRED_ROLE: Record<Area, string | undefined> = {
-  app: undefined,
-  admin: "system:admin",
-  studio: "system:developer",
-  reporting: "system:reports",
+/**
+ * The roles that reveal an area — any one of them admits. An empty set means a
+ * session is enough.
+ *
+ * The admin area carries two because the data list screens live in it while
+ * their maintainers must not hold `system:admin`. Area entry is therefore the
+ * weaker gate, and each screen inside keeps its own role check.
+ */
+const REQUIRED_ROLE: Record<Area, readonly string[]> = {
+  app: [],
+  admin: ["system:admin", "system:datalists"],
+  studio: ["system:developer"],
+  reporting: ["system:reports"],
 };
 
 export function isArea(value: string): value is Area {
@@ -23,8 +30,8 @@ export function isArea(value: string): value is Area {
 }
 
 export function mayEnter(area: Area, roles: readonly string[]): boolean {
-  const role = REQUIRED_ROLE[area];
-  return role === undefined || roles.includes(role);
+  const required = REQUIRED_ROLE[area];
+  return required.length === 0 || required.some((role) => roles.includes(role));
 }
 
 /** Every area the actor may see, in declaration order. */
@@ -42,5 +49,5 @@ export function permittedAreas(roles: readonly string[]): Area[] {
  * reserved role still lands on the app area, so `/` is never a dead end.
  */
 export function landingArea(roles: readonly string[]): Area {
-  return permittedAreas(roles).find((area) => REQUIRED_ROLE[area] !== undefined) ?? "app";
+  return permittedAreas(roles).find((area) => REQUIRED_ROLE[area].length > 0) ?? "app";
 }

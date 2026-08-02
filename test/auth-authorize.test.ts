@@ -2,7 +2,16 @@
  * requireRole gates process-admin operations against Actor.roles. Pure — no DB.
  */
 import { test, expect } from "bun:test";
-import { requireRole, AuthorizationError, PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, REPORTS_ROLE } from "../src/auth/authorize.js";
+import {
+  requireRole,
+  AuthorizationError,
+  PUBLISH_ROLE,
+  CANCEL_ANY_ROLE,
+  ADMIN_ROLE,
+  DEVELOPER_ROLE,
+  REPORTS_ROLE,
+  DATALISTS_ROLE,
+} from "../src/auth/authorize.js";
 import * as authorize from "../src/auth/authorize.js";
 
 test("the reserved role constants carry their documented literal values", () => {
@@ -11,6 +20,7 @@ test("the reserved role constants carry their documented literal values", () => 
   expect(ADMIN_ROLE).toBe("system:admin");
   expect(DEVELOPER_ROLE).toBe("system:developer");
   expect(REPORTS_ROLE).toBe("system:reports");
+  expect(DATALISTS_ROLE).toBe("system:datalists");
 });
 
 test("no authorization registry/plugin envelope exists alongside the fixed role checks", () => {
@@ -21,6 +31,7 @@ test("no authorization registry/plugin envelope exists alongside the fixed role 
     "ADMIN_ROLE",
     "AuthorizationError",
     "CANCEL_ANY_ROLE",
+    "DATALISTS_ROLE",
     "DEVELOPER_ROLE",
     "PUBLISH_ROLE",
     "REPORTS_ROLE",
@@ -47,6 +58,18 @@ test("the reports role implies nothing", () => {
 test("no other reserved role implies the reports role", () => {
   for (const held of [ADMIN_ROLE, DEVELOPER_ROLE, PUBLISH_ROLE, CANCEL_ANY_ROLE]) {
     expect(() => requireRole({ id: "user_1", roles: [held] }, REPORTS_ROLE)).toThrow(AuthorizationError);
+  }
+});
+
+test("the data list role implies nothing", () => {
+  for (const wanted of [ADMIN_ROLE, DEVELOPER_ROLE, CANCEL_ANY_ROLE, PUBLISH_ROLE, REPORTS_ROLE]) {
+    expect(() => requireRole({ id: "user_1", roles: [DATALISTS_ROLE] }, wanted)).toThrow(AuthorizationError);
+  }
+});
+
+test("no other reserved role implies the data list role", () => {
+  for (const held of [ADMIN_ROLE, DEVELOPER_ROLE, PUBLISH_ROLE, CANCEL_ANY_ROLE, REPORTS_ROLE]) {
+    expect(() => requireRole({ id: "user_1", roles: [held] }, DATALISTS_ROLE)).toThrow(AuthorizationError);
   }
 });
 

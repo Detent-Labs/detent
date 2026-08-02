@@ -350,11 +350,16 @@ See `ROADMAP.md` for stage-by-stage status (DONE/NOT STARTED) and what each stag
   a separate, more consequential decision (an unresolvable reference there could
   only park a wait-state forever or throw mid-delivery); it stays deliberately
   out of scope until a concrete need for CEL-visible data-source values exists.
-- **A second (dynamic/I/O-backed) data-source type.** The `DataSourceRegistry`
-  mechanism holds more than one type, but only the built-in `"static"` handler
-  ships. A live type (e.g. an HTTP-backed data source) is deferred until a
-  concrete need exists — its timeout/cache/error semantics are open questions
-  not worth deciding speculatively.
+- **A data-source type whose resolution leaves the database.** Two types now
+  ship: `"static"` and `"db.list"` (the latter reads two engine-owned tables,
+  see `docs/current-state.md`). Neither leaves the engine's own Postgres, so
+  neither exercises a resolution deadline of its own — `"db.list"` inherits the
+  `Bun.sql` connection timeout, and `DataSourceHandlerDef.resolve` carries no
+  deadline seam. The first type that reaches an outside service (e.g. an
+  HTTP-backed data source) owns the timeout, cache and error semantics, which
+  stay open questions not worth deciding speculatively. A deadline would widen
+  `DataSourceContext`, the same additive move `heldValues` already made, so
+  this is a deferral rather than a door that closes.
 - **A second (fallible) assignment strategy, and the failure rules it needs.**
   The `AssignmentRegistry` holds more than one type, but only the built-in
   `"static"` entry ships. `static` reads its own config, performs no I/O, and

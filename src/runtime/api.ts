@@ -355,9 +355,23 @@ function resolveFlag(v: boolean | { lang: "cel"; src: string } | undefined, ctx:
 }
 
 /**
+ * The values the instance holds for a field, as `DataSourceContext.heldValues`:
+ * none when unset, one for a `select`, the whole array for a `multiselect`.
+ * A handler that retires values returns a held one anyway, so the participant
+ * keeps seeing its label and membership validation keeps accepting it.
+ */
+function heldValuesOf(value: Literal | undefined): string[] {
+  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === "string");
+  return typeof value === "string" ? [value] : [];
+}
+
+/**
  * Resolve a `dataSource`-bound field's options via the registry, memoized by
- * `DataSourceId` within one `resolveFields` call so fields on the same step
- * sharing a data source resolve it once. A lookup miss here means the
+ * `DataSourceId` together with the held values within one `resolveFields`
+ * call, so fields on the same step sharing a data source *and* holding the
+ * same values resolve it once. Held values join the key because they change
+ * the result: two fields on one data source holding different values are two
+ * distinct resolutions. A lookup miss here means the
  * registry passed at runtime differs from the one the body was published
  * against — publish-time `data-source-registry-validation` already confirmed
  * every declared type resolves — so it is a "should never happen" canary,
@@ -366,16 +380,18 @@ function resolveFlag(v: boolean | { lang: "cel"; src: string } | undefined, ctx:
  */
 function resolveDataSourceOptions(
   def: DataSourceDef,
+  heldValues: string[],
   registry: DataSourceRegistry,
   cache: Map<string, Promise<FieldOption[]>>,
 ): Promise<FieldOption[]> {
-  const dsId = def.id as string;
-  let pending = cache.get(dsId);
+  const sorted = [...heldValues].sort();
+  const key = JSON.stringify([def.id as string, sorted]);
+  let pending = cache.get(key);
   if (!pending) {
     const handler = resolveDataSource(registry, def.type);
     if (!handler) throw new Error(`data source type '${def.type}' is not registered in the runtime registry`);
-    pending = handler.resolve({ config: def.config });
-    cache.set(dsId, pending);
+    pending = handler.resolve({ config: def.config, heldValues: sorted });
+    cache.set(key, pending);
   }
   return pending;
 }
@@ -412,7 +428,7 @@ async function resolveFields(body: ProcessBody, step: Step, instance: Instance, 
     if (field.dataSource) {
       const def = dataSourcesById.get(field.dataSource as string);
       if (!def) throw new Error(`data source not found: ${field.dataSource}`); // publish-time invariant guarantees resolution; defensive only
-      options = await resolveDataSourceOptions(def, registry, dataSourceCache);
+      options = await resolveDataSourceOptions(def, heldValuesOf(value), registry, dataSourceCache);
     }
     out.push({ field, value, required, readonly, group: vf.group, options });
   }

@@ -1,4 +1,6 @@
 import type {
+  DataListDetail,
+  DataListPage,
   InstancePage,
   InstanceRecordPage,
   InstanceView,
@@ -128,4 +130,51 @@ export async function runMigration(processId: string, fromVersion: number, toVer
     body: JSON.stringify({ processId, fromVersion, toVersion }),
   });
   return (await res.json()) as MigrationResult;
+}
+
+// ---- data lists -------------------------------------------------------------
+// Behind `system:datalists`; the reads also accept `system:developer`, which is
+// what lets the studio's data source panel offer the existing keys.
+
+export async function listDataLists(token: string): Promise<DataListPage> {
+  const res = await request("/admin/data-lists", token);
+  return (await res.json()) as DataListPage;
+}
+
+export async function createDataList(listKey: string, label: string, description: string | null, token: string): Promise<void> {
+  await request("/admin/data-lists", token, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ listKey, label, description }),
+  });
+}
+
+export async function getDataList(listKey: string, token: string): Promise<DataListDetail> {
+  const res = await request(`/admin/data-lists/${encodeURIComponent(listKey)}`, token);
+  return (await res.json()) as DataListDetail;
+}
+
+export async function updateDataList(listKey: string, label: string, description: string | null, token: string): Promise<void> {
+  await request(`/admin/data-lists/${encodeURIComponent(listKey)}`, token, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ label, description }),
+  });
+}
+
+/** Sends the whole set: the route replaces it, deactivating what this omits. */
+export async function putDataListValues(
+  listKey: string,
+  values: { value: string; label: Record<string, string>; sortOrder: number }[],
+  token: string,
+): Promise<void> {
+  await request(`/admin/data-lists/${encodeURIComponent(listKey)}/values`, token, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ values }),
+  });
+}
+
+export async function deleteDataList(listKey: string, token: string): Promise<void> {
+  await request(`/admin/data-lists/${encodeURIComponent(listKey)}`, token, { method: "DELETE" });
 }

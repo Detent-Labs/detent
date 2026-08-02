@@ -22,7 +22,10 @@ The engine SHALL provide a `DataSourceRegistry` (`src/engine/registry.ts`)
 mirroring the existing action `Registry`: a `Map<string, DataSourceHandlerDef>`
 keyed by `type`, where `DataSourceHandlerDef` is `{ resolve: (ctx:
 DataSourceContext) => Promise<FieldOption[]>, configSchema?: z.ZodTypeAny }`
-and `DataSourceContext` is `{ config: Record<string, unknown> }`.
+and `DataSourceContext` is `{ config: Record<string, unknown>, heldValues?:
+string[] }`. `heldValues` carries the values the instance already holds for
+the field under resolution, so a handler can return a value that is otherwise
+retired; a handler that has no such notion ignores it.
 `createDataSourceRegistry`, `registerDataSource`, and `resolveDataSource`
 SHALL provide construction, registration, and lookup, mirroring the action
 registry's own three functions. `resolve` SHALL be `async` regardless of
@@ -43,14 +46,19 @@ I/O-backed handler type is a drop-in rather than an interface change.
 The engine SHALL ship a built-in `"static"` data source handler, registered
 by `createDefaultDataSourceRegistry` (`src/engine/host.ts`), whose
 `configSchema` requires `{ options: FieldOption[] }` and whose `resolve`
-returns exactly `ctx.config.options` unchanged. This is the only data source
-type shipped in v1; the registry mechanism accepts more without requiring a
-built-in for each.
+returns exactly `ctx.config.options` unchanged. The handler SHALL ignore
+`ctx.heldValues`: a static option list holds no notion of a retired value.
+`"static"` is no longer the only data source type shipped; see the
+`db-data-source-type` capability.
 
 #### Scenario: The static handler echoes its configured options
 - **WHEN** the `"static"` handler's `resolve` is called with `{ config: {
   options: [...] } }`
 - **THEN** it returns exactly that `options` array
+
+#### Scenario: The static handler ignores heldValues
+- **WHEN** the `"static"` handler resolves with `heldValues` present
+- **THEN** it returns exactly its configured `options`
 
 ### Requirement: A data-source-bound view field's options are resolved at runtime
 
@@ -58,9 +66,13 @@ built-in for each.
 DataSourceRegistry` parameter and, for each view field whose `FieldDef`
 declares `dataSource`, resolve the referenced `DataSourceDef` from
 `body.dataSources`, look up its handler in `registry` by `type`, call
-`resolve({ config: def.config })`, and attach the result. Resolution SHALL be
-memoized by `DataSourceId` within one `resolveFields` call, so multiple
-fields on the same step bound to the same data source resolve it once.
+`resolve({ config: def.config, heldValues })`, and attach the result.
+`heldValues` SHALL carry the values the instance holds for that field: none
+when the field is unset, one for a `select`, and the whole array for a
+`multiselect`. Resolution SHALL be memoized within one `resolveFields` call
+by `DataSourceId` together with those held values, so multiple fields on the
+same step bound to the same data source and holding the same values resolve
+it once.
 
 `ResolvedViewField` SHALL gain an `options?: FieldOption[]` property,
 populated from `field.options` when the field declares static options
@@ -81,15 +93,27 @@ submission validation) SHALL read options from, rather than reading
 
 #### Scenario: Two fields sharing one data source resolve it once
 - **WHEN** two view fields on the same step both declare the same
-  `dataSource`
+  `dataSource` and hold the same values
 - **THEN** the handler's `resolve` is invoked exactly once for that
   `resolveFields` call, and both fields' resolved `options` reflect its
   result
+
+#### Scenario: Two fields sharing one data source but holding different values resolve separately
+- **WHEN** two view fields on the same step declare the same `dataSource` and
+  hold different values
+- **THEN** the handler's `resolve` is invoked once per distinct held-value
+  set
 
 #### Scenario: A field with neither options nor dataSource has no resolved options
 - **WHEN** a view field's `FieldDef` declares neither `options` nor
   `dataSource`
 - **THEN** the resolved field's `options` is `undefined`
+
+#### Scenario: A retired value the instance holds stays submittable
+- **WHEN** an instance holds a value that its data source no longer offers,
+  and the participant submits the step without changing that field
+- **THEN** the resolved options carry that value, and submission validation
+  accepts it
 
 ### Requirement: Submission validation enforces membership against resolved options, including data-source-bound fields
 

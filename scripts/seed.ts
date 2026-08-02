@@ -22,7 +22,7 @@ import { publishBody, listProcesses, listVersions } from "../src/engine/definiti
 import { createDefaultRegistry, createDefaultDataSourceRegistry } from "../src/engine/host.js";
 import { register } from "../src/engine/registry.js";
 import { createUser, listUsers, setRoles, setPassword } from "../src/auth/users.js";
-import { PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, REPORTS_ROLE } from "../src/auth/authorize.js";
+import { PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, REPORTS_ROLE, DATALISTS_ROLE } from "../src/auth/authorize.js";
 import type { ProcessId, ProcessBody } from "../src/schema/definition.js";
 
 const DEMO_PASSWORD = "seed-demo-password";
@@ -37,6 +37,7 @@ export const DEMO_USERS: { role: string; emailSuffix: string }[] = [
   { role: ADMIN_ROLE, emailSuffix: "admin" },
   { role: DEVELOPER_ROLE, emailSuffix: "developer" },
   { role: REPORTS_ROLE, emailSuffix: "reports" },
+  { role: DATALISTS_ROLE, emailSuffix: "datalists" },
 ];
 
 const EXAMPLES: { path: string; fixedProcessId?: ProcessId }[] = [

@@ -90,4 +90,23 @@ describe("area gating", () => {
     expect(landingArea([])).toBe("app");
     expect(landingArea(["system:publish"])).toBe("app");
   });
+
+  it("admits a data list maintainer to the admin area and nowhere else gated", () => {
+    // The screens live in the admin area, so entry admits either role; each
+    // screen inside keeps its own check.
+    expect(mayEnter("admin", ["system:datalists"])).toBe(true);
+    expect(mayEnter("studio", ["system:datalists"])).toBe(false);
+    expect(mayEnter("reporting", ["system:datalists"])).toBe(false);
+    expect(permittedAreas(["system:datalists"])).toEqual(["app", "admin"]);
+  });
+
+  it("still prefers a gated area for a data list maintainer", () => {
+    expect(landingArea(["system:datalists"])).toBe("admin");
+  });
+
+  it("offers the admin area in the switcher of a data list maintainer standing in the app area", () => {
+    // Chrome.tsx's switcher is exactly `permittedAreas(roles)` minus the open area.
+    const others = permittedAreas(["system:datalists"]).filter((a) => a !== "app");
+    expect(others).toEqual(["admin"]);
+  });
 });

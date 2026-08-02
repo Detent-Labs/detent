@@ -175,3 +175,13 @@ export async function getInstanceRecord(instanceId: string, token: string, opts:
   const res = await request(`/instances/${encodeURIComponent(instanceId)}/record${qs ? `?${qs}` : ""}`, token);
   return (await res.json()) as InstanceRecordPage;
 }
+
+/**
+ * The data list keys the server holds, for the `"db.list"` picker. Reads the
+ * admin data list route, which accepts `system:developer` for exactly this.
+ */
+export async function listDataListKeys(token: string): Promise<string[]> {
+  const res = await request("/admin/data-lists", token);
+  const page = (await res.json()) as { items: { listKey: string }[] };
+  return page.items.map((item) => item.listKey);
+}

@@ -283,6 +283,33 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     updated_by   text NOT NULL,
     updated_at   timestamptz NOT NULL DEFAULT now()
   )`;
+  // Data lists: the option values of a `"db.list"` data source, held outside the
+  // process body so an operator changes them with no publish and no migration.
+  // `label` here is the operator-facing name of the list itself, plain text; the
+  // per-value label is a LocalizedText and therefore jsonb. Both relations sit
+  // outside the audit backbone — they are configuration, not a record of what an
+  // instance did, so no append-only rule applies.
+  await db`CREATE TABLE IF NOT EXISTS data_lists (
+    list_key    text PRIMARY KEY,
+    label       text NOT NULL,
+    description text,
+    updated_by  text NOT NULL,
+    updated_at  timestamptz NOT NULL DEFAULT now()
+  )`;
+  // A value is deactivated, never deleted: an instance that already holds one
+  // must keep resolving its label (see the `heldValues` rule in host.ts). The
+  // cascade therefore only fires when the whole list goes, which the delete
+  // guard blocks while any published body references it.
+  await db`CREATE TABLE IF NOT EXISTS data_list_values (
+    list_key   text NOT NULL REFERENCES data_lists (list_key) ON DELETE CASCADE,
+    value      text NOT NULL,
+    label      jsonb NOT NULL,
+    active     boolean NOT NULL DEFAULT true,
+    sort_order integer NOT NULL DEFAULT 0,
+    updated_by text NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (list_key, value)
+  )`;
 }
 
 /**

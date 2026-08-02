@@ -137,3 +137,42 @@ export interface MigrationResult {
   failed: string[];
 }
 
+/** Mirrors the `data_lists` row the overview route returns. */
+export interface DataListSummary {
+  listKey: string;
+  label: string;
+  description: string | null;
+  updatedAt: string;
+  updatedBy: string;
+  activeValueCount: number;
+}
+
+export interface DataListPage {
+  items: DataListSummary[];
+}
+
+/**
+ * One `data_list_values` row. `active` false means retired: the value is out of
+ * new option lists but still resolves for an instance that holds it, which is
+ * why the editor marks it rather than hiding it.
+ */
+export interface DataListValue {
+  value: string;
+  label: Record<string, string>;
+  active: boolean;
+  sortOrder: number;
+}
+
+/** A published version whose body declares a `"db.list"` data source naming this list. */
+export interface DataListUsage {
+  processId: string;
+  version: number;
+}
+
+export interface DataListDetail {
+  listKey: string;
+  label: string;
+  description: string | null;
+  values: DataListValue[];
+  usedBy: DataListUsage[];
+}

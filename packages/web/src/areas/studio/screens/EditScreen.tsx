@@ -140,7 +140,7 @@ function EditorArea({ processId, token, initialRevision, initialLayout, navigate
         <>
           <ProcessHeader />
           <FieldCatalogPanel />
-          <DataSourcesPanel />
+          <DataSourcesPanel token={token} />
           <ContractPanel />
           <div className="canvas-layout">
             <CanvasView layout={saveState.layout} onMoveStep={onMoveStep} selectedStepId={selectedStepId} onSelectStep={setSelectedStepId} />

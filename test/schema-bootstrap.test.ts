@@ -44,7 +44,7 @@ test.skipIf(!DB)(
   "starting the http server against a database with the schema dropped creates it, and requests succeed",
   async () => {
     // Every table initSchema creates today — a genuinely fresh database.
-    await sql`DROP TABLE IF EXISTS outbox, instances, history_entries, instance_events, definitions, migration_plans, auth_users, drafts CASCADE`;
+    await sql`DROP TABLE IF EXISTS outbox, instances, history_entries, instance_events, definitions, migration_plans, auth_users, drafts, data_list_values, data_lists CASCADE`;
 
     const port = 48213;
     const prevPort = process.env.PORT;
