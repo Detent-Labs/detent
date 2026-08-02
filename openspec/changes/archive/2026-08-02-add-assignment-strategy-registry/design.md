@@ -209,7 +209,23 @@ entry resolves to an empty list rather than raising. That preserves what
   the two existing registries already do, from `startHttpServer` down. The chain
   is longer than theirs. `commitTransition` sits behind `resolution.ts`,
   `timers.ts`, `subprocess.ts` and `runtime/api.ts`. Task group 5 names each
-  link, and typecheck reports any link that is missed.
+  link.
+
+  Each link carries a default of `createDefaultAssignmentRegistry()`. That is
+  the house style. `startEngine` already defaults its own `registry` the same
+  way. Making the registry required would have made the typecheck report a
+  missed link. It would also have forced roughly 770 mechanical edits across
+  `test/`. The default wins that trade.
+
+  The default also bounds what a missed link can cost. The caller resolves
+  against the built-in `static` entry rather than against nothing. A missed link
+  therefore degrades to "a deployment's custom strategy does not reach this
+  path". It never degrades to "an assignment-bearing step commits unassigned".
+
+  That second failure is the one worth a compiler diagnostic, and it has one.
+  The resolved set reaches `planStepEntry` as a required field. The bullet above
+  therefore still holds in full. Do not read this bullet as a claim that the
+  typecheck covers the threading. It does not.
 - **The context could prove too narrow for change C.** → Widening it later is
   additive. Guessing at it now would freeze a contract nobody has tested.
 

@@ -163,11 +163,17 @@ new signature, so existing callers keep the newest matching child and do not
 silently adopt the change. This pins the interface while the implementation
 floats.
 
-**Extensibility.** Custom actions, guards, data sources, and field types are
-plugins behind a uniform envelope `{ type, config }`. The core validates only
-the envelope; each plugin ships its own JSON Schema. (Assignment strategy is
-not an extension point: `"static"` is the only supported
-`Step.assignment.strategy.type`, checked directly — see `docs/current-state.md`.) The
+**Extensibility.** Custom actions, guards, data sources, assignment strategies,
+and field types are plugins behind a uniform envelope `{ type, config }`. The
+core validates only the envelope; each plugin ships its own JSON Schema.
+`Step.assignment.strategy.type` resolves through its own `AssignmentRegistry`
+(`registry.ts`), a third sibling beside the action `Registry` and the
+`DataSourceRegistry`; `"static"` is a registered entry there — the type an
+author gets by default, and the only one that ships — not a literal any engine
+code compares against. An entry declares a candidate resolver
+(`(ctx) => Promise<string[]>`, async even for `static`, over the narrow context
+`{ config, stepId, instance: { id, startedBy, data } }`) and may declare a
+config schema. The
 registry maps `type -> { config schema }` (`registry.ts`,
 `HandlerDef.configSchema`) and is validated at PUBLISH time:
 `checkActionRegistry` (`src/engine/registry-check.ts`) resolves every action's
@@ -187,7 +193,13 @@ re-publish. A handler with no declared `configSchema` accepts any `config`
 `RETURN_ACTION_TYPE`) is exempt from the registry-resolution check — those
 types are dispatched internally by `subprocess.ts`, never through this
 author-facing registry, and are separately rejected in *authored* bodies by
-the existing Zod refinement in `authoredProcessBody`. Data sources are never
+the existing Zod refinement in `authoredProcessBody`. That exemption does not
+extend to an assignment strategy: no internal dispatch reaches one, so a
+`core.` type there is an unknown type like any other.
+`checkAssignmentRegistry` and `checkDataSourceRegistry` run the same
+resolve-then-parse loop at the same placement, against their own registries,
+and throw `AssignmentRegistryValidationError` / `DataSourceRegistryValidationError`.
+Data sources are never
 inlined; fields bind to them by id and options resolve at runtime.
 
 **Runtime record (the audit backbone).** The instance carries assignment/claim
@@ -343,6 +355,21 @@ See `ROADMAP.md` for stage-by-stage status (DONE/NOT STARTED) and what each stag
   ships. A live type (e.g. an HTTP-backed data source) is deferred until a
   concrete need exists — its timeout/cache/error semantics are open questions
   not worth deciding speculatively.
+- **A second (fallible) assignment strategy, and the failure rules it needs.**
+  The `AssignmentRegistry` holds more than one type, but only the built-in
+  `"static"` entry ships. `static` reads its own config, performs no I/O, and
+  cannot fail, so nothing shipped exercises a resolution deadline, a failure
+  classification, or an `assignment.unresolved` event. The first strategy that
+  reaches a database or a directory owns all three — the same judgement the
+  dynamic data source above takes. That change also owns one known path: the
+  subprocess return resolves the parent's candidates while holding the parent's
+  row lock (`SELECT ... FOR UPDATE`), because it derives the step it enters from
+  the row it read under that lock. Every other path — a manual transition, an
+  automatic cascade hop, a timer-forced transition, a cancellation, a top-level
+  creation, a subprocess spawn — resolves before its transaction opens. A slow
+  resolver on the return path therefore holds the lock; bound it with the
+  deadline, or hoist resolution above the lock with an optimistic pre-read plus
+  a sequence re-check on entry.
 - **A publish-time warning for a step with no `assignment`.**
   `Step.assignment` is optional, and the studio leaves it empty by default.
   A whole process can therefore publish without one, as `Test-process` did.

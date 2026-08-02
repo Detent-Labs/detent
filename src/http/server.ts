@@ -8,7 +8,13 @@
 import { SQL } from "bun";
 import { sql, initSchema } from "../engine/store.js";
 import { startEngine, createDefaultDataSourceRegistry } from "../engine/host.js";
-import { createRegistry, type Registry, type DataSourceRegistry } from "../engine/registry.js";
+import {
+  createRegistry,
+  createDefaultAssignmentRegistry,
+  type Registry,
+  type DataSourceRegistry,
+  type AssignmentRegistry,
+} from "../engine/registry.js";
 import { devHeaderResolver, type ActorResolver } from "../auth/resolve.js";
 import { serveWebAsset, resolveWebRoot, isNavigationRequest } from "./static.js";
 import { jwtResolver, type IssuerConfig } from "../auth/jwt.js";
@@ -233,6 +239,7 @@ export function createServer(
   allowedOrigins: AllowedOrigins = undefined,
   loginSecret: string | undefined = undefined,
   webRoot: string | undefined = undefined,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): (req: Request) => Promise<Response> {
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
@@ -369,7 +376,7 @@ export function createServer(
     }
     // POST /processes/:processId/instances
     if (req.method === "POST" && parts.length === 3 && parts[0] === "processes" && parts[2] === "instances") {
-      return toRes(await handleCreateInstance(parts[1]!, req, resolver, dataSourceRegistry, db));
+      return toRes(await handleCreateInstance(parts[1]!, req, resolver, dataSourceRegistry, db, assignmentRegistry));
     }
     // GET /instances (list)
     if (req.method === "GET" && parts.length === 1 && parts[0] === "instances") {
@@ -381,7 +388,7 @@ export function createServer(
     }
     // POST /instances/:instanceId/submit
     if (req.method === "POST" && parts.length === 3 && parts[0] === "instances" && parts[2] === "submit") {
-      return toRes(await handleSubmit(parts[1]!, req, resolver, dataSourceRegistry, db));
+      return toRes(await handleSubmit(parts[1]!, req, resolver, dataSourceRegistry, db, assignmentRegistry));
     }
     // POST /instances/:instanceId/claim
     if (req.method === "POST" && parts.length === 3 && parts[0] === "instances" && parts[2] === "claim") {
@@ -430,7 +437,7 @@ export function createServer(
     }
     // POST /processes (publish)
     if (req.method === "POST" && parts.length === 1 && parts[0] === "processes") {
-      return toRes(await handlePublish(req, resolver, registry, dataSourceRegistry, db));
+      return toRes(await handlePublish(req, resolver, registry, dataSourceRegistry, db, assignmentRegistry));
     }
     // GET /processes (list)
     if (req.method === "GET" && parts.length === 1 && parts[0] === "processes") {
@@ -510,7 +517,7 @@ export function createServer(
     }
     // POST /drafts/:processId/publish
     if (req.method === "POST" && parts.length === 3 && parts[0] === "drafts" && parts[2] === "publish") {
-      return toRes(await handlePublishDraft(parts[1]!, req, resolver, registry, dataSourceRegistry, db));
+      return toRes(await handlePublishDraft(parts[1]!, req, resolver, registry, dataSourceRegistry, db, assignmentRegistry));
     }
     // GET /processes/:processId/versions/:version/orphan-keys
     if (req.method === "GET" && parts.length === 5 && parts[0] === "processes" && parts[2] === "versions" && parts[4] === "orphan-keys") {
@@ -530,7 +537,7 @@ export function createServer(
     }
     // GET /registry
     if (req.method === "GET" && parts.length === 1 && parts[0] === "registry") {
-      return toRes(await handleGetRegistry(req, resolver, registry, dataSourceRegistry));
+      return toRes(await handleGetRegistry(req, resolver, registry, dataSourceRegistry, assignmentRegistry));
     }
 
     // Static assets fall through here, behind every API route, so no URL prefix
@@ -570,14 +577,15 @@ export async function startHttpServer(
     AUTH_ISSUERS: process.env.AUTH_ISSUERS,
     ALLOW_INSECURE_DEV_AUTH: process.env.ALLOW_INSECURE_DEV_AUTH,
   }),
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<{ stop: () => void }> {
   await initSchema(db);
   const allowedOrigins = parseAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS);
   const webRoot = resolveWebRoot(process.env.WEB_ROOT);
-  const fetch = createServer(dataSourceRegistry, registry, db, resolver, allowedOrigins, process.env.AUTH_JWT_SECRET, webRoot);
+  const fetch = createServer(dataSourceRegistry, registry, db, resolver, allowedOrigins, process.env.AUTH_JWT_SECRET, webRoot, assignmentRegistry);
   const port = Number(process.env.PORT ?? 3000);
   const server = Bun.serve({ fetch, port, maxRequestBodySize: MAX_REQUEST_BODY_SIZE });
-  const engine = startEngine(db, registry);
+  const engine = startEngine(db, registry, assignmentRegistry);
   log.info("HTTP server listening", { port: server.port, webRoot: webRoot ?? null });
   return {
     stop: () => {

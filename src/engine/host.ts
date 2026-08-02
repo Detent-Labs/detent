@@ -19,7 +19,9 @@ import {
   type Registry,
   createDataSourceRegistry,
   registerDataSource,
+  createDefaultAssignmentRegistry,
   type DataSourceRegistry,
+  type AssignmentRegistry,
 } from "./registry.js";
 import { HTTP_ACTION_TYPE, httpHandlerDef } from "../handlers/http.js";
 import { NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef } from "../handlers/notification-email.js";
@@ -81,16 +83,19 @@ export function parseRetentionDays(): number | undefined {
 export function startEngine(
   db: SQL = sql,
   registry: Registry = createDefaultRegistry(),
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): { stop: () => void } {
   const { resolveBody, resolveLatestByContract } = createDefinitionStore(db);
   // Register the engine-internal subprocess handlers so the outbox worker can
   // dispatch core.spawnSubprocess / core.returnSubprocess like any other action.
-  registerSubprocessHandlers(registry, db, resolveBody, resolveLatestByContract);
+  // The spawn handler resolves a child's initial-step candidates, so it needs
+  // the same assignment registry the rest of the engine runs against.
+  registerSubprocessHandlers(registry, db, resolveBody, resolveLatestByContract, assignmentRegistry);
   const retentionDays = parseRetentionDays();
   const workers = [
     startOutboxWorker(db, registry, 500, resolveBody),
-    startResolutionWorker(db, resolveBody),
-    startTimerScheduler(db, resolveBody),
+    startResolutionWorker(db, resolveBody, 500, undefined, assignmentRegistry),
+    startTimerScheduler(db, resolveBody, 500, assignmentRegistry),
     ...(retentionDays !== undefined ? [startRetentionSweep(db, retentionDays)] : []),
   ];
   return { stop: () => workers.forEach((w) => w.stop()) };

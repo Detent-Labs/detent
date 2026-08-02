@@ -10,6 +10,11 @@ import { sql, initSchema, createInstance, withTransaction } from "../src/engine/
 import { startInstance, cancelInstance, selectAutomaticPath, executeAutomaticTransition } from "../src/engine/transition.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { registerSubprocessHandlers } from "../src/engine/subprocess.js";
+import {
+  createAssignmentRegistry,
+  registerAssignmentStrategy,
+  type AssignmentRegistry,
+} from "../src/engine/registry.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { drainResolutions } from "../src/engine/resolution.js";
 import { subprocessChildId } from "../src/engine/idempotency.js";
@@ -54,6 +59,58 @@ const childBody = (): ProcessBody =>
         ] },
         { id: "step_c_approved", key: "c_approved", label: { en: "Approved" }, type: "task", terminal: true, outcome: "approved" },
         { id: "step_c_rejected", key: "c_rejected", label: { en: "Rejected" }, type: "task", terminal: true, outcome: "rejected" },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+// A child whose INITIAL step carries an assignment, so a spawn exercises
+// creation-time candidate resolution. Wait-state (manual paths only), so the
+// spawn does not immediately cascade off the step under test.
+const assignedChildBody = (strategyType: string): ProcessBody =>
+  ({
+    key: "child_assigned", baseLocale: "en", label: { en: "Assigned child" },
+    contract: { inputFields: ["field_c_amount"], outputFields: ["field_c_amount"], outcomes: ["approved"] },
+    fields: [{ id: "field_c_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
+    workflow: {
+      initialStep: "step_c_wait",
+      steps: [
+        {
+          id: "step_c_wait", key: "c_wait", label: { en: "Wait" }, type: "task",
+          assignment: { strategy: { type: strategyType, config: { candidates: ["role_reviewer"] } } },
+          paths: [manualPath("path_c_done", "step_c_approved")],
+        },
+        { id: "step_c_approved", key: "c_approved", label: { en: "Approved" }, type: "task", terminal: true, outcome: "approved" },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+// Parent whose post-subprocess step declares an assignment, so the RETURN path
+// resolves candidates. That is the one path resolving while its own row lock is
+// held, so the step it enters must be reached by the return, not by the spawn.
+const assignedAfterSubParentBody = (childPid: string, childVersion: number, strategyType: string): ProcessBody =>
+  ({
+    key: "parent_assigned", baseLocale: "en", label: { en: "Parent assigned" },
+    fields: [
+      { id: "field_p_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      { id: "field_p_result", key: "result", label: { en: "Result" }, type: "string" },
+    ],
+    workflow: {
+      initialStep: "step_p_entry",
+      steps: [
+        { id: "step_p_entry", key: "p_entry", label: { en: "Entry" }, type: "task", paths: [autoPath("path_p_sub", "step_p_sub")] },
+        { id: "step_p_sub", key: "p_sub", label: { en: "Sub" }, type: "subprocess",
+          subprocess: {
+            processId: childPid, versionBinding: "pinned", pinnedVersion: childVersion,
+            inputMapping: { field_c_amount: cel("data.amount") },
+            outputMapping: { field_p_result: cel("child.outcome") },
+          },
+          paths: [autoPath("path_p_rev", "step_p_review", 1, 'child.outcome == "approved"')] },
+        {
+          id: "step_p_review", key: "p_review", label: { en: "Review" }, type: "task",
+          assignment: { strategy: { type: strategyType, config: { candidates: ["role_reviewer"] } } },
+          paths: [manualPath("path_p_done", "step_p_done")],
+        },
+        { id: "step_p_done", key: "p_done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -365,10 +422,10 @@ const subInitialCallerBody = (key: string, childPid: string, childVersion: numbe
     },
   }) as unknown as ProcessBody;
 
-function engineRegistry(): { registry: Reg; resolveBody: ReturnType<typeof createDefinitionStore>["resolveBody"] } {
+function engineRegistry(assignmentRegistry?: AssignmentRegistry): { registry: Reg; resolveBody: ReturnType<typeof createDefinitionStore>["resolveBody"] } {
   const store = createDefinitionStore(sql);
   const registry: Reg = new Map();
-  registerSubprocessHandlers(registry, sql, store.resolveBody, store.resolveLatestByContract);
+  registerSubprocessHandlers(registry, sql, store.resolveBody, store.resolveLatestByContract, assignmentRegistry);
   return { registry, resolveBody: store.resolveBody };
 }
 
@@ -513,6 +570,86 @@ test.skipIf(!DB)("entering a subprocess step spawns a linked child seeded from i
   expect(child).toBeDefined();
   expect(child!.parent?.instanceId).toBe(parent.instanceId);
   expect(dataField(child, "field_c_amount")).toBe(500); // seeded from parent inputMapping
+});
+
+test.skipIf(!DB)("a spawn resolves the child's initial-step candidates before its transaction opens", async () => {
+  // The resolver records whether the child row exists at call time. It must
+  // not: the spawn handler resolves with the child body and seed data in hand,
+  // ahead of the transaction that creates the row.
+  const seen: { childExisted: boolean; stepId: string; data: unknown }[] = [];
+  const assignmentRegistry = createAssignmentRegistry();
+  registerAssignmentStrategy(assignmentRegistry, "spy", {
+    resolve: async (ctx) => {
+      const rows = (await sql`SELECT 1 FROM instances WHERE instance_id = ${ctx.instance.id}`) as unknown[];
+      seen.push({ childExisted: rows.length > 0, stepId: ctx.stepId, data: ctx.instance.data });
+      return ["role_reviewer"];
+    },
+  });
+
+  const { registry } = engineRegistry(assignmentRegistry);
+  const cv = await publishBody(CHILD_PID, assignedChildBody("spy"), emptyRegistry, dataSourceReg, sql, assignmentRegistry);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry, dataSourceReg, sql, assignmentRegistry);
+  const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
+  await seedField(parent.instanceId, "field_p_amount", 500);
+
+  await drainOutbox(sql, registry);
+  const childId = subprocessChildId(parent.instanceId, 1, "step_p_sub");
+  const child = await loadInstance(childId);
+  expect(child!.assignment?.candidates).toEqual(["role_reviewer"]);
+  expect(seen.length).toBe(1);
+  expect(seen[0]!.childExisted).toBe(false);
+  expect(seen[0]!.stepId).toBe("step_c_wait");
+  expect((seen[0]!.data as Record<string, unknown>).field_c_amount).toBe(500); // the mapped seed
+});
+
+test.skipIf(!DB)("the return resolves the parent's candidates while holding the parent's row lock", async () => {
+  // From inside the resolver, try to take the parent's row lock on a SECOND
+  // pooled connection with NOWAIT. NOWAIT never blocks: it raises at once when
+  // the row is already locked. A raise therefore proves the return's own
+  // `SELECT ... FOR UPDATE` is still held when the resolver runs — the one
+  // carved-out path in the assignment-strategy-registry spec.
+  const seen: { parentLocked: boolean; stepId: string; result: unknown }[] = [];
+  const assignmentRegistry = createAssignmentRegistry();
+  registerAssignmentStrategy(assignmentRegistry, "spy", {
+    resolve: async (ctx) => {
+      let parentLocked = false;
+      try {
+        await sql`SELECT 1 FROM instances WHERE instance_id = ${ctx.instance.id} FOR UPDATE NOWAIT`;
+      } catch {
+        parentLocked = true;
+      }
+      seen.push({
+        parentLocked,
+        stepId: ctx.stepId,
+        result: (ctx.instance.data as Record<string, unknown>).field_p_result,
+      });
+      return ["role_reviewer"];
+    },
+  });
+
+  // Dedicated ids: this suite truncates nothing between tests, so each test
+  // publishes under its own process id.
+  const C_PID = "proc_child_ret_assigned" as Instance["processId"];
+  const P_PID = "proc_parent_ret_assigned" as Instance["processId"];
+  const { registry } = engineRegistry(assignmentRegistry);
+  const cv = await publishBody(C_PID, childBody(), emptyRegistry, dataSourceReg, sql, assignmentRegistry);
+  const pv = await publishBody(
+    P_PID, assignedAfterSubParentBody(C_PID, cv.version, "spy"), emptyRegistry, dataSourceReg, sql, assignmentRegistry,
+  );
+  const parent = await startInstance(pv.definition, { processId: P_PID, version: pv.version }, actor);
+  await seedField(parent.instanceId, "field_p_amount", 500); // -> child outcome "approved"
+
+  await drainAll(registry);
+
+  const after = await loadInstance(parent.instanceId);
+  expect(after!.currentStepId as string).toBe("step_p_review");
+  expect(after!.assignment?.candidates).toEqual(["role_reviewer"]);
+  expect(seen.length).toBe(1);
+  expect(seen[0]!.stepId).toBe("step_p_review");
+  expect(seen[0]!.parentLocked).toBe(true);
+  // The outputMapping writeback committed in the same transaction is already
+  // visible to the resolver's context.
+  expect(seen[0]!.result).toBe("approved");
 });
 
 test.skipIf(!DB)("the child outcome and data return to the parent, driving it off the wait-state", async () => {

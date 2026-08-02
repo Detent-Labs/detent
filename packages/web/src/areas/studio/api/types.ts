@@ -73,6 +73,7 @@ export interface OrphanKeyScan {
 export interface RegistryInfo {
   actionTypes: string[];
   dataSourceTypes: string[];
+  assignmentStrategyTypes: string[];
 }
 
 /** Mirrors src/runtime/api.ts::InstanceView (studio-player spec). */

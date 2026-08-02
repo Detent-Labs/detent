@@ -480,18 +480,23 @@ test("OPTIONS preflight on the registry route returns 204 permitting GET", async
 // GET /registry
 // ============================================================
 
-test.skipIf(!DB)("GET /registry lists the registered action and data-source type names for a developer", async () => {
+test.skipIf(!DB)("GET /registry lists the registered action, data-source and assignment type names for a developer", async () => {
   const res = await fetch(authedReq("http://x/registry", "GET", developer));
   expect(res.status).toBe(200);
-  const body = (await res.json()) as { actionTypes: string[]; dataSourceTypes: string[] };
+  const body = (await res.json()) as {
+    actionTypes: string[];
+    dataSourceTypes: string[];
+    assignmentStrategyTypes: string[];
+  };
   expect(body.actionTypes).toContain("http.request");
   expect(body.dataSourceTypes).toContain("static");
+  expect(body.assignmentStrategyTypes).toContain("static");
 });
 
 test.skipIf(!DB)("GET /registry exposes only type names, no configSchema or config detail", async () => {
   const res = await fetch(authedReq("http://x/registry", "GET", developer));
   const body = (await res.json()) as Record<string, unknown>;
-  expect(Object.keys(body).sort()).toEqual(["actionTypes", "dataSourceTypes"]);
+  expect(Object.keys(body).sort()).toEqual(["actionTypes", "assignmentStrategyTypes", "dataSourceTypes"]);
 });
 
 test.skipIf(!DB)("GET /registry without system:developer maps to 403", async () => {

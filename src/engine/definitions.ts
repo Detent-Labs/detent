@@ -30,7 +30,7 @@ import { validateProcessBody, checkSubprocessChildRefs, type CelIssue } from "..
 import { checkActionRegistry, checkAssignmentRegistry, checkDataSourceRegistry, type RegistryIssue } from "./registry-check.js";
 import { sql } from "./store.js";
 import type { ResolveBody } from "./resolution.js";
-import type { Registry, DataSourceRegistry } from "./registry.js";
+import { createDefaultAssignmentRegistry, type Registry, type DataSourceRegistry, type AssignmentRegistry } from "./registry.js";
 
 /** Resolve the newest child version whose contract signature equals `contractRef`. */
 export type ResolveLatestByContract = (
@@ -189,6 +189,7 @@ export async function publishBody(
   registry: Registry,
   dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<ProcessVersion> {
   const body = compileProcessBody(authoredBody);
   const hash = definitionHash(body);
@@ -223,7 +224,7 @@ export async function publishBody(
   if (registryIssues.length > 0) throw new RegistryValidationError(registryIssues);
 
   // Same placement as the action registry check, immediately alongside it.
-  const assignmentIssues = checkAssignmentRegistry(body);
+  const assignmentIssues = checkAssignmentRegistry(body, assignmentRegistry);
   if (assignmentIssues.length > 0) throw new AssignmentRegistryValidationError(assignmentIssues);
 
   // Same placement again: in-process, no DB round-trip.

@@ -242,7 +242,7 @@ test.skipIf(!DB)("a cascade interrupted after its first hop is durably resumed b
   const path = source.paths![0];
   const target = body.workflow.steps.find((s) => s.id === path.to)!;
   const actions = orderedTriggerActions(source, path, target);
-  const plan = planStepEntry(i, target, body, { pathId: path.id, cause: "user", actorId: actor.id, actions });
+  const plan = planStepEntry(i, target, body, { pathId: path.id, cause: "user", actorId: actor.id, actions, assignment: undefined });
   const afterHop1 = await withTransaction(sql, (tx) => applyStepEntry(tx, plan));
   expect(afterHop1.currentStepId as string).toBe("step_g1");
   // The commit alone — with no cascade having run — already left the instance

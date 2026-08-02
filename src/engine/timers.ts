@@ -11,6 +11,7 @@
 import type { SQL } from "bun";
 import { sql } from "./store.js";
 import { fireTimer } from "./transition.js";
+import { createDefaultAssignmentRegistry, type AssignmentRegistry } from "./registry.js";
 import { instance as instanceSchema, type Instance } from "../schema/definition.js";
 import type { ResolveBody } from "./resolution.js";
 import { pollForever } from "./poll.js";
@@ -42,7 +43,11 @@ async function pushOutOfScan(db: SQL, instanceId: string, observedNextTimerAt: u
  * picked up next pass (a reminder recomputes `next_timer_at` to it; a transition
  * timer moves the instance).
  */
-export async function drainTimers(db: SQL = sql, resolveBody: ResolveBody = () => undefined): Promise<number> {
+export async function drainTimers(
+  db: SQL = sql,
+  resolveBody: ResolveBody = () => undefined,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+): Promise<number> {
   const dueRows = (await db`SELECT instance_id, body, next_timer_at FROM instances
     WHERE (body->>'status') = 'running' AND next_timer_at IS NOT NULL AND next_timer_at <= now()
     ORDER BY next_timer_at
@@ -74,7 +79,7 @@ export async function drainTimers(db: SQL = sql, resolveBody: ResolveBody = () =
         .filter((t) => !t.fired && new Date(t.fireAt).getTime() <= nowMs)
         .sort((a, b) => ((a.fireAt as string) < (b.fireAt as string) ? -1 : 1))[0];
       if (!dueTimer) continue;
-      await fireTimer(inst, dueTimer.timerId, body, db);
+      await fireTimer(inst, dueTimer.timerId, body, db, assignmentRegistry);
       fired++;
     } catch {
       // A lost OCC race (ConcurrencyConflict), a parse/resolve failure, or any
@@ -90,6 +95,7 @@ export function startTimerScheduler(
   db: SQL = sql,
   resolveBody: ResolveBody = () => undefined,
   intervalMs = 500,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): { stop: () => void } {
-  return pollForever(() => drainTimers(db, resolveBody), intervalMs);
+  return pollForever(() => drainTimers(db, resolveBody, assignmentRegistry), intervalMs);
 }

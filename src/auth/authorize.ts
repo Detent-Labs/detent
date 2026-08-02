@@ -4,9 +4,9 @@
  * reserved role on the already-resolved `Actor`. Deliberately separate from
  * `resolve.ts` (credential -> Actor): this only reads `Actor.roles`, which
  * every `ActorResolver` already populates. No policy engine, no role
- * hierarchy — a fixed set of roles, checked directly, same as
- * `Step.assignment.strategy.type`'s single `"static"` check. No role implies
- * another.
+ * hierarchy — a fixed set of roles, checked directly, unlike
+ * `Step.assignment.strategy.type`, which resolves against the injected
+ * `AssignmentRegistry`. No role implies another.
  */
 import type { Actor } from "../cel/eval.js";
 

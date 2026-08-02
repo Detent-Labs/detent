@@ -445,21 +445,39 @@ Stage-by-stage status is in `ROADMAP.md`.
   and ships one concrete, non-production implementation, `devHeaderResolver`
   (trusts `X-Actor-Id`/`X-Actor-Roles` headers) — no real identity provider
   (JWT/OIDC/session) ships in core; a deployment supplies its own resolver
-  against the same extension point. Assignment strategy is not pluggable:
-  `"static"` (`registry.ts::STATIC_ASSIGNMENT_STRATEGY_TYPE`) is the only
-  supported `Step.assignment.strategy.type`, checked directly at PUBLISH
-  (`registry-check.ts::checkAssignmentRegistry`, wired into
-  `definitions.ts::publishBody`, throwing `AssignmentRegistryValidationError`)
-  — a non-`"static"` type or a `config` failing `{ candidates: string[] }` is
-  a publish error, never a runtime one. (A prior design registered assignment
-  strategies in a `Map`-based registry parallel to the action registry; that
-  was removed as a ponytail-audit cut — the strategy space never grew past
-  one, so the indirection bought nothing. Reintroduce a registry only if a
-  second strategy is ever authored.) A target step's declared `assignment`
-  resolves to a fresh `Instance["assignment"]` (candidates, unclaimed) at step
-  entry (`transition.ts::resolveStepAssignment`), except migration
-  (`carryAssignment` carries `instance.assignment` forward byte-for-byte instead
-  of re-resolving fresh candidates). `claimStep`/`releaseClaim`
+  against the same extension point. Assignment strategy is a plugin position
+  too: `Step.assignment.strategy.type` resolves against an injected
+  `AssignmentRegistry` (`registry.ts`), a `Map<string, AssignmentStrategyDef>`
+  sibling to the action `Registry` and the `DataSourceRegistry`. An entry
+  declares a resolver (`(ctx) => Promise<string[]>`) and may declare a config
+  schema. `"static"` (`registry.ts::STATIC_ASSIGNMENT_STRATEGY_TYPE`,
+  registered by `createDefaultAssignmentRegistry`) is the entry an author gets
+  by default and the only one that ships; its schema is
+  `{ candidates: string[] }` and its resolver returns that list verbatim. The
+  type is checked at PUBLISH (`registry-check.ts::checkAssignmentRegistry`,
+  through the same resolve-then-parse loop the action and data-source checks
+  share, wired into `definitions.ts::publishBody`, throwing
+  `AssignmentRegistryValidationError`) — an unregistered type or a `config` the
+  entry's schema rejects is a publish error, never a runtime one; the reserved
+  `core.` prefix is not exempt, since no internal dispatch reaches an assignment
+  strategy. (An earlier design held such a registry and a ponytail audit cut it,
+  on the condition that it return once a second strategy is authored. It
+  returned one change ahead of that condition, so the seam and the first
+  per-instance strategy could be reviewed as separate diffs — an empty refactor
+  and an authorization change do not belong in one.) A target step's declared
+  `assignment` resolves to a fresh `Instance["assignment"]` (candidates,
+  unclaimed) at step entry via `registry.ts::resolveStepAssignment`, called by
+  the step-entry CALLER — `commitTransition`, the subprocess spawn handler,
+  `startInstance`, `api.ts::createProcessInstance` — never by `planStepEntry`
+  (pure and synchronous, it takes the resolved set as a required
+  `StepEntryOpts.assignment` field) and never by `createInstance`
+  (persistence-only, it takes the set as an option). Required rather than
+  optional so a missed caller fails to compile instead of silently unassigning
+  the step. Migration passes `{ carry: true }` instead, carrying
+  `instance.assignment` forward byte-for-byte and running no resolver at all.
+  An unregistered type reaching step entry resolves to an empty candidate list
+  rather than raising, and no fallback assignee is substituted.
+  `claimStep`/`releaseClaim`
   (`transition.ts`, exposed via the Runtime API and the two new HTTP routes) are
   exclusive-claim operations, not transitions (no step change, no
   `HistoryEntry`): claiming requires an unclaimed assignment and an eligible
@@ -766,8 +784,8 @@ Stage-by-stage status is in `ROADMAP.md`.
   (`{error: {type: "authorization", message}}`) — separate from
   `ActorResolutionError`'s `401` (no valid identity vs. valid identity,
   insufficient permission). No policy engine, no role hierarchy: two fixed
-  strings checked directly, the same pattern as
-  `Step.assignment.strategy.type`'s single `"static"` check. Deliberately
+  strings checked directly — unlike `Step.assignment.strategy.type`, which
+  resolves against the injected `AssignmentRegistry`. Deliberately
   unrelated to assignment/claim enforcement — `submitAndTransition`,
   `claimStep`, `releaseClaim` are untouched, and an actor holding neither
   reserved role still fully participates in any process instance it is an
@@ -1134,8 +1152,9 @@ Stage-by-stage status is in `ROADMAP.md`.
   the studio area already had an independent copy there.
 
   Adds two screens. The **Tools** screen (`/tools`) shows the running
-  server's registered plugin type names — action-handler types and
-  data-source types, nothing more (no `configSchema`, no config values) —
+  server's registered plugin type names — action-handler types,
+  data-source types and assignment-strategy types, nothing more (no
+  `configSchema`, no config values) —
   via a new `GET /registry` route (`DEVELOPER_ROLE`-gated, unprefixed like
   the other studio-only routes), and a static CEL scratchpad: an expression
   checked against a chosen field catalog (a published version, fetched via

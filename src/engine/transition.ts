@@ -23,7 +23,13 @@
 import type { SQL } from "bun";
 import { sql, createInstance, appendInstanceEvent, appendInstanceEvents, newInstanceEventId, withTransaction } from "./store.js";
 import { idempotencyKey } from "./idempotency.js";
-import { SPAWN_ACTION_TYPE, RETURN_ACTION_TYPE, STATIC_ASSIGNMENT_STRATEGY_TYPE } from "./registry.js";
+import {
+  SPAWN_ACTION_TYPE,
+  RETURN_ACTION_TYPE,
+  createDefaultAssignmentRegistry,
+  resolveStepAssignment,
+  type AssignmentRegistry,
+} from "./registry.js";
 import { armStepTimers, minFireAt, type TimerDrop } from "./duration.js";
 import { buildGuardContext, evalGuard, SYSTEM_ACTOR, type Actor } from "../cel/eval.js";
 import { CANCEL_SINK_STEP_ID, instance as instanceSchema } from "../schema/definition.js";
@@ -77,22 +83,15 @@ export function isEligibleCandidate(actor: Actor, candidates: readonly string[])
   return candidates.includes(actor.id) || actor.roles.some((r) => candidates.includes(r));
 }
 
-/**
- * Resolve a target step's declared `assignment` into a fresh `AssignmentState`,
- * synchronous and pure — no I/O, called from `planStepEntry`. `undefined` when
- * the step declares no `assignment` (unrestricted). A non-`"static"` strategy
- * type resolves to zero candidates rather than throwing: publish-time
- * `checkAssignmentRegistry` already guarantees `"static"` for a published body,
- * so this is defensive only, mirroring `resolveFields`' unresolved-ref handling.
- */
-function resolveStepAssignment(target: Step): Instance["assignment"] {
-  if (!target.assignment) return undefined;
-  const strategy = target.assignment.strategy;
-  if (strategy.type !== STATIC_ASSIGNMENT_STRATEGY_TYPE) return { candidates: [], claimedBy: undefined, claimedAt: undefined };
-  const candidates = (strategy.config as { candidates?: string[] }).candidates ?? [];
-  return { candidates, claimedBy: undefined, claimedAt: undefined };
+/** Narrows `StepEntryOpts.assignment`'s union: a carry marker, not a resolved set. */
+function isCarry(a: StepEntryOpts["assignment"]): a is { carry: true } {
+  return a !== null && a !== undefined && "carry" in a;
 }
 
+/** The resolver context an instance about to enter a step supplies (see registry.ts::AssignmentContext). */
+function assignmentContextFor(instance: Instance): { id: string; startedBy: string | undefined; data: Instance["data"] } {
+  return { id: instance.instanceId, startedBy: instance.startedBy, data: instance.data };
+}
 
 /** One outbox row a step entry implies, in the shape `applyStepEntry` inserts. */
 export type OutboxRow = {
@@ -122,28 +121,35 @@ export type OutboxRow = {
  *   child id, creating a duplicate child). Never inferred from
  *   `target.id === instance.currentStepId`: a genuine self-loop must spawn, and
  *   only the caller knows which this is.
- * - `carryAssignment`: skip fresh candidate resolution and carry
- *   `instance.assignment` forward byte-for-byte instead — migration's only use
- *   (`migration.ts::migrateOne`). An in-flight claim deliberately survives a
- *   migration untouched: the claim is not re-validated against the target
- *   step's declaration, joining the existing "reconcile in-flight action
- *   writebacks across a migration" item as a known, deferred gap. Every
- *   authored transition path leaves this unset, so it always gets fresh
- *   resolution.
  * - `events`: additional events appended to the plan's event list, so a caller
  *   supplying its own timer set can still record what it dropped while
  *   deriving that set.
+ *
+ * `assignment` is the one required field that is not an input the entry is
+ * unconstructible without: it is the caller's already-resolved candidate set
+ * (`registry.ts::resolveStepAssignment`), or `{ carry: true }` to carry
+ * `instance.assignment` forward byte-for-byte instead — migration's only use
+ * (`migration.ts::migrateOne`), where an in-flight claim deliberately survives
+ * untouched and is not re-validated against the target step's declaration
+ * (joining the existing "reconcile in-flight action writebacks across a
+ * migration" item as a known, deferred gap). It is required rather than an
+ * optional override like `timers` because an omitted set and a deliberate carry
+ * are indistinguishable to the planner: a missed caller would silently leave an
+ * assignment-bearing step unassigned, falling back to the
+ * starter-or-`system:admin` floor in `api.ts::submitAndTransition` with no
+ * compiler diagnostic. Carrying skips the resolver call entirely rather than
+ * calling it and discarding the result, so a migration pays for no lookup.
  */
 export type StepEntryOpts = {
   pathId: HistoryEntry["pathId"];
   cause: HistoryEntry["cause"];
   actorId: string | undefined;
   actions: Action[];
+  assignment: Instance["assignment"] | { carry: true };
   status?: Instance["status"];
   timers?: Instance["timers"];
   entryVersion?: number;
   suppressSpawn?: boolean;
-  carryAssignment?: boolean;
   events?: InstanceEvent[];
 };
 
@@ -171,8 +177,10 @@ export type StepEntryPlan = {
  *
  * Every consequence of entering `target` is derived here from `target` alone
  * (status, the armed set, the subprocess spawn, the subprocess return) — never
- * re-implemented by a caller — except the four explicit overrides above, which
- * exist because a synthesized caller sometimes has to vary exactly one of them.
+ * re-implemented by a caller — except the five explicit overrides above, which
+ * exist because a synthesized caller sometimes has to vary exactly one of them,
+ * and `opts.assignment`, which the caller resolves because a resolver is
+ * asynchronous and this function is not.
  */
 export function planStepEntry(
   instance: Instance,
@@ -201,11 +209,12 @@ export function planStepEntry(
   const { armed, drops }: { armed: NonNullable<Instance["timers"]>; drops: TimerDrop[] } =
     opts.timers !== undefined ? { armed: opts.timers, drops: [] } : armStepTimers(target, at, body, entering);
   const nextTimerAt = minFireAt(armed);
-  // Recomputed fresh on every entry, never carried from the source step: a
-  // target with no declared assignment resolves to undefined (unrestricted),
-  // clearing whatever the instance carried before. Except migration
-  // (`opts.carryAssignment`), which deliberately leaves it untouched.
-  const assignment = opts.carryAssignment ? instance.assignment : resolveStepAssignment(target);
+  // The caller's fresh resolution, never carried from the source step: a target
+  // with no declared assignment resolves to undefined (unrestricted), clearing
+  // whatever the instance carried before. Except migration (`{ carry: true }`),
+  // which deliberately leaves it untouched. No resolver runs here — the planner
+  // stays pure and synchronous.
+  const assignment = isCarry(opts.assignment) ? instance.assignment : opts.assignment;
   const next: Instance = { ...entering, timers: armed, assignment };
   // Timers the target step declared that arming could not compute a fireAt for
   // (empty when a caller supplied its own armed set). Written in the commit, so
@@ -401,6 +410,18 @@ export async function applyStepEntry(tx: SQL, plan: StepEntryPlan, extraFields?:
  * armed against `body`), the HistoryEntry `pathId` (null for a synthesized
  * transition with no authored path), the `cause`, an optional `actorId`, and
  * any of the `StepEntryOpts` overrides (`cancelInstance` overrides `status`).
+ *
+ * The target step's candidates resolve here, before the plan and so before
+ * `withTransaction` opens — the resolver is asynchronous and must not run while
+ * a connection and the instance's row lock are held. `withTransaction` joins an
+ * already-open transaction through a savepoint rather than starting a second
+ * one, so "outside the transaction" holds only where `db` is a plain
+ * connection. The subprocess return is the one caller that passes a transaction
+ * handle instead: it derives the step it enters from the row it read under
+ * `SELECT ... FOR UPDATE`, so hoisting resolution above that lock would need an
+ * optimistic pre-read plus a sequence re-check. No resolver shipped today
+ * performs I/O, so the lock is held no longer than before; the first fallible
+ * resolver owns that fix.
  */
 async function commitTransition(
   instance: Instance,
@@ -413,8 +434,10 @@ async function commitTransition(
   db: SQL,
   overrides?: Pick<StepEntryOpts, "status" | "timers" | "entryVersion" | "suppressSpawn" | "events">,
   extraFields?: Record<string, unknown>,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
-  const plan = planStepEntry(instance, target, body, { pathId, cause, actorId, actions, ...overrides });
+  const assignment = await resolveStepAssignment(target, assignmentRegistry, assignmentContextFor(instance));
+  const plan = planStepEntry(instance, target, body, { pathId, cause, actorId, actions, assignment, ...overrides });
   return withTransaction(db, (tx) => applyStepEntry(tx, plan, extraFields));
 }
 
@@ -444,6 +467,7 @@ export async function commitManualTransition(
   actor: Actor,
   db: SQL = sql,
   dataPatch?: Instance["data"],
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
   // Deliberately a no-op, not a throw: internal idempotent re-entry (e.g. a
   // timer firing against an instance a cascade already completed) must not
@@ -478,6 +502,7 @@ export async function commitManualTransition(
     db,
     undefined,
     dataPatch ? { data: mergedData } : undefined,
+    assignmentRegistry,
   );
 }
 
@@ -494,10 +519,11 @@ export async function executeManualTransition(
   actor: Actor,
   db: SQL = sql,
   dataPatch?: Instance["data"],
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
   if (instance.status !== "running") return instance;
-  const committed = await commitManualTransition(instance, pathId, body, actor, db, dataPatch);
-  return resolveAutomatic(committed, body, actor, db);
+  const committed = await commitManualTransition(instance, pathId, body, actor, db, dataPatch, assignmentRegistry);
+  return resolveAutomatic(committed, body, actor, db, assignmentRegistry);
 }
 
 /** Outcome of one direct-child cancellation sweep pass (see `sweepCancelledChildren`). */
@@ -582,6 +608,13 @@ async function sweepCancelledChildren(
  * never re-commits the instance's own cancel transition: no `HistoryEntry` is
  * appended and `transitionSeq` does not change, exactly as for any other
  * non-running instance; only the child cascade is resumed.
+ *
+ * Takes no `AssignmentRegistry`, unlike every other step-entry caller. The one
+ * step this ever enters is the publish-injected cancel sink, which
+ * `compile.ts` synthesizes with no `assignment` field, so
+ * `resolveStepAssignment` returns before consulting any registry and no
+ * resolver can run on this path. The omission is the absence of a call, not a
+ * missed link in the threading.
  */
 export async function cancelInstance(
   instance: Instance,
@@ -623,12 +656,23 @@ export async function startInstance(
   opts: { processId: Instance["processId"]; version: number },
   actor: Actor,
   db: SQL = sql,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
   // The initial step's timers are armed atomically inside createInstance (a crash
   // between INSERT and a separate arming UPDATE would strand them). If resolveAutomatic
   // transitions off the initial step, the first commit re-arms the resting step.
-  const created = await createInstance(body, opts, db);
-  return resolveAutomatic(created, body, actor, db);
+  // Creation is a step entry, so its candidates resolve here and are passed in:
+  // createInstance calls no resolver, keeping its persistence-only remit.
+  // The id is minted here rather than inside createInstance so the resolver sees
+  // the id of the instance it is resolving for — the same reason
+  // `api.ts::createProcessInstance` mints its own.
+  const instanceId = `inst_${crypto.randomUUID()}`;
+  const initial = body.workflow.steps.find((s) => s.id === body.workflow.initialStep);
+  const assignment = initial
+    ? await resolveStepAssignment(initial, assignmentRegistry, { id: instanceId, startedBy: undefined, data: {} })
+    : undefined;
+  const created = await createInstance(body, { ...opts, instanceId, assignment }, db);
+  return resolveAutomatic(created, body, actor, db, assignmentRegistry);
 }
 
 /**
@@ -652,13 +696,14 @@ export async function executeAutomaticTransition(
   path: Path,
   body: ProcessBody,
   db: SQL = sql,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
   const source = body.workflow.steps.find((s) => s.id === instance.currentStepId);
   if (!source) throw new Error(`current step not in body: ${instance.currentStepId}`);
   const target = body.workflow.steps.find((s) => s.id === path.to);
   if (!target) throw new Error(`path target not in body: ${path.to}`);
   const actions = orderedTriggerActions(source, path, target);
-  return commitTransition(instance, target, body, path.id, actions, "automatic", undefined, db, undefined, undefined);
+  return commitTransition(instance, target, body, path.id, actions, "automatic", undefined, db, undefined, undefined, assignmentRegistry);
 }
 
 /**
@@ -703,6 +748,7 @@ export async function resolveAutomatic(
   body: ProcessBody,
   actor: Actor,
   db: SQL = sql,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
   let current = instance;
   const seen = new Set<string>([current.currentStepId]);
@@ -716,7 +762,7 @@ export async function resolveAutomatic(
     const path = selectAutomaticPath(step, buildGuardContext(body, current, actor));
     if (!path) return current; // wait-state: no guard matched
 
-    current = await executeAutomaticTransition(current, path, body, db);
+    current = await executeAutomaticTransition(current, path, body, db, assignmentRegistry);
     if (seen.has(current.currentStepId)) {
       await markFaulted(current, current.currentStepId, db);
       throw new AutomaticCascadeLoop(current.currentStepId);
@@ -743,6 +789,7 @@ export async function fireTimer(
   timerId: string,
   body: ProcessBody,
   db: SQL = sql,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
   if (instance.status !== "running") return instance;
 
@@ -760,8 +807,8 @@ export async function fireTimer(
     const target = body.workflow.steps.find((s) => s.id === path.to);
     if (!target) throw new Error(`timer targetPath target not in body: ${path.to}`);
     const actions = [...(timer.onFire.actions ?? []), ...orderedTriggerActions(source, path, target)];
-    const committed = await commitTransition(instance, target, body, path.id, actions, "timer", undefined, db, undefined, undefined);
-    return resolveAutomatic(committed, body, SYSTEM_ACTOR, db);
+    const committed = await commitTransition(instance, target, body, path.id, actions, "timer", undefined, db, undefined, undefined, assignmentRegistry);
+    return resolveAutomatic(committed, body, SYSTEM_ACTOR, db, assignmentRegistry);
   }
 
   // Reminder timer: enqueue onFire.actions and mark fired, no transition, no seq
