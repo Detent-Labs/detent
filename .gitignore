@@ -32,6 +32,8 @@ Thumbs.db
 .claude/settings.json
 .claude/settings.local.json
 .claude/worktrees/
+# Holds an absolute path to a linter outside this repository.
+.claude/skills/antislop/
 
 # Local devcontainer overrides (personal, per-machine)
 .devcontainer/docker-compose.override.yml
