@@ -4,7 +4,7 @@
      (container images) name unrelated concepts that happen to share this
      rule's synonym bucket. Rewriting either to dodge the rule would make
      the wrong section read worse for a false-positive cross-reference. -->
-# SummitBPS
+# Detent
 
 A headless, API-first workflow / BPM engine in TypeScript. It executes
 structured, form- and approval-driven business processes with explicit states.

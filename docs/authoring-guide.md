@@ -1,14 +1,14 @@
 # Process authoring guide
 
 This guide is for the person who builds a process. It explains the vocabulary
-SummitBPS uses, and the order in which to assemble a process from it.
+Detent uses, and the order in which to assemble a process from it.
 
 Every example comes from `examples/expense-approval.json`, a process that
 lives in this repository and that the test suite covers.
 
 ## Orientation
 
-SummitBPS runs business processes that involve forms and approvals. A process
+Detent runs business processes that involve forms and approvals. A process
 is a finite state machine. Steps are the states, and Paths are the transitions
 between them. This is not a BPMN token flow, and there is no token.
 
@@ -25,7 +25,7 @@ watch the result in the other three.
 | Operations | `system:admin` | operator | instances, outbox, timers, users, migrations |
 | Reports | `system:reports` | process owner | cycle time, bottlenecks, SLA |
 
-After you log in, SummitBPS sends you to the first role-gated area you may
+After you log in, Detent sends you to the first role-gated area you may
 enter. An actor with no reserved role lands in Tasks.
 
 The three areas outside Studio matter to you, because your published process
