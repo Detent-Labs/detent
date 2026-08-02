@@ -272,6 +272,15 @@ never arrives waits forever.
 For every step a person must act on, set the **assignment strategy** and list
 the candidates. A step nobody acts on needs no assignment.
 
+The strategy is a plugin, like an action or a data source. It carries a `type`
+and a `config`. The engine resolves the `type` against the strategies your
+deployment registers. A `type` nobody registered is a publish error, not a
+surprise at run time.
+
+`static` is the one that ships, and the one you get by default. Its `config` is
+a flat list, `{ "candidates": ["finance-approver"] }`. The engine uses that list
+unchanged.
+
 Assign by role, not by person. A person leaves the company, and the process
 outlives them.
 

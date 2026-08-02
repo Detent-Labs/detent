@@ -514,7 +514,9 @@ async function migrateOne(
         entryVersion: toVersion,
         suppressSpawn: !stepChanged,
         // An in-flight claim survives a migration untouched — see StepEntryOpts.
-        carryAssignment: true,
+        // Carrying skips the resolver call entirely, so a migration pays for no
+        // lookup whatever the target step's strategy does internally.
+        assignment: { carry: true },
         events: [...dropEvents, ...transformDropEvents],
       },
     );

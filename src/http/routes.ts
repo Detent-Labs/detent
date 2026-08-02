@@ -30,7 +30,12 @@ import { instanceStatus } from "../schema/definition.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, PUBLISH_ROLE, ADMIN_ROLE } from "../auth/authorize.js";
-import type { Registry, DataSourceRegistry } from "../engine/registry.js";
+import {
+  createDefaultAssignmentRegistry,
+  type Registry,
+  type DataSourceRegistry,
+  type AssignmentRegistry,
+} from "../engine/registry.js";
 import type { Instance, PathId, ProcessId, InstanceId, StepId, ProcessBody } from "../schema/definition.js";
 import { mapError, RequestShapeError, type HttpResult, type HttpBinaryResult, type ErrorContext } from "./errors.js";
 import { z } from "zod";
@@ -130,11 +135,12 @@ export async function handleCreateInstance(
   resolver: ActorResolver,
   dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     const body = await parseJsonBody(req, createInstanceBodySchema);
-    const created = await createProcessInstance(processId as ProcessId, actor, dataSourceRegistry, { version: body.version, data: body.data as Instance["data"] | undefined }, db);
+    const created = await createProcessInstance(processId as ProcessId, actor, dataSourceRegistry, { version: body.version, data: body.data as Instance["data"] | undefined }, db, assignmentRegistry);
     return { status: 201, body: created };
   });
 }
@@ -159,12 +165,13 @@ export async function handleSubmit(
   resolver: ActorResolver,
   dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<HttpResult> {
   let actor: Actor | undefined;
   try {
     actor = await resolveActor(req, resolver);
     const body = await parseJsonBody(req, submitBodySchema);
-    const updated = await submitAndTransition(instanceId as InstanceId, body.pathId as PathId, body.data as Instance["data"], actor, dataSourceRegistry, db);
+    const updated = await submitAndTransition(instanceId as InstanceId, body.pathId as PathId, body.data as Instance["data"], actor, dataSourceRegistry, db, assignmentRegistry);
     return { status: 200, body: updated };
   } catch (err) {
     // The write already committed before this raised; report the resulting
@@ -366,6 +373,7 @@ export async function handlePublish(
   registry: Registry,
   dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
@@ -379,7 +387,7 @@ export async function handlePublish(
     if (typeof parsed.processId !== "string" || !parsed.body) {
       throw new RequestShapeError("request body must be { processId: string, body: ProcessBody }");
     }
-    const published = await publishBody(parsed.processId as ProcessId, parsed.body as ProcessBody, registry, dataSourceRegistry, db);
+    const published = await publishBody(parsed.processId as ProcessId, parsed.body as ProcessBody, registry, dataSourceRegistry, db, assignmentRegistry);
     return {
       status: 200,
       body: { processId: published.processId, version: published.version, definitionHash: published.definitionHash, status: published.status },

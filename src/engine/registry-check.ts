@@ -10,15 +10,21 @@
  * which is an engine-owned, in-process concept `definition.ts` must not depend
  * on — the same reason `src/cel/check.ts` stays out of `definition.ts`.
  *
- * `checkAssignmentRegistry` below applies a direct, registry-free check to
- * `Step.assignment.strategy`: `"static"` is the only supported type.
+ * `checkAssignmentRegistry` and `checkDataSourceRegistry` below apply the same
+ * shape to `Step.assignment.strategy` and to `body.dataSources`, each against
+ * its own injected registry.
  */
 
 import { z } from "zod";
 import type { Action, DataSourceDef, ProcessBody, Step } from "../schema/definition.js";
-import { resolve, type Registry, STATIC_ASSIGNMENT_STRATEGY_TYPE, resolveDataSource, type DataSourceRegistry } from "./registry.js";
-
-const staticAssignmentConfigSchema = z.object({ candidates: z.array(z.string()) });
+import {
+  resolve,
+  type Registry,
+  resolveAssignmentStrategy,
+  type AssignmentRegistry,
+  resolveDataSource,
+  type DataSourceRegistry,
+} from "./registry.js";
 
 export interface RegistryIssue {
   loc: string;
@@ -47,8 +53,9 @@ interface TypedSite {
 
 /**
  * Shared resolve -> not-registered -> configSchema-safeParse-and-map loop used
- * by both checkActionRegistry and checkDataSourceRegistry: only the resolve
- * function and the "not registered" entity label differ between them.
+ * by checkActionRegistry, checkAssignmentRegistry and checkDataSourceRegistry:
+ * only the resolve function and the "not registered" entity label differ
+ * between them.
  */
 function checkTypedConfig(
   sites: TypedSite[],
@@ -128,26 +135,17 @@ function collectAssignments(body: ProcessBody): AssignmentSite[] {
 }
 
 /**
- * Validate every step's `assignment.strategy` directly: `"static"` is the
- * only supported type (no registry to resolve against), and its `config`
- * must match a fixed `{ candidates: string[] }` schema. A step with no
- * `assignment` is not visited.
+ * Validate every step's `assignment.strategy` against `assignmentRegistry`,
+ * through the same resolve-then-parse loop the action and data-source checks
+ * use. A step with no `assignment` is not visited.
+ *
+ * The reserved `core.` prefix is not exempt here: no internal dispatch reaches
+ * an assignment strategy, so a `core.` type is an unknown type like any other.
  */
-export function checkAssignmentRegistry(body: ProcessBody): RegistryIssue[] {
-  const issues: RegistryIssue[] = [];
-
-  for (const { step, loc } of collectAssignments(body)) {
-    const strategy = step.assignment!.strategy;
-    if (strategy.type !== STATIC_ASSIGNMENT_STRATEGY_TYPE) {
-      issues.push({ loc, type: strategy.type, message: `assignment strategy type '${strategy.type}' is not registered` });
-      continue;
-    }
-
-    const result = staticAssignmentConfigSchema.safeParse(strategy.config);
-    if (!result.success) issues.push(...mapConfigIssues(loc, strategy.type, result.error.issues));
-  }
-
-  return issues;
+export function checkAssignmentRegistry(body: ProcessBody, assignmentRegistry: AssignmentRegistry): RegistryIssue[] {
+  const sites = collectAssignments(body)
+    .map(({ step, loc }) => ({ loc, type: step.assignment!.strategy.type, config: step.assignment!.strategy.config }));
+  return checkTypedConfig(sites, (type) => resolveAssignmentStrategy(assignmentRegistry, type), "assignment strategy");
 }
 
 interface DataSourceSite {

@@ -8,6 +8,7 @@
  */
 import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
+import { createDefaultAssignmentRegistry, resolveStepAssignment } from "../src/engine/registry.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { startInstance, executeManualTransition, claimStep } from "../src/engine/transition.js";
 import { drainOutbox } from "../src/engine/outbox.js";
@@ -111,7 +112,20 @@ const nextTimerAt = async (id: string): Promise<string | null> => {
 // body is resolved from the store so its hash matches the published (compiled) pin.
 const mkInstance = async (pid: Instance["processId"], version: number, data?: Record<string, unknown>): Promise<Instance> => {
   const body = (await createDefinitionStore(sql).resolveBody(pid, version))!;
-  return createInstance(body, { processId: pid, version, ...(data ? { data: data as Instance["data"] } : {}) }, sql);
+  // createInstance calls no resolver; its caller resolves. Mirrors what
+  // `startInstance` and `api.ts::createProcessInstance` do at creation.
+  const initial = body.workflow.steps.find((st) => st.id === body.workflow.initialStep)!;
+  const instanceId = `inst_${crypto.randomUUID()}`;
+  const assignment = await resolveStepAssignment(initial, createDefaultAssignmentRegistry(), {
+    id: instanceId,
+    startedBy: undefined,
+    data: (data ?? {}) as Instance["data"],
+  });
+  return createInstance(
+    body,
+    { processId: pid, version, instanceId, assignment, ...(data ? { data: data as Instance["data"] } : {}) },
+    sql,
+  );
 };
 
 // Publish `body` as the next version, label-stamped so an otherwise-identical body
@@ -389,6 +403,25 @@ test.skipIf(!DB)("6.x a migration carries an in-flight claim forward untouched",
   // Carried untouched, not freshly re-resolved: candidates AND claimedBy/claimedAt
   // are byte-identical to what claimStep set, not merely equal by coincidence.
   expect(after!.assignment).toEqual(claimed.assignment);
+});
+
+test.skipIf(!DB)("6.x a migration resolves nothing, even where the target declares different candidates", async () => {
+  const p = pid();
+  // The TARGET version's step_wait declares a different candidate list. A
+  // migration that resolved fresh would write ["user_9"]; carrying keeps
+  // ["user_1"]. The two are distinguishable, unlike an identity body.
+  const v2 = assignedWaitBody("a") as unknown as {
+    workflow: { steps: { id: string; assignment?: { strategy: { config: { candidates: string[] } } } }[] };
+  };
+  v2.workflow.steps.find((s) => s.id === "step_wait")!.assignment!.strategy.config.candidates = ["user_9"];
+  await twoVersions(p, assignedWaitBody("a"), v2 as unknown as ProcessBody, {} as MigrationSpec);
+  const inst = await mkInstance(p, 1);
+  expect(inst.assignment?.candidates).toEqual(["user_1"]);
+
+  await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  const after = await loadInstance(inst.instanceId);
+  expect(after!.version).toBe(2);
+  expect(after!.assignment?.candidates).toEqual(["user_1"]);
 });
 
 test.skipIf(!DB)("6.2 migration onto a terminal step yields completed", async () => {

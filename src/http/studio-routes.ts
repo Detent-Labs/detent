@@ -10,7 +10,12 @@ import { sql, withTransaction } from "../engine/store.js";
 import { getDraft, saveDraft, listDrafts, deleteDraft, markDraftPublished } from "../engine/drafts.js";
 import { publishBody, createDefinitionStore } from "../engine/definitions.js";
 import { registerMigrationPlan, resolveMigrationPlan, findOrphanKeys } from "../engine/migration.js";
-import type { Registry, DataSourceRegistry } from "../engine/registry.js";
+import {
+  createDefaultAssignmentRegistry,
+  type Registry,
+  type DataSourceRegistry,
+  type AssignmentRegistry,
+} from "../engine/registry.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, DEVELOPER_ROLE, PUBLISH_ROLE } from "../auth/authorize.js";
@@ -114,6 +119,7 @@ export async function handlePublishDraft(
   registry: Registry,
   dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
@@ -122,7 +128,7 @@ export async function handlePublishDraft(
     const draft = await getDraft(processId as ProcessId, db);
     if (!draft) return { status: 404, body: { error: { type: "not-found", message: `no draft: ${processId}` } } };
     const published = await withTransaction(db, async (tx) => {
-      const result = await publishBody(processId as ProcessId, draft.body as ProcessBody, registry, dataSourceRegistry, tx);
+      const result = await publishBody(processId as ProcessId, draft.body as ProcessBody, registry, dataSourceRegistry, tx, assignmentRegistry);
       await markDraftPublished(processId as ProcessId, result.version, tx);
       return result;
     });
@@ -209,10 +215,23 @@ export async function handleGetOrphanKeys(processId: string, versionRaw: string,
  * HTTP boundary — `configSchema` stays a publish-time server-side check, not
  * something the Tools screen renders.
  */
-export async function handleGetRegistry(req: Request, resolver: ActorResolver, registry: Registry, dataSourceRegistry: DataSourceRegistry): Promise<HttpResult> {
+export async function handleGetRegistry(
+  req: Request,
+  resolver: ActorResolver,
+  registry: Registry,
+  dataSourceRegistry: DataSourceRegistry,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, DEVELOPER_ROLE);
-    return { status: 200, body: { actionTypes: [...registry.keys()], dataSourceTypes: [...dataSourceRegistry.keys()] } };
+    return {
+      status: 200,
+      body: {
+        actionTypes: [...registry.keys()],
+        dataSourceTypes: [...dataSourceRegistry.keys()],
+        assignmentStrategyTypes: [...assignmentRegistry.keys()],
+      },
+    };
   });
 }

@@ -34,7 +34,13 @@ import { definitionHash } from "../schema/hash.js";
 import { NotFoundError, InstanceNotRunningError } from "../errors.js";
 import { encodeCursor, decodeCursor } from "../pagination.js";
 import { instance as instanceSchema, historyEntry as historyEntrySchema, instanceEvent as instanceEventSchema, collectFieldsDeep, typeMatches, expectedTypeLabel } from "../schema/definition.js";
-import { resolveDataSource, type DataSourceRegistry } from "../engine/registry.js";
+import {
+  resolveDataSource,
+  createDefaultAssignmentRegistry,
+  resolveStepAssignment,
+  type DataSourceRegistry,
+  type AssignmentRegistry,
+} from "../engine/registry.js";
 import type {
   ProcessId,
   InstanceId,
@@ -597,6 +603,7 @@ export async function createProcessInstance(
   registry: DataSourceRegistry,
   opts?: { version?: number; data?: Instance["data"] },
   db: SQL = sql,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
   const store = getStore(db);
   let version: number;
@@ -638,12 +645,21 @@ export async function createProcessInstance(
 
   await validateSubmissionData(body, initial, stub, actor, submitted, registry, { checkRequired: false });
 
+  // Creation is a step entry, so the initial step's candidates resolve here —
+  // before `createInstance`, which calls no resolver — over the same minted id
+  // and validated seed data the instance is actually created with.
+  const assignment = await resolveStepAssignment(initial, assignmentRegistry, {
+    id: mintedId,
+    startedBy: actor.id,
+    data: submitted as Instance["data"],
+  });
+
   const created = await createInstance(
     body,
-    { processId, version, instanceId: mintedId, data: submitted as Instance["data"], startedBy: actor.id },
+    { processId, version, instanceId: mintedId, data: submitted as Instance["data"], startedBy: actor.id, assignment },
     db,
   );
-  return resolveAutomatic(created, body, actor, db);
+  return resolveAutomatic(created, body, actor, db, assignmentRegistry);
 }
 
 /**
@@ -731,6 +747,7 @@ export async function submitAndTransition(
   actor: Actor,
   registry: DataSourceRegistry,
   db: SQL = sql,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
   const store = getStore(db);
   const submitted = data as Record<string, Literal>;
@@ -769,12 +786,12 @@ export async function submitAndTransition(
 
     await validateSubmissionData(body, step, instance, actor, submitted, registry);
 
-    return commitManualTransition(instance, pathId, body, actor, tx, data);
+    return commitManualTransition(instance, pathId, body, actor, tx, data, assignmentRegistry);
   });
 
   const body = await store.resolveBody(committed.processId, committed.version);
   if (!body) throw new NotFoundError(`no published body for process ${committed.processId} version ${committed.version}`);
-  return resolveAutomatic(committed, body, actor, db);
+  return resolveAutomatic(committed, body, actor, db, assignmentRegistry);
 }
 
 /**

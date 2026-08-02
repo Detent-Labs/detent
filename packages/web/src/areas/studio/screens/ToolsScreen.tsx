@@ -155,6 +155,18 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
             ) : (
               <p className="studio-empty">No data-source types registered.</p>
             )}
+            <h2>Assignment strategies</h2>
+            {registry && registry.assignmentStrategyTypes.length > 0 ? (
+              <ul>
+                {registry.assignmentStrategyTypes.map((t2) => (
+                  <li key={t2}>
+                    <code>{t2}</code>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="studio-empty">No assignment-strategy types registered.</p>
+            )}
           </fieldset>
 
           <fieldset>

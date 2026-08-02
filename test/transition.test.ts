@@ -50,7 +50,8 @@ const inst = (over: Record<string, unknown> = {}): Instance =>
     startedAt: "2026-01-01T00:00:00Z", ...over,
   }) as unknown as Instance;
 
-const baseOpts = (): StepEntryOpts => ({ pathId: "path_ab" as HistoryEntry["pathId"], cause: "user", actorId: "user_1", actions: [] });
+const baseOpts = (): StepEntryOpts =>
+  ({ pathId: "path_ab" as HistoryEntry["pathId"], cause: "user", actorId: "user_1", actions: [], assignment: undefined });
 const dataOf = (o: Record<string, unknown>): Instance["data"] => o as unknown as Instance["data"];
 
 // A deadline reading an unseeded field: evaluate() raises, so arming drops it

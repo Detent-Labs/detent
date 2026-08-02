@@ -20,7 +20,7 @@ import {
 import { definitionHash } from "../schema/hash.js";
 import { armStepTimers, minFireAt } from "./duration.js";
 import { idempotencyKey } from "./idempotency.js";
-import { SPAWN_ACTION_TYPE, STATIC_ASSIGNMENT_STRATEGY_TYPE } from "./registry.js";
+import { SPAWN_ACTION_TYPE } from "./registry.js";
 
 /**
  * Constructs the real client on first use, throwing an error naming
@@ -363,6 +363,13 @@ export async function createInstance(
     data?: Instance["data"];
     parent?: { instanceId: string; stepId: StepId };
     startedBy?: string;
+    // The initial step's already-resolved candidate set. Creation is a step
+    // entry, so an assignment-bearing initial step carries candidates — but the
+    // caller resolves them (`registry.ts::resolveStepAssignment`), never this
+    // function: a resolver is asynchronous and may reach outside the process,
+    // which would break the persistence-only remit stated above and, on a
+    // subprocess spawn, would run inside an already-open transaction.
+    assignment?: Instance["assignment"];
   },
   db: SQL = sql,
 ): Promise<Instance> {
@@ -399,18 +406,7 @@ export async function createInstance(
     ...(opts.startedBy !== undefined ? { startedBy: opts.startedBy } : {}),
   });
   const { armed: timers, drops } = armStepTimers(initial, startedAt, body, seed);
-  // Creation is a step entry like any other, so an assignment-bearing initial
-  // step gets candidates resolved here too — mirroring timer arming just
-  // above, which planStepEntry also does not cover for creation.
-  let assignment: Instance["assignment"];
-  if (initial?.assignment) {
-    const strategy = initial.assignment.strategy;
-    const candidates = strategy.type === STATIC_ASSIGNMENT_STRATEGY_TYPE
-      ? ((strategy.config as { candidates?: string[] }).candidates ?? [])
-      : [];
-    assignment = { candidates, claimedBy: undefined, claimedAt: undefined };
-  }
-  const inst: Instance = { ...seed, timers, assignment };
+  const inst: Instance = { ...seed, timers, assignment: opts.assignment };
   // A timer the initial step declared but arming could not compute a fireAt for.
   // Recorded at seq 0 — creation advances no sequence, and an event records the
   // seq in force rather than advancing it.

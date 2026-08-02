@@ -71,12 +71,22 @@ deadline, a failure classification, and an `assignment.unresolved` event. See
 
 ## Impact
 
-- `src/engine/registry.ts`: `AssignmentStrategyDef`, `AssignmentRegistry`, and
-  its create, register and resolve helpers. Types and helpers only. The
-  built-in entry lives in `host.ts`, since `registry.ts` stays the leaf module
-  its own doc comment describes.
-- `src/engine/host.ts`: `createDefaultAssignmentRegistry`, holding the built-in
-  `static` entry, beside `createDefaultDataSourceRegistry`.
+- `src/engine/registry.ts`: `AssignmentStrategyDef`, `AssignmentRegistry`, its
+  create, register and resolve helpers, the built-in `static` entry,
+  `createDefaultAssignmentRegistry`, and `resolveStepAssignment`.
+
+  The built-in entry lives here rather than in `host.ts` beside
+  `createDefaultDataSourceRegistry`. `host.ts` holds the other two defaults for
+  one reason. Their handlers import back into the engine. That would close a
+  cycle through `registry.ts`. The `static` assignment resolver imports nothing.
+  It reads its own config.
+
+  So `registry.ts` stays the leaf module its own doc comment describes. Three
+  modules can then fall back to the factory without importing `host.ts`:
+  `store.ts`, `transition.ts` and `definitions.ts`.
+- `src/engine/host.ts`: `startEngine` takes the registry and hands it to
+  `registerSubprocessHandlers`, `startResolutionWorker` and
+  `startTimerScheduler`.
 - `src/engine/registry-check.ts`: `checkAssignmentRegistry` takes the registry,
   reuses `checkTypedConfig`, and drops `staticAssignmentConfigSchema`.
 - `src/engine/definitions.ts`: `publishBody` takes and forwards the registry.

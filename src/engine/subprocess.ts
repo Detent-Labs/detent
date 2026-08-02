@@ -41,7 +41,14 @@ import { instance as instanceSchema, type Instance, type InstanceEvent, type Pro
 import { appendInstanceEvent, newInstanceEventId } from "./store.js";
 import type { ResolveLatestByContract } from "./definitions.js";
 import type { ResolveBody } from "./resolution.js";
-import { register, type Registry, type HandlerContext } from "./registry.js";
+import {
+  register,
+  createDefaultAssignmentRegistry,
+  resolveStepAssignment,
+  type Registry,
+  type HandlerContext,
+  type AssignmentRegistry,
+} from "./registry.js";
 import { SPAWN_ACTION_TYPE, RETURN_ACTION_TYPE } from "./transition.js";
 
 const parseInstance = (raw: unknown): Instance =>
@@ -57,6 +64,7 @@ export function makeSpawnHandler(
   db: SQL,
   resolveBody: ResolveBody,
   resolveLatestByContract: ResolveLatestByContract,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): (ctx: HandlerContext) => Promise<unknown> {
   return async (ctx) => {
     const { subprocessStepId, parentSeq } = ctx.config as { subprocessStepId: string; parentSeq: number };
@@ -113,6 +121,19 @@ export function makeSpawnHandler(
         at: droppedAt,
       }));
 
+      // Creation is a step entry, so an assignment-bearing initial step carries
+      // candidates. Resolved HERE, before the transaction below opens: the child
+      // body, its initial step and its seed data are all in hand, and a resolver
+      // must not run while a connection and a row lock are held.
+      const childInitial = childBody.workflow.steps.find((s) => s.id === childBody.workflow.initialStep);
+      const childAssignment = childInitial
+        ? await resolveStepAssignment(childInitial, assignmentRegistry, {
+            id: childId,
+            startedBy: undefined,
+            data: childData as Instance["data"],
+          })
+        : undefined;
+
       // The drop events land on the parent in the same transaction as the
       // child's creation: withTransaction nests as a savepoint inside
       // createInstance's own transaction when `db` is already one (see
@@ -120,7 +141,7 @@ export function makeSpawnHandler(
       child = await withTransaction(db, async (tx) => {
         const created = await createInstance(
           childBody,
-          { processId: spec.processId, version: childVersion, instanceId: childId, data: childData as Instance["data"], parent: { instanceId: parentId, stepId: subprocessStepId as StepId } },
+          { processId: spec.processId, version: childVersion, instanceId: childId, data: childData as Instance["data"], parent: { instanceId: parentId, stepId: subprocessStepId as StepId }, assignment: childAssignment },
           tx,
         );
         for (const event of dropEvents) await appendInstanceEvent(tx, event);
@@ -133,7 +154,7 @@ export function makeSpawnHandler(
     // child already created still reaches this, completing a drive-to-rest a
     // prior delivery started but crashed before finishing. Already-rested state
     // (terminal, or parked at a non-automatic/wait-state step) makes this a no-op.
-    await resolveAutomatic(child, childBody, SYSTEM_ACTOR, db);
+    await resolveAutomatic(child, childBody, SYSTEM_ACTOR, db, assignmentRegistry);
 
     // Cancel/spawn race backstop: if the parent was cancelled after our status
     // check — or, on redelivery, before an earlier delivery reached this point —
@@ -153,6 +174,7 @@ export function makeSpawnHandler(
 export function makeReturnHandler(
   db: SQL,
   resolveBody: ResolveBody,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): (ctx: HandlerContext) => Promise<unknown> {
   return async (ctx) => {
     // The config names the parent instance and the outcome only. Which step of the
@@ -258,14 +280,19 @@ export function makeReturnHandler(
         await appendInstanceEvent(tx, event);
         return null; // stay parked (bounded by a step timer, if declared)
       }
-      const committed = await executeAutomaticTransition(parked, path, parentBody, tx);
+      // The one path that resolves under a row lock: the parked step and the
+      // matched path are both derived from the row read `FOR UPDATE` above, so
+      // hoisting resolution above the lock would need an optimistic pre-read
+      // plus a sequence re-check on entry. No resolver shipped today performs
+      // I/O, so the lock is held no longer than before.
+      const committed = await executeAutomaticTransition(parked, path, parentBody, tx, assignmentRegistry);
       return { committed, parentBody };
     });
 
     // The remaining cascade runs to rest on committed state, off the lock: it is
     // guard-driven over data no longer in flux, and holding the row across it would
     // extend the lock for no gain.
-    if (advance) await resolveAutomatic(advance.committed, advance.parentBody, SYSTEM_ACTOR, db);
+    if (advance) await resolveAutomatic(advance.committed, advance.parentBody, SYSTEM_ACTOR, db, assignmentRegistry);
     return {};
   };
 }
@@ -284,10 +311,14 @@ export function registerSubprocessHandlers(
   db: SQL,
   resolveBody: ResolveBody,
   resolveLatestByContract: ResolveLatestByContract,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): void {
   register(registry, SPAWN_ACTION_TYPE, {
-    handler: makeSpawnHandler(db, resolveBody, resolveLatestByContract),
+    handler: makeSpawnHandler(db, resolveBody, resolveLatestByContract, assignmentRegistry),
     configSchema: spawnConfigSchema,
   });
-  register(registry, RETURN_ACTION_TYPE, { handler: makeReturnHandler(db, resolveBody), configSchema: returnConfigSchema });
+  register(registry, RETURN_ACTION_TYPE, {
+    handler: makeReturnHandler(db, resolveBody, assignmentRegistry),
+    configSchema: returnConfigSchema,
+  });
 }

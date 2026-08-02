@@ -15,7 +15,15 @@ import {
   NotACandidateError,
   AlreadyClaimedError,
   NotClaimantError,
+  startInstance,
+  planStepEntry,
 } from "../src/engine/transition.js";
+import {
+  createAssignmentRegistry,
+  registerAssignmentStrategy,
+  type AssignmentRegistry,
+  type AssignmentContext,
+} from "../src/engine/registry.js";
 import type { ProcessBody, Instance, InstanceEvent } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
@@ -226,4 +234,146 @@ test.skipIf(!DB)("two actors racing to claim the same unclaimed step resolve to 
   expect(fulfilled.length).toBe(1);
   expect(rejected.length).toBe(1);
   expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(AlreadyClaimedError);
+});
+
+// --- registry-backed resolution ----------------------------------------------
+
+// A body whose INITIAL step carries the assignment, so creation — itself a step
+// entry — is exercised rather than only a transition.
+const assignedInitialBody = (strategy: { type: string; config: Record<string, unknown> }): ProcessBody =>
+  ({
+    key: "p",
+    label: { en: "P" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a", key: "a", label: { en: "A" }, type: "task",
+          assignment: { strategy },
+          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+/** A registry whose single entry records every context it was called with. */
+const spyRegistry = (candidates: string[] = []): { reg: AssignmentRegistry; calls: AssignmentContext[] } => {
+  const calls: AssignmentContext[] = [];
+  const reg = createAssignmentRegistry();
+  registerAssignmentStrategy(reg, "spy", {
+    resolve: async (ctx) => {
+      calls.push(ctx);
+      // Yield to the microtask queue: an awaited resolver, not a synchronous one
+      // the caller happens to get away with.
+      await Promise.resolve();
+      return candidates;
+    },
+  });
+  return { reg, calls };
+};
+
+const pid = "proc_assign" as Instance["processId"];
+
+test.skipIf(!DB)("a static strategy resolves its configured list verbatim at creation", async () => {
+  const body = assignedInitialBody({ type: "static", config: { candidates: ["finance-approver", "user_42"] } });
+  const created = await startInstance(body, { processId: pid, version: 1 }, candidate);
+  expect(created.assignment?.candidates).toEqual(["finance-approver", "user_42"]);
+  expect(created.assignment?.claimedBy).toBeUndefined();
+});
+
+test.skipIf(!DB)("a step with no assignment calls no resolver", async () => {
+  const { reg, calls } = spyRegistry(["never"]);
+  const body = loopBody(); // step_a, the initial step, declares no assignment
+  const created = await startInstance(body, { processId: pid, version: 1 }, candidate, sql, reg);
+  expect(created.assignment).toBeUndefined();
+  expect(calls.length).toBe(0);
+});
+
+test.skipIf(!DB)("a resolver returning a promise is awaited and its list lands in candidates", async () => {
+  const { reg, calls } = spyRegistry(["role_x", "user_1"]);
+  const body = assignedInitialBody({ type: "spy", config: {} });
+  const created = await startInstance(body, { processId: pid, version: 1 }, candidate, sql, reg);
+  expect(created.assignment?.candidates).toEqual(["role_x", "user_1"]);
+  expect(calls.length).toBe(1);
+  expect(calls[0]!.stepId).toBe("step_a");
+  // The context exposes exactly id, startedBy and data — nothing else.
+  expect(Object.keys(calls[0]!.instance).sort()).toEqual(["data", "id", "startedBy"]);
+  expect(calls[0]!.instance.id).toBe(created.instanceId);
+});
+
+test.skipIf(!DB)("an unregistered strategy type at entry yields empty candidates and the entry commits", async () => {
+  const body = loopBody(); // step_b declares `static`
+  const emptyReg = createAssignmentRegistry(); // holds nothing, not even `static`
+  const inst = await createInstance(body, { processId: pid, version: 1 });
+  const onB = await executeManualTransition(inst, "path_ab", body, candidate, sql, undefined, emptyReg);
+  expect(onB.currentStepId as string).toBe("step_b");
+  expect(onB.assignment?.candidates).toEqual([]);
+});
+
+test.skipIf(!DB)("a step whose resolved candidates are empty rejects every actor at claimStep", async () => {
+  const body = assignedInitialBody({ type: "static", config: { candidates: [] } });
+  const created = await startInstance(body, { processId: pid, version: 1 }, candidate);
+  expect(created.assignment?.candidates).toEqual([]);
+  // No fallback assignee is substituted — not the starter, not an admin.
+  await rejectsWith(claimStep(created.instanceId, candidate), NotACandidateError);
+  await rejectsWith(claimStep(created.instanceId, outsider), NotACandidateError);
+});
+
+test.skipIf(!DB)("a resolver on a transition carrying a dataPatch sees the merged value", async () => {
+  const { reg, calls } = spyRegistry([]);
+  // step_a (unassigned, initial) -> step_b, whose strategy is the spy.
+  const body = structuredClone(loopBody()) as unknown as {
+    workflow: { steps: { id: string; assignment?: { strategy: unknown } }[] };
+  };
+  body.workflow.steps.find((s) => s.id === "step_b")!.assignment = { strategy: { type: "spy", config: {} } };
+  const b = body as unknown as ProcessBody;
+
+  const inst = await createInstance(b, { processId: pid, version: 1 });
+  const patch = { field_x: "submitted" } as unknown as Instance["data"];
+  await executeManualTransition(inst, "path_ab", b, candidate, sql, patch, reg);
+
+  expect(calls.length).toBe(1);
+  expect((calls[0]!.instance.data as Record<string, unknown>).field_x).toBe("submitted");
+});
+
+// --- planStepEntry stays free of resolution -----------------------------------
+
+test("planStepEntry consumes the caller's resolved set and calls no resolver", () => {
+  const body = loopBody();
+  const target = body.workflow.steps.find((s) => s.id === "step_b")!;
+  const instance = {
+    instanceId: "inst_x", processId: pid, version: 1, definitionHash: "x",
+    currentStepId: "step_a", transitionSeq: 0, data: {}, status: "running",
+    startedAt: "2026-01-01T00:00:00Z",
+  } as unknown as Instance;
+
+  // The step declares `static` with ["role_x", "user_1"]; the planner writes what
+  // the caller handed it instead, which no resolver would have produced.
+  const plan = planStepEntry(instance, target, body, {
+    pathId: null,
+    cause: "user",
+    actorId: "user_1",
+    actions: [],
+    assignment: { candidates: ["resolved_elsewhere"], claimedBy: undefined, claimedAt: undefined },
+  });
+  expect(plan.instance.assignment?.candidates).toEqual(["resolved_elsewhere"]);
+});
+
+test("planStepEntry carries the instance's assignment forward on { carry: true }", () => {
+  const body = loopBody();
+  const target = body.workflow.steps.find((s) => s.id === "step_b")!;
+  const carried = { candidates: ["role_x"], claimedBy: "user_1", claimedAt: "2026-01-01T00:00:00Z" };
+  const instance = {
+    instanceId: "inst_x", processId: pid, version: 1, definitionHash: "x",
+    currentStepId: "step_a", transitionSeq: 0, data: {}, status: "running",
+    startedAt: "2026-01-01T00:00:00Z", assignment: carried,
+  } as unknown as Instance;
+
+  const plan = planStepEntry(instance, target, body, {
+    pathId: null, cause: "migration", actorId: undefined, actions: [], assignment: { carry: true },
+  });
+  expect(plan.instance.assignment).toEqual(carried);
 });

@@ -1,15 +1,22 @@
 /**
- * Authoring-time assignment-strategy validation: checkAssignmentRegistry checks
- * every step's assignment.strategy.type is "static" (the only supported type,
- * no registry to resolve against) and its config against a fixed { candidates:
- * string[] } schema. Pure — no DB — mirrors registry-check.test.ts's style. The
+ * Authoring-time assignment-strategy validation: checkAssignmentRegistry
+ * resolves every step's assignment.strategy.type against an injected
+ * AssignmentRegistry and checks its config against the schema the resolved
+ * entry declares. Pure — no DB — mirrors registry-check.test.ts's style. The
  * bottom section covers checkAssignmentRegistry's wiring into publishBody
  * (DB-backed, skips without DATABASE_URL), mirroring definitions.test.ts's
  * registry section.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { checkAssignmentRegistry } from "../src/engine/registry-check.js";
-import { createRegistry, STATIC_ASSIGNMENT_STRATEGY_TYPE, createDataSourceRegistry } from "../src/engine/registry.js";
+import {
+  createRegistry,
+  STATIC_ASSIGNMENT_STRATEGY_TYPE,
+  createDataSourceRegistry,
+  createAssignmentRegistry,
+  createDefaultAssignmentRegistry,
+  registerAssignmentStrategy,
+} from "../src/engine/registry.js";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody, AssignmentRegistryValidationError } from "../src/engine/definitions.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
@@ -62,13 +69,15 @@ const bodyWithTwoBadAssignments = (): ProcessBody =>
 
 // --- pure: checkAssignmentRegistry ---------------------------------------------
 
+const assignmentReg = createDefaultAssignmentRegistry();
+
 test("a step declaring the static strategy with a valid candidates config passes", () => {
-  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "static", config: { candidates: ["role_a"] } }));
+  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "static", config: { candidates: ["role_a"] } }), assignmentReg);
   expect(issues.length).toBe(0);
 });
 
-test("a step declaring a non-static strategy type is rejected", () => {
-  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "nope", config: {} }));
+test("a step declaring an unregistered strategy type is rejected", () => {
+  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "nope", config: {} }), assignmentReg);
   expect(issues.length).toBe(1);
   expect(issues[0]!.loc).toContain("steps[0].assignment");
   expect(issues[0]!.type).toBe("nope");
@@ -76,40 +85,53 @@ test("a step declaring a non-static strategy type is rejected", () => {
 });
 
 test("a step with no assignment declared is not checked", () => {
-  const issues = checkAssignmentRegistry(bodyWithAssignment());
+  const issues = checkAssignmentRegistry(bodyWithAssignment(), assignmentReg);
   expect(issues.length).toBe(0);
 });
 
 test("a static strategy's config missing candidates is rejected", () => {
-  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "static", config: {} }));
+  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "static", config: {} }), assignmentReg);
   expect(issues.length).toBe(1);
   expect(issues[0]!.type).toBe("static");
 });
 
 test("a static strategy's config with a non-string candidates entry is rejected", () => {
-  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "static", config: { candidates: ["ok", 42] } }));
+  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "static", config: { candidates: ["ok", 42] } }), assignmentReg);
   expect(issues.length).toBe(1);
   expect(issues[0]!.type).toBe("static");
 });
 
-test("a non-static type is not also checked for a config violation", () => {
-  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "nope", config: { bad: true } }));
+test("an unregistered type is not also checked for a config violation", () => {
+  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "nope", config: { bad: true } }), assignmentReg);
   expect(issues.length).toBe(1); // just "not registered", no separate config issue
 });
 
-test("every step's non-static assignment type is collected, not only the first", () => {
-  const issues = checkAssignmentRegistry(bodyWithTwoBadAssignments());
+test("every step's unregistered assignment type is collected, not only the first", () => {
+  const issues = checkAssignmentRegistry(bodyWithTwoBadAssignments(), assignmentReg);
   expect(issues.length).toBe(2);
   expect(issues.map((i) => i.type).sort()).toEqual(["nope_a", "nope_b"]);
   expect(issues.some((i) => i.loc.includes("steps[0]"))).toBe(true);
   expect(issues.some((i) => i.loc.includes("steps[1]"))).toBe(true);
 });
 
-test("the static strategy type constant matches what the check accepts", () => {
-  const ok = checkAssignmentRegistry(bodyWithAssignment({ type: STATIC_ASSIGNMENT_STRATEGY_TYPE, config: { candidates: ["x"] } }));
+test("the static strategy type constant resolves in the default registry", () => {
+  const ok = checkAssignmentRegistry(bodyWithAssignment({ type: STATIC_ASSIGNMENT_STRATEGY_TYPE, config: { candidates: ["x"] } }), assignmentReg);
   expect(ok.length).toBe(0);
-  const bad = checkAssignmentRegistry(bodyWithAssignment({ type: STATIC_ASSIGNMENT_STRATEGY_TYPE, config: {} }));
+  const bad = checkAssignmentRegistry(bodyWithAssignment({ type: STATIC_ASSIGNMENT_STRATEGY_TYPE, config: {} }), assignmentReg);
   expect(bad.length).toBe(1);
+});
+
+test("a registered strategy declaring no config schema accepts any config", () => {
+  const reg = createAssignmentRegistry();
+  registerAssignmentStrategy(reg, "schemaless", { resolve: async () => [] });
+  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "schemaless", config: { anything: 1 } }), reg);
+  expect(issues.length).toBe(0);
+});
+
+test("a core.-prefixed strategy type is not exempt from the type check", () => {
+  const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "core.spawnSubprocess", config: {} }), assignmentReg);
+  expect(issues.length).toBe(1);
+  expect(issues[0]!.message.toLowerCase()).toContain("not registered");
 });
 
 // --- DB-backed: checkAssignmentRegistry wired into publishBody ----------------
@@ -182,4 +204,14 @@ test.skipIf(!DB)("a rejected assignment-strategy publish consumes no version num
   const good = bodyWithAssignment({ type: STATIC_ASSIGNMENT_STRATEGY_TYPE, config: { candidates: [] } });
   const v = await publishBody(PID, good, actionReg, dataSourceReg);
   expect(v.version).toBe(1); // not 2 — the rejected publish reserved nothing
+});
+
+test.skipIf(!DB)("an identical re-publish survives the registry dropping the body's strategy type", async () => {
+  const body = bodyWithAssignment({ type: STATIC_ASSIGNMENT_STRATEGY_TYPE, config: { candidates: ["role_a"] } });
+  const v1 = await publishBody(PID, body, actionReg, dataSourceReg);
+  // The hash-hit return sits ahead of every publish-time check, so a body
+  // published before a strategy existed is not retroactively rejected.
+  const emptyAssignmentReg = createAssignmentRegistry();
+  const v2 = await publishBody(PID, body, actionReg, dataSourceReg, sql, emptyAssignmentReg);
+  expect(v2.version).toBe(v1.version);
 });
