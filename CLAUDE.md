@@ -412,11 +412,20 @@ See `ROADMAP.md` for stage-by-stage status (DONE/NOT STARTED) and what each stag
   gaps, the studio Player and the inbox predicate.
 
 ## Codebase memory (knowledge graph)
-The repo is indexed into codebase-memory-mcp (`full` mode, covering the engine,
-the Runtime API Layer, the HTTP/auth layers, and every frontend package
-(`packages/web`, `packages/form-ui`);
-`packages/*/{dist,node_modules}` excluded). Resolve the `project` arg via `list_projects` (match on root_path);
-the slug is machine-specific, never hardcode it. Entry points: `search_graph`
+Index the repo into codebase-memory-mcp with `index_repository` in `full` mode.
+That covers the engine, the Runtime API Layer and the HTTP/auth layers. It also
+covers both frontend packages, `packages/web` and `packages/form-ui`. The
+indexer reads its exclusions from `.gitignore`, so it skips `node_modules` and
+`packages/web/dist` without configuration.
+
+The index is per-machine local state, not repository state. Nothing in the repo
+carries it, and no setup step builds it. A machine that has never run
+`index_repository` therefore holds no graph at all. Check with `list_projects`
+before you trust a graph query. Treat an absent project as "index it now", not
+as "the graph says no".
+
+Resolve the `project` arg from that same `list_projects` call, matching on
+root_path. The slug is machine-specific, never hardcode it. Entry points: `search_graph`
 (find symbols), `get_code_snippet` (read a body), `trace_path` (callers/callees,
 `mode=calls|data_flow|cross_service` — useful for tracing across the
 engine↔runtime↔web boundary, e.g. `packages/web/src/areas/studio` ->
