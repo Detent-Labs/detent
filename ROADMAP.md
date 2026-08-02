@@ -1193,7 +1193,7 @@ capability of its own.
      here, not a file-wide one. -->
 25. Per-instance step assignment: design DONE (approved 2026-08-02, see
     `docs/superpowers/specs/2026-08-02-pluggable-step-assignment-design.md`);
-    change B proposed 2026-08-02, A and C NOT STARTED. Raised 2026-08-01 as a
+    change B DONE, A and C NOT STARTED. Raised 2026-08-01 as a
     reality check on how a user acquires a role a process names. The answer
     exposed a deeper gap: `planStepEntry` copies `assignment.strategy.config
     .candidates` verbatim from the frozen definition onto the instance, so
@@ -1214,9 +1214,10 @@ capability of its own.
        `UsersScreen`. Closes the CLI-only gap stage 10's `admin-users`
        deliberately left, which becomes untenable once business roles multiply.
        No contract change; independent of (b).
-    b. Assignment strategy registry: PROPOSED
-       (`openspec/changes/add-assignment-strategy-registry`, all four artifacts
-       complete, `openspec validate --strict` clean). `AssignmentRegistry`
+    b. Assignment strategy registry: DONE (archived
+       `2026-08-02-add-assignment-strategy-registry`; see the
+       "Auth/Actor-Resolution + Assignment/Claim-Enforcement" entry under
+       `docs/current-state.md`, which now carries the registry). `AssignmentRegistry`
        becomes a third map beside the action `Registry` and the
        `DataSourceRegistry`, `publishBody` takes it, `checkAssignmentRegistry`
        resolves against it (reusing `checkTypedConfig` and deleting its
@@ -1229,15 +1230,28 @@ capability of its own.
        migration; `Step.assignment.strategy` already uses the generic `plugin`
        envelope, so the JSON contract is untouched. The resolver signature is
        async even though `static` needs no I/O, copying
-       `DataSourceHandlerDef.resolve`'s reasoning. **This contradicts a stated
-       rule**: `CLAUDE.md` and `docs/current-state.md` both record that
-       assignment strategy is not an extension point, and (b) must correct them
-       and `docs/authoring-guide.md` in the same commit. Deferred to (c) after
+       `DataSourceHandlerDef.resolve`'s reasoning. **This contradicted a stated
+       rule**: `CLAUDE.md` and `docs/current-state.md` both recorded that
+       assignment strategy is not an extension point; the same commit corrected
+       them and `docs/authoring-guide.md`.
+       Two things landed wider than the proposal stated. The caller set is four,
+       not two — `commitTransition`, the subprocess spawn handler,
+       `startInstance` and `api.ts::createProcessInstance` — and
+       `StepEntryOpts.assignment` is required rather than optional, so a missed
+       caller fails to compile instead of silently unassigning a step; migration
+       passes `{ carry: true }` and runs no resolver at all. Three of the four
+       resolve before their transaction opens, but the subprocess RETURN path
+       resolves the parent's candidates while holding the parent's row lock,
+       because it derives the step it enters from the row it read under that
+       lock. `static` performs no I/O, so nothing shipped waits there; (c) owns
+       bounding it, and `CLAUDE.md`'s "Decided, not yet built" list records the
+       two ways out. Deferred to (c) after
        review: a resolution deadline, a failure classification and an
        `assignment.unresolved` event — `static` cannot fail, so nothing in (b)
        exercises them, and deciding them here would repeat the speculative
        timeout/error semantics `CLAUDE.md` already defers for a dynamic data
-       source.
+       source. An unregistered type reaching step entry resolves to an empty
+       candidate list rather than raising, and substitutes no fallback assignee.
     c. Manager service: NOT STARTED. One field on the user (manager → person, a
        pointer, not a tree) edited on the same screen (a) touches, plus a
        built-in `org.manager-of-starter` strategy resolving the manager of
@@ -1267,9 +1281,10 @@ capability of its own.
      entry matches the dense technical-prose convention every other entry
      in this file already uses; see the antislop-targeted-allow-not-file-all
      memory for why a block-scoped allow is the correct tool here. -->
-26. DB-backed data lists: PROPOSED (`openspec/changes/add-db-data-lists`, all
-    four artifacts complete, `openspec validate --strict` clean; design at
-    `docs/superpowers/specs/2026-08-02-db-data-lists-design.md`). Raised
+26. DB-backed data lists: DONE (archived `2026-08-03-add-db-data-lists`; design
+    at `docs/superpowers/specs/2026-08-02-db-data-lists-design.md`; see the
+    "Database-backed data lists" and "Two-role admin area" entries under
+    `docs/current-state.md`). Raised
     2026-08-02 while working through what a data source actually is today.
     `"static"` is the only type that ships, and its option list lives in
     `config.options` inside the immutable, hashed body — so changing one value
@@ -1309,12 +1324,103 @@ capability of its own.
     picker needs no second route. Nothing in `definition.ts` changes.
     Seven capabilities: `db-data-source-type` and `data-list-administration` are
     new; `data-source-resolution`, `authorization`, `persistence`, `admin-app`
-    and `studio-app` gain deltas. The task list is cut so the engine-side read
-    path lands and stays green before the routes and screens, which are the
+    and `studio-app` gain deltas. The task list was cut so the engine-side read
+    path landed and stayed green before the routes and screens, which are the
     larger half of the work.
+    Three decisions the proposal left open were settled while building it.
+    `createDefaultDataSourceRegistry` takes the database handle and the handler
+    closes over it, rather than every other type ignoring a handle on
+    `DataSourceContext`. `MAX_DATA_LIST_VALUES` is 500 and counts the ACTIVE
+    values, with the `LIMIT` leaving room for the held rows on top — counting
+    rows would break the very instances the retirement rule protects, since 500
+    offered values plus one retired value a holder names is 501 rows; the
+    handler throws above the bound rather than resolving a short list, because a
+    truncated list rejects a value a participant legitimately holds. And the
+    shell's area table now carries a SET of roles per area, since the data list
+    screens live in the admin area while their maintainers must not hold
+    `system:admin`: area entry became the weaker gate, each screen keeps its own
+    check, and `requireRole` on every `/admin/*` route stays the enforcement.
     Deliberately out of scope, each with its reason in the design: search and
     typeahead (a list too large for a dropdown needs its own route, field type
     and renderer), caching across calls, a change history beyond
     `updated_at`/`updated_by`, a separate import endpoint (a sync job writes
     through the values route — it is the same operation), and CEL-readable data
     sources, which stay a publish error exactly as before.
+<!-- antislop: allow sentence-length run-ons passive-voice em-dash. This
+     entry matches the dense technical-prose convention every other entry
+     in this file already uses; see the antislop-targeted-allow-not-file-all
+     memory for why a block-scoped allow is the correct tool here. -->
+27. No-code / low-code process authoring: NOT STARTED, no OpenSpec change yet.
+    Raised 2026-08-03 as the product direction the README and `CLAUDE.md` now
+    state: a business analyst builds a process in the studio area without
+    writing JSON or CEL. This is a stage, not a rewrite. The studio area already
+    covers the structural half — canvas, steps, paths, fields, views, the
+    Player, publish, versions — and every gap below is an authoring surface,
+    never a contract change.
+    **The two words name two different things, on purpose.** No-code is the
+    target for the subset the builders cover: an author completes a whole
+    process through forms and a canvas, never typing CEL or JSON, and never
+    seeing either. Low-code is what stays underneath, permanently: the JSON
+    view, the CEL text input and hand-authored bodies remain first-class, for a
+    developer and for every case a builder cannot express. The two are one
+    product, not two editions, and an author moves between them per field. That
+    is also why "no-code" here is never a promise that a process needs no
+    developer — it is a promise about one authoring path through one product.
+    **The rule that governs the whole stage.** An authoring surface PRODUCES the
+    serialized JSON definition; it never becomes a second language beside it.
+    Nothing here enters `src/schema/definition.ts`, so `definitionHash`,
+    version immutability and migration stay untouched, and a hand-authored body
+    stays first-class. The JSON view is the escape hatch and stays reachable
+    from every screen a builder covers.
+    Four gaps, measured against the code rather than guessed, ordered cheapest
+    and most valuable first:
+    a. A plugin config form. `panels/shared/PluginEnvelopeEditor.tsx` edits
+       every `{ type, config }` position — actions, data sources, assignment
+       strategies, a custom field type — as a free-text `type` input beside a
+       raw JSON textarea. An author must know both the type string and the
+       config shape, and a typo surfaces at publish. The registry already holds
+       what a form needs: `HandlerDef.configSchema` (and its data-source and
+       assignment siblings) declares the shape the publish-time check already
+       parses against. `GET /registry` (`src/http/studio-routes.ts`) returns
+       only the three type-name arrays, so the change widens that route and
+       owns one decision: `configSchema` is a Zod schema (`z.ZodTypeAny`), so
+       either the server serializes it to JSON Schema or each entry ships a
+       hand-written descriptor beside it. Everything downstream — a type
+       picker, a generated form, inline per-field errors — follows from that
+       one answer.
+    b. A condition builder over CEL. `panels/shared/ExpressionInput.tsx` is one
+       text input writing `{ lang: "cel", src }`; publish type-checks it and
+       the Tools scratchpad checks it ahead of time, but the author writes CEL
+       by hand. A builder reads the field catalog and emits CEL text. The hard
+       part is not emitting it but reading it back: a guard someone typed by
+       hand, or emitted by an older builder, must still open in the builder, or
+       the two surfaces silently diverge. Parsing CEL back into a builder model
+       is the honest option, since the library already parses. A sidecar
+       recording "how this guard was built" is the tempting one and must be
+       weighed carefully: it cannot live in `ProcessBody` (that changes the
+       hash), and beside the draft it dies at publish, which leaves a published
+       version uneditable in the builder. This is the largest of the four and
+       deserves its own design.
+    c. Migration-plan authoring without JSON. Stage 11 shipped a `MigrationSpec`
+       textarea on purpose — no field-by-field form existed to extend and the
+       server owns validation. A field-mapping UI over the two versions'
+       catalogs is the same shape of work as (a), and both versions are already
+       fetchable.
+    d. Process templates. Nothing seeds a new process today; an author starts
+       from an empty draft. A template is a stored draft body, so this needs no
+       engine concept — only a decision about where templates live and who
+       curates them.
+    One open question the stage must answer before (a) ships, not after: the
+    studio area sits behind one coarse role. `system:developer` reaches drafts,
+    the registry, migration planning and the Player alike, and publishing needs
+    `system:publish` on top. A business analyst authoring a process is exactly
+    the actor that role was not shaped for. Either the analyst gets
+    `system:developer` (and with it migration planning), or the area splits its
+    gate the way stage 26 split the admin area's — a set of roles per area,
+    each screen keeping its own check.
+    Deliberately out of scope: a natural-language or AI-assisted authoring
+    surface (it produces the same JSON, so it is a later surface over the same
+    contract, not a reason to reshape one), executable code authored in the
+    browser (actions stay declarative handler references, per the contract),
+    and relaxing any v1 boundary — no parallelism arrives because a canvas
+    could draw it.

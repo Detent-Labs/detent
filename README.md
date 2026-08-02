@@ -6,8 +6,23 @@
      the wrong section read worse for a false-positive cross-reference. -->
 # Detent
 
-A headless, API-first workflow / BPM engine in TypeScript. It executes
-structured, form- and approval-driven business processes with explicit states.
+A workflow / BPM platform in TypeScript. It runs structured, form- and
+approval-driven business processes with explicit states.
+
+The product is the engine plus its browser UI. Four areas serve the four people
+around a process. The participant works a task. The operator runs the
+installation. The developer builds the process. The owner measures it.
+
+The engine stays headless and API-first behind that UI. It carries no UI
+dependency, and the browser package reaches it only over HTTP. So an
+integration drives a process with no browser at all.
+
+Where this is going: no-code and low-code process authoring (`ROADMAP.md` stage
+27). No-code is the target for what the builders cover. An analyst completes a
+process through forms and a canvas, typing no CEL and no JSON. Low-code is what
+stays underneath, permanently. The JSON view and the CEL input remain
+first-class for a developer, and for what a builder cannot express. CEL guards
+and action config still need a developer today.
 
 The paradigm is a **state-based finite-state machine**: Steps (states) connected
 by explicit Paths (transitions). This is *not* BPMN token flow.
@@ -17,7 +32,7 @@ by explicit Paths (transitions). This is *not* BPMN token flow.
 A serialized JSON process definition is the one artifact three roles share:
 
 - **Engine** — executes definitions.
-- **Editor** — produces them graphically (the studio area of `packages/web`).
+- **Studio** — builds them on a canvas (the studio area of `packages/web`).
 - **Hand-authoring** — definitions written directly as JSON (rare).
 
 `src/schema/definition.ts` is that contract, expressed as Zod schemas with TS
@@ -33,9 +48,9 @@ and an Action are. It also gives the order in which to build a process.
 
 ## Status
 
-Schema, validation, a working engine, a Runtime API Layer, an HTTP wrapper with
-JWT authentication and role-gated authorization, and three frontends
-(participant, operator, developer).
+Schema, validation, a working engine, a Runtime API Layer, and an HTTP wrapper
+with JWT authentication and role-gated authorization. One frontend package
+carries the four areas above.
 
 | Piece | State |
 |-------|-------|
@@ -43,11 +58,11 @@ JWT authentication and role-gated authorization, and three frontends
 | `src/cel/check.ts` | Authoring-time CEL parse/type-check against the field catalog (`@marcbachmann/cel-js`). |
 | `src/cel/eval.ts` | Runtime CEL: guards (total — a runtime error is `false`), Action.output writeback, and migration `transforms` (total per entry). |
 | `src/schema/compile.ts` | Publish-time pass: injects the cancel-sink (+ reserved outcome for a contracted process) before hashing, deterministic and idempotent. |
-| `src/engine/` | Instance store, transactional outbox (delivery + writeback + retry/dead-letter + reclaim), transition executor (manual/automatic/timer), async wait-state re-resolution, timer arming + scheduler, crash recovery, runtime cancellation, subprocess execution (`subprocess.ts`: spawn + return + downward cancel cascade), instance migration (`migration.ts`: plan store + row-locked, keyset-paginated version migration), definition/version store (`definitions.ts`) + `startEngine` host. PostgreSQL via `Bun.sql`. |
+| `src/engine/` | Instance store, transactional outbox (delivery + writeback + retry/dead-letter + reclaim), transition executor (manual/automatic/timer), async wait-state re-resolution, timer arming + scheduler, crash recovery, runtime cancellation, subprocess execution (`subprocess.ts`: spawn + return + downward cancel cascade), instance migration (`migration.ts`: plan store + row-locked, keyset-paginated version migration), definition/version store (`definitions.ts`) + `startEngine` host. Three plugin registries (`registry.ts`) cover actions, data sources and assignment strategies. The `db.list` data source reads the `data_lists`/`data_list_values` tables. PostgreSQL via `Bun.sql`. |
 | `src/runtime/api.ts` | Runtime API Layer: instance creation, view resolution, submit-and-transition, claim/release, cancel, and the read/query surface (`listInstances` / `getInstanceRecord`) — the boundary a UI calls without touching engine internals. Every function takes an explicit `Actor`. |
 | `src/http/` | Thin REST/JSON wrapper over `Bun.serve` around the Runtime API Layer, plus the admin and studio route files. Typed-error-to-HTTP-status mapping, configurable CORS. |
-| `src/auth/` | `ActorResolver` seam with two implementations (a non-production dev-header resolver and a production-capable JWT resolver accepting local `auth_users` accounts and JWKS-backed external issuers), login + rate limiting, a user-admin CLI, and the reserved roles (`system:publish`, `system:cancel-any`, `system:admin`, `system:developer`). |
-| `src/handlers/` | `http.request` — the one shipped action handler; a vendor-neutral REST call with engine-set idempotency and outbox-aligned retry semantics. |
+| `src/auth/` | `ActorResolver` seam with two implementations (a non-production dev-header resolver and a production-capable JWT resolver accepting local `auth_users` accounts and JWKS-backed external issuers), login + rate limiting, a user-admin CLI, and the six reserved roles (`system:publish`, `system:cancel-any`, `system:admin`, `system:developer`, `system:reports`, `system:datalists`). The server checks each role directly. None implies another. |
+| `src/handlers/` | Two action handlers ship. `http.request` is a vendor-neutral REST call with engine-set idempotency and outbox-aligned retry semantics. `notification.email` speaks SMTP directly and reads its connection details from the environment. |
 | `packages/web/` | The one browser package. `src/shell/` holds prefix routing, the one session and login, the account menu and the area switcher; `src/api/` and `src/i18n/` hold what every area shares; `src/areas/{app,admin,studio,reporting}/` hold the four audiences' screens, one URL prefix, one lazy chunk and one role gate each. An area never imports from another area. |
 | `packages/form-ui/` | Source-only shared step-form renderer, so what an author previews is what a participant gets. |
 | `examples/expense-approval.json` | Complete Capture → Review → Book example. |
@@ -58,7 +73,11 @@ Done: validation, CEL wiring, the engine (runtime cancellation, subprocess
 execution with downward cancel propagation, both timer kinds, plan-governed
 instance migration), the Runtime API Layer, the HTTP wrapper, authentication
 and authorization, assignment/claim enforcement, and the read/query API — plus
-the participant, operator and developer frontends. See `ROADMAP.md` for
+the four frontend areas. Custom actions, data sources and assignment strategies
+are plugins behind one envelope, `{ type, config }`. Publish resolves each type
+against its registry and checks its config. A `db.list` data source keeps its
+option values in engine-owned tables. Business staff edit a list without
+publishing a new version. See `ROADMAP.md` for
 stage-by-stage status and what is deliberately deferred.
 
 ## Develop
@@ -139,7 +158,9 @@ docker build -f docker/frontend.Dockerfile \
 The engine image reads its configuration from the container runtime
 environment. These are the same variables `bun run serve` already reads
 locally: `DATABASE_URL`, one of `AUTH_JWT_SECRET`/`AUTH_ISSUERS`, and
-optionally `CORS_ALLOWED_ORIGINS` and `PORT`. It never sets
+optionally `CORS_ALLOWED_ORIGINS` and `PORT`. A definition using the
+`notification.email` action also needs `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`,
+`SMTP_PASSWORD` and `SMTP_FROM`. It never sets
 `ALLOW_INSECURE_DEV_AUTH` itself. A deployment that omits both auth
 variables fails to start immediately. It names the missing variable,
 exactly as `bun run serve` already does locally, instead of falling back
