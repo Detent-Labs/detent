@@ -3,7 +3,19 @@ schema: spec-driven
 # Project context (optional)
 # This is shown to AI when creating artifacts.
 context: |
-  Headless, API-first workflow/BPM engine in TypeScript. Paradigm: state-based
+  Workflow/BPM platform in TypeScript. The product is the engine plus its
+  browser UI (`packages/web`), whose four areas serve the participant, the
+  operator, the developer and the process owner. The engine itself stays
+  headless and API-first behind that UI: it carries no UI dependency, and
+  `packages/web` reaches it only over the HTTP wrapper and the exports map.
+  Keep that boundary. Direction: no-code and low-code process authoring
+  (ROADMAP stage 27). No-code is the target for what the builders cover, and
+  low-code is what stays underneath permanently — the JSON view, the CEL
+  input and hand-authored bodies stay first-class. Every authoring surface
+  produces the same JSON definition as today, so none of them relaxes a
+  contract rule.
+
+  Paradigm: state-based
   finite-state machine — Steps (states) joined by explicit Paths (transitions),
   NOT BPMN token flow. v1: one active step per instance (no parallelism);
   subprocesses are synchronous call-and-return.
@@ -14,7 +26,10 @@ context: |
   type-prefixed, immutable `id` (the sole reference anchor); `key` is a mutable
   slug that references nothing; `label` is display text. All conditions are CEL
   ({ lang: "cel", src }): pure, total, no now(). Authoring-time invariants are Zod
-  refinements, each shipping with a test that rejects a violating definition.
+  refinements or write-path checks in src/schema/compile.ts — a rule that may
+  tighten over time belongs on the write path, since definition.ts also
+  deserializes stored immutable bodies. Each ships with a test that rejects a
+  violating definition.
   Change the schema deliberately, never as a side effect of another task.
 
   Stack: TypeScript strict, ESM. Bun is the runtime, package manager (`bun
@@ -44,7 +59,8 @@ context: |
   instance record; gated by `system:developer`. The admin area is the
   operator's product — all-instances list, merged transition/event record
   with cancel, outbox with dead-letter retry/discard, pending timers, user
-  administration; gated by `system:admin`. The app area is participant-facing
+  administration, data list maintenance; gated by `system:admin` or, for the
+  data list screens alone, `system:datalists`. The app area is participant-facing
   (My-tasks inbox / Task / Start-a-process over `scope=mine`-derived inbox
   filtering and JWT auth). The reporting area is the process owner's — cycle
   time, bottlenecks, SLA; gated by `system:reports`. `packages/form-ui` is a
@@ -63,8 +79,11 @@ context: |
   it as `http-wrapper`, alongside `src/http/admin-routes.ts` and
   `src/http/studio-routes.ts`; JWT/local-account auth (`jwt-authentication`,
   `local-user-accounts`) and role-gated operations (`authorization`:
-  `system:publish`, `system:cancel-any`, `system:admin`, `system:developer`)
-  sit in front of it. All of this is built — nothing here is still "post-v1
+  `system:publish`, `system:cancel-any`, `system:admin`, `system:developer`,
+  `system:reports`, `system:datalists` — six flat roles, none implying another)
+  sit in front of it. Actions, data sources and assignment strategies are
+  plugins behind `{ type, config }`, each resolved and config-checked at
+  publish against its own registry in `src/engine/registry.ts`. All of this is built — nothing here is still "post-v1
   roadmap"; see `ROADMAP.md` for current stage-by-stage status.
 
 # Per-artifact rules (optional)

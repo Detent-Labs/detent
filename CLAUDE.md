@@ -1,18 +1,42 @@
-# Workflow / BPM Engine — Project Context
+# Workflow / BPM Platform — Project Context
 
+<!-- antislop: allow synonym-rotation. "operator" and "surface" are domain
+     terms here: an operator is the admin area's audience, one of the four
+     named alongside participant, developer and process owner, and an
+     authoring surface is what the studio presents. The linter's buckets
+     ("user", "present") name unrelated concepts in this repo. -->
 ## What this is
-A headless, API-first workflow/BPM engine written in TypeScript. It executes
-structured, form- and approval-driven business processes with explicit states.
+A workflow/BPM platform written in TypeScript. It runs structured, form- and
+approval-driven business processes with explicit states.
+
+The product is the engine plus its browser UI (`packages/web`). Four areas serve
+the participant, the operator, the developer and the process owner.
+
+The engine itself stays headless and API-first behind that UI. It carries no UI
+dependency. `packages/web` reaches it only over the HTTP wrapper and the
+exports map. That property is load-bearing: an integration drives a process
+with no browser at all. Do not let a UI concern leak into `src/`.
+
+Direction: no-code and low-code process authoring (`ROADMAP.md` stage 27, NOT
+STARTED). The two words name two things. No-code is the target for what the
+builders cover: an author types no CEL and no JSON. Low-code is what stays
+underneath permanently: the JSON view, the CEL input and hand-authored bodies
+stay first-class.
+
+The studio area already builds a process on a canvas. CEL guards and action
+config still need a developer today. That direction relaxes none of the
+contract rules below. Every authoring surface produces the same JSON
+definition.
 
 The paradigm is a state-based finite-state machine: Steps (states) connected by
 explicit Paths (transitions). This is NOT BPMN token flow.
 
 Three roles share one artifact, the serialized JSON process definition:
 - Engine: executes definitions (the executor).
-- Editor: produces definitions graphically (the studio area of `packages/web`).
+- Studio: builds definitions on a canvas (the studio area of `packages/web`).
 - Hand-authoring: definitions written directly as JSON (rare).
 
-The serialized JSON definition is the contract between engine and editor.
+The serialized JSON definition is the contract between engine and studio.
 `src/schema/definition.ts` is that contract, expressed as TypeScript types.
 
 ### Hard v1 boundaries (do not cross without a deliberate decision)
@@ -44,7 +68,7 @@ src/runtime/api.ts         Runtime API Layer: createProcessInstance / getInstanc
                             / claimStep / releaseClaim / cancelInstance / listInstances / getInstanceRecord
 src/http/                  REST/JSON wrapper over Bun.serve (routes.ts, admin-routes.ts, studio-routes.ts)
 src/auth/                  ActorResolver seam (dev-header + JWT), local accounts, login, roles, CLI
-src/handlers/              action handlers; http.request is the only one shipped
+src/handlers/              action handlers; http.request and notification.email ship
 examples/                  serialized example definitions
 test/                      bun:test suites; tests run inside the container
 docs/current-state.md      per-subsystem descriptive counterpart to this file
@@ -68,7 +92,7 @@ packages/form-ui/          shared step-form renderer (source-only, no build step
 
 ## The contract: load-bearing rules
 JSON is the one artifact; the Zod schemas (with TS types derived via z.infer)
-are the contract. All of the following are facts the engine and editor must
+are the contract. All of the following are facts the engine and studio must
 uphold, not open questions.
 
 **Identity.** Every entity has an opaque `id` (UUIDv4 with a type prefix, e.g.
@@ -100,7 +124,7 @@ frozen context: `data`, `instance`, `actor`, plus `child.outcome`/`child.data`
 inside a subprocess step. A declared data source is not a readable CEL namespace —
 a CEL reference to one is a publish error (the engine resolves none). One extra namespace,
 `result` (a handler's structured return), is scoped ONLY to an Action.output
-mapping and is never visible to guards. Use ONE CEL library for both the editor
+mapping and is never visible to guards. Use ONE CEL library for both the studio
 (parse) and the engine (evaluate) so there is no semantic drift.
 
 A guard is total: a runtime error is not a match, not a throw. The most
