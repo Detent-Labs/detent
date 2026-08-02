@@ -52,16 +52,40 @@ const dsBody = (): ProcessBody =>
     },
   }) as unknown as ProcessBody;
 
-function countingStaticHandler(): { handler: DataSourceHandlerDef; calls: () => number } {
+function countingStaticHandler(): { handler: DataSourceHandlerDef; calls: () => number; heldValueSets: () => string[][] } {
   let calls = 0;
+  const heldValueSets: string[][] = [];
   return {
     handler: {
       resolve: async (ctx) => {
         calls++;
+        heldValueSets.push(ctx.heldValues ?? []);
         return (ctx.config as { options: typeof COUNTRY_OPTIONS }).options;
       },
     },
     calls: () => calls,
+    heldValueSets: () => heldValueSets,
+  };
+}
+
+/**
+ * A handler that models retirement: it offers `active` plus any value the
+ * caller says the instance already holds. `active` is mutable so a test can
+ * retire a value between two calls, the way an operator does.
+ */
+function retiringHandler(active: string[]): { handler: DataSourceHandlerDef; retire: (v: string) => void } {
+  const ALL = [
+    { value: "cc1", label: { en: "One" } },
+    { value: "cc_old", label: { en: "Old" } },
+  ];
+  let offered = new Set(active);
+  return {
+    handler: {
+      resolve: async (ctx) => ALL.filter((o) => offered.has(o.value) || (ctx.heldValues ?? []).includes(o.value)),
+    },
+    retire: (v) => {
+      offered = new Set([...offered].filter((x) => x !== v));
+    },
   };
 }
 
@@ -131,6 +155,69 @@ test.skipIf(!DB)("createProcessInstance's seed data is validated against resolve
     raised = e;
   }
   expect(raised).toBeInstanceOf(SubmissionValidationError);
+});
+
+test.skipIf(!DB)("a select contributes one held value and a multiselect contributes its whole array", async () => {
+  const { handler, heldValueSets } = countingStaticHandler();
+  const dsReg = createDataSourceRegistry();
+  registerDataSource(dsReg, "static", handler);
+  await publishBody(PID, dsBody(), reg, dsReg);
+  const created = await createProcessInstance(PID, actor, dsReg, {
+    data: { field_country: "us", field_tags: ["us", "ca"] } as unknown as Instance["data"],
+  });
+  const before = heldValueSets().length;
+  await getInstanceView(created.instanceId, actor, dsReg);
+  // Sorted, so the multiselect's array order does not leak into the memo key.
+  expect(heldValueSets().slice(before)).toEqual([["us"], ["ca", "us"]]);
+});
+
+test.skipIf(!DB)("two fields sharing one data source resolve twice when their held values differ", async () => {
+  const { handler, calls } = countingStaticHandler();
+  const dsReg = createDataSourceRegistry();
+  registerDataSource(dsReg, "static", handler);
+  await publishBody(PID, dsBody(), reg, dsReg);
+  const created = await createProcessInstance(PID, actor, dsReg, {
+    data: { field_country: "us", field_tags: ["ca"] } as unknown as Instance["data"],
+  });
+  const before = calls();
+  await getInstanceView(created.instanceId, actor, dsReg);
+  expect(calls() - before).toBe(2);
+});
+
+test.skipIf(!DB)("two fields sharing one data source resolve once when their held values match", async () => {
+  const { handler, calls } = countingStaticHandler();
+  const dsReg = createDataSourceRegistry();
+  registerDataSource(dsReg, "static", handler);
+  await publishBody(PID, dsBody(), reg, dsReg);
+  const created = await createProcessInstance(PID, actor, dsReg, {
+    data: { field_country: "us", field_tags: ["us"] } as unknown as Instance["data"],
+  });
+  const before = calls();
+  await getInstanceView(created.instanceId, actor, dsReg);
+  expect(calls() - before).toBe(1);
+});
+
+test.skipIf(!DB)("a retired value the instance holds stays visible and stays submittable", async () => {
+  const { handler, retire } = retiringHandler(["cc1", "cc_old"]);
+  const dsReg = createDataSourceRegistry();
+  registerDataSource(dsReg, "static", handler);
+  await publishBody(PID, dsBody(), reg, dsReg);
+  const created = await createProcessInstance(PID, actor, dsReg, { data: { field_country: "cc_old" } as unknown as Instance["data"] });
+
+  retire("cc_old");
+
+  // The holder still sees it, with its label — not a bare key.
+  const view = await getInstanceView(created.instanceId, actor, dsReg);
+  const country = view.fields.find((f) => f.field.key === "country")!;
+  expect(country.options).toContainEqual({ value: "cc_old", label: { en: "Old" } });
+  // And a field nobody holds it for no longer offers it.
+  const tags = view.fields.find((f) => f.field.key === "tags")!;
+  expect(tags.options).toEqual([{ value: "cc1", label: { en: "One" } }]);
+
+  // Resubmitting the unchanged value passes membership validation, which reads
+  // the resolved options — optionValuesValid needs no change of its own.
+  const updated = await submitAndTransition(created.instanceId, "path_ab" as PathId, { field_country: "cc_old" } as unknown as Instance["data"], actor, dsReg);
+  expect(updated.currentStepId as string).toBe("step_b");
 });
 
 test.skipIf(!DB)("a runtime registry mismatch for a published data source type throws a plain canary Error", async () => {

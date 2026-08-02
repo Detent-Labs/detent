@@ -1720,3 +1720,78 @@ Stage-by-stage status is in `ROADMAP.md`.
   (`packages/web/dist`) stops being inert here. `docker/frontend.Dockerfile`
   survives as the nginx alternative, minus its `PACKAGE` build argument, since
   exactly one package now produces a bundle.
+
+- Database-backed data lists (`src/engine/store.ts`, `src/engine/host.ts`,
+  `src/engine/registry.ts`, `src/runtime/api.ts`, `src/http/admin-routes.ts`,
+  `src/auth/authorize.ts`, the admin and studio areas of `packages/web`):
+  a second data source type, `"db.list"`. Its option values live in two
+  engine-owned tables instead of the process body. It closes the case
+  `"static"` could not serve. That is a value list business staff own, where
+  one changed entry cost a new published version plus a migration.
+
+  `initSchema` creates `data_lists` (keyed by `list_key`) and
+  `data_list_values` (keyed by `(list_key, value)`). The second references the
+  first with `ON DELETE CASCADE`. Both sit outside the audit backbone. They
+  hold configuration an operator changes, not a record of what an instance
+  did, so no append-only rule applies.
+
+  The declaration stays in the body. A `"db.list"` data source still carries
+  `config: { listKey }`, and only the values move out. `definition.ts` does
+  not change. `definitionHash` therefore stays the same, and every published
+  body stays valid.
+
+  `DataSourceContext` gains an optional `heldValues: string[]`.
+  `resolveFields` supplies the values the instance holds for the field under
+  resolution: none when unset, one for a `select`, the whole array for a
+  `multiselect`. The handler's query returns active values plus any value
+  `heldValues` names. A value an operator retires therefore stays visible to
+  the instances that already hold it. Its label still renders, and
+  `optionValuesValid` accepts it with no change of its own, since that
+  function already read the resolved options. The memo key widened from
+  `DataSourceId` to `DataSourceId` plus those values, sorted, because held
+  values change the result. `"static"` ignores the field.
+
+  `createDefaultDataSourceRegistry` now takes the database handle, and the
+  handler closes over it. The alternative put a handle on
+  `DataSourceContext`, which every other type would ignore.
+  `MAX_DATA_LIST_VALUES` is 500, and it counts the ACTIVE values. The handler
+  throws above it rather than resolving a short list. A truncated list would
+  reject a value a participant legitimately holds.
+
+  The `LIMIT` leaves room for the held rows on top of that bound. Counting
+  rows instead would break the instances the retirement rule protects: 500
+  offered values plus one retired value a holder names is 501 rows. The
+  boundary carries two tests, one on each side of it.
+
+  An unknown `listKey` throws the same plain `Error`, the engine's canary
+  style. Publish-time validation checks the type and the config shape alone
+  and never reads the tables, so an identical re-publish stays a no-op
+  whatever they hold.
+
+  Six routes maintain a list, behind a sixth reserved role,
+  `DATALISTS_ROLE = "system:datalists"`. It implies none of the other five,
+  and none of them implies it. Reads also accept `DEVELOPER_ROLE`, so the
+  studio's `DataSourcesPanel` offers the existing keys as a choice through the
+  same route. A draft naming a key the server does not report draws a warning,
+  never a validation error, and publishing still works.
+  `PUT /admin/data-lists/:listKey/values` replaces the whole set. A value the
+  request omits becomes inactive, and a value it names again becomes active.
+  No route deletes a value row. That is what keeps a running instance's held
+  value resolvable. `DELETE /admin/data-lists/:listKey` refuses while a
+  published body references the key. The detail route reports the same scan as
+  its usage report, so the guard and the report cannot disagree. Both read
+  every published body with no supporting index. Both are admin routes on no
+  instance path.
+
+- Two-role admin area (`packages/web/src/shell/areas.ts`,
+  `packages/web/src/areas/admin/`): the shell's area table now carries a set
+  of roles per area rather than one, and an actor holding any of them enters.
+  An empty set still means a session is enough. The admin area lists
+  `system:admin` and `system:datalists`, because the data list screens live in
+  it while their maintainers must not hold `system:admin`. Area entry is
+  therefore the weaker gate. Each screen keeps its own role check, the tab bar
+  lists only the tabs the actor's roles reach, and a screen the actor cannot
+  read shows the area's explanatory empty state. The area sends a maintainer
+  who lands on its default route to the data list overview, rather than
+  leaving them on an explanation. The server's `requireRole` on every
+  `/admin/*` route stays the enforcement.

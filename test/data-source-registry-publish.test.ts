@@ -11,6 +11,7 @@ import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody, DataSourceRegistryValidationError } from "../src/engine/definitions.js";
 import { createRegistry } from "../src/engine/registry.js";
 import { createDataSourceRegistry, registerDataSource } from "../src/engine/registry.js";
+import { createDefaultDataSourceRegistry, DB_LIST_DATA_SOURCE_TYPE } from "../src/engine/host.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 
 const DB = !!process.env.DATABASE_URL;
@@ -76,6 +77,24 @@ test.skipIf(!DB)("an identical re-publish of an already-stored body stays a no-o
   expect(v2.version).toBe(v1.version);
   const rows = (await sql`SELECT count(*)::int AS n FROM definitions WHERE process_id = ${PID}`) as { n: number }[];
   expect(rows[0].n).toBe(1);
+});
+
+test.skipIf(!DB)("a body naming a db.list listKey with no row publishes — the check reads the registry, never the tables", async () => {
+  const reg = createDefaultDataSourceRegistry(sql);
+  await sql`DELETE FROM data_lists WHERE list_key = ${"no_such_list"}`;
+  const v = await publishBody(PID, bodyWithDataSource(DB_LIST_DATA_SOURCE_TYPE, { listKey: "no_such_list" }), actionReg, reg);
+  expect(v.version).toBe(1);
+});
+
+test.skipIf(!DB)("a db.list config with no listKey fails the publish", async () => {
+  const reg = createDefaultDataSourceRegistry(sql);
+  let caught: unknown;
+  try {
+    await publishBody(PID, bodyWithDataSource(DB_LIST_DATA_SOURCE_TYPE, {}), actionReg, reg);
+  } catch (e) {
+    caught = e;
+  }
+  expect(caught).toBeInstanceOf(DataSourceRegistryValidationError);
 });
 
 test.skipIf(!DB)("a rejected data-source-registry publish consumes no version number", async () => {

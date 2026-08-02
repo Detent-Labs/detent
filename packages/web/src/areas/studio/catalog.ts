@@ -48,6 +48,7 @@ const en = {
   "dataSources.empty": "No data sources yet.",
   "dataSources.addDataSource": "+ Add data source",
   "dataSources.removeDataSource": "Remove data source",
+  "dataSources.pickListKey": "Pick a data list",
 
   "steps.heading": "Steps",
   "steps.empty": "No steps yet.",

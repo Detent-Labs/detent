@@ -151,6 +151,12 @@ export async function resolveStepAssignment(
  */
 export interface DataSourceContext {
   config: Record<string, unknown>;
+  /**
+   * The values the instance already holds for the field under resolution, so a
+   * handler can return one its own store has since retired. A handler with no
+   * such notion (`"static"`) ignores it.
+   */
+  heldValues?: string[];
 }
 
 /** `resolve` is async even for a pure config-echo handler, so a future I/O-backed type is a drop-in, not an interface change. */

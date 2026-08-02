@@ -76,6 +76,46 @@ participant opens the form.
 The example uses no data source. Its `dataSources` array is empty, and
 `booking_status` carries its options inline.
 
+Two types ship. Pick between them by who owns the values.
+
+`static` holds its options in the body:
+
+```json
+{ "id": "ds_status", "key": "status", "type": "static",
+  "config": { "options": [{ "value": "open", "label": { "en": "Open" } }] } }
+```
+
+The body is immutable, so one changed value costs a new published version and a
+migration for every running instance. Use `static` for a list the process
+itself defines, such as a decision with three outcomes.
+
+`db.list` holds its options in the engine's own tables, keyed by a list key:
+
+```json
+{ "id": "ds_centres", "key": "centres", "type": "db.list",
+  "config": { "listKey": "cost_centres" } }
+```
+
+An operator maintains the values on the Data lists screen of the admin area.
+Changing one takes effect on the next form a participant opens. No publish, no
+new version, no migration. Use `db.list` for a list that business staff own,
+such as cost centres or departments.
+
+Three rules follow from that split.
+
+Publishing does not read the tables. A body naming a list that does not exist
+publishes. The studio warns about the unknown key instead, and the field's
+options stay empty until an operator creates the list.
+
+A value an operator retires stays visible to the instances that already hold
+it. Their forms keep rendering its label, and resubmitting the step keeps
+working. The engine offers it to nobody else.
+
+A list offers at most 500 values. Past that the engine raises rather than
+resolving a short list. A truncated list would reject a value a participant
+legitimately holds. A retired value a running instance holds sits on top of
+that count. A full list therefore keeps working for its holders.
+
 ### Step
 
 One state. Exactly one step is active per running process.

@@ -1,10 +1,12 @@
+# db-data-source-type
+
 ## Purpose
 
 A data source type whose option list lives in engine-owned tables, not in the
 process body. An operator changes those values without publishing a new
 process version.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: The engine stores data lists in two tables
 
@@ -53,16 +55,33 @@ any value named in `ctx.heldValues`.
 - **WHEN** a list holds several values with distinct `sort_order` values
 - **THEN** the resolved options follow `sort_order`, then `value`
 
-### Requirement: The engine bounds the size of a data list
+### Requirement: The engine bounds the offered values of a data list
 
-The engine SHALL define `MAX_DATA_LIST_VALUES`. The `"db.list"` handler SHALL
-read at most `MAX_DATA_LIST_VALUES + 1` rows. It SHALL throw a plain `Error`
-naming the `listKey` when it reads more rows than the bound allows. It SHALL
-NOT return a truncated list.
+The engine SHALL define `MAX_DATA_LIST_VALUES`. The bound SHALL count the
+active values of a list. The `"db.list"` handler SHALL throw a plain `Error`
+naming the `listKey` when a list offers more active values than the bound
+allows. It SHALL NOT return a truncated list.
+
+A value named in `ctx.heldValues` SHALL NOT count against the bound. The
+handler's read SHALL leave room for those rows on top of it. A list sitting
+exactly on the bound therefore keeps resolving for an instance holding a
+retired value of that list. Bounding the row count instead would fail the
+instances the retirement rule exists to protect.
 
 #### Scenario: A list over the bound raises rather than truncates
 - **WHEN** a list holds more than `MAX_DATA_LIST_VALUES` active values and a
   field binds to it
+- **THEN** resolution throws an `Error` naming the `listKey`
+
+#### Scenario: A list on the bound still resolves for a holder of a retired value
+- **WHEN** a list holds exactly `MAX_DATA_LIST_VALUES` active values plus a
+  retired value, and `heldValues` names that retired value
+- **THEN** resolution returns `MAX_DATA_LIST_VALUES + 1` options, including
+  the retired one
+
+#### Scenario: A held value does not rescue a list that is over the bound
+- **WHEN** a list holds more than `MAX_DATA_LIST_VALUES` active values and
+  `heldValues` names a retired value of that list
 - **THEN** resolution throws an `Error` naming the `listKey`
 
 ### Requirement: An unknown listKey at runtime is a canary error

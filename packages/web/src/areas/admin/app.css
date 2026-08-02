@@ -434,3 +434,40 @@ h2 {
     animation: none !important;
   }
 }
+
+/* A retired data list value keeps its row rather than vanishing: an instance
+   can still hold it. Recessed, not hidden — the badge carries the state, this
+   only stops a retired row competing with the offered ones for attention. */
+.admin-row-retired td input,
+.admin-row-retired td {
+  color: var(--color-text-muted);
+}
+
+/* An inline explanation under a heading or beside a control. Muted and narrow
+   so it reads as a note, not as body copy. */
+.admin-note {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  max-width: 60ch;
+}
+
+/* A labelled control in .admin-controls: the label stacks above its input, the
+   way the login form already does it. */
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.75rem;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.admin-field input {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-text);
+}

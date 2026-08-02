@@ -20,6 +20,8 @@ export const ADMIN_ROLE = "system:admin";
 export const DEVELOPER_ROLE = "system:developer";
 /** Required for every `/reporting/*` route. Implies nothing else: a process owner holding only this cannot publish, administer users, or read the operator's instance list. */
 export const REPORTS_ROLE = "system:reports";
+/** Required to write a data list (`/admin/data-lists/*`); reads also accept `DEVELOPER_ROLE`, so the studio can offer the existing keys. Implies nothing else: staff who maintain cost centres must not gain the power to cancel instances. */
+export const DATALISTS_ROLE = "system:datalists";
 
 /** The resolved Actor lacks a role an operation requires. Distinct from ActorResolutionError (no valid identity at all). */
 export class AuthorizationError extends Error {

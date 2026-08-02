@@ -27,6 +27,7 @@ import { HTTP_ACTION_TYPE, httpHandlerDef } from "../handlers/http.js";
 import { NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef } from "../handlers/notification-email.js";
 import { z } from "zod";
 import { fieldOption, type FieldOption } from "../schema/definition.js";
+import { MAX_KEY_LENGTH } from "../schema/compile.js";
 
 /**
  * A registry pre-populated with the built-in, vendor-neutral `http.request`
@@ -48,16 +49,67 @@ export function createDefaultRegistry(): Registry {
 
 const staticDataSourceConfigSchema = z.object({ options: z.array(fieldOption) });
 
+export const DB_LIST_DATA_SOURCE_TYPE = "db.list";
+
 /**
- * A registry pre-populated with the built-in `"static"` data source handler,
- * which echoes its configured `options` unchanged. Mirrors
- * `createDefaultRegistry` above; only one data source type ships in v1.
+ * The most values one data list may hold. A list past the bound raises rather
+ * than resolving truncated: a silently short option list would let a
+ * participant's valid value fail membership validation, which is worse than a
+ * loud failure an operator can see and split the list over.
  */
-export function createDefaultDataSourceRegistry(): DataSourceRegistry {
+export const MAX_DATA_LIST_VALUES = 500;
+
+const dbListDataSourceConfigSchema = z.object({ listKey: z.string().min(1).max(MAX_KEY_LENGTH) });
+
+/**
+ * A registry pre-populated with the built-in `"static"` and `"db.list"` data
+ * source handlers. `"static"` echoes its configured `options` unchanged;
+ * `"db.list"` reads them from `data_lists`/`data_list_values`, so an operator
+ * changes them with no publish and no migration.
+ *
+ * `db` is closed over here rather than carried on `DataSourceContext`: only
+ * this one type needs a handle, and putting it in the context would make every
+ * caller supply one for types that do not.
+ */
+export function createDefaultDataSourceRegistry(db: SQL = sql): DataSourceRegistry {
   const reg = createDataSourceRegistry();
   registerDataSource(reg, "static", {
     configSchema: staticDataSourceConfigSchema,
+    // A static option list holds no notion of a retired value, so heldValues is ignored.
     resolve: async (ctx) => (ctx.config as { options: FieldOption[] }).options,
+  });
+  registerDataSource(reg, DB_LIST_DATA_SOURCE_TYPE, {
+    configSchema: dbListDataSourceConfigSchema,
+    resolve: async (ctx) => {
+      const { listKey } = ctx.config as { listKey: string };
+      const held = ctx.heldValues ?? [];
+      // The LEFT JOIN is what separates "no such list" (no rows at all) from
+      // "a list with nothing to offer" (one row whose value is null). A
+      // retired value the instance holds comes back so its label still
+      // renders and membership validation still accepts it.
+      //
+      // The bound counts ACTIVE rows, and the limit leaves room for the held
+      // ones on top of it. Bounding the row count instead would make a list
+      // sitting exactly on the bound throw for the very instances the
+      // retirement rule protects: 500 active values plus one retired value a
+      // holder names is 501 rows and 500 offered values.
+      const rows = (await db`
+        SELECT v.value, v.label, v.active
+        FROM data_lists l
+        LEFT JOIN data_list_values v
+          ON v.list_key = l.list_key AND (v.active OR v.value = ANY(${db.array(held, "TEXT")}))
+        WHERE l.list_key = ${listKey}
+        ORDER BY v.sort_order, v.value
+        LIMIT ${MAX_DATA_LIST_VALUES + 1 + held.length}
+      `) as { value: string | null; label: FieldOption["label"] | null; active: boolean | null }[];
+      if (rows.length === 0) throw new Error(`data list '${listKey}' does not exist`);
+      // At most `held.length` of the rows read are inactive, so the limit above
+      // always leaves enough room to see a 501st active value when one exists.
+      if (rows.filter((r) => r.active).length > MAX_DATA_LIST_VALUES) {
+        throw new Error(`data list '${listKey}' holds more than the ${MAX_DATA_LIST_VALUES}-value bound`);
+      }
+      return rows.filter((r) => r.value !== null).map((r) => ({ value: r.value as string, label: r.label as FieldOption["label"] }));
+    },
   });
   return reg;
 }
