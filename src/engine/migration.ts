@@ -29,7 +29,7 @@ import {
   type Action,
 } from "../schema/definition.js";
 import { celType, validateMigrationSpec } from "../cel/check.js";
-import { evalTransforms, type TransformDrop } from "../cel/eval.js";
+import { evalTransforms, type MapEntryDrop } from "../cel/eval.js";
 import { definitionHash } from "../schema/hash.js";
 import { createDefinitionStore } from "./definitions.js";
 import { planStepEntry, applyStepEntry, ConcurrencyConflict } from "./transition.js";
@@ -229,7 +229,7 @@ function remapData(
   spec: MigrationSpec,
   fromBody: ProcessBody,
   snapshot: Instance,
-): { data: Instance["data"]; drops: TransformDrop[] } {
+): { data: Instance["data"]; drops: MapEntryDrop[] } {
   const src = snapshot.data as Record<string, unknown>;
   const fieldMap = spec.fieldMap ?? {};
   const sources = new Set(Object.keys(fieldMap));
