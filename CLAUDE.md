@@ -51,9 +51,40 @@ new capability, contract/schema change, tooling or infra switch — goes through
 OpenSpec change, not a direct edit: propose -> generate specs/tasks -> implement
 -> verify -> archive. Start one with the `opsx:` skills (`opsx:new`, or
 `opsx:propose` for a full proposal in one step); `opsx:apply` implements tasks and
-`opsx:archive` closes it. Trivial fixes (typo, comment, one-liner) skip it. The
+`opsx:archive` closes it. The
 project context OpenSpec shows the AI when generating artifacts lives in
 `openspec/config.yaml` (`context:`) — keep it current.
+
+**A trivial fix touches one file, no spec and no test.** It skips the cycle.
+Everything else is a change, whatever it looked like at first glance. Count the
+files before you call something a one-liner. A self-declared "one-liner" here
+touched four files and a spec.
+
+**No phase inside the cycle is optional.** Do not propose skipping the spec or
+the plan phase. That holds for `opsx:propose` and for the brainstorming skill.
+Run the `openspec-review-change` skill before `opsx:apply`, every time. Resolve
+every finding it reports first. Apply starts at zero open findings.
+
+That review keeps finding real errors. Three of them:
+- a missed second consumer of `GET /instances`
+- a design resting on a false `InstanceView.assignment` premise
+- a migration ordering derived from files nobody read
+
+## Verification (the gate before "done")
+Call a change done only after all four checks pass. Report what each one
+printed, not that you ran it.
+- `bun run typecheck`, then the **full** `bun test` with `DATABASE_URL` set.
+  Both rules under Conventions apply. A green without the variable is not
+  evidence. A single-file rerun is not the signal.
+- The antislop linter, on every Markdown file the change touched.
+- `git diff --check`, for trailing whitespace and blank-at-eof. It does NOT
+  report CRLF here. `.gitattributes` sets `* text=auto eol=lf`, so git
+  normalizes a CRLF worktree file on `git add`. The diff then sees pure LF,
+  and CRLF from an edit or a subagent cannot reach a commit. To find CRLF in
+  the worktree, run `grep -lI $'\r'`.
+- A real browser, for any UI change. Green tests do not see an error dialog
+  rendered behind a modal, a stale result row, or an `/admin/*` route
+  collision. All three shipped past a green suite here.
 
 ## Repository layout
 ```
@@ -499,6 +530,13 @@ change lands.
   results. This has happened twice: once as a vanishing stash mid-run, once as a
   `// MUTATION` marker left in `transition.ts` that three separate reviewers then
   reported as a critical defect.
+- **Never use `git stash`, not for mutation testing and not otherwise.** The
+  agents share this tree. A stash nobody else expects hides work that was never
+  committed. Commit to a branch instead.
+- **A history rewrite states its branch list first.** Before `git filter-branch`
+  or `git filter-repo`, print `git branch -a`. Name the refs the rewrite will
+  touch. Exclude every backup branch explicitly. The PII rewrite here also
+  rewrote the backup branch, which left no untouched copy to fall back on.
 - Comments state facts, not process history. Concise and technically precise.
 - The JSON contract is the foundation. Change the schema (definition.ts / the
   Zod source) deliberately, never as a casual side effect of another task.
