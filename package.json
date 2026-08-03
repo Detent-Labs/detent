@@ -19,7 +19,8 @@
     "typecheck:engine": "tsc --noEmit",
     "typecheck": "bun run typecheck:engine && bun run --filter './packages/*' typecheck",
     "test": "bun test",
-    "check": "bun run typecheck && bun test",
+    "test:tz": "TZ=Europe/Zurich bun test packages/web/test/reporting-reportingLogic.test.ts",
+    "check": "bun run typecheck && bun test && bun run test:tz",
     "serve": "bun run src/http/server.ts",
     "seed": "bun run scripts/seed.ts"
   },

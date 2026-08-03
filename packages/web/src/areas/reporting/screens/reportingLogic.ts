@@ -14,23 +14,53 @@ export const DEFAULT_RANGE_DAYS = 30;
  * The server applies no default of its own, so an omitted range would be a
  * request error rather than a silently assumed window.
  *
+ * The bounds sit on local day edges, the same ones `fromDateInput` produces,
+ * so the control redisplays this range unchanged. That widens the window past
+ * thirty days: it runs from local midnight thirty days back to the last
+ * millisecond of today, up to thirty-one local days. It still covers the
+ * thirty days before `now`, which is what the requirement asks for.
+ *
  * `now` is injectable so a test can assert against a fixed instant.
  */
 export function defaultRange(now: Date = new Date()): DateRange {
-  const to = new Date(now);
-  const from = new Date(now);
-  from.setUTCDate(from.getUTCDate() - DEFAULT_RANGE_DAYS);
+  const to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - DEFAULT_RANGE_DAYS);
   return { from: from.toISOString(), to: to.toISOString() };
 }
 
-/** `<input type="date">` speaks YYYY-MM-DD; the API speaks ISO instants. */
+/**
+ * `<input type="date">` speaks YYYY-MM-DD; the API speaks ISO instants. The
+ * day is the viewer's local day: reading it back with `iso.slice(0, 10)` would
+ * take the UTC day, which is the previous one for any instant before local
+ * midnight plus the offset.
+ */
 export function toDateInput(iso: string): string {
-  return iso.slice(0, 10);
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/** Start of day for `from`, end of day for `to`, so a one-day range covers that whole day. */
+/**
+ * Start of day for `from`, end of day for `to`, so a one-day range covers that
+ * whole day — the local day the viewer picked, not the UTC one. The local
+ * `Date` constructor is what makes it local: appending a `Z` would pin the
+ * boundary to UTC midnight, and `getTimezoneOffset()` arithmetic would break
+ * across a DST shift inside the range.
+ *
+ * A value the control cannot parse yields an empty string, which
+ * `rangeIsValid` rejects and the area's root renders as an invalid range.
+ * Clearing the field is the way to reach that: `<input type="date">` reports
+ * an empty value, and `toISOString()` on the resulting Invalid Date would
+ * throw where nothing catches it.
+ */
 export function fromDateInput(value: string, edge: "start" | "end"): string {
-  return new Date(`${value}T${edge === "start" ? "00:00:00.000Z" : "23:59:59.999Z"}`).toISOString();
+  const [y, m, d] = value.split("-").map(Number);
+  const at =
+    edge === "start"
+      ? new Date(y, m - 1, d)
+      : new Date(y, m - 1, d, 23, 59, 59, 999);
+  return Number.isNaN(at.getTime()) ? "" : at.toISOString();
 }
 
 export function rangeIsValid(range: DateRange): boolean {

@@ -19,11 +19,38 @@ import {
 import { ReportingClientError } from "../src/areas/reporting/api/client.js";
 
 test("the default range covers the thirty days before a fixed reference instant", () => {
+  // The bounds sit on local day edges, so the span is not exactly thirty days:
+  // each end grows by part of a day. Asserting literal instants here would pin
+  // the runner's timezone, so this asserts the property the requirement states,
+  // that the range covers the thirty days before the instant.
   const now = new Date("2026-08-01T12:00:00.000Z");
   const range = defaultRange(now);
-  expect(range.to).toBe("2026-08-01T12:00:00.000Z");
-  expect(range.from).toBe("2026-07-02T12:00:00.000Z");
-  expect((Date.parse(range.to) - Date.parse(range.from)) / 86_400_000).toBe(DEFAULT_RANGE_DAYS);
+  const span = (Date.parse(range.to) - Date.parse(range.from)) / 86_400_000;
+
+  expect(Date.parse(range.from)).toBeLessThanOrEqual(now.getTime() - DEFAULT_RANGE_DAYS * 86_400_000);
+  expect(Date.parse(range.to)).toBeGreaterThanOrEqual(now.getTime());
+  expect(span).toBeGreaterThanOrEqual(DEFAULT_RANGE_DAYS);
+  expect(span).toBeLessThan(DEFAULT_RANGE_DAYS + 1);
+});
+
+test("a cleared or unparseable date yields an invalid range, not a throw", () => {
+  // `<input type="date">` reports "" when the field is cleared. toISOString()
+  // on the resulting Invalid Date threw, and nothing above catches it. An
+  // empty bound flows into rangeIsValid, which the area's root already
+  // renders as an invalid range.
+  expect(fromDateInput("", "start")).toBe("");
+  expect(fromDateInput("", "end")).toBe("");
+  expect(fromDateInput("nonsense", "start")).toBe("");
+  expect(rangeIsValid({ from: fromDateInput("", "start"), to: "2026-08-04T21:59:59.999Z" })).toBe(false);
+
+  expect(toDateInput("nonsense")).toBe("");
+  expect(toDateInput("")).toBe("");
+});
+
+test("the default range survives a round trip through the control", () => {
+  const range = defaultRange(new Date("2026-08-01T12:00:00.000Z"));
+  expect(fromDateInput(toDateInput(range.from), "start")).toBe(range.from);
+  expect(fromDateInput(toDateInput(range.to), "end")).toBe(range.to);
 });
 
 test("the default range is always valid", () => {
@@ -35,10 +62,27 @@ test("a start after the end is rejected", () => {
   expect(rangeIsValid({ from: "nonsense", to: "2026-08-01T00:00:00.000Z" })).toBe(false);
 });
 
-test("date inputs round-trip, with `to` covering the whole closing day", () => {
-  expect(toDateInput("2026-07-02T12:00:00.000Z")).toBe("2026-07-02");
-  expect(fromDateInput("2026-07-02", "start")).toBe("2026-07-02T00:00:00.000Z");
-  expect(fromDateInput("2026-07-02", "end")).toBe("2026-07-02T23:59:59.999Z");
+test("a picked day survives the round trip through both conversions", () => {
+  // Asserting the round trip rather than a literal instant is what makes this
+  // hold in every timezone. The literals it replaced encoded UTC midnight, so
+  // they passed in the container while the control was two hours out in
+  // Zurich.
+  for (const day of ["2026-07-02", "2026-01-15", "2026-03-29", "2026-10-25"]) {
+    expect(toDateInput(fromDateInput(day, "start"))).toBe(day);
+    expect(toDateInput(fromDateInput(day, "end"))).toBe(day);
+  }
+});
+
+// The companion to the round trip above, which stays true under UTC even when
+// the conversions are wrong. This one pins the offset, so it needs a known
+// zone. Run it with TZ set in the command, never by assigning process.env.TZ
+// here: Date may already have read the zone. It skips visibly otherwise,
+// matching the test.skipIf(!DB) convention the DB suites use.
+const ZURICH = process.env.TZ === "Europe/Zurich";
+
+test.skipIf(!ZURICH)("a picked day spans that day in local time, not in UTC", () => {
+  expect(fromDateInput("2026-07-02", "start")).toBe("2026-07-01T22:00:00.000Z");
+  expect(fromDateInput("2026-07-02", "end")).toBe("2026-07-02T21:59:59.999Z");
 });
 
 test("durations use the largest fitting unit", () => {
