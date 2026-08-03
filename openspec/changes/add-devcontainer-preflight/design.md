@@ -11,11 +11,13 @@ run on the host for the same reason.
 
 `ALLOW_INSECURE_DEV_AUTH: "1"` sits in `.devcontainer/docker-compose.yml:27`
 on purpose, with a comment. The bare container and the test suite start
-without auth configuration because of it. `dev-up.sh:70` injects
-`AUTH_JWT_SECRET` into the `bun run serve` process alone.
+without auth configuration because of it. `dev-up.sh`'s `bun run serve` line
+injects `AUTH_JWT_SECRET` into that process alone.
 
-`.devcontainer/docker-compose.yml` declares no healthcheck. `docker compose
-ps` reports `running` or `exited`, never `healthy`.
+`.devcontainer/docker-compose.yml` declares no healthcheck for `db` or `app`,
+so `docker compose ps` reports only `running` or `exited` for them.
+`mailpit`'s upstream image ships its own (`CMD /mailpit readyz`), so it
+already reports `healthy` today.
 
 ## Goals / Non-Goals
 
@@ -49,6 +51,22 @@ failure the spec forbids.
 A single implementation in TypeScript was the other alternative. It fails
 check 1: `bun` lives inside the container, and the container is what check 1
 questions.
+
+### `dev-up` calls the `serve` profile last, not first
+
+`dev-up.sh` and `dev-up.ps1` call the `serve` profile after their existing
+bring-up steps. The call sits right after restarting the HTTP server, as a
+closing confirmation rather than a precondition.
+
+A fresh clone starts with no containers, no secret file, no seed and no
+server. The `serve` profile checks all of those. Calling it before the
+script's own bring-up work would fail check 2 immediately. The script would
+stop before it ever ran `compose up -d`, which defeats the one-command
+premise `dev-up` exists for.
+
+The push gate faces the opposite case. It runs against an environment the
+developer already brought up. There, the `core` profile is a genuine
+precondition, checked first.
 
 ### Two host implementations stay
 
@@ -103,6 +121,14 @@ globs the directory rather than building the slug.
 Windows holds mandatory file locks, so opening the `.db` for write fails while
 another process holds it. That failure is the signal.
 
+`scripts/preflight.sh` runs under Git Bash's MSYS/Cygwin layer. That layer's
+own `<>` redirection does not surface the Windows sharing violation.
+Measured against a real lock held by the running codebase-memory-mcp
+indexer. MSYS's own open succeeds there, where a native Win32 open fails.
+The bash script's check 6 therefore shells out to `powershell.exe` on
+Windows. It opens the file with .NET's `FileStream` and `FileShare.None`,
+which does see the violation.
+
 This detects nothing on Linux and macOS, where locks are advisory. Check 6
 warns rather than blocks, so a silent pass there costs nothing. The
 implementation carries a `ponytail:` comment naming that ceiling.
@@ -133,3 +159,11 @@ The healthchecks reach a running stack only after `docker compose up -d`
 recreates the containers. The preflight's check 2 fails with `up -d` as its
 repair command, which is the same command. A developer with an old container
 therefore meets one failure and one command.
+
+## Open Questions
+
+None. This design carried one open question: whether `docker compose ps`'s
+text output stays parseable, or check 2 needs a per-container
+`docker inspect` fallback. Implementation settled it. `ps --format '{{.Health}}'` alone was enough.
+It saw a healthy stack, a stopped `mailpit`, and a from-scratch fresh
+clone. It never failed to parse.

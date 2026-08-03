@@ -73,6 +73,10 @@ Start-Sleep -Seconds 1
 Invoke-Compose exec -d -e "AUTH_JWT_SECRET=$Secret" -w /workspace app bun run serve
 Start-Sleep -Seconds 2
 
+Write-Host "==> Confirming the stack is ready"
+& (Join-Path $PSScriptRoot "preflight.ps1") serve
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 Write-Host ""
 Write-Host "Ready: http://localhost:3000/"
 Write-Host "Login: $SuperuserEmail / $SuperuserPassword"

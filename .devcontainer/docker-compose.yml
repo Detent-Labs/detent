@@ -34,6 +34,13 @@ services:
     depends_on:
       - db
       - mailpit
+    # Proves the runtime answers and nothing more — this container runs no
+    # service of its own (see add-devcontainer-preflight).
+    healthcheck:
+      test: ["CMD", "bun", "--version"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   db:
     image: postgres:16
@@ -44,6 +51,11 @@ services:
       POSTGRES_DB: workflow_engine
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   # Catches every message the notification.email handler sends. Port 1025 is
   # SMTP, 8025 the web interface — the host binding for the latter lives in
@@ -51,6 +63,14 @@ services:
   mailpit:
     image: axllent/mailpit:v1.27
     restart: unless-stopped
+    # The image already ships this exact check (CMD /mailpit readyz) as its
+    # own HEALTHCHECK; declared here too so the guarantee lives in the
+    # tracked compose file rather than only in an upstream image detail.
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
 volumes:
   pgdata:

@@ -17,7 +17,12 @@ CI: DONE. A local push gate rather than a hosted service, by the owner's
 decision. `.githooks/pre-push` runs `bun run check` in the dev container. A
 non-zero exit blocks the push. Not a numbered stage: it gates every stage below
 instead of adding a capability.
-Change: `add-ci-and-dependency-hygiene`, `specify-the-real-push-gate`.
+
+A preflight now runs first. It names which of six ordered devcontainer
+preconditions is missing, instead of the push failing on a symptom.
+
+Change: `add-ci-and-dependency-hygiene`, `specify-the-real-push-gate`,
+`add-devcontainer-preflight`.
 Spec: `development-toolchain`.
 
 1. **Validation layer (Zod-first): DONE.** The JSON contract as Zod schemas,

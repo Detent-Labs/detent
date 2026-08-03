@@ -1852,3 +1852,45 @@ Stage-by-stage status is in `ROADMAP.md`.
   the action position too. That includes `onPath` (`PathsPanel.tsx`) and
   `onFire.actions` (`TimersPanel.tsx`), which also render
   `ActionListEditor`.
+
+- Devcontainer preflight (`scripts/preflight.sh`, `scripts/preflight.ps1`,
+  `.devcontainer/docker-compose.yml`, `scripts/dev-up.sh`,
+  `scripts/dev-up.ps1`, `.githooks/pre-push`, `add-devcontainer-preflight`):
+  names which of six ordered preconditions is missing. Before this, a
+  developer met its symptom instead: a connection reset, a login 404, an
+  empty screen. They then worked backwards to the cause.
+
+  The six checks, in order:
+
+  1. the Docker daemon answers
+  2. every container reports healthy
+  3. the HTTP server process carries `AUTH_JWT_SECRET`
+  4. every published port answers on the host
+  5. the database holds its schema and seed data
+  6. no stale codebase-memory WAL file holds a lock
+
+  The preflight stops at the first failure and prints the exact repair
+  command.
+
+  Two profiles split the checks. `core` covers the daemon, container
+  health and the WAL lock. Those are the preconditions of any work in the
+  container. That includes a test run. `serve` adds the secret, the ports
+  and the seed. Those are the preconditions of a browser session.
+
+  `.githooks/pre-push` runs `core` before `bun run check`. That replaces
+  its own inline container check. `dev-up.sh` and `dev-up.ps1` run
+  `serve` last. It runs as a closing confirmation after their own
+  bring-up work, not before. On a fresh clone the containers, secret,
+  seed and server do not exist yet. Calling it first would fail check 2
+  before the script ever ran `compose up -d`.
+
+  `.devcontainer/docker-compose.yml` gained a `healthcheck` per service, so
+  check 2 has a health state to read. `mailpit`'s upstream image already
+  shipped one (`CMD /mailpit readyz`); `db` and `app` did not.
+
+  Check 6 warns rather than blocks. The index is per-machine local
+  state, per `CLAUDE.md`. It also carries a Windows-specific detail. Git
+  Bash's own MSYS/Cygwin file redirection does not see a Windows sharing
+  violation. The bash preflight shells out to `powershell.exe` for this
+  one check instead. It opens the file with a `FileShare.None` request
+  that a plain redirection does not make.

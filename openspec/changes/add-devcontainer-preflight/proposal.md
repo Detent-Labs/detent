@@ -59,7 +59,9 @@ working one.
   check.
 - `.devcontainer/docker-compose.yml`: gains a healthcheck per service. This is
   the tracked compose file, so the change reaches every clone.
-- `docs/current-state.md` and `README.md`: both describe the bring-up today.
+- `docs/current-state.md` and `README.md`: neither describes the bring-up
+  today. This change adds new content to both, not a rewrite of existing
+  prose.
 - The codebase-memory WAL sits at `~/.cache/codebase-memory-mcp/<slug>.db-wal`,
   outside the repository. The slug carries the username, so no script can
   hardcode the path. `CLAUDE.md` already records this index as per-machine
