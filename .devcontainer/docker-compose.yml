@@ -15,8 +15,9 @@ services:
     command: sleep infinity
     environment:
       DATABASE_URL: postgres://postgres:postgres@db:5432/workflow_engine
-      # The three frontend dev servers, each pinned to its own port (see
-      # pin-frontend-dev-ports): app 5173, admin 5174, studio 5175.
+      # The one frontend dev server, pinned to its own port (see
+      # pin-frontend-dev-ports, consolidate-frontend-shell): packages/web
+      # on 5173.
       # Unset means the HTTP wrapper emits no CORS headers at all.
       CORS_ALLOWED_ORIGINS: http://localhost:5173
       # No AUTH_JWT_SECRET / AUTH_ISSUERS in this container, so the server

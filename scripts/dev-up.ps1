@@ -27,8 +27,6 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
       - "127.0.0.1:5173:5173"
-      - "127.0.0.1:5174:5174"
-      - "127.0.0.1:5175:5175"
 
   # Mailpit's web interface. The 127.0.0.1 prefix is load-bearing on Windows:
   # without it Docker binds [::], and the host browser meets a connection reset.
