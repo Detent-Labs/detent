@@ -27,6 +27,7 @@ function emit(level: Level, msg: string, context?: Record<string, unknown>): voi
 }
 
 export const log = {
+  debug: (msg: string, context?: Record<string, unknown>) => emit("debug", msg, context),
   info: (msg: string, context?: Record<string, unknown>) => emit("info", msg, context),
   warn: (msg: string, context?: Record<string, unknown>) => emit("warn", msg, context),
   error: (msg: string, context?: Record<string, unknown>) => emit("error", msg, context),

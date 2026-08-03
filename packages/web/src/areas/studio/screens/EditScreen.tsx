@@ -145,7 +145,7 @@ function EditorArea({ processId, token, initialRevision, initialLayout, navigate
           <div className="canvas-layout">
             <CanvasView layout={saveState.layout} onMoveStep={onMoveStep} selectedStepId={selectedStepId} onSelectStep={setSelectedStepId} />
             <aside className="canvas-inspector">
-              <StepsPanel fields={fields} selectedStepId={selectedStepId} onSelectStep={setSelectedStepId} />
+              <StepsPanel fields={fields} token={token} selectedStepId={selectedStepId} onSelectStep={setSelectedStepId} />
             </aside>
           </div>
         </>

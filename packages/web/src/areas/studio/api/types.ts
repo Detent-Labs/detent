@@ -69,11 +69,38 @@ export interface OrphanKeyScan {
   unreadable: string[];
 }
 
-/** GET /registry's response: the running server's registered plugin type names, nothing more (studio-tools spec). */
+/**
+ * Mirrors src/engine/config-descriptor.ts::ConfigFieldDescriptor
+ * (studio-plugin-config-form spec).
+ */
+export interface ConfigFieldDescriptor {
+  key: string;
+  kind: "string" | "number" | "boolean" | "enum" | "string-array";
+  required: boolean;
+  enumValues?: string[];
+  default?: unknown;
+  minLength?: number;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+  minItems?: number;
+  maxItems?: number;
+  format?: "email";
+}
+
+/**
+ * GET /registry's response: the running server's registered plugin type
+ * names (studio-tools spec), plus a config-schema description per type
+ * where one exists (studio-plugin-config-form spec) — keyed per registry,
+ * since a type name (e.g. "static") is not unique across the three.
+ */
 export interface RegistryInfo {
   actionTypes: string[];
   dataSourceTypes: string[];
   assignmentStrategyTypes: string[];
+  actionSchemas: Record<string, ConfigFieldDescriptor[]>;
+  dataSourceSchemas: Record<string, ConfigFieldDescriptor[]>;
+  assignmentStrategySchemas: Record<string, ConfigFieldDescriptor[]>;
 }
 
 /** Mirrors src/runtime/api.ts::InstanceView (studio-player spec). */

@@ -493,10 +493,27 @@ test.skipIf(!DB)("GET /registry lists the registered action, data-source and ass
   expect(body.assignmentStrategyTypes).toContain("static");
 });
 
-test.skipIf(!DB)("GET /registry exposes only type names, no configSchema or config detail", async () => {
+test.skipIf(!DB)("GET /registry keeps the type-name arrays to exactly those three keys' worth of type names", async () => {
   const res = await fetch(authedReq("http://x/registry", "GET", developer));
-  const body = (await res.json()) as Record<string, unknown>;
-  expect(Object.keys(body).sort()).toEqual(["actionTypes", "assignmentStrategyTypes", "dataSourceTypes"]);
+  const body = (await res.json()) as { actionTypes: string[]; dataSourceTypes: string[]; assignmentStrategyTypes: string[] };
+  expect(body.actionTypes).toEqual(["http.request"]);
+  expect(body.dataSourceTypes).toEqual(["static"]);
+  expect(body.assignmentStrategyTypes).toEqual(["static"]);
+});
+
+test.skipIf(!DB)("GET /registry carries a config-schema description only for a schema-backed type", async () => {
+  const res = await fetch(authedReq("http://x/registry", "GET", developer));
+  const body = (await res.json()) as {
+    actionSchemas: Record<string, unknown>;
+    dataSourceSchemas: Record<string, unknown>;
+    assignmentStrategySchemas: Record<string, unknown[]>;
+  };
+  // The test registry's own "http.request" and "static" data-source entries declare no
+  // configSchema, so neither carries a description; the default assignment registry's
+  // built-in "static" strategy does declare one.
+  expect(body.actionSchemas).toEqual({});
+  expect(body.dataSourceSchemas).toEqual({});
+  expect(body.assignmentStrategySchemas.static).toEqual([{ key: "candidates", kind: "string-array", required: true }]);
 });
 
 test.skipIf(!DB)("GET /registry without system:developer maps to 403", async () => {

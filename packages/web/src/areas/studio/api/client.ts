@@ -125,7 +125,11 @@ export async function getOrphanKeys(processId: string, version: number, token: s
   return (await res.json()) as OrphanKeyScan;
 }
 
-/** The running server's registered action-handler and data-source type names (studio-tools spec). */
+/**
+ * The running server's registered action-handler, data-source and
+ * assignment-strategy type names (studio-tools spec), plus a config-schema
+ * description per type where one exists (studio-plugin-config-form spec).
+ */
 export async function getRegistry(token: string): Promise<RegistryInfo> {
   const res = await request("/registry", token);
   return (await res.json()) as RegistryInfo;

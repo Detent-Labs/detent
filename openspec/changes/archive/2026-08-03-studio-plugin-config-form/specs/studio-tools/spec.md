@@ -1,22 +1,5 @@
-<!-- antislop: allow-file all -->
-<!-- Every requirement in this corpus uses the same fixed SHALL/WHEN/THEN
-     Gherkin grammar, established before antislop existed in this repo (see
-     admin-app/spec.md). This new file follows the same convention for
-     consistency with every sibling spec, rather than reading differently
-     from the rest of openspec/specs/. -->
+## MODIFIED Requirements
 
-# studio-tools Specification
-
-## Purpose
-
-A read-only Tools screen on the studio area of `packages/web`: a view of the running
-server's three plugin registries (registered action-handler, data-source and
-assignment-strategy type names) and a static CEL scratchpad that parses and
-type-checks an ad-hoc expression against a chosen field catalog. Neither
-writes anything. See `studio-app` for the shell navigation that reaches it,
-and `authorization` for the `system:developer` role every route here
-enforces.
-## Requirements
 ### Requirement: A Tools screen lists the running server's registered plugin types
 
 The studio area SHALL offer a `/studio/tools` screen, reachable from the shell
@@ -95,39 +78,3 @@ its type-name array, with no schema description alongside it.
 - **WHEN** a registered type declares no `configSchema`
 - **THEN** `GET /registry` lists its type name with no schema description
   for that type
-
-### Requirement: A CEL scratchpad parses and type-checks an expression against a chosen field catalog, never against live data
-
-The Tools screen SHALL offer a CEL scratchpad: a text input for an
-expression plus a choice of field catalog (a published version, fetched via
-the existing `GET /processes/:processId/versions/:version` route, or the
-currently open draft's own catalog) against which the expression is parsed
-and type-checked, entirely client-side through `workflow-engine/cel/check`
-— the same entry point live draft validation already uses. No new HTTP
-endpoint backs this.
-
-The scratchpad SHALL NOT evaluate the expression against any instance's live
-`data`, matching the static-only scope already chosen for orphan-key
-inspection: it answers "does this expression parse and type-check against
-this catalog", never "what does this expression currently evaluate to".
-
-#### Scenario: A valid expression against a published version's catalog
-
-- **WHEN** a developer selects a published version and enters an expression
-  that parses and type-checks against that version's field catalog
-- **THEN** the scratchpad reports no issue
-
-#### Scenario: An expression referencing an undeclared field is rejected
-
-- **WHEN** a developer enters an expression referencing a `data.<key>` not
-  present in the selected catalog
-- **THEN** the scratchpad reports a type-check issue naming the unresolved
-  reference, and no network request is made beyond the one that already
-  fetched the catalog
-
-#### Scenario: No live-data evaluation is offered
-
-- **WHEN** the scratchpad is inspected for an action that runs an expression
-  against a running instance's current `data`
-- **THEN** no such action exists; the scratchpad only parses and type-checks
-

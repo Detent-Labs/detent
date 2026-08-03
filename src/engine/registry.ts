@@ -94,7 +94,7 @@ export function resolveAssignmentStrategy(reg: AssignmentRegistry, type: string)
   return reg.get(type);
 }
 
-const staticAssignmentConfigSchema = z.object({ candidates: z.array(z.string()) });
+export const staticAssignmentConfigSchema = z.object({ candidates: z.array(z.string()) });
 
 /** The built-in `static` entry: its configured list, verbatim, with no CEL evaluation and no dynamic lookup. */
 export const staticAssignmentStrategyDef: AssignmentStrategyDef = {

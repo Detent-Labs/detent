@@ -16,6 +16,8 @@ import {
   type DataSourceRegistry,
   type AssignmentRegistry,
 } from "../engine/registry.js";
+import { describeConfigSchema, type ConfigFieldDescriptor } from "../engine/config-descriptor.js";
+import type { ZodTypeAny } from "zod";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, DEVELOPER_ROLE, PUBLISH_ROLE } from "../auth/authorize.js";
@@ -209,11 +211,29 @@ export async function handleGetOrphanKeys(processId: string, versionRaw: string,
 }
 
 /**
- * Read-only view of the running server's two plugin registries: registered
- * action-handler types and data-source types, by name only. No
- * `HandlerDef`/`DataSourceHandlerDef` detail beyond the map keys crosses the
- * HTTP boundary — `configSchema` stays a publish-time server-side check, not
- * something the Tools screen renders.
+ * Builds a `type -> descriptor` map for every entry in `reg` whose
+ * `configSchema` the converter can represent. An entry with no declared
+ * `configSchema`, or one the converter cannot represent, is simply absent —
+ * the studio area's plugin-config-form then falls back to its raw JSON
+ * textarea for that type.
+ */
+function describeRegistry(reg: Map<string, { configSchema?: ZodTypeAny }>): Record<string, ConfigFieldDescriptor[]> {
+  const schemas: Record<string, ConfigFieldDescriptor[]> = {};
+  for (const [type, def] of reg) {
+    if (!def.configSchema) continue;
+    const descriptor = describeConfigSchema(def.configSchema, type);
+    if (descriptor) schemas[type] = descriptor;
+  }
+  return schemas;
+}
+
+/**
+ * Read-only view of the running server's three plugin registries: registered
+ * action-handler, data-source and assignment-strategy types, by name, plus a
+ * browser-consumable config-schema description per type where one exists.
+ * The Tools screen renders only the type-name arrays; `actionSchemas` /
+ * `dataSourceSchemas` / `assignmentStrategySchemas` serve the studio area's
+ * `studio-plugin-config-form` capability instead.
  */
 export async function handleGetRegistry(
   req: Request,
@@ -231,6 +251,9 @@ export async function handleGetRegistry(
         actionTypes: [...registry.keys()],
         dataSourceTypes: [...dataSourceRegistry.keys()],
         assignmentStrategyTypes: [...assignmentRegistry.keys()],
+        actionSchemas: describeRegistry(registry),
+        dataSourceSchemas: describeRegistry(dataSourceRegistry),
+        assignmentStrategySchemas: describeRegistry(assignmentRegistry),
       },
     };
   });

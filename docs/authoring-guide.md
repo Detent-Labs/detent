@@ -76,7 +76,8 @@ participant opens the form.
 The example uses no data source. Its `dataSources` array is empty, and
 `booking_status` carries its options inline.
 
-Two types ship. Pick between them by who owns the values.
+Two types ship. Pick the type from the picker, then between the two by who
+owns the values.
 
 `static` holds its options in the body:
 
@@ -87,7 +88,9 @@ Two types ship. Pick between them by who owns the values.
 
 The body is immutable, so one changed value costs a new published version and a
 migration for every running instance. Use `static` for a list the process
-itself defines, such as a decision with three outcomes.
+itself defines, such as a decision with three outcomes. Its options list stays
+raw JSON in the studio. Nesting a label per option is beyond what a generated
+form covers today.
 
 `db.list` holds its options in the engine's own tables, keyed by a list key:
 
@@ -96,7 +99,10 @@ itself defines, such as a decision with three outcomes.
   "config": { "listKey": "cost_centres" } }
 ```
 
-An operator maintains the values on the Data lists screen of the admin area.
+Set the key from the studio's own list-key picker below the type, not a
+generated form. It already offers the real, known keys, and it warns about
+one that isn't. An operator maintains the values on the Data lists screen of
+the admin area.
 Changing one takes effect on the next form a participant opens. No publish, no
 new version, no migration. Use `db.list` for a list that business staff own,
 such as cost centres or departments.
@@ -295,8 +301,11 @@ arrives, so the process waits.
 ### 6. Attach actions and timers
 
 Add actions where the engine should do something. An action sits on entry to a
-step, on exit from it, or on a path. Pick the type from the registered
-handlers, which the **Action registry** panel lists. Then fill in its config.
+step, on exit from it, or on a path. Pick the type from the picker, which
+lists the registered handlers. Fill in the form the studio generates for that
+type. A type with no generated form still takes a raw JSON config, the same
+as before. For a type that does have a form, switch to JSON instead with the
+JSON button, if you prefer it.
 
 Remember the order. `onExit` runs first, then `onPath`, then `onEntry`.
 
@@ -313,13 +322,13 @@ For every step a person must act on, set the **assignment strategy** and list
 the candidates. A step nobody acts on needs no assignment.
 
 The strategy is a plugin, like an action or a data source. It carries a `type`
-and a `config`. The engine resolves the `type` against the strategies your
-deployment registers. A `type` nobody registered is a publish error, not a
-surprise at run time.
+and a `config`. Pick the `type` from the picker, which lists the strategies
+your deployment registers. A `type` nobody registered is a publish error, not
+a surprise at run time.
 
-`static` is the one that ships, and the one you get by default. Its `config` is
-a flat list, `{ "candidates": ["finance-approver"] }`. The engine uses that list
-unchanged.
+`static` is the one that ships, and the one you get by default. The studio
+generates a form for it: one candidates field, `finance-approver` for
+example. The engine uses that list unchanged.
 
 Assign by role, not by person. A person leaves the company, and the process
 outlives them.
