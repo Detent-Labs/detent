@@ -1,11 +1,11 @@
 /**
  * `auth_users` schema (ensureSchema/initSchema) + `src/auth/users.ts`
- * (createUser/verifyLogin/setRoles/setPassword/listUsers/setDisabled).
- * DB-backed, skips when DATABASE_URL is unset.
+ * (createUser/verifyLogin/setRoles/setRolesById/setPassword/listUsers/
+ * setDisabled). DB-backed, skips when DATABASE_URL is unset.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
-import { createUser, verifyLogin, setRoles, setPassword, listUsers, setDisabled } from "../src/auth/users.js";
+import { createUser, verifyLogin, setRoles, setRolesById, setPassword, listUsers, setDisabled } from "../src/auth/users.js";
 
 const DB = !!process.env.DATABASE_URL;
 
@@ -108,6 +108,24 @@ test.skipIf(!DB)("setDisabled flips the flag and returns the updated row, or und
   const [after] = await listUsers();
   expect(after!.disabled).toBe(true);
   expect(await setDisabled("user_does_not_exist", true)).toBeUndefined();
+});
+
+test.skipIf(!DB)("setRolesById replaces the whole set and returns the updated row, or undefined for an unknown userId", async () => {
+  const { userId } = await createUser("k@example.com", "pw", ["a", "b"]);
+  const updated = await setRolesById(userId, ["a"]);
+  expect(updated).toEqual({ userId, email: "k@example.com", roles: ["a"], disabled: false });
+  expect(await setRolesById("user_does_not_exist", ["a"])).toBeUndefined();
+});
+
+test.skipIf(!DB)("setRoles and setRolesById write the same column", async () => {
+  const { userId } = await createUser("l@example.com", "pw", []);
+  await setRoles("l@example.com", ["from-cli"]);
+  const [afterCli] = await listUsers();
+  expect(afterCli!.roles).toEqual(["from-cli"]);
+  await setRolesById(userId, ["from-route"]);
+  const [afterRoute] = await listUsers();
+  expect(afterRoute!.roles).toEqual(["from-route"]);
+  expect((await verifyLogin("l@example.com", "pw"))?.roles).toEqual(["from-route"]);
 });
 
 test.skipIf(!DB)("a user disabled via setDisabled fails verifyLogin exactly like one disabled directly in the DB", async () => {

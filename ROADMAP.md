@@ -441,7 +441,7 @@ Spec: `development-toolchain`.
 
 25. Per-instance step assignment: design DONE (approved 2026-08-02, see
     `docs/superpowers/specs/2026-08-02-pluggable-step-assignment-design.md`);
-    change (b) DONE, (a) and (c) NOT STARTED. Raised 2026-08-01 as a reality
+    changes (a) and (b) DONE, (c) NOT STARTED. Raised 2026-08-01 as a reality
     check on how a user acquires a role a process names. The answer exposed a
     deeper gap: the candidate list is copied verbatim from the frozen definition
     onto every instance, so every instance of a definition carries an identical
@@ -454,11 +454,19 @@ Spec: `development-toolchain`.
     pieces are missing — organizational facts (`auth_users` holds email, password
     hash, roles and a disabled flag, no manager and no department) and a path for
     the answer to reach the step. Three OpenSpec changes:
-    a. Role editing in the admin area: NOT STARTED. A role-editing route behind
-       `system:admin` over the existing `setRoles`, plus a control in the admin
-       area's users screen. Closes the CLI-only gap stage 10b deliberately left,
-       which becomes untenable once business roles multiply. No contract change;
-       independent of (b).
+    a. **Role editing in the admin area: DONE.** `PATCH
+       /admin/users/:id/roles` behind `system:admin`, plus in-place roles
+       editing per row in the admin area's users screen. Closes the CLI-only
+       gap stage 10b deliberately left, which becomes untenable once business
+       roles multiply. No contract change; independent of (b). The route runs
+       over a new `setRolesById`, not the existing `setRoles` this entry and
+       the design doc first named: every other `/admin/users*` route keys on
+       `user_id`, and the browser never holds an email. `setRoles` stays for
+       the CLI, which is also the recovery path the route's one refusal
+       assumes — it returns 409 rather than let an actor strip `system:admin`
+       from its own account.
+       Change: `add-admin-role-editing`. Specs: `admin-user-management`,
+       `local-user-accounts`, `admin-app` (all modified).
     b. **Assignment strategy registry: DONE.** Makes a step's assignment strategy
        a plugin like actions and data sources already are: a third registry,
        validated at publish, with the resolver called before the transaction

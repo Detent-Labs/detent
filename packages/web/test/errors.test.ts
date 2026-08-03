@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { describeError } from "../src/areas/app/errors.js";
+import { parseErrorBody } from "../src/api/client.js";
+import { describeError as describeAdminError } from "../src/areas/admin/errors.js";
 
 describe("describeError", () => {
   it("maps already-claimed to refresh-and-remove", () => {
@@ -34,5 +36,36 @@ describe("describeError", () => {
     const described = describeError({ type: "authorization", message: "actor 'user_1' may not cancel instance 'inst_x'" }, "en");
     expect(described.kind).toBe("explain");
     expect(described.message).toBe("You're not allowed to do that.");
+  });
+});
+
+/**
+ * A server error type reaches an operator through three sites that each carry
+ * their own closed switch: `parseErrorBody`, the `ClientError` union, and the
+ * area's `describeError`. Miss one and the text silently degrades to the
+ * generic fallback — which is what happened to `self-role-strip` between the
+ * union and the parser, caught in a browser rather than by a test.
+ */
+describe("a server error type maps through every layer", () => {
+  const parse = async (status: number, type: string, message: string) =>
+    parseErrorBody(new Response(JSON.stringify({ error: { type, message } }), { status }));
+
+  it("carries self-role-strip through the parser rather than collapsing it to internal", async () => {
+    const parsed = await parse(409, "self-role-strip", "an actor cannot remove system:admin from its own account");
+    expect(parsed.type).toBe("self-role-strip");
+  });
+
+  it("gives self-role-strip its own operator-facing text, not the generic fallback", async () => {
+    const parsed = await parse(409, "self-role-strip", "an actor cannot remove system:admin from its own account");
+    const text = describeAdminError(parsed, 409);
+    expect(text).toContain("your own account");
+    expect(text).not.toBe("Something went wrong.");
+    expect(text).not.toBe("The server hit an error. Try again.");
+  });
+
+  it("still collapses a type no layer knows into internal", async () => {
+    const parsed = await parse(500, "type-from-the-future", "x");
+    expect(parsed.type).toBe("internal");
+    expect(describeAdminError(parsed, 500)).toBe("The server hit an error. Try again.");
   });
 });

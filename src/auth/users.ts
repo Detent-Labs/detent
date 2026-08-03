@@ -2,10 +2,10 @@
  * Project-local BPS user accounts, backed by the `auth_users` table
  * (`src/engine/store.ts::initSchema`). Passwords are hashed with
  * `Bun.password` (argon2id, built into Bun — no dependency). Creating a
- * user, changing a password, or assigning roles is CLI-only
- * (`src/auth/cli.ts`); listing users and toggling `disabled` are the one
- * carve-out, also reachable over HTTP through the `system:admin`-gated
- * `/admin/users*` routes (`src/http/admin-routes.ts`).
+ * user and changing a password are CLI-only (`src/auth/cli.ts`); listing
+ * users, toggling `disabled` and assigning roles are the carve-out, also
+ * reachable over HTTP through the `system:admin`-gated `/admin/users*`
+ * routes (`src/http/admin-routes.ts`).
  */
 import { SQL } from "bun";
 import { sql } from "../engine/store.js";
@@ -72,6 +72,22 @@ export async function listUsers(db: SQL = sql): Promise<UserSummary[]> {
     disabled: boolean;
   }[];
   return rows.map((r) => ({ userId: r.user_id, email: r.email, roles: r.roles, disabled: r.disabled }));
+}
+
+/**
+ * Keyed by `userId`, unlike `setRoles` — the browser holds ids, never emails.
+ * Replaces the whole role set: an omitted role is a removed role. Returns the
+ * updated row, or `undefined` if no such `userId` exists.
+ */
+export async function setRolesById(userId: string, roles: string[], db: SQL = sql): Promise<UserSummary | undefined> {
+  const rows = (await db`UPDATE auth_users SET roles = ${db.array(roles, "TEXT")} WHERE user_id = ${userId} RETURNING user_id, email, roles, disabled`) as {
+    user_id: string;
+    email: string;
+    roles: string[];
+    disabled: boolean;
+  }[];
+  const row = rows[0];
+  return row ? { userId: row.user_id, email: row.email, roles: row.roles, disabled: row.disabled } : undefined;
 }
 
 /** Keyed by `userId`, unlike `setRoles`/`setPassword` — see design.md. Returns the updated row, or `undefined` if no such `userId` exists. */

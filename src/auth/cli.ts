@@ -1,9 +1,12 @@
 /**
- * User administration CLI — the only way to create a local BPS user, assign
- * its roles, or change its password; no HTTP route does any of those three.
- * Listing users and disabling/enabling them do have an HTTP route — see
+ * User administration CLI — the only way to create a local BPS user or change
+ * its password; no HTTP route does either. Listing users, disabling/enabling
+ * them and assigning roles do have an HTTP route — see
  * `src/http/admin-routes.ts` (`GET /admin/users`, `POST
- * /admin/users/:id/disable`, `POST /admin/users/:id/enable`). Usage:
+ * /admin/users/:id/disable`, `POST /admin/users/:id/enable`, `PATCH
+ * /admin/users/:id/roles`). `set-roles` below stays: it keys on the email a
+ * human types, and it is the recovery path when no `system:admin` holder is
+ * left. Usage:
  *
  *   bun run src/auth/cli.ts add-user <email> <password> [role,role,...]
  *   bun run src/auth/cli.ts set-roles <email> <role,role,...>

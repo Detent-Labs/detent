@@ -1,7 +1,8 @@
 /**
  * Operator-facing routes behind `system:admin`: outbox listing/counts, the two
  * dead-letter repairs, pending timers, and listing/disabling/enabling local
- * users. Kept out of `routes.ts`, which stays the participant-facing surface.
+ * users plus assigning their roles. Kept out of `routes.ts`, which stays the
+ * participant-facing surface.
  * Same framework-agnostic handler shape and `guarded` wrapper as `routes.ts`;
  * each handler resolves the actor then requires `ADMIN_ROLE` before any read
  * or write.
@@ -9,7 +10,7 @@
 import type { SQL } from "bun";
 import { sql, withTransaction } from "../engine/store.js";
 import { listOutbox, countOutboxByStatus, listPendingTimers, requeueOutboxRow, discardOutboxRow, getOutboxRow, type OutboxListFilter } from "../engine/admin-queries.js";
-import { listUsers, setDisabled } from "../auth/users.js";
+import { listUsers, setDisabled, setRolesById } from "../auth/users.js";
 import { migrateInstances } from "../engine/migration.js";
 import { redactInstance } from "../engine/retention.js";
 import { localizedText, type ProcessId, type InstanceId, type LocalizedText } from "../schema/definition.js";
@@ -131,6 +132,55 @@ async function handleSetUserDisabled(userId: string, disabled: boolean, req: Req
     const actor = await resolveActor(req, resolver);
     requireRole(actor, ADMIN_ROLE);
     const updated = await setDisabled(userId, disabled, db);
+    if (!updated) return { status: 404, body: { error: { type: "not-found", message: `no user: ${userId}` } } };
+    return { status: 200, body: updated };
+  });
+}
+
+/** A role string reaches a JWT claim and an assignment candidate list; both stay bounded. No character set is enforced — cli.ts has written role strings unchecked since stage 7, and a pattern would make an existing row unsavable here. */
+const MAX_ROLE_LENGTH = 64;
+const MAX_ROLES = 64;
+
+/** Trims each entry and drops duplicates, first occurrence winning. Raises `RequestShapeError` (400) on any shape the route refuses. */
+function parseRoles(value: unknown): string[] {
+  if (!Array.isArray(value)) throw new RequestShapeError("roles must be an array of strings");
+  if (value.length > MAX_ROLES) throw new RequestShapeError(`roles holds at most ${MAX_ROLES} entries`);
+  const seen = new Set<string>();
+  const roles: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "string") throw new RequestShapeError("roles must be an array of strings");
+    const role = entry.trim();
+    if (!role) throw new RequestShapeError("a role must not be empty");
+    if (role.length > MAX_ROLE_LENGTH) throw new RequestShapeError(`a role is at most ${MAX_ROLE_LENGTH} characters`);
+    if (seen.has(role)) continue;
+    seen.add(role);
+    roles.push(role);
+  }
+  return roles;
+}
+
+/**
+ * The self-strip guard runs before the read, so an actor whose own id backs no
+ * `auth_users` row still gets the 409: the rule governs the actor, who
+ * demonstrably authenticated, not the row. Both non-2xx bodies are returned
+ * inline, the way `handleSetUserDisabled` returns its 404 — no error class and
+ * no mapping entry is added to `errors.ts`.
+ */
+export async function handleAdminSetUserRoles(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    requireRole(actor, ADMIN_ROLE);
+    let body: { roles?: unknown };
+    try {
+      body = (await req.json()) as typeof body;
+    } catch {
+      throw new RequestShapeError("request body is not valid JSON");
+    }
+    const roles = parseRoles(body.roles);
+    if (actor.id === userId && !roles.includes(ADMIN_ROLE)) {
+      return { status: 409, body: { error: { type: "self-role-strip", message: `an actor cannot remove ${ADMIN_ROLE} from its own account` } } };
+    }
+    const updated = await setRolesById(userId, roles, db);
     if (!updated) return { status: 404, body: { error: { type: "not-found", message: `no user: ${userId}` } } };
     return { status: 200, body: updated };
   });

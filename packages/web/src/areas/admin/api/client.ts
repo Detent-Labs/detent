@@ -123,6 +123,16 @@ export async function enableUser(userId: string, token: string): Promise<UserSum
   return (await res.json()) as UserSummary;
 }
 
+/** Replaces the whole set: a role this array omits is a role removed. A 409 means the actor tried to remove `system:admin` from its own account. */
+export async function setUserRoles(userId: string, roles: string[], token: string): Promise<UserSummary> {
+  const res = await request(`/admin/users/${encodeURIComponent(userId)}/roles`, token, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ roles }),
+  });
+  return (await res.json()) as UserSummary;
+}
+
 export async function runMigration(processId: string, fromVersion: number, toVersion: number, token: string): Promise<MigrationResult> {
   const res = await request("/admin/migrations/run", token, {
     method: "POST",

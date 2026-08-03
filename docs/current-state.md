@@ -926,11 +926,12 @@ Stage-by-stage status is in `ROADMAP.md`.
   row from a `listUsers` result rather than a human typing an address they
   know; it returns the updated row via `RETURNING`, or `undefined` for an
   unknown id, so the HTTP handler needs no follow-up query to answer 200/404.
-  Three new `system:admin`-gated routes in `admin-routes.ts`: `GET
+  Four `system:admin`-gated routes in `admin-routes.ts`: `GET
   /admin/users`, `POST /admin/users/:id/disable`, `POST
-  /admin/users/:id/enable`. Creating a user, changing a password, or
-  assigning roles remain CLI-only — this change adds no HTTP path for any of
-  those three. Disabling takes effect on the user's *next* login attempt only;
+  /admin/users/:id/enable`, and (added later, see the role-editing entry
+  below) `PATCH /admin/users/:id/roles`. Creating a user and changing a
+  password remain CLI-only — no HTTP path reaches either. Disabling takes
+  effect on the user's *next* login attempt only;
   it does not revoke a JWT already issued to them, since token verification
   performs no per-request database lookup (proven by an end-to-end test:
   log in, disable via the new route, the pre-disable token still
@@ -1894,3 +1895,52 @@ Stage-by-stage status is in `ROADMAP.md`.
   violation. The bash preflight shells out to `powershell.exe` for this
   one check instead. It opens the file with a `FileShare.None` request
   that a plain redirection does not make.
+
+- Admin role editing (`src/auth/users.ts`, `src/http/admin-routes.ts`,
+  `src/http/server.ts`, the admin area of `packages/web`, roadmap #25a,
+  `add-admin-role-editing`): `PATCH /admin/users/:id/roles` behind
+  `system:admin`, the fourth `/admin/users*` route. Before this only
+  `src/auth/cli.ts` wrote a user's roles, so every business role a process
+  names reached a person through a server shell.
+
+  `setRolesById(userId, roles, db)` mirrors `setDisabled`: it keys on
+  `user_id` and returns the updated row, or `undefined` for an unknown id.
+  `setRoles(email, ...)` stays untouched for the CLI. Both write the same
+  column.
+
+  The body is `{ roles: string[] }` and replaces the whole set, so an
+  omitted role is a removed role. There is no `revision` column on
+  `auth_users` and no optimistic concurrency: two operators editing one
+  user in the same second is not a case a handful of admins produce.
+
+  The route bounds and normalizes the array. It rejects a `roles` that is
+  absent, is not an array, holds a non-string, holds an entry empty after
+  trimming, holds an entry over 64 characters, or holds over 64 entries.
+  Each is a 400 with no write. It then trims and deduplicates, first
+  occurrence winning. It enforces no character set. The CLI has written
+  role strings unchecked since stage 7, so a pattern would make an
+  existing row unsavable through the screen this adds.
+
+  One refusal is its own: the route returns 409 when the path's `:id` is
+  the calling actor's own id and the submitted set omits `system:admin`.
+  Otherwise the last admin could lock the area out of itself, with the
+  server shell as the only recovery. That guard runs before the read, so
+  an actor whose `sub` matches no `auth_users` row still gets the 409 —
+  the rule governs the actor, not the row. It covers the caller alone:
+  one admin may still strip another's role.
+
+  Both non-2xx bodies are returned inline, the way the disable route
+  returns its 404. No error class and no mapping entry was added to
+  `errors.ts`.
+
+  A role assignment reaches an already-issued JWT no more than a disable
+  does. Token verification performs no per-request database lookup, so a
+  token keeps its `roles` claim until its `exp`.
+
+  The admin area's `/users` screen edits the roles cell in place: a text
+  input holding the comma-separated current roles, with save and cancel,
+  Enter and Escape, and the six reserved `system:*` roles as chips that
+  append to the input. The screen keeps the pending text across the
+  window-focus refetch `useRefresh` fires unasked. A picker over known
+  roles was rejected for now, since nothing knows which business roles
+  exist until roadmap #25c gives them a source.
