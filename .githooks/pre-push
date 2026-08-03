@@ -14,6 +14,28 @@
 # before Docker sees it.
 set -e
 
+# The ponytail ledgers record every `ponytail:` marker in the tree, so they go
+# stale in silence when a marker appears, disappears or moves to another file.
+# This compares the files PONYTAIL-DEBT.md names against the files that hold a
+# marker today, and runs first: it needs no container and costs milliseconds.
+#
+# ponytail: paths only, not line numbers. A marker that moves inside its own
+# file does not trip this. Compare line numbers too if a drifted line number
+# ever costs something.
+if [ -f PONYTAIL-DEBT.md ]; then
+  LEDGER_PATHS=$(grep -oE '^\*\*[^:*]+' PONYTAIL-DEBT.md | cut -c3- | sort -u)
+  TREE_PATHS=$(git grep -l 'ponytail:' -- src packages | sort -u)
+
+  if [ "$LEDGER_PATHS" != "$TREE_PATHS" ]; then
+    echo "pre-push: the ponytail ledgers are stale. These files differ:" >&2
+    printf '%s\n%s\n' "$LEDGER_PATHS" "$TREE_PATHS" | sort | uniq -u | sed 's/^/  /' >&2
+    echo "Rebuild them, then commit the result:" >&2
+    echo "  sh scripts/ponytail-ledgers.sh" >&2
+    echo "To push without the check, pass --no-verify." >&2
+    exit 1
+  fi
+fi
+
 COMPOSE="docker compose -f .devcontainer/docker-compose.yml"
 
 if [ -z "$($COMPOSE ps -q app 2>/dev/null)" ]; then
