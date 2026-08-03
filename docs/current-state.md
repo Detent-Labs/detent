@@ -399,13 +399,12 @@ Stage-by-stage status is in `ROADMAP.md`.
   `ActorResolver` will need the allowlist mode this change built, not the
   wildcard, so it is that change's job to add the credentials header, not
   this one's. The devcontainer's `app` service sets
-  `CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174,http://localhost:5175`
-  (`pin-frontend-dev-ports`): the three frontend dev servers, each pinned to
-  its own port in its `vite.config.ts` (`app` 5173, `admin` 5174, `studio`
-  5175, each with `strictPort: true` so a taken port fails
-  startup instead of silently sliding to the next free one), so all three can
-  run at once against one engine, in any start order, with no configuration
-  edit.
+  `CORS_ALLOWED_ORIGINS=http://localhost:5173`
+  (`pin-frontend-dev-ports`, narrowed by `consolidate-frontend-shell`). That
+  origin is the one frontend dev server. Its `vite.config.ts` pins the port
+  to 5173, with `strictPort: true`. A taken port then fails startup, rather
+  than sliding to the next free one in silence. The list held three origins
+  while `app`, `admin` and `studio` were separate packages.
 
   **Static assets fall through behind every API route** (`serve-web-assets`,
   roadmap #12 step 0): `src/http/static.ts::serveWebAsset` is called at
