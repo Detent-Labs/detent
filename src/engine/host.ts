@@ -47,7 +47,7 @@ export function createDefaultRegistry(): Registry {
   return reg;
 }
 
-const staticDataSourceConfigSchema = z.object({ options: z.array(fieldOption) });
+export const staticDataSourceConfigSchema = z.object({ options: z.array(fieldOption) });
 
 export const DB_LIST_DATA_SOURCE_TYPE = "db.list";
 
@@ -59,7 +59,7 @@ export const DB_LIST_DATA_SOURCE_TYPE = "db.list";
  */
 export const MAX_DATA_LIST_VALUES = 500;
 
-const dbListDataSourceConfigSchema = z.object({ listKey: z.string().min(1).max(MAX_KEY_LENGTH) });
+export const dbListDataSourceConfigSchema = z.object({ listKey: z.string().min(1).max(MAX_KEY_LENGTH) });
 
 /**
  * A registry pre-populated with the built-in `"static"` and `"db.list"` data

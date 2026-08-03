@@ -1,10 +1,11 @@
-import { useState } from "react";
 import type { Action, Expression, FieldId } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import { mintId } from "../draft/ids";
 import { removeAt, updateAt } from "../draft/list-ops";
 import type { DraftField } from "../draft/fields";
+import type { ConfigFieldDescriptor } from "../api/types.js";
 import { FieldExpressionMapEditor } from "./shared/FieldExpressionMapEditor";
+import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { IssueList, NotCheckedBadge } from "./shared/IssueList";
 import { useDraft } from "../draft/store";
 import { t } from "../catalog.js";
@@ -16,6 +17,9 @@ interface Props {
   actions: DraftAction[] | undefined;
   onChange: (next: DraftAction[]) => void;
   fields: DraftField[];
+  /** The action registry's live type names and config-schema descriptions (GET /registry). */
+  registryTypes?: string[];
+  registrySchemas?: Record<string, ConfigFieldDescriptor[]>;
 }
 
 /**
@@ -24,7 +28,7 @@ interface Props {
  * mutates in place — always calls `onChange` with a full new array so the
  * caller's own immer recipe stays the single source of the write.
  */
-export function ActionListEditor({ label, actions, onChange, fields }: Props) {
+export function ActionListEditor({ label, actions, onChange, fields, registryTypes, registrySchemas }: Props) {
   const list = actions ?? [];
 
   const addAction = () => {
@@ -49,6 +53,8 @@ export function ActionListEditor({ label, actions, onChange, fields }: Props) {
           key={action.id ?? index}
           action={action}
           fields={fields}
+          registryTypes={registryTypes}
+          registrySchemas={registrySchemas}
           onChange={(patch) => updateAction(index, patch)}
           onRemove={() => removeAction(index)}
         />
@@ -63,28 +69,19 @@ export function ActionListEditor({ label, actions, onChange, fields }: Props) {
 function ActionRow({
   action,
   fields,
+  registryTypes,
+  registrySchemas,
   onChange,
   onRemove,
 }: {
   action: DraftAction;
   fields: DraftField[];
+  registryTypes?: string[];
+  registrySchemas?: Record<string, ConfigFieldDescriptor[]>;
   onChange: (patch: Partial<DraftAction>) => void;
   onRemove: () => void;
 }) {
-  const [configText, setConfigText] = useState(() => JSON.stringify(action.config ?? {}, null, 2));
-  const [configError, setConfigError] = useState<string | null>(null);
   const { validation } = useDraft();
-
-  const commitConfig = (text: string) => {
-    setConfigText(text);
-    try {
-      const parsed = JSON.parse(text);
-      setConfigError(null);
-      onChange({ config: parsed });
-    } catch (e) {
-      setConfigError(e instanceof Error ? e.message : t("common.invalidJson"));
-    }
-  };
 
   const output = action.output ?? {};
 
@@ -92,23 +89,14 @@ function ActionRow({
 
   return (
     <div className="action-row">
-      <input
-        type="text"
-        placeholder={t("actions.typePlaceholder")}
-        value={action.type ?? ""}
-        onChange={(e) => onChange({ type: e.target.value })}
+      <PluginEnvelopeEditor
+        label={t("actions.pluginLabel")}
+        value={action}
+        onChange={onChange}
+        typePlaceholder={t("actions.typePlaceholder")}
+        registryTypes={registryTypes}
+        registrySchemas={registrySchemas}
       />
-      <textarea
-        rows={3}
-        value={configText}
-        onChange={(e) => commitConfig(e.target.value)}
-        aria-label="action config JSON"
-      />
-      {configError && (
-        <p className="error">
-          {t("common.configErrorPrefix")} {configError}
-        </p>
-      )}
 
       <FieldExpressionMapEditor
         legend={t("actions.outputMappingLabel")}

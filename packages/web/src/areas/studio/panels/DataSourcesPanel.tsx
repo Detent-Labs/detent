@@ -7,6 +7,7 @@ import { mintId } from "../draft/ids";
 import { addToDraftArray, updateInDraftArray } from "../draft/draft-array-crud";
 import { listDataListKeys } from "../api/client.js";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
+import { useRegistry } from "./shared/useRegistry.js";
 import { IssueList } from "./shared/IssueList";
 import { DB_LIST_TYPE, keyOptions, listKeyOf, unknownListKeyWarning } from "./dataListKeysLogic.js";
 
@@ -19,6 +20,7 @@ export function DataSourcesPanel({ token }: { token: string }) {
   // `undefined` until the keys arrive, and after a failed fetch — the picker
   // then falls back to free text and warns about nothing.
   const [listKeys, setListKeys] = useState<string[] | undefined>(undefined);
+  const registry = useRegistry(token);
 
   useEffect(() => {
     let live = true;
@@ -44,6 +46,14 @@ export function DataSourcesPanel({ token }: { token: string }) {
     updateInDraftArray(mutate, (d) => d.dataSources?.[index], patch);
   };
 
+  // `db.list`'s only config field, `listKey`, already has the dedicated
+  // picker below (real known keys, an unknown-key warning) — a generated
+  // form for it would just be a plain, less-informed text input for the
+  // same field. Excluded here so that picker stays the one place it's set.
+  const dataSourceSchemasForForm = registry?.dataSourceSchemas
+    ? Object.fromEntries(Object.entries(registry.dataSourceSchemas).filter(([type]) => type !== DB_LIST_TYPE))
+    : undefined;
+
   return (
     <div className="data-sources-panel">
       <h3>{t("dataSources.heading")}</h3>
@@ -57,7 +67,13 @@ export function DataSourcesPanel({ token }: { token: string }) {
               key
               <input type="text" value={ds.key ?? ""} onChange={(e) => updateDataSource(index, { key: e.target.value })} />
             </label>
-            <PluginEnvelopeEditor label="plugin" value={ds} onChange={(patch) => updateDataSource(index, patch)} />
+            <PluginEnvelopeEditor
+              label="plugin"
+              value={ds}
+              onChange={(patch) => updateDataSource(index, patch)}
+              registryTypes={registry?.dataSourceTypes}
+              registrySchemas={dataSourceSchemasForForm}
+            />
             {ds.type === DB_LIST_TYPE && listKeys !== undefined && (
               <label>
                 data list

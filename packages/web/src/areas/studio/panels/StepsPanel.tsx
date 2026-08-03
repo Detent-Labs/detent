@@ -10,6 +10,7 @@ import { ActionListEditor } from "./ActionListEditor";
 import { ViewEditor } from "./ViewEditor";
 import { SubprocessSpecEditor } from "./SubprocessSpecEditor";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
+import { useRegistry } from "./shared/useRegistry.js";
 import { PathsPanel } from "./PathsPanel";
 import { TimersPanel } from "./TimersPanel";
 import { IssueList, NotCheckedBadge } from "./shared/IssueList";
@@ -21,6 +22,7 @@ type DraftStep = DraftOf<Step>;
 
 interface Props {
   fields: DraftField[];
+  token: string;
   /** Controlled accordion selection (studio-canvas: canvas step/edge
    * selection drives which step's row is expanded). Uncontrolled — internal
    * `useState`, today's behavior — when `onSelectStep` is omitted. */
@@ -28,9 +30,10 @@ interface Props {
   onSelectStep?: (stepId: string | undefined) => void;
 }
 
-export function StepsPanel({ fields, selectedStepId, onSelectStep }: Props) {
+export function StepsPanel({ fields, token, selectedStepId, onSelectStep }: Props) {
   const { draft, mutate, validation, setChildForStep, contentLocale } = useDraft();
   const steps = draft.workflow?.steps ?? [];
+  const registry = useRegistry(token);
   const isControlled = onSelectStep !== undefined;
   const [internalExpanded, setInternalExpanded] = useState<string | undefined>(undefined);
   const expanded = isControlled ? selectedStepId : internalExpanded;
@@ -218,24 +221,32 @@ export function StepsPanel({ fields, selectedStepId, onSelectStep }: Props) {
                   label={t("steps.assignmentStrategyLabel")}
                   value={step.assignment?.strategy}
                   onChange={(strategy) => updateStep(index, { assignment: { strategy } })}
+                  registryTypes={registry?.assignmentStrategyTypes}
+                  registrySchemas={registry?.assignmentStrategySchemas}
                 />
 
                 <ActionListEditor
                   label="onEntry"
                   actions={step.onEntry}
                   fields={fields}
+                  registryTypes={registry?.actionTypes}
+                  registrySchemas={registry?.actionSchemas}
                   onChange={(onEntry) => updateStep(index, { onEntry })}
                 />
                 <ActionListEditor
                   label="onExit"
                   actions={step.onExit}
                   fields={fields}
+                  registryTypes={registry?.actionTypes}
+                  registrySchemas={registry?.actionSchemas}
                   onChange={(onExit) => updateStep(index, { onExit })}
                 />
                 <ActionListEditor
                   label="onCancel"
                   actions={step.onCancel}
                   fields={fields}
+                  registryTypes={registry?.actionTypes}
+                  registrySchemas={registry?.actionSchemas}
                   onChange={(onCancel) => updateStep(index, { onCancel })}
                 />
 
@@ -245,6 +256,8 @@ export function StepsPanel({ fields, selectedStepId, onSelectStep }: Props) {
                   steps={steps}
                   fields={fields}
                   onChange={(paths) => updateStep(index, { paths })}
+                  registryTypes={registry?.actionTypes}
+                  registrySchemas={registry?.actionSchemas}
                 />
 
                 <h4>{t("steps.timersHeading")}</h4>
@@ -253,6 +266,8 @@ export function StepsPanel({ fields, selectedStepId, onSelectStep }: Props) {
                   paths={step.paths ?? []}
                   fields={fields}
                   onChange={(timers) => updateStep(index, { timers })}
+                  registryTypes={registry?.actionTypes}
+                  registrySchemas={registry?.actionSchemas}
                 />
 
                 <IssueList entityId={step.id} />

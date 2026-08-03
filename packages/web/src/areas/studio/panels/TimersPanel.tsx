@@ -7,6 +7,7 @@ import { t } from "../catalog.js";
 import { ExpressionInput } from "./shared/ExpressionInput";
 import { IssueList } from "./shared/IssueList";
 import { ActionListEditor } from "./ActionListEditor";
+import type { ConfigFieldDescriptor } from "../api/types.js";
 
 type DraftTimer = DraftOf<Timer>;
 type DraftPath = DraftOf<Path>;
@@ -16,6 +17,9 @@ interface Props {
   paths: DraftPath[];
   fields: DraftField[];
   onChange: (next: DraftTimer[]) => void;
+  /** The action registry's live type names and config-schema descriptions (GET /registry), for `onFire.actions`. */
+  registryTypes?: string[];
+  registrySchemas?: Record<string, ConfigFieldDescriptor[]>;
 }
 
 type DurationMode = "duration" | "deadline";
@@ -24,7 +28,7 @@ function modeOf(timer: DraftTimer): DurationMode {
   return timer.deadline !== undefined ? "deadline" : "duration";
 }
 
-export function TimersPanel({ timers, paths, fields, onChange }: Props) {
+export function TimersPanel({ timers, paths, fields, onChange, registryTypes, registrySchemas }: Props) {
   const list = timers ?? [];
 
   const addTimer = () => {
@@ -109,6 +113,8 @@ export function TimersPanel({ timers, paths, fields, onChange }: Props) {
               actions={timer.onFire?.actions}
               onChange={(actions) => updateTimer(index, { onFire: { ...timer.onFire, actions } })}
               fields={fields}
+              registryTypes={registryTypes}
+              registrySchemas={registrySchemas}
             />
 
             <IssueList entityId={timer.id} />

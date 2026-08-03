@@ -82,6 +82,7 @@ const en = {
   "actions.addAction": "+ Add action",
   "actions.removeAction": "Remove action",
   "actions.typePlaceholder": "action type (e.g. http.call)",
+  "actions.pluginLabel": "action",
   "common.invalidJson": "invalid JSON",
   "common.configErrorPrefix": "config:",
   "actions.outputMappingLabel": "output mapping",
@@ -134,6 +135,12 @@ const en = {
 
   "expression.placeholder": "CEL expression",
   "plugin.typePlaceholder": "plugin type identifier",
+  "plugin.selectType": "-- select type --",
+  "plugin.unregisteredType": "(unregistered)",
+  "plugin.switchToJson": "Edit as JSON",
+  "plugin.switchToForm": "Edit as form",
+  "plugin.fieldRequired": "required",
+  "plugin.arrayHint": "one per line",
 
   "error.retry": "Retry",
   "error.failed": "Failed",

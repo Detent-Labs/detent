@@ -7,6 +7,7 @@ import { t } from "../catalog.js";
 import { ExpressionInput } from "./shared/ExpressionInput";
 import { IssueList } from "./shared/IssueList";
 import { ActionListEditor } from "./ActionListEditor";
+import type { ConfigFieldDescriptor } from "../api/types.js";
 
 type DraftPath = DraftOf<Path>;
 type DraftStep = DraftOf<Step>;
@@ -16,6 +17,9 @@ interface Props {
   steps: DraftStep[];
   fields: DraftField[];
   onChange: (next: DraftPath[]) => void;
+  /** The action registry's live type names and config-schema descriptions (GET /registry), for `onPath` actions. */
+  registryTypes?: string[];
+  registrySchemas?: Record<string, ConfigFieldDescriptor[]>;
 }
 
 /**
@@ -23,7 +27,7 @@ interface Props {
  * abstracted away — the wait-state and guard-priority concepts stay
  * visible to the author.
  */
-export function PathsPanel({ paths, steps, fields, onChange }: Props) {
+export function PathsPanel({ paths, steps, fields, onChange, registryTypes, registrySchemas }: Props) {
   const list = paths ?? [];
 
   const addPath = () => {
@@ -107,6 +111,8 @@ export function PathsPanel({ paths, steps, fields, onChange }: Props) {
             actions={path.onPath}
             onChange={(onPath) => updatePath(index, { onPath })}
             fields={fields}
+            registryTypes={registryTypes}
+            registrySchemas={registrySchemas}
           />
 
           <IssueList entityId={path.id} />
