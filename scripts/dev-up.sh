@@ -67,6 +67,9 @@ sleep 1
 compose exec -d -e AUTH_JWT_SECRET="$SECRET" -w /workspace app bun run serve
 sleep 2
 
+echo "==> Confirming the stack is ready"
+bash scripts/preflight.sh serve
+
 echo
 echo "Ready: http://localhost:3000/"
 echo "Login: $SUPERUSER_EMAIL / $SUPERUSER_PASSWORD"

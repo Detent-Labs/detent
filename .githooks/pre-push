@@ -36,13 +36,8 @@ if [ -f PONYTAIL-DEBT.md ]; then
   fi
 fi
 
-COMPOSE="docker compose -f .devcontainer/docker-compose.yml"
+bash scripts/preflight.sh core
 
-if [ -z "$($COMPOSE ps -q app 2>/dev/null)" ]; then
-  echo "pre-push: devcontainer is not running. Start it with:" >&2
-  echo "  $COMPOSE up -d" >&2
-  echo "To push without the check, pass --no-verify." >&2
-  exit 1
-fi
+COMPOSE="docker compose -f .devcontainer/docker-compose.yml"
 
 MSYS_NO_PATHCONV=1 exec $COMPOSE exec -T -w /workspace app bun run check

@@ -85,6 +85,15 @@ stage-by-stage status and what is deliberately deferred.
 Bun is the runtime, package manager, and test runner. Everything runs inside the
 dev container (`.devcontainer/`), never on the host.
 
+Bring the whole stack up with one command: `bash scripts/dev-up.sh`, or
+`pwsh scripts/dev-up.ps1` on Windows without Git Bash. It starts the
+containers, installs dependencies, seeds the demo processes and users, and
+starts the HTTP server. A preflight check runs last, confirming the whole
+stack answers before it prints the login. The same preflight gates every
+push: `.githooks/pre-push` runs its `core` profile first. Run either
+profile standalone with `bash scripts/preflight.sh core|serve`, or the
+`.ps1` equivalent.
+
 ```bash
 bun install
 DATABASE_URL=postgres://postgres:postgres@db:5432/workflow_engine bun test   # bun:test suites
