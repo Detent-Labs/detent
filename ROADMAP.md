@@ -520,7 +520,8 @@ Spec: `development-toolchain`.
     `data-list-administration`. Design:
     `docs/superpowers/specs/2026-08-02-db-data-lists-design.md`.
 
-27. No-code / low-code process authoring: NOT STARTED, no OpenSpec change yet.
+27. No-code / low-code process authoring: item (a) DONE, (b)-(d) NOT STARTED,
+    no OpenSpec change yet for those three.
     Raised 2026-08-03 as the product direction the README and `CLAUDE.md` now
     state: a business analyst builds a process in the studio area without
     writing JSON or CEL. This is a stage, not a rewrite. The studio area already
@@ -544,20 +545,26 @@ Spec: `development-toolchain`.
     from every screen a builder covers.
     Four gaps, measured against the code rather than guessed, ordered cheapest
     and most valuable first:
-    a. A plugin config form. `panels/shared/PluginEnvelopeEditor.tsx` edits
-       every `{ type, config }` position — actions, data sources, assignment
-       strategies, a custom field type — as a free-text `type` input beside a
-       raw JSON textarea. An author must know both the type string and the
-       config shape, and a typo surfaces at publish. The registry already holds
-       what a form needs: `HandlerDef.configSchema` (and its data-source and
-       assignment siblings) declares the shape the publish-time check already
-       parses against. `GET /registry` (`src/http/studio-routes.ts`) returns
-       only the three type-name arrays, so the change widens that route and
-       owns one decision: `configSchema` is a Zod schema (`z.ZodTypeAny`), so
-       either the server serializes it to JSON Schema or each entry ships a
-       hand-written descriptor beside it. Everything downstream — a type
-       picker, a generated form, inline per-field errors — follows from that
-       one answer.
+    a. **A plugin config form: DONE.** `panels/shared/PluginEnvelopeEditor.tsx`
+       edited every `{ type, config }` position — actions, data sources,
+       assignment strategies, a custom field type — as a free-text `type`
+       input beside a raw JSON textarea. A typo in either surfaced only at
+       publish. `GET /registry` (`src/http/studio-routes.ts`) now also
+       carries a browser-consumable config-schema description per registered
+       type, built by a new bespoke converter
+       (`src/engine/config-descriptor.ts`) rather than a hand-written
+       descriptor or a generic JSON-Schema library — the design weighed both
+       and rejected them. The action, data-source and assignment-strategy
+       positions now offer a type picker plus a generated form with inline
+       per-field validation, for any type whose schema the converter can
+       represent; a type it cannot (a cross-field `.refine()`, a nested
+       object, `z.unknown()`) keeps the raw JSON path, same as before, with a
+       manual JSON escape hatch available even for a schema-backed type. The
+       custom field-type position stays free-text, since no registry backs
+       it.
+       Change: `studio-plugin-config-form`. Specs: `studio-plugin-config-form`
+       (new), `studio-tools` (modified: `GET /registry`'s response shape, the
+       Tools screen's registered-registry count).
     b. A condition builder over CEL. `panels/shared/ExpressionInput.tsx` is one
        text input writing `{ lang: "cel", src }`; publish type-checks it and
        the Tools scratchpad checks it ahead of time, but the author writes CEL

@@ -1152,11 +1152,14 @@ Stage-by-stage status is in `ROADMAP.md`.
   the studio area already had an independent copy there.
 
   Adds two screens. The **Tools** screen (`/tools`) shows the running
-  server's registered plugin type names — action-handler types,
-  data-source types and assignment-strategy types, nothing more (no
-  `configSchema`, no config values) —
-  via a new `GET /registry` route (`DEVELOPER_ROLE`-gated, unprefixed like
-  the other studio-only routes), and a static CEL scratchpad: an expression
+  server's registered plugin type names: action-handler types,
+  data-source types and assignment-strategy types. No `configSchema`
+  internals, no config values, via a new `GET /registry` route
+  (`DEVELOPER_ROLE`-gated, unprefixed like the other studio-only routes).
+  That route's response widened (roadmap #27a): a config-schema
+  description per type, for the plugin config form. The Tools screen
+  itself still renders only the type names.
+  The other screen is a static CEL scratchpad: an expression
   checked against a chosen field catalog (a published version, fetched via
   the existing version-body route, or the current draft), parsed and
   type-checked client-side through a new `workflow-engine/cel/check` export,
@@ -1795,3 +1798,57 @@ Stage-by-stage status is in `ROADMAP.md`.
   who lands on its default route to the data list overview, rather than
   leaving them on an explanation. The server's `requireRole` on every
   `/admin/*` route stays the enforcement.
+
+- Studio plugin config form (`src/engine/config-descriptor.ts`,
+  `src/http/studio-routes.ts`, `src/log.ts`, the studio area of
+  `packages/web`, roadmap #27a, `studio-plugin-config-form`): the first
+  piece of the no-code/low-code direction. Replaces free-text `type` entry
+  for the action, data-source and assignment-strategy positions with a
+  picker over `GET /registry`'s live type names. It also adds a generated
+  form, for any type whose `configSchema` a new converter can represent.
+
+  `describeConfigSchema` walks a `ZodObject`'s shape. It recognizes
+  `ZodString` (plus `.email()`), `ZodNumber`, `ZodBoolean`, `ZodEnum` and
+  `ZodArray` of a string, each optionally wrapped in `ZodOptional` or
+  `ZodDefault`. It also reads each field's own length and format checks:
+  `minLength`/`maxLength`, `min`/`max`, `minItems`/`maxItems`, and an
+  email format flag.
+
+  Some constructs fail the whole type's conversion, not just one field:
+  a `.refine()`/`.superRefine()`-wrapped object, a nested object
+  property, or `z.unknown()`. Any other unsupported construct fails it
+  too.
+  `GET /registry` then omits a schema description
+  for it. The studio area falls back to the raw JSON textarea for that
+  type, unchanged from before this capability.
+
+  This was a deliberate choice over two alternatives. One: a
+  hand-written descriptor per registry entry, a second artifact beside
+  `configSchema` a handler author must keep in sync by hand. Two: a
+  generic Zod-to-JSON-Schema library, more than today's five schemas
+  need, and still unable to express a `.refine()` predicate.
+
+  A type either gets a fully generated form, or it keeps the fully raw
+  JSON textarea. Never a mix within one envelope. An author can still
+  switch a schema-backed type's form to raw JSON and back, pre-filled
+  with the form's current value. `db.list`'s single `listKey` field is
+  schema-representable. `DataSourcesPanel.tsx` deliberately excludes it
+  from the generated form. That panel already has a dedicated `listKey`
+  picker, backed by the real, live list of known keys. A generated
+  form's plain text input for the same field would only duplicate it.
+
+  The type picker also excludes the reserved
+  `core.spawnSubprocess`/`core.returnSubprocess` action types from its
+  options.
+
+  `GET /registry` still lists them, since `subprocess.ts`
+  registers them on the same `Registry` for internal dispatch. Without
+  the exclusion, an author could select one and have it fail at publish.
+
+  `ActionListEditor.tsx`'s `ActionRow` had its own separate, duplicate
+  free-text-plus-JSON implementation, never built on
+  `PluginEnvelopeEditor`. This change refactors it onto
+  `PluginEnvelopeEditor`, so the type picker and generated form cover
+  the action position too. That includes `onPath` (`PathsPanel.tsx`) and
+  `onFire.actions` (`TimersPanel.tsx`), which also render
+  `ActionListEditor`.
