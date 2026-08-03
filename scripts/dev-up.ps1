@@ -1,7 +1,7 @@
 # One-command devcontainer bring-up (PowerShell 7+ variant of dev-up.sh, for
 # Windows systems without Git Bash / WSL). Starts the compose services,
 # installs deps, seeds the example processes + demo users, ensures a
-# demo-superuser with all five system:* roles, and (re)starts the HTTP
+# demo-superuser with all six system:* roles, and (re)starts the HTTP
 # server. Safe to re-run — every step is idempotent, and the JWT signing
 # secret is generated once and reused, so restarts don't invalidate
 # existing logins.
@@ -15,7 +15,7 @@ Set-Location (Join-Path $PSScriptRoot "..")
 
 $SuperuserEmail = "demo-superuser@example.test"
 $SuperuserPassword = "seed-demo-password"
-$SuperuserRoles = "system:publish,system:cancel-any,system:admin,system:developer,system:reports"
+$SuperuserRoles = "system:publish,system:cancel-any,system:admin,system:developer,system:reports,system:datalists"
 $SecretFile = ".devcontainer/.auth-secret"
 
 $overridePath = ".devcontainer/docker-compose.override.yml"
@@ -62,7 +62,11 @@ Write-Host "==> Seeding example processes + per-role demo users"
 Invoke-Compose exec -e SEED_ALLOW=1 -w /workspace app bun run seed
 
 Write-Host "==> Ensuring $SuperuserEmail (all system:* roles)"
-Invoke-Compose exec -w /workspace app bun run src/auth/cli.ts add-user $SuperuserEmail $SuperuserPassword $SuperuserRoles 2>$null
+# The redirect sits on the native command, not on Invoke-Compose: stderr from
+# a native command inside a function bypasses a redirect written at the call
+# site. On a re-run add-user hits the unique constraint on auth_users.email,
+# and set-roles below is the expected path.
+docker compose @ComposeFiles exec -w /workspace app bun run src/auth/cli.ts add-user $SuperuserEmail $SuperuserPassword $SuperuserRoles 2>$null
 if ($LASTEXITCODE -ne 0) {
     Invoke-Compose exec -w /workspace app bun run src/auth/cli.ts set-roles $SuperuserEmail $SuperuserRoles
 }
