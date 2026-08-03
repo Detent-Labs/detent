@@ -50,6 +50,10 @@ export type ClientError =
   | { type: "conflict"; message: string }
   | { type: "draft-conflict"; message: string }
   | { type: "migration-plan"; message: string }
+  // `PATCH /admin/users/:id/roles` refusing to strip `system:admin` from the
+  // account making the request. A 409, but not a concurrency one: retrying
+  // changes nothing, so it reads as its own type rather than "conflict".
+  | { type: "self-role-strip"; message: string }
   // Publish-time rejections. The server maps six distinct error classes here
   // (registry, CEL, duration, compile, schema, cross-process); five carry
   // located `issues`, cross-process carries a message. All six reach a

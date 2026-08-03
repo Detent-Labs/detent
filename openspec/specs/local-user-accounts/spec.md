@@ -278,16 +278,21 @@ caller it affects can also see it happen.
 
 `src/auth/cli.ts` SHALL provide a command-line tool
 (`bun run src/auth/cli.ts add-user …`) to create a user, set that user's roles,
-and change a user's password. The engine SHALL expose no HTTP route for
-creating, modifying passwords or roles for, or registering users, and SHALL
-provide no registration, password-reset or MFA flow.
+and change a user's password. The engine SHALL expose no HTTP route that
+creates a user, changes a password, or registers anyone. It SHALL provide no
+registration flow, no password-reset flow and no MFA flow.
 
-Listing users and toggling a user's `disabled` state ARE additionally
-reachable over HTTP, through the `system:admin`-gated routes defined by the
-`admin-user-management` capability (`GET /admin/users`, `POST
-/admin/users/:id/disable`, `POST /admin/users/:id/enable`). This is the one
-carve-out from CLI-only administration: no other field or action on
-`auth_users` (email, password, roles) is reachable outside the CLI.
+Three actions ARE reachable over HTTP: listing users, toggling a user's
+`disabled` state, and assigning a user's roles. The `admin-user-management`
+capability defines four `system:admin`-gated routes for them.
+
+- `GET /admin/users`
+- `POST /admin/users/:id/disable`
+- `POST /admin/users/:id/enable`
+- `PATCH /admin/users/:id/roles`
+
+This is the carve-out from CLI-only administration. Creating a user and setting
+a password stay outside it. Neither one is reachable except from the CLI.
 
 #### Scenario: A user is created from the CLI
 
@@ -296,13 +301,12 @@ carve-out from CLI-only administration: no other field or action on
 - **THEN** a row exists in `auth_users` with that email, those roles, and a
   hash that verifies the given password
 
-#### Scenario: No route creates, changes a password for, or assigns roles to a user
+#### Scenario: No route creates a user or changes a password
 
 - **WHEN** the server's route table is inspected
-- **THEN** no route creates a user, sets a password, or assigns roles; the
-  only account-administration routes are `GET /admin/users`, `POST
-  /admin/users/:id/disable` and `POST /admin/users/:id/enable`, which only
-  list users or toggle `disabled`
+- **THEN** no route creates a user or sets a password
+- **AND** the account-administration routes are exactly the four this
+  requirement lists
 
 #### Scenario: A user disabled via the new HTTP route cannot log in
 
@@ -311,3 +315,9 @@ carve-out from CLI-only administration: no other field or action on
 - **THEN** `verifyLogin` rejects the attempt exactly as it already does for a
   user disabled by any other means (the pre-existing "A disabled user cannot
   log in" scenario)
+
+#### Scenario: The CLI and the route write the same column
+
+- **WHEN** `PATCH /admin/users/:id/roles` sets a user's roles
+- **AND** the CLI or a login then reads that user's roles
+- **THEN** the value read is the one the route wrote, from the same column

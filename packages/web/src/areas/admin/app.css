@@ -312,6 +312,65 @@ h2 {
   padding: var(--space-4) 0;
 }
 
+/* A role is an identifier the engine matches literally, never prose, so the
+   roles column and its editor take the display face the badges already use. */
+.admin-role-list,
+.admin-role-input,
+.admin-role-chip {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+}
+
+.admin-role-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 18rem;
+}
+
+.admin-role-input {
+  width: 100%;
+  padding: 0.25rem 0.4rem;
+  border: 1.5px solid var(--color-accent);
+  border-radius: 2px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.admin-role-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+/* Appends the role to the input. The six reserved names are exactly the
+   strings a typo makes silently ineffective, so they are clickable. */
+.admin-role-chip {
+  border: 1.5px dashed var(--color-border);
+  border-radius: 2px;
+  padding: 0.1rem 0.4rem;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.admin-role-chip:hover {
+  border-style: solid;
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.admin-role-caveat {
+  margin: 0;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  max-width: 34rem;
+}
+
 .admin-error {
   color: var(--color-danger);
 }

@@ -72,6 +72,8 @@ export async function parseErrorBody(res: Response): Promise<ClientError> {
       return { type: "draft-conflict", message };
     case "migration-plan":
       return { type: "migration-plan", message };
+    case "self-role-strip":
+      return { type: "self-role-strip", message };
     case "registry-validation":
     case "cel-validation":
     case "duration-validation":

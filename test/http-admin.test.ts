@@ -2,9 +2,9 @@
  * The `/admin/*` HTTP surface (src/http/admin-routes.ts): 401 without a
  * credential, 403 without `system:admin`, success with it, plus retry/discard's
  * 404 (no such row) and 409 (present but not a dead letter), the users
- * routes' 404 (no such userId), and migrations/run's 409 (no registered
- * plan) and request error (non-integer version). DB-backed — skips when
- * DATABASE_URL is unset.
+ * routes' 404 (no such userId) and the roles route's 400/409, and
+ * migrations/run's 409 (no registered plan) and request error (non-integer
+ * version). DB-backed — skips when DATABASE_URL is unset.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
@@ -296,6 +296,123 @@ test.skipIf(!DB)("POST /admin/users/:id/enable on an unknown id maps to 404", as
 });
 
 // ============================================================
+// PATCH /admin/users/:id/roles
+// ============================================================
+
+const rolesReq = (userId: string, body: unknown, actor: Actor) =>
+  new Request(`http://x/admin/users/${userId}/roles`, {
+    method: "PATCH",
+    headers: {
+      "content-type": "application/json",
+      "X-Actor-Id": actor.id,
+      ...(actor.roles.length > 0 ? { "X-Actor-Roles": actor.roles.join(",") } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+const storedRoles = async (userId: string): Promise<string[]> => {
+  const rows = (await sql`SELECT roles FROM auth_users WHERE user_id = ${userId}`) as { roles: string[] }[];
+  return rows[0]!.roles;
+};
+
+test.skipIf(!DB)("PATCH /admin/users/:id/roles with system:admin replaces the whole set", async () => {
+  const { userId } = await createUser("r1@example.com", "pw", ["a", "b"]);
+  const res = await fetch(rolesReq(userId, { roles: ["a", "finance:approver"] }, admin));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { roles: string[] };
+  expect(body.roles).toEqual(["a", "finance:approver"]);
+  expect(await storedRoles(userId)).toEqual(["a", "finance:approver"]);
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/roles removes a role the request omits", async () => {
+  const { userId } = await createUser("r2@example.com", "pw", ["a", "b"]);
+  const res = await fetch(rolesReq(userId, { roles: ["a"] }, admin));
+  expect(res.status).toBe(200);
+  expect(await storedRoles(userId)).toEqual(["a"]);
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/roles refuses each malformed body with 400 and no write", async () => {
+  const { userId } = await createUser("r3@example.com", "pw", ["keep"]);
+  const bodies: unknown[] = [
+    {},
+    { roles: "finance:approver" },
+    { roles: ["a", 1] },
+    { roles: ["a", "   "] },
+    { roles: ["a", "x".repeat(65)] },
+    { roles: Array.from({ length: 65 }, (_, i) => `role${i}`) },
+  ];
+  for (const body of bodies) {
+    const res = await fetch(rolesReq(userId, body, admin));
+    expect(res.status).toBe(400);
+  }
+  expect(await storedRoles(userId)).toEqual(["keep"]);
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/roles trims and deduplicates, first occurrence winning", async () => {
+  const { userId } = await createUser("r4@example.com", "pw", []);
+  const res = await fetch(rolesReq(userId, { roles: [" a ", "b", "a"] }, admin));
+  expect(res.status).toBe(200);
+  expect(await storedRoles(userId)).toEqual(["a", "b"]);
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/roles accepts a role string no system:* shape matches", async () => {
+  const { userId } = await createUser("r5@example.com", "pw", []);
+  const odd = "Abteilung Süd / Freigabe-2";
+  const res = await fetch(rolesReq(userId, { roles: [odd] }, admin));
+  expect(res.status).toBe(200);
+  expect(await storedRoles(userId)).toEqual([odd]);
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/roles on an unknown id maps to 404", async () => {
+  const res = await fetch(rolesReq("user_does_not_exist", { roles: ["a"] }, admin));
+  expect(res.status).toBe(404);
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/roles without system:admin maps to 403 and performs no update", async () => {
+  const { userId } = await createUser("r6@example.com", "pw", ["keep"]);
+  const res = await fetch(rolesReq(userId, { roles: ["changed"] }, bystander));
+  expect(res.status).toBe(403);
+  expect(await storedRoles(userId)).toEqual(["keep"]);
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/roles refuses to strip system:admin from the calling actor", async () => {
+  const { userId } = await createUser("r7@example.com", "pw", [ADMIN_ROLE, "a"]);
+  const self: Actor = { id: userId, roles: [ADMIN_ROLE] };
+  const res = await fetch(rolesReq(userId, { roles: ["a"] }, self));
+  expect(res.status).toBe(409);
+  expect(await storedRoles(userId)).toEqual([ADMIN_ROLE, "a"]);
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/roles lets the calling actor change its own other roles", async () => {
+  const { userId } = await createUser("r8@example.com", "pw", [ADMIN_ROLE, "a"]);
+  const self: Actor = { id: userId, roles: [ADMIN_ROLE] };
+  const res = await fetch(rolesReq(userId, { roles: [ADMIN_ROLE, "b"] }, self));
+  expect(res.status).toBe(200);
+  expect(await storedRoles(userId)).toEqual([ADMIN_ROLE, "b"]);
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/roles lets one admin strip another admin's role", async () => {
+  const { userId } = await createUser("r9@example.com", "pw", [ADMIN_ROLE]);
+  const res = await fetch(rolesReq(userId, { roles: ["a"] }, admin));
+  expect(res.status).toBe(200);
+  expect(await storedRoles(userId)).toEqual(["a"]);
+});
+
+// `admin.id` backs no auth_users row here, the shape an external issuer produces.
+test.skipIf(!DB)("PATCH /admin/users/:id/roles decides the self-strip guard ahead of the unknown-user 404", async () => {
+  const res = await fetch(rolesReq(admin.id, { roles: ["a"] }, admin));
+  expect(res.status).toBe(409);
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/roles returns its 409 in the existing error envelope", async () => {
+  const res = await fetch(rolesReq(admin.id, { roles: ["a"] }, admin));
+  expect(res.status).toBe(409);
+  const body = (await res.json()) as { error: { type: string; message: string } };
+  expect(body.error.type).toBe("self-role-strip");
+  expect(typeof body.error.message).toBe("string");
+});
+
+// ============================================================
 // POST /admin/migrations/run
 // ============================================================
 
@@ -402,6 +519,32 @@ test("OPTIONS preflight on the admin users enable route returns 204 permitting P
   const res = await fetch(new Request("http://x/admin/users/user_x/enable", { method: "OPTIONS" }));
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
+});
+
+// `local-user-accounts` holds creating a user and setting a password to the
+// CLI. Listing, disable/enable and roles are the whole HTTP carve-out.
+test.skipIf(!DB)("no route creates a user, sets a password, or registers one", async () => {
+  const absent = [
+    ["POST", "http://x/admin/users"],
+    ["PUT", "http://x/admin/users"],
+    ["POST", "http://x/admin/users/user_x/password"],
+    ["PATCH", "http://x/admin/users/user_x/password"],
+    ["POST", "http://x/admin/users/user_x/email"],
+    ["POST", "http://x/auth/register"],
+  ] as const;
+  for (const [method, url] of absent) {
+    const res = await fetch(authedReq(url, method, admin));
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: { type: string; message: string } };
+    expect(body.error.type).toBe("not-found");
+    expect(body.error.message).toStartWith("no route:");
+  }
+});
+
+test("OPTIONS preflight on the admin users roles route returns 204 permitting PATCH", async () => {
+  const res = await fetch(new Request("http://x/admin/users/user_x/roles", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("PATCH");
 });
 
 test("OPTIONS preflight on the admin migrations run route returns 204 permitting POST", async () => {

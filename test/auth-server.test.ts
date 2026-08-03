@@ -7,7 +7,7 @@
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
-import { createUser } from "../src/auth/users.js";
+import { createUser, setRolesById } from "../src/auth/users.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
 import { createServer, resolveAuthResolver, parseAuthIssuers } from "../src/http/server.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
@@ -165,6 +165,36 @@ test.skipIf(!DB)("with the JWT resolver active, a valid token reaches the route 
     }),
   );
   expect(res.status).toBe(200);
+});
+
+// A role granted over PATCH /admin/users/:id/roles reaches the roles claim at
+// the next login only. Token verification does no per-request database lookup,
+// so an already-issued token keeps the claim it was signed with.
+test.skipIf(!DB)("a token issued before a grant keeps its old roles, and the next login carries the new ones", async () => {
+  const resolver = resolveAuthResolver({ AUTH_JWT_SECRET: SECRET });
+  const fetch = createServer(dataSourceReg, reg, sql, resolver, undefined, SECRET);
+  const login = async (): Promise<string> => {
+    const res = await fetch(
+      new Request("http://x/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "grantee@example.com", password: "correct-horse" }),
+      }),
+    );
+    return ((await res.json()) as { token: string }).token;
+  };
+
+  const { userId } = await createUser("grantee@example.com", "correct-horse", []);
+  const staleToken = await login();
+
+  await setRolesById(userId, [ADMIN_ROLE]);
+
+  const stale = await fetch(new Request("http://x/admin/users", { headers: { Authorization: `Bearer ${staleToken}` } }));
+  expect(stale.status).toBe(403);
+
+  const freshToken = await login();
+  const fresh = await fetch(new Request("http://x/admin/users", { headers: { Authorization: `Bearer ${freshToken}` } }));
+  expect(fresh.status).toBe(200);
 });
 
 // GET /instances, GET /instances/:id/record, GET /processes and GET
