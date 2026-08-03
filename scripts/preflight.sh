@@ -77,8 +77,16 @@ fi
 # lock probe detects a hold only where the OS enforces mandatory file locks.
 # ponytail: Windows-only detection ceiling; Linux/macOS locks are advisory,
 # so a held lock there passes silently. Upgrade if that ever costs something.
+#
+# A zero-length WAL is skipped before the probe. SQLite zeroes the WAL on a
+# checkpoint, so such a file holds no unrecovered frame and the database
+# behind it is complete -- the opposite of the stale WAL this check looks
+# for. Without that skip the check warns on every run, since the editor's own
+# codebase-memory-mcp holds the index open and a live handle refuses the
+# FileShare.None probe below.
 shopt -s nullglob
 for wal in "$HOME"/.cache/codebase-memory-mcp/*.db-wal; do
+  [ -s "$wal" ] || continue
   db="${wal%-wal}"
   case "$(uname -s)" in
     MINGW*|MSYS*|CYGWIN*)

@@ -1896,6 +1896,16 @@ Stage-by-stage status is in `ROADMAP.md`.
   one check instead. It opens the file with a `FileShare.None` request
   that a plain redirection does not make.
 
+  Check 6 skips a WAL file of zero length before the probe reaches it.
+  SQLite zeroes the WAL on a checkpoint. Such a file holds no
+  unrecovered frame, and the database beside it is complete. That is the
+  opposite of the stale WAL the check looks for.
+
+  The narrower trigger earns its place. `codebase-memory-mcp` runs as a
+  child of the editor and holds the index open. A live handle refuses
+  the `FileShare.None` probe. Without the skip the check warned on every
+  run, and a warning that always prints is one nobody reads.
+
 - Admin role editing (`src/auth/users.ts`, `src/http/admin-routes.ts`,
   `src/http/server.ts`, the admin area of `packages/web`, roadmap #25a,
   `add-admin-role-editing`): `PATCH /admin/users/:id/roles` behind
