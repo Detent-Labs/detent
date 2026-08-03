@@ -215,9 +215,17 @@ The silent-skip hazard is why placement matters. The DB-backed suites are
 variable reports a pass count that omits most of what was written. It looks
 identical to a genuine green.
 
-The hook SHALL refuse to run when the devcontainer is down. It SHALL say how
-to start it. It SHALL NOT fall back to the host. A gate that quietly degrades
-to a weaker environment is the error this rule exists to prevent.
+The hook SHALL run the preflight's `core` profile before the checks. That
+profile is what refuses a push when the devcontainer is down, and it names the
+command that starts it. The hook SHALL NOT fall back to the host. A gate that
+quietly degrades to a weaker environment is the error this rule exists to
+prevent.
+
+The hook SHALL NOT run the preflight's `serve` profile. That profile restarts
+the HTTP server, whose outbox poller claims rows the suite is driving. The
+measurement stands at 3 red runs of 20 with a dev server up, and 0 of 20 with
+none. A gate that starts a server would manufacture the failures it exists to
+catch.
 
 The typecheck SHALL be a step of its own. Bun does not typecheck, so a type
 error passes `bun test` cleanly.
@@ -235,8 +243,14 @@ file that never runs reads as coverage it does not provide.
 #### Scenario: A stopped devcontainer blocks the push
 
 - **WHEN** a push is attempted while the devcontainer is not running
-- **THEN** the hook fails with a message naming the command that starts it,
-  and runs no checks on the host
+- **THEN** the preflight `core` profile fails, names the command that starts
+  the devcontainer, and runs no check on the host
+
+#### Scenario: The gate starts no HTTP server
+
+- **WHEN** the hook runs its preflight step before the suite
+- **THEN** no HTTP server runs during the suite, so the outbox poller claims
+  none of the rows the suite drives
 
 #### Scenario: A type error blocks the push
 
