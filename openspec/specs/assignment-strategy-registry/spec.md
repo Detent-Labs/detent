@@ -7,9 +7,7 @@ Defines the registry that maps a `Step.assignment.strategy.type` to its config
 schema and its candidate resolver. Assignment then resolves through the same
 seam that actions and data sources already use. Covers the built-in `static`
 entry and the resolver contract a later strategy implements.
-
 ## Requirements
-
 ### Requirement: An assignment registry maps a strategy type to a config schema and a resolver
 
 The system SHALL provide an `AssignmentRegistry`, a `type -> def` map. It is a
@@ -55,6 +53,11 @@ Every other path SHALL resolve before its transaction opens. Those paths are a
 manual transition, an automatic cascade hop, and a timer-forced transition. They
 also include a cancellation, a top-level creation, and a subprocess spawn.
 
+Every resolution SHALL be bounded by the resolution deadline defined below. That
+holds on the carved-out path and on every other. The bound is what makes the
+carve-out safe. A resolver that exceeds it cannot hold the parent's row lock open
+past the deadline.
+
 A resolver that needs its own database access uses the shared pool, the same way
 `src/auth/users.ts` does. No connection or transaction handle travels in the
 context, on either kind of path.
@@ -72,6 +75,14 @@ context, on either kind of path.
   subprocess step, onto a step with a declared `assignment`
 - **THEN** the parent's candidates resolve while its row lock is held, and no
   connection or transaction handle reaches the resolver
+
+#### Scenario: A slow resolver on the return path releases the lock at the deadline
+
+- **WHEN** a child returns an outcome advancing the parent onto a step whose
+  resolver does not answer within the deadline
+- **THEN** the resolution is abandoned at the deadline
+- **AND** the parent's transition commits with empty candidates, and its row lock
+  is released
 
 #### Scenario: A resolver sees the merged submitted data
 
@@ -129,3 +140,86 @@ SHALL NOT substitute a fallback assignee.
 
 - **WHEN** a step's resolved `candidates` is empty
 - **THEN** no actor satisfies the eligible-candidate check for that step
+
+### Requirement: A resolution deadline bounds every strategy on every path
+
+The engine SHALL bound each assignment resolution by a deadline. The bound SHALL
+be engine-wide rather than declared per strategy. It SHALL be configurable
+through the `ASSIGNMENT_RESOLUTION_TIMEOUT_MS` environment variable, defaulting
+to 5000 milliseconds.
+
+A resolution that has not answered when the deadline expires SHALL be abandoned.
+The step entry SHALL then proceed with an empty candidate list. That matches a
+resolution which raised.
+
+Abandoning a resolution SHALL return control to the caller at the deadline. The
+engine SHALL NOT wait for an abandoned resolver to settle. It SHALL ignore that
+resolver's answer if it settles later.
+
+#### Scenario: A resolver exceeding the deadline is abandoned
+
+- **WHEN** a step declares a strategy whose resolver does not answer within the
+  configured deadline
+- **THEN** the entry commits with empty candidates
+
+#### Scenario: A late answer is ignored
+
+- **WHEN** an abandoned resolver settles after its deadline
+- **THEN** its value is not written to the instance
+
+#### Scenario: The deadline is configurable
+
+- **WHEN** `ASSIGNMENT_RESOLUTION_TIMEOUT_MS` is set
+- **THEN** that value bounds each resolution instead of the default
+
+### Requirement: A failed or empty resolution commits the entry and records why
+
+Assignment resolution SHALL be total. Three cases SHALL NOT roll back the step
+entry. Those are a resolver that raises, a resolver that exceeds the deadline,
+and a resolver that yields no candidate. The state change that reached the step
+is real. It SHALL commit whatever the resolution produced.
+
+In each of those three cases the engine SHALL write an empty candidate list. It
+SHALL also record an `assignment.unresolved` event, in the same transaction that
+commits the entry. The `runtime-events` capability defines that event.
+
+The three cases SHALL be distinguished by reason. The resolver raised, the
+deadline expired, or the resolution produced no candidate.
+
+The engine SHALL apply this uniformly across every registered strategy. It SHALL
+NOT decide whether to record the event by comparing a strategy type against a
+literal. A `static` strategy configured with an empty list therefore records the
+no-candidate reason like any other.
+
+A step declaring no `assignment` SHALL record nothing. Resolution does not run
+for an unrestricted step.
+
+#### Scenario: A raising resolver still commits the entry
+
+- **WHEN** a participant submits a form transitioning onto a step whose resolver
+  raises
+- **THEN** the transition commits, the submitted data is written, and the
+  instance's candidates are empty
+
+#### Scenario: Each failure mode records its own reason
+
+- **WHEN** a resolution raises, exceeds the deadline, or returns an empty list
+- **THEN** an `assignment.unresolved` event is recorded naming the step
+- **AND** each of the three carries a different reason
+
+#### Scenario: A static strategy with an empty list records the event
+
+- **WHEN** a step declares `{ "type": "static", "config": { "candidates": [] } }`
+  and is entered
+- **THEN** the entry commits and an `assignment.unresolved` event records the
+  no-candidate reason
+
+#### Scenario: An unrestricted step records nothing
+
+- **WHEN** an instance enters a step that declares no `assignment`
+- **THEN** no `assignment.unresolved` event is recorded
+
+#### Scenario: The event does not survive a rolled-back entry
+
+- **WHEN** the transaction committing a step entry fails
+- **THEN** neither the entry nor its `assignment.unresolved` event is persisted
