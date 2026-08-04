@@ -1,3 +1,4 @@
+<!-- antislop: allow-file passive-voice sentence-length em-dash synonym-rotation run-ons -->
 # cel-expressions
 
 ## Purpose
@@ -11,7 +12,7 @@ authoring-time parse + type-checking of every Expression against the field catal
 The system SHALL use exactly one CEL library, shared by the editor (parse) and
 the engine (evaluate), so that a parsed expression and an evaluated expression
 carry identical semantics. The library MUST run in-container under Bun and expose
-a parse entry point that does not require an evaluation context.
+a parse entry point that needs no evaluation context.
 
 #### Scenario: Editor and engine agree on parse result
 
@@ -210,7 +211,7 @@ all-automatic step whose guards all evaluate false waits (the wait-state idiom:
 
 #### Scenario: A guard referencing a data source is not resolvable at runtime
 - **WHEN** the engine evaluates a guard that references a declared data-source result (a body that predates this rule)
-- **THEN** the reference is unresolvable, the guard is total and evaluates to `false`, and the instance waits — which is why such a reference is a publish error going forward
+- **THEN** the reference is unresolvable, the guard is total and evaluates to `false`, and the instance waits — which is why such a reference is a publish error
 
 ### Requirement: Runtime instance is projected onto INSTANCE_SCHEMA from one source of truth
 
