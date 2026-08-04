@@ -269,7 +269,7 @@ no step change get a sibling record, `InstanceEvent` (append-only, `evt_` ids): 
 discriminated union over `kind` with a kind-specific payload, carrying the instance,
 the `version` and the `transitionSeq` **in force**. An event never advances the
 sequence, so several may share one and share it with a transition; they order by
-`at`. Eleven kinds exist — `timer.fired` (a reminder fired: actions enqueued, no
+`at`. Twelve kinds exist — `timer.fired` (a reminder fired: actions enqueued, no
 transition), `timer.unarmed` (a declared timer produced no `fireAt` at entry, with
 the reason), `migration.skipped` (an instance left on its source version, with the
 reason), `subprocess.spawn-enqueued` (creation at a subprocess initial step
@@ -290,14 +290,19 @@ payload `{stepId, reason}`, `stepId` the repeated step), and `mapping.entry-drop
 be made JSON-safe, so its target field went unwritten; payload `{fieldId,
 direction, reason}`, `direction` `"input"` or `"output"`; recorded on the PARENT,
 since both mappings evaluate over its context, in the same transaction as the
-spawn's or the return's own commit). The latter five are not
+spawn's or the return's own commit), and `assignment.unresolved` (a step entry
+resolved its declared assignment to no candidate, because the resolver raised,
+exceeded its deadline, or answered empty; payload `{stepId, reason}`, reason one
+of `resolver-raised`/`timed-out`/`no-candidates`; resolution is total, so the
+entry committed with empty candidates, and the event lands in that same
+transaction). The latter six are not
 transition-shaped either — no step change, so no HistoryEntry and no
 `transitionSeq` advance, the same reasoning as `migration.skipped`; the flip and
 the event for `instance.faulted` commit in one transaction, guarded by the same
 OCC predicate, so a `faulted` instance cannot exist without its event.
 Kinds are added additively; the record shape is settled. A kind that enqueues
 actions carries their `ActionOutcome`s — `timer.fired` and
-`subprocess.spawn-enqueued` do, the other nine enqueue nothing and so must not
+`subprocess.spawn-enqueued` do, the other ten enqueue nothing and so must not
 invite a reader to expect outcomes.
 
 An `ActionOutcome` attaches to the record that **enqueued** the action, carried on the
@@ -415,21 +420,24 @@ See `ROADMAP.md` for stage-by-stage status (DONE/NOT STARTED) and what each stag
   stay open questions not worth deciding speculatively. A deadline would widen
   `DataSourceContext`, the same additive move `heldValues` already made, so
   this is a deferral rather than a door that closes.
-- **A second (fallible) assignment strategy, and the failure rules it needs.**
-  The `AssignmentRegistry` holds more than one type, but only the built-in
-  `"static"` entry ships. `static` reads its own config, performs no I/O, and
-  cannot fail, so nothing shipped exercises a resolution deadline, a failure
-  classification, or an `assignment.unresolved` event. The first strategy that
-  reaches a database or a directory owns all three — the same judgement the
-  dynamic data source above takes. That change also owns one known path: the
-  subprocess return resolves the parent's candidates while holding the parent's
-  row lock (`SELECT ... FOR UPDATE`), because it derives the step it enters from
-  the row it read under that lock. Every other path — a manual transition, an
-  automatic cascade hop, a timer-forced transition, a cancellation, a top-level
-  creation, a subprocess spawn — resolves before its transaction opens. A slow
-  resolver on the return path therefore holds the lock; bound it with the
-  deadline, or hoist resolution above the lock with an optimistic pre-read plus
-  a sequence re-check on entry.
+- **An assignment strategy whose resolution leaves the database.** Two
+  strategies now ship: `"static"` and `"org.manager-of-starter"`, the latter
+  reading `auth_users.manager_user_id` (see `docs/current-state.md`). Neither
+  leaves the engine's own Postgres, so neither exercises a network failure mode.
+  The resolution deadline (`ASSIGNMENT_RESOLUTION_TIMEOUT_MS`, default 5000),
+  the failure classification and the `assignment.unresolved` event all exist
+  and already bound EVERY strategy, so the first one reaching an outside
+  directory inherits them rather than owning them. What it owns is its own
+  retry and cache semantics, and whether a per-strategy deadline earns the
+  granularity. A deferral, not a door that closes.
+
+  The subprocess-return row-lock question this list used to pose is answered:
+  bounded by the deadline, not hoisted above the lock. A hoist needs an
+  optimistic pre-read plus a sequence re-check, and that re-check must still
+  fall back to resolving under the lock when it fails — so hoisting makes the
+  unbounded hold rarer without making it impossible, while costing a second
+  read of the parent row on every return delivery. Do not re-propose the hoist
+  without a measurement showing the bounded hold is itself the problem.
 - **A publish-time warning for a step with no `assignment`.**
   `Step.assignment` is optional, and the studio leaves it empty by default.
   A whole process can therefore publish without one, as `Test-process` did.
