@@ -355,6 +355,9 @@ export function createServer(
     if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "admin" && parts[1] === "users" && parts[3] === "roles") {
       return preflight("PATCH");
     }
+    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "admin" && parts[1] === "users" && parts[3] === "manager") {
+      return preflight("PATCH");
+    }
     if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "admin" && parts[1] === "migrations" && parts[2] === "run") {
       return preflight("POST");
     }
