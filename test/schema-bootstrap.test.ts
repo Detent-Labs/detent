@@ -29,10 +29,12 @@ const minimalBody = (): ProcessBody =>
     },
   }) as unknown as ProcessBody;
 
-let stopServer: (() => void) | undefined;
+let stopServer: (() => Promise<void>) | undefined;
 
 afterEach(async () => {
-  stopServer?.();
+  // Awaited: `stop` drains in-flight requests before it resolves, and the
+  // next test binds its own port straight after.
+  await stopServer?.();
   stopServer = undefined;
   // However a test above finished, leave a full schema behind for every
   // other suite sharing this database — the same guarantee initSchema's own
