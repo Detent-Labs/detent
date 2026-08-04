@@ -40,9 +40,11 @@ the cost of finding one. Run the review to the end before `/opsx:apply`.
    as a Critical finding. Then keep going. The strict pass covers structure alone.
 3. **Read all of it.** `proposal.md`, every `specs/**/spec.md`, `design.md` and
    `tasks.md`. Read `openspec/specs/<capability>/spec.md` for each capability
-   the change marks MODIFIED or REMOVED. Read the contract section and the
-   authoring-invariant section of CLAUDE.md. Read `ROADMAP.md` and the CLAUDE.md
-   lists "Open questions" and "Decided, not yet built".
+   the change marks MODIFIED or REMOVED. Read
+   `.claude/rules/process-contract.md` and
+   `.claude/rules/authoring-invariants.md`. Read `ROADMAP.md` and
+   `docs/decisions.md`, which holds "Open questions" and "Decided, not yet
+   built".
 4. **Verify every codebase claim.** The artifacts name paths, symbols,
    functions, tables, routes and roles. Confirm each one exists. Use the
    knowledge graph (`search_graph`, `get_code_snippet`, `trace_path`) or Read.
@@ -56,7 +58,8 @@ the cost of finding one. Run the review to the end before `/opsx:apply`.
 
 ## Checklist
 
-**Contract.** CLAUDE.md is the authority, the artifacts are not.
+**Contract.** CLAUDE.md and `.claude/rules/` are the authority, the artifacts
+are not.
 
 - Does the change cross a hard v1 boundary? One active step per instance, no
   parallelism, synchronous call-and-return subprocesses.
@@ -88,8 +91,8 @@ before the stages that follow it.
 - Does the change add persisted state? A column, a table, a status, an event
   kind. State what happens to the rows written before it. Additive is a valid
   answer. Silence is not.
-- Does the change decide an open question in passing? `ROADMAP.md` and the
-  CLAUDE.md lists hold the parked questions.
+- Does the change decide an open question in passing? `ROADMAP.md` and
+  `docs/decisions.md` hold the parked questions.
 - Does the change implement part of a later stage in a shape that stage cannot
   use? Name the stage and the conflict.
 - Find the one-way door. Ask one question for each later stage: does that stage
