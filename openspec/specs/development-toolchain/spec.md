@@ -3,13 +3,14 @@
 
 ## Purpose
 
-Defines the project's standard runtime, package manager, test runner, and
-typecheck tool, and how contributors install, test, and typecheck the project.
+Defines the project's standard runtime, package manager, test runner and
+typecheck tool. Also defines how a contributor installs, tests and typechecks
+the project.
 ## Requirements
 ### Requirement: Bun is the standard toolchain
-The project SHALL use Bun as its runtime, package manager, and test runner,
-across a Bun workspace rooted at the repository root. Dependencies MUST be
-installed with `bun install` and tests MUST run with `bun test`. The project
+The project SHALL use Bun as its runtime, package manager and test runner. The
+Bun workspace is rooted at the repository root. Dependencies MUST be installed
+with `bun install`, and tests MUST run with `bun test`. The project
 MUST NOT depend on pnpm, corepack, tsx, or vitest, in the root package or in
 any workspace member.
 
@@ -31,8 +32,8 @@ any workspace member.
 
 #### Scenario: A workspace member's local dependency resolves without a registry fetch
 - **WHEN** a workspace member declares a local, non-registry dependency
-  (`workspace:*` on another member, or `file:` on the workspace root,
-  which is not itself a member matched by the `workspaces` glob)
+- **AND** that dependency is `workspace:*` on another member, or `file:` on the
+  workspace root, which the `workspaces` glob does not match
 - **THEN** `bun install` links it from the local filesystem rather than
   fetching it from a registry
 
@@ -95,18 +96,18 @@ in either direction.
 ### Requirement: Typechecking remains tsc-based
 Because Bun does not typecheck, type safety SHALL be enforced by
 `tsc --noEmit`. The engine package keeps its own `typecheck` script
-covering `src` and `test`. Each additional workspace member SHALL declare
-its own `typecheck` script and `tsconfig.json` (member-specific compiler
-settings, e.g. DOM/JSX libs, SHALL NOT be added to the engine's
-`tsconfig.json`). The root `typecheck` script, run via `bun run
-typecheck`, SHALL run the engine's own check and every workspace member's
-`typecheck` script, failing if any of them fails.
+covering `src` and `test`. Every other workspace member SHALL declare its own
+`typecheck` script and `tsconfig.json`. A member-specific compiler setting, a
+DOM or JSX lib for example, SHALL NOT go in the engine's `tsconfig.json`.
+
+The root `typecheck` script runs via `bun run typecheck`. It SHALL run the engine's
+own check and every workspace member's `typecheck` script. It SHALL fail when
+any one of them fails.
 
 #### Scenario: Typecheck a valid tree
 - **WHEN** a contributor runs `bun run typecheck` on a valid source tree
-- **THEN** `tsc` checks `src` and `test` under strict mode and reports no
-  errors, and every workspace member's own `typecheck` script also runs
-  and reports no errors
+- **THEN** `tsc` checks `src` and `test` under strict mode and reports no error
+- **AND** every workspace member's own `typecheck` script runs and reports none
 
 #### Scenario: A workspace member's type error fails the root command
 - **WHEN** `packages/web` (or any other workspace member) has a type
@@ -116,9 +117,9 @@ typecheck`, SHALL run the engine's own check and every workspace member's
 
 ### Requirement: Each frontend package serves on a fixed, distinct dev port
 
-Every workspace package that ships a Vite dev server SHALL pin its own port
-in its `vite.config.ts` and SHALL fail to start rather than fall back to a
-different one. The assignment is one port per package and is stable across
+Every workspace package that ships a Vite dev server SHALL pin its own port in
+its `vite.config.ts`. It SHALL fail to start rather than fall back to a
+different one. The assignment is one port per package. It stays stable across
 contributors and machines:
 
 | package | port |
@@ -126,14 +127,13 @@ contributors and machines:
 | `packages/web` | 5173 |
 
 Exactly one package ships a dev server, so exactly one port is assigned. The
-rule stays stated per package rather than as a single constant, because it is
-what a second browser package would have to satisfy.
+rule stays stated per package rather than as a single constant. That is what a
+second browser package would have to satisfy.
 
-Pinning alone is not sufficient: without a strict-port setting Vite silently
-serves on the next free port when the configured one is taken, which
-reintroduces exactly the start-order dependence the fixed assignment exists
-to remove. A conflict MUST surface as a startup failure a contributor can
-see and act on.
+Pinning alone is not enough. Without a strict-port setting, Vite serves on the
+next free port when the configured one is taken. That reintroduces the
+start-order dependence the fixed assignment exists to remove. A conflict MUST
+surface as a startup error a contributor can see and act on.
 
 #### Scenario: Starting one dev server
 
@@ -144,8 +144,9 @@ see and act on.
 
 - **WHEN** a contributor starts every frontend dev server, which is now one
 - **THEN** every area is reachable under its prefix on that one port, in any
-  order, with no second dev server to start and so no start-order dependence
-  left to have
+  order
+- **AND** no second dev server exists to start, so no start-order dependence
+  remains
 
 #### Scenario: An occupied port fails loudly
 
@@ -156,17 +157,17 @@ see and act on.
 ### Requirement: The devcontainer permits every frontend dev origin
 
 The devcontainer's `CORS_ALLOWED_ORIGINS` value SHALL list the
-`http://localhost:<port>` origin of every frontend package's dev server, so
-each of them can call the engine's HTTP wrapper from a browser without any
-per-contributor configuration edit. With one browser package, that is one
-origin. The value MUST use the allowlist form
-(a comma-separated origin list) that `configurable-cors-origins` already
-specifies, not the `*` wildcard: the wildcard would work today but is
-mutually exclusive with the credentialed CORS a future cookie-backed
-`ActorResolver` would need.
+`http://localhost:<port>` origin of every frontend package's dev server. Each
+of them can then call the engine's HTTP wrapper from a browser, with no
+per-contributor setting change. With one browser package, that is one origin.
 
-When a package's assigned port changes, or a frontend package is added or
-removed, the allowlist SHALL be updated in the same change.
+The value MUST use the allowlist form that `configurable-cors-origins` already
+specifies, a comma-separated origin list. It MUST NOT use the `*` wildcard.
+That wildcard would work today. It is also mutually exclusive with the
+credentialed CORS a future cookie-backed `ActorResolver` would need.
+
+A change that alters a package's assigned port SHALL carry the matching
+allowlist change. So SHALL one that adds or removes a frontend package.
 
 #### Scenario: Any frontend calls the engine from a browser
 
@@ -278,6 +279,10 @@ file that never runs reads as coverage it does not provide.
 - **THEN** `DATABASE_URL` is set for that run, so the DB-backed suites execute
   rather than skipping
 
+<!-- antislop: allow synonym-rotation -->
+<!-- "defect" is this requirement's name, and OpenSpec matches a requirement
+     header character for character. Renaming it to satisfy a synonym rule
+     would break every delta that modifies it. -->
 ### Requirement: A wandering test result counts as a defect
 
 `bun run check` gates every push, through `.githooks/pre-push`. That gate
@@ -310,28 +315,33 @@ received values, says what.
 ### Requirement: A runtime import is a declared runtime dependency of the package that imports it
 
 Every package SHALL declare, in its own manifest, the packages it imports as
-runtime values — as a `dependency`, or as a `peerDependency` where the package
-is source-only and is compiled by its consumer. A package SHALL NOT rely on
-workspace hoisting to supply a runtime import it does not declare, and a
-runtime import SHALL NOT be declared as a `devDependency`.
+runtime values. It declares each one as a `dependency`. It uses a
+`peerDependency` where the package is source-only, and its consumer compiles
+it. A package SHALL NOT rely on workspace hoisting to supply a runtime import
+it does not declare. A runtime import SHALL NOT sit in `devDependencies`.
 
-The rule exists because the failure is not theoretical: `bun install
---production`, or a slim engine image, yields `Cannot find module "zod"` on the
-first import of the schema module, and the failure would first appear in
-whichever change builds that image rather than in the change that mis-declared
-it. `zod` is the case that produced the rule, in both directions — a root
-`devDependency` behind a public `exports` map, and browser packages importing
-it while declaring it nowhere.
+The rule exists because the error is not theoretical. `bun install --production`
+yields `Cannot find module "zod"` on the first import of the schema module. So
+does a slim engine image. The error would first appear in whichever change
+builds that image, not in the change that mis-declared it.
 
-Dependencies whose behavior the contract depends on SHALL be pinned exactly,
-following the treatment `typescript` already gets. `@marcbachmann/cel-js` is
-such a dependency by explicit design — one CEL library backs both the
-publish-time type-check and runtime evaluation — and its failure mode is
-silent: guard evaluation is total (an error becomes `false`) and the transform
-path degrades to a recorded drop, so an evaluation-semantics change reroutes
-or parks already-published, immutable definitions instead of throwing. The
-reason SHALL be recorded next to the "one CEL library" rule it protects, so
-that an upgrade is a deliberate commit that re-runs the CEL suite.
+`zod` is the case that produced the rule, in both directions. It sat as a root
+`devDependency` behind a public `exports` map. Browser packages imported it
+while declaring it nowhere.
+
+A dependency the contract rests on SHALL be pinned exactly. The pin on
+`typescript` already shows that treatment.
+
+One such dependency is `@marcbachmann/cel-js`, by explicit design. One CEL
+library backs both the publish-time type-check and runtime evaluation.
+
+Its error mode is silent. Guard evaluation is total, so an error becomes
+`false`. The transform path degrades to a recorded drop. An
+evaluation-semantics change therefore reroutes or parks already-published,
+immutable definitions instead of throwing.
+
+The reason SHALL sit next to the "one CEL library" rule it protects. An upgrade
+is then a deliberate commit that re-runs the CEL suite.
 
 #### Scenario: A production install can start the engine
 
