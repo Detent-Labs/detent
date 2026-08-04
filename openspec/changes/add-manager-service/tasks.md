@@ -26,17 +26,19 @@
 - [ ] 3.6 Test: each of those three carries its own reason. A late answer is not written.
 - [ ] 3.7 Test: the environment variable overrides the default.
 
-## 4. Recording the event at the five step-entry sites
+## 4. Recording the event at the four step-entry sites
 
-- [ ] 4.1 `commitTransition` (`src/engine/transition.ts`): mint the event. Pass it through the `events` field of `StepEntryOpts`.
-- [ ] 4.2 `startInstance` (`src/engine/transition.ts`) and `createProcessInstance` (`src/runtime/api.ts`): pass the event into `createInstance` at sequence 0. That function already writes an event list.
-- [ ] 4.3 Subprocess spawn (`src/engine/subprocess.ts`): add the event to the drop-event list it already appends. It is recorded on the child.
-- [ ] 4.4 Subprocess return (`src/engine/subprocess.ts`): the event lands through `commitTransition` inside the held transaction. Confirm no second transaction opens.
-- [ ] 4.5 Adjust the migration call site and `test/migration.test.ts` for the widened return.
-- [ ] 4.6 Test: the event commits with the entry, and not without it.
-- [ ] 4.7 Test: a successful resolution records none. An unrestricted step records none.
-- [ ] 4.8 Test: a creation records the event at sequence 0.
-- [ ] 4.9 Adjust existing tests that assert an exact event list where `static` candidates are empty.
+- [ ] 4.1 `commitTransition` (`src/engine/transition.ts`): mint the event. Pass it through the `events` field of `StepEntryOpts`, the seam `migration.ts:520` already uses.
+- [ ] 4.2 Add an optional `events?: InstanceEvent[]` to `createInstance`'s opts (`src/engine/store.ts:383`). Append it to the list that function already builds, before `appendInstanceEvents` at `store.ts:506`.
+- [ ] 4.3 `startInstance` (`src/engine/transition.ts`) and `createProcessInstance` (`src/runtime/api.ts`): pass the event through that new field, at sequence 0.
+- [ ] 4.4 Subprocess spawn (`src/engine/subprocess.ts`): pass the child's event through the same new field, with `instanceId: childId`, `version: childVersion` and `transitionSeq` 0. Do NOT add it to the parent's `dropEvents` list, which carries `instanceId: parent.instanceId`.
+- [ ] 4.5 Subprocess return (`src/engine/subprocess.ts`): the event lands through `commitTransition` inside the held transaction. Confirm no second transaction opens.
+- [ ] 4.6 Adjust `test/migration.test.ts:119` for the widened return. Migration itself calls no resolver: it passes `assignment: { carry: true }` (`migration.ts:519`), which stays unchanged.
+- [ ] 4.7 Test: the event commits with the entry, and not without it.
+- [ ] 4.8 Test: a successful resolution records none. An unrestricted step records none.
+- [ ] 4.9 Test: a creation records the event at sequence 0.
+- [ ] 4.10 Test: a spawned child's event carries the child's id, not the parent's.
+- [ ] 4.11 Adjust existing tests that assert an exact event list where `static` candidates are empty.
 
 ## 5. The org.manager-of-starter strategy
 
@@ -45,11 +47,12 @@
 - [ ] 5.3 Point `src/http/server.ts`'s import of `createDefaultAssignmentRegistry` at the new module. One import line, and no default-parameter expression changes.
 - [ ] 5.4 Point `src/http/routes.ts` and `src/http/studio-routes.ts` at the same module.
 - [ ] 5.5 Test: the strategy resolves the starter's manager.
-- [ ] 5.6 Test: two starters with different managers get different candidates. Neither manager is eligible for the other's instance.
+- [ ] 5.6 Test: two starters with different managers get different candidates. Neither manager is eligible for the other's instance. Run it through `createProcessInstance`: `startInstance` passes `startedBy: undefined` and would resolve to nobody.
 - [ ] 5.7 Test: a starter with no manager resolves to empty with `no-candidates`. So do an absent and an unknown `startedBy`.
 - [ ] 5.8 Test: the resolved list does not change when the manager changes afterwards.
 - [ ] 5.9 Test: a config carrying any key fails to publish.
 - [ ] 5.10 Test: the strategy appears in the registry the studio Tools screen reads.
+- [ ] 5.11 Test: the registry `serve` defaults to resolves `org.manager-of-starter`. Two factories share the name, so a wrong import is otherwise silent.
 
 ## 6. The admin route
 
@@ -60,14 +63,17 @@
 
 ## 7. The admin screen
 
+- [ ] 7.0 Invoke `/frontend-design:frontend-design` first, plus `web-design-guidelines`, `vercel-react-best-practices` and `vercel-composition-patterns`. CLAUDE.md requires this before reshaping a screen.
 - [ ] 7.1 Add `managerUserId` to the admin area's account type and API module (`packages/web/src/areas/admin/api/types.ts`, `client.ts`).
 - [ ] 7.2 Add the manager request to that module.
 - [ ] 7.3 Add the manager control to `UsersScreen.tsx` and its logic to `usersLogic.ts`, beside the roles control.
 - [ ] 7.4 Offer the other listed accounts plus a clearing choice. Never offer the account being changed.
 - [ ] 7.5 Show a rejected change without changing the displayed value.
-- [ ] 7.6 Add the locale strings the control needs.
-- [ ] 7.7 Test `usersLogic.ts`: the choices exclude the account being changed.
-- [ ] 7.8 Test `usersLogic.ts`: a rejection leaves the value, and a success updates it.
+- [ ] 7.6 Give the control an accessible name identifying its account, as the roles input already carries.
+- [ ] 7.7 Add the locale strings the control needs.
+- [ ] 7.8 Test `usersLogic.ts`: the choices exclude the account being changed.
+- [ ] 7.9 Test `usersLogic.ts`: a rejection leaves the value, and a success updates it.
+- [ ] 7.10 Test `usersLogic.ts`: a focus refetch does not clobber a pending manager change.
 
 ## 8. Documentation
 
@@ -76,7 +82,8 @@
 - [ ] 8.3 `docs/current-state.md`: the new event kind, the new route, and the new screen control.
 - [ ] 8.4 `CLAUDE.md`: delete the "second (fallible) assignment strategy" entry from "Decided, not yet built". Its row-lock question is now answered.
 - [ ] 8.5 `CLAUDE.md`: add the new event kind to the Runtime record list and correct its count.
-- [ ] 8.6 `ROADMAP.md`: mark stage 25c DONE.
+- [ ] 8.6 `CLAUDE.md`: state that the assignment resolver is deadline-bounded, and that the subprocess-return lock is bounded rather than hoisted.
+- [ ] 8.7 `ROADMAP.md`: mark stage 25c DONE.
 
 ## 9. Verification
 
