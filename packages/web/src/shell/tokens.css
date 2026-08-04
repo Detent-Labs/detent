@@ -6,7 +6,6 @@
  * (see openspec design.md); components below reference only the semantic
  * layer, never a raw hex.
  */
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&display=swap');
 
 :root {
   /* primitives — each has a dark-mode override below; the ramps do not, they
@@ -72,9 +71,9 @@
   --color-accent-contrast: var(--paper-50);
   --color-refusal: var(--refusal-700);
 
-  --font-heading: "Archivo", system-ui, sans-serif;
+  --font-heading: system-ui, sans-serif;
   --font-heading-weight: 800;
-  --font-body: "Archivo", system-ui, sans-serif;
+  --font-body: system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
 
   --space-1: 4px;
