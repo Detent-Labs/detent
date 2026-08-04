@@ -22,7 +22,7 @@ the file's old path. Reading it at the new path would return zero and make every
 pre-existing finding read as new. Archiving a change renames every artifact in
 it, so this is a routine case rather than an edge one.
 
-The linter reports a bad path as an error, not as a finding. The gate SHALL
+A bad path makes the linter exit 2, which is not a finding. The gate SHALL
 distinguish the two. It SHALL NOT read a failed lint as a finding count. A base
 of one instead of zero would let a new file carry a finding through.
 
