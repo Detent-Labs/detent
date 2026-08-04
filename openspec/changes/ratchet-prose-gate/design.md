@@ -87,6 +87,22 @@ The `--json` flag would also give a countable structure. It needs a JSON parser,
 and this gate runs host-side in POSIX `sh` with no such tool. The exit-code
 branch adds nothing.
 
+### A rename keeps its baseline, through `-M`
+
+`git diff --name-only` reports the new name alone for a rename. That name does
+not exist at the base. The base count therefore returns zero, and every
+pre-existing finding reads as new.
+
+Measured: renaming `timers/spec.md` reported 0 findings at the base and 220 at
+the tip, and the gate blocked the push. Archiving a change renames every
+artifact in it, so the same block hit a change whose proposal carried 7
+findings. Both are routine operations, not edge cases.
+
+The gate therefore collects triples of `(range, base path, tip path)` from
+`git diff --name-status -M`. That reports `R<score>` with both paths. The two
+paths differ only for a rename or a copy. A copy takes the same treatment: its
+source carries the findings the new path inherits.
+
 ### The comparison is a count, not a diff of findings
 
 The gate compares two integers. It does not match individual findings between the
@@ -135,9 +151,10 @@ appears in the diff, and a reviewer is the only check on it.
 
 ### The rejection output names both counts
 
-The gate prints the path, the base count, the worktree count, and the linter's
-findings for the worktree version. The skip-floor gate already prints both
-counts when it rejects a push. The two therefore read alike.
+The gate prints the path, the base count, the tip count, and the linter's
+findings for the pushed version. A renamed file gets both of its paths named.
+The skip-floor gate already prints both counts when it rejects a push, so the
+two read alike.
 
 The gate does not print which findings are new. It does not know.
 
@@ -145,10 +162,9 @@ The gate does not print which findings are new. It does not know.
 
 - A contributor silences a real finding with a directive instead of fixing it.
   The repository already shows this going unchallenged. Commit `bbf37d1` put a
-  six-rule `allow-file` line at the top of `CLAUDE.md`. Measured: that file
-  reports 0 findings with the directive and 45 without it. Mitigation: task 4.4
-  writes the norm down, and the directive appears in the diff. Neither is a
-  gate, and no gate can judge intent.
+  six-rule `allow-file` line at the top of `CLAUDE.md`, which reports 0 findings
+  with the directive and 45 without it. Mitigation: task 4.4 writes the norm
+  down, and the directive appears in the diff. Neither is a gate.
 - A file gains one finding and loses another in the same push. Mitigation: none.
   The count did not rise, so the gate permits it. Accepted above.
 - The gate costs one more linter run per changed Markdown file. Measured at
@@ -156,16 +172,17 @@ The gate does not print which findings are new. It does not know.
   invocations. The suite dominates the push.
 - Marking a task box changes a file's finding count. Measured on this change's
   own `tasks.md`: 0 findings with every box as `- [ ]`, and 2 with them as
-  `- [x]`. The linter reads the empty box as a sentence boundary. It reads the
-  filled one as a word. A long task line therefore passes while open and fails
-  once done. Every OpenSpec change meets this at apply time. Mitigation: keep a
-  task line short enough to pass in both states. No directive suits it, since
-  the finding is real prose length either way.
+  `- [x]`. The linter reads the empty box as a sentence boundary, and the filled
+  one as a word. A long task line therefore passes while open and fails once
+  done. Every OpenSpec change meets this at apply time. Mitigation: keep a task
+  line short enough to pass in both states.
 - The 3166 findings stay. That is the point of the change, and it is a debt the
   repository keeps until somebody spends the time. The norm in `CLAUDE.md` is
   what reduces it, not the gate.
-- `git show` on a path with unusual characters could misbehave. The repository
-  has no such path today, and the gate quotes its arguments.
+- `git show` on a path with unusual characters could misbehave. Measured for a
+  path holding a space: a clean file passes, and a file carrying 7 findings gets
+  rejected by name. The gate quotes its arguments. A path git itself quotes,
+  such as one holding a non-ASCII byte, stays untested.
 
 ## Migration Plan
 

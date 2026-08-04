@@ -28,6 +28,9 @@
   offending file rather than the first
 - [x] 2.8 Check a path that appears in two ranges against each base. It fails the
   push when it rises in either one
+- [x] 2.9 Collect `(range, base path, tip path)` triples from
+  `git diff --name-status -M`. Read the base count at the old path for a rename
+- [x] 2.10 Name both paths when a renamed file blocks the push
 
 ## 3. Proof
 
@@ -49,6 +52,11 @@
   then add a finding to it without committing. Show the gate passes
 - [x] 3.7b Prove the multi-range case. Feed two ranges with different bases, and
   show the gate checks each file against its own base
+- [x] 3.7c Prove a rename keeps its baseline. Rename a spec carrying 220
+  findings. Show the gate passes
+- [x] 3.7d Prove a rename plus a new finding still blocks, naming both paths
+- [x] 3.7e Prove archiving works. Archive a change whose artifact carries
+  findings. Show the gate passes
 - [x] 3.8 Re-prove the case that motivated this change. Replay the
   `development-toolchain` sync shape, a file with pre-existing findings gaining
   new ones. Show the gate reports only the increase

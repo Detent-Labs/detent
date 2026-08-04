@@ -17,6 +17,11 @@ A file with no content at the base commit has a base count of zero. A file the
 push adds SHALL therefore lint clean. A file the range deleted has no content at
 the tip, so the gate SHALL skip it.
 
+A renamed file SHALL keep its baseline. The gate SHALL read the base count at
+the file's old path. Reading it at the new path would return zero and make every
+pre-existing finding read as new. Archiving a change renames every artifact in
+it, so this is a routine case rather than an edge one.
+
 The linter reports a bad path as an error, not as a finding. The gate SHALL
 distinguish the two. It SHALL NOT read a failed lint as a finding count. A base
 of one instead of zero would let a new file carry a finding through.
@@ -73,6 +78,17 @@ gate. A named skip costs one check. A bypassed hook costs every check.
 
 - **WHEN** the pushed range lowers a Markdown file's finding count
 - **THEN** the gate raises no finding and the push proceeds
+
+#### Scenario: A renamed file keeps its baseline
+
+- **WHEN** the pushed range renames a Markdown file that carries findings
+- **THEN** the gate reads the base count at the old path
+- **AND** the push proceeds, since the count did not rise
+
+#### Scenario: A rename that also adds a finding blocks the push
+
+- **WHEN** the pushed range renames such a file and adds a finding to it
+- **THEN** the gate rejects the push, naming both paths
 
 #### Scenario: A newly added file must lint clean
 
