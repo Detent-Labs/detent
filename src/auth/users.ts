@@ -62,16 +62,30 @@ export interface UserSummary {
   email: string;
   roles: string[];
   disabled: boolean;
+  /** The account's manager, or `undefined` for no manager on record. One pointer to one other account, never a tree. */
+  managerUserId: string | undefined;
 }
 
+/** The column list every user-returning query below selects, so one mapper serves them all. */
+interface UserRow {
+  user_id: string;
+  email: string;
+  roles: string[];
+  disabled: boolean;
+  manager_user_id: string | null;
+}
+
+const toSummary = (r: UserRow): UserSummary => ({
+  userId: r.user_id,
+  email: r.email,
+  roles: r.roles,
+  disabled: r.disabled,
+  managerUserId: r.manager_user_id ?? undefined,
+});
+
 export async function listUsers(db: SQL = sql): Promise<UserSummary[]> {
-  const rows = (await db`SELECT user_id, email, roles, disabled FROM auth_users ORDER BY email`) as {
-    user_id: string;
-    email: string;
-    roles: string[];
-    disabled: boolean;
-  }[];
-  return rows.map((r) => ({ userId: r.user_id, email: r.email, roles: r.roles, disabled: r.disabled }));
+  const rows = (await db`SELECT user_id, email, roles, disabled, manager_user_id FROM auth_users ORDER BY email`) as UserRow[];
+  return rows.map(toSummary);
 }
 
 /**
@@ -80,24 +94,72 @@ export async function listUsers(db: SQL = sql): Promise<UserSummary[]> {
  * updated row, or `undefined` if no such `userId` exists.
  */
 export async function setRolesById(userId: string, roles: string[], db: SQL = sql): Promise<UserSummary | undefined> {
-  const rows = (await db`UPDATE auth_users SET roles = ${db.array(roles, "TEXT")} WHERE user_id = ${userId} RETURNING user_id, email, roles, disabled`) as {
-    user_id: string;
-    email: string;
-    roles: string[];
-    disabled: boolean;
-  }[];
+  const rows = (await db`UPDATE auth_users SET roles = ${db.array(roles, "TEXT")} WHERE user_id = ${userId} RETURNING user_id, email, roles, disabled, manager_user_id`) as UserRow[];
   const row = rows[0];
-  return row ? { userId: row.user_id, email: row.email, roles: row.roles, disabled: row.disabled } : undefined;
+  return row ? toSummary(row) : undefined;
 }
 
 /** Keyed by `userId`, unlike `setRoles`/`setPassword` — see design.md. Returns the updated row, or `undefined` if no such `userId` exists. */
 export async function setDisabled(userId: string, disabled: boolean, db: SQL = sql): Promise<UserSummary | undefined> {
-  const rows = (await db`UPDATE auth_users SET disabled = ${disabled} WHERE user_id = ${userId} RETURNING user_id, email, roles, disabled`) as {
-    user_id: string;
-    email: string;
-    roles: string[];
-    disabled: boolean;
-  }[];
+  const rows = (await db`UPDATE auth_users SET disabled = ${disabled} WHERE user_id = ${userId} RETURNING user_id, email, roles, disabled, manager_user_id`) as UserRow[];
   const row = rows[0];
-  return row ? { userId: row.user_id, email: row.email, roles: row.roles, disabled: row.disabled } : undefined;
+  return row ? toSummary(row) : undefined;
+}
+
+/**
+ * Set (or, with `null`, clear) the account's manager. Keyed by `userId` like
+ * `setRolesById`. Returns the updated row, or `undefined` if no such `userId`
+ * exists.
+ *
+ * A self-pointer is rejected here rather than by a constraint: it would name an
+ * instance's starter as their own approver, which is an operator mistake rather
+ * than an organizational fact. A cycle between two accounts is NOT rejected —
+ * `org.manager-of-starter` reads one hop and never walks, so a cycle has no
+ * effect. A `managerUserId` naming no account is refused by the column's own
+ * foreign key.
+ */
+export async function setManagerById(userId: string, managerUserId: string | null, db: SQL = sql): Promise<UserSummary | undefined> {
+  if (managerUserId !== null && managerUserId === userId) throw new SelfManagerError(userId);
+  const rows = (await db`UPDATE auth_users SET manager_user_id = ${managerUserId} WHERE user_id = ${userId} RETURNING user_id, email, roles, disabled, manager_user_id`) as UserRow[];
+  const row = rows[0];
+  return row ? toSummary(row) : undefined;
+}
+
+/** Thrown by `setManagerById` when an account is pointed at itself. */
+export class SelfManagerError extends Error {
+  constructor(readonly userId: string) {
+    super(`a user cannot be their own manager: ${userId}`);
+    this.name = "SelfManagerError";
+  }
+}
+
+/**
+ * The email-keyed sibling of `setManagerById`, for `src/auth/cli.ts` — a human
+ * types an email, never a `user_id`. `managerEmail` `null` clears the pointer.
+ * Throws when either email names no account, so the CLI reports which one.
+ */
+export async function setManagerByEmail(email: string, managerEmail: string | null, db: SQL = sql): Promise<void> {
+  const userId = await userIdForEmail(email, db);
+  if (!userId) throw new Error(`no such user: ${email}`);
+  let managerUserId: string | null = null;
+  if (managerEmail !== null) {
+    managerUserId = (await userIdForEmail(managerEmail, db)) ?? null;
+    if (!managerUserId) throw new Error(`no such user: ${managerEmail}`);
+  }
+  await setManagerById(userId, managerUserId, db);
+}
+
+async function userIdForEmail(email: string, db: SQL): Promise<string | undefined> {
+  const rows = (await db`SELECT user_id FROM auth_users WHERE email = ${email}`) as { user_id: string }[];
+  return rows[0]?.user_id;
+}
+
+/**
+ * The `user_id` of `userId`'s manager, or `undefined` when that account has no
+ * manager on record or does not exist. One hop: this never walks a chain.
+ * Read by the `org.manager-of-starter` assignment strategy.
+ */
+export async function getManagerOf(userId: string, db: SQL = sql): Promise<string | undefined> {
+  const rows = (await db`SELECT manager_user_id FROM auth_users WHERE user_id = ${userId}`) as { manager_user_id: string | null }[];
+  return rows[0]?.manager_user_id ?? undefined;
 }

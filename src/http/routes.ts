@@ -31,11 +31,13 @@ import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, PUBLISH_ROLE, ADMIN_ROLE } from "../auth/authorize.js";
 import {
-  createDefaultAssignmentRegistry,
   type Registry,
   type DataSourceRegistry,
   type AssignmentRegistry,
 } from "../engine/registry.js";
+// The org-aware set (static + org.manager-of-starter), not the static-only leaf
+// factory of the same name in registry.js. This is the composition root.
+import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies.js";
 import type { Instance, PathId, ProcessId, InstanceId, StepId, ProcessBody } from "../schema/definition.js";
 import { mapError, RequestShapeError, type HttpResult, type HttpBinaryResult, type ErrorContext } from "./errors.js";
 import { z } from "zod";

@@ -5,7 +5,7 @@
  */
 
 import { z } from "zod";
-import type { Action, FieldOption, Instance, Step } from "../schema/definition.js";
+import type { Action, AssignmentUnresolvedReason, FieldOption, Instance, Step } from "../schema/definition.js";
 
 /** What a handler is invoked with. It MUST dedupe external effects on `idempotencyKey` (delivery is at-least-once). */
 export interface HandlerContext {
@@ -116,30 +116,98 @@ export function createDefaultAssignmentRegistry(): AssignmentRegistry {
   return reg;
 }
 
+/** The default resolution deadline in milliseconds, overridden by `ASSIGNMENT_RESOLUTION_TIMEOUT_MS`. */
+export const DEFAULT_ASSIGNMENT_RESOLUTION_TIMEOUT_MS = 5000;
+
+/** Read per call, not once at module load, so a test can set the variable after import. */
+function resolutionTimeoutMs(): number {
+  const raw = Number(process.env.ASSIGNMENT_RESOLUTION_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_ASSIGNMENT_RESOLUTION_TIMEOUT_MS;
+}
+
+/**
+ * What `resolveStepAssignment` answers: the state to write, plus the reason it
+ * produced no candidate. The CALLER records that reason as an
+ * `assignment.unresolved` event, inside the transaction committing the entry.
+ * This function holds no transaction handle and, on three of the four paths,
+ * runs before one opens — appending here could commit an event beside a
+ * rolled-back entry.
+ */
+export interface ResolvedAssignment {
+  assignment: Instance["assignment"];
+  unresolved?: AssignmentUnresolvedReason;
+}
+
 /**
  * Resolve a step's declared `assignment` into a fresh `AssignmentState` through
- * `reg`. `undefined` when the step declares no `assignment` (unrestricted).
+ * `reg`. `assignment: undefined` and no reason when the step declares no
+ * `assignment` (unrestricted): resolution does not run for it, and it records
+ * nothing.
  *
- * Called by the step-entry callers — `commitTransition`, the subprocess spawn
- * handler, `startInstance` — never by `planStepEntry` (which stays pure and
- * synchronous) and never by `createInstance` (which stays persistence-only).
+ * Called by the step-entry callers — `commitTransition`, `startInstance`, the
+ * subprocess spawn handler, `createProcessInstance` — never by `planStepEntry`
+ * (which stays pure and synchronous) and never by `createInstance` (which stays
+ * persistence-only). Migration reaches none of this: it passes
+ * `assignment: { carry: true }` and keeps the candidates the instance holds.
+ *
+ * Resolution is TOTAL. A resolver that raises, that exceeds the deadline, or
+ * that answers with an empty list yields empty candidates and a reason. It never
+ * rolls back the entry: the state change that reached the step is real. No
+ * fallback assignee is substituted, so an empty list means no actor is an
+ * eligible candidate and the instance stalls visibly.
  *
  * An unregistered type resolves to zero candidates rather than raising:
  * publish-time `checkAssignmentRegistry` already rejects one, so this is
- * defensive only, mirroring `resolveFields`' unresolved-ref handling. An empty
- * list means no actor is an eligible candidate; no fallback assignee is
- * substituted.
+ * defensive only, mirroring `resolveFields`' unresolved-ref handling.
+ *
+ * The deadline bounds every path, which is what makes the subprocess return's
+ * carve-out safe. That one path resolves while holding the parent's row lock,
+ * since it derives the step it enters from the row it read `FOR UPDATE`, so an
+ * unbounded resolver there would hold the lock against every other writer of
+ * that instance. `Promise.race` does not cancel the loser and does not need to:
+ * the orphaned query holds a different pool connection, so the caller returns
+ * and its transaction commits and releases the lock on time. A late answer is
+ * ignored.
  */
 export async function resolveStepAssignment(
   step: Step,
   reg: AssignmentRegistry,
   instance: AssignmentContext["instance"],
-): Promise<Instance["assignment"]> {
-  if (!step.assignment) return undefined;
+): Promise<ResolvedAssignment> {
+  if (!step.assignment) return { assignment: undefined };
   const strategy = step.assignment.strategy;
   const def = resolveAssignmentStrategy(reg, strategy.type);
-  const candidates = def ? await def.resolve({ config: strategy.config, stepId: step.id, instance }) : [];
-  return { candidates, claimedBy: undefined, claimedAt: undefined };
+
+  let candidates: string[] = [];
+  let unresolved: AssignmentUnresolvedReason | undefined;
+  if (!def) {
+    unresolved = "no-candidates";
+  } else {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = Symbol("assignment-resolution-timeout");
+    try {
+      const raced = await Promise.race([
+        def.resolve({ config: strategy.config, stepId: step.id, instance }),
+        new Promise<typeof timedOut>((resolve) => {
+          timer = setTimeout(() => resolve(timedOut), resolutionTimeoutMs());
+        }),
+      ]);
+      if (raced === timedOut) unresolved = "timed-out";
+      else if (raced.length === 0) unresolved = "no-candidates";
+      else candidates = raced;
+    } catch {
+      unresolved = "resolver-raised";
+    } finally {
+      // Without this a prompt resolver still leaves a pending timer holding the
+      // event loop open for the rest of the deadline.
+      if (timer !== undefined) clearTimeout(timer);
+    }
+  }
+
+  return {
+    assignment: { candidates, claimedBy: undefined, claimedAt: undefined },
+    ...(unresolved ? { unresolved } : {}),
+  };
 }
 
 /**

@@ -419,9 +419,14 @@ export async function applyStepEntry(tx: SQL, plan: StepEntryPlan, extraFields?:
  * connection. The subprocess return is the one caller that passes a transaction
  * handle instead: it derives the step it enters from the row it read under
  * `SELECT ... FOR UPDATE`, so hoisting resolution above that lock would need an
- * optimistic pre-read plus a sequence re-check. No resolver shipped today
- * performs I/O, so the lock is held no longer than before; the first fallible
- * resolver owns that fix.
+ * optimistic pre-read plus a sequence re-check that must still fall back to
+ * resolving under the lock when the re-check fails. The resolution deadline
+ * bounds that hold instead (`registry.ts::resolveStepAssignment`), so a fallible
+ * resolver cannot keep the parent's row locked past it.
+ *
+ * A resolution that produced no candidate is recorded as an
+ * `assignment.unresolved` event here, in the same transaction as the entry —
+ * resolution is total, so the entry commits either way.
  */
 async function commitTransition(
   instance: Instance,
@@ -436,8 +441,24 @@ async function commitTransition(
   extraFields?: Record<string, unknown>,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
-  const assignment = await resolveStepAssignment(target, assignmentRegistry, assignmentContextFor(instance));
-  const plan = planStepEntry(instance, target, body, { pathId, cause, actorId, actions, assignment, ...overrides });
+  const { assignment, unresolved } = await resolveStepAssignment(target, assignmentRegistry, assignmentContextFor(instance));
+  // The seq and version this entry lands on, mirroring planStepEntry's own
+  // derivation so the event and the entry's HistoryEntry agree.
+  const events = unresolved
+    ? [
+        ...(overrides?.events ?? []),
+        {
+          id: newInstanceEventId(),
+          instanceId: instance.instanceId,
+          transitionSeq: instance.transitionSeq + 1,
+          version: overrides?.entryVersion ?? instance.version,
+          kind: "assignment.unresolved" as const,
+          payload: { stepId: target.id, reason: unresolved },
+          at: new Date().toISOString(),
+        },
+      ]
+    : overrides?.events;
+  const plan = planStepEntry(instance, target, body, { pathId, cause, actorId, actions, assignment, ...overrides, ...(events ? { events } : {}) });
   return withTransaction(db, (tx) => applyStepEntry(tx, plan, extraFields));
 }
 
@@ -668,10 +689,23 @@ export async function startInstance(
   // `api.ts::createProcessInstance` mints its own.
   const instanceId = `inst_${crypto.randomUUID()}`;
   const initial = body.workflow.steps.find((s) => s.id === body.workflow.initialStep);
-  const assignment = initial
+  const resolved = initial
     ? await resolveStepAssignment(initial, assignmentRegistry, { id: instanceId, startedBy: undefined, data: {} })
     : undefined;
-  const created = await createInstance(body, { ...opts, instanceId, assignment }, db);
+  // Recorded at seq 0, which creation does not advance, and inside
+  // createInstance's own transaction (the `subprocess.spawn-enqueued` placement).
+  const events: InstanceEvent[] = resolved?.unresolved && initial
+    ? [{
+        id: newInstanceEventId(),
+        instanceId: instanceId as Instance["instanceId"],
+        transitionSeq: 0,
+        version: opts.version,
+        kind: "assignment.unresolved" as const,
+        payload: { stepId: initial.id, reason: resolved.unresolved },
+        at: new Date().toISOString(),
+      }]
+    : [];
+  const created = await createInstance(body, { ...opts, instanceId, assignment: resolved?.assignment, events }, db);
   return resolveAutomatic(created, body, actor, db, assignmentRegistry);
 }
 

@@ -10,11 +10,13 @@ import { sql, initSchema } from "../engine/store.js";
 import { startEngine, createDefaultDataSourceRegistry } from "../engine/host.js";
 import {
   createRegistry,
-  createDefaultAssignmentRegistry,
   type Registry,
   type DataSourceRegistry,
   type AssignmentRegistry,
 } from "../engine/registry.js";
+// The org-aware set (static + org.manager-of-starter), not the static-only leaf
+// factory of the same name in registry.js. This is the composition root.
+import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies.js";
 import { devHeaderResolver, type ActorResolver } from "../auth/resolve.js";
 import { serveWebAsset, resolveWebRoot, isNavigationRequest } from "./static.js";
 import { jwtResolver, type IssuerConfig } from "../auth/jwt.js";
@@ -47,6 +49,7 @@ import {
   handleAdminDisableUser,
   handleAdminEnableUser,
   handleAdminSetUserRoles,
+  handleAdminSetUserManager,
   handleAdminRunMigration,
   handleAdminRedactInstance,
   handleAdminListDataLists,
@@ -497,6 +500,10 @@ export function createServer(
     // PATCH /admin/users/:id/roles
     if (req.method === "PATCH" && parts.length === 4 && parts[0] === "admin" && parts[1] === "users" && parts[3] === "roles") {
       return toRes(await handleAdminSetUserRoles(parts[2]!, req, resolver, db));
+    }
+    // PATCH /admin/users/:id/manager
+    if (req.method === "PATCH" && parts.length === 4 && parts[0] === "admin" && parts[1] === "users" && parts[3] === "manager") {
+      return toRes(await handleAdminSetUserManager(parts[2]!, req, resolver, db));
     }
     // POST /admin/migrations/run
     if (req.method === "POST" && parts.length === 3 && parts[0] === "admin" && parts[1] === "migrations" && parts[2] === "run") {
