@@ -9,7 +9,7 @@
  */
 
 import type { SQL } from "bun";
-import { sql, createInstance, rehydrate, withTransaction, PinMismatch } from "../engine/store.js";
+import { sql, createInstance, rehydrate, withTransaction, newInstanceEventId, PinMismatch } from "../engine/store.js";
 import { createDefinitionStore } from "../engine/definitions.js";
 import {
   commitManualTransition,
@@ -664,15 +664,28 @@ export async function createProcessInstance(
   // Creation is a step entry, so the initial step's candidates resolve here —
   // before `createInstance`, which calls no resolver — over the same minted id
   // and validated seed data the instance is actually created with.
-  const assignment = await resolveStepAssignment(initial, assignmentRegistry, {
+  const { assignment, unresolved } = await resolveStepAssignment(initial, assignmentRegistry, {
     id: mintedId,
     startedBy: actor.id,
     data: submitted as Instance["data"],
   });
+  // Recorded at seq 0, which creation does not advance, and inside
+  // createInstance's own transaction so it cannot outlive a rolled-back creation.
+  const events: InstanceEvent[] = unresolved
+    ? [{
+        id: newInstanceEventId(),
+        instanceId: mintedId as Instance["instanceId"],
+        transitionSeq: 0,
+        version,
+        kind: "assignment.unresolved" as const,
+        payload: { stepId: initial.id, reason: unresolved },
+        at: new Date().toISOString(),
+      }]
+    : [];
 
   const created = await createInstance(
     body,
-    { processId, version, instanceId: mintedId, data: submitted as Instance["data"], startedBy: actor.id, assignment },
+    { processId, version, instanceId: mintedId, data: submitted as Instance["data"], startedBy: actor.id, assignment, events },
     db,
   );
   return resolveAutomatic(created, body, actor, db, assignmentRegistry);

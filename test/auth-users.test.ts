@@ -104,7 +104,7 @@ test.skipIf(!DB)("listUsers returns every user without password_hash", async () 
 test.skipIf(!DB)("setDisabled flips the flag and returns the updated row, or undefined for an unknown userId", async () => {
   const { userId } = await createUser("i@example.com", "pw", ["employee"]);
   const updated = await setDisabled(userId, true);
-  expect(updated).toEqual({ userId, email: "i@example.com", roles: ["employee"], disabled: true });
+  expect(updated).toEqual({ userId, email: "i@example.com", roles: ["employee"], disabled: true, managerUserId: undefined });
   const [after] = await listUsers();
   expect(after!.disabled).toBe(true);
   expect(await setDisabled("user_does_not_exist", true)).toBeUndefined();
@@ -113,7 +113,7 @@ test.skipIf(!DB)("setDisabled flips the flag and returns the updated row, or und
 test.skipIf(!DB)("setRolesById replaces the whole set and returns the updated row, or undefined for an unknown userId", async () => {
   const { userId } = await createUser("k@example.com", "pw", ["a", "b"]);
   const updated = await setRolesById(userId, ["a"]);
-  expect(updated).toEqual({ userId, email: "k@example.com", roles: ["a"], disabled: false });
+  expect(updated).toEqual({ userId, email: "k@example.com", roles: ["a"], disabled: false, managerUserId: undefined });
   expect(await setRolesById("user_does_not_exist", ["a"])).toBeUndefined();
 });
 
