@@ -20,6 +20,9 @@
 # .gitattributes normalizes CRLF on `git add`, so only the worktree still holds
 # the CR. Prose carries no such asymmetry.
 #
+# A rename keeps its baseline: the base count is read at the old path. Archiving
+# a change renames every artifact in it, so this is a routine case, not an edge.
+#
 # Reads ranges on stdin, one per line, as scripts/gates/range.sh prints them.
 # Every range has the form A..B. A push of several refs gives several ranges
 # with different bases, so this evaluates each (range, path) pair against that
@@ -42,6 +45,8 @@ set -e
 RULE=changed-markdown-prose
 LINTER="${ANTISLOP:-$HOME/AI/AntiSlop/antislop.py}"
 
+TAB=$(printf '\t')
+
 ranges=$(mktemp)
 pairs=$(mktemp)
 findings=$(mktemp)
@@ -51,13 +56,26 @@ trap 'rm -f "$ranges" "$pairs" "$findings" "$blob"' EXIT
 # stdin yields once. Capture it, then read the capture.
 cat > "$ranges"
 
-# Collect (range, path) pairs. --diff-filter=d drops a path the range deleted,
-# which is why a deleted file needs no special case below.
+# Collect (range, base path, tip path) triples. The two paths differ only for a
+# rename or a copy.
+#
+# -M is what makes a rename keep its baseline. Without it `git diff` reports the
+# new name alone, that name does not exist at the base, and every pre-existing
+# finding reads as new. Measured: renaming timers/spec.md reported 0 findings at
+# the base and 220 at the tip. Archiving a change renames every artifact in it,
+# so without -M no change carrying a finding could ever be archived.
+#
+# --diff-filter=d drops a path the range deleted, which is why a deleted file
+# needs no special case below.
 while IFS= read -r range; do
   [ -n "$range" ] || continue
-  git diff --name-only --diff-filter=d "$range" -- '*.md' 2>/dev/null \
-    | while IFS= read -r p; do
-        [ -n "$p" ] && printf '%s\t%s\n' "$range" "$p"
+  git diff --name-status -M --diff-filter=d "$range" -- '*.md' 2>/dev/null \
+    | while IFS="$TAB" read -r st p1 p2; do
+        [ -n "$p1" ] || continue
+        case "$st" in
+          R*|C*) printf '%s\t%s\t%s\n' "$range" "$p1" "$p2" ;;
+          *)     printf '%s\t%s\t%s\n' "$range" "$p1" "$p1" ;;
+        esac
       done >> "$pairs" || true
 done < "$ranges"
 
@@ -121,23 +139,26 @@ lint_at() {
 }
 
 fail=0
-TAB=$(printf '\t')
 
-while IFS="$TAB" read -r range path; do
+while IFS="$TAB" read -r range base_path tip_path; do
   [ -n "$range" ] || continue
-  [ -n "$path" ] || continue
+  [ -n "$tip_path" ] || continue
 
   base=${range%%..*}
   tip=${range##*..}
 
-  if ! base_count=$(lint_at "$base" "$path" "$findings"); then exit 1; fi
-  if ! tip_count=$(lint_at "$tip" "$path" "$findings"); then exit 1; fi
+  if ! base_count=$(lint_at "$base" "$base_path" "$findings"); then exit 1; fi
+  if ! tip_count=$(lint_at "$tip" "$tip_path" "$findings"); then exit 1; fi
 
   if [ "$tip_count" -gt "$base_count" ]; then
     if [ "$fail" -eq 0 ]; then
       echo "pre-push: rule '$RULE' rejected this push." >&2
     fi
-    echo "  $path" >&2
+    if [ "$base_path" = "$tip_path" ]; then
+      echo "  $tip_path" >&2
+    else
+      echo "  $tip_path (renamed from $base_path)" >&2
+    fi
     echo "    $base_count findings at $(git rev-parse --short "$base"), $tip_count at $(git rev-parse --short "$tip")" >&2
     # The linter names the temp file it read. Put the real path back, so a
     # contributor can act on the finding without decoding a temp path.
@@ -145,7 +166,7 @@ while IFS="$TAB" read -r range path; do
     # Match on the basename, not on "$blob". Git Bash writes the file through a
     # POSIX path and the Windows Python prints a drive-letter path for the same
     # file, so the two spellings never compare equal.
-    sed -e "s|^.*prose-gate-$$\\.md|$path|" -e 's/^/    /' < "$findings" >&2
+    sed -e "s|^.*prose-gate-$$\\.md|$tip_path|" -e 's/^/    /' < "$findings" >&2
     fail=1
   fi
 done < "$pairs"
