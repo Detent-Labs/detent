@@ -6,17 +6,30 @@ SIGINT. Nothing calls `sql.end()`.
 
 The Bun process stops at once, with the HTTP connection pool and the
 engine's background pollers (`startEngine`, called at
-`src/http/server.ts:635`) still live. Every pooled Postgres connection open
-at that instant gets torn down by the OS in the same instant. Postgres logs
-a burst of "could not receive data from client: Connection reset by peer"
-lines on every restart. A graceful shutdown stops accepting new work and
-closes the pool on purpose instead.
+`src/http/server.ts:635`) still live. The server holds ten Postgres
+connections, measured in `pg_stat_activity`, and the OS tears down every
+one of them at that instant. A graceful shutdown closes them on purpose
+instead.
+
+The first draft of this section overstated one point. Measurement corrected
+it. The devcontainer's Postgres log does carry reset bursts, ten lines at a
+time. The message reads "could not receive data from client: Connection
+reset by peer".
+
+Those bursts track pool creation. They also track `scripts/dev-up.sh`'s own
+`bun run seed` and `bun run src/auth/cli.ts` steps. Each one is
+short-lived, and each exits without closing its pool. A SIGKILL of an idle
+server added no line at all.
+
+So this change does not empty that log. It makes the engine's own stop
+deliberate. After SIGTERM `pg_stat_activity` drops to zero because
+`sql.end()` ran. The kernel no longer has to intervene.
 
 A production container gains more than the dev loop does.
 `docker/engine.Dockerfile:30` runs the engine in exec form, so it is PID 1.
-Linux gives PID 1 no default disposition for SIGTERM, which means `docker
-stop` waits out its whole grace period and then sends SIGKILL. An explicit
-handler is what makes that stop orderly.
+Linux gives PID 1 no default disposition for SIGTERM. So `docker stop`
+waits out its whole grace period, then sends SIGKILL. An explicit handler
+is what makes that stop orderly.
 
 ## What Changes
 
