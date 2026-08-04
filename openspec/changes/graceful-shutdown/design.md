@@ -5,9 +5,11 @@ shape the approach.
 
 `startHttpServer` already returns `{ stop: () => void }`. That `stop`
 already calls `server.stop()`, Bun's `Bun.serve` handle. It also calls
-`engine.stop()`, the four pollers from `src/engine/host.ts::startEngine`.
-Nothing calls this `stop` today outside tests. `import.meta.main` is the
-only production entrypoint. It never calls `stop` at all.
+`engine.stop()`, the pollers from `src/engine/host.ts::startEngine` — the
+outbox, resolution and timer workers always, plus the retention sweep when
+`DATA_RETENTION_DAYS` is set. `import.meta.main` is the only production
+entrypoint, and it never calls `stop` at all. The one caller today is
+`test/schema-bootstrap.test.ts`.
 
 `startHttpServer` also runs many times per test process. For example,
 `test/schema-bootstrap.test.ts` calls it twice in the same file. A signal
@@ -69,6 +71,30 @@ second SIGTERM must not start a second shutdown. For example, an impatient
 double `pkill` must not call `sql.end()` twice. A plain flag, checked
 before the handler does anything, is the smallest correct guard.
 
+**The end-to-end tests spawn the entrypoint against the test database, on a
+port they choose.** `test/preload-db.ts` rewrites `DATABASE_URL` to the
+`_test` database before any suite runs, so a child that inherits
+`process.env` connects there. CLAUDE.md says not to point a server at that
+database, and the rule earns its place: a long-lived `bun run serve` claims
+outbox rows every 500 ms and made three test runs of twenty go red. This
+child lives for about a second, and `bun test` runs one file at a time, so
+no other suite is live while it runs. The alternative — letting it reach
+the real `DATABASE_URL` — is the worse one. It would run `initSchema`
+against the development database and drive the demo state the split exists
+to protect.
+
+The port needs the same care. `startHttpServer` reads `PORT ?? 3000`
+(`src/http/server.ts:633`), and 3000 is what `scripts/dev-up.sh` leaves
+occupied. Each test therefore passes its own free port to the child, the
+way `test/schema-bootstrap.test.ts` already does.
+
+**Hold the in-flight request open with a trickled body.** The unit test in
+task 2.1 has to observe a request that is still running when `stop()` is
+called, and no route is slow. `startHttpServer` builds its own `fetch`, so
+the test cannot inject a slow handler either. A request whose body arrives
+in chunks over a few hundred milliseconds solves it: the route awaits
+`req.json()`, so the connection stays in flight until the last chunk lands.
+
 **Exit code 0 on graceful shutdown.** `import.meta.main`'s existing
 `.catch` block exits with code 1 on a startup failure. A signal-driven
 shutdown is not a startup failure. It uses the normal exit code instead.
@@ -99,3 +125,13 @@ start the dev server via `dev-up.sh` and send it SIGTERM. Confirm
 `.devcontainer/server.log` shows an orderly shutdown. Confirm the Postgres
 log carries no "Connection reset by peer" burst. Rollback is a plain
 revert; no persisted state changes.
+
+## Open Questions
+
+- Does shutdown need a bounded deadline? Not yet. Nothing today issues a
+  request that can hang, so a timeout would guard a case that cannot occur.
+  Revisit when a slow-request path appears, and decide the bound then.
+- Should `pollForever` grow an awaitable stop, so `sql.end()` waits for an
+  in-flight tick? Only if a dropped tick starts costing something. The
+  workers are lease-based and at-least-once, so a tick cut short is retried
+  the same way it is after a crash.

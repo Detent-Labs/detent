@@ -625,7 +625,7 @@ export async function startHttpServer(
     ALLOW_INSECURE_DEV_AUTH: process.env.ALLOW_INSECURE_DEV_AUTH,
   }),
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
-): Promise<{ stop: () => void }> {
+): Promise<{ stop: () => Promise<void> }> {
   await initSchema(db);
   const allowedOrigins = parseAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS);
   const webRoot = resolveWebRoot(process.env.WEB_ROOT);
@@ -635,16 +635,46 @@ export async function startHttpServer(
   const engine = startEngine(db, registry, assignmentRegistry);
   log.info("HTTP server listening", { port: server.port, webRoot: webRoot ?? null });
   return {
-    stop: () => {
-      server.stop();
+    // `server.stop()` with no argument is Bun's graceful form: it refuses new
+    // connections at once and resolves once in-flight requests finish. The
+    // pollers stop after that, so a request still being served can still
+    // reach the workers it expects. `engine.stop()` is synchronous —
+    // `pollForever` only clears a pending timeout.
+    stop: async () => {
+      await server.stop();
       engine.stop();
     },
   };
 }
 
 if (import.meta.main) {
-  startHttpServer(createRegistry(), createDefaultDataSourceRegistry(sql)).catch((err) => {
-    console.error(err instanceof Error ? err.message : String(err));
-    process.exit(1);
-  });
+  startHttpServer(createRegistry(), createDefaultDataSourceRegistry(sql))
+    .then(({ stop }) => {
+      // Registered here rather than in `startHttpServer`, which every test
+      // calls: a listener per call would leak one per test file. This block
+      // runs once, in the one long-lived process `bun run serve` starts.
+      let shuttingDown = false;
+      const shutdown = async (signal: string): Promise<void> => {
+        if (shuttingDown) return;
+        shuttingDown = true;
+        log.info("shutdown started", { signal });
+        try {
+          await stop();
+          await sql.end();
+        } catch (err) {
+          // Exiting still beats hanging: an unclosed pool is what SIGKILL
+          // would have left behind anyway, and a supervisor waiting out its
+          // grace period is the failure this whole path exists to remove.
+          log.error("shutdown did not complete cleanly", { error: err instanceof Error ? err.message : String(err) });
+        }
+        log.info("shutdown complete", { signal });
+        process.exit(0);
+      };
+      process.on("SIGTERM", shutdown);
+      process.on("SIGINT", shutdown);
+    })
+    .catch((err) => {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    });
 }
