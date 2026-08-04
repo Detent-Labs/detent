@@ -47,19 +47,23 @@ stays the default.
 - `runtime-events`: adds the `assignment.unresolved` event kind.
 - `local-user-accounts`: the account record gains a `manager` field, and the CLI
   gains a subcommand that sets it.
-- `admin-user-management`: the admin API and screen gain manager editing.
+- `admin-user-management`: the admin API gains a manager route.
+- `admin-app`: the Users screen gains a manager control beside its roles editor.
 
 ## Impact
 
-- `src/engine/store.ts`: an `auth_users.manager_user_id` column.
+- `src/engine/store.ts`: an `auth_users.manager_user_id` column, and an optional
+  `events` field on `createInstance`'s opts.
 - `src/auth/users.ts`, `src/auth/cli.ts`: the field, its accessors, its CLI verb.
 - `src/engine/registry.ts`: the deadline, the failure classification, and the
   widened `resolveStepAssignment` return.
 - `src/engine/assignment-strategies.ts` (new): the `org.manager-of-starter`
   entry. It reads the database, so it cannot live in leaf `registry.ts`.
 - `src/engine/transition.ts`, `src/engine/subprocess.ts`, `src/runtime/api.ts`:
-  the five step-entry call sites. Each records the event in its own transaction.
+  the four step-entry call sites. Each records the event in its own transaction.
 - `src/schema/definition.ts`: the `assignment.unresolved` event kind.
 - `src/http/admin-routes.ts`: the manager route.
-- `packages/web/src/areas/admin`: the users screen, its logic and its API calls.
+- `packages/web/src/areas/admin`: the Users screen, its logic, its API calls and
+  its locale strings.
+- `test/migration.test.ts`: the one test call site of `resolveStepAssignment`.
 - `docs/authoring-guide.md`, `docs/current-state.md`, `CLAUDE.md`, `ROADMAP.md`.

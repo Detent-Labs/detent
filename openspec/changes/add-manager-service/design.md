@@ -15,14 +15,22 @@ from `store.ts`. A database-reading strategy placed in `registry.ts` closes that
 cycle.
 
 `resolveStepAssignment` (`src/engine/registry.ts:133`) is the single choke point.
-All five step-entry paths call it. Those are `commitTransition`
+Four call sites reach it. Those are `commitTransition`
 (`src/engine/transition.ts:439`), `startInstance` (`transition.ts:672`), the
-subprocess spawn (`subprocess.ts:130`), `createProcessInstance`
-(`src/runtime/api.ts:667`), and the migration path.
+subprocess spawn (`subprocess.ts:130`), and `createProcessInstance`
+(`src/runtime/api.ts:667`).
 
-Four of those five resolve before their transaction opens. The subprocess return
+Migration is deliberately not one of them. It passes `assignment: { carry: true }`
+(`migration.ts:519`), so a migrated instance keeps the candidates it already
+holds. The comment there states that carrying skips the resolver call, and that a
+migration therefore pays for no lookup.
+
+Three of the four resolve before their transaction opens. The subprocess return
 is the exception. `executeAutomaticTransition` (`subprocess.ts:288`) runs inside
 the transaction that read the parent row `SELECT ... FOR UPDATE`.
+
+`startInstance` passes `startedBy: undefined`. Only `createProcessInstance`
+passes a real one (`api.ts:669`).
 
 <!-- antislop: allow synonym-rotation -->
 `auth_users` has five columns and no organizational fact. Ten columns elsewhere
@@ -110,7 +118,7 @@ list rather than a failure.
 `resolveStepAssignment` races `def.resolve(...)` against a timer. The bound comes
 from `ASSIGNMENT_RESOLUTION_TIMEOUT_MS`, defaulting to 5000.
 
-One choke point covers all five call sites. No path added later can forget the
+One choke point covers all four call sites. No path added later can forget the
 bound.
 
 `Promise.race` does not cancel the loser. A resolver that exceeds the deadline
@@ -137,7 +145,7 @@ mitigation that usually holds.
 Hoisting also costs a second read of the parent row on every return delivery.
 That buys a shorter hold on a lock the deadline already caps at five seconds.
 
-The deadline is built for this change regardless. It applies to all five paths
+The deadline is built for this change regardless. It applies to all four paths
 through one mechanism. And it returns control to the caller on time, even when
 the resolver has not settled.
 
@@ -151,7 +159,7 @@ the carve-out now carries a bound.
 ### Resolution reports a reason; the caller records the event
 
 `resolveStepAssignment` returns `{ assignment, unresolved? }` instead of bare
-`assignment`. It has no transaction handle. On four of five paths it runs before
+`assignment`. It has no transaction handle. On three of four paths it runs before
 the transaction opens. So it cannot append the event itself without risking a
 committed event beside a rolled-back entry.
 
@@ -162,6 +170,11 @@ drop-event list it already appends. The two creation paths add it to the events
 `createInstance` already writes.
 
 The reason enum is `resolver-raised`, `timed-out`, `no-candidates`.
+
+Editing `src/schema/definition.ts` is safe on the read path here. Adding an arm
+to `instanceEvent` is additive, not a tightening. A stored row still matches the
+arm it was written under. No existing event throws on read. `ProcessBody` is
+untouched. `definitionHash` therefore does not move, and no instance re-pins.
 
 `no-candidates` covers "no manager on record". The strategy-specific wording is
 not knowable at this layer, and it does not need to be. The event envelope
@@ -202,6 +215,14 @@ rejected with 400: an unknown target, and a target equal to the account itself.
 - **One import line changes in `src/http/server.ts`.** → Unavoidable. It is the
   composition root. A strategy registered nowhere resolves to an empty list.
   Naming the new factory identically keeps the diff to the module specifier.
+- **Two factories will share one name.** → The identical name is what holds that
+  diff to one line. It also lets an importer pick the static-only leaf version by
+  accident, with no type failure to catch it. A test asserts that the registry
+  `serve` defaults to resolves `org.manager-of-starter`.
+- **`startInstance` passes `startedBy: undefined`.** → The strategy resolves to
+  nobody on that path. Only `createProcessInstance` records a starter, so the
+  two-starter test runs through that function. Widening `startInstance` is a
+  separate change, and nothing in this one needs it.
 
 ## Migration Plan
 
