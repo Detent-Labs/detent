@@ -479,18 +479,27 @@ Spec: `development-toolchain`.
        while holding the parent's row lock.
        Change: `add-assignment-strategy-registry`.
        Spec: `assignment-strategy-registry`.
-    c. Manager service: NOT STARTED. One field on the user (manager → person, a
+    c. Manager service: DONE. One field on the user (manager → person, a
        pointer, not a tree) edited on the same screen (a) touches, plus a
        built-in `org.manager-of-starter` strategy resolving the manager of the
-       instance's starter, which every instance already records. This is the
-       first fallible resolver, so it owns the deadline, the failure handling and
-       the `assignment.unresolved` event (b) deferred. A later switch to Entra ID
-       or AD replaces only what the strategy asks internally: a definition names
-       the strategy, never a storage location, and stage 7's JWT resolver already
-       accepts an external issuer. Identity stays consistent because the value
-       written into `candidates` is always the id the person authenticates with;
-       instances created before such a switch keep the old ids, which is a
-       migration concern for the switch itself.
+       instance's starter, which every instance already records. This was the
+       first fallible resolver, so it owns the deadline
+       (`ASSIGNMENT_RESOLUTION_TIMEOUT_MS`, default 5000), the failure handling
+       and the `assignment.unresolved` event (b) deferred. The row-lock question
+       (b) left open is answered: the subprocess-return path is bounded by that
+       deadline rather than hoisted above the lock, since a hoist's sequence
+       re-check must still fall back to resolving under the lock and so makes
+       the unbounded hold rarer without making it impossible. A later switch to
+       Entra ID or AD replaces only what the strategy asks internally: a
+       definition names the strategy, never a storage location, and stage 7's
+       JWT resolver already accepts an external issuer. Identity stays
+       consistent because the value written into `candidates` is always the id
+       the person authenticates with; instances created before such a switch
+       keep the old ids, which is a migration concern for the switch itself.
+       Change: `add-manager-service`.
+       Specs: `manager-of-starter-assignment`, `assignment-strategy-registry`,
+       `runtime-events`, `local-user-accounts`, `admin-user-management`,
+       `admin-app`.
     Deliberately out of scope across all three, each rejected during
     brainstorming with its reason recorded in the design: a permission store per
     process (two instances of one frozen definition would behave differently on
