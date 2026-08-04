@@ -215,7 +215,7 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep }: Prop
                   </>
                 )}
 
-                <ViewEditor view={step.view} fields={fields} onChange={(view) => updateStep(index, { view })} />
+                <ViewEditor view={step.view} fields={fields} stepId={step.id} onChange={(view) => updateStep(index, { view })} />
 
                 <PluginEnvelopeEditor
                   label={t("steps.assignmentStrategyLabel")}
@@ -255,6 +255,7 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep }: Prop
                   paths={step.paths}
                   steps={steps}
                   fields={fields}
+                  stepId={step.id}
                   onChange={(paths) => updateStep(index, { paths })}
                   registryTypes={registry?.actionTypes}
                   registrySchemas={registry?.actionSchemas}

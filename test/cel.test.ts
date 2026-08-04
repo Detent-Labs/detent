@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { readFileSync } from "node:fs";
-import { validateProcessBody, validateMigrationSpec, checkSubprocessChildRefs, parseExpression, checkAgainstFields, celType, type CelIssue } from "../src/cel/check.js";
+import { validateProcessBody, validateMigrationSpec, checkSubprocessChildRefs, parseExpression, parseAst, checkAgainstFields, celType, ACTOR_SCHEMA, type CelIssue } from "../src/cel/check.js";
 import { evalTransforms } from "../src/cel/eval.js";
 import { compileProcessBody } from "../src/schema/compile.js";
 import { instance as instanceSchema, baseFieldType, type ProcessBody, type MigrationSpec, type Instance, type FieldDef } from "../src/schema/definition.js";
@@ -530,4 +530,32 @@ test("a child with no declared outputFields rejects every child.data reference",
 test("validateProcessBody's single-body check is unchanged: it still accepts any child.data key", () => {
   const b = body({ steps: [subprocessStep({ field_p_note: cel("child.data.internal_note") })] });
   expect(validateProcessBody(b)).toEqual([]);
+});
+
+// --- parseAst / ACTOR_SCHEMA: the studio condition builder's two entry points ---
+
+test("parseAst returns null for source that does not parse", () => {
+  expect(parseAst("data.amount >")).toBeNull();
+  expect(parseAst("(((")).toBeNull();
+  expect(parseAst("")).toBeNull();
+});
+
+test("a node's range slices its own substring out of the input", () => {
+  const src = 'data.tags.exists(t, t == "vip") && data.amount > 1000.0';
+  const ast = parseAst(src);
+  expect(ast?.op).toBe("&&");
+  const [left, right] = ast!.args as [{ range: { start: number; end: number } }, { range: { start: number; end: number } }];
+  expect(src.slice(left.range.start, left.range.end)).toBe('data.tags.exists(t, t == "vip")');
+  expect(src.slice(right.range.start, right.range.end)).toBe("data.amount > 1000.0");
+});
+
+test("&& chains left-associatively, and || binds looser than &&", () => {
+  expect(parseAst("a && b && c")?.op).toBe("&&");
+  expect((parseAst("a && b && c")!.args as { op: string }[])[0].op).toBe("&&");
+  expect(parseAst("a && b || c")?.op).toBe("||");
+  expect((parseAst("a && b || c")!.args as { op: string }[])[0].op).toBe("&&");
+});
+
+test("ACTOR_SCHEMA declares id and roles", () => {
+  expect(ACTOR_SCHEMA).toEqual({ id: "string", roles: "list<string>" });
 });

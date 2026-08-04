@@ -164,6 +164,11 @@ answer from outside.
 An automatic path without a guard is the default. It must carry the highest
 priority number, so the engine tries it last.
 
+The studio writes a guard for you. Its condition builder offers the catalog
+fields and emits the CEL. So this section tells you what the text means, not
+what you must type. The text input is still there behind `Edit as CEL`, and a
+guard you write by hand opens in the builder afterwards.
+
 ### Action
 
 Something the engine does, written as a handler reference: a type and a

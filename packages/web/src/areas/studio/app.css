@@ -688,3 +688,134 @@ h2 {
   color: var(--color-text-muted);
   font-size: 0.9rem;
 }
+
+/* --- Condition builder -------------------------------------------------- */
+
+.condition-input {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.condition-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.condition-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: var(--color-surface-muted);
+}
+
+/* A row the author has not finished. It is builder state and never reaches the
+   body, so it is marked rather than treated as an error. */
+.condition-row.is-incomplete {
+  border-color: var(--color-warning);
+}
+
+.condition-flag {
+  color: var(--color-warning);
+  font-size: 0.85rem;
+}
+
+/* One joiner governs the whole flat list, so it reads as a margin annotation
+   between rows rather than a labelled control above them. */
+.condition-joiner {
+  background: none;
+  color: var(--color-accent);
+  font-family: var(--font-display);
+  font-weight: 600;
+  padding: 0 var(--space-1);
+  min-width: 2.5ch;
+}
+
+.condition-remove {
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: var(--space-1) var(--space-2);
+  margin-left: auto;
+}
+
+.condition-remove:hover {
+  color: var(--color-danger);
+}
+
+.condition-raw {
+  flex: 1 1 20ch;
+  min-width: 0;
+  font-family: var(--font-display);
+}
+
+.condition-add {
+  align-self: flex-start;
+  background: none;
+  color: var(--color-accent);
+  padding: 0;
+}
+
+.condition-empty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.condition-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* The one place an author learns what the builder writes. Always visible, never
+   behind a disclosure: low-code stays reachable from every builder site. */
+.condition-readout {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  min-width: 0;
+  flex: 1 1 20ch;
+}
+
+.condition-readout-label {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  flex: none;
+}
+
+.condition-readout code {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.condition-mode {
+  background: none;
+  color: var(--color-accent);
+  padding: 0;
+  flex: none;
+}
+
+.condition-parse-error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 0.85rem;
+}

@@ -15,6 +15,7 @@
  */
 
 import { Environment, parse } from "@marcbachmann/cel-js";
+import type { ASTNode } from "@marcbachmann/cel-js";
 import { collectFieldsDeep } from "../schema/definition.js";
 import type { ProcessBody, FieldDef, BaseFieldType, Expression, MigrationSpec } from "../schema/definition.js";
 
@@ -24,7 +25,10 @@ import type { ProcessBody, FieldDef, BaseFieldType, Expression, MigrationSpec } 
 // (src/cel/eval.ts) derives its whitelist from these keys, so the authoring
 // context and the runtime instance namespace cannot drift.
 export const INSTANCE_SCHEMA = { id: "string", status: "string", transitionSeq: "int", currentStepId: "string" } as const;
-const ACTOR_SCHEMA = { id: "string", roles: "list<string>" } as const;
+// Exported for the same reason INSTANCE_SCHEMA is: the studio's condition
+// builder reads the context mechanically, so a widening here reaches its
+// operand picker with no second list to maintain.
+export const ACTOR_SCHEMA = { id: "string", roles: "list<string>" } as const;
 const CHILD_SCHEMA = { outcome: "string", data: "dyn" } as const; // child.data is plugin-shaped
 
 /**
@@ -412,6 +416,23 @@ export function parseExpression(src: string): { ok: true } | { ok: false; messag
     return { ok: true };
   } catch (err) {
     return { ok: false, message: (err as Error).message };
+  }
+}
+
+/**
+ * Parse to AST for the studio's condition builder. Null when the source does
+ * not parse.
+ *
+ * The builder reads a stored condition back by parsing it, so it needs the tree
+ * rather than a pass/fail verdict. Exported from here so packages/web reaches
+ * the pinned CEL library through this module's exports-map entry — a second
+ * dependency entry there would be a second version pin that can drift.
+ */
+export function parseAst(src: string): ASTNode | null {
+  try {
+    return parse(src).ast ?? null;
+  } catch {
+    return null;
   }
 }
 

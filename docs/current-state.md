@@ -1,7 +1,9 @@
 # Current State
 
 What is built, per subsystem. The load-bearing rules an implementation must
-uphold live in `CLAUDE.md`; this file is the descriptive counterpart.
+uphold live in `.claude/rules/process-contract.md` and
+`.claude/rules/authoring-invariants.md`; this file is the descriptive
+counterpart. Open questions and deferrals are in `docs/decisions.md`.
 Stage-by-stage status is in `ROADMAP.md`.
 
 - `src/schema/definition.ts`: the full definition and runtime model as Zod
@@ -296,7 +298,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   A "no due timer on this instance" outcome does not push; that is a normal result
   of the scan, not a failure).
   `registry.ts`, `registry-check.ts` (publish-time action-registry validation —
-  see "Extensibility" in `CLAUDE.md`),
+  see "Extensibility" in `.claude/rules/process-contract.md`),
   `idempotency.ts`. `src/cel/eval.ts` evaluates guards at runtime (total: a runtime
   error such as an unwritten field is `false`, the wait-state idiom) and
   Action.output writeback. The resolution and timer workers take an injected
@@ -546,7 +548,8 @@ Stage-by-stage status is in `ROADMAP.md`.
   candidate (`AlreadyClaimedError`/`NotACandidateError`), releasing requires the
   caller to be the claimant (`NotClaimedError`/`NotClaimantError`), and each
   records an `assignment.claimed`/`assignment.released` `InstanceEvent` (see
-  "Runtime record" in `CLAUDE.md`). `submitAndTransition` now enforces claimant-only
+  "Runtime record" in `.claude/rules/process-contract.md`). `submitAndTransition`
+  now enforces claimant-only
   submission before validation: a step with a declared assignment requires the
   submitting actor to be the current claimant (`NotClaimedError`/
   `NotClaimantError`); a step with no declared assignment is unaffected —
@@ -699,7 +702,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   v1; the registry mechanism holds more without a built-in for each.
   CEL-readable data-source results remain untouched and out of scope — a CEL
   reference to a data source is still a publish error (see "Decided, not yet
-  built" in `CLAUDE.md`).
+  built" in `docs/decisions.md`).
 - Read/query API (`src/runtime/api.ts`, `src/engine/definitions.ts`, `src/http/`,
   `test/runtime-api.test.ts`, `test/definitions.test.ts`, `test/http.test.ts`):
   closes the gap where the HTTP wrapper could only address a single instance by
@@ -1174,6 +1177,81 @@ Stage-by-stage status is in `ROADMAP.md`.
   (stays `admin-migration-run`'s future `POST /admin/migrations/run`, an
   operator action) and the registry/CEL-scratchpad tools screen plus Player
   (`studio-tools-and-player`).
+- Process Studio, the condition builder (`packages/web/src/areas/studio/panels/shared/{conditionLogic.ts,
+  ConditionBuilder,ConditionInput,BooleanOrExpressionInput,overrideMode}.ts(x)`,
+  `src/cel/check.ts`, `studio-condition-builder`, `cel-expressions`).
+  Stage 27b. A row builder over CEL at the two condition sites. Those are the
+  path guard in `PathsPanel` and the three view overrides in `ViewEditor`.
+
+  `TimersPanel` and `FieldExpressionMapEditor` keep the plain
+  `ExpressionInput`. A deadline must infer to `string`. An `Action.output` value
+  reads `result` alone. Neither is a condition.
+
+  Engine side, `src/cel/check.ts` gains two exports and no behavior. One is
+  `parseAst`, the AST or null when the source does not parse. The other is an
+  `export` on the already-present `ACTOR_SCHEMA`. `packages/web` reaches both
+  over the existing `./cel/check` exports-map entry, so the exact
+  `@marcbachmann/cel-js` pin stays single.
+
+  Read-back is by parse, never a sidecar. Such a record cannot live in
+  `ProcessBody`, because it would move `definitionHash`. Beside the draft it
+  dies at publish, which leaves a published version uneditable in the builder.
+
+  `fromCel` reads the top-level `&&` or `||` as the joiner. It flattens that
+  operator's left-associative chain, then reads each conjunct as a comparison
+  row. Anything it cannot represent slices out by the node's `range`. That
+  becomes a **raw row** holding the exact substring. One macro therefore does
+  not cost the whole guard.
+
+  `toCel` reverses it. It writes the literal in the operand's declared CEL type,
+  so a `number` field emits `1000.0`. That clears the documented `double`
+  papercut for anyone authoring here. An incomplete row stays visible and
+  marked, and `toCel` omits it. The draft saves continuously, so a half-written
+  `data.amount > ` would put a parse error in the `IssueList` on every keystroke.
+
+  Nothing persists the row model, so a later grouping level changes the reader
+  and the writer alone. Two rules keep that open, and both are load-bearing.
+  One: no sidecar. Two: `onChange` fires on a real authoring action only.
+  Mounting,
+  reading and switching mode never write, so a guard an author merely opens
+  stands byte for byte.
+
+  Verified in a browser against `expense-approval.json`. Its single-quoted
+  guards survive an untouched visit, and they normalise to double quotes only on
+  a real edit.
+
+  The operand picker walks the draft catalog with `flattenDraftFields` and drops
+  every `group` node. Both that helper and the contract's `collectFieldsDeep`
+  push the group itself, and an instance's `data` is flat. The picker then reads
+  `INSTANCE_SCHEMA` and `ACTOR_SCHEMA` mechanically, minus a four-entry
+  deny-list: `instance.id`, `instance.currentStepId`, `instance.transitionSeq`
+  and `actor.id`. None of the four can express a guard that means anything at a
+  condition site. A later widening of the context therefore reaches the picker
+  with no second list to maintain. The picker is a suggestion list, not a
+  permission gate, and the CEL arm still reaches every registered variable.
+
+  On a subprocess step whose child resolved, the picker adds `child.outcome`
+  (the contract's `outcomes`) and `child.data.<key>` over `contract.outputFields`
+  **alone**, matching what `contractFieldSchema` types at `check.ts:316`. Both
+  condition sites get them, since `validateProcessBody` pushes guards and view
+  overrides with the same `child = s.type === "subprocess"` flag
+  (`check.ts:198`, `:222-224`).
+
+  Browser testing found two state rules the plan missed. First, builder state
+  re-seeds when the **operand signature** changes, not only when `src` does
+  (`operandSignature`, path plus CEL type, deliberately not label). A child
+  resolving mid-session leaves every guard's text untouched while turning
+  `child.outcome == "approved"` from a raw row into a comparison row. Keying on
+  `src` alone left it raw for the rest of the session.
+
+  Second, `BooleanOrExpressionInput` now remembers the chosen arm instead of
+  deriving it from the value (`overrideMode`). The builder writes `undefined`
+  while its only row is incomplete. Reading that as "not an expression"
+  collapsed the override to its checkbox on the author's first click. It took
+  the row with it. Its `boolean`/`CEL` select stays the outer mode, and
+  `ConditionInput` renders only the CEL arm. A view override therefore never
+  shows two controls for one choice.
+
 - Process Studio — JSON view (`packages/web/src/areas/studio/panels/{JsonView,
   draftJsonLogic}.ts(x)`, `src/draft/load-guard.ts`, `screens/EditScreen.tsx`,
   `studio-json-view`): stage 11's third of five changes, entirely
@@ -1363,7 +1441,8 @@ Stage-by-stage status is in `ROADMAP.md`.
   it. `packages/web` declares it as a dependency of its own.
   `packages/form-ui` declares it as a peer dependency, matching how it
   already declares react. `@marcbachmann/cel-js` now pins an exact version
-  instead of a caret range — see `CLAUDE.md`'s one-CEL-library rule for why.
+  instead of a caret range — see the one-CEL-library rule in
+  `.claude/rules/process-contract.md` for why.
 
 <!-- antislop: allow sentence-length -->
 - Correct the HTTP boundary's error responses (`src/errors.ts`,

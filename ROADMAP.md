@@ -474,8 +474,8 @@ Spec: `development-toolchain`.
        the change alters no behaviour and needs no migration, and the JSON
        contract is untouched. Deferred to (c), because nothing that ships can
        fail: a resolution deadline, a failure classification, and an
-       `assignment.unresolved` event. One known path is recorded in `CLAUDE.md`'s
-       "Decided, not yet built" list — the subprocess return resolves candidates
+       `assignment.unresolved` event. One known path is recorded in
+       `docs/decisions.md` — the subprocess return resolves candidates
        while holding the parent's row lock.
        Change: `add-assignment-strategy-registry`.
        Spec: `assignment-strategy-registry`.
@@ -595,19 +595,28 @@ Spec: `development-toolchain`.
        Change: `studio-plugin-config-form`. Specs: `studio-plugin-config-form`
        (new), `studio-tools` (modified: `GET /registry`'s response shape, the
        Tools screen's registered-registry count).
-    b. A condition builder over CEL. `panels/shared/ExpressionInput.tsx` is one
-       text input writing `{ lang: "cel", src }`; publish type-checks it and
-       the Tools scratchpad checks it ahead of time, but the author writes CEL
-       by hand. A builder reads the field catalog and emits CEL text. The hard
-       part is not emitting it but reading it back: a guard someone typed by
-       hand, or emitted by an older builder, must still open in the builder, or
-       the two surfaces silently diverge. Parsing CEL back into a builder model
-       is the honest option, since the library already parses. A sidecar
-       recording "how this guard was built" is the tempting one and must be
-       weighed carefully: it cannot live in `ProcessBody` (that changes the
-       hash), and beside the draft it dies at publish, which leaves a published
-       version uneditable in the builder. This is the largest of the four and
-       deserves its own design.
+    b. **A condition builder over CEL: DONE.** `panels/shared/ExpressionInput.tsx`
+       was one text input writing `{ lang: "cel", src }`, so a business analyst
+       could not author a path guard at all. The two condition sites — the path
+       guard and the three view overrides — now open on a flat row builder with
+       one joiner, over a picker built from the field catalog and the pinned
+       expression context. `TimersPanel` and `FieldExpressionMapEditor` keep the
+       text input, since a deadline must infer to `string` and an
+       `Action.output` value reads `result` alone.
+       Read-back is by parse, as the design predicted: `parse(src).ast` carries
+       a `range` per node, so a fragment the builder cannot represent slices out
+       of the original source and opens as a raw row, and one macro no longer
+       costs the whole guard. The sidecar was rejected for the reason recorded
+       here. Nothing persists the row model, so a later grouping level changes
+       the reader and writer alone; two rules keep that open, no sidecar and
+       write-only-on-a-real-edit. `src/` gained two exports and no behavior
+       (`parseAst`, and `export` on `ACTOR_SCHEMA`), so the CEL library keeps one
+       version pin. Grouping, field-against-field comparison and date ordering
+       stay deferred, and `field.validation.rule` still has no authoring surface
+       to extend.
+       Change: `add-condition-builder`. Specs: `studio-condition-builder` (new),
+       `cel-expressions` (modified: an authoring surface reaches the AST through
+       the engine's own CEL module).
     c. **Migration-plan authoring without JSON: DONE.** Stage 11 shipped a
        `MigrationSpec` textarea on purpose, since no field-by-field form
        existed to extend and the server owns validation. The migration-plan
