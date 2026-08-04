@@ -439,9 +439,9 @@ Spec: `development-toolchain`.
     self-service signup, forced migration of an on-premise deployment into the
     SaaS control plane, and per-tenant quotas. No OpenSpec change yet.
 
-25. Per-instance step assignment: design DONE (approved 2026-08-02, see
-    `docs/superpowers/specs/2026-08-02-pluggable-step-assignment-design.md`);
-    changes (a) and (b) DONE, (c) NOT STARTED. Raised 2026-08-01 as a reality
+25. **Per-instance step assignment: DONE (a–c)** (design approved 2026-08-02,
+    see `docs/superpowers/specs/2026-08-02-pluggable-step-assignment-design.md`).
+    Raised 2026-08-01 as a reality
     check on how a user acquires a role a process names. The answer exposed a
     deeper gap: the candidate list is copied verbatim from the frozen definition
     onto every instance, so every instance of a definition carries an identical
@@ -624,12 +624,13 @@ Spec: `development-toolchain`.
        from an empty draft. A template is a stored draft body, so this needs no
        engine concept — only a decision about where templates live and who
        curates them.
-    One open question the stage must answer before (a) ships, not after: the
-    studio area sits behind one coarse role. `system:developer` reaches drafts,
-    the registry, migration planning and the Player alike, and publishing needs
+    One open question the stage has not yet answered: the studio area sits
+    behind one coarse role. `system:developer` reaches drafts, the registry,
+    migration planning and the Player alike, and publishing needs
     `system:publish` on top. A business analyst authoring a process is exactly
-    the actor that role was not shaped for. Either the analyst gets
-    `system:developer` (and with it migration planning), or the area splits its
+    the actor that role was not shaped for — a gap (a) shipped without
+    closing. Either the analyst gets `system:developer` (and with it
+    migration planning), or the area splits its
     gate the way stage 26 split the admin area's — a set of roles per area,
     each screen keeping its own check.
     Deliberately out of scope: a natural-language or AI-assisted authoring
