@@ -47,6 +47,19 @@ the browser can render a stable list. A row is `{ rowId, from, to }` for a
 map, or `{ rowId, target, src }` for a transform. `rowId` is a render key
 only and never reaches the plan.
 
+A `transforms` value is an `Expression`, `{ lang: "cel", src }`
+(`src/schema/definition.ts:168`), not a bare string. The row carries `src`
+alone. The conversion adds the wrapper on the way out and strips it on the
+way in.
+
+The `onUnmappable` pairing is an iff in the schema
+(`src/schema/definition.ts:757`). `route-to-step` demands an
+`unmappableStep`, and the other value forbids one. The form therefore
+selects the first eligible target step the moment an author picks
+`route-to-step`. A target body declares at least its `initialStep`, so an
+eligible choice always exists. The half-set state never occurs, and the
+refinement cannot fail on the form's output.
+
 **Alternative**: a richer editor model carrying resolved field objects and
 per-row status, converted to a spec at save. Rejected. Every conversion is
 a chance to lose an entry. The spec is already the simplest shape for this
@@ -98,27 +111,53 @@ This is the rule that keeps the two sides from becoming two sources of
 truth. Text is the JSON side's own state, and the plan is the shared one.
 Text that is not a plan cannot leave the JSON side.
 
+### A catalog holds everything; a picker filters its own option list
+
+`readCatalogs` holds every step and every leaf field the body declares.
+Each picker then filters that catalog for the choices it may offer. The
+two concerns stay apart. One rule follows from the split. A stored row may
+name a step the picker filters out. That row still resolves, and still
+shows its name.
+
+The field walk mirrors `fieldTypeById` (`src/engine/migration.ts:51`). It
+recurses into a `group` field's `fields`. It never registers the group
+itself. An instance's `data` is flat, keyed by a leaf field. A group
+therefore carries no value to map. The studio's `draft/fields.ts` already
+walks a draft the same way.
+
+Every picker filters the reserved cancel-sink step out. The schema module
+exports `CANCEL_SINK_STEP_ID`, and the web package already reaches that
+module. `validatePlan` rejects the sink as a `stepMap` value and as
+`unmappableStep`. It accepts the sink as a `stepMap` key. Such a row can
+never match an instance: `migrateInstances` reads a `running` instance
+only (`src/engine/migration.ts:579`). Offering it in the source picker
+would invite a row that does nothing.
+
+Each label resolves against the version body's own `baseLocale`, through
+`resolveDraftLocalizedText` in
+`packages/web/src/areas/studio/draft/localized-text.ts`. This screen holds
+no draft and therefore no content-locale state. A missing entry falls back
+to `key`, which the localization invariant already makes unreachable.
+
 ### The client-side checks are the three the browser can evaluate
 
 Injectivity, `fieldMap` type agreement, and the cancel-sink rejection.
 Each needs only the plan and the two catalogs.
 
+Type agreement compares CEL types, not declared field types.
+`validatePlan` compares `celType(f.type)`. That function maps `string`,
+`date`, `datetime`, `select` and `reference` onto one CEL type. A check
+over the declared type would render an error on a `date` to `string` pair
+the server accepts. The form imports `celType` from
+`workflow-engine/cel/check`, the same module `ToolsScreen.tsx` already
+value-imports. One function therefore backs both sides.
+
 Everything else stays on the server. The `transforms` expressions need
-CEL type inference against the target catalog. That inference lives in
-`src/cel/check.ts`, on the engine's side of the boundary. The
-identity-carried type check `validatePlan` runs over fields with no
-`fieldMap` entry stays there too. It is a whole-catalog check, not a
-per-row one, so it has no row to attach an inline error to.
-
-### The reserved cancel-sink step is hidden from the pickers that forbid it
-
-`workflow-engine/schema` exports `CANCEL_SINK_STEP_ID`. The web package
-already reaches that module through the exports map. The `stepMap` target
-picker and the `unmappableStep` picker leave it out. The `stepMap` source
-picker keeps it, because `validatePlan` rejects it only as a value.
-
-An inline error still covers the case, for a stored plan that already
-names it.
+CEL type inference against the target catalog, which the browser has no
+field-type context to run. The identity-carried type check `validatePlan`
+runs over fields with no `fieldMap` entry stays there too. It is a
+whole-catalog check, not a per-row one, so it has no row to attach an
+inline error to.
 
 ## Risks / Trade-offs
 
@@ -133,6 +172,11 @@ names it.
   → The form never blocks a save on its own finding. It shows the error
   and lets the server answer. A stale client check is then a wrong
   warning, never a wrong rejection.
+- ROADMAP stage 27b will want the `transforms` text input replaced by its
+  CEL builder.
+
+  → That swaps one component inside a row this design already has. Nothing
+  here needs undoing. The row's `src` string is the seam.
 - A row list keyed by `rowId` reorders a map's keys. The stored plan had
   another order.
 

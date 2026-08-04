@@ -18,6 +18,12 @@ and `unmappableStep`.
 Each choice SHALL name its step or field by `key` and `label`. A raw id
 alone is not enough, because an id is an opaque UUID.
 
+A field catalog SHALL hold the leaf fields a `group` field nests, and SHALL
+NOT hold the `group` field itself. An instance's `data` is flat and keyed
+by a leaf field, so a group carries no value to map.
+
+No picker SHALL offer the reserved cancel-sink step.
+
 #### Scenario: The form lists the source catalog for a fieldMap key
 
 - **WHEN** a developer adds a field-map row
@@ -41,15 +47,26 @@ alone is not enough, because an id is an opaque UUID.
 - **THEN** the developer picks the target field from the target version's
   catalog, and the expression stays a CEL text input
 
+#### Scenario: The form offers a field nested in a group
+
+- **WHEN** the target version declares a `group` field holding two leaf
+  fields
+- **THEN** both leaf fields appear as mapping choices, and the group does
+  not
+
 ### Requirement: The form produces the same MigrationSpec the JSON textarea produces
 
 The form SHALL send the same `MigrationSpec` object shape the raw-JSON
 textarea sends today. It SHALL add no key the schema does not declare. It
 SHALL omit an empty map rather than send an empty object for it.
 
-The form SHALL carry `unmappableStep` only when `onUnmappable` is
-`route-to-step`. The form SHALL hold that pairing by construction. The
-schema refinement therefore cannot fail on the form's own output.
+A `transforms` value SHALL be an `Expression`, not a bare string. The form
+SHALL wrap the text an author types and SHALL read that same text back.
+
+The form SHALL carry `unmappableStep` when `onUnmappable` is
+`route-to-step`, and SHALL carry neither otherwise. The pairing is an iff
+in the schema. The form SHALL hold it by construction, so the schema
+refinement cannot fail on the form's own output.
 
 #### Scenario: A form-built plan matches a hand-written one
 
@@ -63,6 +80,18 @@ schema refinement therefore cannot fail on the form's own output.
 - **WHEN** a developer switches `onUnmappable` from `route-to-step` to
   `reject-and-pin`
 - **THEN** the plan carries no `unmappableStep`
+
+#### Scenario: Choosing route-to-step never leaves the step empty
+
+- **WHEN** a developer chooses `route-to-step`
+- **THEN** the plan carries an `unmappableStep` at once, from the target
+  version's steps
+
+#### Scenario: A transform carries the expression wrapper
+
+- **WHEN** a developer types a CEL source string into a transform row
+- **THEN** the saved plan holds `{ lang: "cel", src }` under the target
+  field id
 
 #### Scenario: An empty form saves an empty plan
 
@@ -100,9 +129,13 @@ The form SHALL show an inline error for a rule it can evaluate from the
 two bodies it already holds. Three rules qualify:
 
 - a `fieldMap` that maps two sources onto one target;
-- a `fieldMap` pair whose declared field types disagree;
+- a `fieldMap` pair whose CEL types disagree;
 - a `stepMap` value or an `unmappableStep` naming the reserved cancel-sink
   step.
+
+The type rule SHALL compare CEL types, not declared field types. Several
+declared types share one CEL type. A check over the declared type would
+report an error the server does not raise.
 
 The form SHALL show each error at the row it applies to. The server keeps
 every check it runs today. The form adds no rule the server does not
@@ -119,6 +152,13 @@ already enforce.
 - **WHEN** a field-map row moves a `string` field onto a field the target
   version declares as `number`
 - **THEN** the form shows an error on that row
+
+#### Scenario: Two declared types sharing one CEL type pass
+
+- **WHEN** a field-map row moves a `date` field onto a field the target
+  version declares as `string`
+- **THEN** the form shows no error, because both hold the CEL type the
+  server compares
 
 #### Scenario: A valid plan shows no inline error
 
