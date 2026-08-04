@@ -28,8 +28,8 @@
   skipping a path the range deleted
 - [x] 2.8 Add `scripts/gates/prose.sh`. Run the antislop linter over the Markdown
   files the range changed
-- [x] 2.9 In `prose.sh`, resolve the linter from `ANTISLOP` first, then the documented
-  host path, and print a named skip when it finds neither
+- [x] 2.9 In `prose.sh`, resolve the linter from `ANTISLOP` first, then a
+  `$HOME`-relative default. Print a named skip when it finds neither
 - [x] 2.10 Add `scripts/gates/machine-paths.sh`. Reject a tracked file holding an
   absolute home-directory path
 - [x] 2.10a Exclude `.devcontainer/`, `docker/` and `.gitignore` from that scan.
