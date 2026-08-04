@@ -30,6 +30,9 @@ replace the placeholder.
 - Badges and buttons: one badge/stamp form carries mono text, uppercase, a
   2px outline, and five tones. Rotation applies only to refusal states.
   Buttons follow the documented `.btn-primary`/`secondary`/`ghost` rules.
+  No `.btn-*` className exists in the codebase today. This change adds
+  one to every `<button>` element across all four areas, alongside the
+  CSS rules themselves. It is the one markup change here.
 - Rows and tables: a 2px structural divider, a 1px hairline between rows,
   no zebra striping.
 - Fields: a field's border is the field. It never sits on a filled
@@ -68,10 +71,14 @@ API, or contract behavior changes. See `.openspec.yaml`: `skip_specs: true`.)
   `packages/web/src/areas/admin/app.css`,
   `packages/web/src/areas/studio/app.css`,
   `packages/web/src/areas/reporting/app.css`,
-  `packages/form-ui/src/form-ui.css`. CSS only. Component markup, routing,
-  and logic stay as they are. A TSX file that hard-codes a color, radius,
-  or font instead of reading a token is an incidental find. Fixing it is
-  not in scope here unless it breaks visibly.
+  `packages/form-ui/src/form-ui.css`, plus every TSX screen and panel that
+  renders a `<button>` element, across all four areas. No button-variant
+  class exists today, so each button gains a
+  `.btn-primary`/`.btn-secondary`/`.btn-ghost` className. That is the one
+  markup change here. Routing and logic stay as they are, with no
+  `onClick` or behavior changes. A TSX file that hard-codes a color,
+  radius, or font instead of reading a token is an incidental find.
+  Fixing it is not in scope here unless it breaks visibly.
 - **Dependencies**: adds `lucide` (icon set) and the Archivo webfont
   (Google Fonts), matching what the source design doc's own preview loads.
 - **No engine, schema, API, or auth impact.** This change does not touch

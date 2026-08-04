@@ -2,179 +2,15 @@
 
 /*
  * Same token structure as the other areas' stylesheets; the tokens themselves
- * live once, in shell/tokens.css
- * (primitives -> semantic aliases; components reference only the semantic
- * layer) so the three frontends read as siblings, not a mismatched pair.
+ * live once, in shell/tokens.css (primitives -> semantic aliases; components
+ * reference only the semantic layer) so the four frontends read as siblings,
+ * not a mismatched pair.
  */
 
-:root {
-  --paper-50: #eef1f2;
-  --ledger-100: #dce3e0;
-  --ink-900: #1c2230;
-  --slate-500: #56606b;
-  --stamp-blue-600: #2c4a6e;
-  --seal-700: #6e7b3f;
-  --alert-700: #a23b2e;
-  --ochre-600: #8a6420;
-
-  --color-surface: var(--paper-50);
-  --color-surface-muted: var(--ledger-100);
-  --color-text: var(--ink-900);
-  --color-text-muted: var(--slate-500);
-  --color-border: var(--ledger-100);
-  --color-accent: var(--stamp-blue-600);
-  --color-accent-contrast: #ffffff;
-  --color-success: var(--seal-700);
-  --color-danger: var(--alert-700);
-  /* Distinct from danger on purpose: the key-collision notice is a caution a
-     developer may knowingly accept, not a refusal. */
-  --color-warning: var(--ochre-600);
-
-  --font-display: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
-  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 1rem;
-  --space-4: 1.5rem;
-  --space-5: 2.5rem;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper-50: #171b22;
-    --ledger-100: #2a303a;
-    --ink-900: #e9ecef;
-    --slate-500: #9aa5b1;
-    --stamp-blue-600: #7ea3cc;
-    --seal-700: #9db072;
-    --alert-700: #d97362;
-    --ochre-600: #d0a959;
-    --color-accent-contrast: #10141a;
-  }
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  background: var(--color-surface);
-  color: var(--color-text);
-  font-family: var(--font-body);
-  font-size: 15px;
-  line-height: 1.5;
-}
-
-button,
-input,
-select,
-textarea {
-  font-family: inherit;
-  font-size: inherit;
-  color: inherit;
-}
-
-:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
-
-button {
-  background: var(--color-accent);
-  color: var(--color-accent-contrast);
-  border: none;
-  border-radius: 3px;
-  padding: var(--space-2) var(--space-3);
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-button.studio-back {
+.studio-back {
   display: block;
-  background: none;
-  color: var(--color-accent);
-  padding: 0;
+  padding-left: 0;
   margin-bottom: var(--space-3);
-}
-
-input,
-select {
-  border: 1px solid var(--color-border);
-  border-radius: 3px;
-  padding: var(--space-2);
-  background: var(--color-surface);
-}
-
-h1,
-h2 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-h1 {
-  font-size: 1.25rem;
-  margin: 0 0 var(--space-4);
-}
-
-h2 {
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-text-muted);
-  margin: var(--space-4) 0 var(--space-2);
-}
-
-.studio-screen {
-  max-width: 60rem;
-  margin: 0 auto;
-  padding: var(--space-4) var(--space-3) var(--space-5);
-}
-
-.studio-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.studio-header nav {
-  display: flex;
-  gap: var(--space-2);
-}
-
-.studio-header-right {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-}
-
-.studio-login {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-}
-
-.studio-login-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  width: 20rem;
-}
-
-.studio-login-form label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  font-size: 0.9rem;
 }
 
 .studio-empty-role {
@@ -186,6 +22,12 @@ h2 {
   text-align: center;
   gap: var(--space-3);
   padding: var(--space-4);
+}
+
+.studio-screen {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-3) var(--space-6);
 }
 
 .studio-controls {
@@ -204,13 +46,13 @@ h2 {
 
 .studio-table th {
   text-align: left;
-  font-family: var(--font-display);
-  font-size: 0.75rem;
+  font-family: var(--font-body);
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-text-muted);
   padding: var(--space-2);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 2px solid var(--color-divider);
 }
 
 .studio-table td {
@@ -224,8 +66,11 @@ h2 {
   padding: var(--space-4) 0;
 }
 
+/* Standalone message, no paired stamp anywhere in this file — keeps the
+   refusal tone rather than moving to plain ink, per design.md's per-call-
+   site bucket-2 rule. */
 .studio-error {
-  color: var(--color-danger);
+  color: var(--color-refusal);
 }
 
 .studio-json-error {
@@ -243,29 +88,30 @@ h2 {
   text-decoration: underline;
 }
 
+/* Standalone, no paired stamp — same rule as .studio-error. */
 .studio-conflict {
-  border: 1px solid var(--color-danger);
-  border-radius: 4px;
+  border: 2px solid var(--color-refusal);
   padding: var(--space-3);
   margin: var(--space-3) 0;
+  color: var(--color-refusal);
 }
 
 .studio-edit-screen {
   max-width: none;
 }
 
+/* A success confirmation is the Settled tone, ink, never green. */
 .studio-publish-result {
-  color: var(--color-success);
+  color: var(--color-text);
 }
 
 .studio-json-editor {
   display: block;
   width: 100%;
   margin-top: var(--space-1);
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   font-size: 0.85rem;
   border: 1px solid var(--color-border);
-  border-radius: 3px;
   padding: var(--space-2);
   background: var(--color-surface);
   resize: vertical;
@@ -285,13 +131,12 @@ h2 {
 
 .studio-map-section {
   border: 1px solid var(--color-border);
-  border-radius: 3px;
   padding: var(--space-3);
 }
 
 .studio-map-section legend {
-  font-family: var(--font-display);
-  font-size: 0.75rem;
+  font-family: var(--font-body);
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-text-muted);
@@ -322,27 +167,30 @@ h2 {
 }
 
 .studio-map-arrow {
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   color: var(--color-text-muted);
 }
 
 .studio-map-picker,
 .studio-map-expression {
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   font-size: 0.85rem;
   min-width: 0;
   padding: var(--space-1);
   border: 1px solid var(--color-border);
-  border-radius: 3px;
   background: var(--color-surface);
   color: var(--color-text);
 }
 
-/* Ochre, not danger: an id the version does not declare is kept and saved
-   unchanged, so this is a caution rather than a refusal. */
+/* Caution tone, not Refusal: an id the version does not declare is kept and
+   saved unchanged, so this is dashed and lighter-bordered — something an
+   author may knowingly accept, distinct from a hard failure. No sixth color:
+   Caution shares Refusal's text but a lighter, dashed border
+   (--color-accent-400), per the document's own stamp-tone definition. */
 .studio-map-unresolved {
-  border-color: var(--color-warning);
-  color: var(--color-warning);
+  border-color: var(--color-accent-400);
+  border-style: dashed;
+  color: var(--color-refusal);
 }
 
 .studio-map-error {
@@ -364,16 +212,16 @@ h2 {
 }
 
 .studio-diff code {
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   font-size: 0.8rem;
 }
 
 .studio-diff-added code:first-child {
-  color: var(--color-success);
+  color: var(--color-neutral-900);
 }
 
 .studio-diff-removed code:first-child {
-  color: var(--color-danger);
+  color: var(--color-refusal);
 }
 
 .canvas-layout {
@@ -388,7 +236,6 @@ h2 {
   flex: 1 1 auto;
   min-width: 0;
   border: 1px solid var(--color-border);
-  border-radius: 4px;
   overflow: hidden;
 }
 
@@ -432,7 +279,7 @@ h2 {
 }
 
 .canvas-node-key {
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   font-size: 11px;
   fill: var(--color-text-muted);
 }
@@ -474,7 +321,7 @@ h2 {
 }
 
 .canvas-edge-badge {
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   font-size: 10px;
   fill: var(--color-accent);
   text-anchor: middle;
@@ -484,25 +331,26 @@ h2 {
   fill: var(--color-text-muted);
 }
 
+/* No errored/normal split — ProcessContract.outcomes carries no error flag to
+   key one on, and every terminal step marks the same way. */
 .canvas-terminal-stamp circle {
   fill: none;
-  stroke: var(--color-success);
+  stroke: var(--color-neutral-900);
   stroke-width: 1.5;
 }
 
 .canvas-terminal-stamp text {
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   font-size: 9px;
   text-transform: uppercase;
   text-anchor: middle;
-  fill: var(--color-success);
+  fill: var(--color-neutral-900);
 }
 
 .canvas-inspector {
   flex: 0 0 20rem;
   overflow-y: auto;
   border: 1px solid var(--color-border);
-  border-radius: 4px;
   padding: var(--space-3);
 }
 
@@ -511,9 +359,8 @@ h2 {
   z-index: 2;
   transform: translate(-50%, -100%);
   background: var(--color-surface);
-  color: var(--color-danger);
-  border: 1px solid var(--color-danger);
-  border-radius: 3px;
+  color: var(--color-refusal);
+  border: 1px solid var(--color-refusal);
   padding: var(--space-1) var(--space-2);
   font-size: 0.8rem;
   pointer-events: none;
@@ -524,40 +371,33 @@ h2 {
  * Error banner: a failed request reported where the data it would have
  * shown normally sits, not a toast — this is a developer tool, and a
  * failure that isn't in the reader's eyeline is the exact bug this class
- * exists to prevent. Reuses the rotated-stamp motif .canvas-terminal-stamp
- * already establishes rather than inventing a second visual language.
+ * exists to prevent.
  */
 .studio-error-banner {
   display: flex;
   align-items: baseline;
   gap: var(--space-3);
-  border: 1.5px solid var(--color-danger);
-  border-radius: 2px;
+  border: 2px solid var(--color-refusal);
   padding: var(--space-2) var(--space-3);
   margin: var(--space-3) 0;
 }
 
 .studio-error-banner-stamp {
   flex: none;
-  font-family: var(--font-display);
-  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--color-danger);
-  border: 1.5px solid currentColor;
-  border-radius: 2px;
-  padding: 0.1rem 0.4rem;
+  color: var(--color-refusal);
+  border: 2px solid currentcolor;
+  padding: 2px 7px;
   transform: rotate(-2deg);
 }
 
 .studio-error-banner-message {
   flex: 1;
   color: var(--color-text);
-}
-
-.studio-error-banner button {
-  flex: none;
 }
 
 /* Full-screen fallback for a render-time throw the ErrorBoundary catches — see ErrorBoundary.tsx for what this does and does not cover. */
@@ -572,21 +412,20 @@ h2 {
 }
 
 .studio-boundary-stamp {
-  font-family: var(--font-display);
-  font-size: 1rem;
+  font-family: var(--font-mono);
+  font-size: 16px;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--color-danger);
-  border: 1.5px solid currentColor;
-  border-radius: 2px;
-  padding: 0.2rem 0.7rem;
+  color: var(--color-refusal);
+  border: 2px solid currentcolor;
+  padding: 4px 12px;
   transform: rotate(-2deg);
 }
 
-/* Step card disclosure header — a real <button> now (spa-accessibility-pass),
-   reset to a full-width bar rather than the default accent pill so it still
-   reads as a header, not a call-to-action. */
+/* Step card disclosure header — a real <button>, reset to a full-width bar
+   rather than the default primary fill so it still reads as a header, not a
+   call-to-action. */
 .step-card-header {
   display: flex;
   align-items: center;
@@ -596,7 +435,6 @@ h2 {
   color: inherit;
   border: none;
   border-bottom: 1px solid var(--color-border);
-  border-radius: 0;
   padding: var(--space-2) var(--space-3);
   font: inherit;
   text-align: left;
@@ -626,10 +464,15 @@ h2 {
 }
 
 /* Environment promotion: the import file control, its result line, and the
-   preview a developer confirms before publishing. */
+   preview a developer confirms before publishing. Structural label, not an
+   engine-matched value (design.md's third bucket), so it takes the body
+   face. */
 .studio-file-label {
-  font-family: var(--font-display);
-  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-body);
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-text-muted);
@@ -641,20 +484,23 @@ h2 {
   margin: 0 0 var(--space-2);
 }
 
+/* Caution tone: refusal text on a lighter, accent-400 rule — distinct from a
+   hard failure, matching the document's stamp-tone definition rather than a
+   sixth ochre color. */
 .studio-warning {
-  color: var(--color-warning);
-  border-left: 3px solid var(--color-warning);
+  color: var(--color-refusal);
+  border-left: 3px solid var(--color-accent-400);
   padding-left: var(--space-2);
 }
 
 .studio-dialog {
   max-width: 34rem;
-  border: 1.5px solid var(--color-border);
-  border-radius: 2px;
+  border: 2px solid var(--color-divider);
   padding: var(--space-4);
   background: var(--color-surface);
   color: var(--color-text);
   overscroll-behavior: contain;
+  box-shadow: var(--shadow-lg);
 }
 
 .studio-dialog::backdrop {
@@ -668,9 +514,11 @@ h2 {
   margin: var(--space-3) 0;
 }
 
+/* Structural label, not an engine-matched value (design.md's third bucket),
+   so it takes the body face. */
 .studio-dialog-facts dt {
-  font-family: var(--font-display);
-  font-size: 0.75rem;
+  font-family: var(--font-body);
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-text-muted);
@@ -714,18 +562,19 @@ h2 {
   gap: var(--space-2);
   padding: var(--space-2);
   border: 1px solid var(--color-border);
-  border-radius: 3px;
   background: var(--color-surface-muted);
 }
 
-/* A row the author has not finished. It is builder state and never reaches the
-   body, so it is marked rather than treated as an error. */
+/* A row the author has not finished. It is builder state and never reaches
+   the body, so it is marked with the Caution tone rather than treated as an
+   error. */
 .condition-row.is-incomplete {
-  border-color: var(--color-warning);
+  border-color: var(--color-accent-400);
+  border-style: dashed;
 }
 
 .condition-flag {
-  color: var(--color-warning);
+  color: var(--color-refusal);
   font-size: 0.85rem;
 }
 
@@ -734,7 +583,7 @@ h2 {
 .condition-joiner {
   background: none;
   color: var(--color-accent);
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   font-weight: 600;
   padding: 0 var(--space-1);
   min-width: 2.5ch;
@@ -750,20 +599,13 @@ h2 {
 }
 
 .condition-remove:hover {
-  color: var(--color-danger);
+  color: var(--color-refusal);
 }
 
 .condition-raw {
   flex: 1 1 20ch;
   min-width: 0;
-  font-family: var(--font-display);
-}
-
-.condition-add {
-  align-self: flex-start;
-  background: none;
-  color: var(--color-accent);
-  padding: 0;
+  font-family: var(--font-mono);
 }
 
 .condition-empty {
@@ -791,9 +633,11 @@ h2 {
   flex: 1 1 20ch;
 }
 
+/* Structural label, not an engine-matched value (design.md's third bucket),
+   so it takes the body face. */
 .condition-readout-label {
-  font-family: var(--font-display);
-  font-size: 0.7rem;
+  font-family: var(--font-body);
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-text-muted);
@@ -801,7 +645,7 @@ h2 {
 }
 
 .condition-readout code {
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   font-size: 0.85rem;
   min-width: 0;
   overflow-wrap: anywhere;
@@ -816,7 +660,7 @@ h2 {
 
 .condition-parse-error {
   margin: 0;
-  color: var(--color-danger);
+  color: var(--color-refusal);
   font-size: 0.85rem;
 }
 
@@ -825,14 +669,13 @@ h2 {
 .field-validation {
   margin: var(--space-2) 0;
   border: 1px solid var(--color-border);
-  border-radius: 3px;
   padding: var(--space-1) var(--space-2);
 }
 
 .field-validation summary {
   cursor: pointer;
   color: var(--color-text-muted);
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   font-size: 0.85rem;
 }
 

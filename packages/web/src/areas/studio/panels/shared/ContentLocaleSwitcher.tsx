@@ -46,7 +46,7 @@ export function ContentLocaleSwitcher() {
         value={newLocale}
         onChange={(e) => setNewLocale(e.target.value)}
       />
-      <button type="button" onClick={addLocale}>
+      <button type="button" className="btn btn-secondary" onClick={addLocale}>
         {t("contentLocale.add")}
       </button>
       {error && <span className="content-locale-error">{error}</span>}

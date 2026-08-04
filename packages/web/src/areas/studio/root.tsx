@@ -1,3 +1,4 @@
+import { Workflow } from "lucide-react";
 import { matchRoute, routePath, type Route } from "./routing.js";
 import { useAreaRoute } from "../../shell/routing.js";
 import { Chrome } from "../../shell/Chrome.js";
@@ -22,12 +23,19 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
     <nav className="shell-nav">
       <button
         type="button"
+        className="btn btn-secondary"
         aria-current={route.name === "processes" || route.name === "edit" ? "page" : undefined}
         onClick={() => navigate({ name: "processes" })}
       >
+        <Workflow size={18} strokeWidth={1.75} aria-hidden="true" />
         Processes
       </button>
-      <button type="button" aria-current={route.name === "tools" ? "page" : undefined} onClick={() => navigate({ name: "tools" })}>
+      <button
+        type="button"
+        className="btn btn-secondary"
+        aria-current={route.name === "tools" ? "page" : undefined}
+        onClick={() => navigate({ name: "tools" })}
+      >
         Tools
       </button>
     </nav>

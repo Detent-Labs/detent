@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Stamp } from "lucide-react";
 import { FieldForm, PathButtons, filterToEditable } from "form-ui";
 import type { SubmissionIssue } from "form-ui";
 import {
@@ -230,7 +231,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
 
   return (
     <main className="app-screen app-task">
-      <button type="button" className="app-back" onClick={() => navigate({ name: "tasks" })}>
+      <button type="button" className="btn btn-ghost app-back" onClick={() => navigate({ name: "tasks" })}>
         {t(locale, "task.backToTasks")}
       </button>
 
@@ -267,7 +268,8 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
 
           <div className="app-task-actions">
             {claimControls.state === "claimable" && (
-              <button type="button" disabled={loading} onClick={() => void doClaim()}>
+              <button type="button" className="btn btn-primary" disabled={loading} onClick={() => void doClaim()}>
+                <Stamp size={18} strokeWidth={1.75} aria-hidden="true" />
                 {t(locale, "task.claim")}
               </button>
             )}
@@ -277,7 +279,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
                     leaves the tab order and assistive technology skips it, so
                     the reason would reach only sighted pointer users. No click
                     handler, so activating it does nothing. */}
-                <button type="button" aria-disabled="true" aria-describedby={CLAIM_BLOCKED_REASON_ID}>
+                <button type="button" className="btn btn-primary" aria-disabled="true" aria-describedby={CLAIM_BLOCKED_REASON_ID}>
                   {t(locale, "task.claim")}
                 </button>
                 {/* Visible text, never a title tooltip: touch devices have no
@@ -291,7 +293,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
               </span>
             )}
             {claimControls.state === "mine" && (
-              <button type="button" disabled={loading} onClick={() => void doRelease()}>
+              <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => void doRelease()}>
                 {t(locale, "task.release")}
               </button>
             )}
@@ -304,12 +306,12 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
                   placeholder={t(locale, "task.delegateToPlaceholder")}
                   onChange={(e) => setDelegateTarget(e.target.value)}
                 />
-                <button type="button" disabled={loading || !delegateTarget} onClick={() => void doDelegate()}>
+                <button type="button" className="btn btn-secondary" disabled={loading || !delegateTarget} onClick={() => void doDelegate()}>
                   {t(locale, "task.delegateSubmit")}
                 </button>
               </span>
             )}
-            <button type="button" disabled={loading} onClick={() => void doDiscard()}>
+            <button type="button" className="btn btn-secondary btn-destructive" disabled={loading} onClick={() => void doDiscard()}>
               {t(locale, "task.discardCase")}
             </button>
           </div>
@@ -335,7 +337,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
                 placeholder={t(locale, "task.commentPlaceholder")}
                 onChange={(e) => setCommentText(e.target.value)}
               />
-              <button type="button" disabled={loading || !commentText.trim()} onClick={() => void doPostComment()}>
+              <button type="button" className="btn btn-secondary" disabled={loading || !commentText.trim()} onClick={() => void doPostComment()}>
                 {t(locale, "task.commentSubmit")}
               </button>
             </div>
@@ -347,7 +349,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
               {attachments.map((a) => (
                 <li key={a.id}>
                   <span>{a.filename}</span>
-                  <button type="button" disabled={loading} onClick={() => void doDownloadAttachment(a)}>
+                  <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => void doDownloadAttachment(a)}>
                     {t(locale, "task.attachmentDownloadLabel")}
                   </button>
                 </li>
@@ -355,7 +357,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
             </ul>
             <div className="app-task-attachment-form">
               <input ref={fileInputRef} type="file" disabled={loading} />
-              <button type="button" disabled={loading} onClick={() => void doUploadAttachment()}>
+              <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => void doUploadAttachment()}>
                 {t(locale, "task.attachmentUploadLabel")}
               </button>
             </div>

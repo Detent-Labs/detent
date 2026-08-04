@@ -3,82 +3,7 @@
 .app-screen {
   max-width: 46rem;
   margin: 0 auto;
-  padding: var(--space-4) var(--space-3) var(--space-5);
-}
-
-/* Header */
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.app-header nav {
-  display: flex;
-  gap: var(--space-2);
-}
-
-.app-header nav button,
-.app-header-right button {
-  background: none;
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-}
-
-.app-header-right {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-}
-
-/* Login */
-.app-login {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-}
-
-.app-login-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  width: 20rem;
-}
-
-.app-login-form label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  font-size: 0.9rem;
-}
-
-/* The signature element: a rotated monospace "stamp" badge, evoking the
-   rubber date-stamp a case is marked with as it moves through steps. */
-.app-stamp {
-  display: inline-block;
-  font-family: var(--font-display);
-  font-size: 0.7rem;
-  letter-spacing: 0.03em;
-  border: 1.5px solid currentColor;
-  border-radius: 2px;
-  padding: 0.1rem 0.4rem;
-  transform: rotate(-2deg);
-}
-
-.app-stamp-mine {
-  color: var(--color-accent);
-}
-
-.app-stamp-open {
-  color: var(--color-text-muted);
-}
-
-.app-stamp-case {
-  color: var(--color-success);
-  margin-bottom: var(--space-3);
+  padding: var(--space-4) var(--space-3) var(--space-6);
 }
 
 /* Controls bar */
@@ -87,13 +12,43 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   margin-bottom: var(--space-3);
+  align-items: center;
 }
 
-.app-controls select,
-.app-controls button {
+.app-controls select {
   background: var(--color-surface);
   color: var(--color-text);
   border: 1px solid var(--color-border);
+}
+
+/* The signature element: a mono, uppercase, outlined stamp — the rubber
+   date-stamp a case is marked with as it moves through steps. Rotation is
+   reserved for a fault (the error banner and boundary stamps below); a
+   stamp inside a row or a table cell sits straight, per the document's own
+   "never two of them" rule. */
+.app-stamp {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 2px solid currentcolor;
+  padding: 2px 7px;
+}
+
+/* Open tone: the case is live and waiting on someone, whether unclaimed or
+   claimed by this actor — both labels share the one tone. */
+.app-stamp-mine,
+.app-stamp-open {
+  color: var(--color-accent);
+}
+
+/* The task screen's own instance/step identifier — the case open on this
+   screen right now, so it reads as the same live/Open tone. */
+.app-stamp-case {
+  color: var(--color-accent);
+  margin-bottom: var(--space-3);
 }
 
 /* Task list — a ledger, not a card grid: hairline rows, right-aligned
@@ -137,7 +92,6 @@
   color: inherit;
   text-align: left;
   cursor: pointer;
-  border-radius: 2px;
 }
 
 .app-task-link:hover .app-task-step {
@@ -146,7 +100,7 @@
 
 .app-task-process {
   color: var(--color-text-muted);
-  font-size: 0.85rem;
+  font-size: 13px;
 }
 
 .app-task-step {
@@ -154,7 +108,7 @@
 }
 
 .app-task-waiting {
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   color: var(--color-text-muted);
   text-align: right;
@@ -165,8 +119,11 @@
   padding: var(--space-4) 0;
 }
 
+/* Standalone message, no paired stamp anywhere in this file — keeps the
+   refusal tone rather than moving to plain ink, per design.md's per-call-
+   site bucket-2 rule. */
 .app-error {
-  color: var(--color-danger);
+  color: var(--color-refusal);
 }
 
 .app-load-more {
@@ -259,43 +216,35 @@
 
 /*
  * Error banner: a failed request reported where the data it would have
- * shown normally sits, not a toast. Reuses the rotated-stamp motif
- * .app-stamp already establishes rather than inventing a second visual
- * language. Distinct from the plain .app-error caption TaskScreen already
- * uses for an inline outcome message — this one is for a list/action that
- * failed outright and needs a retry, not a short explanatory line.
+ * shown normally sits, not a toast. Distinct from the plain .app-error
+ * caption TaskScreen already uses for an inline outcome message — this one
+ * is for a list/action that failed outright and needs a retry.
  */
 .app-error-banner {
   display: flex;
   align-items: baseline;
   gap: var(--space-3);
-  border: 1.5px solid var(--color-danger);
-  border-radius: 2px;
+  border: 2px solid var(--color-refusal);
   padding: var(--space-2) var(--space-3);
   margin: var(--space-3) 0;
 }
 
 .app-error-banner-stamp {
   flex: none;
-  font-family: var(--font-display);
-  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--color-danger);
-  border: 1.5px solid currentColor;
-  border-radius: 2px;
-  padding: 0.1rem 0.4rem;
+  color: var(--color-refusal);
+  border: 2px solid currentcolor;
+  padding: 2px 7px;
   transform: rotate(-2deg);
 }
 
 .app-error-banner-message {
   flex: 1;
   color: var(--color-text);
-}
-
-.app-error-banner button {
-  flex: none;
 }
 
 /* Full-screen fallback for a render-time throw the ErrorBoundary catches — see ErrorBoundary.tsx for what this does and does not cover. */
@@ -310,15 +259,14 @@
 }
 
 .app-boundary-stamp {
-  font-family: var(--font-display);
-  font-size: 1rem;
+  font-family: var(--font-mono);
+  font-size: 16px;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--color-danger);
-  border: 1.5px solid currentColor;
-  border-radius: 2px;
-  padding: 0.2rem 0.7rem;
+  color: var(--color-refusal);
+  border: 2px solid currentcolor;
+  padding: 4px 12px;
   transform: rotate(-2deg);
 }
 

@@ -196,7 +196,7 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep }: Prop
                       {step.id && validation.subprocessStepStatus[step.id] === "checked" ? (
                         <p>
                           {t("steps.crossProcessChecked")}{" "}
-                          <button type="button" onClick={() => setChildForStep(step.id!, undefined)}>
+                          <button type="button" className="btn btn-secondary" onClick={() => setChildForStep(step.id!, undefined)}>
                             {t("steps.unload")}
                           </button>
                         </p>
@@ -273,7 +273,7 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep }: Prop
 
                 <IssueList entityId={step.id} />
 
-                <button type="button" onClick={() => removeStep(step.id)}>
+                <button type="button" className="btn btn-secondary" onClick={() => removeStep(step.id)}>
                   {t("steps.removeStep")}
                 </button>
               </div>
@@ -281,7 +281,7 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep }: Prop
           </div>
         );
       })}
-      <button type="button" onClick={addStep}>
+      <button type="button" className="btn btn-secondary" onClick={addStep}>
         {t("steps.addStep")}
       </button>
     </div>

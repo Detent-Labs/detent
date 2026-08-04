@@ -147,7 +147,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
 
   return (
     <main className="studio-screen">
-      <button type="button" className="studio-back" onClick={() => navigate({ name: "edit", processId })}>
+      <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "edit", processId })}>
         ← Back to process
       </button>
       <h1>Versions</h1>
@@ -155,7 +155,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
         <div className="studio-error-banner" role="alert">
           <span className="studio-error-banner-stamp">{t("error.failed")}</span>
           <span className="studio-error-banner-message">{loadError}</span>
-          <button type="button" onClick={() => load()} disabled={loading}>
+          <button type="button" className="btn btn-secondary" onClick={() => load()} disabled={loading}>
             {t("error.retry")}
           </button>
         </div>
@@ -204,6 +204,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
                   <td>
                     <button
                       type="button"
+                      className="btn btn-secondary"
                       aria-label={`export version ${v.version} for promotion`}
                       disabled={exporting !== null}
                       onClick={() => void exportVersion(v)}
@@ -216,18 +217,19 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
             </tbody>
           </table>
           <div className="studio-controls">
-            <button type="button" disabled={!canDiff(selection)} onClick={() => void diffSelected()}>
+            <button type="button" className="btn btn-secondary" disabled={!canDiff(selection)} onClick={() => void diffSelected()}>
               Diff selected
             </button>
             {canDiff(selection) && (
               <button
                 type="button"
+                className="btn btn-secondary"
                 onClick={() => navigate({ name: "migrate", processId, from: String(selection.a), to: String(selection.b) })}
               >
                 Plan migration {selection.a} → {selection.b}
               </button>
             )}
-            <button type="button" disabled={baseVersion === null} onClick={() => void diffAgainstBase()}>
+            <button type="button" className="btn btn-secondary" disabled={baseVersion === null} onClick={() => void diffAgainstBase()}>
               Diff draft against base {baseVersion !== null ? `(v${baseVersion})` : ""}
             </button>
           </div>

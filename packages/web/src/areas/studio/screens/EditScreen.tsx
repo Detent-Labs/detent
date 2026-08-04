@@ -107,13 +107,13 @@ function EditorArea({ processId, token, initialRevision, initialLayout, navigate
 
   return (
     <main className="studio-screen studio-edit-screen">
-      <button type="button" className="studio-back" onClick={() => navigate({ name: "processes" })}>
+      <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "processes" })}>
         ← Back to processes
       </button>
-      <button type="button" className="studio-back" onClick={() => navigate({ name: "versions", processId })}>
+      <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "versions", processId })}>
         Versions
       </button>
-      <button type="button" className="studio-back" onClick={() => navigate({ name: "play", processId })}>
+      <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "play", processId })}>
         Player
       </button>
       <h1>{t("app.title")}</h1>
@@ -199,13 +199,13 @@ export function EditScreen({ processId, token, navigate, onUnauthorized }: EditS
   if (state.kind === "error") {
     return (
       <main className="studio-screen">
-        <button type="button" className="studio-back" onClick={() => navigate({ name: "processes" })}>
+        <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "processes" })}>
           ← Back to processes
         </button>
         <div className="studio-error-banner" role="alert">
           <span className="studio-error-banner-stamp">{t("error.failed")}</span>
           <span className="studio-error-banner-message">{state.message}</span>
-          <button type="button" onClick={() => load()}>
+          <button type="button" className="btn btn-secondary" onClick={() => load()}>
             {t("error.retry")}
           </button>
         </div>
@@ -215,7 +215,7 @@ export function EditScreen({ processId, token, navigate, onUnauthorized }: EditS
   if (state.kind === "not-found") {
     return (
       <main className="studio-screen">
-        <button type="button" className="studio-back" onClick={() => navigate({ name: "processes" })}>
+        <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "processes" })}>
           ← Back to processes
         </button>
         <p className="studio-error">No draft exists for this process.</p>

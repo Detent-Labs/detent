@@ -57,7 +57,7 @@ export function StartScreen({ token, locale, navigate, onUnauthorized }: StartSc
         <div className="app-error-banner" role="alert">
           <span className="app-error-banner-stamp">{t(locale, "error.failed")}</span>
           <span className="app-error-banner-message">{error}</span>
-          <button type="button" onClick={() => void load()} disabled={loadingList}>
+          <button type="button" className="btn btn-secondary" onClick={() => void load()} disabled={loadingList}>
             {t(locale, "error.retry")}
           </button>
         </div>
@@ -66,7 +66,7 @@ export function StartScreen({ token, locale, navigate, onUnauthorized }: StartSc
       <ul className="app-process-list">
         {processes.map((p) => (
           <li key={p.processId}>
-            <button type="button" disabled={loading} onClick={() => void start(p.processId)}>
+            <button type="button" className="btn btn-primary" disabled={loading} onClick={() => void start(p.processId)}>
               {resolveText(p.label, locale, p.baseLocale)} — {t(locale, "start.create")}
             </button>
           </li>

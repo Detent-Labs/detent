@@ -123,12 +123,12 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
                 value={opt.label}
                 onChange={(label) => updateOption(i, { label })}
               />
-              <button type="button" onClick={() => removeOption(i)}>
+              <button type="button" className="btn btn-secondary" onClick={() => removeOption(i)}>
                 {t("fieldCatalog.removeOption")}
               </button>
             </div>
           ))}
-          <button type="button" onClick={addOption} disabled={hasDataSource}>
+          <button type="button" className="btn btn-secondary" onClick={addOption} disabled={hasDataSource}>
             {t("fieldCatalog.addOption")}
           </button>
         </div>
@@ -153,7 +153,7 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
               onRemove={() => removeSubField(i)}
             />
           ))}
-          <button type="button" onClick={addSubField}>
+          <button type="button" className="btn btn-secondary" onClick={addSubField}>
             {t("fieldCatalog.addSubField")}
           </button>
         </fieldset>
@@ -161,7 +161,7 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
 
       <IssueList entityId={field.id} />
 
-      <button type="button" onClick={onRemove}>
+      <button type="button" className="btn btn-secondary" onClick={onRemove}>
         {t("fieldCatalog.removeField")}
       </button>
     </div>
@@ -205,7 +205,7 @@ export function FieldCatalogPanel() {
           onRemove={() => removeField(index)}
         />
       ))}
-      <button type="button" onClick={addField}>
+      <button type="button" className="btn btn-secondary" onClick={addField}>
         {t("fieldCatalog.addField")}
       </button>
     </div>

@@ -108,7 +108,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
         <div className="admin-error-banner" role="alert">
           <span className="admin-error-banner-stamp">Failed</span>
           <span className="admin-error-banner-message">{error}</span>
-          <button type="button" onClick={refresh} disabled={loading}>
+          <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
             Retry
           </button>
         </div>
@@ -173,7 +173,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
                     <span className={`admin-badge admin-badge-${row.retired ? "disabled" : "enabled"}`}>{row.retired ? "retired" : "offered"}</span>
                   </td>
                   <td>
-                    <button type="button" onClick={() => patch(i, { retired: !row.retired })}>
+                    <button type="button" className="btn btn-secondary" onClick={() => patch(i, { retired: !row.retired })}>
                       {row.retired ? "Offer again" : "Retire"}
                     </button>
                   </td>
@@ -193,6 +193,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
           <div className="admin-controls">
             <button
               type="button"
+              className="btn btn-secondary"
               onClick={() => {
                 setSaved(false);
                 setRows((prev) => [...prev, { value: "", label: "", retired: false }]);
@@ -200,7 +201,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
             >
               Add value
             </button>
-            <button type="button" onClick={() => void save()} disabled={saving || problems.length > 0}>
+            <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={saving || problems.length > 0}>
               {saving ? "Saving…" : "Save changes"}
             </button>
             <span className="admin-note" aria-live="polite">
@@ -226,7 +227,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
           )}
 
           <div className="admin-controls">
-            <button type="button" onClick={() => void remove()} disabled={saving || detail.usedBy.length > 0}>
+            <button type="button" className="btn btn-secondary btn-destructive" onClick={() => void remove()} disabled={saving || detail.usedBy.length > 0}>
               Delete list
             </button>
           </div>

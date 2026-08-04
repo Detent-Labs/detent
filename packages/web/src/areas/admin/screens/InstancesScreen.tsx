@@ -81,7 +81,7 @@ export function InstancesScreen({ token, navigate, onUnauthorized }: InstancesSc
         <input placeholder="Current step id" value={filter.currentStepId} onChange={(e) => setFilter((f) => ({ ...f, currentStepId: e.target.value }))} />
         <input placeholder="Started by" value={filter.startedBy} onChange={(e) => setFilter((f) => ({ ...f, startedBy: e.target.value }))} />
         <input placeholder="Claimed by" value={filter.claimedBy} onChange={(e) => setFilter((f) => ({ ...f, claimedBy: e.target.value }))} />
-        <button type="button" onClick={refresh} disabled={loading}>
+        <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
           Refresh
         </button>
       </div>
@@ -90,7 +90,7 @@ export function InstancesScreen({ token, navigate, onUnauthorized }: InstancesSc
         <div className="admin-error-banner" role="alert">
           <span className="admin-error-banner-stamp">Failed</span>
           <span className="admin-error-banner-message">{error}</span>
-          <button type="button" onClick={refresh} disabled={loading}>
+          <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
             Retry
           </button>
         </div>
@@ -153,7 +153,7 @@ export function InstancesScreen({ token, navigate, onUnauthorized }: InstancesSc
 
       {cursor && (
         <div className="admin-load-more">
-          <button type="button" onClick={() => void loadMore()} disabled={loading}>
+          <button type="button" className="btn btn-secondary" onClick={() => void loadMore()} disabled={loading}>
             Load more
           </button>
         </div>

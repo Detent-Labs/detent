@@ -155,7 +155,7 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
 
   return (
     <main className="studio-screen">
-      <button type="button" className="studio-back" onClick={() => navigate({ name: "versions", processId })}>
+      <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "versions", processId })}>
         {t("migrationPlan.back")}
       </button>
       <h1>
@@ -165,7 +165,7 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
         <div className="studio-error-banner" role="alert">
           <span className="studio-error-banner-stamp">{t("error.failed")}</span>
           <span className="studio-error-banner-message">{loadError}</span>
-          <button type="button" onClick={() => load()} disabled={loading}>
+          <button type="button" className="btn btn-secondary" onClick={() => load()} disabled={loading}>
             {t("error.retry")}
           </button>
         </div>
@@ -210,7 +210,7 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
             </label>
           )}
           <div className="studio-controls">
-            <button type="button" disabled={saving} onClick={() => void save()}>
+            <button type="button" className="btn btn-primary" disabled={saving} onClick={() => void save()}>
               {saving ? t("migrationPlan.saving") : t("migrationPlan.save")}
             </button>
           </div>
@@ -223,10 +223,10 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
           <fieldset>
             <legend>{t("migrationPlan.orphanLegend")}</legend>
             <div className="studio-controls">
-              <button type="button" disabled={scanning} onClick={() => void scanOrphans(fromVersion)}>
+              <button type="button" className="btn btn-secondary" disabled={scanning} onClick={() => void scanOrphans(fromVersion)}>
                 Scan v{fromVersion}
               </button>
-              <button type="button" disabled={scanning} onClick={() => void scanOrphans(toVersion)}>
+              <button type="button" className="btn btn-secondary" disabled={scanning} onClick={() => void scanOrphans(toVersion)}>
                 Scan v{toVersion}
               </button>
             </div>

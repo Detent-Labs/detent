@@ -165,7 +165,7 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
 
   return (
     <main className="studio-screen">
-      <button type="button" className="studio-back" onClick={() => navigate({ name: "edit", processId })}>
+      <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "edit", processId })}>
         ← Back to process
       </button>
       <h1>Player</h1>
@@ -173,7 +173,7 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
       <fieldset>
         <legend>Instance access</legend>
         <div className="studio-controls">
-          <button type="button" disabled={loading} onClick={() => void doCreate()}>
+          <button type="button" className="btn btn-primary" disabled={loading} onClick={() => void doCreate()}>
             Create new instance
           </button>
         </div>
@@ -182,7 +182,7 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
           <input type="text" value={openInstanceIdInput} onChange={(e) => setOpenInstanceIdInput(e.target.value)} />
         </label>
         <div className="studio-controls">
-          <button type="button" disabled={loading || !openInstanceIdInput} onClick={() => void doOpen()}>
+          <button type="button" className="btn btn-secondary" disabled={loading || !openInstanceIdInput} onClick={() => void doOpen()}>
             Open
           </button>
         </div>
@@ -210,16 +210,16 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
 
             <div className="studio-controls">
               {!claimedByMe && (
-                <button type="button" disabled={loading} onClick={() => void doClaim()}>
+                <button type="button" className="btn btn-primary" disabled={loading} onClick={() => void doClaim()}>
                   Claim
                 </button>
               )}
               {claimedByMe && (
-                <button type="button" disabled={loading} onClick={() => void doRelease()}>
+                <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => void doRelease()}>
                   Release
                 </button>
               )}
-              <button type="button" disabled={loading} onClick={() => void doRefresh()}>
+              <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => void doRefresh()}>
                 Refresh
               </button>
             </div>
@@ -242,7 +242,7 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
               })}
             </ul>
             {recordCursor && (
-              <button type="button" onClick={() => loadMoreRecord()}>
+              <button type="button" className="btn btn-secondary" onClick={() => loadMoreRecord()}>
                 Load more
               </button>
             )}

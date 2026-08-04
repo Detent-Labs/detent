@@ -129,7 +129,7 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
       <h1>Users</h1>
 
       <div className="admin-controls">
-        <button type="button" onClick={refresh} disabled={loading}>
+        <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
           Refresh
         </button>
       </div>
@@ -138,7 +138,7 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
         <div className="admin-error-banner" role="alert">
           <span className="admin-error-banner-stamp">Failed</span>
           <span className="admin-error-banner-message">{error}</span>
-          <button type="button" onClick={refresh} disabled={loading}>
+          <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
             Retry
           </button>
         </div>
@@ -228,33 +228,33 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
                 <td>
                   {editingRoles(user.userId) && (
                     <>
-                      <button type="button" onClick={() => void saveRoles(user)} disabled={busyId === user.userId}>
+                      <button type="button" className="btn btn-primary" onClick={() => void saveRoles(user)} disabled={busyId === user.userId}>
                         Save roles
                       </button>
-                      <button type="button" onClick={cancelEditing} disabled={busyId === user.userId}>
+                      <button type="button" className="btn btn-ghost" onClick={cancelEditing} disabled={busyId === user.userId}>
                         Cancel
                       </button>
                     </>
                   )}
                   {editingManager(user.userId) && (
                     <>
-                      <button type="button" onClick={() => void saveManager(user)} disabled={busyId === user.userId}>
+                      <button type="button" className="btn btn-primary" onClick={() => void saveManager(user)} disabled={busyId === user.userId}>
                         Save manager
                       </button>
-                      <button type="button" onClick={cancelEditing} disabled={busyId === user.userId}>
+                      <button type="button" className="btn btn-ghost" onClick={cancelEditing} disabled={busyId === user.userId}>
                         Cancel
                       </button>
                     </>
                   )}
                   {editing?.userId !== user.userId && (
                     <>
-                      <button type="button" onClick={() => startEditing(user)} disabled={busyId === user.userId}>
+                      <button type="button" className="btn btn-secondary" onClick={() => startEditing(user)} disabled={busyId === user.userId}>
                         Edit roles
                       </button>
-                      <button type="button" onClick={() => startEditingManager(user)} disabled={busyId === user.userId}>
+                      <button type="button" className="btn btn-secondary" onClick={() => startEditingManager(user)} disabled={busyId === user.userId}>
                         Edit manager
                       </button>
-                      <button type="button" onClick={() => void toggle(user)} disabled={busyId === user.userId}>
+                      <button type="button" className="btn btn-secondary" onClick={() => void toggle(user)} disabled={busyId === user.userId}>
                         {user.disabled ? "Enable" : "Disable"}
                       </button>
                     </>

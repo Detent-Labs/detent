@@ -102,7 +102,7 @@ export function ConditionBuilder({ condition, operands, onChange }: Props) {
     return (
       <div className="condition-builder">
         <p className="condition-empty">{t("condition.empty")}</p>
-        <button type="button" className="condition-add" onClick={addRow} disabled={!operands.length}>
+        <button type="button" className="btn btn-ghost condition-add" onClick={addRow} disabled={!operands.length}>
           {t("condition.addRow")}
         </button>
       </div>
@@ -189,7 +189,7 @@ export function ConditionBuilder({ condition, operands, onChange }: Props) {
         })}
       </ol>
 
-      <button type="button" className="condition-add" onClick={addRow} disabled={!operands.length}>
+      <button type="button" className="btn btn-ghost condition-add" onClick={addRow} disabled={!operands.length}>
         {t("condition.addRow")}
       </button>
     </div>

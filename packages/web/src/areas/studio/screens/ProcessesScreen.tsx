@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Upload } from "lucide-react";
 import { listProcesses, listDrafts, saveDraft, deleteDraft, getVersionBody, publishProcess, StudioClientError } from "../api/client.js";
 import { deriveProcessRows, seedVersionFor, seededDraftInput, type ProcessRow } from "./processListLogic.js";
 import { collidingProcessId, parsePromotionFile, type PromotionPreview } from "./promotionImportLogic.js";
@@ -78,10 +79,10 @@ function PromotionPreviewDialog({ preview, collision, error, busy, onCancel, onC
         </p>
       )}
       <div className="studio-controls">
-        <button type="button" onClick={onConfirm} disabled={busy}>
+        <button type="button" className="btn btn-primary" onClick={onConfirm} disabled={busy}>
           {busy ? "Publishing…" : "Publish here"}
         </button>
-        <button type="button" onClick={onCancel} disabled={busy}>
+        <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={busy}>
           Cancel
         </button>
       </div>
@@ -214,10 +215,11 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
   return (
     <main className="studio-screen">
       <div className="studio-controls">
-        <button type="button" onClick={newProcess}>
+        <button type="button" className="btn btn-primary" onClick={newProcess}>
           + New process
         </button>
         <label className="studio-file-label" htmlFor="promotion-import">
+          <Upload size={18} strokeWidth={1.75} aria-hidden="true" />
           Import a promoted version
         </label>
         <input
@@ -255,7 +257,7 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
         <div className="studio-error-banner" role="alert">
           <span className="studio-error-banner-stamp">{t("error.failed")}</span>
           <span className="studio-error-banner-message">{error}</span>
-          <button type="button" onClick={() => void load()} disabled={loading}>
+          <button type="button" className="btn btn-secondary" onClick={() => void load()} disabled={loading}>
             {t("error.retry")}
           </button>
         </div>
@@ -291,20 +293,20 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
                 <td>
                   {row.draft ? (
                     <>
-                      <button type="button" onClick={() => navigate({ name: "edit", processId: row.processId })}>
+                      <button type="button" className="btn btn-secondary" onClick={() => navigate({ name: "edit", processId: row.processId })}>
                         Open
                       </button>
-                      <button type="button" onClick={() => void discard(row.processId)}>
+                      <button type="button" className="btn btn-secondary btn-destructive" onClick={() => void discard(row.processId)}>
                         Discard
                       </button>
                     </>
                   ) : (
-                    <button type="button" onClick={() => void createDraft(row.processId, seedVersionFor(row))}>
+                    <button type="button" className="btn btn-secondary" onClick={() => void createDraft(row.processId, seedVersionFor(row))}>
                       Create draft
                     </button>
                   )}
                   {row.published && (
-                    <button type="button" onClick={() => navigate({ name: "versions", processId: row.processId })}>
+                    <button type="button" className="btn btn-secondary" onClick={() => navigate({ name: "versions", processId: row.processId })}>
                       Versions
                     </button>
                   )}

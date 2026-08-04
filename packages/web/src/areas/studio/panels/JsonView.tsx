@@ -42,7 +42,7 @@ export function JsonView({ draft, onApply }: JsonViewProps) {
         />
       </label>
       <div className="studio-controls">
-        <button type="button" onClick={apply}>
+        <button type="button" className="btn btn-secondary" onClick={apply}>
           {t("jsonView.apply")}
         </button>
       </div>

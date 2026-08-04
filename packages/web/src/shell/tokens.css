@@ -6,48 +6,113 @@
  * (see openspec design.md); components below reference only the semantic
  * layer, never a raw hex.
  */
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&display=swap');
 
 :root {
-  /* primitives */
-  --paper-50: #eef1f2;
-  --ledger-100: #dce3e0;
-  --ink-900: #1c2230;
-  --slate-500: #56606b;
-  --stamp-blue-600: #2c4a6e;
-  --seal-700: #6e7b3f;
-  --alert-700: #a23b2e;
+  /* primitives — each has a dark-mode override below; the ramps do not, they
+     are a fixed swatch book and only the semantic role picks a different step
+     per scheme. */
+  --paper-50: #f3f2f2;
+  --ledger-100: #eae9e9;
+  --ink-900: #201e1d;
+  --slate-500: #605d5d;
+  --hairline-300: #d7d3d3;
+  /* #ec3013 (the document's own Stamp hex) reads 3.76:1 on --paper-50 —
+     under the 4.5:1 AA text minimum at the 11px badge / 14px button sizes
+     this role is used at (it clears only the 3:1 non-text/large-text
+     floor, so borders and the focus ring were never the problem). Same
+     hue and saturation, darkened to the exact point that clears 4.5:1
+     (web-design-guidelines review, task 9.7). Dark mode's #ff563c already
+     passes at 5.26:1 and is untouched. */
+  --stamp-600: #d42b11;
+  --refusal-700: #ae1800;
+
+  /* Tonal ramps — generated in OKLCH on one shared lightness scale, so the
+     same step of any role matches the others in visual value. Dark-mode
+     invariant: the semantic layer below picks a different step per scheme,
+     never the ramp itself. */
+  --color-neutral-100: #f8f4f4;
+  --color-neutral-200: #eae7e7;
+  --color-neutral-300: #d7d3d3;
+  --color-neutral-400: #bab6b6;
+  --color-neutral-500: #9b9797;
+  --color-neutral-600: #7d7979;
+  --color-neutral-700: #605d5d;
+  --color-neutral-800: #444141;
+  --color-neutral-900: #2d2b2b;
+
+  --color-accent-100: #fff2ef;
+  --color-accent-200: #ffe0d9;
+  --color-accent-300: #ffc4b8;
+  --color-accent-400: #ff9783;
+  --color-accent-500: #ff563c;
+  --color-accent-600: #dd2b0f;
+  --color-accent-700: #ae1800;
+  --color-accent-800: #7c1405;
+  --color-accent-900: #4d170e;
+
+  --color-accent-2-100: #fff2ef;
+  --color-accent-2-200: #ffe0da;
+  --color-accent-2-300: #ffc4b9;
+  --color-accent-2-400: #ff9784;
+  --color-accent-2-500: #ef6853;
+  --color-accent-2-600: #c94b39;
+  --color-accent-2-700: #9e3526;
+  --color-accent-2-800: #71261b;
+  --color-accent-2-900: #471d16;
 
   /* semantic aliases — components reference these, never a primitive directly */
   --color-surface: var(--paper-50);
   --color-surface-muted: var(--ledger-100);
   --color-text: var(--ink-900);
   --color-text-muted: var(--slate-500);
-  --color-border: var(--ledger-100);
-  --color-accent: var(--stamp-blue-600);
-  --color-accent-contrast: #ffffff;
-  --color-success: var(--seal-700);
-  --color-danger: var(--alert-700);
+  --color-border: var(--hairline-300);
+  --color-divider: color-mix(in srgb, var(--color-text) 40%, transparent);
+  --color-accent: var(--stamp-600);
+  --color-accent-contrast: var(--paper-50);
+  --color-refusal: var(--refusal-700);
 
-  --font-display: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
-  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-heading: "Archivo", system-ui, sans-serif;
+  --font-heading-weight: 800;
+  --font-body: "Archivo", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
 
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 1rem;
-  --space-4: 1.5rem;
-  --space-5: 2.5rem;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+
+  /* Elevation, derived from the current-scheme ink so it stays correct in
+     dark mode too, unlike the fixed light-mode tint the source document
+     shows. Used for exactly one component, the dialog (and shell's dropdown
+     menu, the closest thing to one outside it). */
+  --shadow-sm: 0 1px 2px color-mix(in srgb, var(--color-text) 14%, transparent);
+  --shadow-md: 0 3px 10px color-mix(in srgb, var(--color-text) 16%, transparent);
+  --shadow-lg: 0 12px 32px color-mix(in srgb, var(--color-text) 22%, transparent);
+
+  /* Native form controls and scrollbars follow the OS/browser dark chrome
+     only when this is declared — background/color alone on an <input> or
+     <select> doesn't reach a <select>'s own dropdown popup. Was previously
+     set only on reporting's own :root for its <input type="date">; every
+     area needs it for <select>, checkboxes and scrollbars alike. */
+  color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper-50: #171b22;
-    --ledger-100: #2a303a;
-    --ink-900: #e9ecef;
-    --slate-500: #9aa5b1;
-    --stamp-blue-600: #7ea3cc;
-    --seal-700: #9db072;
-    --alert-700: #d97362;
-    --color-accent-contrast: #10141a;
+    --paper-50: #201e1d;
+    --ledger-100: #2d2b2b;
+    --ink-900: #f3f2f2;
+    --slate-500: #9b9797;
+    --hairline-300: #444141;
+    --stamp-600: #ff563c;
+    --refusal-700: #ff9783;
   }
 }
 
@@ -79,40 +144,108 @@ textarea {
 }
 
 button {
-  background: var(--color-accent);
-  color: var(--color-accent-contrast);
   border: none;
-  border-radius: 3px;
-  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 
 button:disabled {
-  opacity: 0.5;
-  cursor: default;
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
-button.app-back {
-  display: block;
-  background: none;
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  font-size: 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) calc(var(--space-3) * 1.2);
+  cursor: pointer;
+}
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* A destructive commit: outlined in the accent, never filled, per the
+   document's own "Destructive" example. Applies alongside .btn-secondary. */
+.btn-destructive {
+  border-color: var(--color-accent);
   color: var(--color-accent);
-  padding: 0;
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.btn-primary:hover {
+  background: var(--color-accent-600);
+}
+
+.btn-primary:active {
+  background: var(--color-accent-700);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--color-text);
+  border-color: var(--color-divider);
+}
+
+.btn-secondary:hover {
+  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+}
+
+.btn-secondary:active {
+  background: color-mix(in srgb, var(--color-text) 14%, transparent);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-accent);
+  padding-inline: var(--space-1);
+}
+
+.btn-ghost:hover {
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
+.btn-ghost:active {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.app-back {
+  display: block;
+  padding-left: 0;
   margin-bottom: var(--space-3);
 }
 
 input,
 select {
   border: 1px solid var(--color-border);
-  border-radius: 3px;
+  border-radius: var(--radius-md);
   padding: var(--space-2);
   background: var(--color-surface);
 }
 
+input:focus-visible,
+select:focus-visible {
+  border-color: var(--color-accent);
+  outline-offset: 0;
+}
+
 h1,
 h2 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  letter-spacing: -0.015em;
 }
 
 h1 {

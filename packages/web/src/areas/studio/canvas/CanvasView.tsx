@@ -200,7 +200,7 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep }:
   return (
     <div className="canvas-wrap">
       <div className="canvas-toolbar">
-        <button type="button" onClick={fitToView}>
+        <button type="button" className="btn btn-secondary" onClick={fitToView}>
           {t("canvas.fitToView")}
         </button>
       </div>

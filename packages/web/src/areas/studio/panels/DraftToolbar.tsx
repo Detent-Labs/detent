@@ -114,13 +114,13 @@ export function DraftToolbar({ processId, token, saveState, onSaveState, onDisca
   return (
     <fieldset className="draft-toolbar">
       <legend>{t("draftToolbar.legend")}</legend>
-      <button type="button" disabled={saving} onClick={() => void save()}>
+      <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => void save()}>
         {saving ? t("draftToolbar.saving") : t("draftToolbar.save")}
       </button>
-      <button type="button" onClick={() => void discard()}>
+      <button type="button" className="btn btn-secondary btn-destructive" onClick={() => void discard()}>
         {t("draftToolbar.discard")}
       </button>
-      <button type="button" disabled={publishing} onClick={() => void publish()}>
+      <button type="button" className="btn btn-primary" disabled={publishing} onClick={() => void publish()}>
         {publishing ? t("draftToolbar.publishing") : t("draftToolbar.publish")}
       </button>
       {error && <p className="studio-error">{error}</p>}
@@ -132,7 +132,7 @@ export function DraftToolbar({ processId, token, saveState, onSaveState, onDisca
       {saveState.conflict && (
         <p className="studio-conflict">
           {t("draftToolbar.conflictMessage")}{" "}
-          <button type="button" onClick={() => void reload()}>
+          <button type="button" className="btn btn-secondary" onClick={() => void reload()}>
             {t("draftToolbar.conflictReload")}
           </button>
         </p>

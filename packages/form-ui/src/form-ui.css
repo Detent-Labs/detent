@@ -1,11 +1,13 @@
-/* ponytail: structural layout only, no visual design yet — real styling
-   lands with the end-user app screens (the app area of packages/web), then flows back here
-   so the editor's Player picks it up too. */
+/* Real styling, not layout-only: the studio area's Player and the app area
+   share this file, so what an author previews is what a participant fills
+   in. Components reference only the semantic layer tokens.css defines; the
+   host area (app.css or studio's app.css) has already loaded it by the time
+   these rules apply, so this file needs no import of its own. */
 
 .form-ui-field-form {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--space-4);
 }
 
 /* Wraps a label+control pair and its (sibling, not nested) issue list —
@@ -15,32 +17,77 @@
 .form-ui-field {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: var(--space-1);
+}
+
+/* Label above control, both flush left, 4px apart — the document's own
+   Fields rule. */
+.form-ui-field-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+}
+
+.form-ui-field input,
+.form-ui-field select,
+.form-ui-field textarea {
+  font: inherit;
+  font-size: 14px;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.form-ui-field input:focus-visible,
+.form-ui-field select:focus-visible,
+.form-ui-field textarea:focus-visible {
+  border-color: var(--color-accent);
+  outline-offset: 0;
 }
 
 .form-ui-field-control {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: var(--space-1);
 }
 
 .form-ui-field-group {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--space-4);
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.form-ui-field-group > legend {
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  font-size: 16px;
+  padding: 0;
 }
 
 .form-ui-required-marker {
-  margin-left: 0.25rem;
+  margin-left: var(--space-1);
+  color: var(--color-accent);
 }
 
+/* "Required.", "Must be a number." — an engine-checked constraint stated
+   literally, so it takes the mono face, in the refusal tone (matching the
+   document's own Fields example). A sibling of the label, never nested
+   inside it. */
 .form-ui-field-issues {
   margin: 0;
   padding: 0;
   list-style: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-refusal);
 }
 
 .form-ui-paths {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }

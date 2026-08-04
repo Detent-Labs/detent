@@ -112,7 +112,7 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
 
   return (
     <main className="studio-screen">
-      <button type="button" className="studio-back" onClick={() => navigate({ name: "processes" })}>
+      <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "processes" })}>
         ← Back to processes
       </button>
       <h1>Tools</h1>
@@ -120,7 +120,7 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
         <div className="studio-error-banner" role="alert">
           <span className="studio-error-banner-stamp">{t("error.failed")}</span>
           <span className="studio-error-banner-message">{loadError}</span>
-          <button type="button" onClick={() => load()} disabled={loading}>
+          <button type="button" className="btn btn-secondary" onClick={() => load()} disabled={loading}>
             {t("error.retry")}
           </button>
         </div>
