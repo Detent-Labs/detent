@@ -648,6 +648,14 @@ test("OPTIONS preflight on the admin users roles route returns 204 permitting PA
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("PATCH");
 });
 
+// Without this the admin screen's manager save fails in a browser and nowhere
+// else: the PATCH never leaves, because its preflight has no handler.
+test("OPTIONS preflight on the admin users manager route returns 204 permitting PATCH", async () => {
+  const res = await fetch(new Request("http://x/admin/users/user_x/manager", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("PATCH");
+});
+
 test("OPTIONS preflight on the admin migrations run route returns 204 permitting POST", async () => {
   const res = await fetch(new Request("http://x/admin/migrations/run", { method: "OPTIONS" }));
   expect(res.status).toBe(204);
