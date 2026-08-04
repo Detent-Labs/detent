@@ -6,15 +6,15 @@ When the process started via `import.meta.main` receives SIGTERM or SIGINT,
 the server SHALL run an orderly shutdown. It SHALL NOT exit at once. It
 SHALL stop accepting new HTTP connections and let in-flight requests
 finish. It SHALL then stop the engine's background pollers, close the
-database connection pool, and exit. A second SIGTERM or SIGINT received
-while shutdown is already in progress SHALL NOT start a second shutdown
-sequence.
+database connection pool, and exit with code 0. A second SIGTERM or SIGINT
+received while shutdown is already in progress SHALL NOT start a second
+shutdown sequence.
 
 #### Scenario: SIGTERM triggers an orderly shutdown
 - **WHEN** the running server process receives SIGTERM
 - **THEN** it stops accepting new HTTP connections and lets in-flight
   requests complete
-- **AND** it then stops the four background pollers and closes the
+- **AND** it then stops the engine's background pollers and closes the
   database pool
 - **AND** it exits with code 0
 

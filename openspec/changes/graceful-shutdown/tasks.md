@@ -9,21 +9,29 @@
 - [ ] 1.3 Guard the handler with a module-level boolean. A signal received
       while shutdown is already running does nothing, so `sql.end()` never
       runs twice
+- [ ] 1.4 Update `test/schema-bootstrap.test.ts`, the one existing caller of
+      that `stop`. Widen its `stopServer` type to hold a promise-returning
+      function and await it in `afterEach`, so a drain finishes before the
+      next test opens its own server
 
 ## 2. Tests
 
 - [ ] 2.1 Add a unit test that `startHttpServer(...).stop()` awaits
-      `server.stop()` before it returns. Start a slow in-flight request,
-      call `stop()`, and assert the request finishes before `stop()`'s
-      promise resolves
+      `server.stop()` before it returns. Hold a request in flight with a
+      body trickled in chunks (the route awaits `req.json()`), call
+      `stop()`, and assert the request finishes before `stop()`'s promise
+      resolves
 - [ ] 2.2 Add an end-to-end test, following the `Bun.spawn` pattern in
       `test/auth-cli.test.ts`. Run `bun run src/http/server.ts` as a child
-      process, wait for `/livez` to answer, send SIGTERM, and assert the
-      process exits with code 0 within a bound
+      process with `env: { ...process.env, PORT: String(port) }` on a free
+      port of the test's own choosing — never the 3000 default, which
+      `scripts/dev-up.sh` occupies. Wait for `/livez` on that port to
+      answer, send SIGTERM, and assert the process exits with code 0 within
+      a bound
 - [ ] 2.3 Extend that test to send SIGTERM twice in quick succession and
       assert the process still exits cleanly exactly once
 - [ ] 2.4 Add a SIGINT variant of 2.2, confirming SIGINT follows the same
-      shutdown path as SIGTERM
+      shutdown path as SIGTERM. Give it its own free port
 
 ## 3. Sync the spec and the state doc
 
