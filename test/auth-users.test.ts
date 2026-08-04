@@ -5,7 +5,19 @@
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
-import { createUser, verifyLogin, setRoles, setRolesById, setPassword, listUsers, setDisabled } from "../src/auth/users.js";
+import {
+  createUser,
+  verifyLogin,
+  setRoles,
+  setRolesById,
+  setPassword,
+  listUsers,
+  setDisabled,
+  setManagerById,
+  setManagerByEmail,
+  getManagerOf,
+  SelfManagerError,
+} from "../src/auth/users.js";
 
 const DB = !!process.env.DATABASE_URL;
 
@@ -134,4 +146,104 @@ test.skipIf(!DB)("a user disabled via setDisabled fails verifyLogin exactly like
   expect(await verifyLogin("j@example.com", "correct-horse")).toBeUndefined();
   await setDisabled(userId, false);
   expect(await verifyLogin("j@example.com", "correct-horse")).toBeDefined();
+});
+
+// ============================================================
+// The manager pointer (manager-of-starter-assignment)
+// ============================================================
+
+test.skipIf(!DB)("initSchema adds manager_user_id, and an existing row holds NULL", async () => {
+  // The column ships as its own ALTER, since CREATE TABLE IF NOT EXISTS does not
+  // touch a table that already exists. Re-running initSchema over a populated
+  // table is the shape a deployed database upgrades through.
+  const { userId } = await createUser("m1@example.com", "pw", []);
+  await initSchema();
+  const rows = (await sql`SELECT manager_user_id FROM auth_users WHERE user_id = ${userId}`) as { manager_user_id: string | null }[];
+  expect(rows[0]!.manager_user_id).toBeNull();
+  const [listed] = await listUsers();
+  expect(listed!.managerUserId).toBeUndefined();
+});
+
+test.skipIf(!DB)("a manager pointer round-trips through setManagerById and getManagerOf", async () => {
+  const boss = await createUser("boss@example.com", "pw", []);
+  const staff = await createUser("staff@example.com", "pw", []);
+  const updated = await setManagerById(staff.userId, boss.userId);
+  expect(updated!.managerUserId).toBe(boss.userId);
+  expect(await getManagerOf(staff.userId)).toBe(boss.userId);
+});
+
+test.skipIf(!DB)("setManagerById with null clears the pointer", async () => {
+  const boss = await createUser("boss2@example.com", "pw", []);
+  const staff = await createUser("staff2@example.com", "pw", []);
+  await setManagerById(staff.userId, boss.userId);
+  const cleared = await setManagerById(staff.userId, null);
+  expect(cleared!.managerUserId).toBeUndefined();
+  expect(await getManagerOf(staff.userId)).toBeUndefined();
+});
+
+test.skipIf(!DB)("setManagerById returns undefined for an unknown userId", async () => {
+  const boss = await createUser("boss3@example.com", "pw", []);
+  expect(await setManagerById("user_does_not_exist", boss.userId)).toBeUndefined();
+});
+
+test.skipIf(!DB)("a manager naming no account is refused by the self-reference", async () => {
+  const staff = await createUser("staff4@example.com", "pw", []);
+  let caught: unknown;
+  try {
+    await setManagerById(staff.userId, "user_does_not_exist");
+  } catch (err) {
+    caught = err;
+  }
+  expect(caught).toBeDefined();
+  expect(await getManagerOf(staff.userId)).toBeUndefined();
+});
+
+test.skipIf(!DB)("an account cannot be its own manager", async () => {
+  const staff = await createUser("staff5@example.com", "pw", []);
+  let caught: unknown;
+  try {
+    await setManagerById(staff.userId, staff.userId);
+  } catch (err) {
+    caught = err;
+  }
+  expect(caught).toBeInstanceOf(SelfManagerError);
+  expect(await getManagerOf(staff.userId)).toBeUndefined();
+});
+
+test.skipIf(!DB)("a two-account cycle is representable, since nothing walks the pointer", async () => {
+  const a = await createUser("cyc-a@example.com", "pw", []);
+  const b = await createUser("cyc-b@example.com", "pw", []);
+  await setManagerById(a.userId, b.userId);
+  await setManagerById(b.userId, a.userId);
+  expect(await getManagerOf(a.userId)).toBe(b.userId);
+  expect(await getManagerOf(b.userId)).toBe(a.userId);
+});
+
+test.skipIf(!DB)("getManagerOf is undefined for no manager and for an unknown account", async () => {
+  const staff = await createUser("staff6@example.com", "pw", []);
+  expect(await getManagerOf(staff.userId)).toBeUndefined();
+  expect(await getManagerOf("user_does_not_exist")).toBeUndefined();
+});
+
+test.skipIf(!DB)("an account with no manager still logs in and still lists", async () => {
+  await createUser("plain@example.com", "pw", ["employee"]);
+  expect(await verifyLogin("plain@example.com", "pw")).toMatchObject({ roles: ["employee"] });
+  const [listed] = await listUsers();
+  expect(listed!.managerUserId).toBeUndefined();
+});
+
+test.skipIf(!DB)("setManagerByEmail is the CLI's email-keyed path, and clears with null", async () => {
+  await createUser("boss7@example.com", "pw", []);
+  const staff = await createUser("staff7@example.com", "pw", []);
+  await setManagerByEmail("staff7@example.com", "boss7@example.com");
+  const boss = (await listUsers()).find((u) => u.email === "boss7@example.com")!;
+  expect(await getManagerOf(staff.userId)).toBe(boss.userId);
+  await setManagerByEmail("staff7@example.com", null);
+  expect(await getManagerOf(staff.userId)).toBeUndefined();
+});
+
+test.skipIf(!DB)("setManagerByEmail names the email that does not exist", async () => {
+  await createUser("staff8@example.com", "pw", []);
+  expect(setManagerByEmail("staff8@example.com", "ghost@example.com")).rejects.toThrow("ghost@example.com");
+  expect(setManagerByEmail("ghost@example.com", null)).rejects.toThrow("ghost@example.com");
 });

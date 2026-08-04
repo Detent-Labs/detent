@@ -220,8 +220,8 @@ export async function handleAdminSetUserManager(userId: string, req: Request, re
       if (err instanceof SelfManagerError) {
         return { status: 400, body: { error: { type: "self-manager", message: "a user cannot be their own manager" } } };
       }
-      // The self-reference rejecting an id that backs no account.
-      if (isForeignKeyViolation(err)) {
+      // The column's self-reference rejecting an id that backs no account.
+      if (isManagerForeignKeyViolation(err)) {
         return { status: 400, body: { error: { type: "unknown-manager", message: `no user: ${managerUserId}` } } };
       }
       throw err;
@@ -231,9 +231,16 @@ export async function handleAdminSetUserManager(userId: string, req: Request, re
   });
 }
 
-/** Postgres SQLSTATE 23503. Bun.sql surfaces the code on the thrown error rather than as a typed class. */
-function isForeignKeyViolation(err: unknown): boolean {
-  return typeof err === "object" && err !== null && (err as { code?: unknown }).code === "23503";
+/**
+ * Postgres SQLSTATE 23503 on this column's own constraint. Bun.sql throws an
+ * untyped `PostgresError` carrying the SQLSTATE as `errno` (`code` holds
+ * `ERR_POSTGRES_SERVER_ERROR`, which is the same for every server error), so the
+ * check reads `errno` and the constraint name rather than `code`.
+ */
+function isManagerForeignKeyViolation(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const e = err as { errno?: unknown; constraint?: unknown };
+  return e.errno === "23503" && e.constraint === "auth_users_manager_user_id_fkey";
 }
 
 export async function handleAdminDisableUser(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
