@@ -198,12 +198,15 @@ removed, the allowlist SHALL be updated in the same change.
 ### Requirement: Every push runs the toolchain's checks against a real database
 
 The repository SHALL carry a `pre-push` hook, under a committed hooks
-directory. It SHALL run the repo-wide typecheck and the full test suite before
-a push leaves the machine. Each clone enables it once, with
+directory. It SHALL run three things before a push leaves the machine. Those
+are the repo-wide typecheck, the full test suite, and the mechanical gates
+`push-gate-checks` specifies. Each clone enables the hook once, with
 `git config core.hooksPath .githooks`.
 
 The hook SHALL run the checks **inside the devcontainer**, not on the host.
-That placement is what makes the checks meaningful.
+That placement is what makes the checks meaningful. The gates that need only git
+and a shell are the exception. They run on the host, before the container starts,
+as `push-gate-checks` specifies.
 
 Two properties come with it. `DATABASE_URL` is already set there, so the
 DB-backed suites run instead of skipping. The Bun version is the one
@@ -213,7 +216,9 @@ a different runtime than the project's.
 The silent-skip hazard is why placement matters. The DB-backed suites are
 `test.skipIf(!DB)` at hundreds of sites, most of the suite. A run without the
 variable reports a pass count that omits most of what was written. It looks
-identical to a genuine green.
+identical to a genuine green. Placement alone no longer carries that guarantee.
+`push-gate-checks` adds a gate that reads the run's own skip count. That gate
+checks the property rather than assuming it.
 
 The hook SHALL run the preflight's `core` profile before the checks. That
 profile is what refuses a push when the devcontainer is down, and it names the
@@ -230,6 +235,10 @@ catch.
 The typecheck SHALL be a step of its own. Bun does not typecheck, so a type
 error passes `bun test` cleanly.
 
+A gate that rejects a push SHALL block that push. The terms are those of a
+failing typecheck or a failing suite. The hook has one bypass, `--no-verify`.
+That flag disables every check at once, not the one a contributor means to skip.
+
 The repository SHALL NOT carry a hosted-CI workflow for this purpose. The
 owner does not want a hosted service executing this repository. A workflow
 file that never runs reads as coverage it does not provide.
@@ -239,6 +248,12 @@ file that never runs reads as coverage it does not provide.
 - **WHEN** a push is attempted with the devcontainer up
 - **THEN** the hook runs the repo-wide typecheck, then the full test suite,
   both in the container. The push proceeds only when both pass
+
+#### Scenario: A push runs the mechanical gates
+
+- **WHEN** a push is attempted with the devcontainer up
+- **THEN** the hook also runs the gates `push-gate-checks` specifies, and the
+  push proceeds only when every one of them passes
 
 #### Scenario: A stopped devcontainer blocks the push
 
