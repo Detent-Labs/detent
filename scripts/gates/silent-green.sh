@@ -28,7 +28,11 @@ if [ -z "$OUT" ] || [ ! -f "$OUT" ]; then
   exit 1
 fi
 
-if grep -q '\[test\] DATABASE_URL unset' "$OUT"; then
+# Both literals are anchored to line start. The preload prints them in column 0,
+# while bun prints a test line as `(pass) <name>`. Without the anchor a test
+# whose NAME held either literal would block every push, and no edit to the
+# suite could satisfy the gate.
+if grep -q '^\[test\] DATABASE_URL unset' "$OUT"; then
   echo "pre-push: rule '$RULE' rejected this push." >&2
   echo "  The suite ran with DATABASE_URL unset, so the DB-backed suites" >&2
   echo "  skipped. That pass count proves almost nothing." >&2
@@ -37,7 +41,7 @@ if grep -q '\[test\] DATABASE_URL unset' "$OUT"; then
   exit 1
 fi
 
-if ! grep -q '\[test\] database:' "$OUT"; then
+if ! grep -q '^\[test\] database:' "$OUT"; then
   echo "pre-push: rule '$RULE' rejected this push." >&2
   echo "  The captured run names no database. development-toolchain requires" >&2
   echo "  every run to print the database it connected to, before the first" >&2
