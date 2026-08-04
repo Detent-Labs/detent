@@ -55,6 +55,15 @@ const delegated = () => ({
   payload: { fromActorId: "user_1", toActorId: "user_2" },
 });
 
+const unresolved = () => ({
+  ...fired(),
+  kind: "assignment.unresolved",
+  payload: {
+    stepId: "step_1a2b3c4d-0000-4000-8000-000000000005",
+    reason: "no-candidates",
+  },
+});
+
 describe("InstanceEvent", () => {
   it("accepts both declared kinds", () => {
     expect(instanceEvent.safeParse(fired()).success).toBe(true);
@@ -77,6 +86,31 @@ describe("InstanceEvent", () => {
       ],
     };
     expect(instanceEvent.safeParse(withOutcome).success).toBe(true);
+  });
+
+  it("accepts assignment.unresolved on each of its three reasons", () => {
+    for (const reason of ["resolver-raised", "timed-out", "no-candidates"]) {
+      const e = { ...unresolved(), payload: { ...unresolved().payload, reason } };
+      expect(instanceEvent.safeParse(e).success).toBe(true);
+    }
+  });
+
+  it("rejects a malformed assignment.unresolved payload", () => {
+    const e = unresolved();
+    // An unknown reason, an extra key, and a missing reason each fail: the
+    // payload is strict and the enum is closed.
+    expect(instanceEvent.safeParse({ ...e, payload: { ...e.payload, reason: "gave-up" } }).success).toBe(false);
+    expect(instanceEvent.safeParse({ ...e, payload: { ...e.payload, strategyType: "static" } }).success).toBe(false);
+    expect(instanceEvent.safeParse({ ...e, payload: { stepId: e.payload.stepId } }).success).toBe(false);
+  });
+
+  it("never surfaces action outcomes on assignment.unresolved", () => {
+    // The arm declares no `actions` field, because an unresolved assignment
+    // enqueues nothing. A stray one is stripped on read (the read path strips
+    // rather than rejects, so a stored row stays parseable), which is the
+    // guarantee that matters: a reader cannot see outcomes that cannot exist.
+    const parsed = instanceEvent.parse({ ...unresolved(), actions: [] });
+    expect(parsed).not.toHaveProperty("actions");
   });
 
   it("rejects an extra key on the subprocess.spawn-enqueued payload", () => {

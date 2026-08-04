@@ -266,6 +266,13 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     roles         text[] NOT NULL DEFAULT '{}',
     disabled      boolean NOT NULL DEFAULT false
   )`;
+  // The account's manager: a pointer to one other account, never a tree. Read by
+  // the `org.manager-of-starter` assignment strategy (assignment-strategies.ts).
+  // Its own statement, since CREATE TABLE IF NOT EXISTS does not touch a table
+  // that already exists. The self-reference makes a pointer to no account
+  // unrepresentable; nothing deletes an account today, so ON DELETE SET NULL
+  // states an intent rather than a path that runs.
+  await db`ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS manager_user_id text REFERENCES auth_users(user_id) ON DELETE SET NULL`;
   // Studio's mutable draft store: one row per process, the authored (uncompiled)
   // body an author is still editing. Deliberately not `definitions` with
   // `status='draft'` — that table is what resolution.ts and the timer worker
@@ -397,6 +404,12 @@ export async function createInstance(
     // which would break the persistence-only remit stated above and, on a
     // subprocess spawn, would run inside an already-open transaction.
     assignment?: Instance["assignment"];
+    // Events the caller minted for this creation, appended to the ones this
+    // function derives itself (unarmed timers, an enqueued initial spawn). The
+    // caller supplies an `assignment.unresolved` here when the resolution above
+    // produced no candidate: it must land in the same transaction as the INSERT,
+    // and only the caller knows the reason.
+    events?: InstanceEvent[];
   },
   db: SQL = sql,
 ): Promise<Instance> {
@@ -437,15 +450,18 @@ export async function createInstance(
   // A timer the initial step declared but arming could not compute a fireAt for.
   // Recorded at seq 0 — creation advances no sequence, and an event records the
   // seq in force rather than advancing it.
-  const events: InstanceEvent[] = drops.map((d) => ({
-    id: newInstanceEventId(),
-    instanceId: inst.instanceId,
-    transitionSeq: inst.transitionSeq,
-    version: inst.version,
-    kind: "timer.unarmed" as const,
-    payload: { timerId: d.timerId, reason: d.reason },
-    at: startedAt,
-  }));
+  const events: InstanceEvent[] = [
+    ...(opts.events ?? []),
+    ...drops.map((d) => ({
+      id: newInstanceEventId(),
+      instanceId: inst.instanceId,
+      transitionSeq: inst.transitionSeq,
+      version: inst.version,
+      kind: "timer.unarmed" as const,
+      payload: { timerId: d.timerId, reason: d.reason },
+      at: startedAt,
+    })),
+  ];
   // Creation at a subprocess initial step is a step entry like any other and
   // carries the same consequence: the child is spawned. planStepEntry enqueues
   // this on a transition; creation is not a transition and does not route

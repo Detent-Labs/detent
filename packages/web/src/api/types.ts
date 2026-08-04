@@ -54,6 +54,10 @@ export type ClientError =
   // account making the request. A 409, but not a concurrency one: retrying
   // changes nothing, so it reads as its own type rather than "conflict".
   | { type: "self-role-strip"; message: string }
+  // `PATCH /admin/users/:id/manager` refusing a pointer. Two 400s, distinct
+  // because the repair differs: pick another account, or refresh first.
+  | { type: "self-manager"; message: string }
+  | { type: "unknown-manager"; message: string }
   // Publish-time rejections. The server maps six distinct error classes here
   // (registry, CEL, duration, compile, schema, cross-process); five carry
   // located `issues`, cross-process carries a message. All six reach a

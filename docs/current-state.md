@@ -472,7 +472,24 @@ Stage-by-stage status is in `ROADMAP.md`.
   schema. `"static"` (`registry.ts::STATIC_ASSIGNMENT_STRATEGY_TYPE`,
   registered by `createDefaultAssignmentRegistry`) is the entry an author gets
   by default and the only one that ships; its schema is
-  `{ candidates: string[] }` and its resolver returns that list verbatim. The
+  `{ candidates: string[] }` and its resolver returns that list verbatim. A
+  second entry now ships beside it: `"org.manager-of-starter"`
+  (`engine/assignment-strategies.ts::MANAGER_OF_STARTER_STRATEGY_TYPE`), whose
+  config schema is a strict empty object. Its resolver returns the manager
+  of `instance.startedBy` as the single candidate. ONE hop: never a chain, and
+  never the manager of whoever acted last.
+
+  It reads `auth_users.manager_user_id` through `auth/users.ts::getManagerOf`.
+  That is why it lives in its own module rather than in leaf `registry.ts`:
+  `store.ts` imports `registry.ts` back, so a database-reading entry there
+  would close a cycle.
+  `assignment-strategies.ts::createDefaultAssignmentRegistry(db)` returns the
+  static entry plus this one, and deliberately shares the leaf factory's NAME.
+  The three `src/http/*` modules therefore switch the whole HTTP surface onto
+  it by changing which module the identifier comes from, with no
+  default-parameter expression touched. Every in-engine default parameter still
+  resolves to the static-only leaf factory. A test therefore asserts that the
+  registry `serve` defaults to holds `org.manager-of-starter`. The
   type is checked at PUBLISH (`registry-check.ts::checkAssignmentRegistry`,
   through the same resolve-then-parse loop the action and data-source checks
   share, wired into `definitions.ts::publishBody`, throwing
@@ -495,7 +512,33 @@ Stage-by-stage status is in `ROADMAP.md`.
   the step. Migration passes `{ carry: true }` instead, carrying
   `instance.assignment` forward byte-for-byte and running no resolver at all.
   An unregistered type reaching step entry resolves to an empty candidate list
-  rather than raising, and no fallback assignee is substituted.
+  rather than raising, and no fallback assignee is substituted. Resolution is
+  TOTAL and DEADLINE-BOUNDED: `resolveStepAssignment` races every resolver
+  against `ASSIGNMENT_RESOLUTION_TIMEOUT_MS` (default 5000) and returns
+  `{ assignment, unresolved? }`, classifying the three no-candidate outcomes as
+  `resolver-raised`, `timed-out` or `no-candidates`. None rolls back the entry.
+  The state change that reached the step is real.
+
+  The bound is what makes the subprocess return's carve-out safe. That one path
+  resolves while holding the parent's row lock, since it derives the step it
+  enters from the row it read `FOR UPDATE`. It is bounded rather than hoisted
+  above the lock. A hoist would still fall back to resolving under the lock
+  whenever its sequence re-check failed, which makes the unbounded hold rarer
+  rather than impossible. `Promise.race` does not cancel the loser, and need
+  not: the orphaned query holds a different pool connection. The caller
+  therefore returns on time, its transaction commits and releases the lock, and
+  a late answer is ignored.
+
+  Each of the four step-entry callers records the reason as an
+  `assignment.unresolved` `InstanceEvent`, payload `{ stepId, reason }`, the
+  `instance.faulted` shape. It lands in the transaction that commits the entry:
+  `commitTransition` through `StepEntryOpts.events`, and the three creation
+  paths through `createInstance`'s own `events` option, at seq 0 where no
+  `HistoryEntry` exists. A spawned child's event carries the CHILD's id, not
+  the parent-scoped `mapping.entry-dropped` list's. The rule is uniform across
+  every registered strategy, since no engine code branches on a strategy type.
+  A `static` entry configured with an empty list therefore records
+  `no-candidates` too. A step declaring no `assignment` records nothing.
   `claimStep`/`releaseClaim`
   (`transition.ts`, exposed via the Runtime API and the two new HTTP routes) are
   exclusive-claim operations, not transitions (no step change, no
@@ -939,16 +982,18 @@ Stage-by-stage status is in `ROADMAP.md`.
   `src/http/admin-routes.ts`, `admin-users`, `admin-user-management`): stage
   10's second of three changes, the one HTTP carve-out from
   `local-user-accounts`'s CLI-only administration. `src/auth/users.ts` gains
-  `listUsers` (every `auth_users` row as `{userId, email, roles, disabled}`,
+  `listUsers` (every `auth_users` row as
+  `{userId, email, roles, disabled, managerUserId}`,
   never `password_hash`) and `setDisabled(userId, disabled, db)` — keyed by
   `userId`, unlike `setRoles`/`setPassword`'s `email`, since its caller is a
   row from a `listUsers` result rather than a human typing an address they
   know; it returns the updated row via `RETURNING`, or `undefined` for an
   unknown id, so the HTTP handler needs no follow-up query to answer 200/404.
-  Four `system:admin`-gated routes in `admin-routes.ts`: `GET
+  Five `system:admin`-gated routes in `admin-routes.ts`: `GET
   /admin/users`, `POST /admin/users/:id/disable`, `POST
   /admin/users/:id/enable`, and (added later, see the role-editing entry
-  below) `PATCH /admin/users/:id/roles`. Creating a user and changing a
+  below) `PATCH /admin/users/:id/roles` and `PATCH /admin/users/:id/manager`.
+  Creating a user and changing a
   password remain CLI-only — no HTTP path reaches either. Disabling takes
   effect on the user's *next* login attempt only;
   it does not revoke a JWT already issued to them, since token verification
@@ -1973,6 +2018,57 @@ Stage-by-stage status is in `ROADMAP.md`.
   window-focus refetch `useRefresh` fires unasked. A picker over known
   roles was rejected for now, since nothing knows which business roles
   exist until roadmap #25c gives them a source.
+
+- Manager service (`src/engine/store.ts`, `src/auth/users.ts`,
+  `src/auth/cli.ts`, `src/engine/assignment-strategies.ts`,
+  `src/engine/registry.ts`, `src/schema/definition.ts`,
+  `src/http/admin-routes.ts`, the admin area of `packages/web`, roadmap #25c,
+  `add-manager-service`): the first per-instance assignment, and the first
+  fallible resolver. The strategy, the deadline and the
+  `assignment.unresolved` event all sit under "Assignment" above. What
+  follows is the account side.
+
+  <!-- antislop: allow synonym-rotation -->
+  `auth_users` gains `manager_user_id text REFERENCES auth_users(user_id) ON
+  DELETE SET NULL`. It is added by its own `ALTER TABLE ... ADD COLUMN IF NOT
+  EXISTS`, because `CREATE TABLE IF NOT EXISTS` does not touch a table that
+  already exists. One pointer to one other account: no department, no deputy,
+  no matrix, and no second hop.
+
+  The self-reference makes a pointer to no
+  account unrepresentable. A cycle between two accounts stays representable
+  and stays harmless, since nothing walks the pointer. A self-pointer is the
+  one case refused, on the write path rather than in the schema. It would name
+  an instance's starter as their own approver.
+
+  `setManagerById(userId, managerUserId, db)` mirrors `setRolesById`.
+  `setManagerByEmail` is the CLI's email-keyed sibling, behind
+  `bun run src/auth/cli.ts set-manager <email> <manager-email|->`, where `-`
+  clears. `getManagerOf(userId, db)` is what the strategy reads.
+
+  `PATCH /admin/users/:id/manager` is the fifth `/admin/users*` route, body
+  `{ managerUserId: string | null }`. It answers 400 for a self-pointer
+  (`SelfManagerError`) and for a target naming no account. The column's own
+  foreign key reports the latter, rather than a pre-read. A concurrent
+  delete therefore cannot slip between a check and the write. Bun's `PostgresError`
+  carries the SQLSTATE on `errno`, not on `code`, which holds
+  `ERR_POSTGRES_SERVER_ERROR` for every server error. The check therefore reads
+  `errno` plus the constraint name.
+
+  The `/users` screen gains a Manager column. Each row carries a select of the
+  other listed accounts plus a clearing choice, never the account under edit.
+  A manager is a pointer into a known set, not a free string. It therefore
+  takes a select where roles take a text input. One editor is open per screen,
+  so a row never shows two pending changes at once.
+
+  A disabled account stays selectable. Disabling blocks a login, and it does
+  not retire someone from an org chart. Hiding such an account would strand an
+  existing pointer.
+
+  The route needed its own `OPTIONS` preflight entry in `server.ts`. Without
+  one the screen's save never left the browser, while every server-side test
+  still passed. Found in a browser, and now covered by a test beside the roles
+  route's.
 
 ## Process Studio, migration-plan field mapping (`studio-migration-plan-field-mapping`)
 
