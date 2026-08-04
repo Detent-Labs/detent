@@ -533,8 +533,8 @@ Spec: `development-toolchain`.
     `data-list-administration`. Design:
     `docs/superpowers/specs/2026-08-02-db-data-lists-design.md`.
 
-27. No-code / low-code process authoring: item (a) DONE, (b)-(d) NOT STARTED,
-    no OpenSpec change yet for those three.
+27. No-code / low-code process authoring: items (a) and (c) DONE, (b) and (d)
+    NOT STARTED, no OpenSpec change yet for those two.
     Raised 2026-08-03 as the product direction the README and `CLAUDE.md` now
     state: a business analyst builds a process in the studio area without
     writing JSON or CEL. This is a stage, not a rewrite. The studio area already
@@ -591,11 +591,26 @@ Spec: `development-toolchain`.
        hash), and beside the draft it dies at publish, which leaves a published
        version uneditable in the builder. This is the largest of the four and
        deserves its own design.
-    c. Migration-plan authoring without JSON. Stage 11 shipped a `MigrationSpec`
-       textarea on purpose — no field-by-field form existed to extend and the
-       server owns validation. A field-mapping UI over the two versions'
-       catalogs is the same shape of work as (a), and both versions are already
-       fetchable.
+    c. **Migration-plan authoring without JSON: DONE.** Stage 11 shipped a
+       `MigrationSpec` textarea on purpose, since no field-by-field form
+       existed to extend and the server owns validation. The migration-plan
+       screen now carries a Mapping/JSON toggle. The Mapping side
+       (`panels/MigrationSpecEditor.tsx`) offers both versions' catalogs as
+       pickers over all five `MigrationSpec` keys, labelled by `key` and
+       `label` rather than by raw id. It reads both bodies through the
+       existing `getVersionBody` call, so nothing in `src/` changed: no
+       route, no schema, no engine code. Three rules the browser can
+       evaluate report inline before the save (a non-injective `fieldMap`, a
+       `fieldMap` pair whose CEL types disagree, the reserved cancel-sink as
+       a target); the server keeps every check it had. A row whose id no
+       catalog declares is kept and marked, never dropped, so a
+       hand-authored plan round-trips unchanged. The JSON textarea stays as
+       the escape hatch, and the orphan-key dry run is untouched. Stage 27's
+       read-back problem does not arise here: a `MigrationSpec` is
+       structured data, not a language, so the form holds the same object it
+       writes.
+       Change: `studio-migration-plan-field-mapping`. Spec:
+       `studio-migration-plan-form` (new).
     d. Process templates. Nothing seeds a new process today; an author starts
        from an empty draft. A template is a stored draft body, so this needs no
        engine concept — only a decision about where templates live and who

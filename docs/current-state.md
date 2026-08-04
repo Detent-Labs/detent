@@ -1122,10 +1122,10 @@ Stage-by-stage status is in `ROADMAP.md`.
   entry at the end of this file); and a
   migration-plan authoring screen, a JSON-textarea editor over
   `MigrationSpec` (`screens/migrationPlanLogic.ts`) plus an orphan-key
-  dry-run panel — no field-by-field form exists anywhere in the repo for
-  `MigrationSpec`'s shape to extend, and the server already owns validation
-  at `PUT /migration-plans/...`, so a bespoke widget-per-field UI would only
-  duplicate it. Deliberately out of scope: *executing* a migration plan
+  dry-run panel. Stage 27c added the field-mapping form beside that
+  textarea (see the `studio-migration-plan-field-mapping` entry at the end
+  of this file); the textarea stays as the escape hatch. Deliberately out
+  of scope: *executing* a migration plan
   (stays `admin-migration-run`'s future `POST /admin/migrations/run`, an
   operator action) and the registry/CEL-scratchpad tools screen plus Player
   (`studio-tools-and-player`).
@@ -1973,3 +1973,55 @@ Stage-by-stage status is in `ROADMAP.md`.
   window-focus refetch `useRefresh` fires unasked. A picker over known
   roles was rejected for now, since nothing knows which business roles
   exist until roadmap #25c gives them a source.
+
+## Process Studio, migration-plan field mapping (`studio-migration-plan-field-mapping`)
+
+ROADMAP stage 27c. Entirely in the browser. No route, no schema, no engine
+code. The migration-plan screen gained a Mapping/JSON toggle. It uses
+`role="tablist"`, the idiom the edit screen's Structure/JSON toggle already
+uses.
+
+The Mapping side is `panels/MigrationSpecEditor.tsx`, four sections over the
+five `MigrationSpec` keys. The JSON side is the textarea stage 11 shipped,
+unchanged.
+
+`screens/MigrationPlanScreen.tsx` loads both version bodies beside the plan.
+It uses `Promise.allSettled` over the `getVersionBody` call the versions
+screen already makes. A body that fails to load costs the form, not the
+screen. The toggle then forces the JSON side and names the reason.
+
+The plan is one state. The textarea's text is the JSON side's own state, and
+it converts back through `parseSpecText`. Text that is not a plan therefore
+cannot leave that side.
+
+`screens/migrationPlanLogic.ts` holds the conversion and the checks.
+`readCatalog` reads an opaque body into pickable entries. Its field walk
+mirrors `fieldTypeById` (`src/engine/migration.ts`). It recurses into a
+`group` field and never registers the group itself. Labels resolve against
+the body's own `baseLocale`, since this screen holds no draft.
+
+`checkPlan` covers the three rules the browser can evaluate from those two
+bodies:
+
+- a non-injective `fieldMap`;
+- a `fieldMap` pair whose CEL types disagree;
+- the reserved cancel-sink as a `stepMap` value or as `unmappableStep`.
+
+Type agreement imports `celType` from `workflow-engine/cel/check`, the
+function `validatePlan` itself compares. Several declared types share one
+CEL type. A check over the declared type would report an error the server
+does not raise. Everything else stays on the server, including the
+`transforms` expressions and the identity-carried type check. The form never
+blocks a save on its own finding.
+
+Two properties are load-bearing. A row whose id no catalog declares keeps
+that id, shows as unresolved, and saves unchanged. Dropping it would lose
+part of a plan the author never edited. And `route-to-step` selects a target
+step at once, so the schema's presence-iff refinement cannot fail on the
+form's own output.
+
+Stage 27's read-back problem does not apply here. A `MigrationSpec` is
+structured data, not a language. The form therefore reads back what it wrote
+by holding the same object. The one free-text position, a `transforms`
+expression, stays a text input and round-trips as its own `src` string.
+Stage 27b's CEL builder replaces that input, and nothing else.
