@@ -89,14 +89,54 @@ printed, not that you ran it.
 - `bun run typecheck`, then the **full** `bun test` with `DATABASE_URL` set.
   Both rules under Conventions apply. A green without the variable is not
   evidence. A single-file rerun is not the signal.
-- The antislop linter, on every Markdown file the change touched.
+- The antislop linter, on every Markdown file the change touched. The push gate
+  runs it too, over the changed Markdown: `scripts/gates/prose.sh`.
 - `git diff --check`, for trailing whitespace and blank-at-eof. It does NOT
   report CRLF here. `.gitattributes` sets `* text=auto eol=lf`, so git
   normalizes a CRLF worktree file on `git add`. To find CRLF in the worktree,
-  run `grep -lI $'\r'`.
+  run `git ls-files --eol` and read the `w/` column. Do NOT use
+  `grep -lI $'\r'`: MSYS grep opens the file in text mode and strips the CR, so
+  it reports nothing in Git Bash. The push gate runs the `--eol` check over the
+  pushed range: `scripts/gates/whitespace.sh`.
 - A real browser, for any UI change. Green tests do not see an error dialog
   rendered behind a modal, a stale result row, or an `/admin/*` route
   collision. All three shipped past a green suite here.
+
+## Enforced mechanically. Do not re-litigate these.
+
+`.githooks/pre-push` runs the gates below on every push. Each one covers a defect
+class this repository produced two or more times. Each names the rule it broke,
+the files that broke it, and the command that repairs them.
+
+Do not argue these down, weaken a pattern to make a push pass, or raise a
+threshold to clear a red gate. Repair the file instead. Where a gate is wrong
+about a specific line, silence it in place and say why, the way the antislop
+directives already work.
+
+| Rule | Script | Rejects |
+|---|---|---|
+| `ponytail-ledger-fresh` | `gates/ponytail-ledger.sh` | a `ponytail:` marker the ledgers do not list |
+| `pushed-whitespace` | `gates/whitespace.sh` | a CR byte, a trailing space, a blank line at EOF, in the pushed range |
+| `changed-markdown-prose` | `gates/prose.sh` | antislop findings in the Markdown the push changes |
+| `no-machine-paths` | `gates/machine-paths.sh` | an absolute home-directory path in a tracked file |
+| `frozen-lockfile` | `gates/lockfile.sh` | a manifest the committed `bun.lock` cannot satisfy |
+| `no-silent-green` | `gates/silent-green.sh` | a suite run with no database, or one skipping past the floor |
+
+The first four need only git and a shell, so they run on the host and report
+even when the container is down. The last two run in the devcontainer.
+
+Two properties are worth knowing before a push. `--no-verify` bypasses the hook,
+and so disables every gate at once, never just the one in the way. The skip floor
+in `scripts/gates/skip-floor.txt` is a ratchet: raise it only in the commit that
+adds the skip, with a row naming what the increase covers.
+
+Four defect classes recur here and have no gate, on purpose. Stale UI state after
+a mutation needs a browser, which is why the browser check above stays. Orphaned
+exports after a refactor need real TypeScript reference analysis, since a grep
+detector flags 76 of 786 exports. Stale roadmap status has no reliable mapping
+from a change name to a stage line. Off-by-one bounds has one instance and no
+general detector. `openspec/changes/archive/*gate-recurring-defects*/design.md`
+carries the reasoning.
 
 ## Repository layout
 ```

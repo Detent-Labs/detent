@@ -1,8 +1,19 @@
 #!/bin/sh
-# Pre-push gate: `bun run check` (typecheck + the full suite) inside the
-# devcontainer, never on the host — see CLAUDE.md's Conventions. DATABASE_URL
-# is already in the container's environment, so the DB-backed suites run
+# Pre-push gate. Runs in three stages:
+#
+#   1. the host gates      — need only git and a shell, so a stopped container
+#                            still reports them, and they cost milliseconds
+#   2. the preflight       — refuses the push when the devcontainer is down
+#   3. the container gates — `bun run check` (typecheck, then the full suite)
+#                            plus the two gates that need Bun
+#
+# Stage 3 runs INSIDE the devcontainer, never on the host — see CLAUDE.md's
+# Conventions. DATABASE_URL is already set there, so the DB-backed suites run
 # instead of skipping silently.
+#
+# Each gate lives in scripts/gates/ and names the rule it enforces when it
+# rejects a push. Run one alone while repairing it, for example:
+#   sh scripts/gates/whitespace.sh < /dev/null
 #
 # Enable once per clone:
 #   git config core.hooksPath .githooks
@@ -12,32 +23,51 @@
 #
 # MSYS_NO_PATHCONV=1 stops Git Bash rewriting /workspace into a Windows path
 # before Docker sees it.
+#
+# --no-verify bypasses this hook, and so disables every gate at once.
 set -e
 
-# The ponytail ledgers record every `ponytail:` marker in the tree, so they go
-# stale in silence when a marker appears, disappears or moves to another file.
-# This compares the files PONYTAIL-DEBT.md names against the files that hold a
-# marker today, and runs first: it needs no container and costs milliseconds.
-#
-# ponytail: paths only, not line numbers. A marker that moves inside its own
-# file does not trip this. Compare line numbers too if a drifted line number
-# ever costs something.
-if [ -f PONYTAIL-DEBT.md ]; then
-  LEDGER_PATHS=$(grep -oE '^\*\*[^:*]+' PONYTAIL-DEBT.md | cut -c3- | sort -u)
-  TREE_PATHS=$(git grep -l 'ponytail:' -- src packages | sort -u)
+GATES=scripts/gates
 
-  if [ "$LEDGER_PATHS" != "$TREE_PATHS" ]; then
-    echo "pre-push: the ponytail ledgers are stale. These files differ:" >&2
-    printf '%s\n%s\n' "$LEDGER_PATHS" "$TREE_PATHS" | sort | uniq -u | sed 's/^/  /' >&2
-    echo "Rebuild them, then commit the result:" >&2
-    echo "  sh scripts/ponytail-ledgers.sh" >&2
-    echo "To push without the check, pass --no-verify." >&2
-    exit 1
-  fi
-fi
+# Git feeds the pushed refs on stdin, and only the first reader gets them.
+# Capture once, then replay the file into each gate that needs a range.
+REFS=$(mktemp)
+RANGES=$(mktemp)
+CHECK_OUT=$(mktemp)
+trap 'rm -f "$REFS" "$RANGES" "$CHECK_OUT"' EXIT
 
+cat > "$REFS"
+sh "$GATES/range.sh" < "$REFS" > "$RANGES"
+
+# Stage 1: the host gates.
+sh "$GATES/ponytail-ledger.sh"
+sh "$GATES/whitespace.sh" < "$RANGES"
+sh "$GATES/prose.sh" < "$RANGES"
+sh "$GATES/machine-paths.sh"
+
+# Stage 2: the preflight. Its `core` profile, never `serve` — that one restarts
+# the HTTP server, whose outbox poller claims rows the suite is driving.
 bash scripts/preflight.sh core
+
+# Stage 3: the container gates.
+sh "$GATES/lockfile.sh"
 
 COMPOSE="docker compose -f .devcontainer/docker-compose.yml"
 
-MSYS_NO_PATHCONV=1 exec $COMPOSE exec -T -w /workspace app bun run check
+# Capture without a pipe. `cmd | tee` returns tee's status, which needs
+# `set -o pipefail`, and that is not POSIX.
+if MSYS_NO_PATHCONV=1 $COMPOSE exec -T -w /workspace app bun run check \
+     > "$CHECK_OUT" 2>&1; then
+  check_status=0
+else
+  check_status=$?
+fi
+
+cat "$CHECK_OUT"
+
+if [ "$check_status" -ne 0 ]; then
+  echo "pre-push: 'bun run check' failed. See the output above." >&2
+  exit "$check_status"
+fi
+
+sh "$GATES/silent-green.sh" "$CHECK_OUT"

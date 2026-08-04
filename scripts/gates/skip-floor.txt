@@ -1,0 +1,21 @@
+# The number of tests `bun run check` may skip before the no-silent-green gate
+# rejects a push. The gate reads the last bare integer in this file and ignores
+# every line that is not one.
+#
+# Raise this only in the same commit as the change that adds the skip, and add
+# a row below naming what the increase covers. A rising floor with no row is
+# the drift this gate exists to catch.
+#
+# Measured 2026-08-04, on the tree that added the gates: 1831 pass, 1 skip,
+# 0 fail across 111 files, plus 16 pass in test:tz.
+#
+# What the current floor covers:
+#   1  packages/web/test/reporting-reportingLogic.test.ts
+#      "a picked day spans that day in local time, not in UTC" skips under the
+#      default TZ. `bun run test:tz` runs it again with TZ=Europe/Zurich, where
+#      it passes. The skip is the design, not a gap.
+#
+# The DB-backed suites are NOT in this budget. They are test.skipIf(!DB) at
+# hundreds of sites, and the gate's DATABASE_URL check rejects a run that skips
+# them before this number is ever read.
+1
