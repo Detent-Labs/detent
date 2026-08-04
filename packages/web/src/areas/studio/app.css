@@ -271,6 +271,86 @@ h2 {
   resize: vertical;
 }
 
+/*
+ * The mapping form reads as a ledger of transfers, the authored counterpart to
+ * the version diff below: a source on the left, an arrow, a target on the right.
+ * The arrow column is fixed-width so every row's two sides align down the
+ * section, which is what makes a long map scannable.
+ */
+.studio-map-editor {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.studio-map-section {
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  padding: var(--space-3);
+}
+
+.studio-map-section legend {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  padding: 0 var(--space-1);
+}
+
+.studio-map-hint {
+  margin: 0 0 var(--space-3);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  max-width: 60ch;
+  text-wrap: pretty;
+}
+
+.studio-map-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-1) 0;
+  max-width: 64rem;
+}
+
+/* The section's own empty state sits between a hint and a button, so it takes
+   less room than the screen-level one. */
+.studio-map-section .studio-empty {
+  padding: 0 0 var(--space-2);
+}
+
+.studio-map-arrow {
+  font-family: var(--font-display);
+  color: var(--color-text-muted);
+}
+
+.studio-map-picker,
+.studio-map-expression {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  min-width: 0;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+/* Ochre, not danger: an id the version does not declare is kept and saved
+   unchanged, so this is a caution rather than a refusal. */
+.studio-map-unresolved {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.studio-map-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
 .studio-diff {
   list-style: none;
   margin: var(--space-3) 0 0;

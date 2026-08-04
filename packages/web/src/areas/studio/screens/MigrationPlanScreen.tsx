@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
-import { getMigrationPlan, putMigrationPlan, getOrphanKeys, StudioClientError } from "../api/client.js";
-import { parseSpecText, formatSpecText } from "./migrationPlanLogic.js";
+import { getMigrationPlan, putMigrationPlan, getOrphanKeys, getVersionBody, StudioClientError } from "../api/client.js";
+import {
+  EMPTY_ROWS,
+  formatSpecText,
+  parseSpecText,
+  planToRows,
+  readCatalog,
+  rowsToPlan,
+  type Catalogs,
+  type PlanRows,
+} from "./migrationPlanLogic.js";
+import { MigrationSpecEditor } from "../panels/MigrationSpecEditor.js";
 import type { Route } from "../routing.js";
 import type { OrphanKeyScan } from "../api/types.js";
 import { describeCaughtError } from "../errors.js";
@@ -15,11 +25,24 @@ interface MigrationPlanScreenProps {
   onUnauthorized: () => void;
 }
 
-/** studio-migration-planning spec: author a plan (fieldMap/stepMap/transforms/onUnmappable) and run a read-only orphan-key dry run. */
+type Surface = "form" | "json";
+
+/**
+ * studio-migration-planning spec: author a plan (fieldMap/stepMap/transforms/onUnmappable)
+ * and run a read-only orphan-key dry run. studio-migration-plan-form spec: the mapping
+ * form over both versions' catalogs, with the JSON textarea as the escape hatch.
+ *
+ * `rows` is the one plan state. The textarea's `text` is the JSON surface's own state and
+ * converts back through `parseSpecText` on the way in, so text that is not a plan can
+ * never leave that surface.
+ */
 export function MigrationPlanScreen({ processId, from, to, token, navigate, onUnauthorized }: MigrationPlanScreenProps) {
   const fromVersion = Number(from);
   const toVersion = Number(to);
+  const [rows, setRows] = useState<PlanRows>(EMPTY_ROWS);
   const [text, setText] = useState("{}");
+  const [surface, setSurface] = useState<Surface>("form");
+  const [catalogs, setCatalogs] = useState<Catalogs | undefined>(undefined);
   const [appliedAt, setAppliedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
@@ -32,19 +55,32 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
     let cancelled = false;
     setLoading(true);
     setLoadError(undefined);
-    getMigrationPlan(processId, fromVersion, toVersion, token)
-      .then((plan) => {
-        if (cancelled || !plan) return;
-        setText(formatSpecText(plan.spec));
-        setAppliedAt(plan.appliedAt);
-      })
-      .catch((e: unknown) => {
+    // The two bodies settle independently of the plan: a body that fails to load
+    // costs the form, not the screen.
+    Promise.allSettled([
+      getMigrationPlan(processId, fromVersion, toVersion, token),
+      getVersionBody(processId, fromVersion, token),
+      getVersionBody(processId, toVersion, token),
+    ])
+      .then(([plan, sourceBody, targetBody]) => {
         if (cancelled) return;
-        if (e instanceof StudioClientError && e.status === 401) {
-          onUnauthorized();
+        if (plan.status === "rejected") {
+          const e: unknown = plan.reason;
+          if (e instanceof StudioClientError && e.status === 401) {
+            onUnauthorized();
+            return;
+          }
+          setLoadError(describeCaughtError(e));
           return;
         }
-        setLoadError(describeCaughtError(e));
+        if (plan.value) {
+          setRows(planToRows(plan.value.spec));
+          setText(formatSpecText(plan.value.spec));
+          setAppliedAt(plan.value.appliedAt);
+        }
+        if (sourceBody.status === "fulfilled" && targetBody.status === "fulfilled")
+          setCatalogs({ source: readCatalog(sourceBody.value), target: readCatalog(targetBody.value) });
+        else setSurface("json");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -56,16 +92,39 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
 
   useEffect(() => load(), [load]);
 
-  const save = async () => {
+  const showSurface = (next: Surface) => {
+    if (next === surface) return;
+    if (next === "json") {
+      setText(formatSpecText(rowsToPlan(rows)));
+      setError(null);
+      setSurface("json");
+      return;
+    }
     const parsed = parseSpecText(text);
     if ("error" in parsed) {
       setError(`invalid JSON: ${parsed.error}`);
       return;
     }
+    setRows(planToRows(parsed.spec));
+    setError(null);
+    setSurface("form");
+  };
+
+  const save = async () => {
+    let spec: unknown;
+    if (surface === "form") spec = rowsToPlan(rows);
+    else {
+      const parsed = parseSpecText(text);
+      if ("error" in parsed) {
+        setError(`invalid JSON: ${parsed.error}`);
+        return;
+      }
+      spec = parsed.spec;
+    }
     setSaving(true);
     setError(null);
     try {
-      const result = await putMigrationPlan(processId, fromVersion, toVersion, parsed.spec, token);
+      const result = await putMigrationPlan(processId, fromVersion, toVersion, spec, token);
       setAppliedAt(result.appliedAt);
     } catch (e) {
       if (e instanceof StudioClientError && e.status === 401) {
@@ -97,7 +156,7 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
   return (
     <main className="studio-screen">
       <button type="button" className="studio-back" onClick={() => navigate({ name: "versions", processId })}>
-        ← Back to versions
+        {t("migrationPlan.back")}
       </button>
       <h1>
         Migration plan {fromVersion} → {toVersion}
@@ -112,33 +171,57 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
         </div>
       )}
       {loading ? (
-        <p className="studio-empty">Loading…</p>
+        <p className="studio-empty">{t("migrationPlan.loading")}</p>
       ) : loadError ? null : (
         <>
           {appliedAt && (
             <p className="studio-conflict">
-              Applied at {new Date(appliedAt).toLocaleString()} — this plan is frozen; further edits will be rejected.
+              Applied at {new Date(appliedAt).toLocaleString()} — {t("migrationPlan.frozen")}
             </p>
           )}
-          <label>
-            Plan spec (JSON — stepMap, fieldMap, transforms, onUnmappable, unmappableStep)
-            <textarea
-              className="studio-json-editor"
-              rows={16}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              spellCheck={false}
-            />
-          </label>
-          <div className="studio-controls">
-            <button type="button" disabled={saving} onClick={() => void save()}>
-              {saving ? "Saving…" : "Save plan"}
+          <div className="studio-surface-toggle" role="tablist" aria-label={t("migrationPlan.surfaceLabel")}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={surface === "form"}
+              disabled={!catalogs}
+              onClick={() => showSurface("form")}
+            >
+              {t("migrationPlan.surfaceForm")}
+            </button>
+            <button type="button" role="tab" aria-selected={surface === "json"} onClick={() => showSurface("json")}>
+              {t("migrationPlan.surfaceJson")}
             </button>
           </div>
-          {error && <p className="studio-error">{error}</p>}
+          {!catalogs && <p className="studio-warning">{t("migrationPlan.formUnavailable")}</p>}
+
+          {surface === "form" && catalogs ? (
+            <MigrationSpecEditor rows={rows} catalogs={catalogs} onChange={setRows} />
+          ) : (
+            <label>
+              {t("migrationPlan.jsonLabel")}
+              <textarea
+                className="studio-json-editor"
+                rows={16}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                spellCheck={false}
+              />
+            </label>
+          )}
+          <div className="studio-controls">
+            <button type="button" disabled={saving} onClick={() => void save()}>
+              {saving ? t("migrationPlan.saving") : t("migrationPlan.save")}
+            </button>
+          </div>
+          {error && (
+            <p className="studio-error" role="alert">
+              {error}
+            </p>
+          )}
 
           <fieldset>
-            <legend>Orphan-key dry run</legend>
+            <legend>{t("migrationPlan.orphanLegend")}</legend>
             <div className="studio-controls">
               <button type="button" disabled={scanning} onClick={() => void scanOrphans(fromVersion)}>
                 Scan v{fromVersion}
@@ -149,7 +232,7 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
             </div>
             {orphans &&
               (orphans.orphans.length === 0 && orphans.unreadable.length === 0 ? (
-                <p className="studio-empty">No orphan keys found.</p>
+                <p className="studio-empty">{t("migrationPlan.orphanEmpty")}</p>
               ) : (
                 <ul className="studio-diff">
                   {orphans.orphans.map((o) => (
@@ -159,7 +242,7 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
                   ))}
                   {orphans.unreadable.map((id) => (
                     <li key={id}>
-                      <code>{id}</code>: unreadable
+                      <code>{id}</code>: {t("migrationPlan.orphanUnreadable")}
                     </li>
                   ))}
                 </ul>
