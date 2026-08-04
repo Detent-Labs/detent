@@ -142,6 +142,43 @@ const en = {
   "plugin.fieldRequired": "required",
   "plugin.arrayHint": "one per line",
 
+  "migrationPlan.back": "← Back to versions",
+  "migrationPlan.surfaceForm": "Mapping",
+  "migrationPlan.surfaceJson": "JSON",
+  "migrationPlan.surfaceLabel": "Plan surface",
+  "migrationPlan.jsonLabel": "Plan spec (JSON — stepMap, fieldMap, transforms, onUnmappable, unmappableStep)",
+  "migrationPlan.save": "Save plan",
+  "migrationPlan.saving": "Saving…",
+  "migrationPlan.loading": "Loading…",
+  "migrationPlan.frozen": "this plan is frozen; further edits will be rejected.",
+  "migrationPlan.formUnavailable": "The mapping form needs both version bodies. Edit the JSON instead.",
+  "migrationPlan.orphanLegend": "Orphan-key dry run",
+  "migrationPlan.orphanEmpty": "No orphan keys found.",
+  "migrationPlan.orphanUnreadable": "unreadable",
+
+  "migrationForm.stepMapLegend": "stepMap",
+  "migrationForm.stepMapHint":
+    "Move an instance from a step of the source version onto a step of the target version. A step the target still declares needs no row.",
+  "migrationForm.fieldMapLegend": "fieldMap",
+  "migrationForm.fieldMapHint":
+    "Rename a field. Each target field takes at most one source, and both sides must hold the same CEL type.",
+  "migrationForm.transformsLegend": "transforms",
+  "migrationForm.transformsHint":
+    "Compute a target field from the pre-migration data. The server type-checks each expression on save.",
+  "migrationForm.unmappableLegend": "onUnmappable",
+  "migrationForm.unmappableHint":
+    "What happens to an instance sitting on a step the target version does not declare.",
+  "migrationForm.sourceLabel": "Source",
+  "migrationForm.targetLabel": "Target",
+  "migrationForm.expressionLabel": "CEL expression",
+  "migrationForm.expressionPlaceholder": "data.amount * 2.0",
+  "migrationForm.unmappableStepLabel": "Unmappable step",
+  "migrationForm.policyNone": "(none — an unmappable instance is skipped)",
+  "migrationForm.addRow": "+ Add row",
+  "migrationForm.removeRow": "Remove",
+  "migrationForm.noRows": "No rows yet.",
+  "migrationForm.unresolved": "(not in this version)",
+
   "error.retry": "Retry",
   "error.failed": "Failed",
   "error.authorization": "You don't have permission to do that.",
