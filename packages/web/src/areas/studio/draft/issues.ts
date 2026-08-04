@@ -121,10 +121,14 @@ export function resolveLoc(
         sawContract = true;
         break;
       default:
-        // A field id appearing right after a "fields" token (e.g. the
+        // A field id appearing right after a BARE "fields" token (e.g. the
         // authored-content-localization invariant's `["fields", fieldId,
-        // "label"]`), rather than a numeric array index.
-        if (prevKey === "fields" && fieldIdRef === undefined) fieldIdRef = t.key;
+        // "label"]`), never after one that already carried its own bracketed
+        // index (e.g. `checkPatterns`' string-form
+        // "fields[0].validation.pattern") — there the next segment
+        // ("validation") is a path segment, not a field id, and `fieldIdx`
+        // is already set from the "fields[0]" token itself.
+        if (prevKey === "fields" && fieldIdx === undefined && fieldIdRef === undefined) fieldIdRef = t.key;
         break;
     }
     prevKey = t.key;

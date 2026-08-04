@@ -612,8 +612,9 @@ Spec: `development-toolchain`.
        write-only-on-a-real-edit. `src/` gained two exports and no behavior
        (`parseAst`, and `export` on `ACTOR_SCHEMA`), so the CEL library keeps one
        version pin. Grouping, field-against-field comparison and date ordering
-       stay deferred, and `field.validation.rule` still has no authoring surface
-       to extend.
+       stay deferred. `field.validation.rule` now has an authoring surface: the
+       `add-field-validation-editor` change mounts the plain `ExpressionInput`
+       there.
        Change: `add-condition-builder`. Specs: `studio-condition-builder` (new),
        `cel-expressions` (modified: an authoring surface reaches the AST through
        the engine's own CEL module).

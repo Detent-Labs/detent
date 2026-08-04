@@ -44,6 +44,9 @@ const en = {
   "fieldCatalog.addSubField": "+ Add sub-field",
   "fieldCatalog.customTypeLabel": "custom type",
 
+  "fieldValidation.legend": "validation",
+  "fieldValidation.notEvaluated": "not evaluated for this field type",
+
   "dataSources.heading": "Data sources",
   "dataSources.empty": "No data sources yet.",
   "dataSources.addDataSource": "+ Add data source",

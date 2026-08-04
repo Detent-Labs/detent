@@ -22,8 +22,7 @@ module does not.
 
 - Put the whole `FieldValidation` object under an editor, with one place
   deciding which keys a given field type offers.
-- Keep the type-to-key decision and the `pattern` checks testable without a
-  DOM.
+- Keep the type-to-key decision testable without a DOM.
 - Leave the field row readable. It already renders eight controls.
 
 **Non-Goals:**
@@ -47,11 +46,12 @@ its own selection state. It also separates a field's constraints from its type,
 and the type is what the key mapping reads. Always-expanded rows lose too, since
 a catalog of twenty fields turns unreadable.
 
-### One `…Logic.ts` module owns the mapping and the pattern checks
+### One `…Logic.ts` module owns the mapping
 
-`fieldValidationLogic.ts` exports `offeredKeys(type)` and
-`checkPattern(src, bound)`. Both are pure. `packages/web/test/` tests them
-without a DOM, following `studio-migrationPlanLogic` and its two siblings.
+`fieldValidationLogic.ts` exports `offeredKeys(type)`, `carriedKeys(validation)`
+and `patchValidation(current, key, value)`. All three are pure.
+`packages/web/test/` tests them without a DOM, following
+`studio-migrationPlanLogic` and its two siblings.
 
 I rejected inlining the mapping in the component. The mapping mirrors
 `checkConstraints` in `src/runtime/api.ts`. A table that must track engine
@@ -90,23 +90,32 @@ This matters beyond tidiness. `definitionHash` is the JCS hash of the body, so
 `validation: {}` and an absent `validation` hash differently. Two drafts an
 author reads as identical would publish as two versions.
 
-### The `pattern` reports are advisory, not a save block
+### The `pattern` report reuses live validation, and never blocks the save
 
-The draft saves whatever the author typed. The report renders beside the input.
-Publish keeps `compile.ts::checkPatterns` unchanged.
+The editor renders this field's own `pattern` issues straight from
+`validation.issues` (`useDraft()`), the same array `IssueList` already reads
+for that field. It computes no check of its own.
 
-I rejected refusing the save. A draft is work in progress, and every other
-panel in the studio area saves an incomplete body. Live validation already
-reports issues without blocking.
+I rejected a bespoke browser-side pattern check. `IssueList` already mounts on
+every field row. It recomputes `compile.ts::checkPatterns`'s result on every
+draft change (`draft/validation.ts::runValidation`, memoized on the draft). A
+second implementation would either duplicate that work or drift from it. That
+is the exact risk `rule`'s own requirement avoids by reusing the same
+mechanism. The draft saves whatever the author typed. Publish keeps
+`compile.ts::checkPatterns` unchanged.
+
+I also rejected refusing the save on a reported issue. A draft is work in
+progress, and every other panel in the studio area saves an incomplete body.
+Live validation already reports issues without blocking.
 
 ## Risks / Trade-offs
 
 The browser table drifts from `checkConstraints` when someone changes the
 engine's constraint evaluation. Mitigation: the test over `offeredKeys` names
 the engine function in its description, so the next reader knows where to look.
-The mapping is four rows.
+The mapping is five rows.
 
-An author reads the inline note as an error and deletes a key a hand-authored
+An author reads the inline note as an issue and deletes a key a hand-authored
 body meant to keep. Mitigation: the note states that the engine skips the key
 for this field type. It does not call the key invalid.
 

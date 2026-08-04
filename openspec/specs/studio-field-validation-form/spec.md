@@ -5,7 +5,7 @@ set on a field's `validation` object without opening the JSON view. It also
 defines which keys each field type offers. A third rule governs a key that does
 not suit the field's type.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: The field catalog edits a field's validation object
 
@@ -54,7 +54,16 @@ the submitted value's JavaScript type. The offered set SHALL mirror it:
 | `number` | `min`, `max`, `rule` |
 | `string`, `date`, `datetime`, `select`, `reference` | `minLength`, `maxLength`, `pattern`, `rule` |
 | `multiselect` | `minLength`, `maxLength`, `rule` |
-| `boolean`, `file`, `group`, a plugin type | `rule` |
+| `boolean`, `group` | `rule` |
+| `file`, a plugin type | `min`, `max`, `minLength`, `maxLength`, `pattern`, `rule` |
+
+`typeMatches` (`src/schema/definition.ts`) treats `file` and a plugin type as
+opaque. Neither constrains the submitted value's JavaScript shape, so
+`checkConstraints` may apply any of its branches depending on what arrives.
+The offered set mirrors that by offering everything.
+
+`boolean` and `group` never reach a `checkConstraints` branch, regardless of
+value. `rule` is all either can ever use.
 
 The editor SHALL offer `rule` for every type. A CEL rule reads the whole
 instance context, not one value's JavaScript type.
@@ -74,7 +83,8 @@ instance context, not one value's JavaScript type.
 
 - **WHEN** an author opens the validation editor on a field with a custom
   (plugin) type
-- **THEN** the editor offers `rule` alone
+- **THEN** the editor offers every key, since the type constrains no
+  particular JavaScript shape for the submitted value
 
 ### Requirement: The editor keeps and marks a key that does not suit the type
 
@@ -105,32 +115,39 @@ rule.
   without touching a control
 - **THEN** the field's `validation` object stays exactly as it was
 
-### Requirement: The pattern editor reports its two authoring rules inline
+### Requirement: The pattern editor surfaces the draft's live validation inline
 
-The editor SHALL report two conditions on `pattern` before the draft saves. The
-source MUST compile as a JavaScript `RegExp`. Its length MUST stay under the
-bound `compile.ts::checkLengthBounds` declares.
+The editor SHALL show, beside the `pattern` input, this field's own `pattern`
+issues. These come from the draft's existing live validation
+(`compile.ts::checkPatterns`, run on every draft change). The editor SHALL
+compute no check of its own. It SHALL read the same issue list `IssueList`
+already shows for this field, never a second implementation.
 
-These reports SHALL stay advisory in the editor. Publish SHALL keep both checks
-exactly as `compile.ts::checkPatterns` and `compile.ts::checkLengthBounds`
-enforce them today. A body reaching publish by another route therefore meets
-the same bar.
+`checkPatterns` reports two conditions. The source MUST compile as a
+JavaScript `RegExp`. Its length MUST stay under the bound
+`compile.ts::checkPatterns` declares, the constant `MAX_PATTERN_LENGTH`.
+These reports SHALL stay advisory in the editor and SHALL NOT block saving.
+Publish keeps `compile.ts::checkPatterns` unchanged. A body reaching publish
+by another route meets the same bar.
 
 #### Scenario: An uncompilable pattern
 
 - **WHEN** an author types `[a-` into `pattern`
-- **THEN** the editor reports inline that the pattern does not compile, and the
-  draft still saves the text as typed
+- **THEN** the editor shows the live-validation issue beside the input,
+  reporting that the pattern does not compile
+- **AND** the draft still saves the text as typed
 
 #### Scenario: An over-long pattern
 
-- **WHEN** an author pastes a pattern longer than the declared bound
-- **THEN** the editor reports inline that the pattern exceeds the bound
+- **WHEN** an author pastes a pattern longer than the bound
+  `compile.ts::checkPatterns` enforces
+- **THEN** the editor shows the live-validation issue beside the input,
+  reporting that the pattern exceeds the bound
 
 #### Scenario: A valid pattern
 
 - **WHEN** an author types `^[A-Z]{2}[0-9]{4}$`
-- **THEN** the editor reports nothing
+- **THEN** the editor shows no pattern issue beside the input
 
 ### Requirement: The rule editor uses the studio's CEL expression input
 
