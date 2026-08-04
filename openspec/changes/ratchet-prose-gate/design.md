@@ -151,8 +151,16 @@ The gate does not print which findings are new. It does not know.
   gate, and no gate can judge intent.
 - A file gains one finding and loses another in the same push. Mitigation: none.
   The count did not rise, so the gate permits it. Accepted above.
-- The gate costs one more linter run per changed Markdown file. Measured at 0.16s
-  per file. A ten-file change pays about 1.6s. The suite dominates the push.
+- The gate costs one more linter run per changed Markdown file. Measured at
+  0.16s per invocation. A five-file change measured 1.625s in total, across ten
+  invocations. The suite dominates the push.
+- Marking a task box changes a file's finding count. Measured on this change's
+  own `tasks.md`: 0 findings with every box as `- [ ]`, and 2 with them as
+  `- [x]`. The linter reads the empty box as a sentence boundary. It reads the
+  filled one as a word. A long task line therefore passes while open and fails
+  once done. Every OpenSpec change meets this at apply time. Mitigation: keep a
+  task line short enough to pass in both states. No directive suits it, since
+  the finding is real prose length either way.
 - The 3166 findings stay. That is the point of the change, and it is a debt the
   repository keeps until somebody spends the time. The norm in `CLAUDE.md` is
   what reduces it, not the gate.

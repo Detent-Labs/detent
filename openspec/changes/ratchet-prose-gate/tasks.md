@@ -41,8 +41,8 @@
   passes on the lower count, then revert
 - [x] 3.5 Prove a new file must lint clean. Add a Markdown file with one finding.
   Show the rejection against a base count of zero, then revert
-- [x] 3.6 Prove the deleted-path case: delete a Markdown file the range also
-  changed, show the gate skips it rather than failing
+- [x] 3.6 Prove the deleted-path case. Delete a Markdown file the range also
+  changed. Show the gate skips it, rather than failing
 - [x] 3.7 Prove the absent-linter skip still works, with `ANTISLOP` pointing
   nowhere
 - [x] 3.7a Prove the gate reads the tip, not the worktree. Commit a clean file,
@@ -60,8 +60,8 @@
   table to say the gate rejects a rising finding count
 - [x] 4.2 State the norm in that section: clear a touched file's debt when it is
   cheap. Name it as advisory, and the ratchet as the mechanical floor
-- [x] 4.3 Record the current debt, 3166 findings across 52 of 80 live specs, so a
-  later reader knows what the ratchet permits and why
+- [x] 4.3 Record the current debt: 3166 findings across 52 of 80 live specs. A
+  later reader then knows what the ratchet permits, and why
 - [x] 4.4 Write the norm against a blanket `allow-file` directive into `CLAUDE.md`.
   No such norm exists in the repository today. Name the targeted form as the
   wanted one. Say that a directive lowers the count, so the gate permits it
