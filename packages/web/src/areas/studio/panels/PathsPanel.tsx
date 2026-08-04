@@ -4,7 +4,7 @@ import type { DraftField } from "../draft/fields";
 import { mintId } from "../draft/ids";
 import { removeAt, updateAt } from "../draft/list-ops";
 import { t } from "../catalog.js";
-import { ExpressionInput } from "./shared/ExpressionInput";
+import { ConditionInput } from "./shared/ConditionInput";
 import { IssueList } from "./shared/IssueList";
 import { ActionListEditor } from "./ActionListEditor";
 import type { ConfigFieldDescriptor } from "../api/types.js";
@@ -16,6 +16,8 @@ interface Props {
   paths: DraftPath[] | undefined;
   steps: DraftStep[];
   fields: DraftField[];
+  /** The step these paths leave. A subprocess step's guards also read `child.*`. */
+  stepId?: string;
   onChange: (next: DraftPath[]) => void;
   /** The action registry's live type names and config-schema descriptions (GET /registry), for `onPath` actions. */
   registryTypes?: string[];
@@ -27,7 +29,7 @@ interface Props {
  * abstracted away — the wait-state and guard-priority concepts stay
  * visible to the author.
  */
-export function PathsPanel({ paths, steps, fields, onChange, registryTypes, registrySchemas }: Props) {
+export function PathsPanel({ paths, steps, fields, stepId, onChange, registryTypes, registrySchemas }: Props) {
   const list = paths ?? [];
 
   const addPath = () => {
@@ -101,7 +103,7 @@ export function PathsPanel({ paths, steps, fields, onChange, registryTypes, regi
               </label>
               <label>
                 guard (omit for the default/else path)
-                <ExpressionInput value={path.guard} onChange={(guard) => updatePath(index, { guard })} />
+                <ConditionInput value={path.guard} stepId={stepId} onChange={(guard) => updatePath(index, { guard })} />
               </label>
             </>
           )}

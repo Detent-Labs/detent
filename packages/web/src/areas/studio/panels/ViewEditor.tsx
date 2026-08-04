@@ -11,6 +11,8 @@ type DraftViewField = DraftOf<ViewField>;
 interface Props {
   view: DraftView | undefined;
   fields: DraftField[];
+  /** The step this view belongs to. A subprocess step's overrides also read `child.*`. */
+  stepId?: string;
   onChange: (next: DraftView) => void;
 }
 
@@ -20,7 +22,7 @@ interface Props {
  * IS the per-step display order, so reordering the array is how an author
  * sets it.
  */
-export function ViewEditor({ view, fields, onChange }: Props) {
+export function ViewEditor({ view, fields, stepId, onChange }: Props) {
   const rows = view?.fields ?? [];
 
   const setRows = (next: DraftViewField[]) => onChange({ ...view, fields: next });
@@ -64,16 +66,19 @@ export function ViewEditor({ view, fields, onChange }: Props) {
             </button>
             <BooleanOrExpressionInput
               label="visible"
+              stepId={stepId}
               value={row.visible}
               onChange={(visible) => updateRow(index, { visible })}
             />
             <BooleanOrExpressionInput
               label="required"
+              stepId={stepId}
               value={row.required}
               onChange={(required) => updateRow(index, { required })}
             />
             <BooleanOrExpressionInput
               label="readonly"
+              stepId={stepId}
               value={row.readonly}
               onChange={(readonly) => updateRow(index, { readonly })}
             />

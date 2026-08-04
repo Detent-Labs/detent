@@ -106,6 +106,30 @@ const en = {
   "view.remove": "Remove",
   "view.addFieldOverride": "+ Add field override",
 
+  // The condition builder. "guard", "visible"/"required"/"readonly" and the CEL
+  // operators stay untranslated, per this file's header: they name the JSON the
+  // author is editing.
+  "condition.empty": "No condition — this always matches.",
+  "condition.addRow": "+ Add row",
+  "condition.removeRow": "Remove row",
+  "condition.selectOperand": "(select a field)",
+  "condition.operandLabel": "field",
+  "condition.operatorLabel": "operator",
+  "condition.valueLabel": "value",
+  "condition.valuePlaceholder": "value…",
+  "condition.selectValue": "(select a value)",
+  "condition.contains": "contains",
+  "condition.yes": "yes",
+  "condition.no": "no",
+  "condition.rawRow": "Written by hand. Edit it as CEL.",
+  "condition.incomplete": "Needs a value before it is written.",
+  "condition.joinerHint": "How the rows combine. Click to flip.",
+  "condition.celReadout": "Writes",
+  "condition.celEmpty": "nothing yet",
+  "condition.editAsCel": "Edit as CEL",
+  "condition.useBuilder": "Use the builder",
+  "condition.unparseable": "This does not parse as CEL, so the builder cannot open it.",
+
   "subprocess.legend": "subprocess",
   "subprocess.processIdPlaceholder": "proc_...",
   "subprocess.removeMappingEntry": "remove",
