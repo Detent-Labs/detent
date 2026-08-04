@@ -1124,7 +1124,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   `MigrationSpec` (`screens/migrationPlanLogic.ts`) plus an orphan-key
   dry-run panel. Stage 27c added the field-mapping form beside that
   textarea (see the `studio-migration-plan-field-mapping` entry at the end
-  of this file); the textarea stays as the escape hatch. Deliberately out
+  of this file). The textarea stays as the escape hatch. Deliberately out
   of scope: *executing* a migration plan
   (stays `admin-migration-run`'s future `POST /admin/migrations/run`, an
   operator action) and the registry/CEL-scratchpad tools screen plus Player
@@ -2020,7 +2020,7 @@ part of a plan the author never edited. And `route-to-step` selects a target
 step at once, so the schema's presence-iff refinement cannot fail on the
 form's own output.
 
-Stage 27's read-back problem does not apply here. A `MigrationSpec` is
+Stage 27's read-back problem does not apply here. A `MigrationSpec` holds
 structured data, not a language. The form therefore reads back what it wrote
 by holding the same object. The one free-text position, a `transforms`
 expression, stays a text input and round-trips as its own `src` string.
