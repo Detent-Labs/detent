@@ -584,6 +584,14 @@ Spec: `development-toolchain`.
        manual JSON escape hatch available even for a schema-backed type. The
        custom field-type position stays free-text, since no registry backs
        it.
+       Shipping this exposed an open question the stage has not yet answered:
+       the studio area sits behind one coarse role. `system:developer` reaches
+       drafts, the registry, migration planning and the Player alike, and
+       publishing needs `system:publish` on top. A business analyst authoring
+       a process is exactly the actor that role was not shaped for. Either
+       the analyst gets `system:developer` (and with it migration planning),
+       or the area splits its gate the way stage 26 split the admin area's —
+       a set of roles per area, each screen keeping its own check.
        Change: `studio-plugin-config-form`. Specs: `studio-plugin-config-form`
        (new), `studio-tools` (modified: `GET /registry`'s response shape, the
        Tools screen's registered-registry count).
@@ -624,15 +632,6 @@ Spec: `development-toolchain`.
        from an empty draft. A template is a stored draft body, so this needs no
        engine concept — only a decision about where templates live and who
        curates them.
-    One open question the stage has not yet answered: the studio area sits
-    behind one coarse role. `system:developer` reaches drafts, the registry,
-    migration planning and the Player alike, and publishing needs
-    `system:publish` on top. A business analyst authoring a process is exactly
-    the actor that role was not shaped for — a gap (a) shipped without
-    closing. Either the analyst gets `system:developer` (and with it
-    migration planning), or the area splits its
-    gate the way stage 26 split the admin area's — a set of roles per area,
-    each screen keeping its own check.
     Deliberately out of scope: a natural-language or AI-assisted authoring
     surface (it produces the same JSON, so it is a later surface over the same
     contract, not a reason to reshape one), executable code authored in the
