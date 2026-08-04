@@ -72,7 +72,14 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "==> (Re)starting the HTTP server"
 try { Invoke-Compose exec -w /workspace app pkill -f "src/http/server.ts" 2>$null } catch {}
 Start-Sleep -Seconds 1
-Invoke-Compose exec -d -e "AUTH_JWT_SECRET=$Secret" -w /workspace app bun run serve
+# docker logs/compose logs only capture the container's PID 1 (sleep
+# infinity) -- a detached `exec -d` process's stdout/stderr are never
+# captured, so the server's structured logs (src/log.ts) went nowhere.
+# Redirecting to a file under /workspace makes them readable both inside
+# the container and on the host (bind mount), e.g. `Get-Content
+# .devcontainer/server.log -Wait`.
+Invoke-Compose exec -d -e "AUTH_JWT_SECRET=$Secret" -w /workspace app `
+    bash -c 'bun run serve > .devcontainer/server.log 2>&1'
 Start-Sleep -Seconds 2
 
 Write-Host "==> Confirming the stack is ready"

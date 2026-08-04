@@ -64,7 +64,14 @@ compose exec -w /workspace app bun run src/auth/cli.ts add-user "$SUPERUSER_EMAI
 echo "==> (Re)starting the HTTP server"
 compose exec -w /workspace app pkill -f "src/http/server.ts" >/dev/null 2>&1 || true
 sleep 1
-compose exec -d -e AUTH_JWT_SECRET="$SECRET" -w /workspace app bun run serve
+# docker logs/compose logs only capture the container's PID 1 (sleep
+# infinity) — a detached `exec -d` process's stdout/stderr are never
+# captured, so the server's structured logs (src/log.ts) went nowhere.
+# Redirecting to a file under /workspace makes them readable both inside
+# the container and on the host (bind mount), e.g. `tail -f
+# .devcontainer/server.log`.
+compose exec -d -e AUTH_JWT_SECRET="$SECRET" -w /workspace app \
+  bash -c 'bun run serve > .devcontainer/server.log 2>&1'
 sleep 2
 
 echo "==> Confirming the stack is ready"
