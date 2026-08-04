@@ -377,6 +377,26 @@ Stage-by-stage status is in `ROADMAP.md`.
   the route reports the resulting (now-`faulted`) view as a 200, not an
   error.
 
+  **Shutdown is orderly** (`graceful-shutdown`, `test/http-shutdown.test.ts`):
+  `startHttpServer`'s returned `stop` is async. It awaits Bun's graceful
+  `server.stop()`. That call refuses new connections at once. It resolves
+  once in-flight requests finish, and only then does `stop` halt the engine
+  pollers.
+
+  The `import.meta.main` entrypoint registers SIGTERM and SIGINT against
+  it. The handler closes the pool with `sql.end()` and exits 0. A boolean
+  guard makes a second signal a no-op. The server holds ten Postgres
+  connections. `pg_stat_activity` drops to zero after SIGTERM because
+  `sql.end()` ran. Before, `scripts/dev-up.sh`'s `pkill` left that to the
+  kernel.
+
+  `docker/engine.Dockerfile` runs the engine as PID 1. Linux gives PID 1 no
+  default SIGTERM disposition, so `docker stop` gains the most. It used to
+  wait out its whole grace period, then send SIGKILL. Nothing awaits an
+  in-flight poller tick, on purpose.
+  The workers are lease-based and at-least-once. A tick cut short retries
+  the way it does after a crash.
+
   **CORS is configuration, not a constant** (`configurable-cors-origins`):
   `createServer` takes an `allowedOrigins` parameter (`undefined` | `"*"` |
   `string[]`), and `startHttpServer` sources it from `CORS_ALLOWED_ORIGINS`
