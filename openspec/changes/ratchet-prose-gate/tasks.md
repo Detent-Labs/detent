@@ -52,7 +52,7 @@
 - [x] 3.8 Re-prove the case that motivated this change. Replay the
   `development-toolchain` sync shape, a file with pre-existing findings gaining
   new ones. Show the gate reports only the increase
-- [ ] 3.9 Delete the scratch branch and confirm the working tree is clean
+- [x] 3.9 Delete the scratch branch and confirm the working tree is clean
 
 ## 4. Documentation
 
@@ -70,10 +70,9 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck` in the devcontainer and report what it printed
-- [ ] 5.2 Run the full `bun test` in the devcontainer with `DATABASE_URL` set, and
-  report the pass, fail and skip counts
-- [ ] 5.3 Run the antislop linter over every Markdown file this change touched
-- [ ] 5.4 Run the whole hook end to end, and report what each stage printed
-- [ ] 5.5 Measure the added cost on a real push. Record it in `design.md`, beside
-  the 0.16s per-file figure
+- [x] 5.1 Run `bun run typecheck` in the devcontainer and report what it printed
+- [x] 5.2 Run the full `bun test` in the devcontainer, with `DATABASE_URL` set.
+  Report the pass, fail and skip counts
+- [x] 5.3 Run the antislop linter over every Markdown file this change touched
+- [x] 5.4 Run the whole hook end to end, and report what each stage printed
+- [x] 5.5 Measure the added cost on a real push. Record it in `design.md`
