@@ -50,7 +50,13 @@ export function Chrome({ area, roles, locale, onLocaleChange, onLogout, onGoToAr
         <span className="shell-tab">{t(locale, `area.${area}`)}</span>
         {nav}
         <div className="shell-account" ref={menu}>
-          <button type="button" className="shell-account-button" aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen(!open)}>
+          <button
+            type="button"
+            className="btn btn-secondary shell-account-button"
+            aria-expanded={open}
+            aria-haspopup="menu"
+            onClick={() => setOpen(!open)}
+          >
             {t(locale, "account.menu")}
           </button>
           {open && (

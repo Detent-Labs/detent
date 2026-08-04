@@ -19,10 +19,15 @@ is a 5-step rem scale today. The document specifies a 6-step px scale:
 A repo-wide grep for the tokens and patterns this change touches
 (`--color-success`, `--color-danger`, `--font-display`, `border-radius`,
 `--color-accent-contrast`, `--color-surface-muted`, `--color-text-muted`,
-`--color-border`) returns 250 occurrences across the six `packages/web`
+`--color-border`) returns 256 occurrences across the six `packages/web`
 CSS files. That count is the real size of the mechanical migration inside
 each area's restyle pass. It is separate from the token-file rewrite
 itself.
+
+A repo-wide check found zero `className` containing `btn` anywhere in
+`packages/web/src`. The codebase carries no button-variant class today.
+Every `<button>` element relies on one unclassed rule
+(`tokens.css:81-88`). See the button-classification decision below.
 
 See `proposal.md` for why this replaces the current system.
 
@@ -37,10 +42,20 @@ See `proposal.md` for why this replaces the current system.
 - Carry the new ramps through the existing primitive-to-semantic
   indirection, the same way it carries today's seven primitives. Dark mode
   keeps working through that same mechanism.
+- Verify the new ramps meet WCAG AA contrast on the surfaces they render
+  against. The reviewed document already supplies the visual direction
+  CLAUDE.md's design-skill routing exists to give a change like this one.
+  That routing also requires a contrast check. Nobody has run one against
+  these live components yet, so this change still runs it (task 9.7).
 
 **Non-Goals:**
 - Rewriting component markup (TSX) to change structure. A markup change is
-  in scope only to swap a class or a hardcoded value that blocks a token.
+  in scope to swap a class, or to fix a hardcoded value that blocks a
+  token. It is also in scope for one specific addition: a
+  button-variant className (`.btn-primary`, `.btn-secondary`, or
+  `.btn-ghost`) on an existing `<button>` element. No button-variant class
+  exists anywhere yet, so this addition is unavoidable; nothing else about
+  a button's markup changes.
 - Introducing a CSS-in-JS layer, a design-token build step, or a new
   styling method. Plain CSS custom properties on plain classes, as today.
 - Reconciling every visual difference between the source `.dc.html`
@@ -79,13 +94,40 @@ these two variables turns up three different jobs, not one:
    decision.
 2. **Plain inline error and conflict text, and its border**:
    `.shell-error`, `.app-error`, `.studio-error`, `.studio-conflict`,
-   `.rep-error`, `.admin-error`. These move to `--color-text` (ink), not
-   to the refusal tone. The document's own error-banner mockup colors
-   only the stamp red. Its message text (`Could not reach the server…`)
-   renders in plain ink beside a red "Failed" stamp. Each of the five
-   classes above already has a sibling `*-error-banner-stamp` class. That
-   sibling carries the stamp's own color separately, so this split costs
-   no new markup.
+   `.rep-error`, `.admin-error`. The document's own error-banner mockup
+   colors only the stamp red. Its message text (`Could not reach the
+   server…`) renders in plain ink beside a red "Failed" stamp. That
+   pairing holds only where a call site renders a stamp next to the text.
+
+   A check of every occurrence of the six classes found most do not pair
+   with one. The `*-error-banner-stamp` siblings pair correctly, such as
+   `.app-error-banner-stamp`. Most occurrences are standalone
+   form-validation or outcome messages with no stamp nearby:
+
+   - `.shell-error` at `LoginScreen.tsx:61-62`.
+   - Nine `.studio-error` sites: `VersionsScreen.tsx:236`,
+     `ToolsScreen.tsx:199,216`, `PlayerScreen.tsx:191,232`,
+     `EditScreen.tsx:221`, `MigrationPlanScreen.tsx:218`,
+     `MigrationSpecEditor.tsx:133,233`, `DraftToolbar.tsx:126`.
+   - Two `.studio-conflict` sites: `PlayerScreen.tsx:205`,
+     `DraftToolbar.tsx:133`, `MigrationPlanScreen.tsx:178`.
+   - Two `.app-error` sites: `TaskScreen.tsx:243,246`.
+   - `.admin-error` at `DataListScreen.tsx:187`.
+   - One of `.rep-error`'s two sites, `reporting/root.tsx:84`. The other
+     `.rep-error` site, `components.tsx:63-64`, does pair with
+     `.rep-stamp-danger`.
+
+   Decision: the move to `--color-text` (ink) applies only at a paired
+   call site. That is one where the class sits beside a stamp carrying
+   the error color on its own. The stamp is a `*-error-banner-stamp`
+   sibling, or (for `.rep-error`) `.rep-stamp-danger`. Every standalone
+   occurrence keeps `--color-danger`. It repoints to the refusal tone,
+   not to ink, so it still reads as an error.
+
+   This is a rule per call site, not per class name. Two `.rep-error`
+   sites in the same file resolve differently. The area pass (tasks
+   3.2/4.3/5.4/6.2, and 1.6 for `.shell-error`) checks each occurrence
+   against its rendered context before repointing it.
 3. **A JSON diff and a canvas terminal-step marker, neither covered by
    the document.** Two classes in `studio/app.css` fall here. One is
    `.studio-diff-added`/`.studio-diff-removed`, which colors an added or
@@ -95,11 +137,22 @@ these two variables turns up three different jobs, not one:
    new single-accent palette also has no green to fall back to for
    "added."
 
-   Decision: `.studio-diff-removed` keeps accent-700, and so does
-   `.canvas-terminal-stamp` on an error path. `.studio-diff-added` and a
-   normal `.canvas-terminal-stamp` move to `--color-neutral-900` instead.
-   From here, the leading `+`/`-` character and the stamp's own shape
-   carry the distinction, not color alone.
+   Decision: `.studio-diff-removed` keeps accent-700. `.studio-diff-added`
+   moves to `--color-neutral-900` instead. The leading `+`/`-` character
+   carries the distinction, not color alone.
+
+   `.canvas-terminal-stamp` gets no errored/normal split.
+   `ProcessContract.outcomes` (`src/schema/definition.ts:562`) is
+   `z.array(z.string())`. It is a free-form, author-named list. Nothing in
+   it marks one entry as an error. `CanvasView.tsx` applies the class
+   unconditionally to every terminal step. There is no data to key a
+   split on. Inferring one from outcome text, matching `"reject"` or
+   similar, breaks against an author's own naming.
+
+   Every `.canvas-terminal-stamp` moves to `--color-neutral-900`
+   uniformly, matching `.studio-diff-added`. A later stage that gives an
+   outcome a real semantic kind can reopen this split with data behind
+   it. Nothing here forecloses that.
 
 Alternative for bucket 1: keep `--color-success` as an alias for ink,
 `--color-danger` for accent-700. Rejected. A property still named
@@ -151,6 +204,22 @@ mono-headings choice is the exact inversion of that rule. Today's
 mono-table-headers choice is a case the document's own reference CSS
 already contradicts.
 
+**An eighth primitive, `--color-warning` (ochre), lives only in
+`studio/app.css`. Retire it into the Caution tone.**
+
+Found during the area pass, not during review. Four classes key a "key
+collision" or "unfinished row" state off this ochre primitive:
+`.studio-warning`, `.condition-flag`, `.studio-map-unresolved`, and
+`.condition-row.is-incomplete`.
+None of the seven primitives above back it. The document caps stamp
+tones at five and calls a sixth a design change, not a screen
+decision. Ochre was an unauthorized sixth color under that rule.
+
+Its own use already matches the Caution tone: refusal-colored text on
+a lighter, accent-400 rule, dashed wherever a border exists.
+The studio pass repoints all four sites to that definition. It keeps
+no bespoke color.
+
 **Radius and shadow tokens are new, not renamed.** Nothing today reads a
 `--radius-*` or `--shadow-*` variable; neither existed. The area pass
 replaces every literal `border-radius` and `box-shadow` in the six CSS
@@ -159,6 +228,25 @@ zero. Every rounded corner in the product becomes square as a result.
 `--shadow-*` exists for one component only, the dialog. The document
 keeps an elevation there. Most of the product's flat surfaces will not
 reference it at all.
+
+**Add `.btn-primary`/`.btn-secondary`/`.btn-ghost` classNames to every
+`<button>` element; none exist today.** Every button today is the bare
+`<button>` element, styled by one unclassed rule (`tokens.css:81-88`). The
+document's three button treatments have no selector to restyle without
+this addition.
+
+Classification: a button that submits, starts, publishes, or otherwise
+commits the primary action of its screen is `.btn-primary`. An alternate
+committing action beside it, such as release, delegate, or retry, is
+`.btn-secondary`. A dismissing action, such as cancel, discard, back, or
+close, is `.btn-ghost`. The area pass (tasks 3.1/4.1/5.1/6.1) applies
+this classification button by button, screen by screen. The touched TSX
+files join `proposal.md`'s Impact list.
+
+Alternative: keep every button on the current single unclassed rule and
+drop the primary/secondary/ghost distinction. Rejected. The document
+specifies three visually distinct button treatments. Wiring only a
+default rule ships a change that never shows two of the three.
 
 ## Risks / Trade-offs
 

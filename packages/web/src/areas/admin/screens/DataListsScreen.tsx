@@ -84,10 +84,10 @@ export function DataListsScreen({ token, navigate, onUnauthorized }: DataListsSc
           spellCheck={false}
         />
         <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Cost centres…" aria-label="List name" autoComplete="off" />
-        <button type="submit" disabled={!canCreate}>
+        <button type="submit" className="btn btn-primary" disabled={!canCreate}>
           {creating ? "Creating…" : "Create list"}
         </button>
-        <button type="button" onClick={refresh} disabled={loading}>
+        <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
           Refresh
         </button>
       </form>
@@ -96,7 +96,7 @@ export function DataListsScreen({ token, navigate, onUnauthorized }: DataListsSc
         <div className="admin-error-banner" role="alert">
           <span className="admin-error-banner-stamp">Failed</span>
           <span className="admin-error-banner-message">{error}</span>
-          <button type="button" onClick={refresh} disabled={loading}>
+          <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
             Retry
           </button>
         </div>

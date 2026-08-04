@@ -58,10 +58,10 @@ export function ViewEditor({ view, fields, stepId, onChange }: Props) {
         return (
           <div className="view-row" key={row.ref ?? index}>
             <span className="view-row-field">{field?.key ?? row.ref}</span>
-            <button type="button" onClick={() => move(index, -1)} disabled={index === 0} aria-label={t("view.moveUp")}>
+            <button type="button" className="btn btn-secondary" onClick={() => move(index, -1)} disabled={index === 0} aria-label={t("view.moveUp")}>
               ↑
             </button>
-            <button type="button" onClick={() => move(index, 1)} disabled={index === rows.length - 1} aria-label={t("view.moveDown")}>
+            <button type="button" className="btn btn-secondary" onClick={() => move(index, 1)} disabled={index === rows.length - 1} aria-label={t("view.moveDown")}>
               ↓
             </button>
             <BooleanOrExpressionInput
@@ -86,13 +86,13 @@ export function ViewEditor({ view, fields, stepId, onChange }: Props) {
               group
               <input type="text" value={row.group ?? ""} onChange={(e) => updateRow(index, { group: e.target.value })} />
             </label>
-            <button type="button" onClick={() => removeRow(index)}>
+            <button type="button" className="btn btn-secondary" onClick={() => removeRow(index)}>
               {t("view.remove")}
             </button>
           </div>
         );
       })}
-      <button type="button" onClick={addRow} disabled={available.length === 0}>
+      <button type="button" className="btn btn-secondary" onClick={addRow} disabled={available.length === 0}>
         {t("view.addFieldOverride")}
       </button>
     </fieldset>

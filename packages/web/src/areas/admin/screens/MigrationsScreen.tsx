@@ -101,7 +101,7 @@ export function MigrationsScreen({ token, onUnauthorized }: MigrationsScreenProp
             ))}
           </select>
         </label>
-        <button type="button" onClick={() => void run()} disabled={!canRun || running}>
+        <button type="button" className="btn btn-primary" onClick={() => void run()} disabled={!canRun || running}>
           Run migration
         </button>
       </div>

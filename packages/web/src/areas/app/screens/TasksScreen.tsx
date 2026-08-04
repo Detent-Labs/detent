@@ -101,7 +101,7 @@ export function TasksScreen({ token, actorId, locale, navigate, onUnauthorized }
           <option value="none">{t(locale, "tasks.groupNone")}</option>
           <option value="process">{t(locale, "tasks.groupByProcess")}</option>
         </select>
-        <button type="button" onClick={() => void load()} disabled={loading}>
+        <button type="button" className="btn btn-secondary" onClick={() => void load()} disabled={loading}>
           {t(locale, "tasks.refresh")}
         </button>
       </div>
@@ -110,7 +110,7 @@ export function TasksScreen({ token, actorId, locale, navigate, onUnauthorized }
         <div className="app-error-banner" role="alert">
           <span className="app-error-banner-stamp">{t(locale, "error.failed")}</span>
           <span className="app-error-banner-message">{error}</span>
-          <button type="button" onClick={() => void load()} disabled={loading}>
+          <button type="button" className="btn btn-secondary" onClick={() => void load()} disabled={loading}>
             {t(locale, "error.retry")}
           </button>
         </div>
@@ -144,7 +144,7 @@ export function TasksScreen({ token, actorId, locale, navigate, onUnauthorized }
 
       {cursor && (
         <div className="app-load-more">
-          <button type="button" onClick={() => void loadMore()} disabled={loading}>
+          <button type="button" className="btn btn-secondary" onClick={() => void loadMore()} disabled={loading}>
             {t(locale, "tasks.loadMore")}
           </button>
           <p className="app-caveat">{t(locale, "tasks.loadMoreCaveat")}</p>

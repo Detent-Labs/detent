@@ -89,13 +89,13 @@ export function DataSourcesPanel({ token }: { token: string }) {
             )}
             {warning && <p className="studio-warning">{warning}</p>}
             <IssueList entityId={ds.id} />
-            <button type="button" onClick={() => removeDataSource(index)}>
+            <button type="button" className="btn btn-secondary" onClick={() => removeDataSource(index)}>
               {t("dataSources.removeDataSource")}
             </button>
           </div>
         );
       })}
-      <button type="button" onClick={addDataSource}>
+      <button type="button" className="btn btn-secondary" onClick={addDataSource}>
         {t("dataSources.addDataSource")}
       </button>
     </div>

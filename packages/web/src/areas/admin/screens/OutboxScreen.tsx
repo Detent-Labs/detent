@@ -119,7 +119,7 @@ export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
           <option value="discarded">Discarded</option>
         </select>
         <input placeholder="Instance id" value={instanceIdFilter} onChange={(e) => setInstanceIdFilter(e.target.value)} />
-        <button type="button" onClick={refresh} disabled={loading}>
+        <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
           Refresh
         </button>
       </div>
@@ -128,7 +128,7 @@ export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
         <div className="admin-error-banner" role="alert">
           <span className="admin-error-banner-stamp">Failed</span>
           <span className="admin-error-banner-message">{error}</span>
-          <button type="button" onClick={refresh} disabled={loading}>
+          <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
             Retry
           </button>
         </div>
@@ -163,10 +163,20 @@ export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
                 <td>
                   {row.status === "dead-letter" && (
                     <>
-                      <button type="button" onClick={() => void doRetry(row.idempotencyKey)} disabled={busyKey === row.idempotencyKey}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => void doRetry(row.idempotencyKey)}
+                        disabled={busyKey === row.idempotencyKey}
+                      >
                         Retry
                       </button>{" "}
-                      <button type="button" onClick={() => void doDiscard(row.idempotencyKey)} disabled={busyKey === row.idempotencyKey}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-destructive"
+                        onClick={() => void doDiscard(row.idempotencyKey)}
+                        disabled={busyKey === row.idempotencyKey}
+                      >
                         Discard
                       </button>
                     </>
@@ -180,7 +190,7 @@ export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
 
       {cursor && (
         <div className="admin-load-more">
-          <button type="button" onClick={() => void loadMore()} disabled={loading}>
+          <button type="button" className="btn btn-secondary" onClick={() => void loadMore()} disabled={loading}>
             Load more
           </button>
         </div>

@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { TriangleAlert } from "lucide-react";
 import { t } from "./catalog.js";
 import type { UiLocale } from "../i18n/locale.js";
 
@@ -37,8 +38,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       const locale = this.props.locale;
       return (
         <main className="shell-boundary-fallback">
-          <span className="shell-boundary-stamp">{t(locale, "error.generic")}</span>
-          <button type="button" onClick={() => window.location.reload()}>
+          <span className="shell-boundary-stamp">
+            <TriangleAlert size={18} strokeWidth={1.75} aria-hidden="true" />
+            {t(locale, "error.generic")}
+          </span>
+          <button type="button" className="btn btn-primary" onClick={() => window.location.reload()}>
             {t(locale, "error.retry")}
           </button>
         </main>

@@ -62,12 +62,12 @@ export function FieldExpressionMapEditor({
             ))}
           </select>
           <ExpressionInput value={expr} onChange={(v) => setEntry(fieldId, v)} placeholder={placeholder} />
-          <button type="button" onClick={() => setEntry(fieldId, undefined)}>
+          <button type="button" className="btn btn-secondary" onClick={() => setEntry(fieldId, undefined)}>
             {removeLabel}
           </button>
         </div>
       ))}
-      <button type="button" onClick={addEntry} disabled={fields.length === 0}>
+      <button type="button" className="btn btn-secondary" onClick={addEntry} disabled={fields.length === 0}>
         {addLabel}
       </button>
     </fieldset>

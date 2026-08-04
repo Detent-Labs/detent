@@ -86,7 +86,7 @@ export function ContractPanel() {
             {(contract.outcomes ?? []).map((o) => (
               <div key={o} className="outcome-row">
                 <span>{o}</span>
-                <button type="button" onClick={() => removeOutcome(o)}>
+                <button type="button" className="btn btn-secondary" onClick={() => removeOutcome(o)}>
                   {t("contract.removeOutcome")}
                 </button>
               </div>
@@ -98,7 +98,7 @@ export function ContractPanel() {
               onChange={(e) => setNewOutcome(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addOutcome()}
             />
-            <button type="button" onClick={addOutcome}>
+            <button type="button" className="btn btn-secondary" onClick={addOutcome}>
               {t("contract.addOutcome")}
             </button>
           </fieldset>

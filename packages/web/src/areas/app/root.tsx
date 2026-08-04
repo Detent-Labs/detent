@@ -1,3 +1,4 @@
+import { Inbox } from "lucide-react";
 import { matchRoute, routePath, type Route } from "./routing.js";
 import { useAreaRoute } from "../../shell/routing.js";
 import { Chrome } from "../../shell/Chrome.js";
@@ -18,10 +19,21 @@ export function AppArea({ session, locale, localPath, go, onUnauthorized, onLoca
 
   const nav = (
     <nav className="shell-nav">
-      <button type="button" onClick={() => navigate({ name: "tasks" })}>
+      <button
+        type="button"
+        className="btn btn-secondary"
+        aria-current={route.name === "tasks" ? "page" : undefined}
+        onClick={() => navigate({ name: "tasks" })}
+      >
+        <Inbox size={18} strokeWidth={1.75} aria-hidden="true" />
         {t(locale, "nav.myTasks")}
       </button>
-      <button type="button" onClick={() => navigate({ name: "start" })}>
+      <button
+        type="button"
+        className="btn btn-secondary"
+        aria-current={route.name === "start" ? "page" : undefined}
+        onClick={() => navigate({ name: "start" })}
+      >
         {t(locale, "nav.startProcess")}
       </button>
     </nav>

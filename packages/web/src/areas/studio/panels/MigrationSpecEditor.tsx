@@ -126,7 +126,7 @@ export function MigrationSpecEditor({ rows, catalogs, onChange }: Props) {
               invalid={rowIssues.length > 0}
               onChange={(id) => setList(list.map((r, i) => (i === index ? { ...r, to: id } : r)))}
             />
-            <button type="button" onClick={() => setList(list.filter((_, i) => i !== index))}>
+            <button type="button" className="btn btn-secondary" onClick={() => setList(list.filter((_, i) => i !== index))}>
               {t("migrationForm.removeRow")}
             </button>
             {errorId && (
@@ -139,6 +139,7 @@ export function MigrationSpecEditor({ rows, catalogs, onChange }: Props) {
       })}
       <button
         type="button"
+        className="btn btn-secondary"
         disabled={from.length === 0 || to.length === 0}
         onClick={() => setList([...list, { rowId: nextRowId(), from: from[0]?.id ?? "", to: to[0]?.id ?? "" }])}
       >
@@ -185,13 +186,14 @@ export function MigrationSpecEditor({ rows, catalogs, onChange }: Props) {
                 setTransforms(rows.transforms.map((r, i) => (i === index ? { ...r, src: e.target.value } : r)))
               }
             />
-            <button type="button" onClick={() => setTransforms(rows.transforms.filter((_, i) => i !== index))}>
+            <button type="button" className="btn btn-secondary" onClick={() => setTransforms(rows.transforms.filter((_, i) => i !== index))}>
               {t("migrationForm.removeRow")}
             </button>
           </div>
         ))}
         <button
           type="button"
+          className="btn btn-secondary"
           disabled={catalogs.target.fields.length === 0}
           onClick={() =>
             setTransforms([

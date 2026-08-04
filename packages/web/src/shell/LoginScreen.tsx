@@ -55,7 +55,7 @@ export function LoginScreen({ locale, onLoggedIn }: LoginScreenProps) {
           {t(locale, "login.password")}
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
         </label>
-        <button type="submit" disabled={loading || !email || !password}>
+        <button type="submit" className="btn btn-primary" disabled={loading || !email || !password}>
           {t(locale, "login.submit")}
         </button>
         {failed && <p className="shell-error">{t(locale, "login.failed")}</p>}

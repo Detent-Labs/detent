@@ -13,7 +13,7 @@ export function PathButtons({ paths, onSubmit, loading }: PathButtonsProps) {
   return (
     <div className="form-ui-paths">
       {paths.map((path) => (
-        <button key={path.id} type="button" disabled={loading} onClick={() => onSubmit(path.id)}>
+        <button key={path.id} type="button" className="btn btn-primary" disabled={loading} onClick={() => onSubmit(path.id)}>
           {path.label ?? path.key}
         </button>
       ))}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ChartNoAxesColumn } from "lucide-react";
 import { matchRoute, routePath, type Route, type ViewName } from "./routing.js";
 import { useAreaRoute } from "../../shell/routing.js";
 import { Chrome } from "../../shell/Chrome.js";
@@ -41,7 +42,13 @@ export function ReportingArea({ session, locale, localPath, go, onLocaleChange, 
 
   const nav = (
     <nav className="shell-nav">
-      <button type="button" className="rep-home" aria-current={route.name === "picker" ? "page" : undefined} onClick={() => navigate({ name: "picker" })}>
+      <button
+        type="button"
+        className="btn btn-secondary rep-home"
+        aria-current={route.name === "picker" ? "page" : undefined}
+        onClick={() => navigate({ name: "picker" })}
+      >
+        <ChartNoAxesColumn size={18} strokeWidth={1.75} aria-hidden="true" />
         Processes
       </button>
       {route.name === "view" &&
@@ -49,6 +56,7 @@ export function ReportingArea({ session, locale, localPath, go, onLocaleChange, 
           <button
             key={v.name}
             type="button"
+            className="btn btn-secondary"
             aria-current={route.view === v.name ? "page" : undefined}
             onClick={() => navigate({ name: "view", view: v.name, processId: route.processId })}
           >

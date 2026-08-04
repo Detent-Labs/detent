@@ -61,7 +61,7 @@ export function TimersScreen({ token, navigate, onUnauthorized }: TimersScreenPr
       <h1>Timers</h1>
 
       <div className="admin-controls">
-        <button type="button" onClick={refresh} disabled={loading}>
+        <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
           Refresh
         </button>
       </div>
@@ -70,7 +70,7 @@ export function TimersScreen({ token, navigate, onUnauthorized }: TimersScreenPr
         <div className="admin-error-banner" role="alert">
           <span className="admin-error-banner-stamp">Failed</span>
           <span className="admin-error-banner-message">{error}</span>
-          <button type="button" onClick={refresh} disabled={loading}>
+          <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
             Retry
           </button>
         </div>
@@ -114,7 +114,7 @@ export function TimersScreen({ token, navigate, onUnauthorized }: TimersScreenPr
 
       {cursor && (
         <div className="admin-load-more">
-          <button type="button" onClick={() => void loadMore()} disabled={loading}>
+          <button type="button" className="btn btn-secondary" onClick={() => void loadMore()} disabled={loading}>
             Load more
           </button>
         </div>

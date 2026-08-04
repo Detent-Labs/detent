@@ -194,7 +194,7 @@ export function PluginEnvelopeEditor({ label, value, onChange, typePlaceholder, 
               onChange={(fieldValue) => setConfigField(descriptor.key, fieldValue)}
             />
           ))}
-          <button type="button" onClick={switchToJson}>
+          <button type="button" className="btn btn-secondary" onClick={switchToJson}>
             {t("plugin.switchToJson")}
           </button>
         </>
@@ -210,7 +210,7 @@ export function PluginEnvelopeEditor({ label, value, onChange, typePlaceholder, 
             </p>
           )}
           {descriptorList !== undefined && (
-            <button type="button" onClick={() => setShowRawJson(false)}>
+            <button type="button" className="btn btn-secondary" onClick={() => setShowRawJson(false)}>
               {t("plugin.switchToForm")}
             </button>
           )}

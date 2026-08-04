@@ -119,13 +119,13 @@ export function TimersPanel({ timers, paths, fields, onChange, registryTypes, re
 
             <IssueList entityId={timer.id} />
 
-            <button type="button" onClick={() => removeTimer(index)}>
+            <button type="button" className="btn btn-secondary" onClick={() => removeTimer(index)}>
               {t("timers.removeTimer")}
             </button>
           </div>
         );
       })}
-      <button type="button" onClick={addTimer}>
+      <button type="button" className="btn btn-secondary" onClick={addTimer}>
         {t("timers.addTimer")}
       </button>
     </div>

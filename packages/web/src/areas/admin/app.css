@@ -1,186 +1,21 @@
 @import "../../shell/tokens.css";
 
 /*
- * Same token structure as packages/app/src/app.css (primitives -> semantic
- * aliases; components reference only the semantic layer) so the two
- * frontends read as siblings, not a mismatched pair.
+ * Same token structure as packages/web/src/areas/app/app.css: components
+ * reference only the shared semantic layer in tokens.css, never a local
+ * primitive, so the four areas read as siblings, not a mismatched pair.
  */
-
-:root {
-  --paper-50: #eef1f2;
-  --ledger-100: #dce3e0;
-  --ink-900: #1c2230;
-  --slate-500: #56606b;
-  --stamp-blue-600: #2c4a6e;
-  --seal-700: #6e7b3f;
-  --alert-700: #a23b2e;
-
-  --color-surface: var(--paper-50);
-  --color-surface-muted: var(--ledger-100);
-  --color-text: var(--ink-900);
-  --color-text-muted: var(--slate-500);
-  --color-border: var(--ledger-100);
-  --color-accent: var(--stamp-blue-600);
-  --color-accent-contrast: #ffffff;
-  --color-success: var(--seal-700);
-  --color-danger: var(--alert-700);
-
-  --font-display: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
-  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 1rem;
-  --space-4: 1.5rem;
-  --space-5: 2.5rem;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper-50: #171b22;
-    --ledger-100: #2a303a;
-    --ink-900: #e9ecef;
-    --slate-500: #9aa5b1;
-    --stamp-blue-600: #7ea3cc;
-    --seal-700: #9db072;
-    --alert-700: #d97362;
-    --color-accent-contrast: #10141a;
-  }
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  background: var(--color-surface);
-  color: var(--color-text);
-  font-family: var(--font-body);
-  font-size: 15px;
-  line-height: 1.5;
-}
-
-button,
-input,
-select,
-textarea {
-  font-family: inherit;
-  font-size: inherit;
-  color: inherit;
-}
-
-:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
-
-button {
-  background: var(--color-accent);
-  color: var(--color-accent-contrast);
-  border: none;
-  border-radius: 3px;
-  padding: var(--space-2) var(--space-3);
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-button.admin-back {
-  display: block;
-  background: none;
-  color: var(--color-accent);
-  padding: 0;
-  margin-bottom: var(--space-3);
-}
-
-input,
-select {
-  border: 1px solid var(--color-border);
-  border-radius: 3px;
-  padding: var(--space-2);
-  background: var(--color-surface);
-}
-
-h1,
-h2 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-h1 {
-  font-size: 1.25rem;
-  margin: 0 0 var(--space-4);
-}
-
-h2 {
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-text-muted);
-  margin: var(--space-4) 0 var(--space-2);
-}
 
 .admin-screen {
   max-width: 60rem;
   margin: 0 auto;
-  padding: var(--space-4) var(--space-3) var(--space-5);
+  padding: var(--space-4) var(--space-3) var(--space-6);
 }
 
-.admin-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.admin-header nav {
-  display: flex;
-  gap: var(--space-2);
-}
-
-.admin-header nav button,
-.admin-header-right button {
-  background: none;
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-}
-
-.admin-header nav button[aria-current="page"] {
-  background: var(--color-surface-muted);
-  font-weight: 600;
-}
-
-.admin-header-right {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-}
-
-.admin-login {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-}
-
-.admin-login-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  width: 20rem;
-}
-
-.admin-login-form label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  font-size: 0.9rem;
+.admin-back {
+  display: block;
+  padding-left: 0;
+  margin-bottom: var(--space-3);
 }
 
 .admin-empty-role {
@@ -203,8 +38,7 @@ h2 {
 }
 
 .admin-controls select,
-.admin-controls input,
-.admin-controls button {
+.admin-controls input {
   background: var(--color-surface);
   color: var(--color-text);
   border: 1px solid var(--color-border);
@@ -218,11 +52,10 @@ h2 {
 }
 
 .admin-count-pill {
-  font-family: var(--font-display);
-  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  font-size: 12px;
   border: 1px solid var(--color-border);
-  border-radius: 3px;
-  padding: 0.2rem 0.6rem;
+  padding: 2px 8px;
 }
 
 .admin-table {
@@ -233,13 +66,13 @@ h2 {
 
 .admin-table th {
   text-align: left;
-  font-family: var(--font-display);
-  font-size: 0.75rem;
+  font-family: var(--font-body);
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-text-muted);
   padding: var(--space-2);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 2px solid var(--color-divider);
 }
 
 .admin-table td {
@@ -255,8 +88,8 @@ h2 {
 }
 
 /* The control wrapping a row's identifying cell. Reset to plain text so it
-   reads as a table cell, not a call-to-action button; :focus-visible (above)
-   is what makes it discoverable by keyboard. */
+   reads as a table cell, not a call-to-action button; :focus-visible
+   (tokens.css) is what makes it discoverable by keyboard. */
 .admin-row-link {
   background: none;
   border: none;
@@ -266,45 +99,76 @@ h2 {
   color: inherit;
   text-align: left;
   cursor: pointer;
-  border-radius: 2px;
 }
 
 .admin-row-link:hover {
   text-decoration: underline;
 }
 
+/* The stamp: mono, uppercase, a 2px outline in the current colour. Five
+   tones, no sixth. Rotation is reserved for a stamp annotating a fault
+   outside a row/table (the error banner and boundary fallback below) — a
+   column of tilted stamps stops reading as a column. */
 .admin-badge {
   display: inline-block;
-  font-family: var(--font-display);
-  font-size: 0.7rem;
-  letter-spacing: 0.03em;
-  border: 1.5px solid currentColor;
-  border-radius: 2px;
-  padding: 0.1rem 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 2px solid currentcolor;
+  padding: 2px 7px;
 }
 
+/* Open tone: the case is live and waiting on someone. */
 .admin-badge-running,
 .admin-badge-pending {
   color: var(--color-accent);
 }
 
+/* Settled tone: reached a terminal step by its normal path — ink, never
+   green. */
 .admin-badge-completed,
 .admin-badge-delivered,
 .admin-badge-enabled {
-  color: var(--color-success);
+  color: var(--color-text);
 }
 
+/* Dormant tone: closed without finishing, kept rather than hidden. The
+   document's own neutral-500 (#9b9797) reads 2.59:1 on --paper-50 — well
+   under the 4.5:1 AA text minimum at this badge's 11px size, though it
+   already passes in dark mode (5.75:1 on the dark ground). Same hue and
+   saturation as neutral-500, darkened to the exact point that clears
+   4.5:1 in light mode (web-design-guidelines review, task 9.7); dark
+   mode keeps neutral-500 itself, since that already passes and a literal
+   here (unlike a token) needs its own override to flip. Still visually
+   distinct from the Muted role (neutral-700) the rest of this file uses
+   for secondary text. */
 .admin-badge-cancelled,
-.admin-badge-discarded {
-  color: var(--color-text-muted);
+.admin-badge-discarded,
+.admin-badge-redacted {
+  color: #726e6e;
 }
 
+@media (prefers-color-scheme: dark) {
+  .admin-badge-cancelled,
+  .admin-badge-discarded,
+  .admin-badge-redacted {
+    color: var(--color-neutral-500);
+  }
+}
+
+/* Refusal tone: the one filled stamp, for a fault, a dead letter, or a
+   failed/degraded request — straight, not tilted, since it sits in a
+   table cell. */
 .admin-badge-faulted,
 .admin-badge-dead-letter,
 .admin-badge-overdue,
 .admin-badge-disabled,
 .admin-badge-degraded {
-  color: var(--color-danger);
+  color: var(--color-surface);
+  background: var(--color-refusal);
+  border-color: var(--color-refusal);
 }
 
 .admin-empty {
@@ -313,11 +177,10 @@ h2 {
 }
 
 /* A role is an identifier the engine matches literally, never prose, so the
-   roles column and its editor take the display face the badges already use. */
+   roles column and its editor take the mono face the badges already use. */
 .admin-role-list,
-.admin-role-input,
-.admin-role-chip {
-  font-family: var(--font-display);
+.admin-role-input {
+  font-family: var(--font-mono);
   font-size: 0.8rem;
 }
 
@@ -330,9 +193,8 @@ h2 {
 
 .admin-role-input {
   width: 100%;
-  padding: 0.25rem 0.4rem;
-  border: 1.5px solid var(--color-accent);
-  border-radius: 2px;
+  padding: 4px 6px;
+  border: 2px solid var(--color-accent);
   background: var(--color-surface);
   color: var(--color-text);
 }
@@ -348,11 +210,16 @@ h2 {
 }
 
 /* Appends the role to the input. The six reserved names are exactly the
-   strings a typo makes silently ineffective, so they are clickable. */
+   strings a typo makes silently ineffective, so they are clickable. A
+   suggestion chip, not a committing action — it stays out of the
+   primary/secondary/ghost button taxonomy, with its own dashed-outline
+   affordance instead. Structural, not an engine-matched value read on its
+   own (design.md's third bucket), so it takes the body face. */
 .admin-role-chip {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
   border: 1.5px dashed var(--color-border);
-  border-radius: 2px;
-  padding: 0.1rem 0.4rem;
+  padding: 2px 7px;
   background: none;
   color: var(--color-text-muted);
   cursor: pointer;
@@ -372,24 +239,26 @@ h2 {
 }
 
 /* A manager is a person, shown by the email an operator recognises, so this
-   column takes the body face the email column already uses — unlike the roles
-   column beside it, whose values the engine matches literally. */
+   column takes the body face the email column already uses — unlike the
+   roles column beside it, whose values the engine matches literally. */
 .admin-manager-name {
   font-size: 0.85rem;
 }
 
 .admin-manager-select {
   width: 100%;
-  padding: 0.25rem 0.4rem;
-  border: 1.5px solid var(--color-accent);
-  border-radius: 2px;
+  padding: 4px 6px;
+  border: 2px solid var(--color-accent);
   background: var(--color-surface);
   color: var(--color-text);
   font-size: 0.85rem;
 }
 
+/* Standalone message, no paired stamp anywhere in this file — keeps the
+   refusal tone rather than moving to plain ink, per design.md's per-call-
+   site bucket-2 rule. */
 .admin-error {
-  color: var(--color-danger);
+  color: var(--color-refusal);
 }
 
 .admin-load-more {
@@ -409,15 +278,16 @@ h2 {
   font-size: 0.9rem;
 }
 
+/* A structural/caption label, not an engine-matched value (design.md's
+   third bucket), so it takes the body face rather than mono. */
 .admin-timeline .admin-timeline-meta {
   color: var(--color-text-muted);
   font-size: 0.8rem;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
 }
 
 .admin-detail-header {
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
+  border: 2px solid var(--color-divider);
   padding: var(--space-3);
   margin-bottom: var(--space-4);
   display: grid;
@@ -435,7 +305,7 @@ h2 {
 
 .admin-detail-header dd {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   font-size: 0.85rem;
   word-break: break-all;
 }
@@ -444,40 +314,33 @@ h2 {
  * Error banner: a failed request reported where the data it would have
  * shown normally sits, not a toast — this is an operations console, and a
  * failure that isn't in the reader's eyeline is the exact bug this class
- * exists to prevent. Reuses the rubber-stamp motif already established by
- * .admin-badge/.app-stamp rather than inventing a second visual language.
+ * exists to prevent.
  */
 .admin-error-banner {
   display: flex;
   align-items: baseline;
   gap: var(--space-3);
-  border: 1.5px solid var(--color-danger);
-  border-radius: 2px;
+  border: 2px solid var(--color-refusal);
   padding: var(--space-2) var(--space-3);
   margin: var(--space-3) 0;
 }
 
 .admin-error-banner-stamp {
   flex: none;
-  font-family: var(--font-display);
-  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--color-danger);
-  border: 1.5px solid currentColor;
-  border-radius: 2px;
-  padding: 0.1rem 0.4rem;
+  color: var(--color-refusal);
+  border: 2px solid currentcolor;
+  padding: 2px 7px;
   transform: rotate(-2deg);
 }
 
 .admin-error-banner-message {
   flex: 1;
   color: var(--color-text);
-}
-
-.admin-error-banner button {
-  flex: none;
 }
 
 /* Full-screen fallback for a render-time throw the ErrorBoundary catches — see ErrorBoundary.tsx for what this does and does not cover. */
@@ -492,15 +355,14 @@ h2 {
 }
 
 .admin-boundary-stamp {
-  font-family: var(--font-display);
-  font-size: 1rem;
+  font-family: var(--font-mono);
+  font-size: 16px;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--color-danger);
-  border: 1.5px solid currentColor;
-  border-radius: 2px;
-  padding: 0.2rem 0.7rem;
+  color: var(--color-refusal);
+  border: 2px solid currentcolor;
+  padding: 4px 12px;
   transform: rotate(-2deg);
 }
 
@@ -528,13 +390,14 @@ h2 {
 }
 
 /* A labelled control in .admin-controls: the label stacks above its input, the
-   way the login form already does it. */
+   way the login form already does it. A structural label, not an
+   engine-matched value, so it takes the body face. */
 .admin-field {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   font-size: 0.75rem;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-text-muted);

@@ -21,13 +21,13 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 2px solid var(--color-divider);
   background: var(--color-surface-muted);
 }
 
 .shell-tab {
-  font-family: var(--font-display);
-  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.14em;
@@ -43,6 +43,13 @@
   display: flex;
   gap: var(--space-2);
   flex: 1;
+}
+
+/* The current screen's nav entry, keyed on the DOM attribute the router
+   already sets, never a class. Shared across every area's nav, wired here
+   once rather than redeclared per area. */
+.shell-nav [aria-current="page"] {
+  background: color-mix(in srgb, var(--color-text) 7%, transparent);
 }
 
 .shell-account {
@@ -62,7 +69,7 @@
   padding: var(--space-2);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
+  box-shadow: var(--shadow-md);
 }
 
 .shell-menu-row {
@@ -82,8 +89,8 @@
 }
 
 .shell-menu-label {
-  font-family: var(--font-display);
-  font-size: 0.68rem;
+  font-family: var(--font-body);
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--color-text-muted);
@@ -94,10 +101,26 @@
   padding-top: var(--space-2);
 }
 
+/* A menu row, not a committing action, so it stays out of the
+   primary/secondary/ghost taxonomy: plain ink text with a hover wash, the
+   same treatment `.nav a` gets in the reference document. */
+.shell-menu button[role="menuitem"] {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  color: var(--color-text);
+  padding: var(--space-1) var(--space-2);
+}
+
+.shell-menu button[role="menuitem"]:hover {
+  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+}
+
 .shell-screen {
   max-width: 46rem;
   margin: 0 auto;
-  padding: var(--space-5) var(--space-3);
+  padding: var(--space-6) var(--space-3);
 }
 
 .shell-login-form {
@@ -113,8 +136,11 @@
   font-size: 0.85rem;
 }
 
+/* Standalone message, no paired stamp anywhere nearby (LoginScreen.tsx) — keeps
+   the refusal tone rather than moving to plain ink, per design.md's per-call-
+   site bucket-2 rule. */
 .shell-error {
-  color: var(--color-danger);
+  color: var(--color-refusal);
 }
 
 .shell-empty,
@@ -125,15 +151,29 @@
   gap: var(--space-3);
   max-width: 46rem;
   margin: 0 auto;
-  padding: var(--space-5) var(--space-3);
+  padding: var(--space-6) var(--space-3);
   color: var(--color-text-muted);
 }
 
+.shell-boundary-fallback {
+  border: 2px solid var(--color-divider);
+  padding: var(--space-8);
+  background: var(--color-surface-muted);
+}
+
 .shell-boundary-stamp {
-  font-family: var(--font-display);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-danger);
+  letter-spacing: 0.05em;
+  color: var(--color-refusal);
+  border: 2px solid currentcolor;
+  padding: 4px 12px;
+  transform: rotate(-2deg);
 }
 
 @media (max-width: 30rem) {

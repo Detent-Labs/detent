@@ -119,12 +119,12 @@ export function PathsPanel({ paths, steps, fields, stepId, onChange, registryTyp
 
           <IssueList entityId={path.id} />
 
-          <button type="button" onClick={() => removePath(index)}>
+          <button type="button" className="btn btn-secondary" onClick={() => removePath(index)}>
             {t("paths.removePath")}
           </button>
         </div>
       ))}
-      <button type="button" onClick={addPath} disabled={steps.length === 0}>
+      <button type="button" className="btn btn-secondary" onClick={addPath} disabled={steps.length === 0}>
         {t("paths.addPath")}
       </button>
     </div>

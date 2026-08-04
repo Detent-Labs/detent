@@ -59,7 +59,7 @@ export function ActionListEditor({ label, actions, onChange, fields, registryTyp
           onRemove={() => removeAction(index)}
         />
       ))}
-      <button type="button" onClick={addAction}>
+      <button type="button" className="btn btn-secondary" onClick={addAction}>
         {t("actions.addAction")}
       </button>
     </fieldset>
@@ -111,7 +111,7 @@ function ActionRow({
       {!validation.registryChecked && <NotCheckedBadge label="registry" />}
       <IssueList entityId={action.id} />
 
-      <button type="button" onClick={onRemove}>
+      <button type="button" className="btn btn-secondary" onClick={onRemove}>
         {t("actions.removeAction")}
       </button>
     </div>

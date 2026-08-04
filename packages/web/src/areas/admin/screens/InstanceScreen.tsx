@@ -141,7 +141,7 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
   if (!view) {
     return (
       <main className="admin-screen">
-        <button type="button" className="admin-back" onClick={() => navigate({ name: "instances" })}>
+        <button type="button" className="btn btn-ghost admin-back" onClick={() => navigate({ name: "instances" })}>
           ← Instances
         </button>
         {loading && <p>Loading…</p>}
@@ -149,7 +149,7 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
           <div className="admin-error-banner" role="alert">
             <span className="admin-error-banner-stamp">Failed</span>
             <span className="admin-error-banner-message">{error}</span>
-            <button type="button" onClick={refresh}>
+            <button type="button" className="btn btn-secondary" onClick={refresh}>
               Retry
             </button>
           </div>
@@ -164,7 +164,7 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
 
   return (
     <main className="admin-screen">
-      <button type="button" className="admin-back" onClick={() => navigate({ name: "instances" })}>
+      <button type="button" className="btn btn-ghost admin-back" onClick={() => navigate({ name: "instances" })}>
         ← Instances
       </button>
       <h1>{instanceId}</h1>
@@ -215,16 +215,16 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
       </dl>
 
       {view.status === "running" && (
-        <button type="button" onClick={() => void doCancel()} disabled={cancelling}>
+        <button type="button" className="btn btn-secondary btn-destructive" onClick={() => void doCancel()} disabled={cancelling}>
           Cancel instance
         </button>
       )}
       {view.status !== "running" && (
-        <button type="button" onClick={() => void doRedact()} disabled={redacting || !!view.redactedAt}>
+        <button type="button" className="btn btn-secondary btn-destructive" onClick={() => void doRedact()} disabled={redacting || !!view.redactedAt}>
           Redact data
         </button>
       )}
-      <button type="button" onClick={refresh} disabled={loading}>
+      <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
         Refresh
       </button>
 
@@ -232,7 +232,7 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
         <div className="admin-error-banner" role="alert">
           <span className="admin-error-banner-stamp">Failed</span>
           <span className="admin-error-banner-message">{error}</span>
-          <button type="button" onClick={refresh} disabled={loading}>
+          <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
             Retry
           </button>
         </div>
@@ -254,7 +254,7 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
       </ul>
       {recordCursor && (
         <div className="admin-load-more">
-          <button type="button" onClick={() => void loadMoreRecord()} disabled={loading}>
+          <button type="button" className="btn btn-secondary" onClick={() => void loadMoreRecord()} disabled={loading}>
             Load more history
           </button>
         </div>

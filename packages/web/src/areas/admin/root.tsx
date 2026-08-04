@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { ListChecks, Send, Timer, Users, GitCompareArrows, Table2 } from "lucide-react";
 import { matchRoute, routePath, ROUTE_ROLE, type Route } from "./routing.js";
 import { useAreaRoute } from "../../shell/routing.js";
 import { Chrome } from "../../shell/Chrome.js";
@@ -18,12 +19,12 @@ const DATALISTS_ROLE = "system:datalists";
 
 /** The role each tab's screen needs; `ROUTE_ROLE` in `routing.ts` carries the same rule per route. */
 const TABS = [
-  { name: "instances", label: "Instances", role: ADMIN_ROLE },
-  { name: "outbox", label: "Outbox", role: ADMIN_ROLE },
-  { name: "timers", label: "Timers", role: ADMIN_ROLE },
-  { name: "users", label: "Users", role: ADMIN_ROLE },
-  { name: "migrations", label: "Migrations", role: ADMIN_ROLE },
-  { name: "dataLists", label: "Data lists", role: DATALISTS_ROLE },
+  { name: "instances", label: "Instances", role: ADMIN_ROLE, Icon: ListChecks },
+  { name: "outbox", label: "Outbox", role: ADMIN_ROLE, Icon: Send },
+  { name: "timers", label: "Timers", role: ADMIN_ROLE, Icon: Timer },
+  { name: "users", label: "Users", role: ADMIN_ROLE, Icon: Users },
+  { name: "migrations", label: "Migrations", role: ADMIN_ROLE, Icon: GitCompareArrows },
+  { name: "dataLists", label: "Data lists", role: DATALISTS_ROLE, Icon: Table2 },
 ] as const;
 
 /** The same explanatory state the area shows an actor with no operator role, named per screen. */
@@ -54,6 +55,7 @@ export function AdminArea({ session, locale, localPath, go, onUnauthorized, onLo
         <button
           key={tab.name}
           type="button"
+          className="btn btn-secondary"
           aria-current={
             route.name === tab.name ||
             (tab.name === "instances" && route.name === "instance") ||
@@ -63,6 +65,7 @@ export function AdminArea({ session, locale, localPath, go, onUnauthorized, onLo
           }
           onClick={() => navigate({ name: tab.name } as Route)}
         >
+          <tab.Icon size={18} strokeWidth={1.75} aria-hidden="true" />
           {tab.label}
         </button>
       ))}
