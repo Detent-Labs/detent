@@ -1,0 +1,1 @@
+{"change_id": "add-manager-service", "phase": "implementing", "tasks_done": 34, "tasks_total": 62, "tests_passing": null, "blockers": [], "note": "Engine + HTTP route done and typechecking green (commit 40f2f8a). Baseline was 1685 pass / 1 skip / 0 fail. Remaining: new tests, the admin screen, docs."}

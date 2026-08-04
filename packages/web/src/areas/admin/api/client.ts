@@ -133,6 +133,16 @@ export async function setUserRoles(userId: string, roles: string[], token: strin
   return (await res.json()) as UserSummary;
 }
 
+/** Sets the account's manager, or clears it with `null`. A 400 means the target names no account, or is the account itself. */
+export async function setUserManager(userId: string, managerUserId: string | null, token: string): Promise<UserSummary> {
+  const res = await request(`/admin/users/${encodeURIComponent(userId)}/manager`, token, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ managerUserId }),
+  });
+  return (await res.json()) as UserSummary;
+}
+
 export async function runMigration(processId: string, fromVersion: number, toVersion: number, token: string): Promise<MigrationResult> {
   const res = await request("/admin/migrations/run", token, {
     method: "POST",

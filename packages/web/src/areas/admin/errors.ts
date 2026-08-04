@@ -27,6 +27,10 @@ export function describeError(error: ClientError, status?: number): string {
       return "No migration plan is registered for that version pair.";
     case "self-role-strip":
       return "You cannot remove system:admin from your own account. Ask another administrator, or use the server CLI.";
+    case "self-manager":
+      return "A user cannot be their own manager. Pick a different account.";
+    case "unknown-manager":
+      return "That account no longer exists. Refresh and pick again.";
     case "internal":
       return status === undefined
         ? "Could not reach the server. Check your connection and try again."
