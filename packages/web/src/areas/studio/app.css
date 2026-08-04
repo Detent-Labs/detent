@@ -819,3 +819,23 @@ h2 {
   color: var(--color-danger);
   font-size: 0.85rem;
 }
+
+/* --- Field validation editor --------------------------------------------- */
+
+.field-validation {
+  margin: var(--space-2) 0;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  padding: var(--space-1) var(--space-2);
+}
+
+.field-validation summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+}
+
+.field-validation-row {
+  padding: var(--space-1) 0;
+}

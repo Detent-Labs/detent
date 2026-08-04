@@ -1252,6 +1252,35 @@ Stage-by-stage status is in `ROADMAP.md`.
   `ConditionInput` renders only the CEL arm. A view override therefore never
   shows two controls for one choice.
 
+- Process Studio, the field validation editor
+  (`packages/web/src/areas/studio/panels/shared/{fieldValidationLogic.ts,
+  FieldValidationEditor.tsx}`, `studio-field-validation-form`). A collapsed
+  section inside `FieldCatalogPanel`'s field row, offering the six keys
+  `FieldValidation` declares: `min`, `max`, `minLength`, `maxLength`,
+  `pattern` and `rule`. Previously only reachable through the JSON view.
+
+  `offeredKeys` is a literal table over the field's declared type. It mirrors
+  `checkConstraints` (`src/runtime/api.ts:503`). That function branches on the
+  submitted value's JavaScript runtime type, not the declared one.
+
+  `file` and a plugin (custom) type offer every key. `typeMatches`
+  (`src/schema/definition.ts`) treats both as opaque. A key a hand-authored
+  body carries outside its offered set stays visible and editable. The
+  editor marks it as one the engine skips for that field type. It never
+  drops it.
+
+  `rule` uses the plain `ExpressionInput`, not the condition builder. Stage
+  27b's builder may replace that one line later without changing this
+  capability's contract. The `pattern` control adds no check of its own. It
+  reads this field's own `pattern` entries straight from the draft's own
+  `validation.issues`. That is the same array `IssueList` already shows for
+  the field. `compile.ts::checkPatterns` computes them once, never a second
+  way.
+
+  Clearing a key's control removes it. Clearing the last one patches
+  `validation: undefined` rather than `{}`, since `definitionHash` (the JCS
+  hash of the body) hashes those two shapes differently.
+
 - Process Studio — JSON view (`packages/web/src/areas/studio/panels/{JsonView,
   draftJsonLogic}.ts(x)`, `src/draft/load-guard.ts`, `screens/EditScreen.tsx`,
   `studio-json-view`): stage 11's third of five changes, entirely

@@ -1,7 +1,7 @@
 ## Why
 
-`FieldCatalogPanel.tsx` renders a field's `key`, `label`, `description`, `type`,
-`dataSource`, `options` and nested `fields`. It renders `validation` nowhere.
+`FieldCatalogPanel.tsx` shows a field's `key`, `label`, `description`, `type`,
+`dataSource`, `options` and nested `fields`. It shows `validation` nowhere.
 An author may want a minimum amount, a maximum length, a format or a CEL rule.
 Today they must open the JSON view and hand-write the object.
 
@@ -17,18 +17,25 @@ own change, since it asks its own questions.
 - The editor offers the keys that suit the field's declared type. A `number`
   field shows `min` and `max`. A string-valued field shows `minLength`,
   `maxLength` and `pattern`. A `multiselect` shows the two length keys but not
-  `pattern`, since its value is a list. Every type shows `rule`. The key set
-  mirrors `checkConstraints` in `src/runtime/api.ts:503`, which reads the
-  submitted value's JavaScript type rather than the declared one.
+  `pattern`, since its value is a list. Every type shows `rule`.
+- A `file` field and a custom (plugin) type show every key. Neither constrains
+  what JavaScript shape its submitted value takes. The engine may apply any of
+  them. `boolean` and `group` show `rule` alone, the only key their fixed
+  shape can ever trigger. The key set mirrors `checkConstraints` in
+  `src/runtime/api.ts:503`, which reads the submitted value's JavaScript type
+  rather than the declared one.
 - A key a hand-authored body already carries stays visible and editable, even
   when the field's type does not suit it. The editor marks it. It never drops
   it. Stage 27c's mapping form set that rule for a row no catalog declares.
 - `rule` uses today's `ExpressionInput`, the raw CEL text input. Stage 27b can
   later replace that one line with its `ConditionInput`. Neither change waits
   for the other.
-- `pattern` reports two rules inline before the save. The source must compile
-  as a JavaScript `RegExp`. It must also stay under the declared length bound.
-  `compile.ts::checkPatterns` keeps both checks at publish unchanged.
+- `pattern` shows its live-validation issues inline, beside the input. It
+  reuses the same check every panel already reads
+  (`compile.ts::checkPatterns`), not a second implementation. It never blocks
+  the save. `compile.ts::checkPatterns` keeps both checks at publish
+  unchanged. It compiles as a JavaScript `RegExp`. It stays under the
+  declared length bound.
 - Clearing every key removes `validation` from the field. It does not leave an
   empty object behind.
 
@@ -56,7 +63,18 @@ panel edits.
   editor. Beside it a `…Logic.ts` module holds the type-to-key mapping and the
   `pattern` checks, following `studio-draftJsonLogic` and its two siblings.
 - `packages/web/src/areas/studio/catalog.ts`: the new UI strings.
-- `packages/web/test/`: one new test file for the logic module.
+- `packages/web/test/`: one new test file for the logic module, plus a
+  regression test for the fix below.
+- `packages/web/src/areas/studio/draft/issues.ts`: a pre-existing field-location
+  resolution bug this change's browser verification found. It sent every
+  `pattern` structural issue to the process-level fallback instead of the
+  field. Fixed alongside this change, since Requirement 4 depends on it (see
+  `tasks.md` 4.8).
+- `docs/current-state.md`: the field catalog panel's description gains the new
+  editor.
+<!-- antislop: allow synonym-rotation -->
+- `ROADMAP.md`: stage 27b's entry states `field.validation.rule` has no
+  authoring surface yet. This change gives it one, so that clause moves.
 
 Untouched: `src/schema/definition.ts`, `src/schema/compile.ts`, every route,
 the draft store's shape, and `packages/form-ui`.
@@ -69,4 +87,4 @@ the wrong format", and a failed `rule` reads "This value isn't valid." Making
 that text authorable is a schema change and needs its own decision.
 
 Also out of scope: `FieldDef.default`, the second key `FieldCatalogPanel` does
-not render.
+not show.

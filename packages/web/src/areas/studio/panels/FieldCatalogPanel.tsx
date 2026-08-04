@@ -8,6 +8,7 @@ import { addToDraftArray, updateInDraftArray } from "../draft/draft-array-crud";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { IssueList } from "./shared/IssueList";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput";
+import { FieldValidationEditor } from "./shared/FieldValidationEditor";
 import { seedLocalizedText } from "../draft/localized-text";
 
 type DraftField = DraftOf<FieldDef>;
@@ -132,6 +133,13 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
           </button>
         </div>
       </fieldset>
+
+      <FieldValidationEditor
+        fieldId={field.id}
+        type={field.type}
+        validation={field.validation}
+        onChange={(validation) => onChange({ validation })}
+      />
 
       {field.type === "group" && (
         <fieldset>
