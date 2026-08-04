@@ -1,1 +1,1 @@
-{"change_id": "studio-migration-plan-field-mapping", "phase": "reviewing", "tasks_done": 0, "tasks_total": 27, "tests_passing": null, "blockers": []}
+{"change_id": "studio-migration-plan-field-mapping", "phase": "syncing", "tasks_done": 31, "tasks_total": 31, "tests_passing": true, "blockers": [], "browser_port": 5273, "api_port": 3300, "compose_project": "wf-studio-migration", "test_result": "1708 pass, 1 skip, 0 fail"}
