@@ -25,6 +25,9 @@ const historyOf = async (id: string): Promise<HistoryEntry[]> => {
 
 const unresolvedEvents = (events: InstanceEvent[]) => events.filter((e) => e.kind === "assignment.unresolved");
 
+/** `stepId` is branded on the schema type, so an inline literal will not compare without this. */
+const payloadOf = (e: InstanceEvent) => e.payload as { stepId: string; reason: string };
+
 /** step_a (unassigned, initial) -> step_b, whose assignment carries `strategy`. */
 const bodyWith = (strategy: { type: string; config: Record<string, unknown> }): ProcessBody =>
   ({
@@ -80,7 +83,7 @@ test.skipIf(!DB)("a transition onto a step resolving to nobody records the event
   const [event] = unresolvedEvents(await eventsOf(inst.instanceId));
   expect(event).toBeDefined();
   expect(event!.kind).toBe("assignment.unresolved");
-  expect(event!.payload).toEqual({ stepId: "step_b", reason: "no-candidates" });
+  expect(payloadOf(event!)).toEqual({ stepId: "step_b", reason: "no-candidates" });
 });
 
 test.skipIf(!DB)("a resolver that raises still commits the transition", async () => {
@@ -101,7 +104,7 @@ test.skipIf(!DB)("a resolver that raises still commits the transition", async ()
   expect(onB.currentStepId as string).toBe("step_b");
   expect(onB.assignment!.candidates).toEqual([]);
   const [event] = unresolvedEvents(await eventsOf(inst.instanceId));
-  expect(event!.payload).toEqual({ stepId: "step_b", reason: "resolver-raised" });
+  expect(payloadOf(event!)).toEqual({ stepId: "step_b", reason: "resolver-raised" });
 });
 
 test.skipIf(!DB)("a resolver exceeding the deadline records the timed-out reason", async () => {
@@ -120,7 +123,7 @@ test.skipIf(!DB)("a resolver exceeding the deadline records the timed-out reason
     );
     expect(onB.currentStepId as string).toBe("step_b");
     const [event] = unresolvedEvents(await eventsOf(inst.instanceId));
-    expect(event!.payload).toEqual({ stepId: "step_b", reason: "timed-out" });
+    expect(payloadOf(event!)).toEqual({ stepId: "step_b", reason: "timed-out" });
   } finally {
     delete process.env.ASSIGNMENT_RESOLUTION_TIMEOUT_MS;
   }
@@ -178,7 +181,7 @@ test.skipIf(!DB)("a static strategy configured with an empty list records the ev
   await executeManualTransition(inst, "path_ab", body, actor, sql, undefined, createDefaultAssignmentRegistry());
 
   const [event] = unresolvedEvents(await eventsOf(inst.instanceId));
-  expect(event!.payload).toEqual({ stepId: "step_b", reason: "no-candidates" });
+  expect(payloadOf(event!)).toEqual({ stepId: "step_b", reason: "no-candidates" });
 });
 
 test.skipIf(!DB)("a creation records the event at transitionSeq 0, where no HistoryEntry exists", async () => {
@@ -194,7 +197,7 @@ test.skipIf(!DB)("a creation records the event at transitionSeq 0, where no Hist
   const [event] = unresolvedEvents(await eventsOf(created.instanceId));
   expect(event).toBeDefined();
   expect(event!.transitionSeq).toBe(0);
-  expect(event!.payload).toEqual({ stepId: "step_a", reason: "no-candidates" });
+  expect(payloadOf(event!)).toEqual({ stepId: "step_a", reason: "no-candidates" });
   expect(await historyOf(created.instanceId)).toEqual([]);
 });
 

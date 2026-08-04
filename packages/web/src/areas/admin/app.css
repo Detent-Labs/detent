@@ -371,6 +371,23 @@ h2 {
   max-width: 34rem;
 }
 
+/* A manager is a person, shown by the email an operator recognises, so this
+   column takes the body face the email column already uses — unlike the roles
+   column beside it, whose values the engine matches literally. */
+.admin-manager-name {
+  font-size: 0.85rem;
+}
+
+.admin-manager-select {
+  width: 100%;
+  padding: 0.25rem 0.4rem;
+  border: 1.5px solid var(--color-accent);
+  border-radius: 2px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.85rem;
+}
+
 .admin-error {
   color: var(--color-danger);
 }
