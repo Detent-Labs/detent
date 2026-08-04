@@ -117,7 +117,7 @@ directives already work.
 |---|---|---|
 | `ponytail-ledger-fresh` | `gates/ponytail-ledger.sh` | a `ponytail:` marker the ledgers do not list |
 | `pushed-whitespace` | `gates/whitespace.sh` | a CR byte, a trailing space, a blank line at EOF, in the pushed range |
-| `changed-markdown-prose` | `gates/prose.sh` | antislop findings in the Markdown the push changes |
+| `changed-markdown-prose` | `gates/prose.sh` | a rising antislop finding count in the Markdown the push changes |
 | `no-machine-paths` | `gates/machine-paths.sh` | an absolute home-directory path in a tracked file |
 | `frozen-lockfile` | `gates/lockfile.sh` | a manifest the committed `bun.lock` cannot satisfy |
 | `no-silent-green` | `gates/silent-green.sh` | a suite run with no database, or one skipping past the floor |
@@ -129,6 +129,34 @@ Two properties are worth knowing before a push. `--no-verify` bypasses the hook,
 and so disables every gate at once, never just the one in the way. The skip floor
 in `scripts/gates/skip-floor.txt` is a ratchet: raise it only in the commit that
 adds the skip, with a row naming what the increase covers.
+
+### Prose debt: what the ratchet permits
+
+`changed-markdown-prose` is a ratchet too. It compares a file's antislop finding
+count at the pushed range's base against the count at its tip. It blocks only a
+rise. A file already carrying findings passes, as long as the push adds none.
+
+Measurement sets that rule. The live specs under `openspec/specs/` hold about
+3166 findings across 52 of 80 files. `instance-migration` alone holds 287,
+`timers` 220, `transition-execution` 167. A whole-file gate makes each of those
+unpushable until somebody clears its debt in full.
+
+That happened on 2026-08-04. A change synced one requirement into
+`development-toolchain/spec.md` and paid a 28-finding prose rewrite. Every one
+of those findings predated it.
+
+Clearing a touched file's debt stays the norm where it is cheap. That norm is
+advisory. The ratchet is the mechanical floor. The gate blocks a file getting
+worse. It does not demand that a file get better.
+
+An `allow-file` directive lowers the count, so the gate permits one. Prefer the
+targeted form, `<!-- antislop: allow <rule> -->` next to the line it excuses,
+with a sentence saying why. A blanket directive at the top of a file silences
+rules nobody re-examines afterwards.
+
+`bbf37d1` put a six-rule `allow-file` line at the top of this file. `CLAUDE.md`
+reports 0 findings with it and 45 without. That is the pattern to avoid, not the
+one to copy.
 
 Four defect classes recur here and have no gate, on purpose. Stale UI state after
 a mutation needs a browser, which is why the browser check above stays. Orphaned
