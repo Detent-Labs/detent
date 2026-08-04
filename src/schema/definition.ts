@@ -902,6 +902,18 @@ export type MigrationSkipReason = z.infer<typeof migrationSkipReason>;
  */
 export const instanceFaultedReason = z.enum(["automatic-cascade-loop"]);
 
+/**
+ * Why a step entry resolved its declared assignment to no candidate. Each is
+ * distinguished at the point that knows it: the strategy's resolver raising, the
+ * resolution exceeding its deadline, and a resolver answering with an empty
+ * list. `no-candidates` is the engine-level truth and covers a strategy-specific
+ * cause such as "no manager on record" — the event envelope carries the
+ * `version`, and its `stepId` resolves against that frozen body, so a reader
+ * recovers the strategy type from the definition rather than from the payload.
+ */
+export const assignmentUnresolvedReason = z.enum(["resolver-raised", "timed-out", "no-candidates"]);
+export type AssignmentUnresolvedReason = z.infer<typeof assignmentUnresolvedReason>;
+
 export const instanceEvent = z.discriminatedUnion("kind", [
   // A reminder timer (onFire actions, no targetPath) fired: actions enqueued,
   // no transition.
@@ -1013,6 +1025,20 @@ export const instanceEvent = z.discriminatedUnion("kind", [
     ...instanceEventEnvelope,
     kind: z.literal("mapping.entry-dropped"),
     payload: z.object({ fieldId, direction: z.enum(["input", "output"]), reason: migrationTransformDroppedReason }).strict(),
+  }),
+  // A step entry resolved its declared `assignment` to no candidate: the
+  // resolver raised, exceeded its deadline, or answered with an empty list.
+  // Resolution is total, so the entry committed regardless and `candidates` is
+  // empty. No transition of its own and no actions enqueued — the timer.unarmed
+  // shape, not the timer.fired one: a declared thing produced no value at entry
+  // and the record names the reason. It carries the seq in force after the entry
+  // it accompanies, so it shares that seq with that entry's HistoryEntry where
+  // one exists, and sits at 0 on a creation, where none does. A step declaring
+  // no `assignment` records nothing: resolution never runs for it.
+  z.object({
+    ...instanceEventEnvelope,
+    kind: z.literal("assignment.unresolved"),
+    payload: z.object({ stepId, reason: assignmentUnresolvedReason }).strict(),
   }),
 ]);
 export type InstanceEvent = z.infer<typeof instanceEvent>;

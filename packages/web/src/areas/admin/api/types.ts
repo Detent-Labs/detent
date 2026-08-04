@@ -123,6 +123,8 @@ export interface UserSummary {
   email: string;
   roles: string[];
   disabled: boolean;
+  /** The `userId` of this account's manager, absent when none is on record. Read by the `org.manager-of-starter` assignment strategy. */
+  managerUserId?: string;
 }
 
 export interface UserPage {

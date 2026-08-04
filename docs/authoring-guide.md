@@ -326,12 +326,35 @@ and a `config`. Pick the `type` from the picker, which lists the strategies
 your deployment registers. A `type` nobody registered is a publish error, not
 a surprise at run time.
 
-`static` is the one that ships, and the one you get by default. The studio
-generates a form for it: one candidates field, `finance-approver` for
-example. The engine uses that list unchanged.
+Two strategies ship.
 
-Assign by role, not by person. A person leaves the company, and the process
-outlives them.
+`static` is the one you get by default. The studio generates a form for it:
+one candidates field, `finance-approver` for example. The engine uses that
+list unchanged.
+
+`org.manager-of-starter` resolves the manager of whoever started the
+instance. It takes no config, so its form is empty. Use it for the approval
+every process needs and no role name can express. One leave request routes to
+Anna's manager, the next to Bernd's, from the same definition.
+
+An operator records the manager on the admin Users screen. The strategy reads
+one hop: the starter's manager, never their manager's manager, and never the
+manager of whoever acted last.
+
+The list the strategy produces is frozen when the instance enters the step. A
+manager who changes afterwards does not change an instance already waiting.
+Use delegation for the one-off case.
+
+When a strategy finds nobody, the step commits with no candidates and the
+instance waits where anyone can see it. The admin record carries an
+`assignment.unresolved` entry naming the step and the reason. The engine
+substitutes no stand-in approver: routing to the wrong person silently is
+worse than a visible stall.
+
+Assign by role, not by person, whenever a role fits. A person leaves the
+company, and the process outlives them. `org.manager-of-starter` is not an
+exception to that rule. It names a relationship, and the relationship
+outlives whoever holds it.
 
 ### 8. Declare a contract, if another process will call this one
 

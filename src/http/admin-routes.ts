@@ -10,7 +10,7 @@
 import type { SQL } from "bun";
 import { sql, withTransaction } from "../engine/store.js";
 import { listOutbox, countOutboxByStatus, listPendingTimers, requeueOutboxRow, discardOutboxRow, getOutboxRow, type OutboxListFilter } from "../engine/admin-queries.js";
-import { listUsers, setDisabled, setRolesById } from "../auth/users.js";
+import { listUsers, setDisabled, setRolesById, setManagerById, SelfManagerError } from "../auth/users.js";
 import { migrateInstances } from "../engine/migration.js";
 import { redactInstance } from "../engine/retention.js";
 import { localizedText, type ProcessId, type InstanceId, type LocalizedText } from "../schema/definition.js";
@@ -184,6 +184,63 @@ export async function handleAdminSetUserRoles(userId: string, req: Request, reso
     if (!updated) return { status: 404, body: { error: { type: "not-found", message: `no user: ${userId}` } } };
     return { status: 200, body: updated };
   });
+}
+
+/**
+ * Set or clear the account's manager, read by the `org.manager-of-starter`
+ * assignment strategy. `{ managerUserId: null }` clears it.
+ *
+ * Two 400s: a `managerUserId` naming no account, and one equal to `userId`. The
+ * self-pointer would name an instance's starter as their own approver — an
+ * operator mistake rather than an organizational fact. A cycle between two
+ * accounts is NOT refused: the strategy reads one hop and never walks it.
+ *
+ * The unknown-target 400 comes from the column's own foreign key rather than a
+ * pre-read, so a concurrent delete cannot slip between a check and the write.
+ */
+export async function handleAdminSetUserManager(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    requireRole(actor, ADMIN_ROLE);
+    let body: { managerUserId?: unknown };
+    try {
+      body = (await req.json()) as typeof body;
+    } catch {
+      throw new RequestShapeError("request body is not valid JSON");
+    }
+    const raw = body.managerUserId;
+    if (raw !== null && typeof raw !== "string") throw new RequestShapeError("managerUserId must be a string or null");
+    const managerUserId = raw === null ? null : raw.trim();
+    if (managerUserId !== null && !managerUserId) throw new RequestShapeError("managerUserId must not be empty");
+
+    let updated: Awaited<ReturnType<typeof setManagerById>>;
+    try {
+      updated = await setManagerById(userId, managerUserId, db);
+    } catch (err) {
+      if (err instanceof SelfManagerError) {
+        return { status: 400, body: { error: { type: "self-manager", message: "a user cannot be their own manager" } } };
+      }
+      // The column's self-reference rejecting an id that backs no account.
+      if (isManagerForeignKeyViolation(err)) {
+        return { status: 400, body: { error: { type: "unknown-manager", message: `no user: ${managerUserId}` } } };
+      }
+      throw err;
+    }
+    if (!updated) return { status: 404, body: { error: { type: "not-found", message: `no user: ${userId}` } } };
+    return { status: 200, body: updated };
+  });
+}
+
+/**
+ * Postgres SQLSTATE 23503 on this column's own constraint. Bun.sql throws an
+ * untyped `PostgresError` carrying the SQLSTATE as `errno` (`code` holds
+ * `ERR_POSTGRES_SERVER_ERROR`, which is the same for every server error), so the
+ * check reads `errno` and the constraint name rather than `code`.
+ */
+function isManagerForeignKeyViolation(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const e = err as { errno?: unknown; constraint?: unknown };
+  return e.errno === "23503" && e.constraint === "auth_users_manager_user_id_fkey";
 }
 
 export async function handleAdminDisableUser(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {

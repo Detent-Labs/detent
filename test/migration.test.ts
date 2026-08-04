@@ -116,7 +116,7 @@ const mkInstance = async (pid: Instance["processId"], version: number, data?: Re
   // `startInstance` and `api.ts::createProcessInstance` do at creation.
   const initial = body.workflow.steps.find((st) => st.id === body.workflow.initialStep)!;
   const instanceId = `inst_${crypto.randomUUID()}`;
-  const assignment = await resolveStepAssignment(initial, createDefaultAssignmentRegistry(), {
+  const { assignment } = await resolveStepAssignment(initial, createDefaultAssignmentRegistry(), {
     id: instanceId,
     startedBy: undefined,
     data: (data ?? {}) as Instance["data"],

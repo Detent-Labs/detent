@@ -398,6 +398,107 @@ test.skipIf(!DB)("PATCH /admin/users/:id/roles lets one admin strip another admi
   expect(await storedRoles(userId)).toEqual(["a"]);
 });
 
+// ============================================================
+// PATCH /admin/users/:id/manager
+// ============================================================
+
+const managerReq = (userId: string, body: unknown, actor: Actor) =>
+  new Request(`http://x/admin/users/${userId}/manager`, {
+    method: "PATCH",
+    headers: {
+      "content-type": "application/json",
+      "X-Actor-Id": actor.id,
+      ...(actor.roles.length > 0 ? { "X-Actor-Roles": actor.roles.join(",") } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+const storedManager = async (userId: string): Promise<string | null> => {
+  const rows = (await sql`SELECT manager_user_id FROM auth_users WHERE user_id = ${userId}`) as { manager_user_id: string | null }[];
+  return rows[0]!.manager_user_id;
+};
+
+test.skipIf(!DB)("PATCH /admin/users/:id/manager with system:admin sets the manager", async () => {
+  const boss = await createUser("m-boss@example.com", "pw", []);
+  const staff = await createUser("m-staff@example.com", "pw", []);
+  const res = await fetch(managerReq(staff.userId, { managerUserId: boss.userId }, admin));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { managerUserId: string };
+  expect(body.managerUserId).toBe(boss.userId);
+  expect(await storedManager(staff.userId)).toBe(boss.userId);
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/manager with null clears the manager", async () => {
+  const boss = await createUser("m-boss2@example.com", "pw", []);
+  const staff = await createUser("m-staff2@example.com", "pw", []);
+  await fetch(managerReq(staff.userId, { managerUserId: boss.userId }, admin));
+  const res = await fetch(managerReq(staff.userId, { managerUserId: null }, admin));
+  expect(res.status).toBe(200);
+  expect(await storedManager(staff.userId)).toBeNull();
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/manager naming no account is 400 with no write", async () => {
+  const staff = await createUser("m-staff3@example.com", "pw", []);
+  const res = await fetch(managerReq(staff.userId, { managerUserId: "user_does_not_exist" }, admin));
+  expect(res.status).toBe(400);
+  expect(await storedManager(staff.userId)).toBeNull();
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/manager refuses a self-pointer with 400 and no write", async () => {
+  const staff = await createUser("m-staff4@example.com", "pw", []);
+  const res = await fetch(managerReq(staff.userId, { managerUserId: staff.userId }, admin));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("self-manager");
+  expect(await storedManager(staff.userId)).toBeNull();
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/manager accepts a two-account cycle", async () => {
+  // Nothing walks the pointer, so a cycle has no effect and is not refused.
+  const a = await createUser("m-cyc-a@example.com", "pw", []);
+  const b = await createUser("m-cyc-b@example.com", "pw", []);
+  expect((await fetch(managerReq(a.userId, { managerUserId: b.userId }, admin))).status).toBe(200);
+  expect((await fetch(managerReq(b.userId, { managerUserId: a.userId }, admin))).status).toBe(200);
+  expect(await storedManager(a.userId)).toBe(b.userId);
+  expect(await storedManager(b.userId)).toBe(a.userId);
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/manager refuses a malformed body with 400 and no write", async () => {
+  const boss = await createUser("m-boss5@example.com", "pw", []);
+  const staff = await createUser("m-staff5@example.com", "pw", []);
+  await fetch(managerReq(staff.userId, { managerUserId: boss.userId }, admin));
+  for (const body of [{}, { managerUserId: 7 }, { managerUserId: "   " }, { managerUserId: [] }]) {
+    const res = await fetch(managerReq(staff.userId, body, admin));
+    expect(res.status).toBe(400);
+  }
+  expect(await storedManager(staff.userId)).toBe(boss.userId);
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/manager on an unknown id maps to 404", async () => {
+  const boss = await createUser("m-boss6@example.com", "pw", []);
+  const res = await fetch(managerReq("user_does_not_exist", { managerUserId: boss.userId }, admin));
+  expect(res.status).toBe(404);
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/manager without system:admin maps to 403 and performs no update", async () => {
+  const boss = await createUser("m-boss7@example.com", "pw", []);
+  const staff = await createUser("m-staff7@example.com", "pw", []);
+  const res = await fetch(managerReq(staff.userId, { managerUserId: boss.userId }, bystander));
+  expect(res.status).toBe(403);
+  expect(await storedManager(staff.userId)).toBeNull();
+});
+
+test.skipIf(!DB)("GET /admin/users carries each account's manager", async () => {
+  const boss = await createUser("m-boss8@example.com", "pw", []);
+  const staff = await createUser("m-staff8@example.com", "pw", []);
+  await fetch(managerReq(staff.userId, { managerUserId: boss.userId }, admin));
+  const res = await fetch(authedReq("http://x/admin/users", "GET", admin));
+  expect(res.status).toBe(200);
+  const { items } = (await res.json()) as { items: { userId: string; managerUserId?: string }[] };
+  expect(items.find((u) => u.userId === staff.userId)!.managerUserId).toBe(boss.userId);
+  expect(items.find((u) => u.userId === boss.userId)!.managerUserId).toBeUndefined();
+});
+
 // `admin.id` backs no auth_users row here, the shape an external issuer produces.
 test.skipIf(!DB)("PATCH /admin/users/:id/roles decides the self-strip guard ahead of the unknown-user 404", async () => {
   const res = await fetch(rolesReq(admin.id, { roles: ["a"] }, admin));
@@ -543,6 +644,14 @@ test.skipIf(!DB)("no route creates a user, sets a password, or registers one", a
 
 test("OPTIONS preflight on the admin users roles route returns 204 permitting PATCH", async () => {
   const res = await fetch(new Request("http://x/admin/users/user_x/roles", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("PATCH");
+});
+
+// Without this the admin screen's manager save fails in a browser and nowhere
+// else: the PATCH never leaves, because its preflight has no handler.
+test("OPTIONS preflight on the admin users manager route returns 204 permitting PATCH", async () => {
+  const res = await fetch(new Request("http://x/admin/users/user_x/manager", { method: "OPTIONS" }));
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("PATCH");
 });

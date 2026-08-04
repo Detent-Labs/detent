@@ -491,6 +491,7 @@ test.skipIf(!DB)("GET /registry lists the registered action, data-source and ass
   expect(body.actionTypes).toContain("http.request");
   expect(body.dataSourceTypes).toContain("static");
   expect(body.assignmentStrategyTypes).toContain("static");
+  expect(body.assignmentStrategyTypes).toContain("org.manager-of-starter");
 });
 
 test.skipIf(!DB)("GET /registry keeps the type-name arrays to exactly those three keys' worth of type names", async () => {
@@ -498,7 +499,9 @@ test.skipIf(!DB)("GET /registry keeps the type-name arrays to exactly those thre
   const body = (await res.json()) as { actionTypes: string[]; dataSourceTypes: string[]; assignmentStrategyTypes: string[] };
   expect(body.actionTypes).toEqual(["http.request"]);
   expect(body.dataSourceTypes).toEqual(["static"]);
-  expect(body.assignmentStrategyTypes).toEqual(["static"]);
+  // Both entries the shipped registry holds: the built-in `static` and the
+  // org-aware `org.manager-of-starter` the composition root adds.
+  expect(body.assignmentStrategyTypes).toEqual(["static", "org.manager-of-starter"]);
 });
 
 test.skipIf(!DB)("GET /registry carries a config-schema description only for a schema-backed type", async () => {
@@ -514,6 +517,9 @@ test.skipIf(!DB)("GET /registry carries a config-schema description only for a s
   expect(body.actionSchemas).toEqual({});
   expect(body.dataSourceSchemas).toEqual({});
   expect(body.assignmentStrategySchemas.static).toEqual([{ key: "candidates", kind: "string-array", required: true }]);
+  // org.manager-of-starter declares a strict empty config: a schema with no key,
+  // which is what makes any authored key a publish error.
+  expect(body.assignmentStrategySchemas["org.manager-of-starter"]).toEqual([]);
 });
 
 test.skipIf(!DB)("GET /registry without system:developer maps to 403", async () => {

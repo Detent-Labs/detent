@@ -11,11 +11,13 @@ import { getDraft, saveDraft, listDrafts, deleteDraft, markDraftPublished } from
 import { publishBody, createDefinitionStore } from "../engine/definitions.js";
 import { registerMigrationPlan, resolveMigrationPlan, findOrphanKeys } from "../engine/migration.js";
 import {
-  createDefaultAssignmentRegistry,
   type Registry,
   type DataSourceRegistry,
   type AssignmentRegistry,
 } from "../engine/registry.js";
+// The org-aware set (static + org.manager-of-starter), not the static-only leaf
+// factory of the same name in registry.js. This is the composition root.
+import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies.js";
 import { describeConfigSchema, type ConfigFieldDescriptor } from "../engine/config-descriptor.js";
 import type { ZodTypeAny } from "zod";
 import type { Actor } from "../cel/eval.js";

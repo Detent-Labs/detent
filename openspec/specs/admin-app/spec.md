@@ -316,6 +316,20 @@ an operator does not mistake this for immediate revocation.
 A role assignment SHALL carry the same caveat, for the same reason. The
 affected user's active token keeps the roles it carried at login.
 
+The screen SHALL show each account's manager and SHALL offer manager editing per
+row, over `PATCH /admin/users/:id/manager`. The control SHALL offer the other
+listed accounts as choices. It SHALL offer a choice clearing the manager. It
+SHALL NOT offer the account being changed, which the route refuses with 400.
+
+The manager control SHALL carry an accessible name identifying the account whose
+manager it holds, for the reason the roles input does. A reload SHALL leave a
+pending manager edit untouched, for the reason an open roles editor keeps its
+text.
+
+A rejected manager change SHALL leave the displayed value as it was, and SHALL
+show the server's message. A successful one SHALL show the saved value without a
+full reload.
+
 The screen SHALL follow the same refresh convention as Operations/Outbox/
 Timers: an explicit refresh control and a refetch on window focus, no
 polling.
@@ -362,10 +376,38 @@ polling.
 - **THEN** the screen states that the actor cannot remove its own
   `system:admin`, and the row keeps its roles
 
+#### Scenario: Changing an account's manager
+
+- **WHEN** the operator picks another listed account as a manager and confirms
+- **THEN** `PATCH /admin/users/:id/manager` is called, and the row shows the new
+  manager after the refresh
+
+#### Scenario: Clearing an account's manager
+
+- **WHEN** the operator picks the clearing choice and confirms
+- **THEN** the route is called with a null manager, and the row shows no manager
+
+#### Scenario: The changed account is not offered as its own manager
+
+- **WHEN** the manager control is opened for an account
+- **THEN** that account is absent from the choices
+
+#### Scenario: A reload leaves a pending manager edit alone
+
+- **WHEN** the operator opens the manager control and the window regains focus
+  so the screen refetches
+- **THEN** the control stays open and holds the pending choice
+
+#### Scenario: A rejected manager change is shown
+
+- **WHEN** a manager change is rejected by the server
+- **THEN** the row shows the previous manager and the operator sees the message
+
 #### Scenario: No create or password controls
 
 - **WHEN** the Users screen is inspected for write actions
-- **THEN** only the disable/enable toggle and the roles editor are offered
+- **THEN** only the disable/enable toggle, the roles editor and the manager
+  control are offered
 
 ### Requirement: Data is refreshed on demand, not pushed
 
