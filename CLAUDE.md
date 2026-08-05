@@ -239,7 +239,11 @@ after a substantial change lands.
   `vercel-react-best-practices`, `vercel-composition-patterns`) — do not
   default to plain React/CSS choices. Prefer semantic HTML5 elements
   (`<nav>`, `<main>`, `<button>`, `<dialog>`, ...) over generic
-  `<div>`/`<span>` soup.
+  `<div>`/`<span>` soup. `.claude/rules/design-language.md` carries Detent's
+  own visual language (color roles, type, spacing, component states, class
+  naming) — it loads automatically for `packages/web/**` and
+  `packages/form-ui/**`; the full reference with swatches and specimens is
+  `tmp/Detent Design Language.dc.html`.
 - Bun is the runtime, package manager, and test runner. Use `bun`, not npm/pnpm:
   `bun install`, `bun test`. Typechecking stays with `tsc --noEmit` (`bun run
   typecheck`) — Bun does not typecheck. `BUN_VERSION` in
