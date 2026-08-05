@@ -118,6 +118,12 @@ The narrow grant is the point. Staff who curate a template must not gain the
 power to publish a process. They must not gain the power to cancel an instance
 or to administer an account.
 
+`system:templates` SHALL also admit `GET
+/processes/:processId/versions/:version`, the published body a curator creates
+a template from, together with `system:developer`. It SHALL NOT admit any
+draft route. A draft holds unfinished, private work. A published body is the one
+every participant already runs.
+
 The role mirrors `system:datalists`, including the read asymmetry. It implies
 nothing, and no other reserved role implies it.
 
@@ -146,6 +152,12 @@ nothing, and no other reserved role implies it.
   /processes`, any `/admin/*` route, or any `/reporting/*` route
 - **THEN** the response is `403` in each case
 
+#### Scenario: The role reads a published version's body
+- **WHEN** an actor holding only `system:templates` calls `GET
+  /processes/:processId/versions/:version`
+- **THEN** the route returns the body
+
 #### Scenario: The role opens no other studio route
-- **WHEN** that same actor calls a studio route outside the four template routes
+- **WHEN** that same actor calls a studio route outside the four template
+  routes and the published version body
 - **THEN** the response is `403`

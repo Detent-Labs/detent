@@ -23,7 +23,15 @@ const MANAGER_CAVEAT =
  * Hardcoded here as the area's other screens hardcode theirs (`root.tsx`,
  * `routing.ts`): no route serves the list, and a role string is otherwise free.
  */
-const RESERVED_ROLES = ["system:admin", "system:publish", "system:cancel-any", "system:developer", "system:reports", "system:datalists"];
+const RESERVED_ROLES = [
+  "system:admin",
+  "system:publish",
+  "system:cancel-any",
+  "system:developer",
+  "system:reports",
+  "system:datalists",
+  "system:templates",
+];
 
 export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
   const [items, setItems] = useState<UserSummary[]>([]);

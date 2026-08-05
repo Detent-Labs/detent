@@ -9,6 +9,8 @@ import type {
   RegistryInfo,
   InstanceView,
   InstanceRecordPage,
+  TemplateSummary,
+  TemplateRecord,
 } from "./types.js";
 import { AppClientError, request } from "../../../api/client.js";
 
@@ -188,4 +190,30 @@ export async function listDataListKeys(token: string): Promise<string[]> {
   const res = await request("/admin/data-lists", token);
   const page = (await res.json()) as { items: { listKey: string }[] };
   return page.items.map((item) => item.listKey);
+}
+
+/**
+ * The template routes. Reading accepts `system:developer`, so the picker works
+ * for every author; writing and deleting need `system:templates`.
+ */
+export async function listTemplates(token: string): Promise<TemplateSummary[]> {
+  const res = await request("/templates", token);
+  return (await res.json()) as TemplateSummary[];
+}
+
+export async function getTemplate(templateKey: string, token: string): Promise<TemplateRecord> {
+  const res = await request(`/templates/${encodeURIComponent(templateKey)}`, token);
+  return (await res.json()) as TemplateRecord;
+}
+
+export async function saveTemplate(templateKey: string, body: unknown, layout: Record<string, unknown>, token: string): Promise<TemplateRecord> {
+  const res = await request(`/templates/${encodeURIComponent(templateKey)}`, token, {
+    method: "PUT",
+    body: JSON.stringify({ body, layout }),
+  });
+  return (await res.json()) as TemplateRecord;
+}
+
+export async function deleteTemplate(templateKey: string, token: string): Promise<void> {
+  await request(`/templates/${encodeURIComponent(templateKey)}`, token, { method: "DELETE" });
 }

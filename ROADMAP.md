@@ -638,10 +638,35 @@ Spec: `development-toolchain`.
        writes.
        Change: `studio-migration-plan-field-mapping`. Spec:
        `studio-migration-plan-form` (new).
-    d. Process templates. Nothing seeds a new process today; an author starts
-       from an empty draft. A template is a stored draft body, so this needs no
-       engine concept — only a decision about where templates live and who
-       curates them.
+    d. **Process templates: DONE.** Nothing seeded a new process; an author
+       started from an empty draft every time. The studio already copied a
+       body — `processListLogic.ts::seededDraftInput` reads a published version
+       and strips the compile pass's cancel-sink injection — but every call
+       site handed it the source process's own id, so it produced the next
+       version of one process rather than a new one.
+       The two questions this entry recorded are answered. Templates live in
+       their own `templates` table, for the reason drafts have one: a template
+       row in `definitions` would make every reader of that table responsible
+       for excluding it, and one missed reader puts a template in the
+       participant's start list. A seventh reserved role curates them,
+       `system:templates`, mirroring stage 26's `system:datalists` including
+       its read asymmetry — reads also accept `system:developer`, so the start
+       picker works for every author.
+       Seeding adds no route. The browser reads the template and writes an
+       ordinary draft through the existing `PUT /drafts/:processId`. A
+       template is a snapshot: nothing records which process came from which
+       template, and a later edit changes no draft already seeded from it.
+       Admitting the new role into the studio area widened its entry, so the
+       area gained the per-screen `ROUTE_ROLE` map the admin area already had.
+       That answers half of what (a) left open: splitting `system:developer`
+       is now a change to that map rather than new machinery.
+       Deliberately out of scope: built-in templates seeded by `bun run seed`,
+       template versioning, a record of which process came from which
+       template, and permissions per template.
+       Change: `add-process-templates`. Specs: `process-templates` (new),
+       `authorization`, `unified-shell`, `studio-app`, `database-seed-script`
+       (all modified). Design:
+       `docs/superpowers/specs/2026-08-05-process-templates-design.md`.
     Deliberately out of scope: a natural-language or AI-assisted authoring
     surface (it produces the same JSON, so it is a later surface over the same
     contract, not a reason to reshape one), executable code authored in the

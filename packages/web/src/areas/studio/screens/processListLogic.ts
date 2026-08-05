@@ -80,6 +80,44 @@ export async function seededDraftInput(
   return { body: stripCompiledContent(published), layout: {}, revision: 0, baseVersion: seedVersion };
 }
 
+/**
+ * The body a new draft starts from when the author picks a template rather
+ * than the empty choice. The template's body and layout travel unchanged: a
+ * template already holds the authored shape, so nothing needs stripping here
+ * the way `seededDraftInput` strips a published version.
+ *
+ * No `baseVersion`. A template is not a published version of the new process,
+ * and stamping one would offer the Versions screen a diff against a version
+ * that has nothing to do with this body. The write path would reject it too.
+ *
+ * `readTemplate` rejecting propagates, exactly as `seededDraftInput`'s
+ * `readBody` does, and for the same reason: an empty draft in place of the
+ * template the author picked is the bug this path exists to prevent.
+ */
+export async function templateDraftInput(
+  templateKey: string,
+  readTemplate: (key: string) => Promise<{ body: unknown; layout: Record<string, unknown> }>,
+): Promise<CreateDraftInput> {
+  const template = await readTemplate(templateKey);
+  return { body: template.body, layout: template.layout, revision: 0 };
+}
+
+/**
+ * What a template row and a picker entry are named by. A template body carries
+ * its own `label`, but a template is allowed to declare none — the store checks
+ * the envelope only — so this falls back to the key rather than rendering a
+ * nameless row. `baseLocale` is the body's own, which a template need not
+ * declare either, so the caller passes the locale it is displaying in.
+ */
+export function templateDisplayName(
+  label: Partial<Record<string, string>> | null | undefined,
+  locale: string,
+  templateKey: string,
+): string {
+  if (!label) return templateKey;
+  return label[locale] ?? Object.values(label).find((text) => text !== undefined && text !== "") ?? templateKey;
+}
+
 export function deriveProcessRows(processes: ProcessSummary[], drafts: DraftSummary[]): ProcessRow[] {
   const rows = new Map<string, ProcessRow>();
 

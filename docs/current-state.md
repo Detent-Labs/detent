@@ -1959,6 +1959,65 @@ Stage-by-stage status is in `ROADMAP.md`.
   every published body with no supporting index. Both are admin routes on no
   instance path.
 
+- Process templates (`src/engine/templates.ts`,
+  `packages/web/src/areas/studio/screens/TemplatesScreen.tsx`): a `templates`
+  table. It holds one authored body and its layout per flat `template_key`,
+  plus `created_by` and `updated_at`. No version column and no definition
+  hash. The engine never publishes a template and no instance pins one.
+  Nothing here reaches the audit backbone.
+
+  Its own table, for the reason `drafts` has one. A template row in
+  `definitions` would make every reader of that table responsible for
+  excluding it. One missed reader puts a template in the participant's start
+  list.
+
+  The store checks the envelope alone, reusing `drafts.ts`'s
+  `MAX_DRAFT_ENVELOPE_BYTES`. It never parses the body. A template seeds a
+  draft. The draft store accepts a body that violates the authoring-time
+  invariants. A stricter check here would create a third class of body. An
+  author could save it as a draft but not as a template.
+
+  `saveTemplate` is an upsert with no revision check. A template faces none of
+  the editing pressure a draft on a canvas does.
+
+  Four routes maintain a template, behind a seventh reserved role,
+  `TEMPLATES_ROLE = "system:templates"`. It implies none of the other six, and
+  none of them implies it. Reads also accept `DEVELOPER_ROLE`, so the start
+  picker offers the templates to every author.
+
+  `GET /processes/:processId/versions/:version` accepts the pair too. A
+  curator creates a template from a published version. Refusing that body
+  would leave the role able to write a template and unable to get one. A
+  browser walk caught exactly that.
+
+  A draft stays closed to the curator. A published body is the one every
+  participant already runs. A draft holds unfinished work.
+
+  The list route projects `label` and `description` out of the body. It
+  carries no body, since a body may reach the envelope bound.
+
+  Seeding introduces no route. The browser reads `GET /templates/:key`. It
+  writes the body to the existing `PUT /drafts/:processId` at revision 0. The
+  seeded draft claims no `baseVersion`, because a template is no published
+  version.
+
+  A template is a snapshot: nothing records which process came from which
+  template. A later edit changes no draft already seeded from it. Deleting one
+  strands nothing.
+
+- Two-role studio area (`packages/web/src/shell/areas.ts`,
+  `packages/web/src/areas/studio/routing.ts`): the studio entry lists
+  `system:developer` and `system:templates`. The templates screen lives in the
+  area while a curator must not hold `system:developer`. Entry is therefore
+  the weaker gate, so the area gained the `ROUTE_ROLE` map the admin area
+  already had. The six authoring screens take `system:developer` and the
+  templates screen takes `system:templates`.
+
+  The nav lists only what the actor's roles reach, and a denied screen shows
+  the area's explanatory state. A curator who lands on the area's default
+  route goes to the templates screen, rather than to a refusal. The server's
+  `requireRole` on every studio route stays the enforcement.
+
 - Two-role admin area (`packages/web/src/shell/areas.ts`,
   `packages/web/src/areas/admin/`): the shell's area table now carries a set
   of roles per area rather than one, and an actor holding any of them enters.

@@ -90,8 +90,16 @@ The write route and the delete route SHALL need `system:templates`. The list
 route and the read route SHALL accept `system:templates` or
 `system:developer`. An author can therefore read what a curator writes.
 
+The route returning a published version's body SHALL accept the same pair. A
+curator creates a template from a published version. Refusing that body would
+leave the role able to write a template and unable to get one.
+
 The role SHALL imply nothing else. An actor holding `system:templates` alone
 SHALL NOT publish, cancel an instance, administer a user, or read a draft.
+
+A draft SHALL stay closed to the curator. A draft holds unfinished, private
+work. A published body is the one every participant already runs. The pair is
+therefore split rather than opened together.
 
 A delete SHALL strand nothing. No process, draft or instance references a
 template.
@@ -118,6 +126,12 @@ template.
 - **WHEN** an actor holding only `system:templates` reads a draft
 - **THEN** the read fails with an authorization error
 
+#### Scenario: A curator reads a published version's body
+
+- **WHEN** an actor holding only `system:templates` reads a published
+  version's body
+- **THEN** the read succeeds
+
 #### Scenario: A caller with no identity reaches no template
 
 - **WHEN** a caller carrying no valid identity lists the templates
@@ -137,10 +151,10 @@ freshly minted process id and the first revision of that draft.
 The seeded draft SHALL hold the template's body and layout unchanged. It SHALL
 declare no base version, because a template is no published version.
 
-A curator who creates a template from a published version SHALL get the
-authored shape. That path SHALL strip the compile pass's cancel-sink
-injection. A draft seeded from a published version already gets that
-treatment.
+A curator SHALL create a template from a published version, and from no other
+source. That path SHALL strip the compile pass's cancel-sink injection, so the
+template holds the authored shape. A draft seeded from a published version
+already gets that treatment.
 
 #### Scenario: A process seeded from a template holds its body
 
