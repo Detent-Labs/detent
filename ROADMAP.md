@@ -542,8 +542,7 @@ Spec: `development-toolchain`.
     `data-list-administration`. Design:
     `docs/superpowers/specs/2026-08-02-db-data-lists-design.md`.
 
-27. No-code / low-code process authoring: items (a), (b) and (c) DONE, (d)
-    NOT STARTED, no OpenSpec change yet for that one.
+27. **No-code / low-code process authoring: DONE (a–d).**
     Raised 2026-08-03 as the product direction the README and `CLAUDE.md` now
     state: a business analyst builds a process in the studio area without
     writing JSON or CEL. This is a stage, not a rewrite. The studio area already
