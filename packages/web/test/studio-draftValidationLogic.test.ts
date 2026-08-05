@@ -77,3 +77,41 @@ describe("runValidation: structural (compile-pass) issues", () => {
     expect(result.issues.some((i) => i.source === "structural")).toBe(false);
   });
 });
+
+// add-step-assignment-warning: the studio's assignment-less-step warning
+// (assignmentWarningLogic.ts) stays outside this pipeline entirely, the
+// same way the "db.list" missing-key warning does. This pins that as a
+// regression test rather than relying only on the absence of an import.
+describe("runValidation: an assignment-less step", () => {
+  it("raises no EditorIssue for a non-terminal step with no assignment", () => {
+    const body: Draft = {
+      key: "p",
+      label: { en: "P" },
+      baseLocale: "en",
+      fields: [{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
+      workflow: {
+        initialStep: "step_a",
+        steps: [
+          {
+            id: "step_a",
+            key: "a",
+            label: { en: "A" },
+            type: "task",
+            paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          },
+          {
+            id: "step_b",
+            key: "b",
+            label: { en: "B" },
+            type: "task",
+            terminal: true,
+          },
+        ],
+      },
+    } as unknown as Draft;
+
+    const result = runValidation(body, undefined, {});
+    expect(result.zodValid).toBe(true);
+    expect(result.issues).toHaveLength(0);
+  });
+});
