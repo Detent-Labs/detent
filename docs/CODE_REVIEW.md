@@ -18,6 +18,11 @@ areas the earlier pass reached less deeply — the two outbound action handlers,
 the attachment path, worker error boundaries, and the delivery of the security
 headers.
 
+**Status:** Every actionable finding below is now covered by a prepared
+OpenSpec change, or closed, or declined with a reason. See
+[Status: change coverage](#status-change-coverage). No change has been
+implemented yet.
+
 **Summary:** The prior review's fixes held. Object-level authorization is now
 real and shared by one predicate, auth configuration fails closed, the six
 publish-time structural checks run ahead of both compile branches (verified
@@ -65,6 +70,56 @@ Top findings:
 3. Then TEST-1. Every finding above is a regression candidate, and the project
    currently has no gate that runs without a human remembering to enable one.
 4. SEC-3/4/5 next; each is one function or one config file.
+
+## Status: change coverage
+
+Six OpenSpec changes carry this review's findings. Each one holds a proposal,
+delta specs, a design and a task list, and each passes `openspec validate
+--strict`. None is implemented; `openspec/changes/<name>/` holds the plan.
+
+| Change | Findings |
+|---|---|
+| `harden-http-response-boundary` | SEC-1, SEC-6, SEC-7, SEC-8 (cache-control), PERF-1 |
+| `restrict-http-action-egress` | SEC-2 |
+| `harden-local-account-sessions` | SEC-3, SEC-5, ARCH-3 |
+| `deliver-framing-and-sniffing-headers` | SEC-4, SEC-8 (nosniff, referrer) |
+| `surface-worker-failures` | ERR-1 |
+| `document-deployment-and-self-enable-the-hook` | TEST-1 (what remains), DEP-1, DOC-1, SEC-8 (forwarded-for) |
+
+Five findings carry no change, for the reasons below.
+
+- **ERR-2 closed itself.** `src/log.ts:30` exports `log.debug`, so
+  `LOG_LEVEL=debug` reaches something. The gap the review names is gone.
+- **CQ-1 closed itself.** The archived change
+  `2026-08-05-http-route-table` replaced the sequential `if` chain with a
+  route table, and the preflight now derives from that table rather than from
+  a second hand-written chain.
+- **ARCH-2 is declined.** Nothing measures attachment volume as a cost today,
+  and an interface with one implementation is the abstraction this repository
+  does not build ahead of need. The reason sits in
+  `harden-http-response-boundary`'s proposal, where a later reader will find
+  it.
+- **ARCH-1 has no change yet.** Mapping `NotFoundError` to 404 breaks a
+  contract `http-wrapper` pins on purpose, and `src/http/errors.ts:10-16`
+  records the decision. It needs a change of its own, reviewable apart from
+  the security work.
+- **PERF-2 needed a check, not a change.** `src/engine/definitions.ts:331`
+  states outright that the cache only grows, keyed on `(processId, version)`.
+  It is unbounded in fact and bounded in practice by the published-version
+  count.
+
+Two findings named the wrong place. The prepared changes carry the
+correction, and both are recorded here so a reader of this document does not
+follow the original text.
+
+- ERR-1 says `pollForever` takes a `name` argument at four call sites in
+  `host.ts`. It takes no such argument, and the four call sites are
+  `outbox.ts:353`, `resolution.ts:125`, `timers.ts:100` and
+  `retention.ts:81`.
+- SEC-8 asks `docker/nginx.conf` to normalize `X-Forwarded-For`. That server
+  block holds no `proxy_pass`: it serves static files and forwards nothing.
+  The rule belongs to a deployment that puts its own proxy in front of the
+  engine, so it moves to the deployment runbook.
 
 ## Detailed Findings
 
@@ -358,7 +413,11 @@ treatment as a bad bound on a destructive sweep.
   data are cacheable by any intermediary by default. `Cache-Control: no-store`
   on the JSON envelope is a one-line addition in `toResponse`.
 - **`docker/nginx.conf` does not normalize `X-Forwarded-For`.** Needed before
-  SEC-3's per-IP limiting can trust it.
+  SEC-3's per-IP limiting can trust it. **Correction:** that server block
+  holds no `proxy_pass` and forwards nothing, so the directive has no place
+  in it. The rule belongs to a deployment that fronts the engine with its own
+  proxy, and `document-deployment-and-self-enable-the-hook` puts it in the
+  deployment runbook.
 
 ### Architecture
 
@@ -436,7 +495,16 @@ those metrics describe unable to report their own failure.
 the line if a tight interval makes it noisy — but silence is not the way to
 achieve that.
 
+**Correction.** `pollForever` takes no `name` argument today, and no call
+site sits in `host.ts`. The four are `outbox.ts:353`, `resolution.ts:125`,
+`timers.ts:100` and `retention.ts:81`. The change `surface-worker-failures`
+adds the argument and passes it from those four.
+
 **ERR-2 · Low · `LOG_LEVEL=debug` is accepted and unreachable**
+
+**Closed since this review.** `src/log.ts:30` now exports `log.debug`, so the
+level reaches something. The paragraph below describes the tree as it stood
+on 2026-08-01.
 
 `src/log.ts:11-33` orders four levels and resolves a `debug` threshold, but the
 exported `log` object has only `info`, `warn` and `error`, so
@@ -520,6 +588,11 @@ of this scope and should be defended.
 ### Code Quality
 
 **CQ-1 · Low · `server.ts`'s router is 270 lines of sequential `if`**
+
+**Closed since this review.** The archived change
+`2026-08-05-http-route-table` replaced the chain with a route table, and the
+preflight answer now derives from that table. The paragraph below describes
+the tree as it stood on 2026-08-01.
 
 `src/http/server.ts:237-496`. Every request walks up to sixty predicate chains,
 and each route's CORS preflight is a second hand-written entry that must be kept
@@ -632,7 +705,8 @@ when running them. `docs/runbooks/` exists and is the natural home.
 
 ## Prioritized Action List
 
-Ordered by impact ÷ effort. The first four are a single afternoon.
+Ordered by impact ÷ effort. The first four are a single afternoon. The
+coverage table above says which change now holds each item.
 
 1. **SEC-1** — add `Content-Disposition: attachment`, `X-Content-Type-Options:
    nosniff`, and a MIME-token regex on upload. ~10 lines, two files.

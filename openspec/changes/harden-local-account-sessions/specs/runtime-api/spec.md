@@ -1,0 +1,59 @@
+<!-- The MODIFIED block below copies the live runtime-api requirement
+     verbatim, apart from the paragraph and the scenarios this change adds.
+     That file carries the findings already, and a rewrite here would make
+     the delta and its destination disagree. This directive dies with the
+     change, at archive time. -->
+<!-- antislop: allow-file passive-voice sentence-length -->
+
+## MODIFIED Requirements
+
+### Requirement: Delegate the claim on the current step of a running instance
+
+`delegateClaim(instanceId, actor, toActorId, db?)` SHALL row-lock the
+instance and check that `assignment.claimedBy === actor.id`. On success
+it SHALL set `claimedBy = toActorId`, refresh `claimedAt`, append an
+`assignment.delegated` `InstanceEvent`, and return the updated
+`Instance`. It SHALL throw `NotClaimantError` when the calling actor does
+not hold the claim, the same error `releaseClaim` throws for the same
+reason. No check validates `toActorId` against `assignment.candidates`.
+
+`delegateClaim` SHALL check `toActorId` against the local account
+directory, but only when the calling actor's own id resolves there. A target
+the directory does not hold SHALL raise an error, and the claim SHALL stay
+where it is. A deployment on an external identity provider holds no
+directory entry for its own actors, so the check finds no delegator there and
+runs no target check either. The condition keeps this rule from rejecting
+every delegation in such a deployment.
+
+#### Scenario: The claimant delegates successfully
+
+- **WHEN** `delegateClaim` is called by the actor currently holding the
+  claim, naming a target actor id
+- **THEN** it returns the updated `Instance` with `assignment.claimedBy`
+  set to the target actor's id and `assignment.claimedAt` refreshed
+
+#### Scenario: A non-claimant cannot delegate
+
+- **WHEN** `delegateClaim` is called by an actor who does not hold the
+  current claim
+- **THEN** it throws `NotClaimantError` and the existing claim is
+  unchanged
+
+#### Scenario: A delegate target need not be an eligible candidate
+
+- **WHEN** `delegateClaim` names a target actor id absent from
+  `assignment.candidates`
+- **THEN** the call still succeeds, and that actor becomes the claimant
+
+#### Scenario: A target outside the directory is rejected
+
+- **WHEN** the calling actor's id resolves in the local account directory,
+  and `delegateClaim` names a target id that does not
+- **THEN** it throws, the claim stays with the calling actor, and no
+  `assignment.delegated` event is appended
+
+#### Scenario: A deployment with no local accounts delegates as before
+
+- **WHEN** the calling actor's id does not resolve in the local account
+  directory, and `delegateClaim` names any target id
+- **THEN** the call succeeds, exactly as it does today
