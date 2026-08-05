@@ -17,6 +17,7 @@ import { IssueList, NotCheckedBadge } from "./shared/IssueList";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { parseChildProcessJson } from "../draft/io";
 import { seedLocalizedText } from "../draft/localized-text";
+import { assignmentWarning } from "./assignmentWarningLogic.js";
 
 type DraftStep = DraftOf<Step>;
 
@@ -224,6 +225,9 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep }: Prop
                   registryTypes={registry?.assignmentStrategyTypes}
                   registrySchemas={registry?.assignmentStrategySchemas}
                 />
+                {assignmentWarning(step.terminal, step.assignment) && (
+                  <p className="studio-warning">{assignmentWarning(step.terminal, step.assignment)}</p>
+                )}
 
                 <ActionListEditor
                   label="onEntry"

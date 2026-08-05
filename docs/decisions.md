@@ -46,14 +46,3 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   without making it impossible. It also costs a second read of the parent
   row on every return delivery. Do not re-propose the hoist without a
   measurement showing the bounded hold is itself the problem.
-- **A publish-time warning for a step with no `assignment`.**
-  `Step.assignment` is optional, and the studio leaves it empty by default.
-  A whole process can therefore publish without one, as `Test-process` did.
-  The starter can then walk their own case through every step, since the
-  assignment-less floor is starter-or-`system:admin`
-  (`api.ts::submitAndTransition`). The instance also reaches no inbox,
-  because `scope=mine` filters on `assignedTo`/`assignedToRoles` alone
-  (`api.ts::listInstances`). Keep it a warning in the studio, never an
-  invariant: a self-service form legitimately has no assignment. The
-  archived `2026-08-01-fix-claim-affordance/design.md` records two adjacent
-  gaps, the studio Player and the inbox predicate.
