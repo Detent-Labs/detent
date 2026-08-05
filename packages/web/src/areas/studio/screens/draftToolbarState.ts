@@ -1,39 +1,44 @@
 import type { Draft } from "../draft/types.js";
 
 /**
- * The one transition `DraftToolbar`'s `savedBody` goes through: advance to a
- * clone of whatever body the server just confirmed as persisted. Extracted
- * as a pure reducer, beside `publishGateLogic.ts`, so the invariant it
- * encodes — "the body last known to be persisted" — has exactly one place
- * that writes it, and that place is unit-testable without a DOM.
+ * The draft toolbar's one invariant: the body the server last confirmed as
+ * persisted. `savedBodyReducer` writes it and `isDirty` reads it.
  *
- * Both action kinds do the same thing: a successful save and a reload both
- * mean "current and saved now coincide" (design.md). They stay distinct
- * kinds anyway, one per call site (`doSave`, `reload`), so a reader tracing
- * either wiring path sees which one fired.
+ * `structuredClone` on the way in, matching the mount seed. The panels mutate
+ * the draft object in place, so storing the same reference would make
+ * `savedBody` follow every later change and turn the dirty gate permanently
+ * off, the worse defect (design.md's "Decisions").
  *
- * `structuredClone` on the way in, matching the mount seed — the draft
- * object is mutated in place by the panels, so storing the same reference
- * would make `savedBody` follow every later edit and turn the dirty gate
- * permanently off, the worse defect (design.md's "Decisions").
+ * A save and a reload both mean "current and saved now coincide", so the
+ * reducer takes the body itself. It carried a two-kind action union until
+ * `simplify-web-logic-modules`; both branches were this same expression, and
+ * the call sites are already named `doSave` and `reload`.
  *
- * This is the fallback the design allows for testing this fix: the repo has
- * no interactive DOM test environment (component tests here render via
- * `react-dom/server`'s `renderToStaticMarkup`, which never fires an event or
- * re-renders on state change — see `packages/form-ui/test/field-form.test.tsx`),
- * so a click-through conflict -> reload -> publish flow can't be driven
- * directly. The bug itself was in the *wiring* (`reload()` never called the
- * equivalent of this), which a reducer test alone cannot see — the test
- * beside this file exercises the wiring by calling `DraftToolbar`'s
- * `reload()`-shaped sequence through this reducer, the same one production
- * code now goes through for both call sites.
+ * This file is a reducer rather than an inline `setState` because the repo has
+ * no interactive DOM test environment: component tests render via
+ * `react-dom/server`'s `renderToStaticMarkup`, which fires no event and
+ * re-renders on no state change. The bug this guards was in the *wiring*
+ * (`reload()` never advanced `savedBody`), so the test beside this file drives
+ * `DraftToolbar`'s reload-shaped sequence through the reducer both call sites
+ * now go through.
  */
-export type SavedBodyAction = { kind: "saved"; body: Draft } | { kind: "reloaded"; body: Draft };
-
-export function savedBodyReducer(_state: Draft, action: SavedBodyAction): Draft {
-  return structuredClone(action.body);
+export function savedBodyReducer(_state: Draft, body: Draft): Draft {
+  return structuredClone(body);
 }
 
 export function initialSavedBody(draft: Draft): Draft {
   return structuredClone(draft);
+}
+
+/**
+ * Whether the currently-open draft differs from the last body successfully
+ * saved to the server, checked structurally, since neither side carries a
+ * cheap identity or hash the client can compare instead. Publish always
+ * targets the persisted draft (studio-publish spec), so a dirty draft must be
+ * saved first. This is the gate `DraftToolbar`'s Publish action checks before
+ * calling `publishDraft` (studio-app spec: "Publishing with unsaved changes
+ * prompts a save first").
+ */
+export function isDirty(current: unknown, savedSnapshot: unknown): boolean {
+  return JSON.stringify(current) !== JSON.stringify(savedSnapshot);
 }

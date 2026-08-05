@@ -143,10 +143,14 @@ export const EMPTY_ROWS: PlanRows = {
   unmappableStep: "",
 };
 
-let rowCounter = 0;
+/**
+ * A React list key, never part of the plan the server stores (see `toSpec`).
+ * `crypto.randomUUID()` rather than a module-level counter, matching
+ * `draft/ids.ts::mintId`: the counter was one number shared across every
+ * screen in the process.
+ */
 export function nextRowId(): RowId {
-  rowCounter += 1;
-  return `row_${rowCounter}`;
+  return `row_${crypto.randomUUID()}`;
 }
 
 function readStringMap(value: unknown): MapRow[] {

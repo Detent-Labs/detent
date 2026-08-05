@@ -47,12 +47,16 @@ test("handleReadyz returns 503 with no failure detail when the ping fails", asyn
   expect(result).toEqual({ status: 503, body: { status: "unavailable" } });
 });
 
-test("OPTIONS /livez and OPTIONS /readyz are not treated as a preflight", async () => {
+test("OPTIONS on livez, readyz and metrics is not treated as a preflight", async () => {
   const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver, "*");
   const livez = await fetch(new Request("http://x/livez", { method: "OPTIONS" }));
   const readyz = await fetch(new Request("http://x/readyz", { method: "OPTIONS" }));
+  // The three probe routes stay outside server.ts's route table, which is what
+  // the derived preflight reads. None of them carries a CORS header either.
+  const metrics = await fetch(new Request("http://x/metrics", { method: "OPTIONS" }));
   expect(livez.status).toBe(404);
   expect(readyz.status).toBe(404);
+  expect(metrics.status).toBe(404);
 });
 
 test.skipIf(!DB)("GET /livez ignores the CORS configuration", async () => {

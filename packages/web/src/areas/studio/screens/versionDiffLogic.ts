@@ -10,10 +10,6 @@ export interface VersionSelection {
   b?: number;
 }
 
-export function selectVersion(selection: VersionSelection, which: "a" | "b", version: number): VersionSelection {
-  return { ...selection, [which]: version };
-}
-
 /** A pair is diffable once both sides are chosen and distinct — diffing a version against itself is never useful. */
 export function canDiff(selection: VersionSelection): selection is { a: number; b: number } {
   return selection.a !== undefined && selection.b !== undefined && selection.a !== selection.b;

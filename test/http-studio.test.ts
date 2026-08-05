@@ -5,7 +5,8 @@
  * DATABASE_URL is unset.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
-import { sql, initSchema, createInstance } from "../src/engine/store.js";
+import { sql, createInstance } from "../src/engine/store.js";
+import { DB, initDb, authedReq } from "./helpers/http-fixture.js";
 import { createRegistry, createDataSourceRegistry, register, registerDataSource } from "../src/engine/registry.js";
 import { createDefinitionStore } from "../src/engine/definitions.js";
 import { migrateInstances } from "../src/engine/migration.js";
@@ -15,16 +16,13 @@ import { DEVELOPER_ROLE, PUBLISH_ROLE } from "../src/auth/authorize.js";
 import type { Actor } from "../src/cel/eval.js";
 import type { ProcessId } from "../src/schema/definition.js";
 
-const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
 const dataSourceReg = createDataSourceRegistry();
 register(reg, "http.request", { handler: async () => undefined });
 registerDataSource(dataSourceReg, "static", { resolve: async () => [] });
 const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
-beforeAll(async () => {
-  if (DB) await initSchema();
-});
+beforeAll(initDb);
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE drafts, outbox, instances, history_entries, instance_events, definitions, migration_plans`;
 });
@@ -33,17 +31,6 @@ const developer: Actor = { id: "user_dev", roles: [DEVELOPER_ROLE] };
 const bystander: Actor = { id: "user_bystander", roles: [] };
 const publisher: Actor = { id: "user_publisher", roles: [DEVELOPER_ROLE, PUBLISH_ROLE] };
 const publishOnly: Actor = { id: "user_publish_only", roles: [PUBLISH_ROLE] };
-
-const authedReq = (url: string, method: string, actor: Actor, body?: unknown) =>
-  new Request(url, {
-    method,
-    headers: {
-      "X-Actor-Id": actor.id,
-      ...(actor.roles.length > 0 ? { "X-Actor-Roles": actor.roles.join(",") } : {}),
-      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
 
 let n = 0;
 const pid = () => `proc_http_studio_${++n}`;

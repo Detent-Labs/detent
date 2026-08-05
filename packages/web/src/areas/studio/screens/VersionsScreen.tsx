@@ -3,7 +3,7 @@ import { listVersions, getVersionBody, getDraft, StudioClientError } from "../ap
 import type { VersionSummary } from "../api/types.js";
 import type { ProcessBody } from "workflow-engine/schema";
 import { stripCompiledContent } from "workflow-engine/schema/strip-compiled";
-import { selectVersion, canDiff, diffJson, type VersionSelection, type DiffEntry } from "./versionDiffLogic.js";
+import { canDiff, diffJson, type VersionSelection, type DiffEntry } from "./versionDiffLogic.js";
 import { buildPromotionFile, promotionFilename } from "./promotionExportLogic.js";
 import type { Route } from "../routing.js";
 import { describeCaughtError } from "../errors.js";
@@ -189,7 +189,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
                       name="diff-a"
                       aria-label={`diff side A: version ${v.version}`}
                       checked={selection.a === v.version}
-                      onChange={() => setSelection((s) => selectVersion(s, "a", v.version))}
+                      onChange={() => setSelection((s) => ({ ...s, a: v.version }))}
                     />
                   </td>
                   <td>
@@ -198,7 +198,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
                       name="diff-b"
                       aria-label={`diff side B: version ${v.version}`}
                       checked={selection.b === v.version}
-                      onChange={() => setSelection((s) => selectVersion(s, "b", v.version))}
+                      onChange={() => setSelection((s) => ({ ...s, b: v.version }))}
                     />
                   </td>
                   <td>

@@ -26,7 +26,8 @@ interface StorageLike {
   removeItem(key: string): void;
 }
 
-function browserStorage(): StorageLike | undefined {
+/** Exported for `App.tsx`, which reads the same storage for the locale. */
+export function browserStorage(): StorageLike | undefined {
   return typeof localStorage === "undefined" ? undefined : localStorage;
 }
 

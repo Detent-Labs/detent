@@ -20,6 +20,8 @@
 # A tree-wide check would land red and cost every other gate to --no-verify.
 set -e
 
+. "$(dirname "$0")/_lib.sh"
+
 RULE=pushed-whitespace
 fail=0
 
@@ -33,7 +35,7 @@ while IFS= read -r range; do
   check=$(git diff --check "$range" 2>/dev/null) || true
   if [ -n "$check" ]; then
     if [ "$fail" -eq 0 ]; then
-      echo "pre-push: rule '$RULE' rejected this push." >&2
+      reject "$RULE"
     fi
     echo "$check" >&2
     fail=1
@@ -54,7 +56,7 @@ offenders=$(comm -12 "$files" "$eol")
 
 if [ -n "$offenders" ]; then
   if [ "$fail" -eq 0 ]; then
-    echo "pre-push: rule '$RULE' rejected this push." >&2
+    reject "$RULE"
   fi
   echo "  these files carry CR bytes in the worktree:" >&2
   echo "$offenders" | sed 's/^/    /' >&2
@@ -66,6 +68,6 @@ if [ "$fail" -ne 0 ]; then
   echo "  git ls-files --eol <file>     # confirm the worktree line ending" >&2
   echo "  dos2unix <file>               # for a CR byte" >&2
   echo "  git diff --check              # for the other two" >&2
-  echo "To push without the gates, pass --no-verify. That disables every gate." >&2
+  no_verify_note
   exit 1
 fi

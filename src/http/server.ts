@@ -4,6 +4,12 @@
  * so tests can call it directly with `new Request(...)` — no real port. Low
  * lock-in by design: a later framework swap (e.g. Hono) would only rewrite
  * this file, not `routes.ts`/`errors.ts`. See design.md "Framework choice".
+ *
+ * `createServer`'s `routes` table is the ONE place a route's method and path
+ * shape appear. The CORS preflight answer is derived from it, so adding a
+ * route is one entry and nothing else. Before `http-route-table` a parallel
+ * OPTIONS if-chain restated every route beside the handler chain; the two
+ * drifted, and the four /reporting/* routes never got a preflight branch.
  */
 import { SQL } from "bun";
 import { sql, initSchema } from "../engine/store.js";
@@ -146,6 +152,44 @@ function preflightResponse(methods: string, allowed: AllowedOrigins, requestOrig
 }
 
 /**
+ * One route: its method, its path pattern already split into segments, and a
+ * closure over the dependencies that route's handler reads. The handlers share
+ * no signature — `handleListInstances(req, resolver, db)` beside
+ * `handleGetMigrationPlan(processId, fromVersion, toVersion, req, resolver, db)`
+ * — so the table stores a closure, never a bare handler reference.
+ */
+type Route = {
+  method: string;
+  segments: string[];
+  handler: (params: string[], req: Request) => Promise<HttpResult | HttpBinaryResult>;
+};
+
+/** Split a route pattern into segments. Runs once per route, when `createServer` builds the table. */
+function seg(pattern: string): string[] {
+  return pattern.split("/").filter(Boolean);
+}
+
+/**
+ * Match a request's path segments against one route pattern's. Returns the
+ * captured `:name` values in pattern order, or `null` for no match. A pattern
+ * segment starting with `:` captures; every other segment must be equal.
+ *
+ * No two patterns in the table overlap: any two differ in segment count or in
+ * a literal segment. Order therefore decides no match, and the OPTIONS branch
+ * can collect every matching entry without risking two different routes.
+ */
+function match(segments: string[], parts: string[]): string[] | null {
+  if (segments.length !== parts.length) return null;
+  const params: string[] = [];
+  for (let i = 0; i < segments.length; i++) {
+    const s = segments[i]!;
+    if (s.startsWith(":")) params.push(parts[i]!);
+    else if (s !== parts[i]) return null;
+  }
+  return params;
+}
+
+/**
  * Parse `AUTH_ISSUERS`: a JSON array of `{iss, jwksUrl, audience, rolesClaim}`.
  * Unset or empty means no external issuers. A malformed value throws rather
  * than silently disabling issuers — the composition root lets this propagate
@@ -251,12 +295,119 @@ export function createServer(
   webRoot: string | undefined = undefined,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): (req: Request) => Promise<Response> {
+  // `POST /auth/login` enters the table only when a signing key is
+  // configured, so no state makes the login route reachable without one.
+  // `secret` is a const so the narrowing survives into the closure. The
+  // `loginSecret` parameter alone would not narrow there.
+  const secret = loginSecret;
+  const routes: Route[] = [
+    ...(secret === undefined
+      ? []
+      : [{ method: "POST", segments: seg("/auth/login"),
+           handler: (_p: string[], req: Request) => handleLogin(req, secret, db) } satisfies Route]),
+    { method: "POST", segments: seg("/processes/:processId/instances"),
+      handler: (p, req) => handleCreateInstance(p[0]!, req, resolver, dataSourceRegistry, db, assignmentRegistry) },
+    { method: "GET", segments: seg("/instances"),
+      handler: (_p, req) => handleListInstances(req, resolver, db) },
+    { method: "GET", segments: seg("/instances/:instanceId"),
+      handler: (p, req) => handleGetInstanceView(p[0]!, req, resolver, dataSourceRegistry, db) },
+    { method: "POST", segments: seg("/instances/:instanceId/submit"),
+      handler: (p, req) => handleSubmit(p[0]!, req, resolver, dataSourceRegistry, db, assignmentRegistry) },
+    { method: "POST", segments: seg("/instances/:instanceId/claim"),
+      handler: (p, req) => handleClaim(p[0]!, req, resolver, db) },
+    { method: "POST", segments: seg("/instances/:instanceId/release"),
+      handler: (p, req) => handleRelease(p[0]!, req, resolver, db) },
+    { method: "POST", segments: seg("/instances/:instanceId/delegate"),
+      handler: (p, req) => handleDelegate(p[0]!, req, resolver, db) },
+    { method: "GET", segments: seg("/instances/:instanceId/comments"),
+      handler: (p, req) => handleListComments(p[0]!, req, resolver, db) },
+    { method: "POST", segments: seg("/instances/:instanceId/comments"),
+      handler: (p, req) => handlePostComment(p[0]!, req, resolver, db) },
+    { method: "GET", segments: seg("/instances/:instanceId/attachments"),
+      handler: (p, req) => handleListAttachments(p[0]!, req, resolver, db) },
+    { method: "POST", segments: seg("/instances/:instanceId/attachments"),
+      handler: (p, req) => handleUploadAttachment(p[0]!, req, resolver, db) },
+    { method: "GET", segments: seg("/instances/:instanceId/attachments/:attachmentId"),
+      handler: (p, req) => handleGetAttachment(p[0]!, p[1]!, req, resolver, db) },
+    { method: "GET", segments: seg("/instances/:instanceId/record"),
+      handler: (p, req) => handleInstanceRecord(p[0]!, req, resolver, db) },
+    { method: "POST", segments: seg("/instances/:instanceId/cancel"),
+      handler: (p, req) => handleCancel(p[0]!, req, resolver, db) },
+    { method: "GET", segments: seg("/processes"),
+      handler: (_p, req) => handleListProcesses(req, resolver, db) },
+    { method: "POST", segments: seg("/processes"),
+      handler: (_p, req) => handlePublish(req, resolver, registry, dataSourceRegistry, db, assignmentRegistry) },
+    { method: "GET", segments: seg("/processes/:processId/versions"),
+      handler: (p, req) => handleListVersions(p[0]!, req, resolver, db) },
+    { method: "GET", segments: seg("/admin/outbox"),
+      handler: (_p, req) => handleAdminListOutbox(req, resolver, db) },
+    { method: "POST", segments: seg("/admin/outbox/:idempotencyKey/retry"),
+      handler: (p, req) => handleAdminOutboxRetry(p[0]!, req, resolver, db) },
+    { method: "POST", segments: seg("/admin/outbox/:idempotencyKey/discard"),
+      handler: (p, req) => handleAdminOutboxDiscard(p[0]!, req, resolver, db) },
+    { method: "GET", segments: seg("/admin/timers"),
+      handler: (_p, req) => handleAdminListTimers(req, resolver, db) },
+    { method: "GET", segments: seg("/admin/users"),
+      handler: (_p, req) => handleAdminListUsers(req, resolver, db) },
+    { method: "POST", segments: seg("/admin/users/:userId/disable"),
+      handler: (p, req) => handleAdminDisableUser(p[0]!, req, resolver, db) },
+    { method: "POST", segments: seg("/admin/users/:userId/enable"),
+      handler: (p, req) => handleAdminEnableUser(p[0]!, req, resolver, db) },
+    { method: "PATCH", segments: seg("/admin/users/:userId/roles"),
+      handler: (p, req) => handleAdminSetUserRoles(p[0]!, req, resolver, db) },
+    { method: "PATCH", segments: seg("/admin/users/:userId/manager"),
+      handler: (p, req) => handleAdminSetUserManager(p[0]!, req, resolver, db) },
+    { method: "POST", segments: seg("/admin/migrations/run"),
+      handler: (_p, req) => handleAdminRunMigration(req, resolver, db) },
+    { method: "POST", segments: seg("/admin/instances/:instanceId/redact"),
+      handler: (p, req) => handleAdminRedactInstance(p[0]!, req, resolver, db) },
+    { method: "GET", segments: seg("/admin/data-lists"),
+      handler: (_p, req) => handleAdminListDataLists(req, resolver, db) },
+    { method: "POST", segments: seg("/admin/data-lists"),
+      handler: (_p, req) => handleAdminCreateDataList(req, resolver, db) },
+    { method: "PUT", segments: seg("/admin/data-lists/:listKey/values"),
+      handler: (p, req) => handleAdminPutDataListValues(p[0]!, req, resolver, db) },
+    { method: "GET", segments: seg("/admin/data-lists/:listKey"),
+      handler: (p, req) => handleAdminGetDataList(p[0]!, req, resolver, db) },
+    { method: "PUT", segments: seg("/admin/data-lists/:listKey"),
+      handler: (p, req) => handleAdminUpdateDataList(p[0]!, req, resolver, db) },
+    { method: "DELETE", segments: seg("/admin/data-lists/:listKey"),
+      handler: (p, req) => handleAdminDeleteDataList(p[0]!, req, resolver, db) },
+    { method: "GET", segments: seg("/reporting/processes"),
+      handler: (_p, req) => handleReportingListProcesses(req, resolver, db) },
+    { method: "GET", segments: seg("/reporting/:processId/cycle-time"),
+      handler: (p, req) => handleReportingCycleTime(p[0]!, req, resolver, db) },
+    { method: "GET", segments: seg("/reporting/:processId/bottleneck"),
+      handler: (p, req) => handleReportingBottleneck(p[0]!, req, resolver, db) },
+    { method: "GET", segments: seg("/reporting/:processId/sla"),
+      handler: (p, req) => handleReportingSla(p[0]!, req, resolver, db) },
+    { method: "GET", segments: seg("/drafts"),
+      handler: (_p, req) => handleListDrafts(req, resolver, db) },
+    { method: "GET", segments: seg("/drafts/:processId"),
+      handler: (p, req) => handleGetDraft(p[0]!, req, resolver, db) },
+    { method: "PUT", segments: seg("/drafts/:processId"),
+      handler: (p, req) => handleSaveDraft(p[0]!, req, resolver, db) },
+    { method: "DELETE", segments: seg("/drafts/:processId"),
+      handler: (p, req) => handleDeleteDraft(p[0]!, req, resolver, db) },
+    { method: "POST", segments: seg("/drafts/:processId/publish"),
+      handler: (p, req) => handlePublishDraft(p[0]!, req, resolver, registry, dataSourceRegistry, db, assignmentRegistry) },
+    { method: "GET", segments: seg("/processes/:processId/versions/:version/orphan-keys"),
+      handler: (p, req) => handleGetOrphanKeys(p[0]!, p[1]!, req, resolver, db) },
+    { method: "GET", segments: seg("/processes/:processId/versions/:version"),
+      handler: (p, req) => handleGetVersionBody(p[0]!, p[1]!, req, resolver, db) },
+    { method: "GET", segments: seg("/migration-plans/:processId/:fromVersion/:toVersion"),
+      handler: (p, req) => handleGetMigrationPlan(p[0]!, p[1]!, p[2]!, req, resolver, db) },
+    { method: "PUT", segments: seg("/migration-plans/:processId/:fromVersion/:toVersion"),
+      handler: (p, req) => handlePutMigrationPlan(p[0]!, p[1]!, p[2]!, req, resolver, db) },
+    { method: "GET", segments: seg("/registry"),
+      handler: (_p, req) => handleGetRegistry(req, resolver, registry, dataSourceRegistry, assignmentRegistry) },
+  ];
+
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     const parts = url.pathname.split("/").filter(Boolean);
     const origin = req.headers.get("Origin");
     const toRes = (result: HttpResult) => toResponse(result, allowedOrigins, origin);
-    const preflight = (methods: string) => preflightResponse(methods, allowedOrigins, origin);
 
     // A browser navigation is answered from the web root BEFORE route matching,
     // because an area's URL prefix can collide with an API prefix: the admin
@@ -285,316 +436,26 @@ export function createServer(
       return toBinaryResponse(await handleMetrics(db), undefined, null);
     }
 
-    // CORS preflight for every route below
-    if (loginSecret && req.method === "OPTIONS" && parts.length === 2 && parts[0] === "auth" && parts[1] === "login") {
-      return preflight("POST");
-    }
-    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "processes" && parts[2] === "instances") {
-      return preflight("POST");
-    }
-    if (req.method === "OPTIONS" && parts.length === 2 && parts[0] === "instances") {
-      return preflight("GET");
-    }
-    if (req.method === "OPTIONS" && parts.length === 1 && parts[0] === "instances") {
-      return preflight("GET");
-    }
-    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "instances" && parts[2] === "submit") {
-      return preflight("POST");
-    }
-    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "instances" && parts[2] === "claim") {
-      return preflight("POST");
-    }
-    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "instances" && parts[2] === "release") {
-      return preflight("POST");
-    }
-    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "instances" && parts[2] === "delegate") {
-      return preflight("POST");
-    }
-    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "instances" && parts[2] === "comments") {
-      return preflight("GET, POST");
-    }
-    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "instances" && parts[2] === "attachments") {
-      return preflight("GET, POST");
-    }
-    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "instances" && parts[2] === "attachments") {
-      return preflight("GET");
-    }
-    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "instances" && parts[2] === "record") {
-      return preflight("GET");
-    }
-    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "instances" && parts[2] === "cancel") {
-      return preflight("POST");
-    }
-    if (req.method === "OPTIONS" && parts.length === 1 && parts[0] === "processes") {
-      return preflight("GET, POST");
-    }
-    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "processes" && parts[2] === "versions") {
-      return preflight("GET");
-    }
-    if (req.method === "OPTIONS" && parts.length === 2 && parts[0] === "admin" && parts[1] === "outbox") {
-      return preflight("GET");
-    }
-    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "admin" && parts[1] === "outbox" && parts[3] === "retry") {
-      return preflight("POST");
-    }
-    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "admin" && parts[1] === "outbox" && parts[3] === "discard") {
-      return preflight("POST");
-    }
-    if (req.method === "OPTIONS" && parts.length === 2 && parts[0] === "admin" && parts[1] === "timers") {
-      return preflight("GET");
-    }
-    if (req.method === "OPTIONS" && parts.length === 2 && parts[0] === "admin" && parts[1] === "users") {
-      return preflight("GET");
-    }
-    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "admin" && parts[1] === "users" && parts[3] === "disable") {
-      return preflight("POST");
-    }
-    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "admin" && parts[1] === "users" && parts[3] === "enable") {
-      return preflight("POST");
-    }
-    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "admin" && parts[1] === "users" && parts[3] === "roles") {
-      return preflight("PATCH");
-    }
-    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "admin" && parts[1] === "users" && parts[3] === "manager") {
-      return preflight("PATCH");
-    }
-    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "admin" && parts[1] === "migrations" && parts[2] === "run") {
-      return preflight("POST");
-    }
-    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "admin" && parts[1] === "instances" && parts[3] === "redact") {
-      return preflight("POST");
-    }
-    if (req.method === "OPTIONS" && parts.length === 2 && parts[0] === "admin" && parts[1] === "data-lists") {
-      return preflight("GET, POST");
-    }
-    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "admin" && parts[1] === "data-lists" && parts[3] === "values") {
-      return preflight("PUT");
-    }
-    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "admin" && parts[1] === "data-lists") {
-      return preflight("GET, PUT, DELETE");
-    }
-    if (req.method === "OPTIONS" && parts.length === 1 && parts[0] === "drafts") {
-      return preflight("GET");
-    }
-    if (req.method === "OPTIONS" && parts.length === 2 && parts[0] === "drafts") {
-      return preflight("GET, PUT, DELETE");
-    }
-    if (req.method === "OPTIONS" && parts.length === 3 && parts[0] === "drafts" && parts[2] === "publish") {
-      return preflight("POST");
-    }
-    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "processes" && parts[2] === "versions") {
-      return preflight("GET");
-    }
-    if (req.method === "OPTIONS" && parts.length === 4 && parts[0] === "migration-plans") {
-      return preflight("GET, PUT");
-    }
-    if (req.method === "OPTIONS" && parts.length === 5 && parts[0] === "processes" && parts[2] === "versions" && parts[4] === "orphan-keys") {
-      return preflight("GET");
-    }
-    if (req.method === "OPTIONS" && parts.length === 1 && parts[0] === "registry") {
-      return preflight("GET");
+    // The CORS preflight derives from the table: an OPTIONS request matches
+    // by path alone, and the answer lists every method the table holds for
+    // that pattern, in table order. There is no second per-route chain to
+    // keep in sync. While one existed, the four /reporting/* routes went
+    // unanswered because nobody added their branch to it.
+    if (req.method === "OPTIONS") {
+      const methods = routes.filter((r) => match(r.segments, parts) !== null).map((r) => r.method);
+      if (methods.length > 0) return preflightResponse(methods.join(", "), allowedOrigins, origin);
     }
 
-    // POST /auth/login
-    if (loginSecret && req.method === "POST" && parts.length === 2 && parts[0] === "auth" && parts[1] === "login") {
-      return toRes(await handleLogin(req, loginSecret, db));
-    }
-    // POST /processes/:processId/instances
-    if (req.method === "POST" && parts.length === 3 && parts[0] === "processes" && parts[2] === "instances") {
-      return toRes(await handleCreateInstance(parts[1]!, req, resolver, dataSourceRegistry, db, assignmentRegistry));
-    }
-    // GET /instances (list)
-    if (req.method === "GET" && parts.length === 1 && parts[0] === "instances") {
-      return toRes(await handleListInstances(req, resolver, db));
-    }
-    // GET /instances/:instanceId
-    if (req.method === "GET" && parts.length === 2 && parts[0] === "instances") {
-      return toRes(await handleGetInstanceView(parts[1]!, req, resolver, dataSourceRegistry, db));
-    }
-    // POST /instances/:instanceId/submit
-    if (req.method === "POST" && parts.length === 3 && parts[0] === "instances" && parts[2] === "submit") {
-      return toRes(await handleSubmit(parts[1]!, req, resolver, dataSourceRegistry, db, assignmentRegistry));
-    }
-    // POST /instances/:instanceId/claim
-    if (req.method === "POST" && parts.length === 3 && parts[0] === "instances" && parts[2] === "claim") {
-      return toRes(await handleClaim(parts[1]!, req, resolver, db));
-    }
-    // POST /instances/:instanceId/release
-    if (req.method === "POST" && parts.length === 3 && parts[0] === "instances" && parts[2] === "release") {
-      return toRes(await handleRelease(parts[1]!, req, resolver, db));
-    }
-    // POST /instances/:instanceId/delegate
-    if (req.method === "POST" && parts.length === 3 && parts[0] === "instances" && parts[2] === "delegate") {
-      return toRes(await handleDelegate(parts[1]!, req, resolver, db));
-    }
-    // POST /instances/:instanceId/comments
-    if (req.method === "POST" && parts.length === 3 && parts[0] === "instances" && parts[2] === "comments") {
-      return toRes(await handlePostComment(parts[1]!, req, resolver, db));
-    }
-    // GET /instances/:instanceId/comments
-    if (req.method === "GET" && parts.length === 3 && parts[0] === "instances" && parts[2] === "comments") {
-      return toRes(await handleListComments(parts[1]!, req, resolver, db));
-    }
-    // POST /instances/:instanceId/attachments
-    if (req.method === "POST" && parts.length === 3 && parts[0] === "instances" && parts[2] === "attachments") {
-      return toRes(await handleUploadAttachment(parts[1]!, req, resolver, db));
-    }
-    // GET /instances/:instanceId/attachments
-    if (req.method === "GET" && parts.length === 3 && parts[0] === "instances" && parts[2] === "attachments") {
-      return toRes(await handleListAttachments(parts[1]!, req, resolver, db));
-    }
-    // GET /instances/:instanceId/attachments/:attachmentId — not through the
-    // shared `toRes`: a successful download is `HttpBinaryResult`, not JSON.
-    // See design.md's "server.ts's shared toRes cannot handle this one route
-    // unchanged" (add-instance-attachments).
-    if (req.method === "GET" && parts.length === 4 && parts[0] === "instances" && parts[2] === "attachments") {
-      const result = await handleGetAttachment(parts[1]!, parts[3]!, req, resolver, db);
+    for (const route of routes) {
+      if (route.method !== req.method) continue;
+      const params = match(route.segments, parts);
+      if (params === null) continue;
+      const result = await route.handler(params, req);
+      // A successful attachment download is `HttpBinaryResult`, not a JSON
+      // envelope. One check at this single exit covers that route and any
+      // later one. See errors.ts, the `HttpBinaryResult` doc comment.
       if (isBinaryResult(result)) return toBinaryResponse(result, allowedOrigins, origin);
       return toRes(result);
-    }
-    // GET /instances/:instanceId/record
-    if (req.method === "GET" && parts.length === 3 && parts[0] === "instances" && parts[2] === "record") {
-      return toRes(await handleInstanceRecord(parts[1]!, req, resolver, db));
-    }
-    // POST /instances/:instanceId/cancel
-    if (req.method === "POST" && parts.length === 3 && parts[0] === "instances" && parts[2] === "cancel") {
-      return toRes(await handleCancel(parts[1]!, req, resolver, db));
-    }
-    // POST /processes (publish)
-    if (req.method === "POST" && parts.length === 1 && parts[0] === "processes") {
-      return toRes(await handlePublish(req, resolver, registry, dataSourceRegistry, db, assignmentRegistry));
-    }
-    // GET /processes (list)
-    if (req.method === "GET" && parts.length === 1 && parts[0] === "processes") {
-      return toRes(await handleListProcesses(req, resolver, db));
-    }
-    // GET /processes/:processId/versions
-    if (req.method === "GET" && parts.length === 3 && parts[0] === "processes" && parts[2] === "versions") {
-      return toRes(await handleListVersions(parts[1]!, req, resolver, db));
-    }
-    // GET /admin/outbox
-    if (req.method === "GET" && parts.length === 2 && parts[0] === "admin" && parts[1] === "outbox") {
-      return toRes(await handleAdminListOutbox(req, resolver, db));
-    }
-    // POST /admin/outbox/:idempotencyKey/retry
-    if (req.method === "POST" && parts.length === 4 && parts[0] === "admin" && parts[1] === "outbox" && parts[3] === "retry") {
-      return toRes(await handleAdminOutboxRetry(parts[2]!, req, resolver, db));
-    }
-    // POST /admin/outbox/:idempotencyKey/discard
-    if (req.method === "POST" && parts.length === 4 && parts[0] === "admin" && parts[1] === "outbox" && parts[3] === "discard") {
-      return toRes(await handleAdminOutboxDiscard(parts[2]!, req, resolver, db));
-    }
-    // GET /admin/timers
-    if (req.method === "GET" && parts.length === 2 && parts[0] === "admin" && parts[1] === "timers") {
-      return toRes(await handleAdminListTimers(req, resolver, db));
-    }
-    // GET /admin/users
-    if (req.method === "GET" && parts.length === 2 && parts[0] === "admin" && parts[1] === "users") {
-      return toRes(await handleAdminListUsers(req, resolver, db));
-    }
-    // POST /admin/users/:id/disable
-    if (req.method === "POST" && parts.length === 4 && parts[0] === "admin" && parts[1] === "users" && parts[3] === "disable") {
-      return toRes(await handleAdminDisableUser(parts[2]!, req, resolver, db));
-    }
-    // POST /admin/users/:id/enable
-    if (req.method === "POST" && parts.length === 4 && parts[0] === "admin" && parts[1] === "users" && parts[3] === "enable") {
-      return toRes(await handleAdminEnableUser(parts[2]!, req, resolver, db));
-    }
-    // PATCH /admin/users/:id/roles
-    if (req.method === "PATCH" && parts.length === 4 && parts[0] === "admin" && parts[1] === "users" && parts[3] === "roles") {
-      return toRes(await handleAdminSetUserRoles(parts[2]!, req, resolver, db));
-    }
-    // PATCH /admin/users/:id/manager
-    if (req.method === "PATCH" && parts.length === 4 && parts[0] === "admin" && parts[1] === "users" && parts[3] === "manager") {
-      return toRes(await handleAdminSetUserManager(parts[2]!, req, resolver, db));
-    }
-    // POST /admin/migrations/run
-    if (req.method === "POST" && parts.length === 3 && parts[0] === "admin" && parts[1] === "migrations" && parts[2] === "run") {
-      return toRes(await handleAdminRunMigration(req, resolver, db));
-    }
-    // POST /admin/instances/:id/redact
-    if (req.method === "POST" && parts.length === 4 && parts[0] === "admin" && parts[1] === "instances" && parts[3] === "redact") {
-      return toRes(await handleAdminRedactInstance(parts[2]!, req, resolver, db));
-    }
-    // GET /admin/data-lists
-    if (req.method === "GET" && parts.length === 2 && parts[0] === "admin" && parts[1] === "data-lists") {
-      return toRes(await handleAdminListDataLists(req, resolver, db));
-    }
-    // POST /admin/data-lists
-    if (req.method === "POST" && parts.length === 2 && parts[0] === "admin" && parts[1] === "data-lists") {
-      return toRes(await handleAdminCreateDataList(req, resolver, db));
-    }
-    // PUT /admin/data-lists/:listKey/values
-    if (req.method === "PUT" && parts.length === 4 && parts[0] === "admin" && parts[1] === "data-lists" && parts[3] === "values") {
-      return toRes(await handleAdminPutDataListValues(parts[2]!, req, resolver, db));
-    }
-    // GET /admin/data-lists/:listKey
-    if (req.method === "GET" && parts.length === 3 && parts[0] === "admin" && parts[1] === "data-lists") {
-      return toRes(await handleAdminGetDataList(parts[2]!, req, resolver, db));
-    }
-    // PUT /admin/data-lists/:listKey
-    if (req.method === "PUT" && parts.length === 3 && parts[0] === "admin" && parts[1] === "data-lists") {
-      return toRes(await handleAdminUpdateDataList(parts[2]!, req, resolver, db));
-    }
-    // DELETE /admin/data-lists/:listKey
-    if (req.method === "DELETE" && parts.length === 3 && parts[0] === "admin" && parts[1] === "data-lists") {
-      return toRes(await handleAdminDeleteDataList(parts[2]!, req, resolver, db));
-    }
-    // GET /reporting/processes
-    if (req.method === "GET" && parts.length === 2 && parts[0] === "reporting" && parts[1] === "processes") {
-      return toRes(await handleReportingListProcesses(req, resolver, db));
-    }
-    // GET /reporting/:processId/cycle-time
-    if (req.method === "GET" && parts.length === 3 && parts[0] === "reporting" && parts[2] === "cycle-time") {
-      return toRes(await handleReportingCycleTime(parts[1]!, req, resolver, db));
-    }
-    // GET /reporting/:processId/bottleneck
-    if (req.method === "GET" && parts.length === 3 && parts[0] === "reporting" && parts[2] === "bottleneck") {
-      return toRes(await handleReportingBottleneck(parts[1]!, req, resolver, db));
-    }
-    // GET /reporting/:processId/sla
-    if (req.method === "GET" && parts.length === 3 && parts[0] === "reporting" && parts[2] === "sla") {
-      return toRes(await handleReportingSla(parts[1]!, req, resolver, db));
-    }
-    // GET /drafts (list)
-    if (req.method === "GET" && parts.length === 1 && parts[0] === "drafts") {
-      return toRes(await handleListDrafts(req, resolver, db));
-    }
-    // GET /drafts/:processId
-    if (req.method === "GET" && parts.length === 2 && parts[0] === "drafts") {
-      return toRes(await handleGetDraft(parts[1]!, req, resolver, db));
-    }
-    // PUT /drafts/:processId
-    if (req.method === "PUT" && parts.length === 2 && parts[0] === "drafts") {
-      return toRes(await handleSaveDraft(parts[1]!, req, resolver, db));
-    }
-    // DELETE /drafts/:processId
-    if (req.method === "DELETE" && parts.length === 2 && parts[0] === "drafts") {
-      return toRes(await handleDeleteDraft(parts[1]!, req, resolver, db));
-    }
-    // POST /drafts/:processId/publish
-    if (req.method === "POST" && parts.length === 3 && parts[0] === "drafts" && parts[2] === "publish") {
-      return toRes(await handlePublishDraft(parts[1]!, req, resolver, registry, dataSourceRegistry, db, assignmentRegistry));
-    }
-    // GET /processes/:processId/versions/:version/orphan-keys
-    if (req.method === "GET" && parts.length === 5 && parts[0] === "processes" && parts[2] === "versions" && parts[4] === "orphan-keys") {
-      return toRes(await handleGetOrphanKeys(parts[1]!, parts[3]!, req, resolver, db));
-    }
-    // GET /processes/:processId/versions/:version (body)
-    if (req.method === "GET" && parts.length === 4 && parts[0] === "processes" && parts[2] === "versions") {
-      return toRes(await handleGetVersionBody(parts[1]!, parts[3]!, req, resolver, db));
-    }
-    // GET /migration-plans/:processId/:fromVersion/:toVersion
-    if (req.method === "GET" && parts.length === 4 && parts[0] === "migration-plans") {
-      return toRes(await handleGetMigrationPlan(parts[1]!, parts[2]!, parts[3]!, req, resolver, db));
-    }
-    // PUT /migration-plans/:processId/:fromVersion/:toVersion
-    if (req.method === "PUT" && parts.length === 4 && parts[0] === "migration-plans") {
-      return toRes(await handlePutMigrationPlan(parts[1]!, parts[2]!, parts[3]!, req, resolver, db));
-    }
-    // GET /registry
-    if (req.method === "GET" && parts.length === 1 && parts[0] === "registry") {
-      return toRes(await handleGetRegistry(req, resolver, registry, dataSourceRegistry, assignmentRegistry));
     }
 
     // Static assets fall through here, behind every API route, so no URL prefix

@@ -42,7 +42,6 @@ export interface Operand {
   /** Present when the value editor can offer a closed list. */
   options?: OperandOption[];
   /** A select bound to a data source: no studio route resolves its options. */
-  freeText?: boolean;
 }
 
 export type CmpOp = "==" | "!=" | "<" | "<=" | ">" | ">=" | "in";
@@ -101,7 +100,6 @@ function fieldOperand(f: DraftField, prefix: string, locale: string, baseLocale:
     );
   } else if (f.dataSource) {
     // No studio route resolves a data source's options, so the editor takes text.
-    operand.freeText = true;
   }
   return operand;
 }
@@ -136,7 +134,6 @@ function contextOperands(): Operand[] {
       if (DENIED.has(path)) continue;
       const operand: Operand = { path, label: path, celType: type };
       if (path === "instance.status") operand.options = INSTANCE_STATUSES.map((v) => ({ value: v, label: v }));
-      if (path === "actor.roles") operand.freeText = true; // the body enumerates no roles
       out.push(operand);
     }
   }

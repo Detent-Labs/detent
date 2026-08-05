@@ -11,7 +11,8 @@
  */
 import { readFileSync } from "node:fs";
 import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
-import { sql, initSchema } from "../src/engine/store.js";
+import { sql } from "../src/engine/store.js";
+import { DB, initDb, authHeaders, authedReq } from "./helpers/http-fixture.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { createRegistry, register, createDataSourceRegistry, registerDataSource } from "../src/engine/registry.js";
 import { drainOutbox } from "../src/engine/outbox.js";
@@ -24,16 +25,13 @@ import { PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE } from "../sr
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
-const DB = !!process.env.DATABASE_URL;
 const cel = (src: string) => ({ lang: "cel", src });
 const reg = createRegistry();
 const dataSourceReg = createDataSourceRegistry();
 registerDataSource(dataSourceReg, "static", { resolve: async (ctx) => (ctx.config as { options: unknown[] }).options as never });
 const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
-beforeAll(async () => {
-  if (DB) await initSchema();
-});
+beforeAll(initDb);
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_comments, instance_attachments, definitions`;
 });
@@ -186,10 +184,7 @@ const assignedBody = (): ProcessBody =>
 
 const pid = (n: string) => n as ProcessId;
 
-const authHeaders = (actor: Actor): Record<string, string> => ({
-  "X-Actor-Id": actor.id,
-  ...(actor.roles.length > 0 ? { "X-Actor-Roles": actor.roles.join(",") } : {}),
-});
+
 
 /** A POST request carrying auth headers plus a JSON body (defaulting to `{}` so route handlers that call req.json() unconditionally never see an empty body). */
 const jsonReq = (url: string, method: string, actor: Actor, body: unknown = {}) =>
@@ -200,9 +195,6 @@ const jsonReq = (url: string, method: string, actor: Actor, body: unknown = {}) 
   });
 
 /** A GET/no-body request carrying only auth headers (view, claim, release). */
-const authedReq = (url: string, method: string, actor: Actor) =>
-  new Request(url, { method, headers: authHeaders(actor) });
-
 const user1: Actor = { id: "user_1", roles: [] };
 /** Carries all three reserved roles, for the publish / cancel-any-instance / admin-gated routes this suite exercises as an administrator. */
 const admin: Actor = { id: "user_admin", roles: [PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE] };

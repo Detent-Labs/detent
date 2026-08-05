@@ -22,6 +22,8 @@
 # that runs as a third user needs a row here. Widen it when one does.
 set -e
 
+. "$(dirname "$0")/_lib.sh"
+
 RULE=no-machine-paths
 PATTERN='[A-Za-z]:[\/]Users[\/][A-Za-z0-9_]+|/home/[a-z][a-z0-9_-]*/'
 CONTAINER_USERS='node|root'
@@ -34,11 +36,11 @@ hits=$(
 )
 
 if [ -n "$hits" ]; then
-  echo "pre-push: rule '$RULE' rejected this push." >&2
+  reject "$RULE"
   echo "  these tracked files carry an absolute home-directory path:" >&2
   echo "$hits" | sed 's/^/    /' >&2
   echo "Replace each one with a \$HOME-relative path, an environment variable," >&2
   echo "or a repository-relative path, then commit the result." >&2
-  echo "To push without the gates, pass --no-verify. That disables every gate." >&2
+  no_verify_note
   exit 1
 fi

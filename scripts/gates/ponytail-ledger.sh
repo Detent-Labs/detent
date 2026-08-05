@@ -15,6 +15,8 @@
 # ever costs something.
 set -e
 
+. "$(dirname "$0")/_lib.sh"
+
 RULE=ponytail-ledger-fresh
 
 [ -f PONYTAIL-DEBT.md ] || exit 0
@@ -23,11 +25,11 @@ LEDGER_PATHS=$(grep -oE '^\*\*[^:*]+' PONYTAIL-DEBT.md | cut -c3- | sort -u)
 TREE_PATHS=$(git grep -l 'ponytail:' -- src packages | sort -u)
 
 if [ "$LEDGER_PATHS" != "$TREE_PATHS" ]; then
-  echo "pre-push: rule '$RULE' rejected this push." >&2
+  reject "$RULE"
   echo "  the ponytail ledgers are stale. These files differ:" >&2
   printf '%s\n%s\n' "$LEDGER_PATHS" "$TREE_PATHS" | sort | uniq -u | sed 's/^/    /' >&2
   echo "Rebuild them, then commit the result:" >&2
   echo "  sh scripts/ponytail-ledgers.sh" >&2
-  echo "To push without the gates, pass --no-verify. That disables every gate." >&2
+  no_verify_note
   exit 1
 fi

@@ -19,6 +19,8 @@
 # integer comparison against empty misreports rather than rejecting.
 set -e
 
+. "$(dirname "$0")/_lib.sh"
+
 RULE=no-silent-green
 OUT="$1"
 FLOOR_FILE="$(dirname "$0")/skip-floor.txt"
@@ -33,20 +35,20 @@ fi
 # whose NAME held either literal would block every push, and no edit to the
 # suite could satisfy the gate.
 if grep -q '^\[test\] DATABASE_URL unset' "$OUT"; then
-  echo "pre-push: rule '$RULE' rejected this push." >&2
+  reject "$RULE"
   echo "  The suite ran with DATABASE_URL unset, so the DB-backed suites" >&2
   echo "  skipped. That pass count proves almost nothing." >&2
   echo "Run the suite in the devcontainer, where DATABASE_URL is already set." >&2
-  echo "To push without the gates, pass --no-verify. That disables every gate." >&2
+  no_verify_note
   exit 1
 fi
 
 if ! grep -q '^\[test\] database:' "$OUT"; then
-  echo "pre-push: rule '$RULE' rejected this push." >&2
+  reject "$RULE"
   echo "  The captured run names no database. development-toolchain requires" >&2
   echo "  every run to print the database it connected to, before the first" >&2
   echo "  suite. Its absence means the run is not the one this gate can read." >&2
-  echo "To push without the gates, pass --no-verify. That disables every gate." >&2
+  no_verify_note
   exit 1
 fi
 
@@ -62,12 +64,12 @@ if [ -z "$floor" ]; then
 fi
 
 if [ "$skipped" -gt "$floor" ]; then
-  echo "pre-push: rule '$RULE' rejected this push." >&2
+  reject "$RULE"
   echo "  The run skipped $skipped tests. The recorded floor is $floor." >&2
   echo "  A rising skip count hides tests that stopped running." >&2
   echo "Either repair what started skipping, or raise the floor in the same" >&2
   echo "commit, with a comment naming what the increase covers:" >&2
   echo "  $FLOOR_FILE" >&2
-  echo "To push without the gates, pass --no-verify. That disables every gate." >&2
+  no_verify_note
   exit 1
 fi

@@ -101,13 +101,22 @@ async function parseJsonBody<T>(req: Request, schema: z.ZodType<T>): Promise<T> 
  * unchanged — each resolver reads whatever it needs (`Authorization` for
  * JWT, `X-Actor-Id`/`X-Actor-Roles` for the dev resolver). No
  * resolver-specific field is pre-extracted here.
+ *
+ * Exported: the three sibling route modules import it. Each carried its own
+ * copy until `dedup-server-helpers`.
  */
-async function resolveActor(req: Request, resolver: ActorResolver): Promise<Actor> {
+export async function resolveActor(req: Request, resolver: ActorResolver): Promise<Actor> {
   return resolver(req.headers);
 }
 
-/** `req`'s method and path, for `mapError`'s fallback log — an actionable trace needs the request, not just the stack. */
-function errorContext(req: Request): ErrorContext {
+/**
+ * `req`'s method and path, for `mapError`'s fallback log — an actionable trace
+ * needs the request, not just the stack.
+ *
+ * Exported: `admin-routes.ts`, `studio-routes.ts` and `reporting-routes.ts`
+ * import it. Each carried its own copy until `dedup-server-helpers`.
+ */
+export function errorContext(req: Request): ErrorContext {
   return { method: req.method, path: new URL(req.url).pathname };
 }
 
@@ -122,8 +131,12 @@ function errorContext(req: Request): ErrorContext {
  * cannot return a JSON-only `HttpResult` on success — see design.md's
  * "guarded becomes generic to return either shape" (add-instance-attachments).
  * A thrown error always still maps to a plain `HttpResult`.
+ *
+ * Exported: the three sibling route modules import it. Each carried its own
+ * non-generic copy until `dedup-server-helpers`. They all instantiate
+ * `T = HttpResult`, which is what those copies named outright.
  */
-async function guarded<T>(req: Request, fn: () => Promise<T>): Promise<T | HttpResult> {
+export async function guarded<T>(req: Request, fn: () => Promise<T>): Promise<T | HttpResult> {
   try {
     return await fn();
   } catch (err) {
@@ -275,8 +288,14 @@ export async function handleGetAttachment(
   });
 }
 
-/** `limit=abc` or a `limit` that is not a positive integer is a request error, not a silent default. */
-function parseLimit(url: URL): number | undefined {
+/**
+ * `limit=abc` or a `limit` that is not a positive integer is a request error,
+ * not a silent default.
+ *
+ * Exported: `admin-routes.ts` imports it. It carried a character-identical
+ * copy until `dedup-server-helpers`.
+ */
+export function parseLimit(url: URL): number | undefined {
   const raw = url.searchParams.get("limit");
   if (raw === null) return undefined;
   const n = Number(raw);

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from "react";
 import { matchShell, useLocation, areaHref, LOGIN_PATH } from "./routing.js";
-import { loadSession, persistSession, clearSession, type Session } from "./session.js";
+import { loadSession, persistSession, clearSession, browserStorage, type Session } from "./session.js";
 import { AREAS, landingArea, mayEnter, type Area } from "./areas.js";
 import { loadLocale, persistLocale, type UiLocale } from "../i18n/locale.js";
 import { t } from "./catalog.js";
@@ -37,7 +37,7 @@ export function App() {
   const { pathname, go } = useLocation();
   const [session, setSession] = useState<Session | undefined>(() => loadSession());
   const [locale, setLocale] = useState<UiLocale>(() =>
-    loadLocale(typeof localStorage === "undefined" ? undefined : localStorage, typeof navigator === "undefined" ? undefined : navigator.language),
+    loadLocale(browserStorage(), typeof navigator === "undefined" ? undefined : navigator.language),
   );
 
   const logout = () => {
@@ -48,7 +48,7 @@ export function App() {
 
   const changeLocale = (next: UiLocale) => {
     setLocale(next);
-    persistLocale(next, typeof localStorage === "undefined" ? undefined : localStorage);
+    persistLocale(next, browserStorage());
   };
 
   const here = matchShell(pathname);

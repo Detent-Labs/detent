@@ -7,7 +7,8 @@
  * version). DB-backed — skips when DATABASE_URL is unset.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
-import { sql, initSchema, createInstance } from "../src/engine/store.js";
+import { sql, createInstance } from "../src/engine/store.js";
+import { DB, initDb, authedReq } from "./helpers/http-fixture.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { createServer } from "../src/http/server.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
@@ -18,23 +19,17 @@ import { registerMigrationPlan } from "../src/engine/migration.js";
 import type { Actor } from "../src/cel/eval.js";
 import type { ProcessBody, Instance, MigrationSpec } from "../src/schema/definition.js";
 
-const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
 const dataSourceReg = createDataSourceRegistry();
 const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
-beforeAll(async () => {
-  if (DB) await initSchema();
-});
+beforeAll(initDb);
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, auth_users, migration_plans`;
 });
 
 const admin: Actor = { id: "user_admin", roles: [ADMIN_ROLE] };
 const bystander: Actor = { id: "user_bystander", roles: [] };
-
-const authedReq = (url: string, method: string, actor: Actor) =>
-  new Request(url, { method, headers: { "X-Actor-Id": actor.id, ...(actor.roles.length > 0 ? { "X-Actor-Roles": actor.roles.join(",") } : {}) } });
 
 const insertRow = async (opts: { key: string; instanceId?: string; status: string; attempts?: number }): Promise<void> => {
   await sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, status, attempts)

@@ -216,10 +216,13 @@ describe("the operand picker", () => {
     expect(status.options?.map((o) => o.value)).toEqual(["running", "completed", "cancelled", "faulted"]);
   });
 
-  it("actor.roles and a data-source-bound field take free text", () => {
+  // No `options` IS the free-text path: `ValueEditor` branches on
+  // `celType === "bool"` and then on `options?.length`, so an operand with
+  // neither takes a plain text input. A `freeText` flag said the same thing
+  // and nothing read it (`simplify-web-logic-modules`).
+  it("actor.roles and a data-source-bound field enumerate no options", () => {
     const bound = catalog([field("city", "select", { dataSource: "ds_cities" })]);
-    expect(bound.find((o) => o.path === "actor.roles")!.freeText).toBe(true);
-    expect(bound.find((o) => o.path === "data.city")!.freeText).toBe(true);
+    expect(bound.find((o) => o.path === "actor.roles")!.options).toBeUndefined();
     expect(bound.find((o) => o.path === "data.city")!.options).toBeUndefined();
   });
 
