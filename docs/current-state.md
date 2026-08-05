@@ -1156,7 +1156,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   gained one `errors.ts` mapping (409, `migration-plan`) shared by all three,
   since it previously fell through to the generic 500. The studio area
   gained: a Publish action on the edit screen, gated by a dirty-check pure
-  module (`screens/publishGateLogic.ts::isDirty`, comparing the in-browser
+  module (`screens/draftToolbarState.ts::isDirty`, comparing the in-browser
   draft against the last-saved snapshot) — a `confirm()` prompt offers to
   save then publish when dirty, mirroring the existing discard-confirmation
   convention rather than silently chaining or hard-blocking; a Versions
@@ -2064,9 +2064,14 @@ Stage-by-stage status is in `ROADMAP.md`.
   Check 6 warns rather than blocks. The index is per-machine local
   state, per `CLAUDE.md`. It also carries a Windows-specific detail. Git
   Bash's own MSYS/Cygwin file redirection does not see a Windows sharing
-  violation. The bash preflight shells out to `powershell.exe` for this
+  violation. The preflight shells out to `powershell.exe` for this
   one check instead. It opens the file with a `FileShare.None` request
   that a plain redirection does not make.
+
+  `scripts/preflight.ps1` held a second PowerShell implementation of all six
+  checks until `one-source-gates-and-preflight`. It now runs
+  `scripts/preflight.sh` and returns its exit code, so the two entry points
+  agree by construction.
 
   Check 6 skips a WAL file of zero length before the probe reaches it.
   SQLite zeroes the WAL on a checkpoint. Such a file holds no
@@ -2176,7 +2181,8 @@ Stage-by-stage status is in `ROADMAP.md`.
   The route needed its own `OPTIONS` preflight entry in `server.ts`. Without
   one the screen's save never left the browser, while every server-side test
   still passed. Found in a browser, and now covered by a test beside the roles
-  route's.
+  route's. `http-route-table` since removed that failure mode. The preflight
+  now reads the route table. One route entry is the whole change.
 
 ## Process Studio, migration-plan field mapping (`studio-migration-plan-field-mapping`)
 
@@ -2229,3 +2235,182 @@ structured data, not a language. The form therefore reads back what it wrote
 by holding the same object. The one free-text position, a `transforms`
 expression, stays a text input and round-trips as its own `src` string.
 Stage 27b's CEL builder replaces that input, and nothing else.
+
+## HTTP route table (`http-route-table`)
+
+Ponytail audit finding 1, reported for five scans in a row.
+`src/http/server.ts` stated every route twice. An `OPTIONS` preflight if-chain
+restated the method and the path shape of each route. The handler chain below
+it stated both again. 88 `req.method ===` comparisons across 690 lines.
+
+`createServer` now builds one `Route[]` before it returns its `fetch`. An
+entry carries a method, the path pattern already split into segments, and a
+closure. That closure reads the dependencies its route needs. The handlers
+share no signature, so a closure per route is what the table can hold.
+
+Two helpers sit beside it. `seg(pattern)` splits a pattern once, at table
+construction. `match(segments, parts)` returns the captured `:name` values in
+pattern order, or `null`. No two patterns in the table overlap: any two differ
+in segment count or in a literal segment.
+
+The preflight reads that same table. An `OPTIONS` request matches by path
+alone. The answer lists every method the table holds for the matched pattern,
+in table order. Three patterns list `GET` before `POST`, so the join
+reproduces the `"GET, POST"` the tests pin.
+
+Three routes stay outside the table. `GET /livez`, `GET /readyz` and
+`GET /metrics` answer a probe rather than a browser. None carries a CORS
+header, and none answers a preflight. The `http-wrapper` spec named the first
+two only. The third behaved the same way and the text did not say so.
+
+The second chain drifted. That is why this landed as a change rather than a
+cleanup. The four `/reporting/*` routes had a handler branch and no preflight
+branch. `OPTIONS /reporting/processes` therefore fell through to the 404.
+The spec required a `204`. Deriving the answer closed that gap without a line
+naming reporting.
+
+49 entries, one per route. The typecheck is the completeness check.
+`noUnusedLocals` reports any handler import no entry names.
+
+## Shared server helpers (`dedup-server-helpers`)
+
+Ponytail audit findings 2, 5, 6, 14 and 15, landed together. All five were
+duplication or dead code on the server side. None changed behavior.
+
+Four modules answer HTTP routes. The three written after `routes.ts` copied
+its plumbing. Each of `resolveActor`, `errorContext` and `guarded` stood in
+four copies. `parseLimit` stood in two. Every copy carried a comment saying
+so, in the form "Same shape as routes.ts::guarded".
+
+`routes.ts` now exports all four, and the three siblings import them. The
+generic `guarded<T>` covers what the fixed-to-`HttpResult` copies did, since
+every sibling call site infers `T = HttpResult`. The cost of the choice is
+that `routes.ts` is both a route module and the plumbing home. The
+`http-route-handling-consolidation` spec records that, and `errors.ts` stays
+the fallback home if the set grows.
+
+The audit named three of the four. `errorContext` was the fourth, found while
+reading the files.
+
+`store.ts` gained `makeAssignmentUnresolvedEvent`. Three sites hand-built the
+same seven-field event literal. Only `id` and `kind` were constant across the
+three, which are the two fields a copy can drift on. The helper takes one
+object rather than six positional arguments. Otherwise `instanceId`,
+`stepId` and `reason` would sit in a row. Only the first two carry branded
+types that a typecheck can tell apart.
+
+`parseRoles` in `admin-routes.ts` lost its seen-`Set` and `push` loop for
+`map` plus `[...new Set(roles)]`. A `Set` keeps first-insertion order, so the
+result is the same array. The regression net is line 351 of
+`test/http-admin.test.ts`, "trims and deduplicates, first occurrence
+winning".
+
+`buildTransformContext` and `makeSpawnHandler` lost an `export` keyword each.
+Neither name appears outside its own file, and neither is in the engine
+package's `exports` map.
+
+`test/helpers/http-fixture.ts` is new. It holds `DB`, `initDb`, `authHeaders`
+and `authedReq` for the three http suites. It registers no hook. Bun caches a
+module across test files, so a `beforeAll` at its top level would register
+once and skip two suites. The `beforeEach` truncate stays per suite. The three
+truncate different tables, and each is one tagged-template line.
+
+## One source for the gates and the preflight (`one-source-gates-and-preflight`)
+
+Ponytail audit findings 3 and 4. The audit groups them, because both trace to
+one missing shared source.
+
+`scripts/gates/_lib.sh` is new. It holds `reject <rule>` and
+`no_verify_note`, the two lines every rejecting gate prints around its own
+findings. The header stood in 9 copies and the note in 8. Both are text a
+contributor reads, not logic, and a copy that fell behind would have taught
+the wrong thing.
+
+Two primitives, not one combined `fail_rule`. The gates reject in different
+shapes. `whitespace.sh` and `prose.sh` set a flag, keep checking and exit
+later. `silent-green.sh` rejects at three separate points. Each gate sources
+the library through `$(dirname "$0")`, so it still runs alone during a repair.
+
+One sub-claim of finding 3 did not survive reading the code. The audit says
+`prose.sh` and `whitespace.sh` hand-roll an identical changed-file loop,
+differing only by a `-- '*.md'` pathspec. They do not. `prose.sh` runs
+`git diff --name-status -M` and carries base and tip paths per range. It reads
+a renamed file's baseline at the old path. `whitespace.sh` runs
+`git diff --name-only` and needs neither. A shared collector would push rename
+machinery onto the gate that never reads it.
+
+`scripts/preflight.ps1` went from 133 lines to a delegator. It resolves
+`bash`, runs `scripts/preflight.sh` with the same profile, and returns that
+script's exit code. The six checks now have one source. One requirement says
+both entry points run the same checks in the same order, and it now holds by
+construction.
+
+The delegator needs bash on the host, which `dev-up.ps1` did not before. Three
+facts made that acceptable. `.githooks/pre-push` is a POSIX `sh` script
+running `bash scripts/preflight.sh core`, so anyone who pushes needs bash. The
+old `preflight.ps1` printed `bash scripts/dev-up.sh` as the repair for check 3
+and check 4. Git for Windows ships Git Bash, and nobody clones without git.
+
+A host with no `bash` gets a named message pointing at Git for Windows, not a
+crash. Restoring the native PowerShell implementation is one `git revert`.
+
+## Web logic-module simplifications (`simplify-web-logic-modules`)
+
+Ponytail audit findings 7, 8, 9, 11, 12, 13, 16, 17 and 18, landed together.
+All nine sit in `packages/web`. One of them is visible to a person.
+
+Two came from one convention applied past its use. The studio-app spec asks
+the studio to extract its testable logic from its components. That is right
+where a decision has branches. One file was 13 lines, 9 of them comment,
+around one `JSON.stringify` comparison. Another was 39 lines, 30 of them
+comment, around one `structuredClone`.
+
+The first of those two is gone. Its `isDirty` moved into
+`draftToolbarState.ts`, which already held the other. Both state one
+invariant: the body the server last confirmed. The reducer writes it, and
+`isDirty` reads it.
+
+The reducer's two-kind action union went at the same time. Both branches were
+the same expression. The call sites already carry the names `doSave` and
+`reload`, so the discriminant told a reader nothing the names did not.
+
+The `structuredClone` stays, and so does its comment. The panels mutate the
+draft object in place. Storing the reference would make `savedBody` follow
+every later change, and turn the dirty gate permanently off.
+
+The Versions screen lost `selectVersion`, inlined at its two call sites. It
+wrapped one spread and carried its own exported type plus five test cases. Its
+two siblings stay. `canDiff` states that a version does not diff against
+itself, and `diffJson` walks two bodies.
+
+The login form changed for a person, not only for a reader. Both inputs gained
+`required`, and the submit button gates on `disabled={loading}` alone. A
+disabled button states no reason. It leaves the pointer nothing to click, and
+the screen reader nothing to announce.
+
+The browser now names the empty field and moves focus to it. Chrome confirmed
+that. No CSS changed, since `shell.css` styles no `:invalid` state, so an
+untouched field carries no error styling. The `spa-accessibility` spec now
+carries the rule.
+
+Five one-line removals followed. The `?? catalog.en[key] ?? key` tail went
+from `t()` in both catalogs. The catalog type gives every locale every key.
+The compiler is not set to doubt an index either, since `tsconfig.json` leaves
+`noUncheckedIndexedAccess` off. Elsewhere, `App.tsx` calls the now-exported
+`browserStorage()` rather than writing its guard inline twice.
+
+The flag `Operand.freeText` went too. Two sites wrote it, and `ValueEditor`
+branches on `celType` and `options`, never on the flag. A module-level counter
+behind `nextRowId` became `crypto.randomUUID()`, matching
+`draft/ids.ts::mintId`. The `EVERY_KEY` alias went, and both sites return
+`ALL_KEYS`.
+
+Audit finding 10 did not survive reading the code. It says
+`Intl.RelativeTimeFormat` covers `waitingLabel`'s buckets. It does not.
+
+The function renders `"5m"`, `"3h"`, `"2d"` and `"just now"` into a compact
+inbox badge. Five tests pin those strings. The narrow style of
+`Intl.RelativeTimeFormat` renders `"5 min. ago"`, and no style renders `"5m"`.
+Adopting it would change what a participant reads. It would also drop four
+catalog keys in two locales and rewrite five tests. That is a redesign of the
+badge.

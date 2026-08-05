@@ -3,9 +3,10 @@
  * dead-letter repairs, pending timers, and listing/disabling/enabling local
  * users plus assigning their roles. Kept out of `routes.ts`, which stays the
  * participant-facing surface.
- * Same framework-agnostic handler shape and `guarded` wrapper as `routes.ts`;
- * each handler resolves the actor then requires `ADMIN_ROLE` before any read
- * or write.
+ * Same framework-agnostic handler shape as `routes.ts`, and the same
+ * `resolveActor`, `errorContext`, `guarded` and `parseLimit` helpers, imported
+ * from it rather than copied. Each handler resolves the actor then requires
+ * `ADMIN_ROLE` before any read or write.
  */
 import type { SQL } from "bun";
 import { sql, withTransaction } from "../engine/store.js";
@@ -19,35 +20,8 @@ import { DB_LIST_DATA_SOURCE_TYPE, MAX_DATA_LIST_VALUES } from "../engine/host.j
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, ADMIN_ROLE, DATALISTS_ROLE, DEVELOPER_ROLE } from "../auth/authorize.js";
-import { mapError, RequestShapeError, type HttpResult, type ErrorContext } from "./errors.js";
-
-/** Same credential-passthrough seam as routes.ts::resolveActor. */
-async function resolveActor(req: Request, resolver: ActorResolver): Promise<Actor> {
-  return resolver(req.headers);
-}
-
-/** Same shape as routes.ts::errorContext. */
-function errorContext(req: Request): ErrorContext {
-  return { method: req.method, path: new URL(req.url).pathname };
-}
-
-/** Same shape as routes.ts::guarded. */
-async function guarded(req: Request, fn: () => Promise<HttpResult>): Promise<HttpResult> {
-  try {
-    return await fn();
-  } catch (err) {
-    return mapError(err, errorContext(req));
-  }
-}
-
-/** Same rule as routes.ts::parseLimit: a present-but-invalid limit is a request error, not a silent default. */
-function parseLimit(url: URL): number | undefined {
-  const raw = url.searchParams.get("limit");
-  if (raw === null) return undefined;
-  const n = Number(raw);
-  if (!Number.isInteger(n) || n <= 0) throw new RequestShapeError(`limit must be a positive integer, got '${raw}'`);
-  return n;
-}
+import { RequestShapeError, type HttpResult } from "./errors.js";
+import { resolveActor, guarded, parseLimit } from "./routes.js";
 
 /** Same rejection rule as studio-routes.ts::parseVersion, applied to a request-body field instead of a path segment. */
 function parseVersionField(raw: unknown, label: string): number {
@@ -145,18 +119,16 @@ const MAX_ROLES = 64;
 function parseRoles(value: unknown): string[] {
   if (!Array.isArray(value)) throw new RequestShapeError("roles must be an array of strings");
   if (value.length > MAX_ROLES) throw new RequestShapeError(`roles holds at most ${MAX_ROLES} entries`);
-  const seen = new Set<string>();
-  const roles: string[] = [];
-  for (const entry of value) {
+  const roles = value.map((entry) => {
     if (typeof entry !== "string") throw new RequestShapeError("roles must be an array of strings");
     const role = entry.trim();
     if (!role) throw new RequestShapeError("a role must not be empty");
     if (role.length > MAX_ROLE_LENGTH) throw new RequestShapeError(`a role is at most ${MAX_ROLE_LENGTH} characters`);
-    if (seen.has(role)) continue;
-    seen.add(role);
-    roles.push(role);
-  }
-  return roles;
+    return role;
+  });
+  // A Set keeps first-insertion order, so this is the same array the previous
+  // seen-Set-plus-push loop produced. First occurrence wins.
+  return [...new Set(roles)];
 }
 
 /**

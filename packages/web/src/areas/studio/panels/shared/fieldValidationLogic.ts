@@ -18,7 +18,6 @@ const NUMBER_KEYS: ValidationKey[] = ["min", "max", "rule"];
 const STRING_KEYS: ValidationKey[] = ["minLength", "maxLength", "pattern", "rule"];
 const LIST_KEYS: ValidationKey[] = ["minLength", "maxLength", "rule"];
 const RULE_ONLY: ValidationKey[] = ["rule"];
-const EVERY_KEY: ValidationKey[] = ALL_KEYS;
 
 /**
  * Mirrors `checkConstraints` (`src/runtime/api.ts:503`), which branches on
@@ -28,7 +27,8 @@ const EVERY_KEY: ValidationKey[] = ALL_KEYS;
  * shape — so both offer every key rather than `rule` alone.
  */
 export function offeredKeys(type: BaseFieldType | object): ValidationKey[] {
-  if (typeof type !== "string") return EVERY_KEY; // plugin (custom) type: opaque
+  // ALL_KEYS is every key here: an opaque type fixes no JavaScript shape.
+  if (typeof type !== "string") return ALL_KEYS; // plugin (custom) type: opaque
   switch (type) {
     case "number":
       return NUMBER_KEYS;
@@ -41,7 +41,7 @@ export function offeredKeys(type: BaseFieldType | object): ValidationKey[] {
     case "multiselect":
       return LIST_KEYS;
     case "file":
-      return EVERY_KEY; // opaque, like a plugin type
+      return ALL_KEYS; // opaque, like a plugin type: every key
     case "boolean":
     case "group":
       return RULE_ONLY;

@@ -2,7 +2,8 @@
  * Process-owner routes behind `system:reports`: a process list and the three
  * views. Kept out of `routes.ts` the same way `admin-routes.ts` and
  * `studio-routes.ts` are — one file per role-scoped surface. Same
- * framework-agnostic handler shape and `guarded` wrapper.
+ * framework-agnostic handler shape, and the same `resolveActor` and `guarded`
+ * helpers, imported from `routes.ts` rather than copied.
  *
  * Every handler requires the role BEFORE resolving the process, so a caller
  * without it gets 403 for a process id that does not exist, and cannot probe
@@ -13,29 +14,10 @@ import { sql } from "../engine/store.js";
 import { listProcesses } from "../engine/definitions.js";
 import { cycleTime, bottleneck, sla, type DateRange } from "../engine/reporting.js";
 import type { ProcessId } from "../schema/definition.js";
-import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, REPORTS_ROLE } from "../auth/authorize.js";
-import { mapError, RequestShapeError, type HttpResult, type ErrorContext } from "./errors.js";
-
-/** Same credential-passthrough seam as routes.ts::resolveActor. */
-async function resolveActor(req: Request, resolver: ActorResolver): Promise<Actor> {
-  return resolver(req.headers);
-}
-
-/** Same shape as routes.ts::errorContext. */
-function errorContext(req: Request): ErrorContext {
-  return { method: req.method, path: new URL(req.url).pathname };
-}
-
-/** Same shape as routes.ts::guarded. */
-async function guarded(req: Request, fn: () => Promise<HttpResult>): Promise<HttpResult> {
-  try {
-    return await fn();
-  } catch (err) {
-    return mapError(err, errorContext(req));
-  }
-}
+import { RequestShapeError, type HttpResult } from "./errors.js";
+import { resolveActor, guarded } from "./routes.js";
 
 /**
  * Both bounds are required and must parse. The frontend computes the

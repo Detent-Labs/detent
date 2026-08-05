@@ -3,8 +3,7 @@ import { useDraft } from "../draft/store.js";
 import { t } from "../catalog.js";
 import { saveDraft, getDraft, deleteDraft, publishDraft, StudioClientError } from "../api/client.js";
 import { applySaveResult, applyReload, type DraftSaveState } from "../screens/draftSaveLogic.js";
-import { isDirty } from "../screens/publishGateLogic.js";
-import { savedBodyReducer, initialSavedBody } from "../screens/draftToolbarState.js";
+import { savedBodyReducer, initialSavedBody, isDirty } from "../screens/draftToolbarState.js";
 import { describeCaughtError } from "../errors.js";
 import type { Draft } from "../draft/types.js";
 import type { PublishResult } from "../api/types.js";
@@ -55,7 +54,7 @@ export function DraftToolbar({ processId, token, saveState, onSaveState, onDisca
     setSaving(true);
     try {
       const result = await saveDraft(processId, { body: draft, layout: saveState.layout, revision: saveState.revision }, token);
-      if (result) dispatchSavedBody({ kind: "saved", body: draft });
+      if (result) dispatchSavedBody(draft);
       onSaveState(applySaveResult(saveState, result));
       return result !== undefined;
     } finally {
@@ -100,7 +99,7 @@ export function DraftToolbar({ processId, token, saveState, onSaveState, onDisca
       // (design.md) — without this, savedBody keeps pointing at the discarded
       // local edits, so a draft byte-identical to the server's reads as dirty
       // for the rest of the session and Publish always prompts to save first.
-      dispatchSavedBody({ kind: "reloaded", body });
+      dispatchSavedBody(body);
       onSaveState(applyReload({ revision: record.revision, layout: record.layout }));
     });
 

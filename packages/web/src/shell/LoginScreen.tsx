@@ -49,13 +49,13 @@ export function LoginScreen({ locale, onLoggedIn }: LoginScreenProps) {
         <h1>{t(locale, "login.title")}</h1>
         <label>
           {t(locale, "login.email")}
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
+          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
         </label>
         <label>
           {t(locale, "login.password")}
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+          <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
         </label>
-        <button type="submit" className="btn btn-primary" disabled={loading || !email || !password}>
+        <button type="submit" className="btn btn-primary" disabled={loading}>
           {t(locale, "login.submit")}
         </button>
         {failed && <p className="shell-error">{t(locale, "login.failed")}</p>}

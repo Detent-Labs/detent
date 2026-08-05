@@ -151,3 +151,21 @@ test.skipIf(!DB)("no reporting route mutates engine state", async () => {
   for (const view of VIEWS) await fetch(req(`http://x/reporting/${P}/${view}?${RANGE}`, owner));
   expect(await snapshot()).toEqual(before);
 });
+
+/**
+ * The preflight is derived from `server.ts`'s route table, so these two
+ * routes answer without anyone adding a branch for them. While a parallel
+ * OPTIONS if-chain existed, both fell through to the 404 — the chain named
+ * every other route and never these.
+ */
+test("OPTIONS /reporting/processes answers 204 permitting GET", async () => {
+  const res = await fetch(new Request("http://x/reporting/processes", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
+});
+
+test("OPTIONS on a reporting view route answers 204 permitting GET", async () => {
+  const res = await fetch(new Request("http://x/reporting/proc_x/cycle-time", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
+});

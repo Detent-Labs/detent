@@ -38,7 +38,7 @@ import {
 import { buildGuardContext, evalFieldMap, SYSTEM_ACTOR } from "../cel/eval.js";
 import { subprocessChildId } from "./idempotency.js";
 import { instance as instanceSchema, type Instance, type InstanceEvent, type ProcessBody, type StepId } from "../schema/definition.js";
-import { appendInstanceEvent, newInstanceEventId } from "./store.js";
+import { appendInstanceEvent, newInstanceEventId, makeAssignmentUnresolvedEvent } from "./store.js";
 import type { ResolveLatestByContract } from "./definitions.js";
 import type { ResolveBody } from "./resolution.js";
 import {
@@ -59,8 +59,8 @@ async function loadInstance(db: SQL, instanceId: string): Promise<Instance | und
   return rows.length > 0 ? parseInstance(rows[0].body) : undefined;
 }
 
-/** core.spawnSubprocess handler. */
-export function makeSpawnHandler(
+/** core.spawnSubprocess handler. Registered by `registerSubprocessHandlers` below, its only caller. */
+function makeSpawnHandler(
   db: SQL,
   resolveBody: ResolveBody,
   resolveLatestByContract: ResolveLatestByContract,
@@ -138,15 +138,14 @@ export function makeSpawnHandler(
       // createInstance's own event list rather than the parent-scoped dropEvents
       // above, whose entries all carry `instanceId: parent.instanceId`.
       const childEvents: InstanceEvent[] = childResolved?.unresolved && childInitial
-        ? [{
-            id: newInstanceEventId(),
+        ? [makeAssignmentUnresolvedEvent({
             instanceId: childId as Instance["instanceId"],
             transitionSeq: 0,
             version: childVersion,
-            kind: "assignment.unresolved" as const,
-            payload: { stepId: childInitial.id, reason: childResolved.unresolved },
+            stepId: childInitial.id,
+            reason: childResolved.unresolved,
             at: droppedAt,
-          }]
+          })]
         : [];
 
       // The drop events land on the parent in the same transaction as the

@@ -86,13 +86,17 @@ Bun is the runtime, package manager, and test runner. Everything runs inside the
 dev container (`.devcontainer/`), never on the host.
 
 Bring the whole stack up with one command: `bash scripts/dev-up.sh`, or
-`pwsh scripts/dev-up.ps1` on Windows without Git Bash. It starts the
+`pwsh scripts/dev-up.ps1` on Windows. Both need Git Bash, which Git for
+Windows ships. The PowerShell path runs the same preflight script.
+
+That one command starts
+the
 containers, installs dependencies, seeds the demo processes and users, and
 starts the HTTP server. A preflight check runs last, confirming the whole
 stack answers before it prints the login. The same preflight gates every
 push: `.githooks/pre-push` runs its `core` profile first. Run either
-profile standalone with `bash scripts/preflight.sh core|serve`, or the
-`.ps1` equivalent.
+profile standalone with `bash scripts/preflight.sh core|serve`. The `.ps1`
+entry point takes the same two profiles and runs that same script.
 
 ```bash
 bun install

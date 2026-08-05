@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { savedBodyReducer, initialSavedBody } from "../src/areas/studio/screens/draftToolbarState.js";
-import { isDirty } from "../src/areas/studio/screens/publishGateLogic.js";
+import { savedBodyReducer, initialSavedBody, isDirty } from "../src/areas/studio/screens/draftToolbarState.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
 /**
@@ -37,7 +36,7 @@ describe("DraftToolbar's savedBody transition (draftToolbarState.ts)", () => {
     // The user reloads. The server's stored body may differ from both the
     // original and the local edit (someone else's concurrent save).
     const serverBody: Draft = { key: "expense-approval", label: { en: "Expense approval (someone else's)" } };
-    savedBody = savedBodyReducer(savedBody, { kind: "reloaded", body: serverBody });
+    savedBody = savedBodyReducer(savedBody, serverBody);
 
     // replace(serverBody) makes the live draft equal serverBody too — the
     // toolbar's `draft` prop reflects that same replace() call.
@@ -56,7 +55,7 @@ describe("DraftToolbar's savedBody transition (draftToolbarState.ts)", () => {
   it("reload -> edit -> publish: editing after a reload is dirty again, so the fix does not turn the gate off permanently", () => {
     const serverBody: Draft = { key: "expense-approval", label: { en: "Expense approval" } };
     let savedBody = initialSavedBody(serverBody);
-    savedBody = savedBodyReducer(savedBody, { kind: "reloaded", body: serverBody });
+    savedBody = savedBodyReducer(savedBody, serverBody);
     expect(isDirty(serverBody, savedBody)).toBe(false);
 
     const editedAfterReload: Draft = { key: "expense-approval", label: { en: "Expense approval — edited" } };
@@ -68,18 +67,43 @@ describe("DraftToolbar's savedBody transition (draftToolbarState.ts)", () => {
     let savedBody = initialSavedBody(original);
     const edited: Draft = { key: "p", description: { en: "now with a description" } };
 
-    savedBody = savedBodyReducer(savedBody, { kind: "saved", body: edited });
+    savedBody = savedBodyReducer(savedBody, edited);
 
     expect(isDirty(edited, savedBody)).toBe(false);
   });
 
   it("clones rather than aliasing, so mutating the source body afterward does not follow into savedBody", () => {
     const draft: Draft = { key: "p" };
-    const savedBody = savedBodyReducer(initialSavedBody(draft), { kind: "reloaded", body: draft });
+    const savedBody = savedBodyReducer(initialSavedBody(draft), draft);
 
     expect(savedBody).not.toBe(draft);
     (draft as { key?: string }).key = "mutated-after-the-fact";
 
     expect(savedBody.key).toBe("p");
+  });
+});
+
+/**
+ * `isDirty`'s own cases, moved here from studio-publishGateLogic.test.ts when
+ * `simplify-web-logic-modules` folded that 13-line module into this one.
+ */
+describe("isDirty", () => {
+  it("is false for the identical object", () => {
+    const body = { key: "wf", fields: [] };
+    expect(isDirty(body, body)).toBe(false);
+  });
+
+  it("is false for structurally equal but distinct objects", () => {
+    expect(isDirty({ key: "wf", fields: [] }, { key: "wf", fields: [] })).toBe(false);
+  });
+
+  it("is true when a top-level field differs", () => {
+    expect(isDirty({ key: "wf2" }, { key: "wf" })).toBe(true);
+  });
+
+  it("is true when a nested value differs", () => {
+    const a = { workflow: { steps: [{ id: "step_a" }] } };
+    const b = { workflow: { steps: [{ id: "step_b" }] } };
+    expect(isDirty(a, b)).toBe(true);
   });
 });

@@ -52,5 +52,5 @@ export type ShellKey = keyof typeof en;
 
 /** Looks up `key` in `locale`'s catalog, falling back to `en`, then the raw key. */
 export function t(locale: UiLocale, key: ShellKey): string {
-  return catalog[locale][key] ?? catalog.en[key] ?? key;
+  return catalog[locale][key];
 }

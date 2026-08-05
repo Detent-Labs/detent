@@ -91,7 +91,7 @@ export function buildGuardContext(body: ProcessBody, instance: Instance, actor: 
  * population), no `child`, no data sources — matching the authoring scope
  * `validateMigrationSpec` checks against.
  */
-export function buildTransformContext(fromBody: ProcessBody, snapshot: Instance): Record<string, unknown> {
+function buildTransformContext(fromBody: ProcessBody, snapshot: Instance): Record<string, unknown> {
   const byId = fieldKeyById(fromBody.fields);
   const data: Record<string, unknown> = {};
   for (const [fid, val] of Object.entries(snapshot.data)) {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { DB_LIST_TYPE, keyOptions, listKeyOf, unknownListKeyWarning } from "../src/areas/studio/panels/dataListKeysLogic.js";
-import { isDirty } from "../src/areas/studio/screens/publishGateLogic.js";
+import { isDirty } from "../src/areas/studio/screens/draftToolbarState.js";
 
 describe("listKeyOf", () => {
   it("reads a string listKey and treats anything else as unset", () => {

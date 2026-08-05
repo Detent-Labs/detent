@@ -350,6 +350,39 @@ export function newInstanceEventId(): InstanceEventId {
   return `evt_${crypto.randomUUID()}` as InstanceEventId;
 }
 
+/** The `assignment.unresolved` member of the `InstanceEvent` union. */
+type AssignmentUnresolved = Extract<InstanceEvent, { kind: "assignment.unresolved" }>;
+
+/**
+ * The one statement of an `assignment.unresolved` event's shape. Three sites
+ * record one — `transition.ts`'s step entry, `transition.ts`'s creation path
+ * and `subprocess.ts`'s child spawn — and each hand-built the whole seven-field
+ * literal before `dedup-server-helpers`. Only `id` and `kind` are constant
+ * across the three, and those are exactly the two a copy can drift on.
+ *
+ * Every varying field is a required argument. `instanceId` is the parent's on
+ * a step entry and the child's on a spawn; `transitionSeq` is 0 on a creation
+ * path, which does not advance it. Nothing is defaulted.
+ */
+export function makeAssignmentUnresolvedEvent(opts: {
+  instanceId: AssignmentUnresolved["instanceId"];
+  transitionSeq: AssignmentUnresolved["transitionSeq"];
+  version: AssignmentUnresolved["version"];
+  stepId: AssignmentUnresolved["payload"]["stepId"];
+  reason: AssignmentUnresolved["payload"]["reason"];
+  at: AssignmentUnresolved["at"];
+}): AssignmentUnresolved {
+  return {
+    id: newInstanceEventId(),
+    instanceId: opts.instanceId,
+    transitionSeq: opts.transitionSeq,
+    version: opts.version,
+    kind: "assignment.unresolved",
+    payload: { stepId: opts.stepId, reason: opts.reason },
+    at: opts.at,
+  };
+}
+
 /**
  * Append one runtime event. Takes the transaction handle rather than opening its
  * own: an event must land in the same commit as the state change that caused it,

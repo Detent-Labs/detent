@@ -42,6 +42,8 @@
 # no-machine-paths gate rejects.
 set -e
 
+. "$(dirname "$0")/_lib.sh"
+
 RULE=changed-markdown-prose
 LINTER="${ANTISLOP:-$HOME/AI/AntiSlop/antislop.py}"
 
@@ -152,7 +154,7 @@ while IFS="$TAB" read -r range base_path tip_path; do
 
   if [ "$tip_count" -gt "$base_count" ]; then
     if [ "$fail" -eq 0 ]; then
-      echo "pre-push: rule '$RULE' rejected this push." >&2
+      reject "$RULE"
     fi
     if [ "$base_path" = "$tip_path" ]; then
       echo "  $tip_path" >&2
@@ -175,6 +177,6 @@ if [ "$fail" -ne 0 ]; then
   echo "The gate blocks a rising count, not a non-zero one. Repair what this" >&2
   echo "push added, then commit the result:" >&2
   echo "  $PY $LINTER check <file>" >&2
-  echo "To push without the gates, pass --no-verify. That disables every gate." >&2
+  no_verify_note
   exit 1
 fi

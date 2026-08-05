@@ -1,8 +1,9 @@
 /**
  * Developer-facing draft routes behind `system:developer`. Kept out of
  * `routes.ts`, which stays the participant-facing surface — same reasoning as
- * `admin-routes.ts`. Same framework-agnostic handler shape and `guarded`
- * wrapper; each handler resolves the actor then requires `DEVELOPER_ROLE`
+ * `admin-routes.ts`. Same framework-agnostic handler shape, and the same
+ * `resolveActor` and `guarded` helpers, imported from `routes.ts` rather than
+ * copied. Each handler resolves the actor then requires `DEVELOPER_ROLE`
  * before any read or write.
  */
 import type { SQL } from "bun";
@@ -20,10 +21,10 @@ import {
 import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies.js";
 import { describeConfigSchema, type ConfigFieldDescriptor } from "../engine/config-descriptor.js";
 import type { ZodTypeAny } from "zod";
-import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, DEVELOPER_ROLE, PUBLISH_ROLE } from "../auth/authorize.js";
-import { mapError, RequestShapeError, type HttpResult, type ErrorContext } from "./errors.js";
+import { RequestShapeError, type HttpResult } from "./errors.js";
+import { resolveActor, guarded } from "./routes.js";
 import type { ProcessId, ProcessBody, MigrationSpec } from "../schema/definition.js";
 
 /** Shared by every `:version`/`:fromVersion`/`:toVersion` path segment — no existing HTTP handler parses a numeric path param, so this is the one place that convention starts. */
@@ -31,25 +32,6 @@ function parseVersion(raw: string, label: string): number {
   const n = Number(raw);
   if (!Number.isInteger(n)) throw new RequestShapeError(`${label} must be an integer`);
   return n;
-}
-
-/** Same credential-passthrough seam as routes.ts::resolveActor. */
-async function resolveActor(req: Request, resolver: ActorResolver): Promise<Actor> {
-  return resolver(req.headers);
-}
-
-/** Same shape as routes.ts::errorContext. */
-function errorContext(req: Request): ErrorContext {
-  return { method: req.method, path: new URL(req.url).pathname };
-}
-
-/** Same shape as routes.ts::guarded. */
-async function guarded(req: Request, fn: () => Promise<HttpResult>): Promise<HttpResult> {
-  try {
-    return await fn();
-  } catch (err) {
-    return mapError(err, errorContext(req));
-  }
 }
 
 export async function handleListDrafts(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {

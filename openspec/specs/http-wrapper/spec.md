@@ -422,55 +422,72 @@ cannot serve an allowed origin's response to a different origin.
 
 ### Requirement: HTTP wrapper answers CORS preflight requests
 
-The HTTP wrapper SHALL handle `OPTIONS` requests to each of its routes,
-other than `GET /livez` and `GET /readyz`, as a CORS preflight: respond
-`204 No Content` with `Access-Control-Allow-Methods` listing the route's
-actual method, `Access-Control-Allow-Headers` including `Content-Type`,
-and the `Access-Control-Allow-Origin` header determined by the configured
-allowed origins exactly as an ordinary response's is, without invoking the
-underlying Runtime API Layer operation. `GET /livez` and `GET /readyz`
-register no `OPTIONS` handler at all: an orchestrator's health probe never
-sends a preflight, and an `OPTIONS` request to either path falls through
-to the wrapper's ordinary unmatched-route response.
+The HTTP wrapper SHALL answer an `OPTIONS` request to any of its routes as a
+CORS preflight. The answer is `204 No Content`. It carries
+`Access-Control-Allow-Methods` listing the route's own methods, and
+`Access-Control-Allow-Headers` including `Content-Type`. Its
+`Access-Control-Allow-Origin` header follows the configured allowed origins,
+exactly as an ordinary response's header does. The wrapper SHALL NOT invoke
+the underlying Runtime API Layer operation.
+
+The rule covers every route the wrapper answers. That includes the four
+`/reporting/*` routes.
+
+`GET /livez`, `GET /readyz` and `GET /metrics` are the exceptions. None of
+the three registers an `OPTIONS` handler. A health probe and a metrics scrape
+send no preflight. An `OPTIONS` request to any of the three paths SHALL fall
+through to the wrapper's ordinary unmatched-route answer.
 
 A preflight from an origin the configuration does not permit SHALL still
-answer `204` and SHALL omit the origin header, rather than returning an error
-status: the browser blocks the real request on the missing header, and
-preflight handling stays uniform across every other route and every
-configuration.
+answer `204`, and SHALL omit the origin header. An error status would break
+the uniform handling every other route and every configuration share. The
+browser blocks the real request on the missing header anyway.
 
 #### Scenario: Preflighting the create-instance route
-- **WHEN** an `OPTIONS /processes/:processId/instances` request is made
-- **THEN** the response is `204` with the CORS headers, and
-  `createProcessInstance` is not invoked
+- **WHEN** a browser sends `OPTIONS /processes/:processId/instances`
+- **THEN** the response is `204` with the CORS headers
+- **AND** `createProcessInstance` never runs
 
 #### Scenario: Preflighting the get-instance-view route
-- **WHEN** an `OPTIONS /instances/:instanceId` request is made
-- **THEN** the response is `204` with the CORS headers, and
-  `getInstanceView` is not invoked
+- **WHEN** a browser sends `OPTIONS /instances/:instanceId`
+- **THEN** the response is `204` with the CORS headers
+- **AND** `getInstanceView` never runs
 
 #### Scenario: Preflighting the submit route
-- **WHEN** an `OPTIONS /instances/:instanceId/submit` request is made
-- **THEN** the response is `204` with the CORS headers, and
-  `submitAndTransition` is not invoked
+- **WHEN** a browser sends `OPTIONS /instances/:instanceId/submit`
+- **THEN** the response is `204` with the CORS headers
+- **AND** `submitAndTransition` never runs
 
-#### Scenario: A preflight from a disallowed origin is answered without the origin header
-- **WHEN** the server is configured with an allowlist and an `OPTIONS` request
-  carries an `Origin` not on it
+#### Scenario: Preflighting a reporting route
+- **WHEN** a browser sends `OPTIONS /reporting/processes` or
+  `OPTIONS /reporting/:processId/cycle-time`
+- **THEN** the response is `204` with `Access-Control-Allow-Methods: GET` and
+  the other CORS headers
+- **AND** no reporting query runs
+
+#### Scenario: A preflight from a disallowed origin omits the origin header
+- **WHEN** the configuration holds an allowlist, and a browser sends an
+  `OPTIONS` request whose `Origin` is not on it
 - **THEN** the response is `204` with `Access-Control-Allow-Methods` and
-  `Access-Control-Allow-Headers`, but no `Access-Control-Allow-Origin`
-- **AND** the underlying Runtime API Layer operation is not invoked
+  `Access-Control-Allow-Headers`, and no `Access-Control-Allow-Origin`
+- **AND** the underlying Runtime API Layer operation never runs
 
-#### Scenario: An OPTIONS request to livez is not treated as a preflight
+#### Scenario: An OPTIONS request to livez is not a preflight
 
-- **WHEN** `OPTIONS /livez` is requested
-- **THEN** the response is the wrapper's ordinary unmatched-route response,
+- **WHEN** a probe sends `OPTIONS /livez`
+- **THEN** the response is the wrapper's ordinary unmatched-route answer,
   not a `204` preflight answer
 
-#### Scenario: An OPTIONS request to readyz is not treated as a preflight
+#### Scenario: An OPTIONS request to readyz is not a preflight
 
-- **WHEN** `OPTIONS /readyz` is requested
-- **THEN** the response is the wrapper's ordinary unmatched-route response,
+- **WHEN** a probe sends `OPTIONS /readyz`
+- **THEN** the response is the wrapper's ordinary unmatched-route answer,
+  not a `204` preflight answer
+
+#### Scenario: An OPTIONS request to metrics is not a preflight
+
+- **WHEN** a scraper sends `OPTIONS /metrics`
+- **THEN** the response is the wrapper's ordinary unmatched-route answer,
   not a `204` preflight answer
 
 ### Requirement: Claim the current step of an instance over HTTP

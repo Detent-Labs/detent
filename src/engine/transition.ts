@@ -21,7 +21,7 @@
  */
 
 import type { SQL } from "bun";
-import { sql, createInstance, appendInstanceEvent, appendInstanceEvents, newInstanceEventId, withTransaction } from "./store.js";
+import { sql, createInstance, appendInstanceEvent, appendInstanceEvents, newInstanceEventId, withTransaction, makeAssignmentUnresolvedEvent } from "./store.js";
 import { idempotencyKey } from "./idempotency.js";
 import {
   SPAWN_ACTION_TYPE,
@@ -447,15 +447,14 @@ async function commitTransition(
   const events = unresolved
     ? [
         ...(overrides?.events ?? []),
-        {
-          id: newInstanceEventId(),
+        makeAssignmentUnresolvedEvent({
           instanceId: instance.instanceId,
           transitionSeq: instance.transitionSeq + 1,
           version: overrides?.entryVersion ?? instance.version,
-          kind: "assignment.unresolved" as const,
-          payload: { stepId: target.id, reason: unresolved },
+          stepId: target.id,
+          reason: unresolved,
           at: new Date().toISOString(),
-        },
+        }),
       ]
     : overrides?.events;
   const plan = planStepEntry(instance, target, body, { pathId, cause, actorId, actions, assignment, ...overrides, ...(events ? { events } : {}) });
@@ -695,15 +694,14 @@ export async function startInstance(
   // Recorded at seq 0, which creation does not advance, and inside
   // createInstance's own transaction (the `subprocess.spawn-enqueued` placement).
   const events: InstanceEvent[] = resolved?.unresolved && initial
-    ? [{
-        id: newInstanceEventId(),
+    ? [makeAssignmentUnresolvedEvent({
         instanceId: instanceId as Instance["instanceId"],
         transitionSeq: 0,
         version: opts.version,
-        kind: "assignment.unresolved" as const,
-        payload: { stepId: initial.id, reason: resolved.unresolved },
+        stepId: initial.id,
+        reason: resolved.unresolved,
         at: new Date().toISOString(),
-      }]
+      })]
     : [];
   const created = await createInstance(body, { ...opts, instanceId, assignment: resolved?.assignment, events }, db);
   return resolveAutomatic(created, body, actor, db, assignmentRegistry);

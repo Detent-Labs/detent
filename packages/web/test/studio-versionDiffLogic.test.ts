@@ -3,33 +3,31 @@ import { readFileSync } from "node:fs";
 import { type ProcessBody } from "workflow-engine/schema";
 import { compileProcessBody } from "workflow-engine/schema/compile";
 import { stripCompiledContent } from "workflow-engine/schema/strip-compiled";
-import { selectVersion, canDiff, diffJson } from "../src/areas/studio/screens/versionDiffLogic.js";
+import { canDiff, diffJson } from "../src/areas/studio/screens/versionDiffLogic.js";
 
-describe("selectVersion / canDiff", () => {
+// `VersionsScreen.tsx` builds the selection with a plain spread,
+// `setSelection((s) => ({ ...s, a: v.version }))`. These cases build the same
+// shapes directly; `selectVersion` wrapped that one spread until
+// `simplify-web-logic-modules`.
+describe("canDiff", () => {
   it("starts with neither side chosen", () => {
     expect(canDiff({})).toBe(false);
   });
 
   it("is not diffable with only one side chosen", () => {
-    expect(canDiff(selectVersion({}, "a", 1))).toBe(false);
+    expect(canDiff({ a: 1 })).toBe(false);
   });
 
   it("is not diffable when both sides are the same version", () => {
-    let s = selectVersion({}, "a", 2);
-    s = selectVersion(s, "b", 2);
-    expect(canDiff(s)).toBe(false);
+    expect(canDiff({ a: 2, b: 2 })).toBe(false);
   });
 
   it("is diffable once both sides are chosen and distinct", () => {
-    let s = selectVersion({}, "a", 1);
-    s = selectVersion(s, "b", 2);
-    expect(canDiff(s)).toBe(true);
+    expect(canDiff({ a: 1, b: 2 })).toBe(true);
   });
 
   it("re-selecting a side replaces it", () => {
-    let s = selectVersion({}, "a", 1);
-    s = selectVersion(s, "a", 3);
-    expect(s).toEqual({ a: 3 });
+    expect({ ...{ a: 1 }, a: 3 }).toEqual({ a: 3 });
   });
 });
 
