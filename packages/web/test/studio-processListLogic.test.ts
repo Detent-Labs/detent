@@ -1,6 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import { authoredProcessBody } from "workflow-engine/schema";
-import { deriveProcessRows, seedVersionFor, seededDraftInput } from "../src/areas/studio/screens/processListLogic.js";
+import {
+  deriveProcessRows,
+  seedVersionFor,
+  seededDraftInput,
+  templateDraftInput,
+  templateDisplayName,
+} from "../src/areas/studio/screens/processListLogic.js";
 import type { DraftSummary, ProcessSummary } from "../src/areas/studio/api/types.js";
 
 const published: ProcessSummary = {
@@ -145,5 +151,58 @@ describe("seededDraftInput", () => {
       caught = e;
     }
     expect((caught as Error).message).toBe("read failed");
+  });
+});
+
+describe("templateDraftInput", () => {
+  const template = { body: { key: "wf", label: { en: "Approval" }, baseLocale: "en" }, layout: { step_a: { x: 4, y: 8 } } };
+
+  it("carries the template's body and layout through unchanged", async () => {
+    const input = await templateDraftInput("approval", async (key) => (expect(key).toBe("approval"), template));
+    expect(input.body).toEqual(template.body);
+    expect(input.layout).toEqual(template.layout);
+    expect(input.revision).toBe(0);
+  });
+
+  // A template is no published version of the new process, so stamping one
+  // would offer the Versions screen a diff against an unrelated body — and the
+  // write path rejects an unresolvable baseVersion anyway.
+  it("claims no base version", async () => {
+    const input = await templateDraftInput("approval", async () => template);
+    expect(input.baseVersion).toBeUndefined();
+  });
+
+  it("propagates a failed read so the caller writes nothing", async () => {
+    let caught: unknown;
+    try {
+      await templateDraftInput("approval", async () => {
+        throw new Error("read failed");
+      });
+    } catch (e) {
+      caught = e;
+    }
+    expect((caught as Error).message).toBe("read failed");
+  });
+});
+
+describe("templateDisplayName", () => {
+  it("prefers the displayed locale", () => {
+    expect(templateDisplayName({ en: "Approval", de: "Freigabe" }, "de", "approval")).toBe("Freigabe");
+  });
+
+  it("falls back to another locale rather than to the key", () => {
+    expect(templateDisplayName({ en: "Approval" }, "de", "approval")).toBe("Approval");
+  });
+
+  // The store checks the envelope only, so a template may declare no label at
+  // all. A nameless row is worse than a keyed one.
+  it("falls back to the key for a body declaring no label", () => {
+    expect(templateDisplayName(null, "en", "approval")).toBe("approval");
+    expect(templateDisplayName(undefined, "en", "approval")).toBe("approval");
+    expect(templateDisplayName({}, "en", "approval")).toBe("approval");
+  });
+
+  it("skips an empty string rather than rendering a blank name", () => {
+    expect(templateDisplayName({ en: "" }, "de", "approval")).toBe("approval");
   });
 });

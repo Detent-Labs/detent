@@ -22,6 +22,8 @@ export const DEVELOPER_ROLE = "system:developer";
 export const REPORTS_ROLE = "system:reports";
 /** Required to write a data list (`/admin/data-lists/*`); reads also accept `DEVELOPER_ROLE`, so the studio can offer the existing keys. Implies nothing else: staff who maintain cost centres must not gain the power to cancel instances. */
 export const DATALISTS_ROLE = "system:datalists";
+/** Required to write a process template (`PUT`/`DELETE /templates/:key`); reads also accept `DEVELOPER_ROLE`, so every author can seed a process from one. Implies nothing else: staff who curate templates must not gain the power to publish a process. */
+export const TEMPLATES_ROLE = "system:templates";
 
 /** The resolved Actor lacks a role an operation requires. Distinct from ActorResolutionError (no valid identity at all). */
 export class AuthorizationError extends Error {

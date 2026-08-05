@@ -82,6 +82,10 @@ import {
   handlePutMigrationPlan,
   handleGetOrphanKeys,
   handleGetRegistry,
+  handleListTemplates,
+  handleGetTemplate,
+  handleSaveTemplate,
+  handleDeleteTemplate,
 } from "./studio-routes.js";
 import { handleLivez, handleReadyz } from "./health.js";
 import { handleMetrics } from "./metrics.js";
@@ -401,6 +405,14 @@ export function createServer(
       handler: (p, req) => handlePutMigrationPlan(p[0]!, p[1]!, p[2]!, req, resolver, db) },
     { method: "GET", segments: seg("/registry"),
       handler: (_p, req) => handleGetRegistry(req, resolver, registry, dataSourceRegistry, assignmentRegistry) },
+    { method: "GET", segments: seg("/templates"),
+      handler: (_p, req) => handleListTemplates(req, resolver, db) },
+    { method: "GET", segments: seg("/templates/:templateKey"),
+      handler: (p, req) => handleGetTemplate(p[0]!, req, resolver, db) },
+    { method: "PUT", segments: seg("/templates/:templateKey"),
+      handler: (p, req) => handleSaveTemplate(p[0]!, req, resolver, db) },
+    { method: "DELETE", segments: seg("/templates/:templateKey"),
+      handler: (p, req) => handleDeleteTemplate(p[0]!, req, resolver, db) },
   ];
 
   return async (req: Request): Promise<Response> => {

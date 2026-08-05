@@ -55,8 +55,10 @@ context: |
   a canvas-primary edit screen (drag-to-move, drag-to-connect) with the
   structural panels as inspector and a replacing JSON surface, publish,
   published versions with a JSON diff, migration-plan authoring, a
-  registry/CEL-scratchpad Tools screen, and a Player beside the merged
-  instance record; gated by `system:developer`. The admin area is the
+  registry/CEL-scratchpad Tools screen, a Player beside the merged
+  instance record, and a Templates screen holding the reusable bodies a new
+  process seeds from; gated by `system:developer` or, for the Templates screen
+  alone, `system:templates`. The admin area is the
   operator's product — all-instances list, merged transition/event record
   with cancel, outbox with dead-letter retry/discard, pending timers, user
   administration, data list maintenance; gated by `system:admin` or, for the
@@ -80,7 +82,8 @@ context: |
   `src/http/studio-routes.ts`; JWT/local-account auth (`jwt-authentication`,
   `local-user-accounts`) and role-gated operations (`authorization`:
   `system:publish`, `system:cancel-any`, `system:admin`, `system:developer`,
-  `system:reports`, `system:datalists` — six flat roles, none implying another)
+  `system:reports`, `system:datalists`, `system:templates` — seven flat roles,
+  none implying another)
   sit in front of it. Actions, data sources and assignment strategies are
   plugins behind `{ type, config }`, each resolved and config-checked at
   publish against its own registry in `src/engine/registry.ts`. All of this is built — nothing here is still "post-v1

@@ -128,3 +128,27 @@ export interface InstanceRecordPage {
  * the engine raises carries both fields. A Zod issue names its path `path`
  * instead, normalized on arrival.
  */
+
+/**
+ * Mirrors src/engine/templates.ts::TemplateSummary. The list route projects
+ * `label` and `description` out of the stored body and carries no body: a body
+ * may reach the envelope bound, so a list of every body would answer the picker
+ * with megabytes it never reads. Both are `null` for a body that declares
+ * neither, which a template is allowed to do.
+ */
+export interface TemplateSummary {
+  templateKey: string;
+  label: LocalizedText | null;
+  description: LocalizedText | null;
+  createdBy: string;
+  updatedAt: string;
+}
+
+/** Mirrors src/engine/templates.ts::Template. `body`/`layout` are opaque, as a draft's are. */
+export interface TemplateRecord {
+  templateKey: string;
+  body: unknown;
+  layout: Record<string, unknown>;
+  createdBy: string;
+  updatedAt: string;
+}

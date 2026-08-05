@@ -9,6 +9,7 @@
 import type { SQL } from "bun";
 import { sql, withTransaction } from "../engine/store.js";
 import { getDraft, saveDraft, listDrafts, deleteDraft, markDraftPublished } from "../engine/drafts.js";
+import { getTemplate, listTemplates, saveTemplate, deleteTemplate } from "../engine/templates.js";
 import { publishBody, createDefinitionStore } from "../engine/definitions.js";
 import { registerMigrationPlan, resolveMigrationPlan, findOrphanKeys } from "../engine/migration.js";
 import {
@@ -22,7 +23,7 @@ import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies
 import { describeConfigSchema, type ConfigFieldDescriptor } from "../engine/config-descriptor.js";
 import type { ZodTypeAny } from "zod";
 import type { ActorResolver } from "../auth/resolve.js";
-import { requireRole, DEVELOPER_ROLE, PUBLISH_ROLE } from "../auth/authorize.js";
+import { requireRole, AuthorizationError, DEVELOPER_ROLE, PUBLISH_ROLE, TEMPLATES_ROLE } from "../auth/authorize.js";
 import { RequestShapeError, type HttpResult } from "./errors.js";
 import { resolveActor, guarded } from "./routes.js";
 import type { ProcessId, ProcessBody, MigrationSpec } from "../schema/definition.js";
@@ -32,6 +33,20 @@ function parseVersion(raw: string, label: string): number {
   const n = Number(raw);
   if (!Number.isInteger(n)) throw new RequestShapeError(`${label} must be an integer`);
   return n;
+}
+
+/**
+ * Either studio role admits. Three reads take it: the two template reads, and
+ * the published version body a curator creates a template from. Writing a
+ * template still needs `TEMPLATES_ROLE` alone, and every other studio route
+ * still needs `DEVELOPER_ROLE` alone.
+ *
+ * Not a general `requireAnyRole`: this names one specific pair, so a later
+ * route cannot reach for it and quietly widen itself.
+ */
+function requireEitherStudioRole(actor: { id: string; roles: readonly string[] }): void {
+  if (actor.roles.includes(TEMPLATES_ROLE) || actor.roles.includes(DEVELOPER_ROLE)) return;
+  throw new AuthorizationError(`actor '${actor.id}' lacks required role '${TEMPLATES_ROLE}' or '${DEVELOPER_ROLE}'`);
 }
 
 export async function handleListDrafts(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
@@ -125,11 +140,20 @@ export async function handlePublishDraft(
   });
 }
 
-/** The compiled body `resolveBody` already resolves for engine use — unlike the metadata-only sibling `GET /processes/:processId/versions`, this requires `DEVELOPER_ROLE`. */
+/**
+ * The compiled body `resolveBody` already resolves for engine use, unlike the
+ * metadata-only sibling `GET /processes/:processId/versions`.
+ *
+ * Either studio role admits. A curator creates a template from a published
+ * version, so refusing the body would leave the role able to write a template
+ * and unable to obtain one — a browser walk caught exactly that. A published
+ * body is the one every participant already runs, so it is the safe half of
+ * the pair to widen. A draft stays closed to the curator.
+ */
 export async function handleGetVersionBody(processId: string, versionRaw: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
-    requireRole(actor, DEVELOPER_ROLE);
+    requireEitherStudioRole(actor);
     const version = parseVersion(versionRaw, "version");
     const body = await createDefinitionStore(db).resolveBody(processId as ProcessId, version);
     if (!body) return { status: 404, body: { error: { type: "not-found", message: `no published version ${version} for ${processId}` } } };
@@ -240,5 +264,48 @@ export async function handleGetRegistry(
         assignmentStrategySchemas: describeRegistry(assignmentRegistry),
       },
     };
+  });
+}
+
+export async function handleListTemplates(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    requireEitherStudioRole(actor);
+    return { status: 200, body: await listTemplates(db) };
+  });
+}
+
+export async function handleGetTemplate(templateKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    requireEitherStudioRole(actor);
+    const template = await getTemplate(templateKey, db);
+    if (!template) return { status: 404, body: { error: { type: "not-found", message: `no template: ${templateKey}` } } };
+    return { status: 200, body: template };
+  });
+}
+
+export async function handleSaveTemplate(templateKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    requireRole(actor, TEMPLATES_ROLE);
+    let parsed: { body?: unknown; layout?: unknown };
+    try {
+      parsed = (await req.json()) as { body?: unknown; layout?: unknown };
+    } catch {
+      throw new RequestShapeError("request body is not valid JSON");
+    }
+    const saved = await saveTemplate(templateKey, { body: parsed.body, layout: parsed.layout, createdBy: actor.id }, db);
+    return { status: 200, body: saved };
+  });
+}
+
+export async function handleDeleteTemplate(templateKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    requireRole(actor, TEMPLATES_ROLE);
+    const removed = await deleteTemplate(templateKey, db);
+    if (!removed) return { status: 404, body: { error: { type: "not-found", message: `no template: ${templateKey}` } } };
+    return { status: 204, body: null };
   });
 }

@@ -249,9 +249,19 @@ changeable. Nothing you do to a draft affects a running process.
 
 ### 1. Open a draft
 
-Studio lists your processes. Open one, or start a new one. The draft toolbar
-along the top carries **Save**, **Discard draft** and **Publish**. It also
-tells you whether you have unsaved changes.
+Studio lists your processes. Open one, or start a new one.
+
+**+ New process** asks what to start from. **Empty process** gives you a blank
+draft. A template gives you a prepared body to change. A template is a
+snapshot taken when somebody created it. Editing the template later changes
+nothing you already started from it.
+
+Your installation may list no template. Somebody holding `system:templates`
+creates them on Studio's **Templates** screen, from a published version of a
+process.
+
+The draft toolbar along the top carries **Save**, **Discard draft** and
+**Publish**. It also tells you whether you have unsaved changes.
 
 The screen has two tabs, **Structure** and **JSON**. Structure is the panels
 described below. JSON is the same draft as raw text, which helps when you want

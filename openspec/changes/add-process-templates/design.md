@@ -70,6 +70,11 @@ reach it.
 Without it, a seeded process opens as a stack of boxes at the origin. `drafts`
 already holds `layout` beside `body` for that reason.
 
+The column stays empty for now. A template comes from a published version,
+and a published version carries no layout. Layout lives on the draft, outside
+the hashed body. The column costs one `jsonb` default. It saves a migration
+if a later source carries one.
+
 ### No label column
 
 `ProcessBody` already declares `label` and `description` as `LocalizedText`.
@@ -95,7 +100,7 @@ A revision column would cost a conflict path nobody reaches.
 
 The browser reads `GET /templates/:key` and sends the body to the existing
 `PUT /drafts/:processId` with `revision: 0`. That call already creates a
-draft. The engine's new surface is the template CRUD alone.
+draft. The engine gains the template CRUD alone.
 
 The alternative was a `POST /drafts/from-template/:key` route doing the copy
 server-side. It would duplicate what the draft write route already does. It
@@ -112,6 +117,25 @@ Two reuses of an existing role lost. `system:publish` is defensible, because
 publishing already puts a process in front of every participant. It loses
 because a curator would then also publish. `system:developer` loses because
 every author would then curate. That leaves no curation at all.
+
+### One source, after a browser walk refuted two
+
+A curator creates a template from a published version, and from nothing else.
+
+The first draft of this design offered two sources: a process draft and a
+published version. A browser walk refuted it. `GET /drafts` and
+`GET /processes/:id/versions/:version` both needed `DEVELOPER_ROLE`. A curator
+holding `system:templates` alone could therefore write a template and get no
+body to write. The role contradicted itself, and 1877 passing tests did not
+show it.
+
+Only the published half opens. `GET /processes/:id/versions/:version` accepts
+either studio role. A published body is the one every participant already
+runs. A draft stays closed. It holds unfinished, private work. That keeps
+the "a curator reaches no draft" requirement intact.
+
+The alternative was opening drafts too. That hands a curator every unfinished
+body in the installation, to gain a source the published one already covers.
 
 ### The studio area gains a per-screen gate
 

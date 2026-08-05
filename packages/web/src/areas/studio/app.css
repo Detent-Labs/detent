@@ -682,3 +682,12 @@
 .field-validation-row {
   padding: var(--space-1) 0;
 }
+
+/* The start picker's choices: one button per way to begin a process, stacked so
+   a long template name wraps rather than squeezing its neighbours. */
+.studio-dialog-choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}

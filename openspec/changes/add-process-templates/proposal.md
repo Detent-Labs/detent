@@ -31,8 +31,9 @@ process is the gap this change closes.
   `packages/web/src/areas/studio/routing.ts` puts the six existing screens on
   `system:developer` and the templates screen on `system:templates`. Without
   it, the widened area entry would open every studio screen to a curator.
-- A new studio screen lists templates, creates one from the current draft or
-  from a published version, and deletes one.
+- A new studio screen lists templates, creates one from a published version,
+  and deletes one. A draft is deliberately not a source, since the curating
+  role cannot read one.
 - `+ New process` opens a picker offering an empty process or a template. The
   empty branch keeps today's `{ baseLocale: "en" }` seed.
 - `UsersScreen.tsx:26` lists `system:templates` among the reserved roles its
@@ -79,8 +80,9 @@ the reserved role list in `openspec/config.yaml`'s `context:` block.
 Browser: `packages/web/src/shell/areas.ts`,
 `packages/web/src/areas/studio/routing.ts`,
 `packages/web/src/areas/studio/root.tsx`, a new screen under
-`packages/web/src/areas/studio/screens/`, the process list screen, the studio
-API client, and `packages/web/src/areas/admin/screens/UsersScreen.tsx`.
+`packages/web/src/areas/studio/screens/`, the process list screen,
+`packages/web/src/areas/studio/api/client.ts`, and
+`packages/web/src/areas/admin/screens/UsersScreen.tsx`.
 
 Untouched: `src/schema/definition.ts` and every rule it carries. A template
 holds an ordinary authored body, so `definitionHash`, version immutability and

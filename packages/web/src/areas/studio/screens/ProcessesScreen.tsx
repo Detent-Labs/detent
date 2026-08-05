@@ -1,7 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Upload } from "lucide-react";
-import { listProcesses, listDrafts, saveDraft, deleteDraft, getVersionBody, publishProcess, StudioClientError } from "../api/client.js";
-import { deriveProcessRows, seedVersionFor, seededDraftInput, type ProcessRow } from "./processListLogic.js";
+import {
+  listProcesses,
+  listDrafts,
+  saveDraft,
+  deleteDraft,
+  getVersionBody,
+  publishProcess,
+  listTemplates,
+  getTemplate,
+  StudioClientError,
+} from "../api/client.js";
+import {
+  deriveProcessRows,
+  seedVersionFor,
+  seededDraftInput,
+  templateDraftInput,
+  templateDisplayName,
+  type ProcessRow,
+} from "./processListLogic.js";
+import type { TemplateSummary } from "../api/types.js";
 import { collidingProcessId, parsePromotionFile, type PromotionPreview } from "./promotionImportLogic.js";
 import { mintId } from "../draft/ids.js";
 import type { Route } from "../routing.js";
@@ -90,6 +108,50 @@ function PromotionPreviewDialog({ preview, collision, error, busy, onCancel, onC
   );
 }
 
+/** `seededDraftInput` with no seed version never calls its reader; this names that rather than passing a reader that could run. */
+const noSeedToRead = (): Promise<never> => Promise.reject(new Error("no seed version to read"));
+
+interface StartPickerDialogProps {
+  templates: TemplateSummary[];
+  onCancel: () => void;
+  onPick: (templateKey: string | undefined) => void;
+}
+
+/**
+ * What `+ New process` opens. The same native `<dialog>` treatment
+ * `PromotionPreviewDialog` takes, so the focus trap, Escape and the backdrop
+ * come from the platform rather than from hand-rolled code.
+ *
+ * The empty choice leads first and stays available when no template exists —
+ * an installation starts with none, and the picker must not be a dead end.
+ */
+function StartPickerDialog({ templates, onCancel, onPick }: StartPickerDialogProps) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => ref.current?.showModal(), []);
+
+  return (
+    <dialog ref={ref} className="studio-dialog" aria-labelledby="start-picker-heading" onCancel={onCancel}>
+      <h2 id="start-picker-heading">Start a new process</h2>
+      <div className="studio-dialog-choices">
+        <button type="button" className="btn btn-primary" onClick={() => onPick(undefined)}>
+          Empty process
+        </button>
+        {templates.map((template) => (
+          <button key={template.templateKey} type="button" className="btn btn-secondary" onClick={() => onPick(template.templateKey)}>
+            {templateDisplayName(template.label, "en", template.templateKey)}
+          </button>
+        ))}
+      </div>
+      {templates.length === 0 && <p className="studio-empty">No templates exist yet. A curator creates them on the Templates screen.</p>}
+      <div className="studio-controls">
+        <button type="button" className="btn btn-ghost" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </dialog>
+  );
+}
+
 export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesScreenProps) {
   const [rows, setRows] = useState<ProcessRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -101,6 +163,10 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
   const [importError, setImportError] = useState<string | undefined>(undefined);
   const [importResult, setImportResult] = useState<string | undefined>(undefined);
   const fileInput = useRef<HTMLInputElement>(null);
+  // The start picker's own state. `templates` is undefined until the picker opens,
+  // so the list screen issues no template request an author may never need.
+  const [picking, setPicking] = useState(false);
+  const [templates, setTemplates] = useState<TemplateSummary[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -137,7 +203,45 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
     }
   };
 
-  const newProcess = () => void createDraft(mintId("process"));
+  /**
+   * `+ New process` opens the picker rather than minting straight away. The
+   * template list is read here, not on mount: an author who always starts empty
+   * never pays for it. A failed read still opens the picker, with the empty
+   * choice, since starting empty must not depend on the template route.
+   */
+  const newProcess = async () => {
+    setError(undefined);
+    try {
+      setTemplates(await listTemplates(token));
+    } catch (err) {
+      if (err instanceof StudioClientError && err.status === 401) return onUnauthorized();
+      setTemplates([]);
+      setError(describeCaughtError(err));
+    }
+    setPicking(true);
+  };
+
+  /**
+   * Both branches mint the process id here and write one draft, so a template
+   * start is the same single round trip an empty start already was.
+   * `templateDraftInput` throws when the template cannot be read, so no empty
+   * draft lands in place of the template the author picked.
+   */
+  const startProcess = async (templateKey: string | undefined) => {
+    setPicking(false);
+    const processId = mintId("process");
+    try {
+      const input =
+        templateKey === undefined
+          ? await seededDraftInput(undefined, noSeedToRead)
+          : await templateDraftInput(templateKey, (key) => getTemplate(key, token));
+      await saveDraft(processId, input, token);
+      navigate({ name: "edit", processId });
+    } catch (err) {
+      if (err instanceof StudioClientError && err.status === 401) onUnauthorized();
+      else setError(describeCaughtError(err));
+    }
+  };
 
   /**
    * Reads a chosen promotion file and, when it passes the shape guard, opens
@@ -214,8 +318,9 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
 
   return (
     <main className="studio-screen">
+      {picking && <StartPickerDialog templates={templates} onCancel={() => setPicking(false)} onPick={(key) => void startProcess(key)} />}
       <div className="studio-controls">
-        <button type="button" className="btn btn-primary" onClick={newProcess}>
+        <button type="button" className="btn btn-primary" onClick={() => void newProcess()}>
           + New process
         </button>
         <label className="studio-file-label" htmlFor="promotion-import">

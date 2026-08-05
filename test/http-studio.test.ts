@@ -12,7 +12,7 @@ import { createDefinitionStore } from "../src/engine/definitions.js";
 import { migrateInstances } from "../src/engine/migration.js";
 import { createServer } from "../src/http/server.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
-import { DEVELOPER_ROLE, PUBLISH_ROLE } from "../src/auth/authorize.js";
+import { DEVELOPER_ROLE, PUBLISH_ROLE, TEMPLATES_ROLE, ADMIN_ROLE, REPORTS_ROLE } from "../src/auth/authorize.js";
 import type { Actor } from "../src/cel/eval.js";
 import type { ProcessId } from "../src/schema/definition.js";
 
@@ -24,13 +24,14 @@ const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
 beforeAll(initDb);
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE drafts, outbox, instances, history_entries, instance_events, definitions, migration_plans`;
+  if (DB) await sql`TRUNCATE drafts, templates, outbox, instances, history_entries, instance_events, definitions, migration_plans`;
 });
 
 const developer: Actor = { id: "user_dev", roles: [DEVELOPER_ROLE] };
 const bystander: Actor = { id: "user_bystander", roles: [] };
 const publisher: Actor = { id: "user_publisher", roles: [DEVELOPER_ROLE, PUBLISH_ROLE] };
 const publishOnly: Actor = { id: "user_publish_only", roles: [PUBLISH_ROLE] };
+const curator: Actor = { id: "user_curator", roles: [TEMPLATES_ROLE] };
 
 let n = 0;
 const pid = () => `proc_http_studio_${++n}`;
@@ -559,6 +560,121 @@ test.skipIf(!DB)("a PUT with an unresolvable baseVersion maps to 400", async () 
   const res = await fetch(
     authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: authoredBody("v1"), layout: {}, revision: 0, baseVersion: 9 }),
   );
+  expect(res.status).toBe(400);
+  expect(((await res.json()) as { error: { type: string } }).error.type).toBe("request-shape");
+});
+
+// ============================================================
+// /templates: the read asymmetry, the write gate, and the blast radius of the
+// curating role (process-templates capability)
+// ============================================================
+
+const templateBody = (label: string) => ({ ...authoredBody(label), description: { en: `${label} description` } });
+
+test.skipIf(!DB)("a curator writes a template and reads it back", async () => {
+  const put = await fetch(authedReq("http://x/templates/approval", "PUT", curator, { body: templateBody("Approval"), layout: {} }));
+  expect(put.status).toBe(200);
+
+  const get = await fetch(authedReq("http://x/templates/approval", "GET", curator));
+  expect(get.status).toBe(200);
+  expect(((await get.json()) as { body: { label: { en: string } } }).body.label.en).toBe("Approval");
+});
+
+test.skipIf(!DB)("a developer reads templates but writes none", async () => {
+  await fetch(authedReq("http://x/templates/approval", "PUT", curator, { body: templateBody("Approval"), layout: {} }));
+
+  const list = await fetch(authedReq("http://x/templates", "GET", developer));
+  expect(list.status).toBe(200);
+  const rows = (await list.json()) as { templateKey: string; label: { en: string } }[];
+  expect(rows).toHaveLength(1);
+  expect(rows[0]!.label.en).toBe("Approval");
+  // The list projects a label and carries no body: a body may reach the envelope bound.
+  expect(rows[0]).not.toHaveProperty("body");
+
+  const write = await fetch(authedReq("http://x/templates/other", "PUT", developer, { body: templateBody("Other"), layout: {} }));
+  expect(write.status).toBe(403);
+  const del = await fetch(authedReq("http://x/templates/approval", "DELETE", developer));
+  expect(del.status).toBe(403);
+});
+
+test.skipIf(!DB)("an actor holding neither role reaches no template route", async () => {
+  for (const [url, method] of [
+    ["http://x/templates", "GET"],
+    ["http://x/templates/approval", "GET"],
+    ["http://x/templates/approval", "PUT"],
+    ["http://x/templates/approval", "DELETE"],
+  ] as const) {
+    const body = method === "PUT" ? { body: templateBody("x"), layout: {} } : undefined;
+    const res = await fetch(authedReq(url, method, bystander, body));
+    expect(res.status).toBe(403);
+  }
+});
+
+test.skipIf(!DB)("a request with no credential reaches no template route", async () => {
+  const res = await fetch(new Request("http://x/templates", { method: "GET" }));
+  expect(res.status).toBe(401);
+});
+
+test.skipIf(!DB)("a curator reads a published version's body, the one source a template comes from", async () => {
+  const processId = pid();
+  const published = await fetch(
+    authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("Seedable"), layout: {}, revision: 0 }),
+  );
+  expect(published.status).toBe(200);
+  expect((await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher))).status).toBe(200);
+
+  const res = await fetch(authedReq(`http://x/processes/${processId}/versions/1`, "GET", curator));
+  expect(res.status).toBe(200);
+  expect(((await res.json()) as { label: { en: string } }).label.en).toBe("Seedable");
+});
+
+test.skipIf(!DB)("a curator reaches no draft, no publish, no admin route and no reporting route", async () => {
+  const processId = pid();
+  expect((await fetch(authedReq("http://x/drafts", "GET", curator))).status).toBe(403);
+  expect((await fetch(authedReq(`http://x/drafts/${processId}`, "GET", curator))).status).toBe(403);
+  expect(
+    (await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", curator, { body: authoredBody("v1"), layout: {}, revision: 0 })))
+      .status,
+  ).toBe(403);
+  expect((await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", curator))).status).toBe(403);
+  expect((await fetch(authedReq("http://x/registry", "GET", curator))).status).toBe(403);
+  expect((await fetch(authedReq("http://x/admin/outbox", "GET", curator))).status).toBe(403);
+  expect((await fetch(authedReq("http://x/reporting/processes", "GET", curator))).status).toBe(403);
+});
+
+test.skipIf(!DB)("neither the admin nor the reports role reaches a template write", async () => {
+  for (const actor of [
+    { id: "user_admin", roles: [ADMIN_ROLE] },
+    { id: "user_reports", roles: [REPORTS_ROLE] },
+  ] as Actor[]) {
+    const res = await fetch(authedReq("http://x/templates/approval", "PUT", actor, { body: templateBody("x"), layout: {} }));
+    expect(res.status).toBe(403);
+  }
+});
+
+test.skipIf(!DB)("a GET for an unknown template maps to 404", async () => {
+  const res = await fetch(authedReq("http://x/templates/absent", "GET", curator));
+  expect(res.status).toBe(404);
+  expect(((await res.json()) as { error: { type: string } }).error.type).toBe("not-found");
+});
+
+test.skipIf(!DB)("a DELETE removes the template and a second one maps to 404", async () => {
+  await fetch(authedReq("http://x/templates/approval", "PUT", curator, { body: templateBody("Approval"), layout: {} }));
+  expect((await fetch(authedReq("http://x/templates/approval", "DELETE", curator))).status).toBe(204);
+  expect((await fetch(authedReq("http://x/templates/approval", "DELETE", curator))).status).toBe(404);
+});
+
+test.skipIf(!DB)("a PUT with a non-object body maps to 400 and writes nothing", async () => {
+  const res = await fetch(authedReq("http://x/templates/approval", "PUT", curator, { body: [1, 2], layout: {} }));
+  expect(res.status).toBe(400);
+  expect(((await res.json()) as { error: { type: string } }).error.type).toBe("request-shape");
+
+  const rows = (await sql`SELECT 1 FROM templates WHERE template_key = 'approval'`) as unknown[];
+  expect(rows.length).toBe(0);
+});
+
+test.skipIf(!DB)("a PUT under a key outside the slug grammar maps to 400", async () => {
+  const res = await fetch(authedReq("http://x/templates/Not%20A%20Slug", "PUT", curator, { body: templateBody("x"), layout: {} }));
   expect(res.status).toBe(400);
   expect(((await res.json()) as { error: { type: string } }).error.type).toBe("request-shape");
 });

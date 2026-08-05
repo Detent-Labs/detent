@@ -99,7 +99,9 @@ function isJsonObject(v: unknown): v is Record<string, unknown> {
 // (src/http/server.ts), which covers a draft save arriving over HTTP — but
 // drafts.ts is a module boundary in its own right, so this bound exists to
 // hold for a caller that does not arrive over HTTP too.
-const MAX_DRAFT_ENVELOPE_BYTES = 8 * 1024 * 1024; // 8 MiB
+// Exported for templates.ts: a template seeds a draft, so one bound covers both
+// and a body cannot be legal as one and oversized as the other.
+export const MAX_DRAFT_ENVELOPE_BYTES = 8 * 1024 * 1024; // 8 MiB
 
 function checkEnvelope(input: SaveDraftInput): void {
   if (!isJsonObject(input.body)) {

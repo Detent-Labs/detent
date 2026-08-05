@@ -317,6 +317,22 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (list_key, value)
   )`;
+  // Process templates: a reusable authored body a new process seeds from. Its
+  // own table for the reason `drafts` has one — a template body in `definitions`
+  // would make every read site of that table responsible for excluding it, and
+  // a missed one puts a template in the participant's start list. No `version`
+  // and no `definition_hash`: a template is never published and no instance
+  // pins one, so nothing here reaches the audit backbone. `layout` travels
+  // beside `body` so a seeded process opens with its boxes placed. No `label`
+  // column either — the body already declares `label` and `description`, and
+  // the list route projects them out of it.
+  await db`CREATE TABLE IF NOT EXISTS templates (
+    template_key text PRIMARY KEY,
+    body         jsonb NOT NULL,
+    layout       jsonb NOT NULL DEFAULT '{}',
+    created_by   text NOT NULL,
+    updated_at   timestamptz NOT NULL DEFAULT now()
+  )`;
 }
 
 /**

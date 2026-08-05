@@ -7,10 +7,13 @@ template, labelled by the `label` the stored body declares. A body may declare
 no label for the active content locale. The row SHALL then fall back to the
 template key, so no row renders nameless.
 
-The screen SHALL create a template from the current draft of a process. It
-SHALL also create one from a published version. The published path SHALL
-strip the compile pass's cancel-sink injection, because a template holds the
-authored shape.
+The screen SHALL create a template from a published version of a process, and
+from no other source. That path SHALL strip the compile pass's cancel-sink
+injection, because a template holds the authored shape.
+
+A draft SHALL NOT be a source. `system:templates` cannot read one. Opening
+drafts to a curator would hand them every unfinished body in the
+installation.
 
 The screen SHALL delete a template behind a confirmation. A delete SHALL
 leave every process untouched.
@@ -19,9 +22,9 @@ The screen SHALL need `system:templates`. An actor holding only
 `system:developer` SHALL NOT reach it. That actor still reads the templates
 through the picker.
 
-#### Scenario: A template made from a draft appears in the list
+#### Scenario: A template made from a published version appears in the list
 
-- **WHEN** a curator creates a template from a process draft
+- **WHEN** a curator creates a template from a published version
 - **THEN** the list carries a row for it, labelled by the body's label
 
 #### Scenario: A template whose body declares no label still renders
