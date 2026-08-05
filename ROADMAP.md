@@ -236,37 +236,40 @@ Spec: `development-toolchain`.
     from two sides. Folding it in is a separate decision, not taken.
 
 13. i18n extensions (content-translation UI; UI-chrome white-label overrides):
-    NOT STARTED, deliberately deferred — raised 2026-07-28 as a brainstorm, not
-    a committed stage. Two independent sub-projects, not one change:
-    a. Content-translation UI (studio area). `LocalizedText` (the process/step/
-       field labels a participant sees) already lives in the DB — inline in the
-       versioned JSON definition/draft body — so there is nothing to move. The
-       studio already supports inline per-field locale editing
-       (`ContentLocaleSwitcher`, `LocalizedTextInput`). Missing: a cross-cutting
-       view showing which `LocalizedText` entries lack an entry for a given
-       locale across all of a process's steps/fields (maybe across processes),
-       instead of discovering gaps field-by-field. Pure UI addition, no
-       schema/storage change.
+    design DONE, OpenSpec change proposed for each, implementation NOT
+    STARTED. Raised 2026-07-28 as a brainstorm, not a committed stage. Two
+    independent sub-projects, each with its own design and its own change:
+    a. Content-translation UI (studio area). `LocalizedText` (the
+       process/step/field labels a participant sees) already lives in the DB,
+       inline in the versioned JSON definition/draft body. There is nothing to
+       move. The studio already supports inline per-field locale editing
+       (`ContentLocaleSwitcher`, `LocalizedTextInput`). Adds a per-locale gap
+       count next to the switcher, and an inline missing-translation warning
+       at each `LocalizedTextInput`, following the existing assignment and
+       `db.list`-key non-blocking-warning pattern. Pure UI addition, no
+       schema or storage change.
+       Design: `docs/superpowers/specs/2026-08-05-content-translation-ui-design.md`.
+       Change (proposed, not implemented): `add-content-translation-gap-warnings`.
     b. UI-chrome white-label overrides. Motivated by a per-customer wording
-       requirement (white-label), not language count: each customer already gets
-       its own deployment/DB (existing environment-separation convention) and
-       wants to edit its own UI-chrome wording (buttons/headings) itself,
-       without a redeploy. This touches the same ground as
-       `collapse-editor-i18n`'s decision (fixed English in the studio area) but
-       only adds a per-deployment override layer — not a reversion to a general
-       locale switcher. Sketch: a new sparse table
-       `ui_string_overrides(area, locale, key, value)` overlays the existing
-       hardcoded catalogs (`override ?? builtin[locale] ?? builtin[baseLocale]
-       ?? key` — the same fallback shape the app area's `t()` already uses),
-       loaded once per session, with a `system:admin`-gated editing screen in
-       the admin area (a new `src/engine/ui-strings.ts` plus routes, mirroring
-       `admin-queries.ts`/`admin-routes.ts`). Scoped to text only — no logos,
-       colors or theming.
-    Neither sub-project has an OpenSpec change yet; write one when either
-    actually gets scheduled. Re-brainstormed 2026-07-30: confirmed still no
-    committed trigger for either, so no design was produced. Revisit (a) once a
-    process actually ships in two or more locales and the gaps become hard to
-    find by hand. Revisit (b) once a specific customer asks for its own
+       requirement, not language count. Each customer already gets its own
+       deployment/DB (existing environment-separation convention) and wants
+       to edit its own UI-chrome wording (buttons/headings) without a
+       redeploy. Adds a sparse table
+       `ui_string_overrides(area, locale, key, value)`, an unauthenticated
+       `GET /ui-strings` fetched once at app boot (covering the pre-login
+       screen too), and a one-line patch in each catalog that already has a
+       `t(locale, key)`: `shell`, `app`, `studio`. Writes go through a
+       `system:admin`-gated route (`src/engine/ui-strings.ts` plus routes,
+       mirroring `admin-queries.ts`/`admin-routes.ts`) and a new admin
+       screen. `admin`/`reporting` need their own catalog first; that
+       retrofit is a deliberately deferred, separate prerequisite change.
+       Scoped to text only, no logos, colors, or theming.
+       Design: `docs/superpowers/specs/2026-08-05-ui-chrome-white-label-overrides-design.md`.
+       Change (proposed, not implemented): `add-ui-chrome-white-label-overrides`.
+    Both changes stop at proposal, spec, and task artifacts; neither is
+    applied. Revisit (a)'s implementation once a process actually ships in
+    two or more locales and the gaps become hard to find by hand. Revisit
+    (b)'s implementation once a specific customer asks for its own
     UI-chrome wording, not before.
 
 14. **Deployment & operations readiness: DONE (a–c).** What shipping to a real
