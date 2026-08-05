@@ -65,9 +65,11 @@ database SHALL mint a new `processId`.
   and `publishBody`'s hash-based no-op leaves no new version row
 
 ### Requirement: The script provisions one demo user per reserved role.
+
 The seed script SHALL provision one demo user for each of
 `system:publish`, `system:cancel-any`, `system:admin`,
-`system:developer`, and `system:reports`. Each demo user's email SHALL
+`system:developer`, `system:reports`, `system:datalists` and
+`system:templates`. Each demo user's email SHALL
 follow one fixed, recognizable convention. A re-run SHALL update an
 existing demo user's roles and password. It SHALL NOT create a second
 account with the same email.
@@ -80,15 +82,20 @@ an account by hand.
 #### Scenario: Provisioning demo users on an empty database
 - **WHEN** the seed script runs against a database with no `auth_users`
   rows
-- **THEN** five demo users exist afterward, one per reserved role, each
+- **THEN** seven demo users exist afterward, one per reserved role, each
   reachable by its fixed email
 
 #### Scenario: Re-running does not duplicate a demo user
-- **WHEN** the seed script runs again after those five users already exist
-- **THEN** `auth_users` still contains exactly five demo users, and each
+- **WHEN** the seed script runs again after those seven users already exist
+- **THEN** `auth_users` still contains exactly seven demo users, and each
   one's roles and password match the script's current definition
 
 #### Scenario: The reports demo user reaches the reporting routes
 - **WHEN** the seeded `system:reports` demo user signs in and calls a
   `/reporting/*` route
+- **THEN** the route answers it, without any hand-provisioned account
+
+#### Scenario: The template demo user reaches the template routes
+- **WHEN** the seeded `system:templates` demo user signs in and calls
+  `GET /templates`
 - **THEN** the route answers it, without any hand-provisioned account
