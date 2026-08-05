@@ -11,10 +11,11 @@
 <!-- antislop: allow em-dash sentence-length run-ons passive-voice frozen-verbs -->
 
 The engine SHALL define seven reserved role strings in
-`src/auth/authorize.ts`: `PUBLISH_ROLE = "system:publish"`, `CANCEL_ANY_ROLE =
-"system:cancel-any"`, `ADMIN_ROLE = "system:admin"`, `DEVELOPER_ROLE =
-"system:developer"`, `REPORTS_ROLE = "system:reports"`, `DATALISTS_ROLE =
-"system:datalists"` and `TEMPLATES_ROLE = "system:templates"`. These SHALL be
+`src/auth/authorize.ts`. They are `PUBLISH_ROLE = "system:publish"`,
+`CANCEL_ANY_ROLE = "system:cancel-any"`, `ADMIN_ROLE = "system:admin"`,
+`DEVELOPER_ROLE = "system:developer"`, `REPORTS_ROLE = "system:reports"`,
+`DATALISTS_ROLE = "system:datalists"` and
+`TEMPLATES_ROLE = "system:templates"`. These SHALL be
 the only roles this capability defines; no role hierarchy, wildcard, or general
 permission/policy model SHALL exist — in particular no one of them SHALL imply
 any other. The `system:` prefix is a naming convention only, distinguishing
@@ -91,18 +92,18 @@ enforced, since `Actor.roles` and `auth_users.roles` remain plain `string[]`.
 
 <!-- antislop: allow passive-voice -->
 
-- **WHEN** `requireRole(actor, ADMIN_ROLE)`, `requireRole(actor,
-  DEVELOPER_ROLE)` or `requireRole(actor, PUBLISH_ROLE)` is called for an actor
-  whose `roles` is exactly `["system:templates"]`
+- **WHEN** an actor whose `roles` is exactly `["system:templates"]` reaches
+  `requireRole(actor, ADMIN_ROLE)`, `requireRole(actor, DEVELOPER_ROLE)` or
+  `requireRole(actor, PUBLISH_ROLE)`
 - **THEN** it throws `AuthorizationError` in each case
 
 #### Scenario: No other reserved role implies the template role
 
 <!-- antislop: allow passive-voice -->
 
-- **WHEN** `requireRole(actor, TEMPLATES_ROLE)` is called for an actor whose
-  `roles` is exactly `["system:admin"]`, exactly `["system:developer"]` or
-  exactly `["system:datalists"]`
+- **WHEN** an actor whose `roles` is exactly `["system:admin"]`, exactly
+  `["system:developer"]` or exactly `["system:datalists"]` reaches
+  `requireRole(actor, TEMPLATES_ROLE)`
 - **THEN** it throws `AuthorizationError` in each case
 
 ## ADDED Requirements
