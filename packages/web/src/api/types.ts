@@ -40,6 +40,10 @@ export type ClientError =
   | { type: "not-a-candidate"; message: string }
   | { type: "not-claimed"; message: string }
   | { type: "not-claimant"; message: string }
+  // `POST /instances/:id/delegate` naming a target the local account directory
+  // does not hold. The repair is to pick another account, so it reads as its
+  // own type rather than falling to `internal` with no message at all.
+  | { type: "unknown-delegate"; message: string }
   | { type: "not-assigned"; message: string }
   | { type: "guard-refused"; message: string }
   | { type: "concurrency-conflict" }

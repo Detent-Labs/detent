@@ -19,11 +19,18 @@ reason. No check validates `toActorId` against `assignment.candidates`.
 
 `delegateClaim` SHALL check `toActorId` against the local account
 directory, but only when the calling actor's own id resolves there. A target
-the directory does not hold SHALL raise an error, and the claim SHALL stay
-where it is. A deployment on an external identity provider holds no
-directory entry for its own actors, so the check finds no delegator there and
-runs no target check either. The condition keeps this rule from rejecting
-every delegation in such a deployment.
+the directory does not hold SHALL raise `UnknownDelegateError`, naming the
+target, and the claim SHALL stay where it is. A deployment on an external
+identity provider holds no directory entry for its own actors, so the check
+finds no delegator there and runs no target check either. The condition keeps
+this rule from rejecting every delegation in such a deployment.
+
+The target check SHALL run under the same row lock as the claimant check, and
+only after it. A caller who does not hold the claim SHALL therefore meet
+`NotClaimantError`, whatever target it names, as the paragraph above already
+requires. Ordering it the other way would also make this route answer whether
+an arbitrary `user_id` exists, one try at a time, for any actor holding a
+claim on any instance.
 
 #### Scenario: The claimant delegates successfully
 
@@ -49,8 +56,15 @@ every delegation in such a deployment.
 
 - **WHEN** the calling actor's id resolves in the local account directory,
   and `delegateClaim` names a target id that does not
-- **THEN** it throws, the claim stays with the calling actor, and no
-  `assignment.delegated` event is appended
+- **THEN** it throws `UnknownDelegateError`, the claim stays with the calling
+  actor, and no `assignment.delegated` event is appended
+
+#### Scenario: A non-claimant learns nothing about the target
+
+- **WHEN** an actor who does not hold the current claim calls
+  `delegateClaim` with a target id absent from the directory
+- **THEN** it throws `NotClaimantError`, the same error it throws for a
+  target the directory does hold
 
 #### Scenario: A deployment with no local accounts delegates as before
 

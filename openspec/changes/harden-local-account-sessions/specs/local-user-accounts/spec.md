@@ -34,12 +34,39 @@ behind one address does not reach it in ordinary use. It bounds the
 credential-stuffing case the per-email window cannot see: one password tried
 against many accounts.
 
+The address window SHALL be checked first, before the email window records
+anything. A caller past its address threshold therefore never reaches the
+email map, which is what stops one caller from filling that map. The
+memory-footprint requirement below rests on this ordering.
+
+A successful login SHALL NOT clear the address window, though it clears the
+email one. Clearing it would let a caller who holds one valid account reset
+that window whenever they choose, and so try one password against every other
+account for free.
+
+#### Scenario: A success does not reset the address window
+
+- **WHEN** one address reaches its threshold of recorded attempts, having
+  logged in successfully to an account it holds at some point inside the
+  window
+- **THEN** the next attempt from that address still returns `429`
+
 The client address SHALL come from the connection's peer. When the deployment
 sets `TRUST_PROXY` to `1`, it SHALL come from the `X-Forwarded-For` header
 instead, which the proxy in front of the engine overwrites. Without that
 variable the server SHALL ignore that header, because any caller can send it.
 When the server can determine no address, the second window SHALL NOT apply,
 and the per-email window SHALL still apply.
+
+`X-Forwarded-For` holds a comma-separated list. The server SHALL read the
+last entry, trimmed, and SHALL ignore every entry in front of it. A proxy
+that appends rather than overwrites leaves the caller's own submitted value
+in front of its own, so reading the first entry would hand the bucket key
+back to the caller. A header the proxy overwrites holds one entry, where the
+last entry is that entry. A request carrying no such header under
+`TRUST_PROXY` reached this process without passing the proxy, so its peer is
+the caller rather than the proxy: the server SHALL fall back to the peer,
+which counts that request rather than exempting it from the window.
 
 #### Scenario: An email under the limit is unaffected
 
@@ -110,6 +137,14 @@ and the per-email window SHALL still apply.
 - **THEN** the per-address window counts against that value, not against the
   proxy's own address
 
+#### Scenario: Entries in front of the proxy's own are ignored
+
+- **WHEN** `TRUST_PROXY` is `1` and a caller sends
+  `X-Forwarded-For: <a value it picked>`, which an appending proxy turns into
+  `<that value>, <the caller's real address>`
+- **THEN** the per-address window counts against the last entry, so the value
+  the caller picked changes nothing
+
 ### Requirement: Rate-limit tracking has a bounded memory footprint
 
 The tracking map SHALL NOT grow without bound in response to distinct
@@ -141,6 +176,21 @@ recently active email.
 
 The same reasoning bounds both directions. An evicted entry belongs to the
 oldest window, which is the entry closest to resetting on its own.
+
+The per-address map SHALL carry the same bound, under its own capacity. It
+holds one entry per distinct client address, and under `TRUST_PROXY` its key
+comes from a header. It therefore has the growth this requirement exists to
+stop. The sweep, the capacity check and the eviction of the earliest window
+SHALL apply to it as they apply to the email map, so this change closes one
+unbounded map and does not open a second.
+
+#### Scenario: The address map is bounded the same way
+
+- **WHEN** the per-address map holds its capacity in live windows, and an
+  attempt arrives from a not-yet-tracked address
+- **THEN** the expired entries are swept, and if the map is still full the
+  entry with the earliest window start is evicted and the new address is
+  tracked in the slot that frees
 
 #### Scenario: Expired entries are reclaimed before capacity is judged
 

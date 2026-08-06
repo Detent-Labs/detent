@@ -924,6 +924,23 @@ export class NotClaimantError extends Error {
   }
 }
 
+/**
+ * A delegation named a target the local account directory does not hold. Only
+ * `delegateClaim`'s `validateTarget` callback raises it, and only where the
+ * delegating actor resolves in that directory — a deployment on an external
+ * identity provider has no directory to check against.
+ *
+ * Defined here rather than in `src/auth`, beside the other errors a claim
+ * operation raises, so `src/http/errors.ts` maps it from the one import it
+ * already reads.
+ */
+export class UnknownDelegateError extends Error {
+  constructor(readonly toActorId: string) {
+    super(`delegate target is not a known account: ${toActorId}`);
+    this.name = "UnknownDelegateError";
+  }
+}
+
 async function loadForClaim(tx: SQL, instanceId: string): Promise<Instance> {
   const rows = (await tx`SELECT body FROM instances WHERE instance_id = ${instanceId} FOR UPDATE`) as { body: unknown }[];
   if (rows.length === 0) throw new Error(`instance not found: ${instanceId}`);
@@ -954,7 +971,11 @@ type AssignmentEventSpec =
 async function updateAssignment(
   instanceId: string,
   db: SQL,
-  guard: (assignment: AssignmentState | null | undefined) => void,
+  // The guard may return a promise, and this function awaits it: `delegateClaim`
+  // has a check that reads the account directory, and that check must run under
+  // this row lock and after the claimant check. `claimStep` and `releaseClaim`
+  // return nothing and are unaffected.
+  guard: (assignment: AssignmentState | null | undefined) => void | Promise<void>,
   computeNext: (assignment: AssignmentState, at: string) => AssignmentState,
   eventSpec: AssignmentEventSpec,
 ): Promise<Instance> {
@@ -966,7 +987,7 @@ async function updateAssignment(
     // after the fact and reject the caller-initiated request themselves.
     if (inst.status !== "running") return inst;
 
-    guard(inst.assignment);
+    await guard(inst.assignment);
     const at = new Date().toISOString();
     const next = computeNext(inst.assignment as AssignmentState, at);
     await tx`UPDATE instances SET body = jsonb_set(body, '{assignment}', (${[next]}::jsonb) -> 0)
@@ -1024,13 +1045,28 @@ export async function releaseClaim(instanceId: string, actor: Actor, db: SQL = s
  * delegate does not join it, so releasing returns the step to the
  * original candidates, not to the delegate. Not a transition — same shape
  * as `claimStep`/`releaseClaim`. A no-op on a non-running instance.
+ *
+ * `validateTarget` is an optional check on `toActorId`, supplied by
+ * `runtime/api.ts` and holding the account directory this file does not. It
+ * runs under the same row lock and only AFTER the claimant check, which orders
+ * the two errors deliberately: a caller who does not hold the claim meets
+ * `NotClaimantError` whatever target it names, so this route never answers
+ * whether an arbitrary account exists. Omitted, the target is unchecked, which
+ * is the behavior every caller had before.
  */
-export async function delegateClaim(instanceId: string, actor: Actor, toActorId: string, db: SQL = sql): Promise<Instance> {
+export async function delegateClaim(
+  instanceId: string,
+  actor: Actor,
+  toActorId: string,
+  db: SQL = sql,
+  validateTarget?: (toActorId: string) => Promise<void>,
+): Promise<Instance> {
   return updateAssignment(
     instanceId,
     db,
-    (assignment) => {
+    async (assignment) => {
       if (!assignment || assignment.claimedBy !== actor.id) throw new NotClaimantError(instanceId, actor.id);
+      if (validateTarget) await validateTarget(toActorId);
     },
     (assignment, at) => ({ candidates: assignment.candidates, claimedBy: toActorId, claimedAt: at }),
     { kind: "assignment.delegated", payload: { fromActorId: actor.id, toActorId } },

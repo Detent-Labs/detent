@@ -45,11 +45,18 @@ increment cannot interleave. The live spec states that.
 
 ## Decisions
 
-**The resolver takes an `isDisabled` callback, not a database handle.** A
+**The resolver takes an `isActiveAccount` callback, not a database handle.** A
 callback keeps `src/auth/jwt.ts` free of SQL. That is how the file reads
 today.
-The wiring in `src/auth/host.ts` or the server construction passes one that
-closes over `db`. A test then passes a plain function, with no database.
+
+`resolveAuthResolver` in `src/http/server.ts` is the only place that builds
+the production resolver, so it is the place that passes the callback. It
+takes an `env` object today and no database handle. It gains one, as a second
+parameter with a `sql` default. `startHttpServer` declares `db` before
+`resolver`, so its own default expression can pass it. A test then passes a
+plain function to `jwtResolver` directly, with no database. A test calling
+`resolveAuthResolver` gets the real lookup. Every such test today logs a
+created account in, so each one keeps passing.
 
 **No cache in front of that read.** A cache with a lifetime restores the gap
 for that lifetime. A cache without one needs invalidation across
@@ -77,12 +84,41 @@ bucket. Behind a proxy that overwrites the header, the peer address is the
 proxy, and every login shares one bucket. Only the deployment knows which
 case it is, so only the deployment decides.
 
+**The last `X-Forwarded-For` entry is the one read.** The header holds a
+comma-separated list. A proxy that appends rather than overwrites leaves what
+the caller sent in front of its own entry. Reading the first entry therefore
+hands the bucket key back to the attacker. The last entry is the one the
+nearest proxy wrote, and that proxy is the trusted one. A header the proxy
+overwrites holds one entry, where first and last are the same value. Reading
+the last is right in both deployments.
+
+**The address map carries the email map's bound.** It is a second map with
+the same failure mode. It holds an entry per distinct key, and an attacker
+influences that key. It gets its own capacity, the same expiry sweep, and the
+same eviction of the earliest window. Otherwise this change closes one
+unbounded map and opens another.
+
 **The delegation check keys off the delegator.** The engine cannot ask
 whether a deployment uses local accounts. Both resolvers can be active.
 It can ask whether the delegating actor's own id sits in `auth_users`. On an
 external identity provider that answer is no, and the target check does not
 run. On a local deployment the answer is yes for every actor who can reach
 the route.
+
+**The claimant check runs first.** One row lock covers both checks. The
+`src/runtime/api.ts` wrapper could instead check the target before the engine
+call. That placement has two faults. A caller who does not hold the claim
+would meet the target error rather than `NotClaimantError`. The live
+requirement states that error. And any authenticated actor could then ask
+this route whether an arbitrary `user_id` exists, one try at a time.
+
+`updateAssignment` in `src/engine/transition.ts` takes a synchronous `guard`.
+It gains permission to return a promise, and awaits it. The engine's
+`delegateClaim` takes an optional `validateTarget` callback and calls it in
+that guard, after the claimant check. The engine still holds no directory:
+`src/runtime/api.ts` supplies the callback, closing over `db`. Omitting it
+leaves today's behavior, which is what `test/assignment.engine.test.ts`
+already exercises.
 
 ## Risks / Trade-offs
 
@@ -102,6 +138,15 @@ the route.
 - A local deployment may delegate to an actor only its external identity
   provider knows. That now fails → both resolvers can be active, and that
   delegation is rare. The error names the target, so an operator sees why.
+- A deployment running `ALLOW_INSECURE_DEV_AUTH=1` keeps the whole gap. The
+  dev header resolver reads no token and no directory → that flag already
+  means no authentication at all. It already refuses to start without an
+  explicit opt-in. Closing the gap there would give the flag a guarantee it
+  does not have.
+- A later stage may want a token denylist or a refresh flow → this change
+  undoes neither. Both would sit beside the directory read. The read becomes
+  redundant only where a denylist covers a disable as well. That replaces one
+  requirement. It is not a design a later stage must unpick.
 
 ## Migration Plan
 
@@ -120,3 +165,7 @@ whatever issued the token.
 - What per-address threshold fits? The implementation starts at ten times the
   per-email threshold within the same window. Tuning it changes no
   requirement, because the spec states the property and not the number.
+- What capacity fits the address map? The implementation starts at the email
+  map's own `MAX_TRACKED_EMAILS`. One address holds one entry, and the
+  address window caps how fast one caller mints them. The same number
+  therefore covers a far larger population than it does for emails.

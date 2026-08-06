@@ -25,6 +25,7 @@ import {
   AlreadyClaimedError,
   NotClaimedError,
   NotClaimantError,
+  UnknownDelegateError,
 } from "../runtime/api.js";
 import { ActorResolutionError } from "../auth/resolve.js";
 import { AuthorizationError } from "../auth/authorize.js";
@@ -91,6 +92,10 @@ const MESSAGE_ERRORS: MessageMapping[] = [
   { ctor: AlreadyClaimedError, status: 403, type: "already-claimed" },
   { ctor: NotClaimedError, status: 403, type: "not-claimed" },
   { ctor: NotClaimantError, status: 403, type: "not-claimant" },
+  // 422 rather than 404: the request's shape is right and the instance exists.
+  // What the engine refuses is the content of one field. The message names the
+  // target, so an operator who mistyped an id sees which one.
+  { ctor: UnknownDelegateError, status: 422, type: "unknown-delegate" },
   { ctor: DraftConflictError, status: 409, type: "draft-conflict" },
   { ctor: MigrationPlanError, status: 409, type: "migration-plan" },
 ];
