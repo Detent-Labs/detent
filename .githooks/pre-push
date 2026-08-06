@@ -63,7 +63,13 @@ else
   check_status=$?
 fi
 
-cat "$CHECK_OUT"
+# `|| true` guards the reader, not the gate. Git closes the hook's stdout once
+# it has forwarded what it wants, so on a large captured run `cat` takes
+# SIGPIPE and `set -e` would abort a push whose gates all passed. Measured at
+# 2071 tests: the hook exits 0 alone and 141 under an early-closing reader.
+# The check's own status is already in `check_status`, and silent-green reads
+# the file rather than this output, so nothing here decides the push.
+cat "$CHECK_OUT" || true
 
 if [ "$check_status" -ne 0 ]; then
   echo "pre-push: 'bun run check' failed. See the output above." >&2
