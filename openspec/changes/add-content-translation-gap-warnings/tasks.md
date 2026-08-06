@@ -51,7 +51,7 @@ nested there is invalid markup.
 ## 5. Verification
 
 - [x] 5.1 `bun run typecheck`.
-- [ ] 5.2 Full `bun test` with `DATABASE_URL` set. Left to the serial run:
+- [x] 5.2 Full `bun test` with `DATABASE_URL` set. Left to the serial run:
       every worktree shares one Postgres test database, and concurrent runs
       corrupt each other.
 - [x] 5.3 The antislop linter on every Markdown file this change touches.

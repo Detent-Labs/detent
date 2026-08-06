@@ -121,7 +121,7 @@
 ## 6. Verification
 
 - [x] 6.1 Run `bun run typecheck`.
-- [ ] 6.2 Run the full `bun test` suite with `DATABASE_URL` set, and
+- [x] 6.2 Run the full `bun test` suite with `DATABASE_URL` set, and
       confirm the DB-backed suites ran (not silently skipped).
 - [ ] 6.3 Exercise the new flow in a real browser: open the shared modal
       from a link with no step selected, open it with a step selected,

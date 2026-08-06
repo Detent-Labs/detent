@@ -148,7 +148,7 @@
 ## 8. Verification
 
 - [x] 8.1 Run `bun run typecheck`.
-- [ ] 8.2 Run the full `bun test` suite with `DATABASE_URL` set, and
+- [x] 8.2 Run the full `bun test` suite with `DATABASE_URL` set, and
       confirm the DB-backed suites ran (not silently skipped).
 - [ ] 8.3 Exercise the new flow in a real browser: build a two-column
       form with a spanning field in the new editor, confirm it renders
