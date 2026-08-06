@@ -315,7 +315,7 @@ requirement here asks for that.
 This is the one place `span` does not read as `min(span, columns)`.
 The alternative default is `1` for a group like any other field. That
 would make the member-count rule above wrong, unless the author also
-set `span: 2` on every group. A default that needs a second setting to
+set `span: 2` on every group. A default that needs a second `span` to
 be correct is the wrong default.
 
 On a one-column form the form's full width IS one column. A group
