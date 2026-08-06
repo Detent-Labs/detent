@@ -10,6 +10,9 @@ it. This applies to an error envelope as well as to a success envelope.
 The attachment download is not a JSON envelope. It carries its own headers, in
 the download requirement below.
 
+`GET /livez` and `GET /readyz` answer with a JSON envelope, so they carry the
+header too. A probe ignores it, and the rule stays one rule.
+
 #### Scenario: A success envelope forbids a cache
 
 - **WHEN** a client sends any request this wrapper answers with a JSON envelope

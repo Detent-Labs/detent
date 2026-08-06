@@ -93,6 +93,15 @@ character does not.
 - A percent-encoded filename saves as `my%20file.pdf` where a browser would
   otherwise show a space → acceptable against header injection. A later
   change may add the `filename*` form.
+- The change `deliver-framing-and-sniffing-headers` is in flight and covers
+  the same header name. It works on the `frontend-security-headers`
+  capability. That capability holds only a build-time
+  Content-Security-Policy today, so a runtime header there is new ground.
+  Should it set `X-Content-Type-Options: nosniff` on every response, the
+  later broader rule supersedes the one this change puts in
+  `toBinaryResponse`. A repeated identical header costs a response
+  nothing. This change confines itself to `toBinaryResponse`, so removing
+  the redundancy later stays a one-line change.
 
 ## Migration Plan
 

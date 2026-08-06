@@ -15,9 +15,14 @@ info:
 
     Every route runs through the Runtime API Layer (`src/runtime/api.ts`).
     An unauthenticated request to any route below `POST /auth/login`,
-    `GET /livez`, `GET /readyz`, and `GET /metrics` gets 401. A request lacking a required
+    `GET /livez`, and `GET /readyz` gets 401. `GET /metrics` is also 401
+    without a token, but its token is `METRICS_TOKEN`, not an actor's JWT.
+    A request lacking a required
     reserved role gets 403. A malformed request body gets 400 (request
     shape) or 422 (field-level validation).
+
+
+    Every JSON envelope this API returns carries `Cache-Control: no-store`.
 servers:
   - url: /
     description: Path-relative — point this at the deployment's own origin.
@@ -602,7 +607,12 @@ paths:
         bytes, base64-encoded — there is no multipart upload path.
         `filename`/`contentType` are capped at 255 characters each; the
         decoded payload is capped at `MAX_ATTACHMENT_BYTES`
-        (environment-configured, default 5 MB).
+        (environment-configured, default 5 MB; a value that is not a
+        positive integer stops the process at startup).
+        `contentType` must be one MIME type and subtype joined by `/`,
+        each half drawn from letters, digits and `.`, `+`, `-`, `_`.
+        Parameters do not pass: send `text/plain`, not
+        `text/plain; charset=utf-8`.
       parameters:
         - $ref: "#/components/parameters/instanceId"
       requestBody:
@@ -622,7 +632,8 @@ paths:
           description: >-
             Request body is not valid JSON; is missing `filename`,
             `contentType`, or `dataBase64`; `filename`/`contentType`
-            exceeds 255 characters; or the decoded payload exceeds
+            exceeds 255 characters; `contentType` is outside the MIME
+            token pair; or the decoded payload exceeds
             `MAX_ATTACHMENT_BYTES`.
           content:
             application/json:
@@ -699,13 +710,27 @@ paths:
         Same participant-visibility rule as uploading. Unlike every
         other route in this document, a successful response is not a
         JSON envelope: the body is the raw file, with `Content-Type`
-        set to the attachment's stored `contentType`.
+        set to the attachment's stored `contentType`. The response also
+        carries `Content-Disposition: attachment` and
+        `X-Content-Type-Options: nosniff`, so an uploaded HTML or SVG
+        file saves rather than running as a document on this origin.
       parameters:
         - $ref: "#/components/parameters/instanceId"
         - $ref: "#/components/parameters/attachmentId"
       responses:
         "200":
           description: OK. The raw file bytes, not a JSON envelope.
+          headers:
+            Content-Disposition:
+              description: >-
+                Always `attachment`. The `filename` parameter holds the
+                stored filename, percent-encoded.
+              schema:
+                type: string
+            X-Content-Type-Options:
+              description: Always `nosniff`.
+              schema:
+                type: string
           content:
             "*/*":
               schema:
@@ -845,10 +870,19 @@ paths:
       summary: Prometheus scrape target
       description: >-
         Computed fresh from the database on every request, no in-process
-        aggregation. No auth, no CORS handling. Three gauges:
+        aggregation. No CORS handling. Three gauges:
         `workflow_outbox_backlog{status}`, `workflow_timer_overdue_count`,
         `workflow_timer_lag_seconds`, and `workflow_instances_faulted`.
-      security: []
+
+
+        Conditional on `METRICS_TOKEN`. When that variable is unset or
+        empty the route is not registered at all, and a scrape gets the
+        ordinary unmatched-path answer. When it holds a value, the scrape
+        sends it as a bearer token, compared in constant time; a missing
+        or mismatched token is `401` and runs no query. This token is not
+        the JWT the rest of the document's `bearerAuth` describes.
+      security:
+        - metricsToken: []
       responses:
         "200":
           description: OK. Prometheus text-exposition format, not a JSON envelope.
@@ -856,6 +890,14 @@ paths:
             "text/plain; version=0.0.4; charset=utf-8":
               schema:
                 type: string
+        "401":
+          description: >-
+            The request carried no bearer token, or one that does not
+            match `METRICS_TOKEN`. No query runs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
         "503":
           description: A query against the database failed. Empty body.
           content:
@@ -869,6 +911,13 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    metricsToken:
+      type: http
+      scheme: bearer
+      description: >-
+        The shared value of `METRICS_TOKEN`, sent by the scraper. Not a
+        JWT and not an actor: a scrape carries no identity, so this
+        endpoint resolves none.
 
   parameters:
     processId:
