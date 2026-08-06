@@ -1,28 +1,36 @@
 #!/bin/sh
 # Bumps VERSION after every commit: Major.Minor.Revision.Build.
 #
-# The bump size reads off the commit message (git log -1 --pretty=%B),
-# case-insensitively:
-#   "major: ..." / "breaking: ..." / a "BREAKING CHANGE" body -> major bump
-#   "feat: ..." / "minor: ..."                                -> minor bump
-#   anything else                                              -> revision bump
+# The bump size reads off the commit message, case-insensitively:
+#   subject starts with "major:" / "breaking:", or the body has a
+#   "BREAKING CHANGE:" / "BREAKING-CHANGE:" trailer line -> major bump
+#   subject starts with "feat:" / "minor:"                -> minor bump
+#   anything else                                          -> revision bump
 # A major bump resets minor and revision to 0; a minor bump resets revision
 # to 0. Build is always HEAD's short hash.
+#
+# Checked against the SUBJECT LINE and a trailer line, never a substring
+# search over the whole body — a commit message that merely discusses
+# "breaking change" in prose (like this one) must not itself count as one.
 #
 # The new commit's own hash (and its own bump) can't be known until after it
 # exists, so this hook leaves VERSION modified but uncommitted rather than
 # amending (this repo's convention: never amend, see CLAUDE.md). The next
 # commit picks it up.
 
-subject=$(git log -1 --pretty=%B | tr '[:upper:]' '[:lower:]')
+subject=$(git log -1 --pretty=%s | tr '[:upper:]' '[:lower:]')
 hash=$(git rev-parse --short=8 HEAD)
+
+if git log -1 --pretty=%B | grep -Eqi '^breaking[ -]change:'; then
+  subject="major:$subject"
+fi
 
 major=$(cut -d. -f1 VERSION)
 minor=$(cut -d. -f2 VERSION)
 revision=$(cut -d. -f3 VERSION)
 
 case "$subject" in
-  major:*|breaking:*|*"breaking change"*)
+  major:*|breaking:*)
     major=$((major + 1)); minor=0; revision=0 ;;
   feat:*|minor:*)
     minor=$((minor + 1)); revision=0 ;;
