@@ -371,40 +371,51 @@ test.skipIf(!DB)("a row that keeps failing exhausts attempts and dead-letters", 
 
 // surface-worker-failures: drainOutbox's per-row catch (outbox.ts) used to
 // discard its error with no line, so a row failing every pass was invisible.
-// A throwing deliverFn does NOT reach that boundary — the inner try around the
-// delivery race catches it first and turns it into an ordinary retry. A row
-// whose `action` jsonb holds an unparseable string does reach it, through
-// parseAction.
+//
+// Two seams do NOT reach that boundary. A throwing deliverFn is caught by the
+// inner try around the delivery race and becomes an ordinary retry. A corrupt
+// `action` column is unreachable too: `action` is jsonb, so Postgres validates
+// it on write and it can never hold text JSON.parse rejects.
+//
+// A throwing `resolveBody` does reach it. drainOutbox calls it inside tx2 (to
+// type-check the writeback), so the whole mark transaction aborts. It is keyed
+// by the row's own instance's processId, which makes the failure selective:
+// one instance's rows hit the boundary while another's deliver in the same pass.
 test.skipIf(!DB)("a row the drain skips logs an error line, stays claimed, and does not strand the batch", async () => {
   const body = threeActionBody();
-  const inst = await create();
-  await executeManualTransition(inst, "path_ab", body, actor);
+  const createAs = (p: string) => createInstance(body, { processId: p as Instance["processId"], version: 1 });
+  const good = await createAs("proc_ob_good");
+  const bad = await createAs("proc_ob_bad");
+  await executeManualTransition(good, "path_ab", body, actor); // 3 rows
+  await executeManualTransition(bad, "path_ab", body, actor); // 3 rows
 
-  // Corrupt exactly one of the three rows. `action` is jsonb; a JSON string
-  // value comes back as a JS string, and parseAction's JSON.parse throws on it.
-  const all = await rows(inst.instanceId);
-  const corruptKey = all[0].idempotency_key as string;
-  await sql`UPDATE outbox SET action = ${'"not-json{"'}::jsonb WHERE idempotency_key = ${corruptKey}`;
+  // A non-empty patch, so tx2 reaches the resolveBody call at all.
+  const patching: DeliverFn = async () => ({ field_val: 7 });
+  const flaky = (pid: string) => {
+    if (pid === "proc_ob_bad") throw new Error("simulated resolver failure");
+    return body;
+  };
 
   const errorSpy = spyOn(console, "error").mockImplementation(() => {});
-  const delivered = await drainOutbox(sql, reg, okDeliver);
+  const delivered = await drainOutbox(sql, reg, patching, CLAIM_LEASE_MS, flaky);
   const lines = errorSpy.mock.calls
     .map((c) => JSON.parse(c[0] as string) as Record<string, unknown>)
     .filter((l) => l.msg === "worker skipped a failing item");
   errorSpy.mockRestore();
 
-  expect(lines).toHaveLength(1);
-  expect(lines[0].level).toBe("error");
-  expect(lines[0].worker).toBe("outbox");
-  expect(lines[0].idempotencyKey).toBe(corruptKey);
-  expect(typeof lines[0].error).toBe("string");
+  const badKeys = (await rows(bad.instanceId)).map((r) => r.idempotency_key as string);
+  expect(lines).toHaveLength(3); // one per skipped row
+  for (const line of lines) {
+    expect(line.level).toBe("error");
+    expect(line.worker).toBe("outbox");
+    expect(badKeys).toContain(line.idempotencyKey as string);
+    expect(line.error).toBe("simulated resolver failure");
+  }
 
-  // The drain moved on: the other two rows delivered.
-  expect(delivered).toBe(2);
-  const after = await rows(inst.instanceId);
-  const corrupt = after.find((r) => r.idempotency_key === corruptKey);
-  expect(corrupt?.status).toBe("claimed"); // left for lease reclaim, not marked
-  expect(after.filter((r) => r.status === "delivered")).toHaveLength(2);
+  // The drain moved on: the other instance's three rows still delivered.
+  expect(delivered).toBe(3);
+  expect((await rows(bad.instanceId)).every((r) => r.status === "claimed")).toBe(true); // left for lease reclaim
+  expect((await rows(good.instanceId)).every((r) => r.status === "delivered")).toBe(true);
 });
 
 test.skipIf(!DB)("an action's declared retry.maxAttempts overrides the default", async () => {

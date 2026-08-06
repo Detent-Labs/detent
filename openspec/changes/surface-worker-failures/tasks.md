@@ -30,17 +30,23 @@ error.
 
 ## 3. Tests
 
-Each per-item test needs a seam that reaches the boundary. A throwing
-`deliverFn` does NOT: `outbox.ts:227` catches it first and turns it into an
-ordinary retry. The seams below do reach it.
+Each per-item test needs a seam that reaches the boundary. Two do not reach
+the outbox one. A throwing `deliverFn` is caught by `outbox.ts:227` first and
+becomes an ordinary retry. A corrupt `action` column is unreachable as well.
+`action` is `jsonb`, so Postgres validates it on write. That column can never
+hold text `JSON.parse` rejects. The seams below do reach it.
 
 - [x] 3.1 `test/poll.test.ts` (new): a tick that throws logs an error line
-      naming its worker, and the loop still schedules the next tick.
-- [x] 3.2 `test/outbox.test.ts`: a row whose `action` jsonb holds an
-      unparseable string reaches the boundary through `parseAction`
-      (`outbox.ts:203`). Assert the line carries the row's idempotency key,
-      that the row stays `claimed`, and that a second valid row in the same
-      batch still delivers.
+      naming its worker, and the loop still schedules the next tick. The test
+      waits on the third line, not on the tick count. The catch that writes a
+      line runs a microtask after the tick throws, so a test that signals from
+      inside the tick body observes one line too few.
+- [x] 3.2 `test/outbox.test.ts`: a throwing `resolveBody` reaches the
+      boundary. `drainOutbox` calls it inside tx2, so the mark transaction
+      aborts, and it is keyed by the row's own instance's processId. Fail one
+      instance and assert the lines carry its idempotency keys, that its rows
+      stay `claimed`, and that a second instance's rows deliver in the same
+      pass.
 - [x] 3.3 `test/resolution.test.ts`: an injected `resolveBody` that throws
       reaches the boundary. Assert the line carries the instance id and that
       the drain processes the rest of the batch.
