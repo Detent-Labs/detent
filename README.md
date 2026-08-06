@@ -113,11 +113,10 @@ the second reason to run there.
 
 Nothing runs on a hosted CI service. `.githooks/pre-push` is the gate instead.
 It runs `bun run check` in the dev container and blocks the push unless both
-the typecheck and the suite pass. Arm it once per clone.
-
-```bash
-git config core.hooksPath .githooks
-```
+the typecheck and the suite pass. The `bun install` above arms it: the root
+`prepare` script runs `scripts/enable-hooks.sh`, which points
+`core.hooksPath` at `.githooks`. That arms `post-commit` too, which bumps
+`VERSION` after each commit. Nobody types a `git config` line.
 
 `bun run serve` creates the database schema on startup if it is missing.
 Pointing it at an empty Postgres needs no separate setup step. Every DDL
@@ -133,18 +132,11 @@ the startup call finds both indexes already there and skips them —
 
 ### Authentication configuration
 
-`bun run serve` refuses to start unless you configure authentication. Set one
-of these three:
-
-- `AUTH_JWT_SECRET` — a local HS256 signing key, at least 32 bytes encoded
-  (`openssl rand -base64 32`)
-- `AUTH_ISSUERS` — a JSON array of `{iss, jwksUrl, audience, rolesClaim}`, to
-  accept externally-issued tokens
-- `ALLOW_INSECURE_DEV_AUTH=1` — an explicit opt-out for local development
-  only. It trusts `X-Actor-Id`/`X-Actor-Roles` headers verbatim, with no
-  identity check at all. Never set this where real user data is reachable.
-  The devcontainer sets it for you (`.devcontainer/docker-compose.yml`).
-
+`bun run serve` refuses to start unless you configure authentication. It needs
+one of `AUTH_JWT_SECRET`, `AUTH_ISSUERS` or `ALLOW_INSECURE_DEV_AUTH=1`. The
+devcontainer sets the third one (`.devcontainer/docker-compose.yml`). That one
+belongs nowhere else. `docs/runbooks/deployment.md` gives all three with their
+defaults, and every other variable too.
 Changes go through OpenSpec (`openspec/`) — propose → specs/tasks → implement →
 verify → archive. See `CLAUDE.md` for the full contract rules and invariants.
 
@@ -170,42 +162,21 @@ docker build -f docker/frontend.Dockerfile \
 
 The engine image reads its configuration from the container runtime
 environment. These are the same variables `bun run serve` already reads
-locally: `DATABASE_URL`, one of `AUTH_JWT_SECRET`/`AUTH_ISSUERS`, and
-optionally `CORS_ALLOWED_ORIGINS` and `PORT`. A definition using the
-`notification.email` action also needs `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`,
-`SMTP_PASSWORD` and `SMTP_FROM`.
+locally. `docs/runbooks/deployment.md` is the list. It gives every variable,
+what it controls, whether a deployment must set it, and its default. It also
+marks the defaults that are unsafe to keep. Read it before the first
+deployment, and again when an upgrade adds a variable.
 
-Two more govern the HTTP boundary. `METRICS_TOKEN` gates `GET /metrics`. Unset
-or empty leaves that route unregistered, so a default deployment exposes no
-scrape. A deployment that does scrape puts the same value in its scrape
-config. The scraper sends it as a bearer token.
-`MAX_ATTACHMENT_BYTES` bounds a decoded upload
-and defaults to 5 MB. A value that is not a positive integer stops the process
-at startup, rather than removing the bound. The probes `/livez` and `/readyz`
-stay open either way, because a probe is not a query.
-
-`TRUST_PROXY=1` tells the engine that a proxy in front of it sets
-`X-Forwarded-For`. `POST /auth/login` rate-limits per client address as well
-as per email. This variable decides where that address comes from.
-
-Set it in every deployment behind such a proxy. Leave it unset otherwise: the
-engine ignores the header without it, because any caller can send one. Unset
-behind a proxy puts every login in one bucket, and ordinary use stays under
-that threshold. The engine reads the last comma-separated entry of the
-header, the one the nearest proxy wrote.
+Two of those defaults deny rather than permit.
+`HTTP_ACTION_ALLOWED_HOSTS` starts empty and refuses every `http.request`
+target. `METRICS_TOKEN` starts unset and leaves `GET /metrics` unregistered.
+The runbook covers both.
 
 The image never sets
 `ALLOW_INSECURE_DEV_AUTH` itself. A deployment that omits both auth
 variables fails to start immediately. It names the missing variable,
 exactly as `bun run serve` already does locally, instead of falling back
 to an insecure default.
-
-A definition using the `http.request` action needs
-`HTTP_ACTION_ALLOWED_HOSTS`. It holds a comma-separated list of the hosts
-that action may reach. An unset list refuses every host, so those actions
-dead-letter until an operator sets it. Set `HTTP_ACTION_ALLOW_INSECURE=1`
-only where a target speaks plain HTTP. Without it the handler accepts
-`https` alone.
 
 ```bash
 docker run -p 3000:3000 \

@@ -1621,9 +1621,30 @@ Stage-by-stage status is in `ROADMAP.md`.
   meaningless green. It also pins Bun to the Dockerfile's version, so no
   host-side drift.
 
-- Two gaps the hook has and a hosted gate would not. `--no-verify` bypasses
-  it. A clone arms it with `git config core.hooksPath .githooks` (README's
-  Develop block); until then it is inert.
+- One gap the hook has and a hosted gate would not: `--no-verify` bypasses it.
+
+- The clone arms itself (`scripts/enable-hooks.sh`, `package.json`'s
+  `prepare`, `document-deployment-and-self-enable-the-hook`). `bun install`
+  points `core.hooksPath` at `.githooks`, so nobody types that `git config`
+  line. That value covers the directory, so it arms `post-commit` beside
+  `pre-push`.
+
+- The script asks `git rev-parse --git-dir`, never `[ -d .git ]`. In a
+  linked worktree `.git` is a file. This repository works in worktrees. Two
+  other shapes exit 0: no repository, and no `git` on the path. So the
+  install inside `docker/engine.Dockerfile` stays green. Three tests in
+  `test/enable-hooks.test.ts` drive all three shapes.
+
+- Deployment configuration has one home (`docs/runbooks/deployment.md`, same
+  change). It tables the twenty variables `src/` reads. Two more rows cover
+  the `VITE_API_URL` build argument and the seed script's `SEED_ALLOW`. Each
+  row gives the meaning, whether a deployment must set it, and the default.
+  It marks an unsafe default and says what to set instead.
+
+- The runbook also carries the proxy rule behind `TRUST_PROXY`, and the
+  `bun audit` cadence. Two commands stay in `README.md`, the ones that build
+  and run the images. It points at the runbook for the rest. So a change that
+  adds a variable edits one file.
 <!-- antislop: allow sentence-length -->
 - Dependency-manifest fixes ride along in the same change. `zod` now lives in
   the root's `dependencies`, not `devDependencies` as before. Six modules

@@ -24,6 +24,15 @@ The script SHALL succeed where no git repository exists, and where `git` is
 absent. The production image builds from a copied tree with no `.git`
 directory, and its `bun install` must not fail on this.
 
+The script SHALL decide by asking `git` for the repository, not by testing the
+filesystem for a `.git` directory. In a linked worktree `.git` is a file
+holding a pointer, so a directory test answers false inside a real repository.
+This repository works in such worktrees.
+
+`core.hooksPath` SHALL point at the whole hooks directory, so it arms
+`post-commit` beside `pre-push`. The script SHALL print what it wrote, so an
+install that arms both says so.
+
 The hook SHALL run the checks **inside the devcontainer**, not on the host.
 That placement is what makes the checks meaningful. The gates that need only git
 and a shell are the exception. They run on the host, before the container starts,
@@ -70,6 +79,12 @@ file that never runs reads as coverage it does not provide.
   types no git configuration
 - **THEN** `core.hooksPath` points at the committed hooks directory, and the
   next push runs the hook
+
+#### Scenario: An install inside a linked worktree arms the hook
+
+- **WHEN** `bun install` runs in a linked worktree, where `.git` is a file
+  rather than a directory
+- **THEN** `core.hooksPath` points at the committed hooks directory
 
 #### Scenario: An install with no git repository still succeeds
 
