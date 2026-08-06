@@ -63,7 +63,7 @@
 ## 4. Verification
 
 - [x] 4.1 Run `bun run typecheck`.
-- [ ] 4.2 Run the full `bun test` suite with `DATABASE_URL` set. Report the
+- [x] 4.2 Run the full `bun test` suite with `DATABASE_URL` set. Report the
       pass, fail and skip counts, and compare the skip count against
       `scripts/gates/skip-floor.txt`.
 - [ ] 4.3 Drive one `http.request` action against a refused host and confirm

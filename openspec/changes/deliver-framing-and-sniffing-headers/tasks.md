@@ -39,7 +39,7 @@
 ## 5. Verification
 
 - [x] 5.1 Run `bun run typecheck`.
-- [ ] 5.2 Run the full `bun test` suite with `DATABASE_URL` set. Report the
+- [x] 5.2 Run the full `bun test` suite with `DATABASE_URL` set. Report the
       pass, fail and skip counts, and compare the skip count against
       `scripts/gates/skip-floor.txt`.
 - [ ] 5.3 In a real browser, load an area from the engine and read the four

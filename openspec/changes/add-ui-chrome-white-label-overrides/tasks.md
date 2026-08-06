@@ -137,16 +137,16 @@ first, before anything reads it.
 ## 8. Verification
 
 - [x] 8.1 `bun run typecheck`.
-- [ ] 8.2 Full `bun test` with `DATABASE_URL` set. Read the skip count,
+- [x] 8.2 Full `bun test` with `DATABASE_URL` set. Read the skip count,
       not the pass count alone.
 - [x] 8.3 The antislop linter on every Markdown file this change touches,
       measured as the push gate measures it: the finding count at the
       branch base against the count at the tip.
 - [x] 8.4 `git diff --check`, and `git ls-files --eol` read for a `w/`
       column showing CRLF.
-- [ ] 8.5 Manual check in a real browser: set an override for
+- [x] 8.5 Manual check in a real browser: set an override for
       `shell`/`en`/`login.title`, reload the login screen with no session,
       and confirm the overridden text renders before login.
-- [ ] 8.6 Manual check in a real browser: clear that override, reload, and
+- [x] 8.6 Manual check in a real browser: clear that override, reload, and
       confirm the login screen shows the builtin `Log in` rather than a
       blank heading.

@@ -70,7 +70,7 @@ hold text `JSON.parse` rejects. The seams below do reach it.
 ## 5. Verification
 
 - [x] 5.1 Run `bun run typecheck`.
-- [ ] 5.2 Run the full `bun test` suite with `DATABASE_URL` set. Report the
+- [x] 5.2 Run the full `bun test` suite with `DATABASE_URL` set. Report the
       pass, fail and skip counts, and compare the skip count against
       `scripts/gates/skip-floor.txt`. Every worktree shares one test database,
       so this change ran no suite. The serial full-suite run owns this box.
