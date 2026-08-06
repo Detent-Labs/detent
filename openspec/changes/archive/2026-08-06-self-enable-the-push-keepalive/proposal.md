@@ -62,7 +62,8 @@ and the HTTPS transport holds no connection across the hook.
 ## Impact
 
 - `scripts/enable-hooks.sh`: one branch after the `core.hooksPath` line.
-- `test/enable-hooks.test.ts`: three cases added.
+- `test/enable-hooks.test.ts`: four cases added (no-value write, foreign-value
+  keep, GIT_SSH keep-out, idempotent equal-value).
 - `openspec/specs/development-toolchain/spec.md`: one requirement, at archive.
 - No source file changes. `package.json` stays as it is, because `prepare`
   already runs the script.

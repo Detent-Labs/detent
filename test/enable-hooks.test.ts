@@ -97,3 +97,58 @@ test("a linked worktree gains core.hooksPath, where .git is a file", async () =>
   // contributor wants: one setting covers every worktree of the clone.
   expect(await git(linked, "config", "--get", "core.hooksPath")).toBe(".githooks");
 });
+
+const KEEPALIVE_CMD = "ssh -o ServerAliveInterval=20 -o ServerAliveCountMax=30";
+
+test("a repository with no core.sshCommand gains the keepalive", async () => {
+  const dir = tempDir();
+  await git(dir, "init", "--quiet");
+
+  const { exitCode, stdout } = await run(dir);
+
+  expect(exitCode).toBe(0);
+  expect(await git(dir, "config", "--get", "core.sshCommand")).toBe(KEEPALIVE_CMD);
+  expect(stdout).toContain(KEEPALIVE_CMD);
+});
+
+test("a foreign core.sshCommand survives the run", async () => {
+  const dir = tempDir();
+  await git(dir, "init", "--quiet");
+  await git(dir, "config", "core.sshCommand", "ssh -i /tmp/other_key");
+
+  const { exitCode, stdout } = await run(dir);
+
+  expect(exitCode).toBe(0);
+  expect(await git(dir, "config", "--get", "core.sshCommand")).toBe("ssh -i /tmp/other_key");
+  expect(stdout).toContain("GIT_SSH_COMMAND");
+});
+
+test("GIT_SSH in the environment keeps the script out", async () => {
+  const dir = tempDir();
+  await git(dir, "init", "--quiet");
+
+  const proc = Bun.spawn(["sh", SCRIPT], {
+    cwd: dir,
+    env: { ...process.env, GIT_SSH: "plink" },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const exitCode = await proc.exited;
+  const stdout = await new Response(proc.stdout).text();
+
+  expect(exitCode).toBe(0);
+  await expect(git(dir, "config", "--get", "core.sshCommand")).rejects.toThrow();
+  expect(stdout).toContain("GIT_SSH_COMMAND");
+});
+
+test("a second run writes nothing new", async () => {
+  const dir = tempDir();
+  await git(dir, "init", "--quiet");
+
+  await run(dir);
+  const { exitCode, stdout } = await run(dir);
+
+  expect(exitCode).toBe(0);
+  expect(await git(dir, "config", "--get", "core.sshCommand")).toBe(KEEPALIVE_CMD);
+  expect(stdout).toContain("already carries the push keepalive");
+});

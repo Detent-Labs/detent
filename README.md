@@ -116,7 +116,9 @@ It runs `bun run check` in the dev container and blocks the push unless both
 the typecheck and the suite pass. The `bun install` above arms it: the root
 `prepare` script runs `scripts/enable-hooks.sh`, which points
 `core.hooksPath` at `.githooks`. That arms `post-commit` too, which bumps
-`VERSION` after each commit. Nobody types a `git config` line.
+`VERSION` after each commit. The same script arms an SSH keepalive on
+`core.sshCommand`, so the connection to the remote survives the hook's own
+runtime. Nobody types a `git config` line.
 
 `bun run serve` creates the database schema on startup if it is missing.
 Pointing it at an empty Postgres needs no separate setup step. Every DDL
