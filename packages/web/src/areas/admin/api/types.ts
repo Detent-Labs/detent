@@ -178,3 +178,6 @@ export interface DataListDetail {
   values: DataListValue[];
   usedBy: DataListUsage[];
 }
+
+/** `area -> locale -> key -> value`, the shape both the admin read and the public read return. */
+export type UiStringOverrideMap = Record<string, Record<string, Record<string, string>>>;

@@ -237,8 +237,8 @@ Spec: `development-toolchain`.
     `packages/form-ui` stayed a separate package throughout, since it is imported
     from two sides. Folding it in is a separate decision, not taken.
 
-13. i18n extensions (content-translation UI; UI-chrome white-label overrides):
-    design DONE for both, 13a DONE, 13b NOT STARTED. Raised 2026-07-28 as a
+13. **i18n extensions (content-translation UI; UI-chrome white-label
+    overrides): DONE.** Raised 2026-07-28 as a
     brainstorm, not a committed stage. Two independent sub-projects, each
     with its own design and its own change:
     a. Content-translation UI (studio area): DONE. `LocalizedText` (the
@@ -252,7 +252,7 @@ Spec: `development-toolchain`.
        schema or storage change.
        Design: `docs/superpowers/specs/2026-08-05-content-translation-ui-design.md`.
        Change: `add-content-translation-gap-warnings`. Spec: `studio-app`.
-    b. UI-chrome white-label overrides. Motivated by a per-customer wording
+    b. UI-chrome white-label overrides: DONE. Motivated by a per-customer wording
        requirement, not language count. Each customer already gets its own
        deployment/DB (existing environment-separation convention) and wants
        to edit its own UI-chrome wording (buttons/headings) without a
@@ -267,12 +267,15 @@ Spec: `development-toolchain`.
        retrofit is a deliberately deferred, separate prerequisite change.
        Scoped to text only, no logos, colors, or theming.
        Design: `docs/superpowers/specs/2026-08-05-ui-chrome-white-label-overrides-design.md`.
-       Change (proposed, not implemented): `add-ui-chrome-white-label-overrides`.
-    Both changes stop at proposal, spec, and task artifacts; neither is
-    applied. Revisit (a)'s implementation once a process actually ships in
-    two or more locales and the gaps become hard to find by hand. Revisit
-    (b)'s implementation once a specific customer asks for its own
-    UI-chrome wording, not before.
+       Change: `add-ui-chrome-white-label-overrides`. Specs:
+       `ui-string-overrides`, `admin-app`, `http-api-documentation`.
+    The builtin catalogs moved up to `packages/web/src/i18n/catalogs/` in (b),
+    one file per area. The admin screen needs all three key lists, and the
+    package forbids an area importing another area. `admin` and `reporting`
+    carry no catalog yet, so neither is overridable. That retrofit is the
+    next step here, and it adds two entries to
+    `i18n/catalogs/index.ts` and writes `area = 'admin'` rows with no
+    schema change.
 
 14. **Deployment & operations readiness: DONE (a–c).** What shipping to a real
     customer needs beyond a devcontainer. Three independent sub-projects, each
