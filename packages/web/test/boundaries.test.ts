@@ -81,6 +81,34 @@ describe("area boundaries", () => {
       }
     }
   });
+
+  it("every studio LocalizedTextInput site sits beside a missingTranslationWarning call, or an exempting comment", () => {
+    // `missingTranslationWarning` reads useDraft's contentLocale, which
+    // exists only in the studio area, so this rule stays scoped there.
+    // "Beside" is a line-window check, not an AST walk: it looks LOOKAROUND
+    // lines either side of a site for the warning call, since a site's
+    // warning render sometimes precedes it (an option row computes its
+    // warning before the input) and sometimes follows it (a label field's
+    // warning renders as the input's next sibling).
+    const LOOKAROUND = 30;
+    const EXEMPT = /translation-warning-exempt/;
+    let sitesChecked = 0;
+    for (const file of areaFiles("studio")) {
+      const lines = readFileSync(file, "utf8").split("\n");
+      lines.forEach((line, i) => {
+        if (!line.includes("<LocalizedTextInput")) return;
+        sitesChecked++;
+        const window = lines.slice(Math.max(0, i - LOOKAROUND), Math.min(lines.length, i + LOOKAROUND + 1)).join("\n");
+        const ok = window.includes("missingTranslationWarning(") || EXEMPT.test(window);
+        expect(ok, `${file}:${i + 1} has no adjacent missingTranslationWarning call or exemption comment`).toBe(true);
+      });
+    }
+    // studio-app's requirement enumerates six sites by hand: process label,
+    // step label, step description, field label, field description, field
+    // option label. This confirms the rule actually finds all six rather
+    // than silently checking zero.
+    expect(sitesChecked).toBe(6);
+  });
 });
 
 describe("one package, one build", () => {

@@ -661,6 +661,12 @@ An entry that lacks the `baseLocale` value SHALL NOT draw this warning.
 The existing base-locale `EditorIssue` already flags it. The warning
 SHALL NOT draw when `contentLocale` equals `baseLocale`.
 
+A static rule in `packages/web/test/boundaries.test.ts` SHALL enforce that
+list, scoped to `src/areas/studio/`. Every `LocalizedTextInput` rendered
+there SHALL sit beside a call to `missingTranslationWarning`. An exempt site
+SHALL instead carry an inline comment stating why. A hand-kept list does not
+grow with the code. This rule does.
+
 #### Scenario: A step label missing the current locale draws a warning
 
 - **WHEN** the studio's `contentLocale` is `de`, and a draft's step has a
@@ -683,6 +689,24 @@ SHALL NOT draw when `contentLocale` equals `baseLocale`.
 - **WHEN** an author publishes a draft carrying a missing-translation
   warning
 - **THEN** the publish succeeds
+
+#### Scenario: A new render site warns
+
+- **WHEN** the studio area gains a `LocalizedTextInput` site
+- **THEN** the site calls `missingTranslationWarning`
+- **AND** an untranslated entry draws the warning there
+
+#### Scenario: An unguarded site fails the suite
+
+- **WHEN** a source file under `src/areas/studio/` renders a
+  `LocalizedTextInput` with no adjacent `missingTranslationWarning` call and
+  no exempting comment
+- **THEN** the boundary test names the file and fails
+
+#### Scenario: An exempt site says why
+
+- **WHEN** a site legitimately needs no warning
+- **THEN** an inline comment states the reason, and the rule skips it
 
 ### Requirement: The shared editing modal keeps every change and states so
 

@@ -52,10 +52,18 @@ shape. It calls `createServer`'s handler with no port.
 `docs/browser-checks.md` SHALL open with the operating rules a manual run
 needs.
 
-It SHALL name `http://127.0.0.1:3001` as the address. Under Windows
-`localhost` resolves to `::1` and the connection hangs.
-`.devcontainer/docker-compose.override.yml` publishes `3001:3000`, and the
-engine serves the bundle from `WEB_ROOT`.
+It SHALL name `127.0.0.1`, not `localhost`, as the address: under Windows
+`localhost` resolves to `::1` and the connection hangs. The port itself is a
+per-machine choice. Git ignores `.devcontainer/docker-compose.override.yml`,
+so no number in this file binds every contributor. The checklist SHALL give
+the two-line snippet that publishes one, with `3001:3000` as the suggested
+mapping. It SHALL also state that the engine serves the bundle from
+`WEB_ROOT`.
+
+It SHALL state that a contributor must build the frontend bundle first. The
+engine serves `packages/web/dist`, a build output the repository does not
+track. It answers every navigation with a JSON 404 when that directory is
+absent.
 
 It SHALL state that no `bun test` run may overlap a manual run. The dev
 server's outbox poller claims rows the suite drives.
@@ -66,38 +74,21 @@ Each entry SHALL name the change that first asked for it.
 #### Scenario: A contributor opens an area
 
 - **WHEN** a contributor follows the checklist
-- **THEN** the file gives `http://127.0.0.1:3001`, not `localhost`
+- **THEN** the file gives `127.0.0.1`, not `localhost`, and the snippet that
+  publishes the contributor's own port
+
+#### Scenario: A manual run needs a build
+
+- **WHEN** a contributor has not run the frontend build
+- **THEN** the checklist says to build it first, and names why: the engine
+  serves `packages/web/dist`
 
 #### Scenario: A manual run and a test run do not overlap
 
-- **WHEN** a dev server answers port 3001
+- **WHEN** a dev server answers the published port
 - **THEN** the checklist forbids a `bun test` run until that server stops
 
 #### Scenario: An entry keeps its origin
 
 - **WHEN** a reader asks why an entry exists
 - **THEN** the entry names the change that first asked for the check
-
-### Requirement: An area's router ships match, round-trip and half-match coverage
-
-`CLAUDE.md` names an `/admin/*` route collision as one of three defects that
-shipped past a green suite. Every area router in `packages/web` SHALL carry
-the coverage `admin-routing.test.ts` already has.
-
-A change that adds or edits a route SHALL extend that coverage.
-
-#### Scenario: A new route matches and round-trips
-
-- **WHEN** an area gains a route
-- **THEN** a test asserts that the path matches the route
-- **AND** a test asserts that the route round-trips through its path builder
-
-#### Scenario: A deeper path does not half-match
-
-- **WHEN** a request path runs deeper than a declared route
-- **THEN** a test asserts the router falls back rather than half-matching
-
-#### Scenario: Two prefixes do not collide
-
-- **WHEN** two routes share a leading segment
-- **THEN** a test asserts each path reaches its own route

@@ -397,6 +397,41 @@ test.skipIf(!DB)("createProcessInstance succeeds with a valid data seed, and get
   expect(byKey.get("amount")!.value).toBe(100);
   expect(byKey.get("readonly_f")!.readonly).toBe(true);
   expect(view.availablePaths).toEqual([{ id: "path_ab" as PathId, key: "ab", label: undefined }]);
+  expect(view.columns).toBe(1); // step_a's view declares no columns
+});
+
+/** step_a --(path_ab, manual, guardless)--> step_b (terminal). view.columns: 2, one field with span: 2. */
+const twoColumnViewBody = (): ProcessBody =>
+  ({
+    key: "two_column_view_body",
+    label: { en: "Two Column View Body" },
+    baseLocale: "en",
+    fields: [{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          view: { columns: 2, fields: [{ ref: "field_amount", span: 2 }] },
+          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+test.skipIf(!DB)("getInstanceView reports a declared view.columns, and a field's declared span survives", async () => {
+  const PID = pid("proc_view_columns");
+  await publishBody(PID, twoColumnViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
+  expect(view.columns).toBe(2);
+  const field = view.fields.find((f) => f.field.key === "amount")!;
+  expect(field.span).toBe(2);
 });
 
 test.skipIf(!DB)("createProcessInstance pins to an explicit older version, not the newest", async () => {

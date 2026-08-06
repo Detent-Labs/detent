@@ -18,6 +18,10 @@ describe("matchRoute", () => {
   it("falls back to the inbox for an unrecognized path", () => {
     expect(matchRoute("/nowhere")).toEqual({ name: "tasks" });
   });
+
+  it("falls back to the inbox for a path deeper than the task route, rather than half-matching", () => {
+    expect(matchRoute("/tasks/a/b")).toEqual({ name: "tasks" });
+  });
 });
 
 describe("routePath", () => {

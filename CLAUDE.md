@@ -100,7 +100,9 @@ printed, not that you ran it.
   pushed range: `scripts/gates/whitespace.sh`.
 - A real browser, for any UI change. Green tests do not see an error dialog
   rendered behind a modal, a stale result row, or an `/admin/*` route
-  collision. All three shipped past a green suite here.
+  collision. All three shipped past a green suite here. `docs/browser-checks.md`
+  holds what stays manual; `development-toolchain`'s split rule decides
+  whether a new check lands there or ships as a `bun:test` assertion instead.
 
 ## Enforced mechanically. Do not re-litigate these.
 

@@ -13,6 +13,8 @@ import { createRegistry, register, createDataSourceRegistry } from "../src/engin
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { createUser, setDisabled } from "../src/auth/users.js";
 import { idempotencyKey } from "../src/engine/idempotency.js";
+import { listOutbox } from "../src/engine/admin-queries.js";
+import { httpHandlerDef, HTTP_ACTION_TYPE } from "../src/handlers/http.js";
 import type { ProcessBody, Instance, Action } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
@@ -36,12 +38,40 @@ const actOut = (id: string, type: string, field: string, src: string): Action =>
 // Registry with one handler; unused by the okDeliver/boom seams.
 const reg = createRegistry();
 register(reg, "setter", { handler: async () => ({ val: 7 }) });
+// The real http.request handler, for the egress-policy dead-letter cases
+// below — those drive deliver() through the registry, not a deliverFn seam,
+// since the property under test is the handler's own allowlist check.
+register(reg, HTTP_ACTION_TYPE, httpHandlerDef);
 const dataSourceReg = createDataSourceRegistry();
 
 const okDeliver: DeliverFn = async () => ({});
 const boom: DeliverFn = async () => {
   throw new Error("delivery failed");
 };
+
+/**
+ * Sets the named variables for the duration of `fn` and restores the
+ * previous values in a `finally`. An `undefined` value deletes the variable
+ * rather than setting an empty string. Mirrors `test/handlers-http.test.ts:53`
+ * — that copy is not exported, and the egress policy reads `process.env` per
+ * call, so each suite driving it keeps its own restoring wrapper.
+ */
+async function withEnv<T>(vars: Record<string, string | undefined>, fn: () => Promise<T>): Promise<T> {
+  const saved: Record<string, string | undefined> = {};
+  for (const key of Object.keys(vars)) saved[key] = process.env[key];
+  for (const [key, value] of Object.entries(vars)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+  try {
+    return await fn();
+  } finally {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
 
 // step_a (onExit x1) --path_ab (onPath p1)--> step_b terminal (onEntry e1): 3 actions.
 const threeActionBody = (): ProcessBody =>
@@ -367,6 +397,60 @@ test.skipIf(!DB)("a row that keeps failing exhausts attempts and dead-letters", 
 
   await makeDue(inst.instanceId);
   expect(await drainOutbox(sql, reg, okDeliver)).toBe(0); // dead-letter rows are excluded
+});
+
+// --- egress policy: a refused host dead-letters, a permitted one does not ---
+
+/** step_a --(path_ab, manual, guardless)--> step_b terminal (onEntry: one http.request action against `url`). */
+const httpActionBody = (url: string): ProcessBody =>
+  ({
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }] },
+        {
+          id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true,
+          onEntry: [{ id: "action_egress", type: HTTP_ACTION_TYPE, config: { url, method: "POST" } } as unknown as Action],
+        },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+test.skipIf(!DB)("an http.request action against a host the allowlist refuses dead-letters, naming the host", async () => {
+  const body = httpActionBody("https://refused.example.com/hook");
+  const inst = await createFrom(body);
+  await withEnv({ HTTP_ACTION_ALLOWED_HOSTS: "other.example.com" }, async () => {
+    await executeManualTransition(inst, "path_ab", body, actor);
+    await drainOutbox(sql, reg);
+  });
+
+  const r = await rows(inst.instanceId);
+  expect(r).toHaveLength(1);
+  expect(r[0]!.status).toBe("dead-letter");
+  expect(r[0]!.last_error).toContain("refused.example.com");
+
+  const listed = await listOutbox({ status: ["dead-letter"], instanceId: inst.instanceId });
+  expect(listed.items).toHaveLength(1);
+  expect(listed.items[0]!.lastError).toContain("refused.example.com");
+});
+
+test.skipIf(!DB)("an http.request action against an allowlisted host does not dead-letter on the allowlist's account", async () => {
+  // 127.0.0.1:1 is a closed local port: the connection is refused
+  // immediately, a transient failure distinct from egressRefusal's
+  // before-the-socket PermanentError. No listening socket is opened by this
+  // test — the connection attempt itself fails.
+  const body = httpActionBody("http://127.0.0.1:1/hook");
+  const inst = await createFrom(body);
+  await withEnv({ HTTP_ACTION_ALLOWED_HOSTS: "127.0.0.1:1", HTTP_ACTION_ALLOW_INSECURE: "1" }, async () => {
+    await executeManualTransition(inst, "path_ab", body, actor);
+    await drainOutbox(sql, reg);
+  });
+
+  const r = await rows(inst.instanceId);
+  expect(r).toHaveLength(1);
+  expect(r[0]!.status).not.toBe("dead-letter");
 });
 
 // --- the per-row boundary ---

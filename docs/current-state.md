@@ -2807,3 +2807,50 @@ anything.
 `docs/openapi.yaml` carries the route beside the two health routes. The entry
 states that it needs no role and no token. The two admin routes stay out, under
 the `admin/*` exclusion.
+
+## Browser verification checklist (`close-the-browser-verification-debt`)
+
+`CLAUDE.md` requires a real browser for any UI change. Ten open browser
+tasks from the 2026-08-06 merge of ten changes had no owner between
+changes. Each one wrote its own list. The archive swallowed the list once
+the change closed.
+
+`development-toolchain` now carries the split rule. This repository already
+produced the defect, and an assertion can observe it with no browser: the
+check becomes a `bun:test` assertion. Otherwise it stays manual, in
+`docs/browser-checks.md`. That file sits outside `openspec/`. No archive
+step moves it.
+
+Five assertions landed. `src/http/server.ts` exports `BINARY_ROUTES`, a
+declared ledger of routes returning stored bytes rather than a JSON
+envelope. `test/http-disposition.test.ts` drives every entry. It asserts
+`Content-Disposition: attachment` on each one marked `filename: true`.
+
+A case in `test/outbox.test.ts` drives an `http.request` action past the
+egress allowlist. It asserts the dead-letter row names the refused host.
+Two cases in `test/runtime-api.test.ts` close the untested half of
+`InstanceView.columns`. An absent `view.columns` resolves to `1`. A
+declared `columns: 2` survives, alongside a field's `span`.
+
+A static rule in `packages/web/test/boundaries.test.ts` covers the studio
+area. Every `LocalizedTextInput` render site there must sit beside a call
+to `missingTranslationWarning`.
+
+`packages/web/test/reporting-routing.test.ts` gives the reporting router
+the match, round-trip and half-match coverage `admin-routing.test.ts`
+already had. The studio and app routers each gained the one case they
+lacked.
+
+`docs/browser-checks.md` holds the four checks that stay manual. One is
+`iframe` framing from a second origin. Another is the attachment
+download's Save-not-render behavior. A third is the form editor's pointer
+work. The fourth is the shared modal's four remaining points.
+
+Each entry names the address rule, the frontend build step, and the
+change that first asked for it. The address rule is `127.0.0.1`, not
+`localhost`.
+
+`.claude/skills/openspec-archive-change/SKILL.md` now refuses the ordinary
+confirm-and-proceed path for an incomplete browser task. That task's
+content must move into `docs/browser-checks.md` first. The archive step
+created the 2026-08-06 debt. It now refuses the same class of debt.

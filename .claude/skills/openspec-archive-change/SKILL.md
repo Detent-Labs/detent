@@ -54,6 +54,17 @@ Archive a completed change in the experimental workflow.
 
    **If no tasks file exists:** Proceed without task-related warning.
 
+   **Browser tasks are stricter.** Check each incomplete task's text for a
+   browser check. It names a browser, a manual UI walkthrough, or
+   `playwright-cli`. Do not offer the ordinary confirm-and-proceed path for
+   one of those.
+
+   Refuse the archive until its content moves into `docs/browser-checks.md`
+   as a checklist entry, or the task closes some other way. The archive
+   step must not become how a browser check disappears. An earlier merge of
+   ten changes left ten such tasks unchecked. Nobody read them again once
+   the archive swallowed them.
+
 4. **Assess delta spec sync state**
 
    Use `artifactPaths.specs.existingOutputPaths` from status JSON to check for delta specs. If none exist, proceed without sync prompt.
