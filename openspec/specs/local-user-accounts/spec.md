@@ -184,7 +184,7 @@ coordinate across multiple server processes. Normalization
 passed to `verifyLogin` SHALL remain the request's original, unmodified
 `email` string.
 
-`handleLogin` SHALL apply a second window, keyed on the client address, with
+`handleLogin` SHALL apply a second window, keyed on the caller's address, with
 its own threshold and the same `WINDOW_MS`. A request SHALL pass both windows
 to reach `verifyLogin`, and either one over its threshold SHALL return the
 same `429`. The per-address threshold SHALL be high enough that an office
@@ -192,39 +192,40 @@ behind one address does not reach it in ordinary use. It bounds the
 credential-stuffing case the per-email window cannot see: one password tried
 against many accounts.
 
-The address window SHALL be checked first, before the email window records
-anything. A caller past its address threshold therefore never reaches the
-email map, which is what stops one caller from filling that map. The
+`handleLogin` SHALL check the address window first, before the email window
+records anything. A caller past its address threshold therefore never reaches
+the email map. That is what stops one caller from filling that map. The
 memory-footprint requirement below rests on this ordering.
 
 A successful login SHALL NOT clear the address window, though it clears the
 email one. Clearing it would let a caller who holds one valid account reset
-that window whenever they choose, and so try one password against every other
-account for free.
+that window whenever they choose. That caller could then try one password
+against every other account for free.
 
 #### Scenario: A success does not reset the address window
 
-- **WHEN** one address reaches its threshold of recorded attempts, having
-  logged in successfully to an account it holds at some point inside the
-  window
-- **THEN** the next attempt from that address still returns `429`
+- **WHEN** one address reaches its threshold of recorded attempts, and it
+  holds one valid account. It logged in to that account inside the window
+- **THEN** the next request from that address still returns `429`
 
-The client address SHALL come from the connection's peer. When the deployment
-sets `TRUST_PROXY` to `1`, it SHALL come from the `X-Forwarded-For` header
-instead, which the proxy in front of the engine overwrites. Without that
-variable the server SHALL ignore that header, because any caller can send it.
-When the server can determine no address, the second window SHALL NOT apply,
-and the per-email window SHALL still apply.
+The caller's address SHALL come from the connection's peer. When the deployment
+sets `TRUST_PROXY` to `1`, that address SHALL come from the `X-Forwarded-For`
+header instead. The proxy in front of the engine overwrites that header.
+Without that variable the server SHALL ignore that header, because any caller
+can send it. When the server can determine no address, the second window SHALL
+NOT apply, and the per-email window SHALL still apply.
 
 `X-Forwarded-For` holds a comma-separated list. The server SHALL read the
 last entry, trimmed, and SHALL ignore every entry in front of it. A proxy
 that appends rather than overwrites leaves the caller's own submitted value
-in front of its own, so reading the first entry would hand the bucket key
-back to the caller. A header the proxy overwrites holds one entry, where the
-last entry is that entry. A request carrying no such header under
-`TRUST_PROXY` reached this process without passing the proxy, so its peer is
-the caller rather than the proxy: the server SHALL fall back to the peer,
-which counts that request rather than exempting it from the window.
+in front of its own. Reading the first entry would therefore hand the bucket
+key back to the caller. A header the proxy overwrites holds one entry, where
+the last entry is that entry.
+
+A request carrying no such header under `TRUST_PROXY` reached this process
+without passing the proxy. Its peer is therefore the caller rather than the
+proxy. The server SHALL fall back to the peer, which counts that request
+rather than exempting it from the window.
 
 #### Scenario: An email under the limit is unaffected
 
@@ -276,9 +277,9 @@ which counts that request rather than exempting it from the window.
 
 #### Scenario: One address trying many emails is limited
 
-- **WHEN** one client address submits login attempts for many distinct
+- **WHEN** one address submits login attempts for many distinct
   emails, past the per-address threshold, inside one window
-- **THEN** the next attempt from that address returns `429`, whatever email
+- **THEN** the next request from that address returns `429`, whatever email
   it names, and `verifyLogin` is not invoked for it
 
 #### Scenario: A spoofed forwarding header is ignored by default
@@ -319,36 +320,38 @@ full map. It does not run on every request. It SHALL also stay inside the
 same synchronous, `await`-free function. This keeps check and increment
 atomic against concurrent requests for one email.
 
-If the sweep still leaves the map full of live windows, `checkAndRecordAttempt`
-SHALL evict the entry whose window started earliest, and SHALL track the new
-email in the slot that frees. It SHALL NOT refuse the request.
+The sweep can still leave the map full of live windows.
+`checkAndRecordAttempt` SHALL then evict the entry whose window started
+earliest. It SHALL track the new email in the slot that frees. It SHALL NOT
+refuse the request.
 
-The earlier rule refused it, and gave a reason: admitting untracked requests
+The earlier rule refused it, and gave a reason. Admitting untracked requests
 at capacity lets an unauthenticated caller disable the brute-force control
 for every account. The per-address window above removes the premise. One
 caller can no longer create 50,000 entries inside a window, because the
-address window stops that caller first. What refusal costs is now the larger
-harm: every account whose email is not already tracked loses its login until
-the window rolls. Eviction costs at most one untracked try, for the least
-recently active email.
+address window stops that caller first.
+
+What refusal costs is now the larger harm. Every account whose email is not
+already tracked loses its login until the window rolls. Eviction costs at most
+one untracked try, for the least recently active email.
 
 The same reasoning bounds both directions. An evicted entry belongs to the
 oldest window, which is the entry closest to resetting on its own.
 
 The per-address map SHALL carry the same bound, under its own capacity. It
-holds one entry per distinct client address, and under `TRUST_PROXY` its key
+holds one entry per distinct address, and under `TRUST_PROXY` its key
 comes from a header. It therefore has the growth this requirement exists to
-stop. The sweep, the capacity check and the eviction of the earliest window
-SHALL apply to it as they apply to the email map, so this change closes one
-unbounded map and does not open a second.
+stop. The email map's sweep, capacity check and earliest-window eviction SHALL
+apply to the address map too. This change therefore closes one unbounded map
+and does not open a second.
 
 #### Scenario: The address map is bounded the same way
 
-- **WHEN** the per-address map holds its capacity in live windows, and an
-  attempt arrives from a not-yet-tracked address
-- **THEN** the expired entries are swept, and if the map is still full the
-  entry with the earliest window start is evicted and the new address is
-  tracked in the slot that frees
+- **WHEN** the per-address map holds its capacity in live windows, and a
+  request arrives from a not-yet-tracked address
+- **THEN** the sweep removes the expired entries. If the map is still full,
+  `checkAndRecordAttempt` evicts the entry with the earliest window start.
+  It tracks the new address in the slot that frees
 
 #### Scenario: Expired entries are reclaimed before capacity is judged
 
@@ -362,9 +365,9 @@ unbounded map and does not open a second.
 
 - **WHEN** the tracking map holds `MAX_TRACKED_EMAILS` entries whose windows
   are all still live, and a login attempt arrives for a not-yet-tracked email
-- **THEN** the entry with the earliest window start is removed, the new email
-  is tracked, and the request reaches `verifyLogin` subject to the per-address
-  window
+- **THEN** `checkAndRecordAttempt` removes the entry with the earliest window
+  start and tracks the new email. The request reaches `verifyLogin`, subject
+  to the per-address window
 
 #### Scenario: Already-tracked emails are unaffected by capacity
 
@@ -380,9 +383,9 @@ unbounded map and does not open a second.
 
 #### Scenario: A flood from one address is stopped before it fills the map
 
-- **WHEN** one client address submits distinct email values as fast as it can
+- **WHEN** one address submits distinct email values as fast as it can
 - **THEN** the per-address window rejects that caller once it passes the
-  per-address threshold, so the map does not reach capacity from that caller
+  per-address threshold. The map does not reach capacity from that caller
 
 ### Requirement: Users are administered from a CLI, never over HTTP
 

@@ -48,8 +48,8 @@ SHALL set `auth_users.disabled` to the given boolean for the row matching
 `setDisabled` returns `undefined`.
 
 Disabling SHALL take effect on that user's next request, not on their next
-login. The resolver reads the account behind every locally issued token, so a
-token issued before the disable stops resolving at once. See
+login. The resolver reads the account behind every locally issued token. A
+token issued before the disable therefore stops resolving at once. See
 `jwt-authentication`. The login path SHALL keep rejecting a disabled account
 as it does today.
 

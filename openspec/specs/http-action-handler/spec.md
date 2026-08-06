@@ -180,7 +180,7 @@ restart that follows re-reads the policy.
 
 - **WHEN** the egress policy refuses the target's host or scheme
 - **THEN** the handler's action delivery dead-letters immediately, without
-  consuming a transient retry attempt
+  consuming one of the transient retries
 
 #### Scenario: A 404 response is a permanent failure
 
@@ -282,8 +282,8 @@ not name. An unset or empty variable denies every target, the way an unset
 
 The handler SHALL strip the space around an entry and SHALL compare letters
 without regard to case. A URL's host arrives lower-case and without a default
-port. A list the operator typed with a space after each comma, or with a
-capital letter, still matches what the URL carries.
+port. A list the operator typed with a space after each comma still matches
+what the URL carries. So does a list the operator typed with a capital letter.
 
 Second, the target scheme SHALL be `https:`. A deployment that sets
 `HTTP_ACTION_ALLOW_INSECURE` to `1` also accepts `http:`. That escape hatch

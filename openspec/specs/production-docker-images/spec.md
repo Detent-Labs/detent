@@ -57,7 +57,7 @@ runtime environment. It SHALL NOT set `ALLOW_INSECURE_DEV_AUTH`.
 - **WHEN** the engine image starts with neither `AUTH_JWT_SECRET` nor
   `AUTH_ISSUERS` set
 - **THEN** the process fails to start and names the missing configuration,
-  the same failure `resolveAuthResolver` already raises outside a
+  the same error `resolveAuthResolver` already raises outside a
   container
 
 #### Scenario: The image never enables the insecure dev resolver on its own
