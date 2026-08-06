@@ -37,7 +37,22 @@ test("the policy carries the minimum required directives", () => {
   expect(policy).toContain("object-src 'none'");
   expect(policy).toContain("base-uri 'none'");
   expect(policy).toContain("form-action 'self'");
-  expect(policy).toContain("frame-ancestors 'none'");
+});
+
+/**
+ * The rule, not the one directive `deliver-framing-and-sniffing-headers`
+ * removed: a browser honors all three of these only in an HTTP response
+ * header. A directive here that the browser ignores reads as protection and
+ * gives none, so re-adding any of the three must fail this test.
+ * `frame-ancestors` now ships from `src/http/static.ts` and
+ * `docker/nginx.conf`.
+ */
+test("the meta policy carries no directive a meta tag ignores", () => {
+  delete process.env.VITE_API_URL;
+  const policy = policyOf();
+  for (const inert of ["frame-ancestors", "report-uri", "sandbox"]) {
+    expect(policy).not.toContain(inert);
+  }
 });
 
 test("connect-src is 'self' only, when VITE_API_URL is unset", () => {

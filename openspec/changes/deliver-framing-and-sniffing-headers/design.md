@@ -65,6 +65,13 @@ cost.
   that the header carries `frame-ancestors` alone, which keeps it true.
 - A reader may look for the framing rule in the Vite config → the plugin's
   doc comment names where it moved.
+- A later change to `docker/nginx.conf` drops all four headers → nginx has a
+  replace rule for `add_header`. A level's set reaches a nested block only
+  while that block declares none of its own. One `add_header` inside
+  `location /` therefore removes all four. A comment above the directives
+  states the rule. The later change
+  `document-deployment-and-self-enable-the-hook` rewrites this file, so the
+  comment has a reader.
 
 ## Migration Plan
 
