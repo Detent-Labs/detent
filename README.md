@@ -65,7 +65,7 @@ carries the four areas above.
 | `src/handlers/` | Two action handlers ship. `http.request` is a vendor-neutral REST call with engine-set idempotency and outbox-aligned retry semantics. `notification.email` speaks SMTP directly and reads its connection details from the environment. |
 | `packages/web/` | The one browser package. `src/shell/` holds prefix routing, the one session and login, the account menu and the area switcher; `src/api/` and `src/i18n/` hold what every area shares; `src/areas/{app,admin,studio,reporting}/` hold the four audiences' screens, one URL prefix, one lazy chunk and one role gate each. An area never imports from another area. |
 | `packages/form-ui/` | Source-only shared step-form renderer, so what an author previews is what a participant gets. |
-| `examples/expense-approval.json` | Complete Capture → Review → Book example. |
+| `examples/expense-approval.json` | Complete Capture → Review → Book example. Runs end-to-end in the devcontainer against its `webhook-sink` service. |
 | `examples/subprocess-*.json` | A loan-application parent calling a credit-check subprocess (child) — spawn, `child.outcome` routing, return writeback. |
 | `test/` | `bun:test` suites; each invariant ships a test that rejects a violating definition. |
 

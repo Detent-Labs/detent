@@ -10,17 +10,21 @@ import { canonicalize } from "../src/schema/canonical-json.js";
  * `ProcessBody` alone and a published version is immutable, so neither key may
  * move the hash of a body that declares neither.
  *
- * The literals below were computed against the schema as it stood BEFORE both
- * keys existed, from a `git archive HEAD` copy of the tree. They are the
- * regression guard: a schema change that alters what `processBody.parse`
- * emits for these bodies moves the hash and fails here.
+ * `subprocess-credit-check-child.json` and `subprocess-loan-parent.json` keep
+ * their original provenance: their literals were computed against the schema
+ * as it stood BEFORE both keys existed, from a `git archive HEAD` copy of the
+ * tree, and neither file has changed since.
  *
- * `expense-approval.json` also carries its own `definitionHash` field. That
- * field is already stale at the commit this test was written on, so it is not
- * the pin. Do not "repair" it here.
+ * `expense-approval.json`'s literal does not carry that provenance.
+ * `give-the-example-a-reachable-target` rewrote its three action bodies, which
+ * moves the hash, so this file's entry is a fresh measurement against the
+ * CURRENT schema, taken in the same run that confirmed the other two literals
+ * still pass. All three remain the regression guard from here on: a schema
+ * change that alters what `processBody.parse` emits for any of these bodies
+ * moves its hash and fails here.
  */
 const PRE_CHANGE_HASHES: Record<string, string> = {
-  "expense-approval.json": "b90f7044c52a60a54093c7c92951ea0576ba611403b19420a0042cfeb2f20dd2",
+  "expense-approval.json": "484922c2b599780126301db2a75958957a3ebd7a5d984f0d880820244c65d690",
   "subprocess-credit-check-child.json": "c585d1b2f94b0b8a8541144ab7fbf110344a245446dd25dd100ede94d63ad80a",
   "subprocess-loan-parent.json": "7faa040f7cbb6d5e310bf6440802e53a043929318eee9f436fa85ad3b47d18c5",
 };

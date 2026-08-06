@@ -20,7 +20,6 @@ import { readFileSync } from "node:fs";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody, listProcesses, listVersions } from "../src/engine/definitions.js";
 import { createDefaultRegistry, createDefaultDataSourceRegistry } from "../src/engine/host.js";
-import { register } from "../src/engine/registry.js";
 import { createUser, listUsers, setRoles, setPassword } from "../src/auth/users.js";
 import {
   PUBLISH_ROLE,
@@ -109,11 +108,6 @@ async function main() {
   await initSchema();
 
   const registry = createDefaultRegistry();
-  // Dummy handlers, sufficient for publish-time registry validation only —
-  // mirrors scripts/demo-expense-approval.ts, since expense-approval.json
-  // references action types no real handler ships for yet (roadmap #5e).
-  register(registry, "notify.email", { handler: async () => ({}) });
-  register(registry, "accounting.postInvoice", { handler: async () => ({ status: "booked" }) });
   const dataSourceReg = createDefaultDataSourceRegistry();
 
   console.log("Processes:");

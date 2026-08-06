@@ -12,10 +12,11 @@
 import { readFileSync } from "node:fs";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
-import { createRegistry, register, createDataSourceRegistry } from "../src/engine/registry.js";
+import { createDataSourceRegistry } from "../src/engine/registry.js";
+import { createDefaultRegistry } from "../src/engine/host.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { drainResolutions } from "../src/engine/resolution.js";
-import { createProcessInstance, getInstanceView, submitAndTransition } from "../src/runtime/api.js";
+import { createProcessInstance, getInstanceView, submitAndTransition, claimStep } from "../src/runtime/api.js";
 import type { InstanceView } from "../src/runtime/api.js";
 import type { Actor } from "../src/cel/eval.js";
 import type { ProcessId } from "../src/schema/definition.js";
@@ -41,11 +42,9 @@ function logView(label: string, view: InstanceView) {
 async function main() {
   await initSchema();
 
-  // Real handlers don't exist yet (roadmap #5e); dummy ones just enough to
-  // satisfy publish-time registry validation and drive the demo forward.
-  const registry = createRegistry();
-  register(registry, "notify.email", { handler: async () => ({}) });
-  register(registry, "accounting.postInvoice", { handler: async () => ({ status: "booked" }) });
+  // The same registry a deployment runs: every action type
+  // expense-approval.json names resolves here, no dummy handler needed.
+  const registry = createDefaultRegistry();
   const dataSourceReg = createDataSourceRegistry();
 
   const raw = JSON.parse(readFileSync(new URL("../examples/expense-approval.json", import.meta.url), "utf-8"));
@@ -60,6 +59,10 @@ async function main() {
   let view = await getInstanceView(instance.instanceId, actor, dataSourceReg);
   logView("capture", view);
   const submitPath = view.availablePaths.find((p) => p.key === "submit")!;
+  // "capture" and "review" both declare an assignment; the demo actor holds
+  // both roles, but each step still requires its own claim before
+  // submitAndTransition accepts it.
+  await claimStep(instance.instanceId, actor);
   instance = await submitAndTransition(
     instance.instanceId,
     submitPath.id,
@@ -72,6 +75,7 @@ async function main() {
   view = await getInstanceView(instance.instanceId, actor, dataSourceReg);
   logView("review", view);
   const approvePath = view.availablePaths.find((p) => p.key === "approve")!;
+  await claimStep(instance.instanceId, actor);
   instance = await submitAndTransition(
     instance.instanceId,
     approvePath.id,

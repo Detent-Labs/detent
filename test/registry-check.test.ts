@@ -3,11 +3,13 @@
  * action's type against a Registry and checks its config against the
  * handler's declared configSchema. Pure — no DB — mirrors cel.test.ts's style.
  */
+import { readdirSync, readFileSync } from "node:fs";
 import { test, expect } from "bun:test";
 import { z } from "zod";
 import { checkActionRegistry } from "../src/engine/registry-check.js";
 import { createRegistry, register } from "../src/engine/registry.js";
-import type { ProcessBody } from "../src/schema/definition.js";
+import { createDefaultRegistry } from "../src/engine/host.js";
+import { processBody, type ProcessBody } from "../src/schema/definition.js";
 
 const action = (type: string, config: Record<string, unknown> = {}) => ({ id: "action_x", type, config });
 
@@ -135,3 +137,25 @@ test("a config with multiple violated fields produces one issue per field", () =
   const issues = checkActionRegistry(bodyWithActions({ onEntry: [action("email", { to: 1, subject: 2 })] }), reg);
   expect(issues.length).toBe(2);
 });
+
+// give-the-example-a-reachable-target: the mechanical form of the
+// development-toolchain spec's "every action type the shipped examples name
+// resolves in the default registry" requirement. Reads the AUTHORED body
+// (never compileProcessBody's output), since a compiled body's injected
+// core.spawnSubprocess/core.returnSubprocess actions are dispatched
+// internally by subprocess.ts, never through this author-facing registry —
+// checking the compiled body would fail on every subprocess example
+// regardless of what the example itself names.
+const exampleFiles = readdirSync(new URL("../examples/", import.meta.url)).filter((f) => f.endsWith(".json"));
+
+function exampleBody(file: string): ProcessBody {
+  const raw = JSON.parse(readFileSync(new URL(`../examples/${file}`, import.meta.url), "utf8"));
+  return processBody.parse(raw.definition ?? raw);
+}
+
+for (const file of exampleFiles) {
+  test(`every action type ${file} names resolves in createDefaultRegistry()`, () => {
+    const issues = checkActionRegistry(exampleBody(file), createDefaultRegistry());
+    expect(issues).toEqual([]);
+  });
+}

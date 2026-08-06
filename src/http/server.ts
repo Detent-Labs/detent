@@ -14,13 +14,8 @@
 import { SQL, type Server } from "bun";
 import { timingSafeEqual } from "node:crypto";
 import { sql, initSchema } from "../engine/store.js";
-import { startEngine, createDefaultDataSourceRegistry } from "../engine/host.js";
-import {
-  createRegistry,
-  type Registry,
-  type DataSourceRegistry,
-  type AssignmentRegistry,
-} from "../engine/registry.js";
+import { startEngine, createDefaultRegistry, createDefaultDataSourceRegistry } from "../engine/host.js";
+import { type Registry, type DataSourceRegistry, type AssignmentRegistry } from "../engine/registry.js";
 // The org-aware set (static + org.manager-of-starter), not the static-only leaf
 // factory of the same name in registry.js. This is the composition root.
 import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies.js";
@@ -694,7 +689,7 @@ export async function startHttpServer(
 }
 
 if (import.meta.main) {
-  startHttpServer(createRegistry(), createDefaultDataSourceRegistry(sql))
+  startHttpServer(createDefaultRegistry(), createDefaultDataSourceRegistry(sql))
     .then(({ stop }) => {
       // Registered here rather than in `startHttpServer`, which every test
       // calls: a listener per call would leak one per test file. This block

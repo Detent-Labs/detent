@@ -1243,9 +1243,7 @@ test.skipIf(!DB)("happy path through expense-approval.json settles the async 'bo
   const raw = JSON.parse(readFileSync(new URL("../examples/expense-approval.json", import.meta.url), "utf8"));
   const authored = raw.definition as ProcessBody;
   const expenseReg = createRegistry();
-  register(expenseReg, "accounting.postInvoice", { handler: async () => ({ status: "booked" }) });
-  register(expenseReg, "notify.email", { handler: async () => ({}) });
-  register(expenseReg, "http.request", { handler: async () => ({}) });
+  register(expenseReg, "http.request", { handler: async () => ({ body: { status: "booked" } }) });
   register(expenseReg, "notification.email", { handler: async () => ({}) });
   const expenseFetch = createServer(dataSourceReg, expenseReg, sql, devHeaderResolver);
 

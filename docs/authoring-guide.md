@@ -196,9 +196,12 @@ outbox. Delivery happens at least once, so a handler must tolerate a repeat.
 Actions run in a fixed order. First `onExit` of the step you leave, then
 `onPath` of the path you take, then `onEntry` of the step you enter.
 
-The example posts to accounting with `accounting.postInvoice` on entry to
-`book`. On entry to `escalated_review` it runs `http.request` and
-`notification.email`.
+The example runs `http.request` on entry to `book`, posting the booking
+outcome to an outside system. The devcontainer's own target echoes back
+whatever it receives. The demo's booking always succeeds; a real accounting
+system would decide instead. `review`'s reminder timer sends
+`notification.email`. On entry to `escalated_review` the example runs both
+`http.request` and `notification.email`.
 
 An action can write its result back into the payload. The engine verifies the
 value against the target field's declared type first. A value of the wrong
@@ -208,7 +211,9 @@ The `http.request` type reaches only a host the deployment permits. That list
 lives in the deployment's own environment, not in your process. A target
 outside it never opens a connection, and the action dead-letters with the host
 named in the message. Ask your operator to add the host, or pick one already
-on the list.
+on the list. The devcontainer's own entry is `webhook-sink:8080`, the sink
+service the example's `book` and `escalated_review` steps both target. Try
+the example against it before asking for a new host anywhere else.
 
 Two more rules follow from the same place. The target uses `https`, unless the
 deployment opted into plain HTTP. And the handler does not follow a redirect:

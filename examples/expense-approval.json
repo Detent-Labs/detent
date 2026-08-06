@@ -1,7 +1,7 @@
 {
   "processId": "proc_3f8a1c2e-9b4d-4e7a-a1c8-2e5f7b9d0a13",
   "version": 1,
-  "definitionHash": "2eec7e1e62950988fc3fd972f50899de04df0cfc4b9ed20e894790396c1ee788",
+  "definitionHash": "08c8f0df1d7eb8703a9b3a0303f39c4f658ed6eff0798290a4ebe685a2c97762",
   "status": "published",
   "publishedAt": "2026-07-18T09:00:00Z",
   "definition": {
@@ -174,10 +174,13 @@
                 "actions": [
                   {
                     "id": "action_eeee5555-0001-4a1c-8e2f-000000000001",
-                    "type": "notify.email",
+                    "type": "notification.email",
                     "config": {
-                      "template": "review-reminder",
-                      "toRole": "finance-approver"
+                      "to": [
+                        "finance-approver@example.com"
+                      ],
+                      "subject": "Expense approval reminder",
+                      "body": "An expense request has waited a week for your review."
                     },
                     "execution": "async",
                     "retry": {
@@ -230,19 +233,23 @@
           },
           "type": "task",
           "description": {
-            "en": "Wait-state. onEntry triggers the booking (async). Two automatic paths branch on booking_status, which the action writes back."
+            "en": "Wait-state. onEntry triggers the booking (async). Two automatic paths branch on booking_status, which the action writes back. The devcontainer's webhook sink echoes the request body, so config.body's status is exactly what booking_status becomes."
           },
           "onEntry": [
             {
               "id": "action_eeee5555-0002-4a1c-8e2f-000000000002",
-              "type": "accounting.postInvoice",
+              "type": "http.request",
               "config": {
-                "amountField": "field_1a2b3c4d-0001-4a1c-8e2f-000000000001"
+                "url": "http://webhook-sink:8080/hooks/expense-booked",
+                "method": "POST",
+                "body": {
+                  "status": "booked"
+                }
               },
               "output": {
                 "field_1a2b3c4d-0004-4a1c-8e2f-000000000004": {
                   "lang": "cel",
-                  "src": "result.status"
+                  "src": "result.body.status"
                 }
               },
               "execution": "async",
@@ -395,7 +402,7 @@
               "id": "action_eeee5555-0003-4a1c-8e2f-000000000003",
               "type": "http.request",
               "config": {
-                "url": "https://example.com/hooks/expense-escalated",
+                "url": "http://webhook-sink:8080/hooks/expense-escalated",
                 "method": "POST"
               },
               "execution": "async",
