@@ -66,6 +66,8 @@ import {
   handleAdminUpdateDataList,
   handleAdminPutDataListValues,
   handleAdminDeleteDataList,
+  handleAdminListUiStrings,
+  handleAdminPutUiString,
 } from "./admin-routes.js";
 import {
   handleReportingListProcesses,
@@ -89,6 +91,7 @@ import {
   handleSaveTemplate,
   handleDeleteTemplate,
 } from "./studio-routes.js";
+import { handleGetUiStrings } from "./ui-strings-routes.js";
 import { handleLivez, handleReadyz } from "./health.js";
 import { handleMetrics } from "./metrics.js";
 import type { HttpResult, HttpBinaryResult } from "./errors.js";
@@ -137,11 +140,14 @@ function corsHeaders(allowed: AllowedOrigins, requestOrigin: string | null): Rec
 function toResponse({ status, body }: HttpResult, allowed: AllowedOrigins, requestOrigin: string | null): Response {
   return new Response(JSON.stringify(body), {
     status,
-    // Every envelope this wrapper returns is actor-scoped, and an instance view
-    // or a comment list holds data a participant supplied. No intermediary may
-    // keep a copy. One header here covers every route, success and error alike;
-    // a per-route opt-out list would drift, as the hand-written preflight chain
-    // did before the route table replaced it.
+    // Nearly every envelope this wrapper returns is actor-scoped, and an
+    // instance view or a comment list holds data a participant supplied. No
+    // intermediary may keep a copy. One header here covers every route, success
+    // and error alike; a per-route opt-out list would drift, as the
+    // hand-written preflight chain did before the route table replaced it.
+    // `GET /ui-strings` is the one envelope that is not actor-scoped and would
+    // not need this. It keeps the header anyway, for that same drift reason,
+    // and it costs one uncached fetch per page load.
     headers: { "content-type": "application/json", "Cache-Control": "no-store", ...corsHeaders(allowed, requestOrigin) },
   });
 }
@@ -415,6 +421,16 @@ export function createServer(
       ? []
       : [{ method: "POST", segments: seg("/auth/login"),
            handler: (_p: string[], req: Request, clientAddress: string | undefined) => handleLogin(req, secret, db, clientAddress) } satisfies Route]),
+    // Resolves no actor and requires no role, the way `POST /auth/login` above
+    // does: the login screen renders before a token exists, so its own wording
+    // must be fetchable without one. It belongs in this table rather than
+    // beside /livez and /readyz, which answer with no CORS headers on purpose.
+    // This one is a browser fetch, and API_BASE reads VITE_API_URL, so a
+    // deployment may serve the bundle from a second origin. The OPTIONS
+    // preflight answer is derived from this table too, so a route outside it
+    // gets none.
+    { method: "GET", segments: seg("/ui-strings"),
+      handler: (_p, _req) => handleGetUiStrings(_req, db) },
     { method: "POST", segments: seg("/processes/:processId/instances"),
       handler: (p, req) => handleCreateInstance(p[0]!, req, resolver, dataSourceRegistry, db, assignmentRegistry) },
     { method: "GET", segments: seg("/instances"),
@@ -483,6 +499,10 @@ export function createServer(
       handler: (p, req) => handleAdminUpdateDataList(p[0]!, req, resolver, db) },
     { method: "DELETE", segments: seg("/admin/data-lists/:listKey"),
       handler: (p, req) => handleAdminDeleteDataList(p[0]!, req, resolver, db) },
+    { method: "GET", segments: seg("/admin/ui-strings"),
+      handler: (_p, req) => handleAdminListUiStrings(req, resolver, db) },
+    { method: "PUT", segments: seg("/admin/ui-strings"),
+      handler: (_p, req) => handleAdminPutUiString(req, resolver, db) },
     { method: "GET", segments: seg("/reporting/processes"),
       handler: (_p, req) => handleReportingListProcesses(req, resolver, db) },
     { method: "GET", segments: seg("/reporting/:processId/cycle-time"),

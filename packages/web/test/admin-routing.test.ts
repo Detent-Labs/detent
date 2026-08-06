@@ -31,6 +31,7 @@ describe("the admin area's per-screen role gate", () => {
     { name: "migrations" },
     { name: "dataLists" },
     { name: "dataList", listKey: "cost_centres" },
+    { name: "uiStrings" },
   ];
 
   it("names a role for every route, so no screen renders ungated", () => {
@@ -58,6 +59,14 @@ describe("the admin area's per-screen role gate", () => {
   it("shows an operator the operations screens and no data list screen", () => {
     const roles = ["system:admin"];
     const reachable = ROUTES.filter((r) => roles.includes(ROUTE_ROLE[r.name])).map((r) => r.name);
-    expect(reachable).toEqual(["instances", "instance", "outbox", "timers", "users", "migrations"]);
+    expect(reachable).toEqual([
+      "instances",
+      "instance",
+      "outbox",
+      "timers",
+      "users",
+      "migrations",
+      "uiStrings",
+    ]);
   });
 });

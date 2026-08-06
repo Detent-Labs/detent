@@ -2686,3 +2686,82 @@ inbox badge. Five tests pin those strings. The narrow style of
 Adopting it would change what a participant reads. It would also drop four
 catalog keys in two locales and rewrite five tests. That is a redesign of the
 badge.
+
+## UI-chrome white-label overrides (`add-ui-chrome-white-label-overrides`)
+
+A deployment renames its own buttons and headings. It needs no code change and
+no redeploy. Roadmap stage 13b. The wording only. No logo, no color, no theme.
+
+`initSchema` creates `ui_string_overrides`. The key is `(area, locale, key)`.
+The row also holds `value`, `updated_by` and `updated_at`.
+
+`area` is plain text, not a database enum. The later catalog retrofit for
+`admin` and `reporting` then writes `area = 'admin'` rows against the same
+schema.
+
+A row exists only while it overrides something. Clearing a key deletes its row.
+`data_list_values` deactivates instead, because a running instance may still
+hold one of those values. No instance, draft or published body reads a UI
+string. Nothing pins to a row here.
+
+`src/engine/ui-strings.ts` holds three statements. One returns the whole table
+as a nested `area -> locale -> key -> value` map. One counts the rows. One
+upserts a row, or deletes it when `value` is `null`.
+
+Three routes. `GET /ui-strings` needs no token and no role. It has its own
+module, for the reason `health.ts` has one. Every handler in `admin-routes.ts`
+states the opposite invariant. `GET /admin/ui-strings` and
+`PUT /admin/ui-strings` sit behind `system:admin`. The `PUT` records the acting
+actor.
+
+The public read sits in `createServer`'s route table. It does not sit beside
+`/livez` and `/readyz`. Those two carry no CORS header, on purpose. This one is
+a browser fetch. `API_BASE` reads `VITE_API_URL`, so a deployment may serve the
+bundle from a second origin. That table also decides the `OPTIONS` preflight
+answer. A route outside it gets none.
+
+No token gates the read. The write path therefore decides how large its answer
+gets. `area`, `locale` and `key` each stay under `MAX_KEY_LENGTH`. `value` stays
+under `MAX_OVERRIDE_VALUE_LENGTH`, 4096. The table stays under `MAX_OVERRIDES`,
+2000 rows. Each breach raises a `RequestShapeError`. The route checks the row
+bound only for a write that adds a row. An overwrite and a clear therefore stay
+possible at the bound.
+
+The route refuses an empty-string `value`. Clearing goes through `null`.
+`resolveOverride(...) ?? builtin` does not fall back on `""`. A stored empty
+string would render a blank label. Absence and emptiness stay distinct on both
+sides of the wire.
+
+`packages/web/src/i18n/overrides.ts` holds the fetched map in a module
+variable. Each of the three `t()` functions gained one line that reads it
+first.
+
+React does not observe that variable. `main.tsx` therefore awaits
+`loadUiStringOverrides()` before `createRoot(root).render(<App />)`. An effect
+in `App.tsx` would run after the first render. That first render is the login
+screen. `loadUiStringOverrides` drops every failure and leaves the map
+empty. An unreachable engine still yields a login screen in its shipped
+wording.
+
+The three builtin catalogs moved up to `packages/web/src/i18n/catalogs/`, one
+file per area, plus an `index.ts` keyed by area name. The admin screen needs
+all three key lists, and `boundaries.test.ts` forbids an area importing another
+area. Only that screen imports `index.ts`. Each area imports its own file, so
+the per-area chunking survives. Each `catalog.ts` keeps its `t()` and its
+exported key type at its old path. No call site moved.
+
+The admin area gained `/ui-strings`. It sits behind `system:admin` in
+`ROUTE_ROLE` and in the `TABS` list. The screen picks an area and a locale. It
+lists that catalog's keys, each with the shipped wording beside an editable
+input. It seeds each input from any stored override. A save writes the changed
+rows, then re-reads the public map and installs it.
+
+The public route returns wording, keyed by area, locale and catalog key. It
+returns nothing actor-scoped. It reads one table, and that table holds no
+account, instance, process or definition data. It reads that table whole, so
+its answer never varies by caller. No request probes it for the presence of
+anything.
+
+`docs/openapi.yaml` carries the route beside the two health routes. The entry
+states that it needs no role and no token. The two admin routes stay out, under
+the `admin/*` exclusion.

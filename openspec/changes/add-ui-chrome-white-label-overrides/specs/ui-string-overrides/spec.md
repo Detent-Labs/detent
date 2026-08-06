@@ -63,3 +63,67 @@ override SHALL delete its stored row, not merely blank its value.
 
 - **WHEN** an actor without `system:admin` attempts to set an override
 - **THEN** the system refuses the request
+
+### Requirement: The write path bounds what the public read returns
+
+The override read needs no token, and it returns the whole table. The
+write path SHALL therefore decide that response's size. The system SHALL
+refuse a write whose `area`, `locale` or `key` exceeds the key-length
+bound the repository already declares. It SHALL refuse a write whose
+`value` exceeds a declared value-length bound. It SHALL refuse a write
+that would carry the table past a declared row count.
+
+Each refusal SHALL reject the request shape, and SHALL store no row.
+
+#### Scenario: The system refuses an over-long value
+
+- **WHEN** an actor holding `system:admin` submits a `value` longer than
+  the declared value-length bound
+- **THEN** the system refuses the request and stores no row
+
+#### Scenario: The system refuses an over-long key
+
+- **WHEN** an actor holding `system:admin` submits an `area`, `locale` or
+  `key` longer than the declared key-length bound
+- **THEN** the system refuses the request and stores no row
+
+#### Scenario: The system refuses a write past the row bound
+
+- **WHEN** the table already holds the declared maximum row count, and an
+  actor holding `system:admin` submits a further new `(area, locale, key)`
+- **THEN** the system refuses the request and stores no row
+
+### Requirement: An override is never stored empty
+
+An override exists only while it replaces something. The system SHALL
+refuse an empty-string `value`, and SHALL treat a `null` value as the
+instruction to delete the row.
+
+A stored empty string would resolve ahead of the builtin value and render
+a blank label. The resolver reads absence and emptiness differently. The
+write path refuses the empty string, and that keeps the fallback total.
+
+#### Scenario: The system refuses an empty value rather than storing it
+
+- **WHEN** an actor holding `system:admin` submits an empty string as the
+  `value` for `(area, locale, key)`
+- **THEN** the system refuses the request, and keeps any existing
+  override for that key as it was
+
+#### Scenario: A key with no override renders its builtin value, never blank
+
+- **WHEN** no override row exists for `(area, locale, key)`
+- **THEN** the area's screen shows the builtin catalog value for that key
+
+### Requirement: A failed override read leaves every builtin value in place
+
+The override read runs before the first render. The system SHALL treat a
+failed read as an empty override map. It SHALL render every screen from
+its builtin catalog. A deployment whose override read fails SHALL still
+reach its login screen.
+
+#### Scenario: The override read fails at boot
+
+- **WHEN** the override read returns an error, or the request does not
+  complete
+- **THEN** the login screen renders, showing its builtin wording
