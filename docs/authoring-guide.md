@@ -134,11 +134,28 @@ The example has seven steps. `capture` is the initial step. `booked` and
 
 ### View
 
-What a step shows. The view names catalog fields and overrides how this step
-presents each one: visible, required, readonly, its order, its group.
+What a step shows. The view names catalog fields. It overrides how this step
+presents each one: visible, required, readonly, its span, its order, its group.
 
 Requiredness lives in the view, never in the catalog. One step can demand a
 field that the next step only displays.
+
+The view also sets `columns`, either 1 or 2. That is how many columns the
+step's form lays its fields out in. A field's own `span`, also 1 or 2, is how
+many of those columns it fills.
+
+Both keys are optional and both mean 1 when absent. A view that names neither
+shows one column with every field full width. That is what every view showed
+before the two keys existed.
+
+A field never draws wider than the form around it. A `span` of 2 on a
+one-column form draws at width 1, and the stored value stays 2. Widen the form
+again and the field widens with it. Below a narrow measure the form drops to
+one column, whatever it declares. The stored values again stay as they are.
+
+A group takes the form's own column count. It declares none of its own, and
+it always fills the form's width. A `span` on a group is not read: two columns
+inside the group need the room two columns take.
 
 ### Path
 
@@ -300,8 +317,25 @@ it belongs in an action.
 
 ### 4. Compose the view for each step
 
-Select a step and build its view. Add the catalog fields this step shows, and
-override each one: visible, required, readonly, its position, its group.
+Select a step and choose **View** in its section index. That opens the form
+editor over the canvas.
+
+The editor has three parts. On the left, a palette lists every catalog field
+this step's view does not yet name. In the middle, a canvas draws the form as
+a participant will see it. Below the canvas, a strip edits whichever card you
+select.
+
+Drag a field from the palette onto the canvas to add it. Drag a card to
+another position to reorder the view. Each card also carries move-up and
+move-down buttons, which make the same change without a pointer. Take a card
+off the canvas and its field returns to the palette.
+
+A toggle above the canvas sets the form to one column or two. Select a card
+and the strip sets that field's visible, required, readonly, span and group.
+Each of the first three takes `true`, `false`, or a CEL expression.
+
+The editor writes into the draft as you work. It has no Save button of its
+own: the screen's Save, Discard and Publish still govern what persists.
 
 A terminal step usually shows a readonly summary. A step early in the process
 usually demands the fields it collects.

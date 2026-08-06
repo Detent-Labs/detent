@@ -164,7 +164,8 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
   }
 
   return (
-    <main className="studio-screen">
+    // `studio-player-screen` is the size container the two-pane fold measures.
+    <main className="studio-screen studio-player-screen">
       <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "edit", processId })}>
         ← Back to process
       </button>
@@ -206,7 +207,7 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
               instance {instanceId} · step {view.step.key} · status {view.status}
             </p>
 
-            <FieldForm fields={view.fields} values={formValues} onChange={(fieldId, value) => setFormValues((v) => ({ ...v, [fieldId]: value }))} locale="en" issuesByField={issuesByField} />
+            <FieldForm fields={view.fields} values={formValues} onChange={(fieldId, value) => setFormValues((v) => ({ ...v, [fieldId]: value }))} locale="en" issuesByField={issuesByField} columns={view.columns ?? 1} />
 
             <div className="studio-controls">
               {!claimedByMe && (

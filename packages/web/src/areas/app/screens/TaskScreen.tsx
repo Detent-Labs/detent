@@ -264,6 +264,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
             onChange={(fieldId, value) => setFormValues((v) => ({ ...v, [fieldId]: value }))}
             locale={locale}
             issuesByField={issuesByField}
+            columns={view.columns ?? 1}
           />
 
           <div className="app-task-actions">

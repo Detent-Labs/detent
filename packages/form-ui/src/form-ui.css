@@ -4,10 +4,67 @@
    host area (app.css or studio's app.css) has already loaded it by the time
    these rules apply, so this file needs no import of its own. */
 
+/* The wrapper exists only to be the size container the collapse rule below
+   measures. A container query matches descendants of the container, never the
+   container itself, so the grid cannot carry this and be queried by it.
+   Measuring here rather than the viewport is what makes the Player, which
+   renders the form beside the record, and the app area, which renders it
+   alone, fold at the same form width. */
+.form-ui-form {
+  container-type: inline-size;
+  container-name: form-ui-form;
+}
+
+/* The form is a grid of `view.columns` tracks. One column is the default and
+   is what every body written before `view.columns` existed resolves to, so an
+   already-published form lays out exactly as it did: one track, each field
+   filling it. The gap sits on the 4-point scale. */
 .form-ui-field-form {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: var(--space-4);
+}
+
+.form-ui-field-form[data-columns="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* A group inherits the form's own count rather than declaring one. A group on
+   a one-column form therefore stacks its members, unchanged. */
+.form-ui-field-group[data-columns="2"] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+/* `data-span` is the span already clamped to the grid (`min(span, columns)`),
+   so a `span: 2` field on a one-column form arrives here as 1 and needs no
+   rule of its own. */
+.form-ui-field-form > [data-span="2"],
+.form-ui-field-group[data-columns="2"] > [data-span="2"] {
+  grid-column: span 2;
+}
+
+/* A group's <legend> and any full-width member must not be squeezed into one
+   track of the group's own grid. */
+.form-ui-field-group[data-columns="2"] > legend {
+  grid-column: 1 / -1;
+}
+
+/* Below the form's own comfortable measure there is no room for two tracks,
+   whatever the view declares. Measured on the form element, so the Player and
+   the participant's Task screen collapse at the same form width. The stored
+   `span` is untouched: widening the container restores the declared layout. */
+@container form-ui-form (max-width: 34rem) {
+  .form-ui-field-form[data-columns="2"],
+  .form-ui-field-group[data-columns="2"] {
+    grid-template-columns: 1fr;
+  }
+
+  .form-ui-field-form[data-columns="2"] > [data-span="2"],
+  .form-ui-field-group[data-columns="2"] > [data-span="2"] {
+    grid-column: auto;
+  }
 }
 
 /* Wraps a label+control pair and its (sibling, not nested) issue list —

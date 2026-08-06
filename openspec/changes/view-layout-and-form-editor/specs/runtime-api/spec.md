@@ -92,6 +92,39 @@ caller can distinguish these cases.
 - **THEN** the resolved field's `required` is `false` and its `value`
   is `undefined`, regardless of the view's declaration
 
+#### Scenario: A guarded manual path that fails its guard is omitted
+
+- **WHEN** a manual path's guard evaluates false against the instance's
+  current data
+- **THEN** that path is absent from `availablePaths`
+
+#### Scenario: A guardless manual path is always available
+
+- **WHEN** a manual path on the current step carries no guard
+- **THEN** it is present in `availablePaths` regardless of instance data
+
+#### Scenario: View on a non-running instance still resolves
+
+- **WHEN** `getInstanceView` is called for a `completed` or `cancelled`
+  instance by an actor with a relationship to it
+- **THEN** it returns the instance's `status` and its terminal step's
+  resolved `fields`, with `availablePaths` empty
+
+#### Scenario: View on a subprocess wait-state has no available paths
+
+- **WHEN** `getInstanceView` is called for a `running` instance parked on
+  a `subprocess` step
+- **THEN** `status` is `"running"` and `availablePaths` is empty, since a
+  subprocess step's paths are schema-enforced to be automatic, never
+  manual
+
+#### Scenario: A dataSource-bound field's view carries its resolved options
+
+- **WHEN** `getInstanceView` is called for an instance parked on a step
+  whose visible fields include one bound to a `dataSource`
+- **THEN** that field's resolved `options` reflects the data source's
+  resolved result, not an empty or undefined list
+
 #### Scenario: A field's span defaults to 1
 
 - **WHEN** a step's view references a field whose `ViewField` declares
