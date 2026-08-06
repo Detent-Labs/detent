@@ -327,4 +327,3 @@ Nothing traverses the pointer, so a cycle has no effect.
 - **WHEN** `PATCH /admin/users/:id/manager` is requested with a resolvable
   credential whose `roles` does not include `system:admin`
 - **THEN** the response is 403 and no row is written
-

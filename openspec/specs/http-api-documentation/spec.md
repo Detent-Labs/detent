@@ -104,4 +104,3 @@ status. A not-found instance or process returns 500 by design.
 - **THEN** the entry gives a one-line trigger matching
   `checkAndRecordAttempt`'s per-email rate limit in `src/auth/login.ts`,
   and no other documented route lists 429
-

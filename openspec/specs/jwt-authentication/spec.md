@@ -267,4 +267,3 @@ caller holding no database uses.
   key and no account lookup
 - **AND** a request carries a valid locally issued token
 - **THEN** the resolver returns an `Actor` and issues no query
-

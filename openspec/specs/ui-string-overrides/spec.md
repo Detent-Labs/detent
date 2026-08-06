@@ -126,4 +126,3 @@ reach its login screen.
 - **WHEN** the override read returns an error, or the request does not
   complete
 - **THEN** the login screen renders, showing its builtin wording
-

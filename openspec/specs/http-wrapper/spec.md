@@ -1550,4 +1550,3 @@ generic internal error.
   does not hold
 - **THEN** the response is `403` with `error.type` equal to
   `"not-claimant"`, unchanged by the target
-

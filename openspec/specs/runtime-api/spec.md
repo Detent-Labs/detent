@@ -903,4 +903,3 @@ the same as one that does not exist at all. `getAttachment` SHALL raise
 - **WHEN** an eligible candidate calls `getAttachment` with an
   `attachmentId` that does not exist
 - **THEN** it throws `NotFoundError`
-

@@ -257,4 +257,3 @@ branch alone.
   envelope
 - **THEN** that response carries no framing or referrer header, and its
   behavior stays as `http-wrapper` states it
-

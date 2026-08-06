@@ -338,4 +338,3 @@ redirect would check the first hop against the policy and no other hop.
   `http://169.254.169.254/`
 - **THEN** the handler treats the `302` as a permanent failure, and it sends
   no request to the redirect target
-
