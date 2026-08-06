@@ -26,29 +26,89 @@ export function mergeLocalizedTextEntry(value: DraftLocalizedText, locale: strin
   return { ...(value ?? {}), [locale]: text };
 }
 
+/** Every `LocalizedText` position in a Draft, visited once: the process
+ * label and description, each step's label and description, each field's
+ * label and description (recursing into a `group` field's sub-fields
+ * through `draftFields`), and each field option's label.
+ *
+ * `collectUsedLocales`, `localeGapCount` and `missingTranslationWarning`
+ * read the same set of entries, so they share this walk rather than
+ * carrying three copies of it. A `LocalizedText` position added here
+ * reaches all three at once. */
+function forEachLocalizedEntry(draft: Draft, visit: (entry: DraftLocalizedText) => void): void {
+  visit(draft.label);
+  visit(draft.description);
+  for (const step of draft.workflow?.steps ?? []) {
+    visit(step.label);
+    visit(step.description);
+  }
+  for (const field of draftFields(draft)) {
+    visit(field.label);
+    visit(field.description);
+    for (const option of field.options ?? []) visit(option.label);
+  }
+}
+
 /** Every locale key already used anywhere in the Draft (process, steps,
  * fields including nested group fields, field options), plus the Draft's
  * own `baseLocale` (or "en") so the content-locale switcher always has at
  * least one selectable option, even in a brand-new Draft. */
 export function collectUsedLocales(draft: Draft): string[] {
   const locales = new Set<string>([draft.baseLocale ?? "en"]);
-  const addFrom = (value: DraftLocalizedText) => {
-    for (const k of Object.keys(value ?? {})) locales.add(k);
-  };
-
-  addFrom(draft.label);
-  addFrom(draft.description);
-  for (const step of draft.workflow?.steps ?? []) {
-    addFrom(step.label);
-    addFrom(step.description);
-  }
-  for (const field of draftFields(draft)) {
-    addFrom(field.label);
-    addFrom(field.description);
-    for (const option of field.options ?? []) addFrom(option.label);
-  }
-
+  forEachLocalizedEntry(draft, (entry) => {
+    for (const k of Object.keys(entry ?? {})) locales.add(k);
+  });
   return Array.from(locales).sort();
+}
+
+/** How many `LocalizedText` entries carry the Draft's base locale but not
+ * `locale` — the count the content-locale switcher shows per option.
+ *
+ * An entry with no base-locale value is not counted. `runValidation`
+ * already reports it as an `EditorIssue` against the authored-content
+ * localization invariant, and counting it again here would report one
+ * unfilled entry once per locale in the switcher under a second name.
+ *
+ * The base locale never counts against itself: it is the value every other
+ * locale is measured against, so it has nothing to be missing from. */
+// ponytail: walks the whole draft once per locale, on every render of
+// ContentLocaleSwitcher. That is a few hundred comparisons at realistic
+// process sizes, below what runValidation already redoes on every
+// keystroke. Memoize per draft if a process grows enough to measure it.
+export function localeGapCount(draft: Draft, locale: string): number {
+  const baseLocale = draft.baseLocale ?? "en";
+  if (locale === baseLocale) return 0;
+
+  let count = 0;
+  forEachLocalizedEntry(draft, (entry) => {
+    if (entry?.[baseLocale] && !entry?.[locale]) count++;
+  });
+  return count;
+}
+
+/** The warning to show beside one `LocalizedTextInput`, or `undefined` for
+ * none. A missing translation never blocks publishing, so this is a
+ * warning like `assignmentWarning` and `unknownListKeyWarning`, never an
+ * `EditorIssue`.
+ *
+ * `baseLocale` accepts `undefined` and falls back to "en" here, because
+ * `Draft` is `DraftOf<AuthoredProcessBody>` and every call site holds
+ * `draft.baseLocale` at the type `string | undefined`. The fallback is the
+ * one `collectUsedLocales`, `localeGapCount` and `DraftProvider` apply to
+ * the same property.
+ *
+ * Skips the same entry `localeGapCount` skips, for the same reason: an
+ * entry with no base-locale value already draws an `EditorIssue`. */
+export function missingTranslationWarning(
+  entry: DraftLocalizedText,
+  locale: string,
+  baseLocale: string | undefined,
+): string | undefined {
+  const base = baseLocale ?? "en";
+  if (locale === base) return undefined;
+  if (!entry?.[base]) return undefined;
+  if (entry?.[locale]) return undefined;
+  return `No ${locale} translation yet. Publishing still works; a reader of ${locale} sees the ${base} text.`;
 }
 
 /** Validates a candidate locale code an author types into the content-locale

@@ -16,7 +16,7 @@ import { TimersPanel } from "./TimersPanel";
 import { IssueList, NotCheckedBadge } from "./shared/IssueList";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { parseChildProcessJson } from "../draft/io";
-import { seedLocalizedText } from "../draft/localized-text";
+import { missingTranslationWarning, seedLocalizedText } from "../draft/localized-text";
 import { assignmentWarning } from "./assignmentWarningLogic.js";
 
 type DraftStep = DraftOf<Step>;
@@ -153,6 +153,14 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep }: Prop
                   label
                   <LocalizedTextInput value={step.label} onChange={(label) => updateStep(index, { label })} />
                 </label>
+                {/* Sibling of the label, never nested inside it: a <label>
+                    takes phrasing content, and the design language keeps a
+                    field's own messages beside the label. */}
+                {missingTranslationWarning(step.label, contentLocale, draft.baseLocale) && (
+                  <p className="studio-warning">
+                    {missingTranslationWarning(step.label, contentLocale, draft.baseLocale)}
+                  </p>
+                )}
                 <label>
                   description
                   <LocalizedTextInput
@@ -160,6 +168,11 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep }: Prop
                     onChange={(description) => updateStep(index, { description })}
                   />
                 </label>
+                {missingTranslationWarning(step.description, contentLocale, draft.baseLocale) && (
+                  <p className="studio-warning">
+                    {missingTranslationWarning(step.description, contentLocale, draft.baseLocale)}
+                  </p>
+                )}
                 <label>
                   type
                   <select

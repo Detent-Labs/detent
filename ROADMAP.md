@@ -236,10 +236,10 @@ Spec: `development-toolchain`.
     from two sides. Folding it in is a separate decision, not taken.
 
 13. i18n extensions (content-translation UI; UI-chrome white-label overrides):
-    design DONE, OpenSpec change proposed for each, implementation NOT
-    STARTED. Raised 2026-07-28 as a brainstorm, not a committed stage. Two
-    independent sub-projects, each with its own design and its own change:
-    a. Content-translation UI (studio area). `LocalizedText` (the
+    design DONE for both, 13a DONE, 13b NOT STARTED. Raised 2026-07-28 as a
+    brainstorm, not a committed stage. Two independent sub-projects, each
+    with its own design and its own change:
+    a. Content-translation UI (studio area): DONE. `LocalizedText` (the
        process/step/field labels a participant sees) already lives in the DB,
        inline in the versioned JSON definition/draft body. There is nothing to
        move. The studio already supports inline per-field locale editing
@@ -249,7 +249,7 @@ Spec: `development-toolchain`.
        `db.list`-key non-blocking-warning pattern. Pure UI addition, no
        schema or storage change.
        Design: `docs/superpowers/specs/2026-08-05-content-translation-ui-design.md`.
-       Change (proposed, not implemented): `add-content-translation-gap-warnings`.
+       Change: `add-content-translation-gap-warnings`. Spec: `studio-app`.
     b. UI-chrome white-label overrides. Motivated by a per-customer wording
        requirement, not language count. Each customer already gets its own
        deployment/DB (existing environment-separation convention) and wants
