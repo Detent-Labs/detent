@@ -691,3 +691,197 @@
   gap: var(--space-2);
   margin-bottom: var(--space-3);
 }
+
+/* --- The shared editing modal and the step section index ----------------- */
+
+/* The three links into the shared modal. Inside the Structure branch only:
+   the surface tabs render on both surfaces, and studio-json-view forbids a
+   reachable draft-body-mutating control while JSON is active. */
+.studio-panel-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-bottom: var(--space-3);
+  border-bottom: 2px solid var(--color-divider);
+  margin-bottom: var(--space-3);
+}
+
+/* Wider than .studio-dialog's 34rem reading measure: this one carries a rail
+   beside a full structural editor, which is a tool surface, not a reading
+   column. */
+.studio-panels-modal {
+  max-width: min(72rem, 92vw);
+  width: min(72rem, 92vw);
+  max-height: 88vh;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Two chrome bars and no more: what is open, and one Close. The 2px rule is
+   the structural one the design language reserves for a major section
+   boundary. */
+.studio-panels-modal-header {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 2px solid var(--color-divider);
+}
+
+.studio-panels-modal-header h2 {
+  margin: 0;
+}
+
+.studio-panels-modal-body {
+  display: grid;
+  grid-template-columns: 16rem minmax(0, 1fr);
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.studio-panels-rail {
+  border-right: 2px solid var(--color-divider);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.studio-panels-rail-list,
+.studio-panels-rail-sublist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* A register row, not a card: a hairline between rows, flush-left content, and
+   the quantity right-aligned in the mono face like a ledger's amount column. */
+.studio-panels-rail-entry,
+.studio-panels-rail-field {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  background: none;
+  color: inherit;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.studio-panels-rail-entry:hover,
+.studio-panels-rail-field:hover {
+  background: var(--color-surface-muted);
+}
+
+/* The open view. aria-current is the attribute the DOM already carries, so no
+   state class exists for it. */
+.studio-panels-rail-entry[aria-current="true"] {
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+.studio-panels-rail-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A quantity the reader compares down a column, so mono with tabular figures.
+   The issue count beside it is the refusal tone — the same one .studio-warning
+   already uses for a caution the author must read. */
+.studio-panels-rail-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+.studio-panels-rail-issues {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-refusal);
+  border: 2px solid currentcolor;
+  padding: 0 var(--space-1);
+}
+
+/* A group field's children indent once. A field nested deeper takes depth 0 —
+   `flattenRailFields` caps it there, so no third step exists. */
+.studio-panels-rail-field[data-depth="1"] {
+  padding-left: var(--space-6);
+}
+
+.studio-panels-modal-view {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-3) var(--space-4);
+  min-width: 0;
+}
+
+.studio-panels-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 2px solid var(--color-divider);
+}
+
+.studio-panels-modal-footer .studio-dialog-note {
+  margin: 0;
+}
+
+/* The section index: the same register form as the rail, one scale down. */
+.step-section-index {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.step-section-entry {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  background: none;
+  color: inherit;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-1) var(--space-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.step-section-entry:hover {
+  background: var(--color-surface-muted);
+}
+
+.step-section-entry[aria-expanded="true"] {
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+.step-section-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-section-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+.step-section-issues {
+  margin: var(--space-2) 0;
+}
+
+.step-section-issue-stamp {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-refusal);
+  border: 2px solid currentcolor;
+  padding: 0 var(--space-1);
+}
+
+.step-section-issue-clear {
+  color: var(--color-text-muted);
+}

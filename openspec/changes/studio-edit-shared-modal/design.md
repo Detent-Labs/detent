@@ -45,10 +45,43 @@ their mount site. The data sources panel takes only `token`.
 threads no draft state either. It passes `token` through, and nothing
 else. Each panel's own props stay unchanged.
 
+The Fields view keeps all three of its missing-translation warnings. They
+are a field's label, a field's description, and a field option's label.
+All three live inside `FieldCatalogPanel`. This change remounts that
+panel rather than rewriting it, so they travel with it.
+
 *Alternative considered:* three separate dialogs, one per panel. This
 change rejects that option. The rail's cross-view navigation would then
 need to close one dialog and open another. Jumping from Fields to
 Contract would flash the backdrop and lose focus twice.
+
+**Decision: `EditPanelsModal` stays mounted while Structure is active.**
+The Structure branch renders the `<dialog>` from first paint. It calls
+`showModal()` and `close()` as the open state flips. It does not mount
+the element only while open. Switching to the JSON surface does unmount
+it, since `studio-json-view` requires that.
+
+Two things drive that. `ContractPanel` holds a half-typed outcome name
+in its own `useState`. `DataSourcesPanel` fetches the data list keys in
+a `useEffect`. Mounting on open would drop that typed text on every
+Close, and refetch the keys on every open. The footer says Close keeps
+every change, so losing typed text would contradict the footer.
+
+*Alternative considered:* mount on open, and state that unsubmitted text
+is not draft state. This change rejects that option. The distinction is
+true and invisible. An author sees text vanish under a control that
+promises to keep every change.
+
+**Decision: the process header stays above the canvas.**
+`ProcessHeader` carries `key`, `baseLocale` and `label`. The
+`studio-app` capability requires an author to set a non-English base
+locale on the structural surface. The rail holds no process view, so the
+header cannot move into the modal. Three controls cost the canvas little
+height. They were never the complaint the wireframe review raised.
+
+The Structure surface therefore reads, top to bottom: the three links,
+the process header, then the editing well. The well holds the canvas and
+the section index.
 
 **Decision: the rail holds view selection as component state.**
 `EditPanelsModal` holds `openView: "fields" | "dataSources" |
@@ -65,13 +98,28 @@ needs no shareable deep link today.
 modal trigger.**
 
 `StepsPanel` covers a step's own sections. They are identity (key,
-label, description, type, terminal), assignment, paths, timers, actions,
-subprocess spec, and view. These stay docked beside the canvas. The
-shared modal never opens them.
+label, description, type, terminal, outcome), assignment, paths, timers,
+actions, subprocess spec, and view. These stay docked beside the canvas.
+The shared modal never opens them.
 
 The assignment section keeps its `assignmentWarning` rendered beside the
 editor. `studio-app`'s no-assignment-warning requirement puts it there,
 so the section index must not drop the section that anchors it.
+
+The identity section keeps both missing-translation warnings. One sits
+beside the step's label input, the other beside its description input.
+`add-content-translation-gap-warnings` requires a warning at every
+`LocalizedTextInput` site. These two are among the six.
+
+The subprocess spec section keeps the cross-process check fieldset
+beside `SubprocessSpecEditor`. That fieldset holds the file input which
+loads a child body. `checkSubprocessChildRefs` runs against nothing
+without it. It is the only route to that check in the whole studio.
+
+A section entry is a disclosure. It is therefore a
+`<button type="button">` carrying `aria-expanded` and `aria-controls`.
+`spa-accessibility` requires that shape. The step card header already
+takes it today.
 
 Instead of expanding every section inline at once, `StepsPanel` renders
 a compact list of sections with their entity counts. Choosing one
@@ -112,13 +160,30 @@ own shape.
 **Decision: the rail counts issues per view; the index counts them per
 step, not per section.**
 
+A rail entry carries two numbers. They are not the same number, and the
+tasks name them apart. The entity count says how many fields, data
+sources or outcomes the view holds. The issue count says how many of
+them are wrong. Only the issue count takes the refusal tone.
+
 `draft/issues.ts` already computes the issue list, and the panels
-already surface it inline. The rail's three per-view counts read from
-that same list, one `EntityType` each: `field`, `dataSource`,
+already surface it inline. The rail's three per-view issue counts read
+from that same list, one `EntityType` each: `field`, `dataSource`,
 `contract`. That keeps one source of issue truth.
 
-The section index shows one count for the step as a whole. A per-section
-count is not available. `issues.ts` declares `EntityType` as `"process"
+The rail marks the open view with `aria-current`. A rail entry is a
+view switch, not a disclosure, so `aria-expanded` would misname it.
+
+The section index shows one count for the step as a whole. That count
+covers the step and everything under it. Here `resolveLoc` returns the
+deepest entity it finds. A guard's CEL issue therefore names the path,
+and a timer's duration issue names the timer. A count over the step's
+own id alone would read zero on such a step.
+
+The new pure module collects the step's id plus the ids of its paths,
+timers and actions. The count runs over that set.
+
+A per-section count is a different thing, and it is not available. The
+`issues.ts` module declares `EntityType` as `"process"
 | "field" | "dataSource" | "step" | "path" | "timer" | "action" |
 "contract"`. It carries no `view`, `assignment` or `subprocess` member.
 `resolveLoc` falls through to `{ entityType: "step" }` for all three.
@@ -147,6 +212,19 @@ change, not a side effect of a layout one.
   **Mitigation:** This trade-off already exists for D2 and D3 today.
   The proposal accepts it as consistent with the rest of the studio's
   modal behavior. It is not a regression specific to this change.
+- **Risk:** `showModal()` puts the dialog in the top layer. Everything
+  behind it goes inert and dimmed. That covers the draft-incomplete
+  line, `DraftToolbar`'s save-conflict banner and its publish result.
+  An author cannot read any of them while a view is open. CLAUDE.md
+  records an issue dialog behind a modal as something this repository
+  already shipped once.
+
+  **Mitigation:** The modal carries no Save and no Publish. It therefore
+  starts nothing that produces one of those banners. A save in flight
+  when the modal opens is the one case left. Its banner then waits until
+  the author closes the modal. The `PromotionPreviewDialog` case answers
+  the same question the other way, by putting its own issue inside the
+  dialog. This modal has no issue of its own to surface.
 - **Risk:** Recursion into a group field's children inside the modal
   could run deep. The two-level cap might then surprise an author who
   expects the child to nest, not relocate to the rail.

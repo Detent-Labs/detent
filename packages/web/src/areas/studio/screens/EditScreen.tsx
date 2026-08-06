@@ -3,11 +3,9 @@ import { DraftProvider, useDraft } from "../draft/store.js";
 import { draftFields } from "../draft/fields.js";
 import { resolveBaseLocaleChange } from "./processHeaderLogic.js";
 import type { Draft } from "../draft/types.js";
-import { t } from "../catalog.js";
-import { FieldCatalogPanel } from "../panels/FieldCatalogPanel.js";
-import { DataSourcesPanel } from "../panels/DataSourcesPanel.js";
+import { t, type TranslationKey } from "../catalog.js";
 import { StepsPanel } from "../panels/StepsPanel.js";
-import { ContractPanel } from "../panels/ContractPanel.js";
+import { EditPanelsModal, PANEL_VIEWS, type PanelView } from "../panels/EditPanelsModal.js";
 import { RegistryPanel } from "../panels/RegistryPanel.js";
 import { DraftToolbar } from "../panels/DraftToolbar.js";
 import { IssueList } from "../panels/shared/IssueList.js";
@@ -22,6 +20,14 @@ import { CanvasView } from "../canvas/CanvasView.js";
 import type { Point } from "../canvas/geometry.js";
 import { JsonView } from "../panels/JsonView.js";
 import { describeCaughtError } from "../errors.js";
+
+/** The three links read shorter than the panels' own headings: they name a
+ * destination, not the editor they open. */
+const PANEL_LINK_LABEL: Record<PanelView, TranslationKey> = {
+  fields: "editPanels.linkFields",
+  dataSources: "editPanels.linkDataSources",
+  contract: "editPanels.linkContract",
+};
 
 interface EditScreenProps {
   processId: string;
@@ -103,6 +109,10 @@ function EditorArea({ processId, token, initialRevision, initialLayout, navigate
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
   const [selectedStepId, setSelectedStepId] = useState<string | undefined>(undefined);
   const [surface, setSurface] = useState<"structure" | "json">("structure");
+  // `undefined` while the shared modal is closed. Component state, not route
+  // state: no studio route carries sub-panel state, and a modal that always
+  // opens fresh from its own link needs no shareable link.
+  const [openPanel, setOpenPanel] = useState<PanelView | undefined>(undefined);
   const fields = draftFields(draft);
 
   // Position is not body — it lives in `saveState.layout` (round-tripped
@@ -145,16 +155,31 @@ function EditorArea({ processId, token, initialRevision, initialLayout, navigate
       </div>
       {surface === "structure" ? (
         <>
+          {/* Inside the structure branch, never beside the surface tabs. The
+              tabs render on both surfaces, and studio-json-view forbids a
+              reachable draft-body-mutating control while JSON is active — a
+              link up there would let an author open the modal over a live
+              textarea and clobber it. */}
+          <nav className="studio-panel-links" aria-label={t("editPanels.linksLabel")}>
+            {PANEL_VIEWS.map((view) => (
+              <button key={view} type="button" className="btn btn-secondary" onClick={() => setOpenPanel(view)}>
+                {t(PANEL_LINK_LABEL[view])}
+              </button>
+            ))}
+          </nav>
           <ProcessHeader />
-          <FieldCatalogPanel />
-          <DataSourcesPanel token={token} />
-          <ContractPanel />
           <div className="canvas-layout">
             <CanvasView layout={saveState.layout} onMoveStep={onMoveStep} selectedStepId={selectedStepId} onSelectStep={setSelectedStepId} />
             <aside className="canvas-inspector">
               <StepsPanel fields={fields} token={token} selectedStepId={selectedStepId} onSelectStep={setSelectedStepId} />
             </aside>
           </div>
+          <EditPanelsModal
+            openView={openPanel}
+            onClose={() => setOpenPanel(undefined)}
+            onOpenView={setOpenPanel}
+            token={token}
+          />
         </>
       ) : (
         <JsonView draft={draft} onApply={replace} />
