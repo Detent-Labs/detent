@@ -1731,6 +1731,39 @@ Stage-by-stage status is in `ROADMAP.md`.
   dead-letter branch, `transition.ts::markFaulted`, and
   `migration.ts::appendSkip`.
 
+- Worker error boundaries (`src/engine/poll.ts`, `surface-worker-failures`):
+  the four background workers discard no error without a line. Before this,
+  every catch in that path was empty. A worker that failed on every tick
+  produced no line and no metric. The only symptom was work that did not
+  happen. The 2026-08-01 code review records it as ERR-1.
+
+  Each worker has two boundaries. They behave differently. `pollForever` holds
+  the tick boundary. It takes the worker name as its first argument
+  (`pollForever(name, tick, intervalMs)`). That parameter takes no default, so
+  the compiler finds all four call sites. The line reads `worker tick failed`.
+
+  The four call sites pass `"outbox"`, `"resolution"`, `"timers"` and
+  `"retention"`.
+
+  The per-item boundary is the one that needed the work. Every drain holds one
+  inside its loop: `outbox.ts:338`, `resolution.ts:107`, `timers.ts:84`,
+  `retention.ts:72`. It catches inside the loop, so the drain returns normally
+  and the tick never throws. The tick line does not cover this case at all.
+
+  All four now call the shared `poll.ts::logSkippedItem`. It writes `worker
+  skipped a failing item` with the worker name, the item's identifier and the
+  error message. The identifier is an idempotency key for the outbox, an
+  instance id elsewhere. One function, so the four cannot drift.
+
+  No outcome changed. The outbox and resolution rows still stay claimed for
+  lease reclaim. The timer row still leaves the scan. The retention sweep
+  still steps to the next instance.
+
+  One case logs below error level. A `ConcurrencyConflict` is what the OCC
+  predicate produces when two workers reach one instance together, so it logs
+  at debug. An error line per race would teach an operator to ignore the
+  level.
+
   `GET /metrics` (`src/http/metrics.ts::handleMetrics`) returns Prometheus
   text-exposition format, computed fresh from the database on every
   scrape. That is the same no-in-process-aggregation principle
