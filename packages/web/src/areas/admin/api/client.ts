@@ -9,6 +9,7 @@ import type {
   OutboxRow,
   PendingTimerPage,
   ProcessSummary,
+  UiStringOverrideMap,
   UserPage,
   UserSummary,
   VersionSummary,
@@ -197,4 +198,20 @@ export async function putDataListValues(
 
 export async function deleteDataList(listKey: string, token: string): Promise<void> {
   await request(`/admin/data-lists/${encodeURIComponent(listKey)}`, token, { method: "DELETE" });
+}
+
+/** The screen's own read. Same data the public `GET /ui-strings` returns, behind `system:admin`. */
+export async function listUiStringOverrides(token: string): Promise<UiStringOverrideMap> {
+  const res = await request("/admin/ui-strings", token);
+  const body = (await res.json()) as { overrides: UiStringOverrideMap };
+  return body.overrides;
+}
+
+/** A string sets the override; `null` deletes it. The route refuses an empty string, so a cleared input sends `null`. */
+export async function putUiStringOverride(area: string, locale: string, key: string, value: string | null, token: string): Promise<void> {
+  await request("/admin/ui-strings", token, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ area, locale, key, value }),
+  });
 }

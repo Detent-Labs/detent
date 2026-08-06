@@ -6,7 +6,8 @@ export type Route =
   | { name: "users" }
   | { name: "migrations" }
   | { name: "dataLists" }
-  | { name: "dataList"; listKey: string };
+  | { name: "dataList"; listKey: string }
+  | { name: "uiStrings" };
 
 /**
  * Pure — testable without a DOM, and prefix-unaware: the shell strips `/admin`
@@ -19,6 +20,7 @@ export function matchRoute(path: string): Route {
   if (path === "/users") return { name: "users" };
   if (path === "/migrations") return { name: "migrations" };
   if (path === "/data-lists") return { name: "dataLists" };
+  if (path === "/ui-strings") return { name: "uiStrings" };
   const dataListMatch = /^\/data-lists\/([^/]+)$/.exec(path);
   if (dataListMatch) return { name: "dataList", listKey: decodeURIComponent(dataListMatch[1]!) };
   const instanceMatch = /^\/instances\/([^/]+)$/.exec(path);
@@ -45,6 +47,7 @@ export const ROUTE_ROLE: Record<Route["name"], string> = {
   migrations: "system:admin",
   dataLists: "system:datalists",
   dataList: "system:datalists",
+  uiStrings: "system:admin",
 };
 
 export function routePath(route: Route): string {
@@ -65,5 +68,7 @@ export function routePath(route: Route): string {
       return "/data-lists";
     case "dataList":
       return `/data-lists/${encodeURIComponent(route.listKey)}`;
+    case "uiStrings":
+      return "/ui-strings";
   }
 }

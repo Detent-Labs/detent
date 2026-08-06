@@ -17,6 +17,7 @@ import { redactInstance } from "../engine/retention.js";
 import { localizedText, type ProcessId, type InstanceId, type LocalizedText } from "../schema/definition.js";
 import { MAX_KEY_LENGTH } from "../schema/compile.js";
 import { DB_LIST_DATA_SOURCE_TYPE, MAX_DATA_LIST_VALUES } from "../engine/host.js";
+import { listUiStringOverrides, setUiStringOverride, countUiStringOverrides, uiStringOverrideExists } from "../engine/ui-strings.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, ADMIN_ROLE, DATALISTS_ROLE, DEVELOPER_ROLE } from "../auth/authorize.js";
@@ -459,5 +460,78 @@ export async function handleAdminDeleteDataList(listKey: string, req: Request, r
     }
     await db`DELETE FROM data_lists WHERE list_key = ${listKey}`; // values follow, ON DELETE CASCADE
     return { status: 200, body: { listKey, deleted: true } };
+  });
+}
+
+/**
+ * A UI-chrome override value: a button label, a heading, a sentence of
+ * empty-state prose. Bounded here rather than left to `MAX_REQUEST_BODY_SIZE`,
+ * which would permit 8 MiB in one row. The public `GET /ui-strings` route
+ * returns this table whole to a caller holding no token, so one admin write
+ * would otherwise decide how much every visitor downloads at boot.
+ */
+export const MAX_OVERRIDE_VALUE_LENGTH = 4096;
+
+/**
+ * The whole table's row bound, for the same reason. Three areas carry roughly
+ * 250 keys between them across two locales, so 2000 leaves room for the
+ * admin/reporting catalog retrofit without leaving the read unbounded.
+ */
+export const MAX_OVERRIDES = 2000;
+
+/**
+ * `area`, `locale` and `key` reuse `requireString`'s `MAX_KEY_LENGTH` bound.
+ * `value` is a string or `null` and nothing else: `null` clears the override,
+ * and an empty string is refused rather than stored. A stored `""` would
+ * resolve ahead of the builtin value — the frontend's
+ * `resolveOverride(...) ?? builtin` does not fall back on `""` — and render a
+ * blank label, so absence and emptiness must stay distinct.
+ */
+function parseOverrideValue(raw: unknown): string | null {
+  if (raw === null) return null;
+  if (typeof raw !== "string") throw new RequestShapeError("value must be a string or null");
+  if (raw.length === 0) throw new RequestShapeError("value must not be empty; send null to clear the override");
+  if (raw.length > MAX_OVERRIDE_VALUE_LENGTH) {
+    throw new RequestShapeError(`value exceeds the ${MAX_OVERRIDE_VALUE_LENGTH}-character bound`);
+  }
+  return raw;
+}
+
+/** The admin screen's own read. Same data as the public route, behind the role, so the screen needs no second shape. */
+export async function handleAdminListUiStrings(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    requireRole(actor, ADMIN_ROLE);
+    const overrides = await listUiStringOverrides(db);
+    return { status: 200, body: { overrides } };
+  });
+}
+
+/**
+ * One route for both set and clear: `value` a string upserts, `null` deletes.
+ *
+ * The row bound is checked only for a write that would add a row, so an
+ * overwrite and a clear stay possible at the bound. The check and the write are
+ * not one transaction; two concurrent admins could cross it by one row. That
+ * costs nothing worth a lock, since the bound exists to keep the public read
+ * small rather than to enforce an exact count.
+ */
+export async function handleAdminPutUiString(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    requireRole(actor, ADMIN_ROLE);
+    const body = await readJson(req);
+    const area = requireString(body.area, "area");
+    const locale = requireString(body.locale, "locale");
+    const key = requireString(body.key, "key");
+    const value = parseOverrideValue(body.value);
+    if (value !== null && !(await uiStringOverrideExists(area, locale, key, db))) {
+      const count = await countUiStringOverrides(db);
+      if (count >= MAX_OVERRIDES) {
+        throw new RequestShapeError(`the deployment holds at most ${MAX_OVERRIDES} UI string overrides`);
+      }
+    }
+    const written = await setUiStringOverride(area, locale, key, value, actor.id, db);
+    return { status: 200, body: { area, locale, key, value, deleted: value === null && written } };
   });
 }
