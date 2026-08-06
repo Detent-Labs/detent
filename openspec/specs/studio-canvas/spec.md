@@ -146,42 +146,132 @@ without an outcome key.
 
 ### Requirement: Selecting a node or edge expands its detail in a permanent inspector beside the canvas
 
-`StepsPanel` SHALL be mounted as a fixed-width inspector column beside the
-canvas at all times, replacing the previous stacked layout — its own list
-and "+ Add step" action stay reachable whether or not anything is selected,
-so creating the first step never depends on a prior selection. Selecting a
-step node on the canvas SHALL expand that step's existing accordion detail
-in `StepsPanel` (which already nests `PathsPanel` per step); selecting a
-path edge SHALL resolve to its *source* step and expand that step's detail
-the same way — a path is not independently addressable, it only exists
-nested under its step. Deselecting SHALL collapse the expanded detail,
-leaving `StepsPanel`'s list visible. No panel's own fields, validation, or
-mutation logic SHALL change — only how its accordion is driven.
+`StepsPanel` SHALL mount as a fixed-width inspector column beside the
+canvas at all times. Its own list and "+ Add step" action stay
+reachable whether or not the developer has selected anything. Creating
+the first step never depends on a prior selection.
 
-#### Scenario: Selecting a step expands its detail
+Selecting a step node on the canvas SHALL show that step's sections in
+a compact index. Each entry carries its own entity count. The sections
+are identity (key, label, description, type, terminal, outcome),
+assignment, paths, timers, actions, subprocess spec, and view.
 
-- **WHEN** a step node is clicked on the canvas
-- **THEN** `StepsPanel` expands that step's accordion in the inspector
-  column
+The index SHALL carry every section the step card body holds today. It
+SHALL NOT drop the assignment section. `studio-app` requires a
+no-assignment warning beside the assignment editor. That requirement
+has no anchor without the section.
 
-#### Scenario: Selecting a path edge expands its source step
+The identity section SHALL keep the missing-translation warning beside
+the step's label input and beside its description input. Those are two
+of the six `LocalizedTextInput` sites `studio-app` requires a warning
+at.
 
-- **WHEN** a path edge is clicked on the canvas
-- **THEN** `StepsPanel` expands the accordion for that edge's source step,
-  showing its nested `PathsPanel`
+The subprocess spec section SHALL keep the cross-process check fieldset
+beside the spec editor. That fieldset holds the file input which loads a
+child body, and `checkSubprocessChildRefs` runs against nothing without
+it. Dropping the fieldset would remove the only route to that check.
 
-#### Scenario: Deselecting collapses the detail, not the inspector
+Selecting a path edge SHALL resolve to its *source* step and show that
+step's index the same way. A path is not independently addressable. It
+only exists nested under its step.
 
-- **WHEN** empty canvas space is clicked while a step's accordion is expanded
-- **THEN** the accordion collapses, no entity is selected, and `StepsPanel`'s
-  list (including "+ Add step") remains visible
+Choosing any section other than view SHALL scroll to and expand that one
+section beneath the canvas. Every other section stays collapsed. `StepsPanel`
+already nests `PathsPanel` under the paths section. Deselecting SHALL
+collapse any expanded section, leaving the index visible. No panel's
+own fields, validation, or mutation logic SHALL change. Only how an
+author reaches each section changes.
+
+Choosing the view entry SHALL instead open the form editor (see the
+`studio-form-editor` capability). A step's form benefits from a canvas
+of its own, not an inline scroll target. This is the one section entry
+that opens a dialog instead of scrolling. `StepsPanel` SHALL hold no
+inline view section beneath the canvas. The index then carries one
+route to a step's view, not two.
+
+A section entry is a disclosure. It SHALL therefore be a
+`<button type="button">`. It SHALL carry `aria-expanded` for its own
+state, and `aria-controls` naming the section it opens. The
+`spa-accessibility` capability requires that shape of every disclosure.
+
+The view entry opens a dialog rather than a section. It SHALL instead
+carry `aria-haspopup="dialog"` and no `aria-controls`. A disclosure's
+`aria-expanded` describes a region the document already holds. A modal
+dialog is not that region.
+
+#### Scenario: Selecting a step shows its section index
+
+- **WHEN** the developer clicks a step node on the canvas
+- **THEN** `StepsPanel` shows that step's sections with their entity
+  counts in the inspector column
+
+#### Scenario: Choosing a non-view section expands it beneath the canvas
+
+- **WHEN** the developer chooses the identity, assignment, paths,
+  timers, actions, or subprocess spec entry for the selected step
+- **THEN** `StepsPanel` scrolls to and expands that section, and every
+  other section stays collapsed
+
+#### Scenario: The index carries the assignment section
+
+- **WHEN** the developer selects a non-terminal step carrying no
+  `assignment`
+- **THEN** the index lists an assignment section, and choosing it
+  expands the assignment editor with its no-assignment warning beside
+  it
+
+#### Scenario: The identity section keeps its translation warnings
+
+- **WHEN** the studio's `contentLocale` is `de`, a step's `label`
+  carries the base-locale value but no `de` value, and the developer
+  chooses the identity section
+- **THEN** the missing-translation warning renders beside that step's
+  label input
+
+#### Scenario: The subprocess spec section keeps the cross-process check
+
+- **WHEN** the developer selects a step of type `subprocess` and chooses
+  the subprocess spec section
+- **THEN** the cross-process check fieldset renders beside the spec
+  editor, and its file input still loads a child body
+
+#### Scenario: The step issue count covers an issue on its path
+
+- **WHEN** a step carries no issue of its own and one of its paths
+  carries a guard that fails validation
+- **THEN** the section index reports one issue for that step
+
+#### Scenario: A section entry expands with the keyboard
+
+- **WHEN** a keyboard user tabs to a non-view section entry and presses
+  Enter or Space
+- **THEN** the section expands, `aria-expanded` reads true, and pressing
+  again collapses it
+
+#### Scenario: Choosing the view entry opens the form editor
+
+- **WHEN** the developer chooses the view entry for the selected step
+- **THEN** the form editor dialog opens for that step, and no section
+  expands inline beneath the canvas
+
+#### Scenario: Selecting a path edge shows its source step's index
+
+- **WHEN** the developer clicks a path edge on the canvas
+- **THEN** `StepsPanel` shows the section index for that edge's source
+  step
+
+#### Scenario: Deselecting collapses the expanded section, not the index
+
+- **WHEN** the developer clicks empty canvas space while a section is
+  open
+- **THEN** the section collapses, no entity stays selected, and
+  `StepsPanel`'s list (including "+ Add step") remains visible
 
 #### Scenario: A step is addable with nothing selected
 
-- **WHEN** no step or edge is selected
-- **THEN** `StepsPanel`'s "+ Add step" action is still visible and usable in
-  the inspector column
-
+- **WHEN** the developer has selected no step or edge
+- **THEN** `StepsPanel`'s "+ Add step" action stays visible and usable
+  in the inspector column
 ### Requirement: The canvas supports pan and zoom over the process graph
 
 The canvas SHALL support panning by dragging empty canvas space and zooming

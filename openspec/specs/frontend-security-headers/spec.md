@@ -29,12 +29,15 @@ The policy SHALL at minimum:
   (`script-src 'self'`, with no `'unsafe-inline'` and no `'unsafe-eval'`);
 - forbid plugin content and a rewritten base URI
   (`object-src 'none'`, `base-uri 'none'`);
-- restrict form submission and framing (`form-action 'self'`,
-  `frame-ancestors 'none'`);
+- restrict form submission (`form-action 'self'`);
 - restrict network destinations to the document's own origin plus the
   engine origin the build calls. This is `connect-src`, derived from
   `VITE_API_URL` — the same variable the API client reads. An unset value
   means same-origin, so `connect-src 'self'` is the correct default.
+
+The policy SHALL NOT carry `frame-ancestors`. A browser ignores that
+directive in a meta tag, so its presence there reads as protection and gives
+none. The requirement above puts it in a response header, where it works.
 
 `style-src` MAY keep `'unsafe-inline'`. The mitigation targets script
 execution and exfiltration. The areas rely on inline styles.
@@ -60,6 +63,12 @@ since one policy covers the whole bundle.
 - **THEN** its emitted `index.html` carries a `Content-Security-Policy` meta
   tag containing at least `script-src 'self'`, `object-src 'none'`,
   `base-uri 'none'` and `form-action 'self'`
+
+#### Scenario: The meta policy carries no inert directive
+
+- **WHEN** `packages/web` is built for production
+- **THEN** its emitted meta policy contains no `frame-ancestors`,
+  `report-uri` or `sandbox` directive
 
 #### Scenario: The engine origin is reachable from the built app
 
@@ -94,4 +103,44 @@ since one policy covers the whole bundle.
 - **WHEN** a workspace package that produces a browser bundle is added
 - **THEN** its own Vite config injects the policy in the same change that adds
   the package, and no build of it ships without one
+
+### Requirement: Every path that serves the bundle sends the framing and sniffing headers
+
+A meta tag cannot carry `frame-ancestors`, `report-uri` or `sandbox`. A
+browser honors those three only from an HTTP response header. Every path that
+serves the built bundle SHALL therefore send these four headers with every
+document and every asset:
+
+- `Content-Security-Policy: frame-ancestors 'none'`
+- `X-Frame-Options: DENY`
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: no-referrer`
+
+Two paths serve the bundle. The engine serves it from `WEB_ROOT`, which
+`web-asset-serving` describes. The frontend image serves it from nginx, which
+`production-docker-images` describes. Both SHALL send all four.
+
+`X-Frame-Options` repeats what `frame-ancestors` says, for a client that
+predates CSP Level 2. It costs one line and it conflicts with nothing.
+
+The response header SHALL carry `frame-ancestors` and no other directive. The
+meta tag keeps the rest. A browser applies both policies, and each one
+restricts something the other does not, so no page breaks under the pair.
+
+#### Scenario: A served document refuses framing
+
+- **WHEN** a browser loads the shell document from either serving path
+- **THEN** the response carries `Content-Security-Policy: frame-ancestors
+  'none'` and `X-Frame-Options: DENY`
+
+#### Scenario: A served asset refuses type sniffing
+
+- **WHEN** a browser loads a hashed asset from either serving path
+- **THEN** the response carries `X-Content-Type-Options: nosniff` and
+  `Referrer-Policy: no-referrer`
+
+#### Scenario: A framing try fails
+
+- **WHEN** a page on another origin puts the studio in an `iframe`
+- **THEN** the browser refuses to render it
 

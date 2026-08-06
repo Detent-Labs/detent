@@ -152,6 +152,11 @@ Nginx SHALL fall back to `index.html` for any request path that matches
 no built file. This SHALL match the shell's client-side
 History API routing, including every area prefix.
 
+The server block SHALL send the four headers `frontend-security-headers`
+names, on every response. Each `add_header` SHALL carry the `always`
+argument, so an error response carries the header too. The block replaces the
+base image's own server block, so it inherits no header from it.
+
 #### Scenario: A deep link loads directly
 
 - **WHEN** a browser requests a path the built assets do not contain
@@ -165,6 +170,14 @@ History API routing, including every area prefix.
   `/reporting`
 - **THEN** the same fallback serves `index.html`, with no per-area nginx
   location block
+
+#### Scenario: Every response carries the four headers
+
+- **WHEN** a browser requests the shell, a hashed asset, or a path that
+  produces an error response
+- **THEN** the response carries `Content-Security-Policy: frame-ancestors
+  'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` and
+  `Referrer-Policy: no-referrer`
 
 ### Requirement: The frontend image reports its own health
 
