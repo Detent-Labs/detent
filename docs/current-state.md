@@ -644,9 +644,21 @@ Stage-by-stage status is in `ROADMAP.md`.
     development list would fail on import to production.
   - Out of scope on purpose: the handler resolves no hostname and refuses no
     private or link-local address. DNS rebinding stays open.
-  - The devcontainer sets `HTTP_ACTION_ALLOWED_HOSTS=example.com`, the host
-    `examples/expense-approval.json` targets. It also sets
+  - The devcontainer sets `HTTP_ACTION_ALLOWED_HOSTS=webhook-sink:8080`
+    (`give-the-example-a-reachable-target`), the host of a service the
+    devcontainer itself runs — see `webhook-sink` below. It also sets
     `HTTP_ACTION_ALLOW_INSECURE=1`. Closes the 2026-08-01 review's SEC-2.
+  - `webhook-sink` (`.devcontainer/docker-compose.yml`,
+    `scripts/dev-webhook-sink.ts`): a devcontainer-only service that answers
+    every request with `200` and echoes the JSON body it received.
+    `examples/expense-approval.json`'s `book` and `escalated_review` steps
+    both target it, so `book`'s `Action.output` reads back the same
+    `body.status` the action sent. Runs the image the `app` service already
+    builds, plus one script — no third-party image joins the stack for it.
+    Declares no `ports` entry, matching `db` and `mailpit`; a contributor
+    reaches it via
+    `docker compose logs webhook-sink`, which shows the method, the path, and
+    the `Idempotency-Key` header of every request it receives.
 - Notifications (`src/handlers/notification-email.ts`, roadmap #16): a second
   built-in handler, `notification.email`, registered by `createDefaultRegistry`
   next to `httpHandlerDef`. No schema change — the five existing action

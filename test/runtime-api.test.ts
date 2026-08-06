@@ -1081,9 +1081,7 @@ test.skipIf(!DB)("happy path: create -> view -> submit -> view against expense-a
   const raw = JSON.parse(readFileSync(new URL("../examples/expense-approval.json", import.meta.url), "utf8"));
   const authored = raw.definition as ProcessBody;
   const expenseReg = createRegistry();
-  expenseReg.set("accounting.postInvoice", { handler: async () => ({ status: "pending" }) });
-  expenseReg.set("notify.email", { handler: async () => ({}) });
-  expenseReg.set("http.request", { handler: async () => ({}) });
+  expenseReg.set("http.request", { handler: async () => ({ body: { status: "pending" } }) });
   expenseReg.set("notification.email", { handler: async () => ({}) });
 
   const PID = pid("proc_expense_approval");
@@ -1147,9 +1145,7 @@ test.skipIf(!DB)("escalation: an unactioned review escalates to a manager after 
   const authored = raw.definition as ProcessBody;
   const body = compileProcessBody(authored);
   const expenseReg = createRegistry();
-  expenseReg.set("accounting.postInvoice", { handler: async () => ({ status: "pending" }) });
-  expenseReg.set("notify.email", { handler: async () => ({}) });
-  expenseReg.set("http.request", { handler: async () => ({}) });
+  expenseReg.set("http.request", { handler: async () => ({ body: { status: "pending" } }) });
   expenseReg.set("notification.email", { handler: async () => ({}) });
 
   const PID = pid("proc_expense_approval_escalation");

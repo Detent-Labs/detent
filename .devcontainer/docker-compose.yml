@@ -1,8 +1,10 @@
 # Devcontainer services: the `app` container (Node 22 base + Bun), a PostgreSQL
-# 16 datastore, and a Mailpit SMTP catcher. The engine reaches Postgres via
-# DATABASE_URL (see openspec/specs persistence) and Mailpit via SMTP_HOST/PORT
-# (notification-email-action-handler). pgdata persists the database across
-# rebuilds; caught mail is deliberately not persisted.
+# 16 datastore, a Mailpit SMTP catcher, and a webhook sink. The engine reaches
+# Postgres via DATABASE_URL (see openspec/specs persistence), Mailpit via
+# SMTP_HOST/PORT (notification-email-action-handler), and the sink via
+# HTTP_ACTION_ALLOWED_HOSTS (give-the-example-a-reachable-target). pgdata
+# persists the database across rebuilds; caught mail and received webhooks are
+# deliberately not persisted.
 name: workflow-engine
 
 services:
@@ -34,17 +36,18 @@ services:
       SMTP_FROM: workflow-engine@example.test
       # The http.request handler's egress policy (restrict-http-action-egress).
       # Unset denies every outbound action target, so without an entry here the
-      # dev server reaches nothing at all. example.com is the host
-      # examples/expense-approval.json targets from its escalation step. A
-      # change that points an example or a script at a new host adds it here in
-      # the same commit.
-      HTTP_ACTION_ALLOWED_HOSTS: example.com
-      # A locally started target runs over plain HTTP, which the https: rule
-      # would otherwise refuse. Devcontainer only, like ALLOW_INSECURE_DEV_AUTH.
+      # dev server reaches nothing at all. webhook-sink:8080 is the sink
+      # service below, the target examples/expense-approval.json's `book` and
+      # `escalated_review` steps both name. A change that points an example or
+      # a script at a new host adds it here in the same commit.
+      HTTP_ACTION_ALLOWED_HOSTS: webhook-sink:8080
+      # The sink speaks plain HTTP, which the https: rule would otherwise
+      # refuse. Devcontainer only, like ALLOW_INSECURE_DEV_AUTH.
       HTTP_ACTION_ALLOW_INSECURE: "1"
     depends_on:
       - db
       - mailpit
+      - webhook-sink
     # Proves the runtime answers and nothing more — this container runs no
     # service of its own (see add-devcontainer-preflight).
     healthcheck:
@@ -85,6 +88,28 @@ services:
     # tracked compose file rather than only in an upstream image detail.
     healthcheck:
       test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Answers every http.request delivery with 200 and echoes the JSON body it
+  # received, so book's and escalated_review's actions in
+  # examples/expense-approval.json reach a target that answers
+  # (give-the-example-a-reachable-target). Runs the same image the app
+  # service builds — compose has no build inheritance, so the block repeats —
+  # plus scripts/dev-webhook-sink.ts. Declares no ports entry, matching db
+  # and mailpit; a contributor who wants to reach it from the host publishes
+  # the port in their own gitignored docker-compose.override.yml.
+  webhook-sink:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ..:/workspace:cached
+    working_dir: /workspace
+    command: bun run scripts/dev-webhook-sink.ts
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
       interval: 5s
       timeout: 3s
       retries: 5

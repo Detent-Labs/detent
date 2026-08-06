@@ -111,6 +111,9 @@ None.
   `http.request` with a handler answering `{}`. `book`'s new `Action.output`
   reads `result.body.status` from that answer, and an `Action.output` entry
   that cannot read `result` raises. Each stub gains a body.
+- `test/registry-check.test.ts`: modified. A new case globs `examples/*.json`
+  and asserts every action `type` it finds resolves against
+  `createDefaultRegistry()`.
 - `scripts/seed.ts`, `scripts/demo-expense-approval.ts`: the dummy
   registrations and the roadmap comments above them go.
 - `docs/authoring-guide.md`: the actions section names the example's three
