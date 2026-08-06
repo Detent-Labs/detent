@@ -415,12 +415,26 @@ export const viewField = z.object({
   required: z.union([z.boolean(), expression]).optional(),
   readonly: z.union([z.boolean(), expression]).optional(),
   group: z.string().optional(),
+  /** How many of the view's columns this field occupies. Layout only: it
+   * reaches no guard, no CEL context and no submission check. Absent means 1,
+   * and the renderer clamps to `min(span, columns)`, so a span wider than the
+   * grid is a rendering rule rather than a publish error. */
+  span: z.union([z.literal(1), z.literal(2)]).optional(),
 });
 export type ViewField = z.infer<typeof viewField>;
 
 export const view = z.object({
   fields: z.array(viewField),
   renderer: plugin.optional(),
+  /** How many columns the step's form lays its root fields out in. Layout
+   * only, like `ViewField.span`. Absent means 1, which is the single stacked
+   * column every body written before this key parsed to, so no stored body
+   * changes shape and no `definitionHash` moves.
+   *
+   * Optional, and widening the union later stays safe: this schema is also the
+   * deserializer for stored immutable bodies, so narrowing it or making the key
+   * required would make an already-published body throw on READ. */
+  columns: z.union([z.literal(1), z.literal(2)]).optional(),
 });
 export type View = z.infer<typeof view>;
 

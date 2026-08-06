@@ -448,6 +448,53 @@ describe("definition-contract: view-ref resolution over the full field tree", ()
   });
 });
 
+// `view.columns` and `viewField.span` are `1 | 2`, optional, layout only. Both
+// unions are authoring-time constraints, so each ships a rejecting input.
+// Absence is the third valid state and means 1; see test/view-layout-hash.test.ts
+// for the hash-stability half of the same property.
+describe("definition-contract: view layout accepts only 1 or 2 columns and spans", () => {
+  const layoutBody = (viewExtra: object, fieldExtra: object) => ({
+    key: "p", label: { en: "P" }, baseLocale: "en",
+    fields: [{ id: "field_a", key: "a", label: { en: "A" }, type: "string" }],
+    workflow: {
+      initialStep: "step_a",
+      steps: [{
+        id: "step_a", key: "a", label: { en: "A" }, type: "task", terminal: true,
+        view: { fields: [{ ref: "field_a", ...fieldExtra }], ...viewExtra },
+      }],
+    },
+  });
+
+  it("accepts a view declaring neither key", () => {
+    expect(processBody.safeParse(layoutBody({}, {})).success).toBe(true);
+  });
+
+  it("accepts columns 1 and 2, and span 1 and 2", () => {
+    expect(processBody.safeParse(layoutBody({ columns: 1 }, { span: 1 })).success).toBe(true);
+    expect(processBody.safeParse(layoutBody({ columns: 2 }, { span: 2 })).success).toBe(true);
+  });
+
+  it("rejects view.columns of 3", () => {
+    expect(processBody.safeParse(layoutBody({ columns: 3 }, {})).success).toBe(false);
+  });
+
+  it("rejects viewField.span of 0", () => {
+    expect(processBody.safeParse(layoutBody({}, { span: 0 })).success).toBe(false);
+  });
+
+  it("rejects a non-integer columns and a non-numeric span", () => {
+    expect(processBody.safeParse(layoutBody({ columns: 1.5 }, {})).success).toBe(false);
+    expect(processBody.safeParse(layoutBody({}, { span: "2" })).success).toBe(false);
+  });
+
+  // A span wider than the grid is a rendering rule (`min(span, columns)`), not
+  // a publish error: the two keys change independently, and narrowing a form to
+  // one column must not reject every field that still declares span 2.
+  it("accepts span 2 on a one-column view", () => {
+    expect(processBody.safeParse(layoutBody({ columns: 1 }, { span: 2 })).success).toBe(true);
+  });
+});
+
 // Mirrors the "duration reaches every action position" coverage below: each of
 // the five action positions was independently deletable from the check with the
 // suite green before this change, since none had a test. Grow the blocks rather

@@ -15,8 +15,11 @@ order is instance access, the form and its controls, then the record
 last.
 
 The threshold SHALL come from the form's own comfortable measure, not
-a fixed device width. The Player and the participant's Task screen
-share one reflow rule, applied at the same point in both.
+a fixed device width. This requirement governs the Player's own two
+panes. The form's internal grid carries its own collapse rule. The
+`form-ui` capability owns that rule, so both consumers get it at the
+same point. The participant's Task screen has no second pane to fold,
+so it needs nothing here.
 
 The form itself renders through `form-ui`'s `FieldForm`, honoring the
 current step's `columns` and each field's `span` (see the `form-ui`

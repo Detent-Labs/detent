@@ -24,6 +24,11 @@ export interface ResolvedViewField {
   readonly: boolean;
   group?: string;
   options?: FieldOption[];
+  /** How many of the form's columns this field occupies, as the engine
+   * resolved it. Optional here because a hand-built fixture and an older
+   * response both omit it; `FieldForm` reads an absent value as 1 and clamps
+   * to the grid it renders. */
+  span?: 1 | 2;
 }
 
 export interface AvailablePath {

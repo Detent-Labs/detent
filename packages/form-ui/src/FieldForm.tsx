@@ -11,27 +11,47 @@ interface FieldFormProps {
   locale: LocaleCode;
   baseLocale?: LocaleCode;
   issuesByField?: Map<string, SubmissionIssue[]>;
+  /** The step view's declared column count. 1 is the width every form had
+   * before `view.columns` existed, so an omitted prop renders unchanged. */
+  columns?: 1 | 2;
 }
 
-/** Renders every root-level (non-nested) field from an `InstanceView`; a
- * `group` field recurses into the fields that carry its key as their
- * `ResolvedViewField.group`. */
-export function FieldForm({ fields, values, onChange, locale, baseLocale = locale, issuesByField }: FieldFormProps) {
+/** How many grid columns a field draws across. A field never exceeds the grid
+ * it sits in: the two properties are set independently, so a form narrowed to
+ * one column keeps its `span: 2` fields and simply draws them full width. */
+export function effectiveSpan(span: 1 | 2 | undefined, columns: 1 | 2): 1 | 2 {
+  return Math.min(span ?? 1, columns) as 1 | 2;
+}
+
+/** Renders every root-level (non-nested) field from an `InstanceView` in a
+ * `columns`-wide grid; a `group` field recurses into the fields that carry its
+ * key as their `ResolvedViewField.group`, at that same width.
+ *
+ * Declaration order stays the render order. The grid fills left to right then
+ * wraps down, so a view array built before this grid existed lays out in the
+ * order its `↑`/`↓` buttons already gave it. */
+export function FieldForm({ fields, values, onChange, locale, baseLocale = locale, issuesByField, columns = 1 }: FieldFormProps) {
   const roots = fields.filter((f) => !f.group);
   return (
-    <div className="form-ui-field-form">
-      {roots.map((f) => (
-        <FieldInput
-          key={f.field.id}
-          field={f}
-          allFields={fields}
-          values={values}
-          onChange={onChange}
-          locale={locale}
-          baseLocale={baseLocale}
-          issuesByField={issuesByField}
-        />
-      ))}
+    // The wrapper carries the size container the collapse rule measures. A
+    // container query matches descendants of the container, never the element
+    // declaring it, so the grid cannot be its own container.
+    <div className="form-ui-form">
+      <div className="form-ui-field-form" data-columns={columns}>
+        {roots.map((f) => (
+          <FieldInput
+            key={f.field.id}
+            field={f}
+            allFields={fields}
+            values={values}
+            onChange={onChange}
+            locale={locale}
+            baseLocale={baseLocale}
+            issuesByField={issuesByField}
+            columns={columns}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -44,17 +64,22 @@ interface FieldInputProps {
   locale: LocaleCode;
   baseLocale: LocaleCode;
   issuesByField?: Map<string, SubmissionIssue[]>;
+  /** The width of the grid this field sits in. A group passes its own value
+   * straight down: a group inherits the form's count and declares none of its
+   * own, which is what keeps an already-published one-column form stacked. */
+  columns?: 1 | 2;
 }
 
-export function FieldInput({ field, allFields, values, onChange, locale, baseLocale, issuesByField }: FieldInputProps) {
+export function FieldInput({ field, allFields, values, onChange, locale, baseLocale, issuesByField, columns = 1 }: FieldInputProps) {
   const def = field.field;
   const label = resolveText(def.label, locale, baseLocale) || def.key;
   const issues = issuesByField?.get(def.id) ?? [];
+  const span = effectiveSpan(field.span, columns);
 
   if (def.type === "group") {
     const children = allFields.filter((f) => f.group === def.key);
     return (
-      <fieldset className="form-ui-field form-ui-field-group">
+      <fieldset className="form-ui-field form-ui-field-group" data-span={span} data-columns={columns}>
         <legend>{label}</legend>
         {children.map((c) => (
           <FieldInput
@@ -66,6 +91,7 @@ export function FieldInput({ field, allFields, values, onChange, locale, baseLoc
             locale={locale}
             baseLocale={baseLocale}
             issuesByField={issuesByField}
+            columns={columns}
           />
         ))}
       </fieldset>
@@ -155,7 +181,7 @@ export function FieldInput({ field, allFields, values, onChange, locale, baseLoc
   }
 
   return (
-    <div className="form-ui-field">
+    <div className="form-ui-field" data-span={span}>
       <label className="form-ui-field-control">
         <span className="form-ui-field-label">
           {label}

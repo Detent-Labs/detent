@@ -26,6 +26,17 @@ within the grid. A field with no `span` and no group still renders
 left to right, then wraps down. It renders exactly where the array
 places it.
 
+Below a width threshold the grid SHALL collapse to one column, whatever
+`columns` declares. The threshold is the form's own comfortable measure,
+not a device width. It SHALL therefore come from the grid's own
+available width rather than the viewport's.
+
+The threshold lives in `form-ui`'s own stylesheet. That is what makes it
+one rule both consumers get at the same point. The `studio-player`
+capability's reflow requirement rests on that shared point. A collapse
+changes no field's stored `span`, and widening the container restores
+the declared layout.
+
 #### Scenario: A one-column grid is the default
 
 - **WHEN** a consumer renders `FieldForm` with no `columns` prop
@@ -62,3 +73,10 @@ places it.
 - **WHEN** a group field renders inside a `columns: 2` grid
 - **THEN** the group's own member fields lay out in two columns inside
   the group's container
+
+#### Scenario: A narrow container collapses a two-column grid
+
+- **WHEN** a `columns: 2` form renders in a container below the
+  threshold
+- **THEN** every root field renders in one column, and no field's
+  stored `span` changes
