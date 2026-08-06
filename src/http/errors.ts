@@ -50,8 +50,12 @@ export type HttpResult = { status: number; body: unknown };
  * map to a plain `HttpResult` through `mapError` like every other route. See
  * `add-instance-attachments`'s design.md, "The download route breaks the
  * JSON-only response envelope".
+ *
+ * `filename` is optional because `handleMetrics` returns this shape too. A
+ * result carrying one gets `Content-Disposition: attachment`; a scrape, which
+ * carries none, does not.
  */
-export type HttpBinaryResult = { status: number; contentType: string; data: Uint8Array };
+export type HttpBinaryResult = { status: number; contentType: string; data: Uint8Array; filename?: string };
 
 /** Method and path of the request being mapped, threaded in so the fallback's log entry is actionable — a stack with no request is not. */
 export type ErrorContext = { method: string; path: string };

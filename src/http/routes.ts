@@ -23,6 +23,8 @@ import {
   uploadAttachment,
   listAttachments,
   getAttachment,
+  MAX_LIST_LIMIT,
+  MAX_RECORD_LIMIT,
   type InstanceListFilter,
 } from "../runtime/api.js";
 import { publishBody, listProcesses, listVersions } from "../engine/definitions.js";
@@ -71,11 +73,36 @@ const commentBodySchema = z.object({
 // uploads fail at the Bun.serve layer instead of with this route's own
 // RequestShapeError — see design.md's "MAX_ATTACHMENT_BYTES must stay under
 // MAX_REQUEST_BODY_SIZE" (add-instance-attachments).
-const MAX_ATTACHMENT_BYTES = Number(process.env.MAX_ATTACHMENT_BYTES ?? 5 * 1024 * 1024);
+const DEFAULT_MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+/**
+ * `MAX_ATTACHMENT_BYTES`, read once at module load. A set-but-invalid value
+ * throws instead of resolving to `NaN`: every comparison against `NaN` is
+ * false, so `"5MB"` used to remove the limit it was meant to tighten. Follows
+ * `parseRetentionDays` in `engine/host.ts`.
+ *
+ * Exported for the test that asserts the throw. Nothing else calls it.
+ */
+export function parseMaxAttachmentBytes(raw: string | undefined = process.env.MAX_ATTACHMENT_BYTES): number {
+  if (raw === undefined) return DEFAULT_MAX_ATTACHMENT_BYTES;
+  const bytes = Number(raw);
+  if (!Number.isInteger(bytes) || bytes <= 0) {
+    throw new Error(`MAX_ATTACHMENT_BYTES must be a positive integer, got '${raw}'`);
+  }
+  return bytes;
+}
+const MAX_ATTACHMENT_BYTES = parseMaxAttachmentBytes();
 const MAX_ATTACHMENT_NAME_LENGTH = 255;
+/**
+ * One MIME type and subtype joined by `/`, each half a RFC 2045 token subset.
+ * Parameters do not pass: `text/html; charset=utf-8` fails, and so does any
+ * value holding a CR or an LF. The download route echoes this value into a
+ * response header, where a CR would make `new Response()` throw and turn a
+ * download into a 500.
+ */
+const MIME_TOKEN_PAIR = /^[A-Za-z0-9][A-Za-z0-9.+_-]*\/[A-Za-z0-9][A-Za-z0-9.+_-]*$/;
 const attachmentBodySchema = z.object({
   filename: z.string().min(1).max(MAX_ATTACHMENT_NAME_LENGTH),
-  contentType: z.string().min(1).max(MAX_ATTACHMENT_NAME_LENGTH),
+  contentType: z.string().min(1).max(MAX_ATTACHMENT_NAME_LENGTH).regex(MIME_TOKEN_PAIR),
   dataBase64: z.string().min(1),
 });
 const submitBodySchema = z.object({
@@ -237,7 +264,7 @@ export async function handleListComments(instanceId: string, req: Request, resol
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     const url = new URL(req.url);
-    const limit = parseLimit(url);
+    const limit = parseLimit(url, MAX_LIST_LIMIT);
     const cursor = url.searchParams.get("cursor") ?? undefined;
     const page = await listComments(instanceId as InstanceId, actor, { limit, cursor }, db);
     return { status: 200, body: page };
@@ -266,7 +293,7 @@ export async function handleListAttachments(instanceId: string, req: Request, re
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     const url = new URL(req.url);
-    const limit = parseLimit(url);
+    const limit = parseLimit(url, MAX_LIST_LIMIT);
     const cursor = url.searchParams.get("cursor") ?? undefined;
     const page = await listAttachments(instanceId as InstanceId, actor, { limit, cursor }, db);
     return { status: 200, body: page };
@@ -284,7 +311,7 @@ export async function handleGetAttachment(
   return guarded(req, async (): Promise<HttpBinaryResult> => {
     const actor = await resolveActor(req, resolver);
     const attachment = await getAttachment(instanceId as InstanceId, attachmentId, actor, db);
-    return { status: 200, contentType: attachment.contentType, data: attachment.data };
+    return { status: 200, contentType: attachment.contentType, data: attachment.data, filename: attachment.filename };
   });
 }
 
@@ -292,15 +319,21 @@ export async function handleGetAttachment(
  * `limit=abc` or a `limit` that is not a positive integer is a request error,
  * not a silent default.
  *
+ * `max` is the bound the calling route's own query layer applies, and a value
+ * above it clamps rather than raising: a caller asking for more than the
+ * maximum gets the maximum, which is what it already got one layer down. The
+ * clamp is here as well as there so a later list route inherits a bound from
+ * the layer that parsed the value, instead of depending on its own `Math.min`.
+ *
  * Exported: `admin-routes.ts` imports it. It carried a character-identical
  * copy until `dedup-server-helpers`.
  */
-export function parseLimit(url: URL): number | undefined {
+export function parseLimit(url: URL, max: number): number | undefined {
   const raw = url.searchParams.get("limit");
   if (raw === null) return undefined;
   const n = Number(raw);
   if (!Number.isInteger(n) || n <= 0) throw new RequestShapeError(`limit must be a positive integer, got '${raw}'`);
-  return n;
+  return Math.min(n, max);
 }
 
 /** Every repeated `status` value must be a known InstanceStatus; an unknown one is a request error. */
@@ -349,7 +382,7 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
       // an includeDegraded filter field".
       includeDegraded: scope === "all",
     };
-    const limit = parseLimit(url);
+    const limit = parseLimit(url, MAX_LIST_LIMIT);
     const cursor = url.searchParams.get("cursor") ?? undefined;
     const page = await listInstances(filter, { limit, cursor }, db);
     return { status: 200, body: page };
@@ -360,7 +393,7 @@ export async function handleInstanceRecord(instanceId: string, req: Request, res
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     const url = new URL(req.url);
-    const limit = parseLimit(url);
+    const limit = parseLimit(url, MAX_RECORD_LIMIT);
     const cursor = url.searchParams.get("cursor") ?? undefined;
     const page = await getInstanceRecord(instanceId as InstanceId, actor, { limit, cursor }, db);
     return { status: 200, body: page };

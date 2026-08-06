@@ -227,9 +227,15 @@ export type InstanceAttachment = {
 };
 
 const DEFAULT_LIST_LIMIT = 50;
-const MAX_LIST_LIMIT = 200;
+/**
+ * Exported so `http/routes.ts` clamps to the same bound at the boundary. The
+ * `Math.min` calls below stay, so a caller that reaches this layer directly is
+ * still bounded. `engine/admin-queries.ts` declares its own pair for the
+ * routes it serves; the numbers agree today by coincidence, not by contract.
+ */
+export const MAX_LIST_LIMIT = 200;
 const DEFAULT_RECORD_LIMIT = 100;
-const MAX_RECORD_LIMIT = 500;
+export const MAX_RECORD_LIMIT = 500;
 
 /**
  * The instance's `currentStepId` is not among its pinned body's steps — a

@@ -173,7 +173,18 @@ environment. These are the same variables `bun run serve` already reads
 locally: `DATABASE_URL`, one of `AUTH_JWT_SECRET`/`AUTH_ISSUERS`, and
 optionally `CORS_ALLOWED_ORIGINS` and `PORT`. A definition using the
 `notification.email` action also needs `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`,
-`SMTP_PASSWORD` and `SMTP_FROM`. It never sets
+`SMTP_PASSWORD` and `SMTP_FROM`.
+
+Two more govern the HTTP boundary. `METRICS_TOKEN` gates `GET /metrics`. Unset
+or empty leaves that route unregistered, so a default deployment exposes no
+scrape. A deployment that does scrape puts the same value in its scrape
+config. The scraper sends it as a bearer token.
+`MAX_ATTACHMENT_BYTES` bounds a decoded upload
+and defaults to 5 MB. A value that is not a positive integer stops the process
+at startup, rather than removing the bound. The probes `/livez` and `/readyz`
+stay open either way, because a probe is not a query.
+
+The image never sets
 `ALLOW_INSECURE_DEV_AUTH` itself. A deployment that omits both auth
 variables fails to start immediately. It names the missing variable,
 exactly as `bun run serve` already does locally, instead of falling back

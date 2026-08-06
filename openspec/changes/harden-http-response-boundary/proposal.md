@@ -79,11 +79,21 @@ None.
 - `src/http/server.ts`: `toBinaryResponse`, `toResponse`, the `/metrics` branch.
 - `src/http/errors.ts`: `HttpBinaryResult` gains an optional `filename`, so
   the download carries a header the metrics scrape does not.
+- `src/http/admin-routes.ts`: two of the six `parseLimit` call sites. They cap
+  against `src/engine/admin-queries.ts`, not against the Runtime API Layer.
 - `src/runtime/api.ts`: `getAttachment` already returns `filename`. The download
-  handler passes it through instead of dropping it.
+  handler passes it through instead of dropping it. `MAX_LIST_LIMIT` and
+  `MAX_RECORD_LIMIT` become exports.
+- `src/engine/admin-queries.ts`: its own `MAX_LIST_LIMIT` becomes an export.
+- `src/engine/host.ts`: `parseRetentionDays`' doc comment cites
+  `MAX_ATTACHMENT_BYTES` as a variable that falls back to a default on a bad
+  value. This change makes that false.
 - `docs/openapi.yaml`: the attachment routes and `/metrics`.
 - `docs/current-state.md`: the attachment routes and the metrics endpoint.
+- `README.md`: the engine image's runtime environment variables.
 - One new environment variable, `METRICS_TOKEN`, and a stricter
-  `MAX_ATTACHMENT_BYTES`. Both need an entry wherever this repository records
-  deployment configuration.
-- Tests: `test/http.attachments.test.ts` and the observability suite.
+  `MAX_ATTACHMENT_BYTES`.
+- Tests: `test/http.test.ts`, which holds the attachment and envelope
+  coverage, and `test/metrics.test.ts`. The latter carries one test that
+  asserts an unauthenticated `200` from `GET /metrics`, which this change
+  turns into a `404`.
