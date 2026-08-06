@@ -20,7 +20,7 @@ already brainstormed and approved, is that trigger.
   `forEachLocalizedEntry` walk with the existing `collectUsedLocales`.
 - `ContentLocaleSwitcher` shows a "(N missing)" suffix on each `<option>`
   with a translation gap.
-- Five `LocalizedTextInput` render sites (process label, step
+- Six `LocalizedTextInput` render sites (process label, step
   label/description, field label/description, option label) each render
   `missingTranslationWarning(...)` inline. This follows the existing
   `assignmentWarning`/`unknownListKeyWarning` non-blocking-warning pattern.
@@ -50,5 +50,12 @@ already brainstormed and approved, is that trigger.
   per-option gap count.
 - `packages/web/src/areas/studio/screens/EditScreen.tsx`,
   `panels/StepsPanel.tsx`, `panels/FieldCatalogPanel.tsx`: one warning
-  render each, at an existing `LocalizedTextInput` call site.
+  render per `LocalizedTextInput` call site, six across the three files.
+- `packages/web/test/studio-localizedText.test.ts`: cases for the two new
+  functions and the refactored `collectUsedLocales`. The file already
+  covers this module.
+- `ROADMAP.md`: stage 13 and 13a move off NOT STARTED.
+- `PONYTAIL-DEBT.md` on a machine that has one, rebuilt by
+  `scripts/ponytail-ledgers.sh`. The design's `ponytail:` marker makes the
+  ledger stale, and the `ponytail-ledger-fresh` push gate reads it.
 - No `src/` (engine) change. No new dependency.

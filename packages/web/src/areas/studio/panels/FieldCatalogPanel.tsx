@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { BaseFieldType, DataSourceDef, FieldDef, FieldOption } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import { useDraft } from "../draft/store";
@@ -9,7 +10,7 @@ import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { IssueList } from "./shared/IssueList";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { FieldValidationEditor } from "./shared/FieldValidationEditor";
-import { seedLocalizedText } from "../draft/localized-text";
+import { missingTranslationWarning, seedLocalizedText } from "../draft/localized-text";
 
 type DraftField = DraftOf<FieldDef>;
 type DraftDataSource = DraftOf<DataSourceDef>;
@@ -33,7 +34,7 @@ interface FieldRowProps {
 
 /** Fields are recursive (a `group` field carries its own sub-fields), so this renders itself for `field.fields`. */
 function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
-  const { contentLocale } = useDraft();
+  const { draft, contentLocale } = useDraft();
   const custom = isCustomType(field.type);
   const typeSelectValue = typeof field.type === "object" && field.type !== null ? "__custom__" : (field.type ?? "string");
   const hasOptions = (field.options?.length ?? 0) > 0;
@@ -60,10 +61,21 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
         label
         <LocalizedTextInput value={field.label} onChange={(label) => onChange({ label })} />
       </label>
+      {/* Sibling of the label, never nested inside it: a <label> takes
+          phrasing content, and the design language keeps a field's own
+          messages beside the label. */}
+      {missingTranslationWarning(field.label, contentLocale, draft.baseLocale) && (
+        <p className="studio-warning">{missingTranslationWarning(field.label, contentLocale, draft.baseLocale)}</p>
+      )}
       <label>
         description
         <LocalizedTextInput value={field.description} onChange={(description) => onChange({ description })} />
       </label>
+      {missingTranslationWarning(field.description, contentLocale, draft.baseLocale) && (
+        <p className="studio-warning">
+          {missingTranslationWarning(field.description, contentLocale, draft.baseLocale)}
+        </p>
+      )}
       <label>
         type
         <select
@@ -108,26 +120,35 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
           </select>
         </label>
         <div className="options-editor">
-          {(field.options ?? []).map((opt, i) => (
-            <div className="option-row" key={i}>
-              <input
-                type="text"
-                placeholder={t("fieldCatalog.optionValuePlaceholder")}
-                disabled={hasDataSource}
-                value={opt.value ?? ""}
-                onChange={(e) => updateOption(i, { value: e.target.value })}
-              />
-              <LocalizedTextInput
-                placeholder={t("fieldCatalog.optionLabelPlaceholder")}
-                disabled={hasDataSource}
-                value={opt.label}
-                onChange={(label) => updateOption(i, { label })}
-              />
-              <button type="button" className="btn btn-secondary" onClick={() => removeOption(i)}>
-                {t("fieldCatalog.removeOption")}
-              </button>
-            </div>
-          ))}
+          {(field.options ?? []).map((opt, i) => {
+            // Under the row, not inside it: `.option-row` lays its three
+            // controls out on one line, and a <p> between them would break
+            // the line in half.
+            const optionWarning = missingTranslationWarning(opt.label, contentLocale, draft.baseLocale);
+            return (
+              <Fragment key={i}>
+                <div className="option-row">
+                  <input
+                    type="text"
+                    placeholder={t("fieldCatalog.optionValuePlaceholder")}
+                    disabled={hasDataSource}
+                    value={opt.value ?? ""}
+                    onChange={(e) => updateOption(i, { value: e.target.value })}
+                  />
+                  <LocalizedTextInput
+                    placeholder={t("fieldCatalog.optionLabelPlaceholder")}
+                    disabled={hasDataSource}
+                    value={opt.label}
+                    onChange={(label) => updateOption(i, { label })}
+                  />
+                  <button type="button" className="btn btn-secondary" onClick={() => removeOption(i)}>
+                    {t("fieldCatalog.removeOption")}
+                  </button>
+                </div>
+                {optionWarning && <p className="studio-warning">{optionWarning}</p>}
+              </Fragment>
+            );
+          })}
           <button type="button" className="btn btn-secondary" onClick={addOption} disabled={hasDataSource}>
             {t("fieldCatalog.addOption")}
           </button>
