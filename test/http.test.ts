@@ -2105,11 +2105,17 @@ test("parseLimit clamps a limit above the caller's maximum, and still rejects a 
   }
 });
 
+// `admin`, not `user1`: an omitted `scope` resolves to "all" (parseScope), and
+// scope=all requires ADMIN_ROLE, so a role-less actor is refused at 403 before
+// parseLimit ever runs. That check predates this change.
 test.skipIf(!DB)("GET /instances with a limit far above the maximum still answers 200", async () => {
   const PID = pid("proc_http_limit_clamp");
   await publishBody(PID, assignedBody(), reg, dataSourceReg);
   await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1));
-  const res = await fetch(authedReq("http://x/instances?limit=100000", "GET", user1));
+  const res = await fetch(authedReq("http://x/instances?limit=100000", "GET", admin));
+  // The clamp turns an out-of-range limit into the maximum rather than a 400,
+  // so an oversized request still succeeds. The bound itself is asserted
+  // directly in the parseLimit test above; one row cannot demonstrate it here.
   expect(res.status).toBe(200);
   const body = (await res.json()) as { items: unknown[] };
   expect(body.items.length).toBeLessThanOrEqual(MAX_LIST_LIMIT);
