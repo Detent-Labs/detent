@@ -12,6 +12,7 @@ import { RegistryPanel } from "../panels/RegistryPanel.js";
 import { DraftToolbar } from "../panels/DraftToolbar.js";
 import { IssueList } from "../panels/shared/IssueList.js";
 import { LocalizedTextInput } from "../panels/shared/LocalizedTextInput.js";
+import { missingTranslationWarning } from "../draft/localized-text.js";
 import { ContentLocaleSwitcher } from "../panels/shared/ContentLocaleSwitcher.js";
 import { getDraft, StudioClientError } from "../api/client.js";
 import type { DraftRecord } from "../api/types.js";
@@ -42,6 +43,8 @@ function ProcessHeader() {
     });
     setContentLocale(change.contentLocale);
   };
+
+  const labelWarning = missingTranslationWarning(draft.label, contentLocale, draft.baseLocale);
 
   return (
     <fieldset className="process-header">
@@ -76,6 +79,10 @@ function ProcessHeader() {
           }
         />
       </label>
+      {/* Sibling of the label, never nested inside it: a <label> takes
+          phrasing content, and the design language puts a field's own
+          messages beside the label for the same reason. */}
+      {labelWarning && <p className="studio-warning">{labelWarning}</p>}
       <IssueList entityId="process" />
     </fieldset>
   );
