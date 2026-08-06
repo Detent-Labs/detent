@@ -13,31 +13,36 @@ function errorLines(spy: { mock: { calls: unknown[][] } }): Record<string, unkno
 }
 
 test("a tick that throws logs an error line naming its worker, and the loop keeps going", async () => {
-  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
-  let ticks = 0;
-  let thirdTick: () => void;
+  // Wait on the LINE, not on the tick count and not on wall-clock time. The
+  // catch that writes the line runs a microtask after the tick throws, so a
+  // test that resolves inside the tick body observes n-1 lines and flakes.
+  const seen: string[] = [];
+  let thirdLine: () => void;
   const reached = new Promise<void>((r) => {
-    thirdTick = r;
+    thirdLine = r;
+  });
+  const errorSpy = spyOn(console, "error").mockImplementation((line: string) => {
+    seen.push(line);
+    if (seen.length >= 3) thirdLine(); // >=, so a burst cannot step past the signal and hang
   });
 
+  let ticks = 0;
   const handle = pollForever(
     "test-worker",
     async () => {
       ticks++;
-      if (ticks === 3) thirdTick();
       throw new Error("tick blew up");
     },
     1,
   );
   await reached;
   handle.stop();
-
-  const lines = errorLines(errorSpy).filter((l) => l.msg === "worker tick failed");
   errorSpy.mockRestore();
 
-  // The next tick is still scheduled: a single tick could not reach three.
+  const lines = seen.map((l) => JSON.parse(l) as Record<string, unknown>).filter((l) => l.msg === "worker tick failed");
+  // Three lines means three ticks ran, so the loop rescheduled after each throw.
+  expect(lines).toHaveLength(3);
   expect(ticks).toBeGreaterThanOrEqual(3);
-  expect(lines.length).toBeGreaterThanOrEqual(3);
   expect(lines[0].level).toBe("error");
   expect(lines[0].worker).toBe("test-worker");
   expect(lines[0].error).toBe("tick blew up");
