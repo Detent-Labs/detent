@@ -1270,13 +1270,24 @@ shape:
 { filename: string, contentType: string, dataBase64: string }
 ```
 `filename` and `contentType` SHALL be non-empty and no longer than 255
-characters each. `dataBase64` SHALL be non-empty. It SHALL decode
+characters each. `contentType` SHALL also match a MIME token pair: one
+type and one subtype joined by `/`. Each half holds letters, digits and
+the characters `.`, `+`, `-` and `_`. No other character passes. A value
+that fails that match SHALL be a `RequestShapeError`, mapped to `400`.
+
+The match rejects a CR or an LF byte. Without it, the download route
+carries that byte into a response header. `dataBase64` SHALL be non-empty.
+It SHALL decode
 `dataBase64` and reject a decoded payload larger than
 `MAX_ATTACHMENT_BYTES` as a `RequestShapeError`, mapped to `400`. On
 success it SHALL call `uploadAttachment(instanceId,
 actor, { filename, contentType, data, sizeBytes })`. It SHALL return
 `201` with the created attachment's metadata as the JSON body, without
 `data`.
+
+The system SHALL read `MAX_ATTACHMENT_BYTES` once, when the module holding
+it loads. It SHALL refuse to start when that value is present and is not a
+positive integer. A mistyped limit SHALL NOT resolve to no limit at all.
 
 #### Scenario: A successful upload returns 201
 
@@ -1299,6 +1310,20 @@ actor, { filename, contentType, data, sizeBytes })`. It SHALL return
   `filename` or `contentType` exceeds 255 characters
 - **THEN** the response is `400` with `error.type` equal to
   `"request-shape"`, and `uploadAttachment` is not called
+
+#### Scenario: A contentType outside the MIME token pair is a request-shape error
+
+- **WHEN** a `POST /instances/:instanceId/attachments` request body's
+  `contentType` is `"text/html; charset=utf-8\r\nX-Injected: 1"`, or any
+  other value outside the token pair
+- **THEN** the response is `400` with `error.type` equal to
+  `"request-shape"`, and `uploadAttachment` is not called
+
+#### Scenario: A malformed byte limit stops the process
+
+- **WHEN** the deployment sets `MAX_ATTACHMENT_BYTES` to `"5MB"`
+- **THEN** the process fails at load with a message naming the variable,
+  and no request runs with the limit absent
 
 ### Requirement: List an instance's attachments over HTTP
 
@@ -1324,12 +1349,27 @@ actor via the injected `ActorResolver`. On success it SHALL call
 with the raw file bytes as the response body, and `content-type` set to
 the stored `contentType`. This route does not return a JSON envelope.
 
+The response SHALL also carry `Content-Disposition: attachment`, whose
+`filename` parameter holds the stored filename, and
+`X-Content-Type-Options: nosniff`. The first header makes the browser save
+the bytes instead of rendering them. The second stops the browser from
+guessing a type the upload did not declare. An uploaded HTML or SVG file
+SHALL NOT run as a document on the engine's origin.
+
 #### Scenario: A successful download returns the raw bytes
 
 - **WHEN** a `GET /instances/:instanceId/attachments/:attachmentId`
   request resolves to an actor who may read the instance
 - **THEN** the response is `200`, its `content-type` matches the
   attachment's stored `contentType`, and its body is the raw file bytes
+
+#### Scenario: A download arrives as a file, not as a document
+
+- **WHEN** a `GET /instances/:instanceId/attachments/:attachmentId`
+  request resolves to an actor who may read the instance, and the stored
+  `contentType` is `text/html`
+- **THEN** the response carries `Content-Disposition: attachment` with the
+  stored filename and `X-Content-Type-Options: nosniff`
 
 ### Requirement: A missing or mismatched attachment surfaces the same as any other not-found
 
@@ -1424,7 +1464,6 @@ for today's terminal 404.
   root is configured
 - **THEN** the shell document answers, and the admin route does not
 
-
 ### Requirement: The HTTP server shuts down gracefully on SIGTERM or SIGINT
 
 <!-- antislop: allow synonym-rotation -->
@@ -1455,3 +1494,60 @@ shutdown sequence.
 - **WHEN** a second SIGTERM or SIGINT arrives while shutdown is already in
   progress
 - **THEN** the server ignores it and continues the shutdown already running
+
+### Requirement: JSON responses forbid a shared cache
+
+Every JSON envelope this HTTP wrapper returns SHALL carry
+`Cache-Control: no-store`. An instance view, an instance record and a comment
+list all hold data a participant supplied. No intermediary may keep a copy of
+it. This applies to an error envelope as well as to a success envelope.
+
+The attachment download is not a JSON envelope. It carries its own headers, in
+the download requirement below.
+
+`GET /livez` and `GET /readyz` answer with a JSON envelope, so they carry the
+header too. A probe ignores it, and the rule stays one rule.
+
+#### Scenario: A success envelope forbids a cache
+
+- **WHEN** a client sends any request this wrapper answers with a JSON envelope
+- **THEN** the response carries `Cache-Control: no-store`
+
+#### Scenario: An error envelope forbids a cache
+
+- **WHEN** a request fails and the wrapper answers with an error envelope
+- **THEN** the response carries `Cache-Control: no-store`
+
+### Requirement: A delegation to an unknown target maps to 422
+
+`UnknownDelegateError` thrown by `delegateClaim` SHALL map to `422` with
+`error.type` equal to `"unknown-delegate"`. The response SHALL carry the
+error's message, which names the target id.
+
+Every typed Runtime API Layer error has a status in `src/http/errors.ts`. An
+error with no entry there falls to `500` with a message-free body. That body
+tells an operator nothing about a target they mistyped.
+
+`422` is the status this wrapper already gives a request whose shape is
+right. The engine refuses its content, not its shape.
+
+The browser package (`packages/web/src/api`) SHALL carry the same type. The
+screen offering delegation then prints the message. It does not print a
+generic internal error.
+
+#### Scenario: An unknown delegate target maps to 422
+
+- **WHEN** the claimant calls `POST /instances/:instanceId/delegate` from a
+  deployment whose own actor ids resolve in the local account directory
+- **AND** the `toActorId` it names does not resolve there
+- **THEN** the response is `422` with `error.type` equal to
+  `"unknown-delegate"`, and the body carries a message naming the target
+
+#### Scenario: A non-claimant still gets 403
+
+- **WHEN** a caller who does not hold the claim calls
+  `POST /instances/:instanceId/delegate` with a `toActorId` the directory
+  does not hold
+- **THEN** the response is `403` with `error.type` equal to
+  `"not-claimant"`, unchanged by the target
+

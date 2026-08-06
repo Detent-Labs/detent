@@ -15,9 +15,7 @@ This spec is the contract for `docs/openapi.yaml`, a valid OpenAPI 3.0
 document. It covers exactly the customer-facing routes and none of the
 internal-only ones (`admin/*`, `drafts/*`, `migration-plans/*`, `registry`).
 No engine code changes. This is documentation of the existing HTTP surface.
-
 ## Requirements
-
 ### Requirement: OpenAPI document exists and covers the customer-facing surface
 
 The repository SHALL contain `docs/openapi.yaml`, a valid OpenAPI 3.0
@@ -28,13 +26,21 @@ document. It SHALL describe every route a customer integration can call:
 `POST /instances/:id/delegate`, `POST /instances/:id/comments`,
 `GET /instances/:id/comments`, `POST /instances/:id/cancel`,
 `GET /instances/:id/record`, `POST /processes`, `GET /processes`,
-`GET /processes/:id/versions`, `GET /livez`, `GET /readyz`. It SHALL NOT
-document `admin/*`, `drafts/*`, `migration-plans/*`, `reporting/*`, or
-`registry`.
+`GET /processes/:id/versions`, `GET /livez`, `GET /readyz`,
+`GET /ui-strings`. It SHALL NOT document `admin/*`, `drafts/*`,
+`migration-plans/*`, `reporting/*`, or `registry`.
 
 `reporting/*` falls under the same ground as `admin/*`. It is a role-gated
 surface backing a frontend this repository ships. It is not an integration
 point a customer's own system calls.
+
+`GET /ui-strings` falls under the opposite ground. It backs a frontend
+this repository ships, as `registry` does. No token and no role gate it.
+A document that omits a route in that state reads as an oversight rather
+than a decision. It therefore joins the document, beside the two health
+routes. No token gates those two either, for the same reason.
+`GET /admin/ui-strings` and `PUT /admin/ui-strings` stay outside the
+document, under the `admin/*` exclusion.
 
 This requirement names the exclusion rather than leaving it implicit. A
 reader can then tell the absence is a decision, not an omission. Should a
@@ -53,6 +59,11 @@ extends this requirement. It does not redesign the routes.
 - **WHEN** a reader searches `docs/openapi.yaml` for an `admin/*`,
   `drafts/*`, `migration-plans/*`, `reporting/*`, or `registry` path
 - **THEN** no such path appears in the document
+
+#### Scenario: The public override read declares that it needs no auth
+
+- **WHEN** a reader looks up `GET /ui-strings` in `docs/openapi.yaml`
+- **THEN** the entry states that the route needs no role and no token
 
 ### Requirement: Each route documents auth, schema, and errors
 
@@ -93,3 +104,4 @@ status. A not-found instance or process returns 500 by design.
 - **THEN** the entry gives a one-line trigger matching
   `checkAndRecordAttempt`'s per-email rate limit in `src/auth/login.ts`,
   and no other documented route lists 429
+

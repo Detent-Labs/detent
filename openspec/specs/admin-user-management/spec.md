@@ -47,11 +47,15 @@ SHALL set `auth_users.disabled` to the given boolean for the row matching
 `system:admin`, returning 200 with the updated row on success and 404 when
 `setDisabled` returns `undefined`.
 
-Disabling SHALL take effect on that user's *next* login attempt
-(`verifyLogin` already rejects `disabled = true`, per `local-user-accounts`).
-It SHALL NOT revoke a JWT already issued to that user: token verification
-(`jwt-authentication`) performs no per-request database lookup, so a token
-issued before the disable remains valid until its own `exp`.
+Disabling SHALL take effect on that user's next request, not on their next
+login. The resolver reads the account behind every locally issued token, so a
+token issued before the disable stops resolving at once. See
+`jwt-authentication`. The login path SHALL keep rejecting a disabled account
+as it does today.
+
+An externally issued token SHALL keep its own issuer's behavior. This engine
+holds no `auth_users` row for such an actor, so `setDisabled` does not reach
+that identity. Revoking it is the identity provider's operation.
 
 #### Scenario: Disabling a user
 
@@ -66,12 +70,12 @@ issued before the disable remains valid until its own `exp`.
   does not exist in `auth_users`
 - **THEN** the response is 404
 
-#### Scenario: A token issued before disabling still authenticates until it expires
+#### Scenario: A token issued before disabling stops authenticating
 
 - **WHEN** a user logs in, is then disabled, and presents the token issued
   before the disable to another route before that token's `exp`
-- **THEN** the request resolves to that actor and proceeds, unaffected by the
-  disable
+- **THEN** the request is rejected with `401`, and the route's handler does
+  not run
 
 ### Requirement: A user can be re-enabled over HTTP
 
@@ -241,10 +245,16 @@ type or a new response envelope with it.
 ### Requirement: A role change does not reach an already-issued token
 
 A role assignment SHALL take effect on that user's *next* login. It SHALL NOT
-change the roles carried by a JWT already issued to that user. Token
-verification (`jwt-authentication`) performs no per-request database lookup. A
-token issued before the assignment therefore keeps its own `roles` claim until
-its `exp`.
+change the roles carried by a JWT already issued to that user. The resolver
+reads the account behind a locally issued token to learn whether that account
+is still live, and it reads nothing else. `Actor.roles` keeps coming from the
+token's own `roles` claim. A token issued before the assignment therefore
+keeps that claim until its `exp`.
+
+Reading `roles` from that same row instead would make a grant reach a live
+session. This requirement records that the change did not do so. A disable
+ends a session outright, so the operator has one control that acts at once. A
+grant is not that control.
 
 #### Scenario: A token issued before the change keeps its old roles
 
@@ -317,3 +327,4 @@ Nothing traverses the pointer, so a cycle has no effect.
 - **WHEN** `PATCH /admin/users/:id/manager` is requested with a resolvable
   credential whose `roles` does not include `system:admin`
 - **THEN** the response is 403 and no row is written
+

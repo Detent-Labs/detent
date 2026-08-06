@@ -201,8 +201,26 @@ allowlist change. So SHALL one that adds or removes a frontend package.
 The repository SHALL carry a `pre-push` hook, under a committed hooks
 directory. It SHALL run three things before a push leaves the machine. Those
 are the repo-wide typecheck, the full test suite, and the mechanical gates
-`push-gate-checks` specifies. Each clone enables the hook once, with
-`git config core.hooksPath .githooks`.
+`push-gate-checks` specifies.
+
+The repository SHALL enable that hook itself. A `prepare` script in the root
+`package.json` SHALL point `core.hooksPath` at the committed hooks directory,
+and `bun install` SHALL run it. No clone SHALL need a contributor to type
+that configuration by hand. A clone where nobody typed it is a clone that
+pushes with no gate, and reports nothing about it.
+
+The script SHALL succeed where no git repository exists, and where `git` is
+absent. The production image builds from a copied tree with no `.git`
+directory, and its `bun install` must not fail on this.
+
+The script SHALL decide by asking `git` for the repository, not by testing the
+filesystem for a `.git` directory. In a linked worktree `.git` is a file
+holding a pointer, so a directory test answers false inside a real repository.
+This repository works in such worktrees.
+
+`core.hooksPath` SHALL point at the whole hooks directory, so it arms
+`post-commit` beside `pre-push`. The script SHALL print what it wrote, so an
+install that arms both says so.
 
 The hook SHALL run the checks **inside the devcontainer**, not on the host.
 That placement is what makes the checks meaningful. The gates that need only git
@@ -244,6 +262,26 @@ The repository SHALL NOT carry a hosted-CI workflow for this purpose. The
 owner does not want a hosted service executing this repository. A workflow
 file that never runs reads as coverage it does not provide.
 
+#### Scenario: A fresh clone gains the gate from its first install
+
+- **WHEN** a contributor clones the repository and runs `bun install`, and
+  types no git configuration
+- **THEN** `core.hooksPath` points at the committed hooks directory, and the
+  next push runs the hook
+
+#### Scenario: An install inside a linked worktree arms the hook
+
+- **WHEN** `bun install` runs in a linked worktree, where `.git` is a file
+  rather than a directory
+- **THEN** `core.hooksPath` points at the committed hooks directory
+
+#### Scenario: An install with no git repository still succeeds
+
+- **WHEN** `bun install` runs against a copied tree that holds no `.git`
+  directory, as the production image build does
+- **THEN** the install succeeds, and the missing hooks configuration fails
+  nothing
+
 #### Scenario: A push runs typecheck and the full suite
 
 - **WHEN** a push is attempted with the devcontainer up
@@ -279,10 +317,6 @@ file that never runs reads as coverage it does not provide.
 - **THEN** `DATABASE_URL` is set for that run, so the DB-backed suites execute
   rather than skipping
 
-<!-- antislop: allow synonym-rotation -->
-<!-- "defect" is this requirement's name, and OpenSpec matches a requirement
-     header character for character. Renaming it to satisfy a synonym rule
-     would break every delta that modifies it. -->
 ### Requirement: A wandering test result counts as a defect
 
 `bun run check` gates every push, through `.githooks/pre-push`. That gate
@@ -407,4 +441,39 @@ therefore never depends on a host binding.
   unset
 - **THEN** the end-to-end send test skips, and the config-validation and
   failure-classification tests still run
+
+### Requirement: The devcontainer permits the shipped example's HTTP target
+
+The devcontainer's `HTTP_ACTION_ALLOWED_HOSTS` value SHALL hold the host of
+every `http.request` target the repository's own examples and scripts name.
+Today that is one host, `example.com`, which
+`examples/expense-approval.json` targets from its escalation step.
+
+The devcontainer SHALL also set `HTTP_ACTION_ALLOW_INSECURE` to `1`. A local
+target runs over plain HTTP, and the `https:` rule would otherwise refuse
+every one a contributor starts by hand.
+
+A change that points an example at a new host SHALL add that host here. The
+same holds for a script. Without the entry the action still publishes. It
+still reaches the outbox. It then dead-letters, so nothing fails until an
+operator reads the dead-letter view.
+
+#### Scenario: The shipped example's escalation reaches its target
+
+- **WHEN** the demo script drives `examples/expense-approval.json` to its
+  escalation step inside the devcontainer
+- **THEN** the `http.request` action's delivery reaches `example.com` rather
+  than dead-lettering on the egress policy
+
+#### Scenario: An example gains a new target host
+
+- **WHEN** a change points an example or a script at an `http.request` host
+  the list does not name
+- **THEN** that host joins `HTTP_ACTION_ALLOWED_HOSTS` in the same commit
+
+#### Scenario: A contributor tests against a local target
+
+- **WHEN** a contributor starts a target on `http://localhost:<port>` and
+  points an `http.request` action at it, with that host in the list
+- **THEN** the plain-HTTP scheme does not refuse the delivery
 
