@@ -371,6 +371,16 @@ The list the strategy produces is frozen when the instance enters the step. A
 manager who changes afterwards does not change an instance already waiting.
 Use delegation for the one-off case.
 
+Whoever holds the claim delegates it. The target need not be a candidate.
+Delegation is the escape hatch from a frozen list. A rule tying it to that
+same list would defeat it.
+
+The target must name an account the deployment knows. On a deployment
+running local accounts, the engine refuses a target its directory does not
+hold. The claim stays where it is. A mistyped id no longer parks the task
+on an identity that will never claim it. A deployment on an external identity
+provider has no directory to read, so it accepts any target.
+
 When a strategy finds nobody, the step commits with no candidates and the
 instance waits where anyone can see it. The admin record carries an
 `assignment.unresolved` entry naming the step and the reason. The engine

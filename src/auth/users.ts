@@ -48,6 +48,36 @@ export async function verifyLogin(email: string, password: string, db: SQL = sql
   return { userId: row.user_id, roles: row.roles };
 }
 
+/**
+ * True when `userId` names a row this directory holds and does not hold as
+ * disabled. Read by the JWT resolver behind every locally issued token, so it
+ * is one lookup on the primary key that selects no column: a deleted account
+ * and a disabled one are the same answer, and neither needs a row's contents.
+ *
+ * A `false` therefore covers both, which is what the caller acts on. Nothing
+ * here caches: a cached answer would hold open the gap the per-request read
+ * exists to close, for as long as the entry lives.
+ */
+export async function isActiveUser(userId: string, db: SQL = sql): Promise<boolean> {
+  const rows = (await db`SELECT 1 FROM auth_users WHERE user_id = ${userId} AND NOT disabled`) as unknown[];
+  return rows.length > 0;
+}
+
+/**
+ * The subset of `userIds` this directory holds, disabled or not. One query for
+ * a caller that must ask about two ids at once — `delegateClaim` asks whether
+ * the delegator resolves here and whether the target does, and a single answer
+ * keeps those two facts from disagreeing.
+ *
+ * `disabled` is deliberately not filtered: an account taken out of service is
+ * still a known identity, and delegating to it is an operator's decision, not
+ * a typo. The resolver, not this function, stops that account from acting.
+ */
+export async function knownUserIds(userIds: string[], db: SQL = sql): Promise<Set<string>> {
+  const rows = (await db`SELECT user_id FROM auth_users WHERE user_id = ANY(${db.array(userIds, "TEXT")})`) as { user_id: string }[];
+  return new Set(rows.map((r) => r.user_id));
+}
+
 export async function setRoles(email: string, roles: string[], db: SQL = sql): Promise<void> {
   await db`UPDATE auth_users SET roles = ${db.array(roles, "TEXT")} WHERE email = ${email}`;
 }

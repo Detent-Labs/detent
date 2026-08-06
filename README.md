@@ -184,6 +184,16 @@ and defaults to 5 MB. A value that is not a positive integer stops the process
 at startup, rather than removing the bound. The probes `/livez` and `/readyz`
 stay open either way, because a probe is not a query.
 
+`TRUST_PROXY=1` tells the engine that a proxy in front of it sets
+`X-Forwarded-For`. `POST /auth/login` rate-limits per client address as well
+as per email. This variable decides where that address comes from.
+
+Set it in every deployment behind such a proxy. Leave it unset otherwise: the
+engine ignores the header without it, because any caller can send one. Unset
+behind a proxy puts every login in one bucket, and ordinary use stays under
+that threshold. The engine reads the last comma-separated entry of the
+header, the one the nearest proxy wrote.
+
 The image never sets
 `ALLOW_INSECURE_DEV_AUTH` itself. A deployment that omits both auth
 variables fails to start immediately. It names the missing variable,

@@ -8,7 +8,7 @@ import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
-import { NotAssignedError, NotACandidateError, AlreadyClaimedError, NotClaimedError, NotClaimantError } from "../src/engine/transition.js";
+import { NotAssignedError, NotACandidateError, AlreadyClaimedError, NotClaimedError, NotClaimantError, UnknownDelegateError } from "../src/engine/transition.js";
 import { createProcessInstance, claimStep, releaseClaim, delegateClaim, submitAndTransition, cancelInstance, getInstanceView, InstanceNotRunningError } from "../src/runtime/api.js";
 import { AuthorizationError, ADMIN_ROLE } from "../src/auth/authorize.js";
 import type { ProcessBody, ProcessId, PathId, InstanceEvent } from "../src/schema/definition.js";
@@ -402,4 +402,83 @@ test.skipIf(!DB)("getInstanceView still reports the assignment on a completed in
   expect(view.status).toBe("completed");
   expect(view.availablePaths).toEqual([]);
   expect(view.assignment?.candidates).toEqual(["user_1"]);
+});
+
+// ============================================================
+// delegateClaim: the target must be an account the deployment knows
+// ============================================================
+
+// `auth_users` is deliberately outside this file's `beforeEach` TRUNCATE, so
+// every test above runs with an empty directory — no actor here resolves in it,
+// the delegator check finds nothing, and the target check does not run. That is
+// the external-identity-provider deployment, and it is why those tests still
+// pass unchanged. The three below populate the directory themselves and clear
+// it again, so they do not leak that state into the rest of the file.
+async function withDirectory(userIds: string[], fn: () => Promise<void>): Promise<void> {
+  for (const id of userIds) {
+    await sql`INSERT INTO auth_users (user_id, email, password_hash) VALUES (${id}, ${`${id}@example.com`}, ${"x"})`;
+  }
+  try {
+    await fn();
+  } finally {
+    await sql`DELETE FROM auth_users WHERE user_id = ANY(${sql.array(userIds, "TEXT")})`;
+  }
+}
+
+test.skipIf(!DB)("a local delegator naming an unknown target is rejected and changes nothing", async () => {
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+  await claimStep(inst.instanceId, candidate);
+
+  await withDirectory([candidate.id], async () => {
+    await rejectsWith(delegateClaim(inst.instanceId, candidate, "user_typo"), UnknownDelegateError);
+
+    // The claim stayed where it was, and no event was appended: the check runs
+    // inside the engine's row lock, before anything is written.
+    const after = await getInstanceView(inst.instanceId, operator, dataSourceReg);
+    expect(after.assignment?.claimedBy).toBe(candidate.id);
+    expect((await eventsOf(inst.instanceId)).filter((e) => e.kind === "assignment.delegated")).toHaveLength(0);
+  });
+});
+
+test.skipIf(!DB)("a local delegator naming a known target succeeds, candidate or not", async () => {
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+  await claimStep(inst.instanceId, candidate);
+
+  // `outsider` is absent from step_a's candidate list. Delegation is the escape
+  // hatch from a frozen list, so the directory check must not narrow it to one.
+  await withDirectory([candidate.id, outsider.id], async () => {
+    const delegated = await delegateClaim(inst.instanceId, candidate, outsider.id);
+    expect(delegated.assignment?.claimedBy).toBe(outsider.id);
+    expect(delegated.assignment?.candidates).toEqual(["approver", "user_1"]);
+  });
+});
+
+test.skipIf(!DB)("a delegator absent from the directory delegates to any target, as before", async () => {
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+  await claimStep(inst.instanceId, candidate);
+
+  // Only the TARGET is in the directory here, never the delegator. The engine
+  // cannot ask whether a deployment uses local accounts, so it asks about the
+  // delegator — and this one answers no.
+  await withDirectory([outsider.id], async () => {
+    const delegated = await delegateClaim(inst.instanceId, candidate, "user_unknown_anywhere");
+    expect(delegated.assignment?.claimedBy).toBe("user_unknown_anywhere");
+  });
+});
+
+test.skipIf(!DB)("a non-claimant naming an unknown target still gets NotClaimantError", async () => {
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+  await claimStep(inst.instanceId, candidate);
+
+  // The two checks are ordered on purpose. If the target check ran first, this
+  // route would answer whether an arbitrary `user_id` exists, one try at a
+  // time, for any authenticated actor. Both errors below must be the same one.
+  await withDirectory([candidate.id, roleActor.id, outsider.id], async () => {
+    await rejectsWith(delegateClaim(inst.instanceId, roleActor, "user_typo"), NotClaimantError);
+    await rejectsWith(delegateClaim(inst.instanceId, roleActor, outsider.id), NotClaimantError);
+  });
 });

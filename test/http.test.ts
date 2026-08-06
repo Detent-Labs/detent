@@ -850,6 +850,27 @@ test.skipIf(!DB)("POST /instances/:instanceId/delegate by a non-claimant maps to
   expect(body.error.type).toBe("not-claimant");
 });
 
+test.skipIf(!DB)("POST /instances/:instanceId/delegate with an unknown target maps to 422 unknown-delegate", async () => {
+  const PID = pid("proc_http_delegate_422");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+
+  // The delegator has to resolve in `auth_users` for the target check to run
+  // at all. Without this row the deployment reads as external-IdP and any
+  // target is accepted — which is what the 200 test above relies on.
+  await sql`INSERT INTO auth_users (user_id, email, password_hash) VALUES (${user1.id}, ${"http-delegate-422@example.com"}, ${"x"})`;
+  try {
+    const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/delegate`, "POST", user1, { toActorId: "user_typo" }));
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { error: { type: string; message: string } };
+    expect(body.error.type).toBe("unknown-delegate");
+    expect(body.error.message).toContain("user_typo"); // names the target, so an operator sees which id was wrong
+  } finally {
+    await sql`DELETE FROM auth_users WHERE user_id = ${user1.id}`;
+  }
+});
+
 test.skipIf(!DB)("POST /instances/:instanceId/delegate with a missing toActorId maps to 400 request-shape", async () => {
   const PID = pid("proc_http_delegate_400");
   await publishBody(PID, assignedBody(), reg, dataSourceReg);
