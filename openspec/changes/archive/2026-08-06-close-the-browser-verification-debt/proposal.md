@@ -4,7 +4,7 @@
 that shipped past a green suite here. A dialog rendered behind a modal. A stale
 result row. An `/admin/*` route collision.
 
-On 2026-08-06 the repository merged and archived ten changes. Nine browser
+On 2026-08-06 the repository merged and archived ten changes. Ten browser
 tasks stayed unchecked, spread over seven of them. They now sit under
 `openspec/changes/archive/2026-08-06-*/tasks.md`. Nobody reads them there
 again. One of them says why it stayed open: "no dev server port reaches this
@@ -48,12 +48,14 @@ change adds neither.
   the defect it catches. None of them starts a listening socket. So none of
   them can contend with the suite the way a dev server does.
 - A new `docs/browser-checks.md` holds what stays manual. It survives the
-  archive, because it is not part of a change. It states the port, the address,
-  and the rule that no test run may be in flight.
+  archive, because it is not part of a change. It states how a contributor
+  finds their own address, and the rule that no test run may be in flight.
 - `development-toolchain` gains the rule that decides which side a check lands
   on. The next UI change then does not re-argue it.
-- The nine open tasks close. Five close by assertion, four by one run of the
-  new checklist.
+- Nine of the ten open tasks close. Five close by assertion, four by one run
+  of the new checklist. The tenth, the immediate 401 after a disable, closed
+  already: a live run confirmed it on 2026-08-06, and `design.md` records
+  that verdict.
 
 Out of scope, and named so the reason survives. This change adds no browser
 automation and no gate. `openspec/changes/archive/*gate-recurring-defects*`
@@ -75,28 +77,39 @@ None.
 ### Modified Capabilities
 
 - `development-toolchain`: a rule that splits a browser check into an assertion
-  or a checklist entry. It also fixes the port and address a manual check uses.
-- `http-wrapper`: every route that returns stored bytes declares its
-  disposition. The route table drives the assertion, not one route.
+  or a checklist entry. It also states how a manual check finds its own
+  address.
+- `unified-shell`: an area's router ships match, round-trip and half-match
+  coverage, the shape `admin-routing.test.ts` already has.
+- `http-wrapper`: a declared ledger of routes that return stored bytes drives
+  the disposition assertion, not one route. The percent-encoding requirement
+  gains a scenario naming that ledger.
 - `transactional-outbox`: a dispatch that a host allowlist refuses reaches the
   dead-letter list, and the message names the host.
-- `form-ui`: a stored body that declares no layout renders the way it rendered
-  before the layout keys existed.
-- `authored-content-localization`: an area renders authored text through the
-  localized-text helper, so a missing translation always warns.
+- `studio-app`: the existing missing-translation warning gains a static rule
+  enforcing it at every render site under `src/areas/studio/`.
 
 ## Impact
 
 - `docs/browser-checks.md`: new. The manual checklist, four entries.
-- `test/http-disposition.test.ts`: new. It drives `createServer`'s handler over
-  the route table, with no port, the way `test/http-static.test.ts` does.
+- `src/http/server.ts`: a new exported `BINARY_ROUTES` ledger, the declared
+  list of routes that return stored bytes.
+- `test/http-disposition.test.ts`: new. It drives `createServer`'s handler
+  over `BINARY_ROUTES`, with no port, the way `test/http-static.test.ts`
+  does. It needs the `_test` database, since a disposition case reads an
+  uploaded attachment row.
 - `test/outbox.test.ts`: one case for a refused host reaching the dead-letter
   list.
-- `packages/form-ui/test/`: new. `effectiveSpan` against a body with no
-  `columns` key.
-- `packages/web/test/boundaries.test.ts`: one static rule for authored-text
-  render sites.
-- `packages/web/test/studio-routing.test.ts` and `routing.test.ts`: the match,
-  round-trip and no-half-match shape `admin-routing.test.ts` already has.
+- `test/runtime-api.test.ts`: two cases closing the untested half of the
+  existing `InstanceView.columns` requirement: an absent `view.columns`
+  resolves to `1`, and a declared `columns: 2` survives.
+- `packages/web/test/boundaries.test.ts`: one static rule, scoped to
+  `src/areas/studio/`, for authored-text render sites.
+- `packages/web/test/studio-routing.test.ts` and `routing.test.ts`: the
+  shared-prefix and deeper-path cases each already lacks.
+- `packages/web/test/reporting-routing.test.ts`: new. The match, round-trip
+  and half-match shape `admin-routing.test.ts` already has.
+- `.claude/skills/openspec-archive-change/SKILL.md`: an archive-time check
+  refusing an unchecked browser task.
 - `CLAUDE.md`: the browser bullet points at the checklist.
 - `docs/current-state.md`: the verification entry.

@@ -27,6 +27,12 @@ describe("the studio area's templates route", () => {
   it("leaves a deeper path on the process list fallback rather than half-matching", () => {
     expect(matchRoute("/templates/approval")).toEqual({ name: "processes" });
   });
+
+  it("keeps the /processes/:id/... routes from colliding on their shared prefix", () => {
+    expect(matchRoute("/processes/proc_1/edit")).toEqual({ name: "edit", processId: "proc_1" });
+    expect(matchRoute("/processes/proc_1/versions")).toEqual({ name: "versions", processId: "proc_1" });
+    expect(matchRoute("/processes/proc_1/play")).toEqual({ name: "play", processId: "proc_1" });
+  });
 });
 
 describe("the studio area's per-screen role gate", () => {

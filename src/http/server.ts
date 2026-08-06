@@ -213,6 +213,23 @@ type Route = {
 };
 
 /**
+ * The declared list of routes that return stored bytes (`HttpBinaryResult`)
+ * rather than a JSON envelope. `isBinaryResult` decides binary-ness per
+ * response, at runtime, inside each handler — no static walk of `routes` can
+ * read it back out. A person keeps this list in sync by hand instead, the
+ * same discipline `admin-routing.test.ts`'s own route list needs. A route
+ * added outside it needs that same person to add the entry here.
+ *
+ * `filename: true` sends `Content-Disposition: attachment`
+ * (`toBinaryResponse`); `filename: false` is a scrape with no filename to
+ * disclose. `test/http-disposition.test.ts` drives every entry.
+ */
+export const BINARY_ROUTES: { method: string; pattern: string; filename: boolean }[] = [
+  { method: "GET", pattern: "/instances/:instanceId/attachments/:attachmentId", filename: true },
+  { method: "GET", pattern: "/metrics", filename: false },
+];
+
+/**
  * The address the per-source login window counts against, or `undefined` when
  * the server can determine none. Then that window does not apply and the
  * per-email one still does (`local-user-accounts` spec).

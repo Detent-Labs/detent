@@ -6,7 +6,7 @@ have caught them.
 
 The rule has no owner between changes. Each change writes its own browser
 tasks. The archive swallows them when the change closes. On 2026-08-06 that
-left nine unchecked tasks across seven archived changes.
+left ten unchecked tasks across seven archived changes.
 
 Two facts bound every option here.
 
@@ -72,31 +72,53 @@ nobody has seen here.
 | form editor 8.3, drag and drop, keyboard reorder | manual | Pointer event ordering. The Panzoom race is the precedent. |
 | form editor 8.4, a definition published before the change | assertion | `columns` is optional. A body without it must resolve to one column. |
 | modal 6.3 and 6.4, the rest of the list | manual | Stacking, focus return, backdrop, and discarding nothing. One component. |
+| sessions 6.3, immediate 401 after a disable | closed by the 2026-08-06 live run | Confirmed live, before this change existed. No assertion and no checklist entry needed. |
 
 ### The five assertions, and the defect each one names
 
-**Disposition over the route table**. `src/http/server.ts:173` sets
+**Disposition over a declared ledger**. `src/http/server.ts:173` sets
 `Content-Disposition: attachment` on a result that carries a filename. One
-route does. A new binary route can skip it, and a browser then renders stored
-bytes inline. The defect class is route-table drift, which the `/admin/*`
-collision already demonstrated. The assertion walks the route table rather than
-one route, so a new route arrives covered.
+route does. `GET /metrics` returns binary bytes with no filename. The route
+table decides binary-ness only at runtime, inside each handler. No static
+walk can read it.
+
+The assertion drives a small exported `BINARY_ROUTES` ledger instead. It
+lists the routes known to return stored bytes. Each entry marks whether it
+carries a filename. A person keeps `BINARY_ROUTES` by hand. A route added
+outside it needs that same person to add the entry.
+`admin-routing.test.ts`'s own route list already needs one that way.
+
+The defect class is route-table drift. The `/admin/*` collision already
+showed that class.
 
 **A refused host reaches the dead-letter list**. The egress allowlist rejects a
 host. The dispatch must land in the dead-letter list, and the message must name
 the host. An operator who cannot see the host cannot repair the allowlist. No
 step of that path needs a browser.
 
-**A body with no layout keys**. Such a body must render as it did before.
-The form-editor change added `view.columns` and `viewField.span`.
-`test/view-layout-hash.test.ts` already pins the hash against both keys.
-Nothing pins the render. `effectiveSpan` is pure and exported, so one case
-pins it.
+**A view with no `columns` key resolves to one column**. The form-editor
+change added `view.columns` and `viewField.span`.
+`test/view-layout-hash.test.ts` already pins the hash against both keys. The
+`form-ui` base spec already requires the one-column render. Its own
+requirement text is `Fields render across the view's declared column
+count`.
 
-**An authored-text site routes through the localized-text helper**. The modal
-task enumerated six warning sites by hand. A seventh site added later warns
-about nothing, and a missing translation then ships silently. A static rule in
-the `boundaries.test.ts` style finds it.
+The runtime layer beneath it stays untested. `getInstanceView` resolves
+`columns: step.view?.columns ?? 1`. The `runtime-api` base spec already
+states that default, with no case exercising it. Two cases in
+`test/runtime-api.test.ts` close that gap. Neither spec gains a new
+requirement. Both already state this behavior.
+
+**An authored-text site under `src/areas/studio/` routes through the
+localized-text helper**. `studio-app`'s existing requirement already
+enumerates six warning sites by hand. `missingTranslationWarning`
+(`packages/web/src/areas/studio/draft/localized-text.ts`) draws them. A
+seventh site added later warns about nothing, and a missing translation then
+ships silently. A static rule in the `boundaries.test.ts` style finds it.
+
+The rule stays scoped to the studio area. That helper reads `useDraft`'s
+`contentLocale`, which exists only there. No other area's render sites are a
+candidate for this rule.
 
 **A router refuses a half-match**. It also matches and round-trips.
 `admin-routing.test.ts` already has that shape. `CLAUDE.md` names the
@@ -106,8 +128,11 @@ routers carry no such coverage.
 ### The assertions start no server
 
 `test/http-static.test.ts` shows the shape. It calls `createServer`'s handler
-directly. No port, and for most cases no database. The disposition assertion
-copies it.
+directly, with no port. The disposition assertion copies the no-port shape.
+It does not copy the no-database part. Driving the attachment route needs a
+published process, an instance and an uploaded attachment row. The case is
+`test.skipIf(!DB)` against the `_test` database, the way the outbox case
+already is.
 
 The dead-letter assertion drives the engine in process, against the `_test`
 database that `test/preload-db.ts` provisions. `test/outbox.test.ts` already
@@ -127,12 +152,21 @@ where it is.
 Each entry states what to open, what to do, and what a pass looks like. Each
 one names the change that first asked for it, so its origin survives.
 
-The file opens with the operating rules. Use `http://127.0.0.1:3001`, not
-`localhost`. Under Windows `localhost` resolves to `::1` and the connection
-hangs. `.devcontainer/docker-compose.override.yml` publishes `3001:3000`, and
-the engine serves the bundle from `WEB_ROOT`.
+The file opens with three operating rules.
 
-The second rule: run no `bun test` while a dev server answers that port. The
+The address is `127.0.0.1`, not `localhost`: under Windows `localhost`
+resolves to `::1` and the connection hangs. The port itself is a per-machine
+choice. Git ignores `.devcontainer/docker-compose.override.yml`, so no
+number in this file binds every contributor. The checklist gives the
+two-line snippet that publishes one. `3001:3000` is the suggested mapping.
+It also says where the number then comes from.
+
+Build the bundle first: `resolveWebRoot` (`src/http/static.ts:143-153`)
+falls back to `packages/web/dist`, an untracked build output, and returns
+`undefined` when it is absent. Without a build the engine answers every
+navigation with a JSON 404, and the checklist shows nothing.
+
+The last rule: run no `bun test` while a dev server answers that port. The
 poller and the suite fight over outbox rows.
 
 ### `playwright-cli` drives the manual run, and stays off the dependency list
@@ -158,6 +192,11 @@ gains an entry. No container build gains an install. A contributor with no
 - The split rule needs judgment about what counts as a defect record. A
   contributor may read it loosely. Mitigation: the rule asks for the file and
   the line that records the defect.
+- Spec prose alone repeats the defect this change exists to fix: the archive
+  already dropped ten browser tasks once. Mitigation: the archive-time check
+  in `.claude/skills/openspec-archive-change/SKILL.md` (task 7.3) is the
+  enforcement point. It runs at archive, not at push, since a push gate never
+  sees an archive step.
 
 ## Migration Plan
 
