@@ -102,7 +102,8 @@ entry point takes the same two profiles and runs that same script.
 bun install
 DATABASE_URL=postgres://postgres:postgres@db:5432/workflow_engine bun test   # bun:test suites
 bun run typecheck                                                            # tsc --noEmit (Bun does not typecheck)
-bun run check                                                                # both, in one command
+bun run build                                                                # vite build, the frontend's production bundle
+bun run check                                                                # typecheck, build, then the suite, in one command
 ```
 
 Set `DATABASE_URL`. The database-backed suites carry `test.skipIf(!DATABASE_URL)`
@@ -112,8 +113,10 @@ the suite tests. Inside the dev container the variable is already set, which is
 the second reason to run there.
 
 Nothing runs on a hosted CI service. `.githooks/pre-push` is the gate instead.
-It runs `bun run check` in the dev container and blocks the push unless both
-the typecheck and the suite pass. The `bun install` above arms it: the root
+It runs `bun run check` in the dev container. The push proceeds only when the
+typecheck, the build and the suite all pass.
+
+The `bun install` above arms it: the root
 `prepare` script runs `scripts/enable-hooks.sh`, which points
 `core.hooksPath` at `.githooks`. That arms `post-commit` too, which bumps
 `VERSION` after each commit. The same script arms an SSH keepalive on

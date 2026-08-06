@@ -4,8 +4,8 @@
 ## Purpose
 
 Defines the project's standard runtime, package manager, test runner and
-typecheck tool. Also defines how a contributor installs, tests and typechecks
-the project.
+typecheck tool. Also defines how a contributor installs, tests, typechecks and
+builds the project.
 ## Requirements
 ### Requirement: Bun is the standard toolchain
 The project SHALL use Bun as its runtime, package manager and test runner. The
@@ -196,12 +196,68 @@ allowlist change. So SHALL one that adds or removes a frontend package.
 - **THEN** its origin is removed from `CORS_ALLOWED_ORIGINS` in the same
   change that deletes it
 
+### Requirement: The frontend's production bundle builds
+
+The repository SHALL carry a root `build` script. That script SHALL build every
+workspace package that ships a bundle. Today one package does, `packages/web`.
+
+The root `check` command SHALL run that build. It SHALL run it after the
+typecheck and before the suite. Cheapest first is the order the pre-push hook
+already keeps across its three stages, and this holds to it.
+
+The placement in `check` covers both paths at once. The hook runs `check` in
+the devcontainer, so a push runs the build. A contributor runs the same command
+by hand, so manual verification runs it too.
+
+A build that stops SHALL stop the push, on the terms of a failing typecheck.
+
+The build SHALL be the command that ships the frontend, rather than a detector
+beside it. No script for this belongs under `scripts/gates/`. Those scripts hold
+detectors this repository wrote, each because no off-the-shelf command covers
+its class. Here one does, and it names the file, the line and the reason.
+
+Nothing else in the repository bundles. `tsc` typechecks and emits no bundle.
+`bun test` resolves modules by its own rules. So a construct the build target
+lacks passes both of them.
+
+On 2026-08-06 that gap let a frontend reach `main` that does not build.
+`packages/web/src/main.tsx` carried a top-level `await`. Vite's default target
+is `es2020` and `chrome87`, and neither one has it. The typecheck reported
+green. The full suite reported green, all 2070 tests. All six push gates
+reported green.
+
+A build script SHALL NOT run for a package that ships source only. One such
+package is `packages/form-ui`, and the workspace filter skips it.
+
+#### Scenario: A push builds the frontend
+
+- **WHEN** a contributor pushes with the devcontainer up
+- **THEN** the hook runs the production build in the container, after the
+  typecheck and before the suite
+
+#### Scenario: A construct the target lacks blocks the push
+
+- **WHEN** a change adds source the build target cannot carry, and the
+  typecheck and the suite both report green
+- **THEN** the build stops, and the push does not proceed
+
+#### Scenario: Manual verification runs the same build
+
+- **WHEN** a contributor runs `bun run check` by hand
+- **THEN** that run builds the frontend, the same way the hook does
+
+#### Scenario: A source-only package needs no build
+
+- **WHEN** the root build script runs over the workspace
+- **THEN** it builds `packages/web`, skips `packages/form-ui`, and reports
+  success
+
 ### Requirement: Every push runs the toolchain's checks against a real database
 
 The repository SHALL carry a `pre-push` hook, under a committed hooks
-directory. It SHALL run three things before a push leaves the machine. Those
-are the repo-wide typecheck, the full test suite, and the mechanical gates
-`push-gate-checks` specifies.
+directory. It SHALL run four things before a push leaves the machine. Those
+are the repo-wide typecheck, the production build, the full test suite, and the
+mechanical gates `push-gate-checks` specifies.
 
 The repository SHALL enable that hook itself. A `prepare` script in the root
 `package.json` SHALL point `core.hooksPath` at the committed hooks directory,
@@ -234,7 +290,7 @@ a different runtime than the project's.
 
 The silent-skip hazard is why placement matters. The DB-backed suites are
 `test.skipIf(!DB)` at hundreds of sites, most of the suite. A run without the
-variable reports a pass count that omits most of what was written. It looks
+variable reports a pass count that omits most of what the suite covers. It looks
 identical to a genuine green. Placement alone no longer carries that guarantee.
 `push-gate-checks` adds a gate that reads the run's own skip count. That gate
 checks the property rather than assuming it.
@@ -253,6 +309,10 @@ catch.
 
 The typecheck SHALL be a step of its own. Bun does not typecheck, so a type
 error passes `bun test` cleanly.
+
+The build SHALL be a step of its own too, for the matching reason. Neither the
+typecheck nor the suite bundles anything, so a construct the build target lacks
+passes both. The build requirement above records the measurement.
 
 A gate that rejects a push SHALL block that push. The terms are those of a
 failing typecheck or a failing suite. The hook has one bypass, `--no-verify`.
@@ -282,11 +342,12 @@ file that never runs reads as coverage it does not provide.
 - **THEN** the install succeeds, and the missing hooks configuration fails
   nothing
 
-#### Scenario: A push runs typecheck and the full suite
+#### Scenario: A push runs typecheck, the build and the full suite
 
-- **WHEN** a push is attempted with the devcontainer up
-- **THEN** the hook runs the repo-wide typecheck, then the full test suite,
-  both in the container. The push proceeds only when both pass
+- **WHEN** a contributor pushes with the devcontainer up
+- **THEN** the hook runs the repo-wide typecheck, then the production build,
+  then the full test suite. All three run in the container
+- **AND** the push proceeds only when every one of them passes
 
 #### Scenario: A push runs the mechanical gates
 
@@ -314,7 +375,7 @@ file that never runs reads as coverage it does not provide.
 #### Scenario: The database-backed suites run
 
 - **WHEN** the hook runs the suite in the container
-- **THEN** `DATABASE_URL` is set for that run, so the DB-backed suites execute
+- **THEN** that run carries `DATABASE_URL`, so the DB-backed suites execute
   rather than skipping
 
 ### Requirement: A clone's push connection survives its own pre-push hook
@@ -345,6 +406,10 @@ while the hook runs. The value answers the remote's idle tolerance, not the
 hook's runtime. Each reply resets the clock, so one interval under that
 tolerance holds the connection for any duration.
 
+<!-- antislop: allow synonym-rotation -->
+<!-- The build requirement above uses "stop" for a failed build; "kill" here
+     names ssh dropping the connection, an unrelated concept the linter
+     otherwise pairs with it across the file. -->
 `ServerAliveCountMax` multiplied by the interval SHALL exceed the hook's
 wall-clock runtime. ssh disconnects once that many probes go unanswered. A
 product under the runtime lets a short network drop inside the hook window
