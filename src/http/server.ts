@@ -12,6 +12,7 @@
  * drifted, and the four /reporting/* routes never got a preflight branch.
  */
 import { SQL } from "bun";
+import { timingSafeEqual } from "node:crypto";
 import { sql, initSchema } from "../engine/store.js";
 import { startEngine, createDefaultDataSourceRegistry } from "../engine/host.js";
 import {
@@ -128,7 +129,12 @@ function corsHeaders(allowed: AllowedOrigins, requestOrigin: string | null): Rec
 function toResponse({ status, body }: HttpResult, allowed: AllowedOrigins, requestOrigin: string | null): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json", ...corsHeaders(allowed, requestOrigin) },
+    // Every envelope this wrapper returns is actor-scoped, and an instance view
+    // or a comment list holds data a participant supplied. No intermediary may
+    // keep a copy. One header here covers every route, success and error alike;
+    // a per-route opt-out list would drift, as the hand-written preflight chain
+    // did before the route table replaced it.
+    headers: { "content-type": "application/json", "Cache-Control": "no-store", ...corsHeaders(allowed, requestOrigin) },
   });
 }
 
@@ -137,10 +143,28 @@ function isBinaryResult(result: HttpBinaryResult | HttpResult): result is HttpBi
   return "contentType" in result;
 }
 
-function toBinaryResponse({ status, contentType, data }: HttpBinaryResult, allowed: AllowedOrigins, requestOrigin: string | null): Response {
+/**
+ * `nosniff` goes on every binary response: it costs a scrape nothing and holds
+ * for any later binary route. `Content-Disposition` goes only on a result
+ * carrying a `filename`, which is the attachment download alone — a download
+ * header on a metrics scrape would be wrong.
+ *
+ * The filename is percent-encoded. A stored filename holds up to 255
+ * characters of any kind, a quote and a CR among them, and encoding settles
+ * the header-injection question rather than answering it per character.
+ */
+function toBinaryResponse({ status, contentType, data, filename }: HttpBinaryResult, allowed: AllowedOrigins, requestOrigin: string | null): Response {
+  const disposition = filename === undefined
+    ? {}
+    : { "Content-Disposition": `attachment; filename="${encodeURIComponent(filename)}"` };
   return new Response(data, {
     status,
-    headers: { "content-type": contentType, ...corsHeaders(allowed, requestOrigin) },
+    headers: {
+      "content-type": contentType,
+      "X-Content-Type-Options": "nosniff",
+      ...disposition,
+      ...corsHeaders(allowed, requestOrigin),
+    },
   });
 }
 
@@ -171,6 +195,26 @@ type Route = {
 /** Split a route pattern into segments. Runs once per route, when `createServer` builds the table. */
 function seg(pattern: string): string[] {
   return pattern.split("/").filter(Boolean);
+}
+
+/**
+ * True when `header` carries exactly `expected` as a bearer token.
+ *
+ * The compare is constant time, so a wrong token leaks no prefix. The length
+ * check that precedes it is not an optimization: `timingSafeEqual` throws a
+ * `RangeError` on buffers of different length, which is the ordinary
+ * wrong-token case, and an unhandled raise would turn the 401 into a 500. A
+ * length difference is observable either way, and the constant-time property
+ * never covered length.
+ */
+function bearerTokenMatches(header: string | null, expected: string): boolean {
+  if (header === null) return false;
+  const prefix = "Bearer ";
+  if (!header.startsWith(prefix)) return false;
+  const presented = Buffer.from(header.slice(prefix.length));
+  const secret = Buffer.from(expected);
+  if (presented.length !== secret.length) return false;
+  return timingSafeEqual(presented, secret);
 }
 
 /**
@@ -304,6 +348,11 @@ export function createServer(
   // `secret` is a const so the narrowing survives into the closure. The
   // `loginSecret` parameter alone would not narrow there.
   const secret = loginSecret;
+  // Read once, at construction, so one scrape cannot see a different value
+  // from the next. An empty string counts as unset: a deployment that exports
+  // METRICS_TOKEN= has configured no token.
+  const rawMetricsToken = process.env.METRICS_TOKEN;
+  const metricsToken = rawMetricsToken ? rawMetricsToken : undefined;
   const routes: Route[] = [
     ...(secret === undefined
       ? []
@@ -444,7 +493,18 @@ export function createServer(
     if (req.method === "GET" && parts.length === 1 && parts[0] === "readyz") {
       return toResponse(await handleReadyz(db), undefined, null);
     }
-    if (req.method === "GET" && parts.length === 1 && parts[0] === "metrics") {
+    // GET /metrics: registered only when METRICS_TOKEN holds a value, so a
+    // default deployment exposes nothing. Unset follows CORS_ALLOWED_ORIGINS,
+    // where unset permits nothing, and the login route, which the table
+    // registers conditionally. A scrape carries no actor identity, so this is
+    // a shared bearer token rather than a role: resolving ADMIN_ROLE through
+    // the ordinary resolver would put a full-permission credential in a scrape
+    // config. The two probes stay open — a probe answers from process state or
+    // one cheap query, while a scrape runs three aggregates over live tables.
+    if (metricsToken !== undefined && req.method === "GET" && parts.length === 1 && parts[0] === "metrics") {
+      if (!bearerTokenMatches(req.headers.get("Authorization"), metricsToken)) {
+        return toResponse({ status: 401, body: { error: { type: "actor-resolution", message: "GET /metrics requires a bearer token equal to METRICS_TOKEN" } } }, undefined, null);
+      }
       return toBinaryResponse(await handleMetrics(db), undefined, null);
     }
 

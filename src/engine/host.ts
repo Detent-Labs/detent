@@ -118,9 +118,11 @@ export function createDefaultDataSourceRegistry(db: SQL = sql): DataSourceRegist
  * `undefined` when unset (the sweep stays off, matching every deployment's
  * current behavior). A set-but-invalid value throws rather than silently
  * leaving the sweep off: this variable gates a destructive, irreversible
- * action with no default of its own, unlike `MAX_ATTACHMENT_BYTES` and
- * similar env vars that fall back to a default on a bad value. An operator
- * who mistypes it needs to find out immediately, not after a silent no-op.
+ * action with no default of its own. An operator who mistypes it needs to
+ * find out immediately, not after a silent no-op.
+ *
+ * `parseMaxAttachmentBytes` in `http/routes.ts` reads its own bound the same
+ * way.
  */
 export function parseRetentionDays(): number | undefined {
   const raw = process.env.DATA_RETENTION_DAYS;

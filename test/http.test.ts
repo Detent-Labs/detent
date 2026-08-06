@@ -20,6 +20,8 @@ import { drainResolutions } from "../src/engine/resolution.js";
 import { ConcurrencyConflict } from "../src/engine/transition.js";
 import { createServer } from "../src/http/server.js";
 import { mapError } from "../src/http/errors.js";
+import { parseMaxAttachmentBytes, parseLimit } from "../src/http/routes.js";
+import { MAX_LIST_LIMIT, MAX_RECORD_LIMIT } from "../src/runtime/api.js";
 import { devHeaderResolver, type ActorResolver } from "../src/auth/resolve.js";
 import { PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE } from "../src/auth/authorize.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
@@ -1017,6 +1019,66 @@ test.skipIf(!DB)("POST /instances/:instanceId/attachments with an over-length co
   expect(body.error.type).toBe("request-shape");
 });
 
+// A parameter, a CR and an LF are each outside the MIME token pair. The CR case
+// is the one that used to reach `new Response()` and turn a download into a 500.
+for (const [label, contentType] of [
+  ["a parameter", "text/html; charset=utf-8"],
+  ["a CRLF injection", "text/html\r\nX-Injected: 1"],
+  ["a bare LF", "text/plain\nX-Injected: 1"],
+  ["no subtype", "text-plain"],
+  ["a leading space", " text/plain"],
+] as const) {
+  test.skipIf(!DB)(`POST /instances/:instanceId/attachments with a contentType holding ${label} maps to 400 request-shape`, async () => {
+    const PID = pid(`proc_http_attachment_mime_${label.replace(/\W/g, "_")}`);
+    await publishBody(PID, assignedBody(), reg, dataSourceReg);
+    const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+    const dataBase64 = Buffer.from("x").toString("base64");
+    const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/attachments`, "POST", user1, { filename: "a.txt", contentType, dataBase64 }));
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { type: string } };
+    expect(body.error.type).toBe("request-shape");
+  });
+}
+
+test.skipIf(!DB)("POST /instances/:instanceId/attachments accepts a MIME type carrying the punctuation the token pair permits", async () => {
+  const PID = pid("proc_http_attachment_mime_ok");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const dataBase64 = Buffer.from("<svg/>").toString("base64");
+  const res = await fetch(
+    jsonReq(`http://x/instances/${created.instanceId}/attachments`, "POST", user1, { filename: "d.svg", contentType: "image/svg+xml", dataBase64 }),
+  );
+  expect(res.status).toBe(201);
+  expect(((await res.json()) as { contentType: string }).contentType).toBe("image/svg+xml");
+});
+
+test("parseMaxAttachmentBytes throws on a value that is not a positive integer, naming the variable", () => {
+  for (const bad of ["5MB", "0", "-1", "1.5", "", "abc"]) {
+    expect(() => parseMaxAttachmentBytes(bad)).toThrow("MAX_ATTACHMENT_BYTES");
+  }
+  expect(parseMaxAttachmentBytes(undefined)).toBe(5 * 1024 * 1024);
+  expect(parseMaxAttachmentBytes("1024")).toBe(1024);
+});
+
+test.skipIf(!DB)("a download arrives as a file, not as a document: Content-Disposition and nosniff on a stored text/html", async () => {
+  const PID = pid("proc_http_attachment_disposition");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  const dataBase64 = Buffer.from("<script>alert(1)</script>").toString("base64");
+  const uploaded = (await (
+    await fetch(jsonReq(`http://x/instances/${created.instanceId}/attachments`, "POST", user1, { filename: "evil report.html", contentType: "text/html", dataBase64 }))
+  ).json()) as { id: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/attachments/${uploaded.id}`, "GET", user1));
+  expect(res.status).toBe(200);
+  expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
+  // Percent-encoded, so a quote or a CR in a stored filename cannot open a
+  // second header. The space becomes %20 as a consequence.
+  expect(res.headers.get("Content-Disposition")).toBe('attachment; filename="evil%20report.html"');
+});
+
 test.skipIf(!DB)("an actor with no relation to the instance gets 403 on all three attachment routes", async () => {
   const PID = pid("proc_http_attachment_403");
   await publishBody(PID, assignedBody(), reg, dataSourceReg);
@@ -2007,4 +2069,48 @@ test("the fallback still logs when no context is supplied (a direct mapError cal
   } finally {
     errorSpy.mockRestore();
   }
+});
+
+// ============================================================
+// Cache-Control on the JSON envelope
+// ============================================================
+
+test.skipIf(!DB)("a success envelope forbids a shared cache", async () => {
+  const PID = pid("proc_http_nostore_ok");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const res = await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1));
+  expect(res.status).toBe(201);
+  expect(res.headers.get("Cache-Control")).toBe("no-store");
+});
+
+test("an error envelope forbids a shared cache", async () => {
+  const res = await fetch(authedReq("http://x/instances/inst_missing?limit=abc", "GET", user1));
+  expect(res.headers.get("Cache-Control")).toBe("no-store");
+});
+
+// ============================================================
+// parseLimit clamps at the HTTP boundary
+// ============================================================
+
+test("parseLimit clamps a limit above the caller's maximum, and still rejects a non-positive integer", () => {
+  const at = (q: string) => new URL(`http://x/instances?${q}`);
+  expect(parseLimit(at("limit=10000"), MAX_LIST_LIMIT)).toBe(MAX_LIST_LIMIT);
+  expect(parseLimit(at("limit=10000"), MAX_RECORD_LIMIT)).toBe(MAX_RECORD_LIMIT);
+  // Under the maximum passes through untouched, and an absent limit stays
+  // undefined so the query layer applies its own default.
+  expect(parseLimit(at("limit=7"), MAX_LIST_LIMIT)).toBe(7);
+  expect(parseLimit(at(""), MAX_LIST_LIMIT)).toBeUndefined();
+  for (const bad of ["limit=abc", "limit=0", "limit=-1", "limit=1.5"]) {
+    expect(() => parseLimit(at(bad), MAX_LIST_LIMIT)).toThrow("limit must be a positive integer");
+  }
+});
+
+test.skipIf(!DB)("GET /instances with a limit far above the maximum still answers 200", async () => {
+  const PID = pid("proc_http_limit_clamp");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1));
+  const res = await fetch(authedReq("http://x/instances?limit=100000", "GET", user1));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { items: unknown[] };
+  expect(body.items.length).toBeLessThanOrEqual(MAX_LIST_LIMIT);
 });

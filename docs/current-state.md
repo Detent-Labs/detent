@@ -399,6 +399,34 @@ Stage-by-stage status is in `ROADMAP.md`.
   The workers are lease-based and at-least-once. A tick cut short retries
   the way it does after a crash.
 
+  **Response headers the wrapper sets for every caller**
+  (`harden-http-response-boundary`): `toResponse` puts
+  `Cache-Control: no-store` on every JSON envelope. That covers an error
+  envelope as well as a success one. Every list this wrapper serves is
+  actor-scoped, and an instance view holds data a participant supplied.
+  No intermediary may keep a copy. No route opts out. A per-route list
+  would drift, the way the hand-written preflight chain drifted before
+  the route table replaced it.
+
+  `toBinaryResponse` puts `X-Content-Type-Options: nosniff` on every
+  binary response. It puts `Content-Disposition: attachment` only on a
+  result carrying a `filename`. That is the attachment download alone.
+  A download header on a metrics scrape would be wrong. The filename is
+  percent-encoded. A stored one holds up to 255 characters of any kind,
+  a quote and a CR among them.
+
+  The upload route bounds what it will later echo. `contentType` must
+  match one MIME type and subtype joined by `/`. Each half holds
+  letters, digits and `.`, `+`, `-`, `_`. Parameters fail the match. So
+  does a CR or an LF, which used to reach `new Response()` and turn a
+  download into a 500. With the two headers, an uploaded HTML or SVG
+  file saves instead of running as a document.
+
+  `routes.ts::parseMaxAttachmentBytes` reads `MAX_ATTACHMENT_BYTES` once
+  at module load. A value that is not a positive integer throws there
+  instead of resolving to `NaN`. That `NaN` made every comparison false,
+  and so discarded the limit an operator meant to tighten.
+
   **CORS is configuration, not a constant** (`configurable-cors-origins`):
   `createServer` takes an `allowedOrigins` parameter (`undefined` | `"*"` |
   `string[]`), and `startHttpServer` sources it from `CORS_ALLOWED_ORIGINS`
@@ -1673,8 +1701,20 @@ Stage-by-stage status is in `ROADMAP.md`.
   from a new, general-shaped `countInstancesByStatus`. No functional
   index covers its `GROUP BY`, so it scans the whole `instances` table on
   every call. Acceptable at today's scale; see the change's design.md
-  Risks section. Registered unauthenticated in `server.ts`, alongside
-  `/livez`/`/readyz`, ahead of every auth-dependent route.
+  Risks section.
+
+  `server.ts` registers the branch alongside `/livez`/`/readyz`, ahead of
+  every auth-dependent route, but behind `METRICS_TOKEN`
+  (`harden-http-response-boundary`). Unset or empty leaves the branch
+  unregistered. A default deployment then answers a scrape with the
+  ordinary unmatched-path response.
+
+  Set, the branch requires that value as a bearer token.
+  `timingSafeEqual` compares the two. A length check precedes it, so a
+  wrong-length token gets a 401 and not a `RangeError`. A missing or
+  mismatched token runs no query. That token names no actor. A scraper
+  carries no identity, and `system:admin` would put a full-permission
+  credential in a scrape config.
 
   Returns `HttpBinaryResult`, not `HttpResult`. `server.ts`'s shared
   `toResponse` always `JSON.stringify`s an `HttpResult` body. That would
