@@ -20,8 +20,8 @@ headers.
 
 **Status:** Every actionable finding below is now covered by a prepared
 OpenSpec change, or closed, or declined with a reason. See
-[Status: change coverage](#status-change-coverage). No change has been
-implemented yet.
+[Status: change coverage](#status-change-coverage). All six are now
+implemented and merged.
 
 **Summary:** The prior review's fixes held. Object-level authorization is now
 real and shared by one predicate, auth configuration fails closed, the six
@@ -75,7 +75,9 @@ Top findings:
 
 Six OpenSpec changes carry this review's findings. Each one holds a proposal,
 delta specs, a design and a task list, and each passes `openspec validate
---strict`. None is implemented; `openspec/changes/<name>/` holds the plan.
+--strict`. All six are implemented and merged into `main`, so
+`openspec/changes/<name>/` now holds the record rather than the plan. Each
+still awaits `opsx:archive`.
 
 | Change | Findings |
 |---|---|
