@@ -7,6 +7,10 @@
  * cached and re-fetched by `jose` itself on a key-not-found miss). Both
  * branches produce the same `Actor { id, roles }`, so local and IdP-issued
  * identities are indistinguishable downstream and accepted simultaneously.
+ *
+ * The local branch also asks the account directory whether that subject is
+ * still live, when configured with an `isActiveAccount` callback. That is what
+ * makes an operator's disable end an open session on the next request.
  */
 import { decodeJwt, jwtVerify, createRemoteJWKSet } from "jose";
 import { ActorResolutionError, type ActorResolver } from "./resolve.js";
@@ -29,6 +33,22 @@ export interface JwtResolverConfig {
   localRolesClaim?: string;
   /** `AUTH_ISSUERS`, parsed. */
   issuers?: IssuerConfig[];
+  /**
+   * Answers whether the local account directory still holds `userId` as a live
+   * account. Called on every LOCALLY issued token, after the signature
+   * verifies, so an operator's disable ends that account's open session on its
+   * next request rather than at its token's `exp`. A deleted account answers
+   * the same as a disabled one.
+   *
+   * A callback rather than a database handle, so this file keeps holding no
+   * SQL. `resolveAuthResolver` (`src/http/server.ts`) supplies the real one.
+   * Omitted, this resolver reads no directory — the shape a unit test uses,
+   * and the shape any caller holding no database uses.
+   *
+   * Never called for an externally issued token: that issuer owns revocation,
+   * and this engine holds no row for its subjects.
+   */
+  isActiveAccount?: (userId: string) => Promise<boolean>;
 }
 
 function claimToRoles(payload: Record<string, unknown>, rolesClaim: string): string[] {
@@ -66,7 +86,15 @@ export function jwtResolver(config: JwtResolverConfig): ActorResolver {
       if (iss === LOCAL_ISSUER) {
         if (!localKey) throw new ActorResolutionError(`unconfigured issuer: ${iss}`);
         const { payload } = await jwtVerify(token, localKey, { issuer: LOCAL_ISSUER });
-        return toActor(payload, localRolesClaim);
+        const actor = toActor(payload, localRolesClaim);
+        // Only `Actor.id` comes from this read. `roles` stays the token's own
+        // claim, so a grant still reaches the actor at their next login and not
+        // before — see the admin-user-management spec, "A role change does not
+        // reach an already-issued token".
+        if (config.isActiveAccount && !(await config.isActiveAccount(actor.id))) {
+          throw new ActorResolutionError("account is disabled or no longer exists");
+        }
+        return actor;
       }
       const issuerConfig = config.issuers?.find((i) => i.iss === iss);
       if (!issuerConfig) throw new ActorResolutionError(`unconfigured issuer: ${iss ?? "(none)"}`);

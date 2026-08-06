@@ -42,3 +42,28 @@ owns revocation, and this engine holds no directory entry for that subject.
   issuer
 - **THEN** the resolver verifies it against that issuer's key set alone, and
   reads no directory entry
+
+### Requirement: The composition root wires the account lookup
+
+`resolveAuthResolver` (`src/http/server.ts`) SHALL take the database handle.
+It SHALL give the resolver it builds a lookup that reads `auth_users` through
+that handle. A resolver this function returns SHALL therefore apply the
+requirement above. Without this, that requirement states a capability
+`jwtResolver` carries and no deployment uses.
+
+`jwtResolver` without such a lookup SHALL keep today's behavior and read no
+directory. That is the shape a unit test uses. It is also the shape any
+caller holding no database uses.
+
+#### Scenario: The server's own resolver reads the directory
+
+- **WHEN** `resolveAuthResolver` builds a resolver from `AUTH_JWT_SECRET`,
+  and a request carries a locally issued token for a disabled account
+- **THEN** the resolver raises `ActorResolutionError`
+
+#### Scenario: A resolver built without the lookup reads no directory
+
+- **WHEN** a caller builds a resolver from `jwtResolver` with a local signing
+  key and no account lookup
+- **AND** a request carries a valid locally issued token
+- **THEN** the resolver returns an `Actor` and issues no query

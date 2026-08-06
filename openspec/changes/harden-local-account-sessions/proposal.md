@@ -52,7 +52,9 @@ delegation.
 - `delegateClaim` rejects a target that does not resolve in `auth_users`,
   but only when the delegating actor resolves there. A deployment on an
   external identity provider keeps today's behavior, because it has no
-  directory to check against.
+  directory to check against. The check runs after the claimant check, under
+  the same row lock. A caller who does not hold the claim therefore still
+  meets `NotClaimantError`, and learns nothing about the directory.
 
 ## Capabilities
 
@@ -63,27 +65,40 @@ None.
 ### Modified Capabilities
 
 - `jwt-authentication`: a new requirement covers the per-request account
-  check for locally issued tokens.
+  check for locally issued tokens. A second one obliges the composition root
+  to wire it.
 - `local-user-accounts`: the rate-limit requirement gains the per-source
-  bucket. The memory-footprint requirement replaces refusal with eviction.
+  bucket. The memory-footprint requirement replaces refusal with eviction,
+  and bounds the per-address map the same way.
 - `runtime-api`: the delegation requirement gains the target check.
 - `admin-user-management`: the disable requirement states that a live session
   ends at once. Its current text requires the opposite, and names the missing
-  per-request lookup as the reason.
+  per-request lookup as the reason. The role-change requirement names that
+  same missing lookup and keeps its own outcome. This change restates its
+  reason.
+- `http-wrapper`: the delegation error gets a status, the way every other
+  Runtime API Layer error has one.
 
 ## Impact
 
 - `src/auth/jwt.ts`: the local branch reaches the account directory.
 - `src/auth/users.ts`: a lookup by `user_id` that answers whether the
-  directory holds that account as disabled.
+  directory holds that account as live. Beside it, one that answers whether
+  the directory holds a set of ids at all.
 - `src/auth/login.ts`: the second bucket and the eviction path.
-- `src/http/server.ts`: the request handler takes Bun's `server` argument and
-  passes a client address to the route handlers. Only the login route reads
-  it.
-- `src/runtime/api.ts` and `src/engine`: the `delegateClaim` target check.
+- `src/http/server.ts`: `resolveAuthResolver` takes the database handle and
+  wires the account lookup. The request handler takes Bun's `server`
+  argument and passes a client address to the route handlers. Only the login
+  route reads it.
+- `src/runtime/api.ts` and `src/engine/transition.ts`: the `delegateClaim`
+  target check. The engine gains a validator parameter, not a directory.
+- `src/http/errors.ts`: the new error's status mapping.
+- `packages/web/src/api/types.ts` and `client.ts`: the new error type, so the
+  browser prints the message instead of a generic internal error.
 - One new environment variable, `TRUST_PROXY`.
+- `README.md`: the environment-variable list.
 - `docs/authoring-guide.md`: the delegation paragraph, which today names no
   rule about the target.
 - `docs/current-state.md`: the auth entries.
-- Tests: `test/auth-jwt.test.ts`, `test/auth-login.test.ts` and the
-  assignment suites.
+- Tests: `test/auth-jwt.test.ts`, `test/auth-login.test.ts`,
+  `test/auth-server.test.ts` and the assignment suites.

@@ -26,10 +26,12 @@ import {
   AlreadyClaimedError,
   NotClaimedError,
   NotClaimantError,
+  UnknownDelegateError,
   isEligibleCandidate,
 } from "../engine/transition.js";
 import { buildGuardContext, evalGuard, type Actor } from "../cel/eval.js";
 import { requireRole, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, AuthorizationError } from "../auth/authorize.js";
+import { knownUserIds } from "../auth/users.js";
 import { definitionHash } from "../schema/hash.js";
 import { NotFoundError, InstanceNotRunningError } from "../errors.js";
 import { encodeCursor, decodeCursor } from "../pagination.js";
@@ -73,6 +75,7 @@ export {
   AlreadyClaimedError,
   NotClaimedError,
   NotClaimantError,
+  UnknownDelegateError,
   NotFoundError,
   InstanceNotRunningError,
 };
@@ -861,13 +864,32 @@ export async function releaseClaim(instanceId: InstanceId, actor: Actor, db: SQL
 
 /**
  * Delegate a claim on the current step of a running instance to a named
- * actor. Thin delegation to the engine implementation — see
+ * actor. Delegation to the engine implementation — see
  * `engine/transition.ts::delegateClaim`. Same non-running detection as
- * `claimStep`/`releaseClaim`, for the same reason. `toActorId` is not
- * checked against `assignment.candidates` or any account directory.
+ * `claimStep`/`releaseClaim`, for the same reason. `toActorId` is still not
+ * checked against `assignment.candidates`: the contract permits delegating
+ * outside the candidate set, and the `assignment.delegated` event records
+ * exactly that.
+ *
+ * It IS checked against the local account directory, but only where the
+ * delegating actor's own id resolves there. The engine cannot ask whether a
+ * deployment uses local accounts — both resolvers can be active at once — so
+ * it asks about this delegator instead. On an external identity provider the
+ * answer is no and the target check does not run, which keeps this rule from
+ * rejecting every delegation in such a deployment. One query answers both
+ * halves, so the two facts cannot disagree.
+ *
+ * The check travels as a callback rather than running here, so the engine can
+ * order it after its own claimant check and inside its row lock. Running it
+ * first would make a non-claimant's error depend on whether the target exists,
+ * turning this call into a directory-enumeration oracle.
  */
 export async function delegateClaim(instanceId: InstanceId, actor: Actor, toActorId: string, db: SQL = sql): Promise<Instance> {
-  const updated = await engineDelegateClaim(instanceId, actor, toActorId, db);
+  const validateTarget = async (target: string): Promise<void> => {
+    const known = await knownUserIds([actor.id, target], db);
+    if (known.has(actor.id) && !known.has(target)) throw new UnknownDelegateError(target);
+  };
+  const updated = await engineDelegateClaim(instanceId, actor, toActorId, db, validateTarget);
   if (updated.status !== "running") throw new InstanceNotRunningError(updated.instanceId, updated.status);
   return updated;
 }
