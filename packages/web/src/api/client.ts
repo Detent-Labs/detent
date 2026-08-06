@@ -52,6 +52,8 @@ export async function parseErrorBody(res: Response): Promise<ClientError> {
       return { type: "not-claimed", message };
     case "not-claimant":
       return { type: "not-claimant", message };
+    case "unknown-delegate":
+      return { type: "unknown-delegate", message };
     case "not-assigned":
       return { type: "not-assigned", message };
     case "guard-refused":

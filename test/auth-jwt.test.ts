@@ -30,6 +30,24 @@ async function localToken(opts: { secret?: string; roles?: string[]; expired?: b
     .sign(key);
 }
 
+/**
+ * Stands in for `isActiveUser`, so these stay the pure, DB-free tests the rest
+ * of this file is. `test/auth-login.test.ts` proves the real lookup end to end,
+ * through the resolver the server builds itself. `seen` records which subjects
+ * the resolver actually asked about, which is how a test asserts that a branch
+ * consulted no directory.
+ */
+function calls(answer: boolean): { seen: string[]; isActiveAccount: (userId: string) => Promise<boolean> } {
+  const seen: string[] = [];
+  return {
+    seen,
+    isActiveAccount: async (userId) => {
+      seen.push(userId);
+      return answer;
+    },
+  };
+}
+
 describe("local (bps) issuer", () => {
   test("a valid locally-signed token resolves to the expected Actor", async () => {
     const resolver = jwtResolver({ localSecret: SECRET });
@@ -167,6 +185,70 @@ describe("JWKS-backed external issuer", () => {
         .sign(privateKey);
       expect(await resolver(headers(`Bearer ${externalTok}`))).toEqual({ id: "oid-xyz", roles: ["finance-approver"] });
     });
+  });
+
+  test("an externally issued token reads no directory entry", async () => {
+    await withJwksServer(async (issuer, privateKey) => {
+      const { seen, isActiveAccount } = calls(false);
+      const token = await new SignJWT({ roles: ["employee"] })
+        .setProtectedHeader({ alg: "RS256" })
+        .setIssuer(issuer.iss)
+        .setSubject("oid-abc-123")
+        .setAudience(issuer.audience)
+        .setExpirationTime("8h")
+        .sign(privateKey);
+
+      // The callback answers "not live" for everything. An external subject
+      // must resolve anyway: that issuer owns revocation, and this engine holds
+      // no row for it.
+      const resolver = jwtResolver({ issuers: [issuer], isActiveAccount });
+      expect(await resolver(headers(`Bearer ${token}`))).toEqual({ id: "oid-abc-123", roles: ["employee"] });
+      expect(seen).toEqual([]);
+    });
+  });
+});
+
+describe("the account directory behind a locally issued token", () => {
+  test("a live account resolves to the Actor it always did", async () => {
+    const { seen, isActiveAccount } = calls(true);
+    const resolver = jwtResolver({ localSecret: SECRET, isActiveAccount });
+    const actor = await resolver(headers(`Bearer ${await localToken({ roles: ["employee"] })}`));
+    expect(actor).toEqual({ id: "user_1", roles: ["employee"] });
+    expect(seen).toEqual(["user_1"]); // asked about the token's `sub`, once
+  });
+
+  test("a disabled or deleted account is rejected", async () => {
+    const { seen, isActiveAccount } = calls(false);
+    const resolver = jwtResolver({ localSecret: SECRET, isActiveAccount });
+    const token = await localToken();
+    await expectRejects(() => resolver(headers(`Bearer ${token}`)));
+    expect(seen).toEqual(["user_1"]);
+  });
+
+  test("the roles claim still comes from the token, not from the directory", async () => {
+    // The read answers whether the account is live and nothing else. Reading
+    // `roles` from that same row would make a grant reach a live session,
+    // which `admin-user-management` requires it must not.
+    const resolver = jwtResolver({ localSecret: SECRET, isActiveAccount: async () => true });
+    const actor = await resolver(headers(`Bearer ${await localToken({ roles: ["stale-role"] })}`));
+    expect(actor.roles).toEqual(["stale-role"]);
+  });
+
+  test("a resolver configured without the callback reads no directory", async () => {
+    // The shape a unit test uses, and the shape any caller holding no database
+    // uses. It must keep resolving exactly as it did before this change.
+    const resolver = jwtResolver({ localSecret: SECRET });
+    expect(await resolver(headers(`Bearer ${await localToken({ roles: ["employee"] })}`))).toEqual({ id: "user_1", roles: ["employee"] });
+  });
+
+  test("an unverifiable token is rejected before the directory is consulted", async () => {
+    // A wrong signature must not become a directory probe: `jwtVerify` runs
+    // first, so the callback never sees that subject.
+    const { seen, isActiveAccount } = calls(true);
+    const resolver = jwtResolver({ localSecret: SECRET, isActiveAccount });
+    const token = await localToken({ secret: "a-different-secret-at-least-32-bytes!!" });
+    await expectRejects(() => resolver(headers(`Bearer ${token}`)));
+    expect(seen).toEqual([]);
   });
 });
 

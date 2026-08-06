@@ -11,7 +11,7 @@
  * OPTIONS if-chain restated every route beside the handler chain; the two
  * drifted, and the four /reporting/* routes never got a preflight branch.
  */
-import { SQL } from "bun";
+import { SQL, type Server } from "bun";
 import { timingSafeEqual } from "node:crypto";
 import { sql, initSchema } from "../engine/store.js";
 import { startEngine, createDefaultDataSourceRegistry } from "../engine/host.js";
@@ -28,6 +28,7 @@ import { devHeaderResolver, type ActorResolver } from "../auth/resolve.js";
 import { serveWebAsset, resolveWebRoot, isNavigationRequest } from "./static.js";
 import { jwtResolver, type IssuerConfig } from "../auth/jwt.js";
 import { handleLogin } from "../auth/login.js";
+import { isActiveUser } from "../auth/users.js";
 import {
   handleCreateInstance,
   handleGetInstanceView,
@@ -92,6 +93,13 @@ import { handleLivez, handleReadyz } from "./health.js";
 import { handleMetrics } from "./metrics.js";
 import type { HttpResult, HttpBinaryResult } from "./errors.js";
 import { log } from "../log.js";
+
+/**
+ * Bun's `Server`, with its WebSocket payload type filled in. `Bun.serve` is
+ * called here with a `fetch` handler and no `websocket`, so that payload is
+ * `undefined`. Only `requestIP` is read off it.
+ */
+type BunServer = Server<undefined>;
 
 /**
  * `undefined` = no origins allowed (no CORS headers emitted); `"*"` = the
@@ -189,8 +197,41 @@ function preflightResponse(methods: string, allowed: AllowedOrigins, requestOrig
 type Route = {
   method: string;
   segments: string[];
-  handler: (params: string[], req: Request) => Promise<HttpResult | HttpBinaryResult>;
+  /**
+   * `clientAddress` is the third argument every entry receives and only the
+   * login route reads. TypeScript lets a closure declare fewer parameters, so
+   * no other entry mentions it. The alternative — a special case for the login
+   * path inside the request loop — puts one route's business in the router.
+   */
+  handler: (params: string[], req: Request, clientAddress: string | undefined) => Promise<HttpResult | HttpBinaryResult>;
 };
+
+/**
+ * The address the per-source login window counts against, or `undefined` when
+ * the server can determine none. Then that window does not apply and the
+ * per-email one still does (`local-user-accounts` spec).
+ *
+ * `X-Forwarded-For` is read only under `TRUST_PROXY=1`: any caller can send
+ * that header, so trusting it by default would let one pick their own bucket
+ * per request. Only the deployment knows whether a proxy in front of the
+ * engine controls it.
+ *
+ * The header holds a comma-separated list, and the LAST entry is the one read.
+ * A proxy that appends rather than overwrites leaves whatever the caller sent
+ * in front of its own entry, so reading the first would hand the key back to
+ * the attacker. A header the proxy overwrites holds one entry, where first and
+ * last are the same value.
+ */
+export function clientAddressOf(req: Request, server: BunServer | undefined, trustProxy: boolean): string | undefined {
+  if (trustProxy) {
+    const last = req.headers.get("X-Forwarded-For")?.split(",").pop()?.trim();
+    // No header under TRUST_PROXY means the caller reached this process without
+    // passing the proxy. The peer is then the caller, not the proxy, so falling
+    // back to it counts that request rather than exempting it from the window.
+    if (last) return last;
+  }
+  return server?.requestIP(req)?.address ?? undefined;
+}
 
 /** Split a route pattern into segments. Runs once per route, when `createServer` builds the table. */
 function seg(pattern: string): string[] {
@@ -279,12 +320,21 @@ const MIN_JWT_SECRET_BYTES = 32;
  * `ALLOW_INSECURE_DEV_AUTH=1` — without it, startup fails loudly rather than
  * silently trusting unsigned `X-Actor-*` headers (design.md "Warn loudly and
  * return, rather than warn-only or throw-only").
+ *
+ * This is the only place the production resolver is built, so it is the place
+ * that gives it the account lookup: without that, `jwtResolver`'s directory
+ * check would be a capability nothing uses. `devHeaderResolver` gets none —
+ * that path reads no token at all, and the flag guarding it already means no
+ * authentication.
  */
-export function resolveAuthResolver(env: {
-  AUTH_JWT_SECRET?: string;
-  AUTH_ISSUERS?: string;
-  ALLOW_INSECURE_DEV_AUTH?: string;
-}): ActorResolver {
+export function resolveAuthResolver(
+  env: {
+    AUTH_JWT_SECRET?: string;
+    AUTH_ISSUERS?: string;
+    ALLOW_INSECURE_DEV_AUTH?: string;
+  },
+  db: SQL = sql,
+): ActorResolver {
   const issuers = parseAuthIssuers(env.AUTH_ISSUERS);
   if (!env.AUTH_JWT_SECRET && !issuers) {
     if (env.ALLOW_INSECURE_DEV_AUTH === "1") {
@@ -302,7 +352,11 @@ export function resolveAuthResolver(env: {
       `AUTH_JWT_SECRET must encode to at least ${MIN_JWT_SECRET_BYTES} bytes (HS256 requires a key at least as long as its hash output) — generate one with \`openssl rand -base64 32\``,
     );
   }
-  return jwtResolver({ localSecret: env.AUTH_JWT_SECRET, issuers });
+  return jwtResolver({
+    localSecret: env.AUTH_JWT_SECRET,
+    issuers,
+    isActiveAccount: (userId) => isActiveUser(userId, db),
+  });
 }
 
 /**
@@ -342,7 +396,7 @@ export function createServer(
   loginSecret: string | undefined = undefined,
   webRoot: string | undefined = undefined,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
-): (req: Request) => Promise<Response> {
+): (req: Request, server?: BunServer) => Promise<Response> {
   // `POST /auth/login` enters the table only when a signing key is
   // configured, so no state makes the login route reachable without one.
   // `secret` is a const so the narrowing survives into the closure. The
@@ -353,11 +407,14 @@ export function createServer(
   // METRICS_TOKEN= has configured no token.
   const rawMetricsToken = process.env.METRICS_TOKEN;
   const metricsToken = rawMetricsToken ? rawMetricsToken : undefined;
+  // Read once, at construction, for the same reason `metricsToken` is: one
+  // request cannot see a different value from the next.
+  const trustProxy = process.env.TRUST_PROXY === "1";
   const routes: Route[] = [
     ...(secret === undefined
       ? []
       : [{ method: "POST", segments: seg("/auth/login"),
-           handler: (_p: string[], req: Request) => handleLogin(req, secret, db) } satisfies Route]),
+           handler: (_p: string[], req: Request, clientAddress: string | undefined) => handleLogin(req, secret, db, clientAddress) } satisfies Route]),
     { method: "POST", segments: seg("/processes/:processId/instances"),
       handler: (p, req) => handleCreateInstance(p[0]!, req, resolver, dataSourceRegistry, db, assignmentRegistry) },
     { method: "GET", segments: seg("/instances"),
@@ -464,7 +521,10 @@ export function createServer(
       handler: (p, req) => handleDeleteTemplate(p[0]!, req, resolver, db) },
   ];
 
-  return async (req: Request): Promise<Response> => {
+  // `server` is Bun's second fetch-handler argument, and it is optional because
+  // every existing test invokes this handler with a `Request` alone. Absent, no
+  // peer address is available and the per-source login window does not apply.
+  return async (req: Request, server?: BunServer): Promise<Response> => {
     const url = new URL(req.url);
     const parts = url.pathname.split("/").filter(Boolean);
     const origin = req.headers.get("Origin");
@@ -522,7 +582,7 @@ export function createServer(
       if (route.method !== req.method) continue;
       const params = match(route.segments, parts);
       if (params === null) continue;
-      const result = await route.handler(params, req);
+      const result = await route.handler(params, req, clientAddressOf(req, server, trustProxy));
       // A successful attachment download is `HttpBinaryResult`, not a JSON
       // envelope. One check at this single exit covers that route and any
       // later one. See errors.ts, the `HttpBinaryResult` doc comment.
@@ -562,11 +622,17 @@ export async function startHttpServer(
   registry: Registry,
   dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
-  resolver: ActorResolver = resolveAuthResolver({
-    AUTH_JWT_SECRET: process.env.AUTH_JWT_SECRET,
-    AUTH_ISSUERS: process.env.AUTH_ISSUERS,
-    ALLOW_INSECURE_DEV_AUTH: process.env.ALLOW_INSECURE_DEV_AUTH,
-  }),
+  // `db` is declared above this parameter, so this default expression can read
+  // it: the resolver's account lookup runs against the same handle the rest of
+  // the server uses.
+  resolver: ActorResolver = resolveAuthResolver(
+    {
+      AUTH_JWT_SECRET: process.env.AUTH_JWT_SECRET,
+      AUTH_ISSUERS: process.env.AUTH_ISSUERS,
+      ALLOW_INSECURE_DEV_AUTH: process.env.ALLOW_INSECURE_DEV_AUTH,
+    },
+    db,
+  ),
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<{ stop: () => Promise<void> }> {
   await initSchema(db);

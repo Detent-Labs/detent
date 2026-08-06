@@ -961,6 +961,90 @@ Stage-by-stage status is in `ROADMAP.md`.
   verification on every path, including the no-such-row path. The no-such-row
   path checks against a process-lifetime dummy hash. Its timing no longer
   discloses which emails have accounts.
+- A disable now ends a live session (`src/auth/jwt.ts`,
+  `src/auth/users.ts`, `src/http/server.ts`,
+  `harden-local-account-sessions`): the two entries above no longer describe
+  a disable. `jwtResolver`'s local-issuer branch takes an `isActiveAccount`
+  callback. It calls that callback after the signature verifies.
+  `isActiveUser` in `src/auth/users.ts` answers with one primary-key lookup
+  on `auth_users`, selecting no column. A disabled account and a deleted one
+  give the same answer. Either raises `ActorResolutionError`, so the request
+  gets `401` on that account's next call. `resolveAuthResolver` takes the
+  database handle and wires the callback. It is the one place this repository
+  builds the production resolver.
+
+  Nothing caches the answer. A cache with a lifetime would hold the gap open
+  for that lifetime. A cache without one needs invalidation across processes.
+  One alternative stays available: a `tokens_valid_after` column compared
+  against the token's `iat`. It gives the same guarantee. It costs a
+  migration and a second concept, and it still reads a row.
+
+  Only `Actor.id` comes from that read. `roles` stays the token's own claim.
+  A role grant therefore still reaches its actor at the next login, and not
+  before. An externally issued token reads no directory entry at all. That
+  issuer owns revocation. This engine holds no row for its subjects.
+  `devHeaderResolver` reads no directory either, since it reads no token.
+- Two login windows, and eviction over refusal (`src/auth/login.ts`,
+  `src/http/server.ts`, `harden-local-account-sessions`): the per-email
+  window the entry above describes now has a sibling. The sibling keys on the
+  client address. It carries ten times the threshold and the same
+  `WINDOW_MS`. A login passes both windows or gets the same `429`.
+
+  The sibling bounds what one email at a time cannot see: one password tried
+  against ten thousand accounts. Every email opens its own window there, so
+  no counter ever trips.
+
+  `handleLogin` checks the address window first. A caller past its threshold
+  therefore never reaches the email map. A success clears that email's
+  window and leaves the address's alone. Clearing it would let a caller
+  holding one valid account reset that window at will.
+
+  The address comes from `server.requestIP(req)`, which needed Bun's second
+  fetch-handler argument. `createServer` returns `(req, server?)` now. It
+  passes a client address to every route entry as a third argument. Only the
+  login route reads it. `server` stays optional, because every existing test
+  invokes that handler with a `Request` alone. Absent, the address
+  window does not apply and the email one still does.
+
+  `TRUST_PROXY=1` reads `X-Forwarded-For` instead, and only then: any caller
+  can send that header. The LAST comma-separated entry is the one read. A
+  proxy that appends rather than overwrites leaves what the caller sent in
+  front of its own entry. Reading the first would hand the bucket key back to
+  the attacker.
+
+  `checkAndRecordAttempt` now evicts the earliest window at capacity, rather
+  than refusing the request. The refusal had a reason. Admitting untracked
+  requests at capacity let one caller disable the brute-force control for
+  every account. The address window removes that premise, since 50,000
+  distinct emails inside one window is no longer a free move.
+
+  Refusal now costs the larger harm: every untracked account loses its login
+  until the window rolls. Both maps carry the sweep, the capacity check and
+  the eviction. This change therefore opens no second unbounded map.
+- A delegation names a known account (`src/runtime/api.ts`,
+  `src/engine/transition.ts`, `harden-local-account-sessions`):
+  `delegateClaim` used to accept any `toActorId`. A typo parked the task on
+  an identity that would never claim it. No error followed, and the
+  `assignment.delegated` event read like a real delegation. It now
+  raises `UnknownDelegateError`, which `src/http/errors.ts` maps to `422` and
+  `"unknown-delegate"`.
+
+  That check runs only where the delegating actor's own id resolves in
+  `auth_users`. The engine cannot ask whether a deployment uses local
+  accounts, since both resolvers can be active at once. It asks about this
+  delegator instead. On an external identity provider the answer is no, and
+  the target check does not run. One query answers both halves, so the two
+  facts cannot disagree.
+
+  The check travels into the engine as a `validateTarget` callback, rather
+  than running in the wrapper first. `updateAssignment`'s `guard` may now
+  return a promise, and the engine awaits it. It runs after the engine's own
+  claimant check, under the same row lock. The other order would make a
+  non-claimant's error depend on whether the target exists. That turns this
+  route into a directory-enumeration oracle. Any actor holding any claim
+  could read it. `toActorId` is still unchecked against
+  `assignment.candidates`: the contract permits delegating outside that
+  set.
 - Content-Security-Policy for the four SPAs
   (`packages/{app,admin,studio,editor}/vite.config.ts`,
   `harden-auth-configuration`): rides along in the same change, at the same
@@ -1069,15 +1153,20 @@ Stage-by-stage status is in `ROADMAP.md`.
   /admin/users/:id/enable`, and (added later, see the role-editing entry
   below) `PATCH /admin/users/:id/roles` and `PATCH /admin/users/:id/manager`.
   Creating a user and changing a
-  password remain CLI-only — no HTTP path reaches either. Disabling takes
-  effect on the user's *next* login attempt only;
-  it does not revoke a JWT already issued to them, since token verification
-  performs no per-request database lookup (proven by an end-to-end test:
+  password remain CLI-only — no HTTP path reaches either. Disabling took
+  effect on the user's *next* login attempt only, as this change left it;
+  it revoked no JWT already issued to them, since token verification then
+  performed no per-request database lookup (proven by an end-to-end test:
   log in, disable via the new route, the pre-disable token still
-  authenticates, a fresh login attempt then fails). The admin area gained a
+  authenticates, a fresh login attempt then fails). The
+  admin area gained a
   `/users` screen — list plus a disable/enable toggle, the disable action
   behind a confirmation naming that caveat — with no create/password/role
   controls.
+
+  SUPERSEDED by `harden-local-account-sessions`, below. The resolver now
+  reads the account behind every locally issued token. A disable ends the
+  open session on its next request. That test now asserts the opposite.
 - Process Studio — shell and drafts (the studio area of `packages/web`, `src/engine/drafts.ts`,
   `src/http/studio-routes.ts`, `studio-shell-and-drafts`): the developer's
   substrate — stage 11's first of five changes; `packages/editor` stayed
@@ -2264,8 +2353,15 @@ Stage-by-stage status is in `ROADMAP.md`.
   `errors.ts`.
 
   A role assignment reaches an already-issued JWT no more than a disable
-  does. Token verification performs no per-request database lookup, so a
-  token keeps its `roles` claim until its `exp`.
+  did when this change landed. Token verification performed no per-request
+  database lookup, so a token kept its `roles` claim until its `exp`.
+
+  Half of that still holds. `harden-local-account-sessions`, below, gave the
+  resolver a per-request lookup. A disable now ends an open session at once.
+
+  That lookup reads whether the account is live. It reads nothing else.
+  `Actor.roles` therefore still comes from the token's own claim. A grant
+  still waits for the next login.
 
   The admin area's `/users` screen edits the roles cell in place: a text
   input holding the comma-separated current roles, with save and cancel,

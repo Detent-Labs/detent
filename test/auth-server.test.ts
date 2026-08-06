@@ -168,8 +168,10 @@ test.skipIf(!DB)("with the JWT resolver active, a valid token reaches the route 
 });
 
 // A role granted over PATCH /admin/users/:id/roles reaches the roles claim at
-// the next login only. Token verification does no per-request database lookup,
-// so an already-issued token keeps the claim it was signed with.
+// the next login only. Token verification does read the account behind a
+// locally issued token now (harden-local-account-sessions), but it reads only
+// whether that account is live: `Actor.roles` still comes from the token's own
+// claim, so an already-issued token keeps the roles it was signed with.
 test.skipIf(!DB)("a token issued before a grant keeps its old roles, and the next login carries the new ones", async () => {
   const resolver = resolveAuthResolver({ AUTH_JWT_SECRET: SECRET });
   const fetch = createServer(dataSourceReg, reg, sql, resolver, undefined, SECRET);
