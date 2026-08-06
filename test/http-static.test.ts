@@ -272,3 +272,52 @@ test("an absent web root leaves the navigation ordering inert", async () => {
   const res = await server(undefined)(new Request("http://x/readyz", { headers: NAV }));
   expect(res.headers.get("content-type")).toContain("json");
 });
+
+// ============================================================
+// Framing and sniffing headers
+// ============================================================
+
+/**
+ * A meta tag cannot deliver `frame-ancestors`, so the static branch sends it as
+ * a response header. The three siblings ride along at no cost. The value, not
+ * only the presence, is asserted: a header naming the wrong policy protects
+ * nothing. See `frontend-security-headers`.
+ */
+const SECURITY = {
+  "content-security-policy": "frame-ancestors 'none'",
+  "x-frame-options": "DENY",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "no-referrer",
+} as const;
+
+const expectSecured = (res: Response) => {
+  for (const [name, value] of Object.entries(SECURITY)) expect(res.headers.get(name)).toBe(value);
+};
+
+test("a direct file hit carries the four headers", async () => {
+  expectSecured(await get("/assets/app-a1b2c3.js"));
+});
+
+test("the shell fallback carries the four headers beside its no-cache", async () => {
+  const res = await get("/studio/processes/proc_x/edit");
+  expectSecured(res);
+  expect(res.headers.get("cache-control")).toBe("no-cache");
+});
+
+test("a navigation answer carries the four headers", async () => {
+  // Taken before route matching, so it does not share the fallthrough's exit.
+  const res = await get("/readyz", { headers: NAV });
+  expect(await res.text()).toContain("<title>shell</title>");
+  expectSecured(res);
+});
+
+test("a HEAD answer carries the same four headers as its GET", async () => {
+  expectSecured(await get("/assets/app-a1b2c3.js", { method: "HEAD" }));
+});
+
+test("the JSON envelope carries none of the four", async () => {
+  // The static branch's headers must not leak into the wrapper's own exit.
+  const res = await get("/studio/processes", { method: "POST" });
+  expect(res.status).toBe(404);
+  for (const name of Object.keys(SECURITY)) expect(res.headers.get(name)).toBeNull();
+});
