@@ -4,7 +4,7 @@
  * under concurrency, and the scheduler firing an overdue timer. DB-backed; skips
  * when DATABASE_URL is unset.
  */
-import { test, expect, beforeAll, beforeEach } from "bun:test";
+import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { cancelInstance, executeManualTransition, fireTimer, resolveAutomatic, startInstance } from "../src/engine/transition.js";
 import { drainTimers } from "../src/engine/timers.js";
@@ -767,4 +767,39 @@ test.skipIf(!DB)("a concurrently re-armed timer is not clobbered by the push", a
   // pass observed) matched zero rows once the concurrent re-arm landed first,
   // so the newly armed time stands, not "now + 1 minute".
   expect(await nextTimerIso(inst.instanceId)).toBe(REARMED);
+});
+
+// --- the per-instance boundary logs -----------------------------------------
+
+// surface-worker-failures: drainTimers' per-instance catch used to discard its
+// error with no line. The catch sits inside the drain loop, so the tick returns
+// normally and pollForever's own line never fires — an instance failing every
+// pass was invisible.
+test.skipIf(!DB)("an instance the timer drain skips logs an error line carrying its id", async () => {
+  const body = waitTimerBody(reminderTimer);
+  const good = await createFrom(body);
+  await executeManualTransition(good, "path_ab", body, actor);
+  await sql`UPDATE instances SET
+    body = jsonb_set(body, '{timers,0,fireAt}', '"2020-01-01T00:00:00.000Z"'::jsonb),
+    next_timer_at = '2020-01-01T00:00:00.000Z'
+    WHERE instance_id = ${good.instanceId}`;
+  // 'running' so the scan selects it, but no other Instance field, so
+  // parseInstance throws — the same seam the poison-row test above uses.
+  await sql`INSERT INTO instances (instance_id, transition_seq, body, next_timer_at)
+    VALUES (${"inst_logged_poison"}, ${0}, ${{ status: "running" }}, '2019-01-01T00:00:00.000Z')`;
+
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+  const fired = await drainTimers(sql, () => body);
+  const lines = errorSpy.mock.calls
+    .map((c) => JSON.parse(c[0] as string) as Record<string, unknown>)
+    .filter((l) => l.msg === "worker skipped a failing item");
+  errorSpy.mockRestore();
+
+  expect(lines).toHaveLength(1);
+  expect(lines[0].level).toBe("error");
+  expect(lines[0].worker).toBe("timers");
+  expect(lines[0].instanceId).toBe("inst_logged_poison");
+  expect(typeof lines[0].error).toBe("string");
+
+  expect(fired).toBe(1); // the rest of the batch still ran
 });

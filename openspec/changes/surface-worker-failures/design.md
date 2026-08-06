@@ -10,6 +10,11 @@ Four functions call it. Each one is already named for its worker:
 (`resolution.ts:125`), `startTimerScheduler` (`timers.ts:100`),
 `startRetentionSweep` (`retention.ts:81`).
 
+Each of those four workers also holds a per-item catch block inside its drain
+loop: `outbox.ts:338`, `resolution.ts:107`, `timers.ts:84`, `retention.ts:72`.
+A per-item catch swallows the error before the tick ever throws. The tick
+boundary does not cover this case.
+
 The log module already carries what this needs. `log.error(msg, context)`
 emits structured output, and three operational events already use it.
 
@@ -18,9 +23,10 @@ emits structured output, and three operational events already use it.
 **Goals:**
 
 - A worker that fails on every tick is visible in the log, at once.
+- A worker whose every item fails is visible the same way.
 - The line names which worker, so an operator does not read four files.
-- No behavior change. A failing tick still schedules the next one, and a
-  skipped row still waits for its lease to reclaim it.
+- No behavior change. A failing tick still schedules the next one. A skipped
+  item keeps the recovery its own boundary already gives it.
 
 **Non-Goals:**
 
@@ -29,8 +35,9 @@ emits structured output, and three operational events already use it.
   one.
 - No retry, no backoff and no circuit breaker in `pollForever`. The loop's
   behavior stays exactly as it is.
-- No change to the per-row outcome. The row stays claimed, and its lease
-  reclaims it, which is what the current comment describes.
+- No change to any per-item outcome. Each boundary keeps the recovery its
+  comment already describes. The outbox and resolution rows stay claimed. The
+  timer row leaves the scan. The retention sweep steps past its instance.
 
 ## Decisions
 
@@ -48,6 +55,31 @@ takes out. Volume belongs to `LOG_LEVEL` and to the log pipeline.
 its context to structured output. An `Error` there serializes to `{}` in
 JSON, which is how the three existing call sites already handle it.
 
+**`name` comes first: `pollForever(name, tick, intervalMs)`.** It reads as a
+label on the loop, not as a third parameter beside the interval. Any position
+makes the compiler find the four call sites. All four already pass
+`intervalMs`.
+
+**Two fixed `msg` strings.** `"worker tick failed"` at the tick boundary,
+`"worker skipped a failing item"` at each per-item boundary. The existing
+suite asserts on `msg`: `test/outbox.test.ts:355` matches
+`"outbox row dead-lettered"`. A string the artifacts leave open is a string
+the test and the code can disagree about. The worker name is context, not
+part of the message, so one grep finds every worker.
+
+**One `ConcurrencyConflict` logs at debug, not error.** Two workers reaching
+one instance together is what the OCC predicate is for. The lease retries the
+loser's row. An error line for every race on a healthy two-worker deployment
+teaches an operator to ignore the level. That is the level this change exists
+to make meaningful. Debug still satisfies the requirement: the boundary
+discards no
+error without a line.
+
+**Every per-item line carries the item's own identifier.** The outbox row has
+an idempotency key. The other three drains work on instances, so each carries
+the instance id. One field name per boundary, matching what that boundary's
+own recovery query keys on.
+
 ## Risks / Trade-offs
 
 - A persistently failing worker floods the log → that is the outcome this
@@ -56,6 +88,10 @@ JSON, which is how the three existing call sites already handle it.
   follow-up. It changes no requirement.
 - A test that asserts an empty log for a failing tick breaks → no such test
   exists today. Nothing logged there.
+- A per-item line at debug level is invisible under the default `LOG_LEVEL`
+  → true, and it applies to the `ConcurrencyConflict` case alone. An operator
+  who suspects a race raises the level. Every other error keeps its error
+  line.
 
 ## Migration Plan
 

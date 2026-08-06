@@ -3,7 +3,7 @@
  * wait-state takes its result-driven path. DB-backed; skips when DATABASE_URL is
  * unset — a skip is visible, a false green is not.
  */
-import { test, expect, beforeAll, beforeEach } from "bun:test";
+import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { executeManualTransition } from "../src/engine/transition.js";
 import { drainOutbox } from "../src/engine/outbox.js";
@@ -274,4 +274,40 @@ test.skipIf(!DB)("a resolver throw for one instance does not block another in th
   expect(await drainResolutions(sql, () => body)).toBe(1);
   expect(await resolveState(bad.instanceId)).toBe("idle");
   expect((await readInst(bad.instanceId)).currentStepId as string).toBe("step_done");
+});
+
+// --- the per-instance boundary logs -----------------------------------------
+
+// surface-worker-failures: drainResolutions' per-instance catch used to discard
+// its error with no line. The catch sits inside the drain loop, so the tick
+// returns normally and pollForever's own line never fires — an instance failing
+// every pass was invisible.
+test.skipIf(!DB)("an instance the resolution drain skips logs an error line carrying its id", async () => {
+  const body = waitBody("sayYes");
+  const createAs = (pid: string) => createInstance(body, { processId: pid as Instance["processId"], version: 1 });
+  const good = await createAs("proc_log_good");
+  const bad = await createAs("proc_log_bad");
+  await executeManualTransition(good, "path_ab", body, actor);
+  await executeManualTransition(bad, "path_ab", body, actor);
+  expect(await drainOutbox(sql, reg)).toBe(2);
+
+  const flaky = (pid: string) => {
+    if (pid === "proc_log_bad") throw new Error("simulated resolver failure");
+    return body;
+  };
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+  const processed = await drainResolutions(sql, flaky);
+  const lines = errorSpy.mock.calls
+    .map((c) => JSON.parse(c[0] as string) as Record<string, unknown>)
+    .filter((l) => l.msg === "worker skipped a failing item");
+  errorSpy.mockRestore();
+
+  expect(lines).toHaveLength(1);
+  expect(lines[0].level).toBe("error");
+  expect(lines[0].worker).toBe("resolution");
+  expect(lines[0].instanceId).toBe(bad.instanceId);
+  expect(lines[0].error).toBe("simulated resolver failure");
+
+  expect(processed).toBe(1); // the rest of the batch still ran
+  expect((await readInst(good.instanceId)).currentStepId as string).toBe("step_done");
 });

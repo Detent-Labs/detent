@@ -18,7 +18,7 @@ import { createDefaultAssignmentRegistry, type AssignmentRegistry } from "./regi
 import { definitionHash } from "../schema/hash.js";
 import { instance as instanceSchema, type Instance, type ProcessBody } from "../schema/definition.js";
 import { SYSTEM_ACTOR } from "../cel/eval.js";
-import { pollForever } from "./poll.js";
+import { pollForever, logSkippedItem } from "./poll.js";
 
 export { SYSTEM_ACTOR };
 
@@ -104,7 +104,11 @@ export async function drainResolutions(
       // transitionSeq makes a concurrent transition safe (this one loses and
       // stays claimed for the lease to reclaim).
       await resolveAutomatic(inst, body, SYSTEM_ACTOR, db, assignmentRegistry);
-    } catch {
+    } catch (e) {
+      // Log before continuing: the drain returns normally, so the tick
+      // boundary never sees this and an instance failing every pass is
+      // otherwise invisible.
+      logSkippedItem("resolution", { instanceId: row.instance_id }, e);
       continue; // leave claimed; the lease-expiry predicate is the retry cadence
     }
     await db`UPDATE instances SET resolve_state = 'idle'
@@ -122,5 +126,5 @@ export function startResolutionWorker(
   leaseMs: number = CLAIM_LEASE_MS,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): { stop: () => void } {
-  return pollForever(() => drainResolutions(db, resolveBody, leaseMs, assignmentRegistry), intervalMs);
+  return pollForever("resolution", () => drainResolutions(db, resolveBody, leaseMs, assignmentRegistry), intervalMs);
 }

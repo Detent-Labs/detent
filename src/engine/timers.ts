@@ -14,7 +14,7 @@ import { fireTimer } from "./transition.js";
 import { createDefaultAssignmentRegistry, type AssignmentRegistry } from "./registry.js";
 import { instance as instanceSchema, type Instance } from "../schema/definition.js";
 import type { ResolveBody } from "./resolution.js";
-import { pollForever } from "./poll.js";
+import { pollForever, logSkippedItem } from "./poll.js";
 
 function parseInstance(raw: unknown): Instance {
   return instanceSchema.parse(typeof raw === "string" ? JSON.parse(raw) : raw);
@@ -81,9 +81,13 @@ export async function drainTimers(
       if (!dueTimer) continue;
       await fireTimer(inst, dueTimer.timerId, body, db, assignmentRegistry);
       fired++;
-    } catch {
+    } catch (e) {
       // A lost OCC race (ConcurrencyConflict), a parse/resolve failure, or any
-      // per-instance error: push the row out and continue.
+      // per-instance error: log it, push the row out and continue. The drain
+      // returns normally, so the tick boundary never sees this and an instance
+      // failing every pass is otherwise invisible. A ConcurrencyConflict logs
+      // at debug — logSkippedItem holds that rule for all four workers.
+      logSkippedItem("timers", { instanceId: row.instance_id }, e);
       await pushOutOfScan(db, row.instance_id, row.next_timer_at).catch(() => {});
     }
   }
@@ -97,5 +101,5 @@ export function startTimerScheduler(
   intervalMs = 500,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): { stop: () => void } {
-  return pollForever(() => drainTimers(db, resolveBody, assignmentRegistry), intervalMs);
+  return pollForever("timers", () => drainTimers(db, resolveBody, assignmentRegistry), intervalMs);
 }
