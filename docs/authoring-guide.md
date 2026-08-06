@@ -187,6 +187,17 @@ An action can write its result back into the payload. The engine verifies the
 value against the target field's declared type first. A value of the wrong
 type never lands.
 
+The `http.request` type reaches only a host the deployment permits. That list
+lives in the deployment's own environment, not in your process. A target
+outside it never opens a connection, and the action dead-letters with the host
+named in the message. Ask your operator to add the host, or pick one already
+on the list.
+
+Two more rules follow from the same place. The target uses `https`, unless the
+deployment opted into plain HTTP. And the handler does not follow a redirect:
+a target that answers `301` or `302` dead-letters with that status. Point the
+action at the final address instead.
+
 ### Timer
 
 A clock on a step. It carries a `duration` or a `deadline`, never both. The

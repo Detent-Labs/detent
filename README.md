@@ -190,6 +190,13 @@ variables fails to start immediately. It names the missing variable,
 exactly as `bun run serve` already does locally, instead of falling back
 to an insecure default.
 
+A definition using the `http.request` action needs
+`HTTP_ACTION_ALLOWED_HOSTS`. It holds a comma-separated list of the hosts
+that action may reach. An unset list refuses every host, so those actions
+dead-letter until an operator sets it. Set `HTTP_ACTION_ALLOW_INSECURE=1`
+only where a target speaks plain HTTP. Without it the handler accepts
+`https` alone.
+
 ```bash
 docker run -p 3000:3000 \
   -e DATABASE_URL=postgres://user:pass@host:5432/workflow_engine \

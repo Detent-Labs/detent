@@ -8,6 +8,7 @@ import { test, expect } from "bun:test";
 import {
   httpHandlerDef,
   httpConfigSchema,
+  egressRefusal,
   HTTP_ACTION_TYPE,
   IDEMPOTENCY_HEADER,
   HTTP_DEFAULT_TIMEOUT_MS,
@@ -19,7 +20,44 @@ import type { Action } from "../src/schema/definition.js";
 
 type CapturedRequest = { method: string; headers: Record<string, string>; bodyText: string };
 
-/** Starts a fresh mock target on a random port for the duration of `fn`, capturing every request it receives. */
+/**
+ * Sets the named variables for the duration of `fn` and restores the previous
+ * values in a `finally`. An `undefined` value deletes the variable rather than
+ * setting an empty string.
+ *
+ * Restoring matters here: the egress policy reads process.env per call, the
+ * devcontainer sets HTTP_ACTION_ALLOWED_HOSTS, and bun runs a file's cases in
+ * one process in order — a leaked deletion would refuse every later case.
+ * Nesting is deliberate: an inner call overrides and then restores the outer
+ * call's value, which is how a case narrows the policy `withServer` set.
+ */
+async function withEnv<T>(vars: Record<string, string | undefined>, fn: () => Promise<T>): Promise<T> {
+  const saved: Record<string, string | undefined> = {};
+  const apply = (values: Record<string, string | undefined>) => {
+    for (const [key, value] of Object.entries(values)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  };
+  for (const key of Object.keys(vars)) saved[key] = process.env[key];
+  apply(vars);
+  try {
+    return await fn();
+  } finally {
+    apply(saved);
+  }
+}
+
+/** Permits `host` over plain HTTP, the policy every mock-target case needs. */
+const permitting = <T>(host: string, fn: () => Promise<T>) =>
+  withEnv({ HTTP_ACTION_ALLOWED_HOSTS: host, HTTP_ACTION_ALLOW_INSECURE: "1" }, fn);
+
+/**
+ * Starts a fresh mock target on a random port for the duration of `fn`,
+ * capturing every request it receives, and permits that target's own host for
+ * the same duration. Without the policy every case here would refuse before
+ * opening a connection.
+ */
 async function withServer<T>(
   handle: (req: Request) => Response | Promise<Response>,
   fn: (url: string, requests: CapturedRequest[]) => Promise<T>,
@@ -34,7 +72,7 @@ async function withServer<T>(
     },
   });
   try {
-    return await fn(`http://localhost:${server.port}`, requests);
+    return await permitting(`localhost:${server.port}`, () => fn(`http://localhost:${server.port}`, requests));
   } finally {
     server.stop(true);
   }
@@ -138,10 +176,13 @@ test("a 500 response is a transient (non-permanent) failure", async () => {
 test("a connection failure (no response received) is a transient (non-permanent) failure", async () => {
   const server = Bun.serve({ port: 0, fetch: () => new Response("ok") });
   const url = `http://localhost:${server.port}`;
+  const host = `localhost:${server.port}`;
   server.stop(true);
   await new Promise((r) => setTimeout(r, 10)); // let the OS actually release the port
 
-  const err = await rejects(httpHandlerDef.handler(ctxFor({ url })));
+  // The policy must permit the target, or the refusal would be permanent and
+  // this case would pass for the wrong reason.
+  const err = await permitting(host, () => rejects(httpHandlerDef.handler(ctxFor({ url }))));
   expect(err).not.toBeInstanceOf(PermanentError);
 });
 
@@ -207,8 +248,10 @@ test("a hang during the body read is aborted too, not only a hang before headers
       ),
   });
   try {
-    const err = await rejects(
-      httpHandlerDef.handler(ctxFor({ url: `http://localhost:${server.port}`, method: "GET" }, { timeout: "PT0.1S" })),
+    const err = await permitting(`localhost:${server.port}`, () =>
+      rejects(
+        httpHandlerDef.handler(ctxFor({ url: `http://localhost:${server.port}`, method: "GET" }, { timeout: "PT0.1S" })),
+      ),
     );
     expect(err).not.toBeInstanceOf(PermanentError);
   } finally {
@@ -308,6 +351,105 @@ test("an authored Content-Type is respected, not overwritten", async () => {
         ctxFor({ url, body: { a: 1 }, headers: { "Content-Type": "application/x-www-form-urlencoded" } }),
       );
       expect(requests[0]!.headers["content-type"]).toBe("application/x-www-form-urlencoded");
+    },
+  );
+});
+
+// --- egress policy ----------------------------------------------------------------
+
+test("a target outside HTTP_ACTION_ALLOWED_HOSTS is refused, and no request leaves", async () => {
+  await withServer(
+    () => jsonResponse({ leaked: true }),
+    async (url, requests) => {
+      const err = await withEnv({ HTTP_ACTION_ALLOWED_HOSTS: "api.example.com" }, () =>
+        rejects(httpHandlerDef.handler(ctxFor({ url }))),
+      );
+      expect(err).toBeInstanceOf(PermanentError);
+      expect((err as Error).message).toContain(new URL(url).host);
+      expect(requests).toHaveLength(0);
+    },
+  );
+});
+
+test("the cloud metadata address is refused when the allowlist does not name it", async () => {
+  // The SEC-2 finding's own example. Asserted against the helper so no case
+  // here ever opens a socket to a link-local address.
+  const refusal = await withEnv({ HTTP_ACTION_ALLOWED_HOSTS: "api.example.com" }, async () =>
+    egressRefusal("https://169.254.169.254/latest/meta-data/"),
+  );
+  expect(refusal).toContain("169.254.169.254");
+});
+
+test("an unset HTTP_ACTION_ALLOWED_HOSTS refuses every target, and no request leaves", async () => {
+  await withServer(
+    () => jsonResponse({ leaked: true }),
+    async (url, requests) => {
+      const err = await withEnv({ HTTP_ACTION_ALLOWED_HOSTS: undefined }, () =>
+        rejects(httpHandlerDef.handler(ctxFor({ url }))),
+      );
+      expect(err).toBeInstanceOf(PermanentError);
+      expect(requests).toHaveLength(0);
+    },
+  );
+});
+
+test("an empty HTTP_ACTION_ALLOWED_HOSTS refuses every target", async () => {
+  const refusal = await withEnv({ HTTP_ACTION_ALLOWED_HOSTS: "" }, async () =>
+    egressRefusal("https://api.example.com/hook"),
+  );
+  expect(refusal).toContain("HTTP_ACTION_ALLOWED_HOSTS");
+});
+
+test("a plain-http target is refused without the escape hatch, and permitted with it", async () => {
+  await withServer(
+    () => jsonResponse({ ok: true }),
+    async (url, requests) => {
+      const err = await withEnv({ HTTP_ACTION_ALLOW_INSECURE: undefined }, () =>
+        rejects(httpHandlerDef.handler(ctxFor({ url }))),
+      );
+      expect(err).toBeInstanceOf(PermanentError);
+      expect((err as Error).message).toContain("http:");
+      expect(requests).toHaveLength(0);
+
+      // withServer's own policy is back in force here, hatch included.
+      const result = await httpHandlerDef.handler(ctxFor({ url }));
+      expect((result as { body: unknown }).body).toEqual({ ok: true });
+      expect(requests).toHaveLength(1);
+    },
+  );
+});
+
+test("an https target on the allowlist passes the policy with the hatch unset", async () => {
+  const refusal = await withEnv(
+    { HTTP_ACTION_ALLOWED_HOSTS: "api.example.com", HTTP_ACTION_ALLOW_INSECURE: undefined },
+    async () => egressRefusal("https://api.example.com/hook"),
+  );
+  expect(refusal).toBeUndefined();
+});
+
+test("a list entry survives surrounding space and mixed case", async () => {
+  const refusal = await withEnv(
+    { HTTP_ACTION_ALLOWED_HOSTS: " a.example.com, API.Example.com ", HTTP_ACTION_ALLOW_INSECURE: undefined },
+    async () => egressRefusal("https://api.example.com/hook"),
+  );
+  expect(refusal).toBeUndefined();
+});
+
+test("a redirect off the allowlist fails permanently, and the redirect target sees no request", async () => {
+  await withServer(
+    () => jsonResponse({ leaked: true }), // the redirect target: allowlisted for nothing
+    async (victimUrl, victimRequests) => {
+      await withServer(
+        () => new Response(null, { status: 302, headers: { Location: victimUrl } }),
+        async (redirectorUrl) => {
+          // withServer allowlists the redirector alone, so following the hop
+          // would reach a host the policy never saw.
+          const err = await rejects(httpHandlerDef.handler(ctxFor({ url: redirectorUrl })));
+          expect(err).toBeInstanceOf(PermanentError);
+          expect((err as Error).message).toContain("302");
+          expect(victimRequests).toHaveLength(0);
+        },
+      );
     },
   );
 });

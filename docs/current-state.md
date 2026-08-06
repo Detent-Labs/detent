@@ -620,6 +620,33 @@ Stage-by-stage status is in `ROADMAP.md`.
   total crosses it; either is a `PermanentError`. The response lands in
   `instance.data` via `Action.output`, so an unbounded read is an unbounded
   write.
+- `http.request` reaches only what the deployment permits
+  (`restrict-http-action-egress`). `egressRefusal` in `src/handlers/http.ts`
+  runs before the `fetch`. It answers why the policy refuses a target, or
+  `undefined`. Two rules hold, both in the environment beside `DATABASE_URL`
+  and the `SMTP_*` settings. No process body reaches either one.
+  - `HTTP_ACTION_ALLOWED_HOSTS` is a comma-separated host list. An entry is a
+    hostname with an optional port, the shape `URL.host` carries. The handler
+    trims each entry and matches it without case. The match is exact and
+    covers no subdomain the list omits. An empty or unset value refuses every
+    target, the way an unset `CORS_ALLOWED_ORIGINS` permits no origin.
+  - The scheme is `https:`, unless `HTTP_ACTION_ALLOW_INSECURE` is `1`.
+  - Either refusal raises `PermanentError`. A retry meets the same policy.
+    Only an operator changing the environment makes the target reachable, and
+    the restart re-reads it.
+  - The `fetch` carries `redirect: "manual"`, the load-bearing half. Following
+    a hop would check the first host against the list and no other. An
+    allowlisted host answering `302` to `169.254.169.254` would then reach it.
+    Bun returns the real status there, not an opaque filtered response. A 3xx
+    now reaches the existing non-2xx branch and dead-letters with its status.
+  - The check runs at delivery, never at publish. Environment promotion moves
+    a published body between environments as a file. A body that passes the
+    development list would fail on import to production.
+  - Out of scope on purpose: the handler resolves no hostname and refuses no
+    private or link-local address. DNS rebinding stays open.
+  - The devcontainer sets `HTTP_ACTION_ALLOWED_HOSTS=example.com`, the host
+    `examples/expense-approval.json` targets. It also sets
+    `HTTP_ACTION_ALLOW_INSECURE=1`. Closes the 2026-08-01 review's SEC-2.
 - Notifications (`src/handlers/notification-email.ts`, roadmap #16): a second
   built-in handler, `notification.email`, registered by `createDefaultRegistry`
   next to `httpHandlerDef`. No schema change — the five existing action
