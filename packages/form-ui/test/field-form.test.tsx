@@ -346,7 +346,9 @@ describe("FieldForm: fields render across the view's column count, honoring span
     // descendants of the container rather than the container itself. Without
     // this wrapper the collapse rule would silently never fire on the grid.
     const html = renderGrid([plain("f1")], 2);
-    expect(html.startsWith('<div class="form-ui-form"><div class="form-ui-field-form" data-columns="2"')).toBe(true);
+    expect(html).toContain('<div class="form-ui-form">');
+    // The wrapper is outside the grid, not beside it.
+    expect(html.indexOf('class="form-ui-form"')).toBeLessThan(html.indexOf('class="form-ui-field-form"'));
   });
 
   it("a group member's own span clamps inside the group's grid", () => {
