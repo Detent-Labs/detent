@@ -32,6 +32,16 @@ services:
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
       SMTP_FROM: workflow-engine@example.test
+      # The http.request handler's egress policy (restrict-http-action-egress).
+      # Unset denies every outbound action target, so without an entry here the
+      # dev server reaches nothing at all. example.com is the host
+      # examples/expense-approval.json targets from its escalation step. A
+      # change that points an example or a script at a new host adds it here in
+      # the same commit.
+      HTTP_ACTION_ALLOWED_HOSTS: example.com
+      # A locally started target runs over plain HTTP, which the https: rule
+      # would otherwise refuse. Devcontainer only, like ALLOW_INSECURE_DEV_AUTH.
+      HTTP_ACTION_ALLOW_INSECURE: "1"
     depends_on:
       - db
       - mailpit
