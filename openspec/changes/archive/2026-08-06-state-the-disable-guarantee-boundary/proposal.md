@@ -74,3 +74,5 @@ boundary there would put one rule in two places.
 - `test/auth-login.test.ts`: an admin disabling its own account still gets
   `200` on that request, and `401` on the next one with the same token.
 - `test/outbox.test.ts`: a row enqueued before a disable still delivers.
+- `openspec/specs/jwt-authentication/spec.md`: the modified requirement,
+  synced in whole per task 1.1.

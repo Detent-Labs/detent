@@ -11,6 +11,7 @@ import { executeManualTransition, fireTimer, ConcurrencyConflict } from "../src/
 import { drainOutbox, MAX_ATTEMPTS, CLAIM_LEASE_MS, type DeliverFn } from "../src/engine/outbox.js";
 import { createRegistry, register, createDataSourceRegistry } from "../src/engine/registry.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
+import { createUser, setDisabled } from "../src/auth/users.js";
 import { idempotencyKey } from "../src/engine/idempotency.js";
 import type { ProcessBody, Instance, Action } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
@@ -198,9 +199,10 @@ beforeAll(async () => {
   }
 });
 // drainOutbox is a global worker (drains the whole table), so each test starts
-// from an empty outbox to keep delivered-count assertions exact.
+// from an empty outbox to keep delivered-count assertions exact. auth_users is
+// included so the disabled-account test's fixed email survives a re-run.
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE outbox`;
+  if (DB) await sql`TRUNCATE outbox, auth_users`;
 });
 
 // --- enqueue in the commit tx ---
@@ -903,4 +905,20 @@ test.skipIf(!DB)("a mixed patch writes its conforming entries and drops only the
   const o = await outcomes(inst.instanceId);
   expect(o[0].droppedTargets).toEqual(["field_n"]);
   expect(o[0].suppressed).toBeUndefined(); // one entry landed: not a whole-patch suppression
+});
+
+// See jwt-authentication's "An action enqueued before the disable still
+// delivers" scenario: the delivery worker resolves no actor, so an account
+// disabled after its submission enqueued a row does not stop that row.
+test.skipIf(!DB)("a row enqueued by an account disabled before the worker runs still delivers", async () => {
+  const { userId } = await createUser("outbox-disable@example.com", "correct-horse", ["employee"]);
+  const body = threeActionBody();
+  const inst = await create();
+  await executeManualTransition(inst, "path_ab", body, { id: userId, roles: ["employee"] });
+
+  await setDisabled(userId, true);
+
+  expect(await drainOutbox(sql, reg, okDeliver)).toBe(3); // all three still delivered
+  const r = await rows(inst.instanceId);
+  expect(r.every((x) => x.status === "delivered" && x.delivered_at !== null)).toBe(true);
 });

@@ -145,6 +145,26 @@ test.skipIf(!DB)("a token issued before the user is disabled via the admin route
   expect(reLogin.status).toBe(401);
 });
 
+// See jwt-authentication's "A request already past the resolver keeps its
+// rights" scenario: the check runs once, ahead of the route handler, so the
+// disabling request itself still completes under the rights it resolved
+// before the disable committed.
+test.skipIf(!DB)("an admin's own disabling request still answers 200, and only the next request gets 401", async () => {
+  const { userId } = await createUser("login-self-disable@example.com", "correct-horse", [ADMIN_ROLE]);
+  const { token } = (await handleLogin(loginRequest("login-self-disable@example.com", "correct-horse"), SECRET)).body as { token: string };
+
+  const fetch = createServer(createDataSourceRegistry(), createRegistry(), sql, resolveAuthResolver({ AUTH_JWT_SECRET: SECRET }, sql));
+
+  const disableRes = await fetch(
+    new Request(`http://x/admin/users/${userId}/disable`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
+  );
+  expect(disableRes.status).toBe(200); // the disabling request itself still resolved before the row flipped
+  expect(((await disableRes.json()) as { disabled: boolean }).disabled).toBe(true);
+
+  const after = await fetch(new Request("http://x/instances?scope=mine", { headers: { Authorization: `Bearer ${token}` } }));
+  expect(after.status).toBe(401); // the next request re-reads the directory
+});
+
 test.skipIf(!DB)("an account deleted from the directory loses its live session the same way", async () => {
   const { userId } = await createUser("login-deleted@example.com", "correct-horse", ["employee"]);
   const { token } = (await handleLogin(loginRequest("login-deleted@example.com", "correct-horse"), SECRET)).body as { token: string };
