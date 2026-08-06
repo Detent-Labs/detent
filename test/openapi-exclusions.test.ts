@@ -22,6 +22,21 @@ test("the document declares at least the customer-facing paths", () => {
   expect(documentedPaths.length).toBeGreaterThan(10);
 });
 
+test("the public override read is documented, and its two admin siblings are not", () => {
+  // A route any caller can reach without a token belongs in one list or the
+  // other. Omitting it would read as an oversight rather than as a decision.
+  expect(documentedPaths).toContain("/ui-strings");
+  expect(documentedPaths).not.toContain("/admin/ui-strings");
+});
+
+test("the public override read declares that it needs no role and no token", () => {
+  const entry = DOC.slice(DOC.indexOf("  /ui-strings:"), DOC.indexOf("  /metrics:"));
+  expect(entry).toContain("Needs no role and no token.");
+  // An empty `security` array is how this document says "no bearer token here",
+  // the same way /livez, /readyz and /auth/login say it.
+  expect(entry).toContain("security: []");
+});
+
 test("no internal-only prefix appears as a documented path", () => {
   for (const prefix of EXCLUDED) {
     const offenders = documentedPaths.filter((p) => p.startsWith(`/${prefix}/`) || p === `/${prefix}`);

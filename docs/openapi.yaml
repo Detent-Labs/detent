@@ -15,7 +15,8 @@ info:
 
     Every route runs through the Runtime API Layer (`src/runtime/api.ts`).
     An unauthenticated request to any route below `POST /auth/login`,
-    `GET /livez`, and `GET /readyz` gets 401. `GET /metrics` is also 401
+    `GET /livez`, `GET /readyz`, and `GET /ui-strings` gets 401.
+    `GET /metrics` is also 401
     without a token, but its token is `METRICS_TOKEN`, not an actor's JWT.
     A request lacking a required
     reserved role gets 403. A malformed request body gets 400 (request
@@ -39,6 +40,8 @@ tags:
     description: Unauthenticated liveness/readiness probes for orchestration.
   - name: observability
     description: Unauthenticated Prometheus scrape target.
+  - name: ui-strings
+    description: Unauthenticated read of a deployment's own UI wording.
 
 paths:
   /auth/login:
@@ -862,6 +865,55 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /ui-strings:
+    get:
+      tags: [ui-strings]
+      operationId: uiStrings
+      summary: Read this deployment's UI-wording overrides
+      description: >-
+        Needs no role and no token. The browser bundle fetches this before
+        its first render, so the login screen carries an override too, and
+        no token exists at that point.
+
+
+        Returns wording alone: a heading, a button label, a sentence of
+        empty-state prose, each keyed by the frontend area, the locale and
+        the catalog key it replaces. It reads one table, and that table
+        holds no account, instance, process or definition data. It reads
+        that table whole, so the answer never varies by caller.
+
+
+        A key with no override is absent from the map, and the frontend
+        then renders the wording it ships. `PUT /admin/ui-strings` writes
+        an override and sits outside this document, under the `admin/*`
+        exclusion.
+      security: []
+      responses:
+        "200":
+          description: Every stored override, as one nested map.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [overrides]
+                properties:
+                  overrides:
+                    type: object
+                    description: >-
+                      Area, then locale, then catalog key. Empty when the
+                      deployment has overridden nothing.
+                    additionalProperties:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        additionalProperties:
+                          type: string
+                example:
+                  overrides:
+                    shell:
+                      en:
+                        login.title: Sign in to Acme
 
   /metrics:
     get:

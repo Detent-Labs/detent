@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { ListChecks, Send, Timer, Users, GitCompareArrows, Table2 } from "lucide-react";
+import { ListChecks, Send, Timer, Users, GitCompareArrows, Table2, Languages } from "lucide-react";
 import { matchRoute, routePath, ROUTE_ROLE, type Route } from "./routing.js";
 import { useAreaRoute } from "../../shell/routing.js";
 import { Chrome } from "../../shell/Chrome.js";
@@ -11,6 +11,7 @@ import { UsersScreen } from "./screens/UsersScreen.js";
 import { MigrationsScreen } from "./screens/MigrationsScreen.js";
 import { DataListsScreen } from "./screens/DataListsScreen.js";
 import { DataListScreen } from "./screens/DataListScreen.js";
+import { UiStringsScreen } from "./screens/UiStringsScreen.js";
 import type { AreaRootProps } from "../../shell/App.js";
 import "./app.css";
 
@@ -25,6 +26,7 @@ const TABS = [
   { name: "users", label: "Users", role: ADMIN_ROLE, Icon: Users },
   { name: "migrations", label: "Migrations", role: ADMIN_ROLE, Icon: GitCompareArrows },
   { name: "dataLists", label: "Data lists", role: DATALISTS_ROLE, Icon: Table2 },
+  { name: "uiStrings", label: "UI strings", role: ADMIN_ROLE, Icon: Languages },
 ] as const;
 
 /** The same explanatory state the area shows an actor with no operator role, named per screen. */
@@ -96,6 +98,7 @@ export function AdminArea({ session, locale, localPath, go, onUnauthorized, onLo
           {route.name === "users" && <UsersScreen token={session.token} onUnauthorized={onUnauthorized} />}
           {route.name === "migrations" && <MigrationsScreen token={session.token} onUnauthorized={onUnauthorized} />}
           {route.name === "dataLists" && <DataListsScreen token={session.token} navigate={navigate} onUnauthorized={onUnauthorized} />}
+          {route.name === "uiStrings" && <UiStringsScreen token={session.token} onUnauthorized={onUnauthorized} />}
           {route.name === "dataList" && (
             <DataListScreen
               listKey={route.listKey}

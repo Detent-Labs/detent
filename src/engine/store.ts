@@ -333,6 +333,22 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     created_by   text NOT NULL,
     updated_at   timestamptz NOT NULL DEFAULT now()
   )`;
+  // Per-deployment UI-chrome wording. `area` is plain text, not an enum: the
+  // later admin/reporting catalog retrofit starts writing `area = 'admin'` rows
+  // with no migration here. A row exists only while it overrides something, so
+  // clearing a key deletes the row rather than blanking it — unlike
+  // data_list_values, which deactivates instead, because a running instance may
+  // still hold one. No instance, draft or published body ever reads a UI
+  // string, so nothing pins to a row here and deletion stays safe.
+  await db`CREATE TABLE IF NOT EXISTS ui_string_overrides (
+    area       text NOT NULL,
+    locale     text NOT NULL,
+    key        text NOT NULL,
+    value      text NOT NULL,
+    updated_by text NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (area, locale, key)
+  )`;
 }
 
 /**
