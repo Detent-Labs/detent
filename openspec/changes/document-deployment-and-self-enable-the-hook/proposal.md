@@ -9,13 +9,13 @@ clone where nobody typed the `git config core.hooksPath` line. The spec
 states that step as a per-clone instruction. So a fresh clone pushes with no
 gate at all, and reports nothing.
 
-**No document says what a deployment needs (DOC-1).** The engine reads
-sixteen environment variables today. The changes proposed beside this one add
-four more. Nothing lists them. Nothing says which are mandatory, what each
-one defaults to, or which of those defaults are unsafe. The `docker/`
-directory ships two images with no runbook for what to set when running
-them. The directory `docs/runbooks/` exists and holds one document, for
-backup and restore.
+**No document says what a deployment needs (DOC-1).** The engine reads twenty
+environment variables today. Two sections of `README.md` describe most of
+them in prose. Neither gives an operator a list to read down. Nothing says
+which are mandatory, what each one defaults to, or
+which of those defaults are unsafe. The `docker/` directory ships two images
+with no runbook for what to set when running them. The directory
+`docs/runbooks/` exists and holds one document, for backup and restore.
 
 **Nothing watches the dependencies (DEP-1).** No configuration, and no gate,
 runs `bun audit`. The repository commits its lockfile, and the production
@@ -34,12 +34,15 @@ handles it where that decision leaves room.
 
 - A `prepare` script in the root `package.json` points `core.hooksPath` at
   `.githooks`. Every contributor already runs `bun install`, and that run now
-  enables the gate. The script does nothing and fails nothing when `.git` is
-  absent, so the production image build stays green.
+  enables the gate. The script does nothing and fails nothing where no
+  repository answers, so the production image build stays green.
 - A new `docs/runbooks/deployment.md` lists every environment variable the
   engine and the images read. Each entry gives the meaning, whether the
   variable is mandatory, the default, and whether that default is safe to
-  ship.
+  ship. The runbook becomes the one home for that list. Two commands stay in
+  `README.md`, the ones that build and run the images. It points at the
+  runbook for the rest. A change that adds a variable then has one file to
+  change.
 - That runbook holds the two operational rules this repository has no other
   home for. First, a proxy in front of the engine SHALL overwrite
   `X-Forwarded-For`, which `harden-local-account-sessions` needs before
@@ -68,8 +71,16 @@ that reaches the network on every push also breaks a push made offline.
 
 - `package.json`: one `prepare` script.
 - `scripts/enable-hooks.sh`: the script that `prepare` runs.
+- `test/enable-hooks.test.ts`: new. It drives that script.
 - `docs/runbooks/deployment.md`: new.
-- `README.md`: the setup section, which today tells a reader to run the
-  `git config` line.
-- `docs/current-state.md`: the toolchain entry.
-- No source file changes, and no test changes.
+- `README.md`: two sections. The Develop block tells a reader to run the
+  `git config` line. The Deploy block carries the variable prose the runbook
+  takes over.
+- `docs/runbooks/backup-restore.md`: one pointer to the new runbook.
+- `docs/current-state.md`: the CI entry, which states the manual arming step
+  as a live gap.
+- No source file changes.
+
+Arming `core.hooksPath` arms `.githooks/post-commit` beside `pre-push`. That
+hook bumps `VERSION` after each commit. A contributor who never ran the
+`git config` line gets both hooks, not one.
