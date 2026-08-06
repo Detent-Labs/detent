@@ -442,6 +442,14 @@ Stage-by-stage status is in `ROADMAP.md`.
   request, because its name never changes and it names the current hashes.
   Anything that is not a regular file, including a directory, falls back to the
   shell; a root holding no `index.html` declines instead of masking the 404.
+  Every answer this branch returns also carries four security headers
+  (`static.ts::SECURITY_HEADERS`, `deliver-framing-and-sniffing-headers`):
+  `Content-Security-Policy: frame-ancestors 'none'`, `X-Frame-Options: DENY`,
+  `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`.
+  `fileResponse` sets them in one place. The direct hit, the `index.html`
+  fallback and the navigation answer therefore share them. A `HEAD` carries
+  what its `GET` carries. They stay off the JSON envelope, which has its own
+  exit.
   Containment is a whitelist: decode once, resolve with `node:path`, then serve
   only what stays under the root. Rejecting paths containing `..` would be a
   blacklist over `%2e%2e`, `%252e%252e` and every future encoding.
@@ -903,12 +911,21 @@ Stage-by-stage status is in `ROADMAP.md`.
   `harden-auth-configuration`): rides along in the same change, at the same
   blast radius. Every browser package's production build now emits a
   Content-Security-Policy meta tag (`script-src 'self'`, `object-src 'none'`,
-  `base-uri 'none'`, `form-action 'self'`, `frame-ancestors 'none'`,
+  `base-uri 'none'`, `form-action 'self'`,
   `connect-src` derived from `VITE_API_URL`). A build-only Vite plugin
   injects it, so `bun run dev` keeps working as before. This is defense in
   depth for the bearer token in `localStorage`. Its 8-hour expiry means
   nothing can revoke it early. There is no known injection sink in the tree
   today.
+- Framing and sniffing headers (`src/http/static.ts`, `docker/nginx.conf`,
+  `deliver-framing-and-sniffing-headers`): the meta policy above carries no
+  `frame-ancestors`. A browser honors that directive only in a response
+  header. It ignores `report-uri` and `sandbox` in a meta tag for the same
+  reason. Both paths that serve the bundle now send four headers with every
+  document and every asset. Those are `Content-Security-Policy:
+  frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options:
+  nosniff` and `Referrer-Policy: no-referrer`. The response header carries
+  `frame-ancestors` alone, so the two policies restrict disjoint directives.
 - End-user app (the app area of `packages/web`, `packages/form-ui`, `add-end-user-app`): the
   participant-facing frontend — Login, My-tasks (inbox), Task, Start-a-process,
   four screens over a small hand-written History-API routing hook, talking to
