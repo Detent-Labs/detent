@@ -10,7 +10,7 @@
  */
 import type { SQL } from "bun";
 import { sql, withTransaction } from "../engine/store.js";
-import { listOutbox, countOutboxByStatus, listPendingTimers, requeueOutboxRow, discardOutboxRow, getOutboxRow, type OutboxListFilter } from "../engine/admin-queries.js";
+import { listOutbox, countOutboxByStatus, listPendingTimers, requeueOutboxRow, discardOutboxRow, getOutboxRow, MAX_LIST_LIMIT, type OutboxListFilter } from "../engine/admin-queries.js";
 import { listUsers, setDisabled, setRolesById, setManagerById, SelfManagerError } from "../auth/users.js";
 import { migrateInstances } from "../engine/migration.js";
 import { redactInstance } from "../engine/retention.js";
@@ -55,7 +55,7 @@ export async function handleAdminListOutbox(req: Request, resolver: ActorResolve
       status: status.length > 0 ? status : undefined,
       instanceId: url.searchParams.get("instanceId") ?? undefined,
     };
-    const limit = parseLimit(url);
+    const limit = parseLimit(url, MAX_LIST_LIMIT);
     const cursor = url.searchParams.get("cursor") ?? undefined;
     const [page, counts] = await Promise.all([listOutbox(filter, { limit, cursor }, db), countOutboxByStatus(db)]);
     return { status: 200, body: { ...page, counts } };
@@ -85,7 +85,7 @@ export async function handleAdminListTimers(req: Request, resolver: ActorResolve
     const actor = await resolveActor(req, resolver);
     requireRole(actor, ADMIN_ROLE);
     const url = new URL(req.url);
-    const limit = parseLimit(url);
+    const limit = parseLimit(url, MAX_LIST_LIMIT);
     const cursor = url.searchParams.get("cursor") ?? undefined;
     const page = await listPendingTimers({ limit, cursor }, db);
     return { status: 200, body: page };

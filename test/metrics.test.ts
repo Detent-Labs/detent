@@ -89,13 +89,62 @@ test.skipIf(!DB)("handleMetrics reports a dead-lettered outbox row, an overdue t
   expect(text).toContain("workflow_instances_faulted 1");
 });
 
-test.skipIf(!DB)("GET /metrics is unauthenticated, ignores CORS, and is not treated as a preflight", async () => {
-  const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver, "*");
-  const res = await fetch(new Request("http://x/metrics", { headers: { Origin: "http://example.com" } }));
+/**
+ * `createServer` reads `METRICS_TOKEN` once, at construction, so a test sets
+ * the variable before building its own handler and restores it afterwards.
+ */
+function serverWithToken(token: string | undefined): (req: Request) => Promise<Response> {
+  const before = process.env.METRICS_TOKEN;
+  if (token === undefined) delete process.env.METRICS_TOKEN;
+  else process.env.METRICS_TOKEN = token;
+  try {
+    return createServer(dataSourceReg, reg, sql, devHeaderResolver, "*");
+  } finally {
+    if (before === undefined) delete process.env.METRICS_TOKEN;
+    else process.env.METRICS_TOKEN = before;
+  }
+}
+
+const TOKEN = "s3cret-scrape-token";
+
+test.skipIf(!DB)("an authorized GET /metrics returns Prometheus text, ignores CORS, and is not treated as a preflight", async () => {
+  const fetch = serverWithToken(TOKEN);
+  const res = await fetch(new Request("http://x/metrics", { headers: { Origin: "http://example.com", Authorization: `Bearer ${TOKEN}` } }));
   expect(res.status).toBe(200);
   expect(res.headers.get("content-type")).toBe("text/plain; version=0.0.4; charset=utf-8");
   expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  // Binary responses all carry nosniff; only a download carries a disposition.
+  expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
+  expect(res.headers.get("Content-Disposition")).toBeNull();
 
   const preflight = await fetch(new Request("http://x/metrics", { method: "OPTIONS" }));
   expect(preflight.status).toBe(404);
+});
+
+test.skipIf(!DB)("a scrape with no token, a wrong token, or a token of the wrong length gets 401 and no metric line", async () => {
+  const fetch = serverWithToken(TOKEN);
+  const cases: (Record<string, string> | undefined)[] = [
+    undefined,
+    { Authorization: `Bearer ${TOKEN}x` },
+    { Authorization: "Bearer " },
+    { Authorization: `Bearer ${TOKEN.slice(0, 4)}` },
+    { Authorization: TOKEN },
+    { Authorization: `Basic ${TOKEN}` },
+  ];
+  for (const headers of cases) {
+    const res = await fetch(new Request("http://x/metrics", headers ? { headers } : {}));
+    // A length mismatch must not escape timingSafeEqual as a RangeError; that
+    // would surface as 500 rather than 401.
+    expect(res.status).toBe(401);
+    expect(await res.text()).not.toContain("workflow_");
+  }
+});
+
+test.skipIf(!DB)("an unset or empty METRICS_TOKEN leaves the route unregistered, so a scrape gets the JSON 404 envelope", async () => {
+  for (const token of [undefined, ""]) {
+    const fetch = serverWithToken(token);
+    const res = await fetch(new Request("http://x/metrics"));
+    expect(res.status).toBe(404);
+    expect(await res.text()).not.toContain("workflow_");
+  }
 });

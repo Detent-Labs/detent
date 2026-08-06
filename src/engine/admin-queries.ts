@@ -40,7 +40,12 @@ export type PendingTimer = {
 };
 
 const DEFAULT_LIST_LIMIT = 50;
-const MAX_LIST_LIMIT = 200;
+/**
+ * Exported so `http/admin-routes.ts` clamps to the same bound at the boundary.
+ * Separate from `runtime/api.ts`'s constant of the same name: the outbox and
+ * timer lists this module serves are not the instance lists that one bounds.
+ */
+export const MAX_LIST_LIMIT = 200;
 
 function toOutboxRow(r: {
   idempotency_key: string;
