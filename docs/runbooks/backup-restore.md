@@ -4,6 +4,9 @@ One Postgres database backs an entire environment (see CLAUDE.md's
 environment-separation convention). A whole-database dump is the backup unit
 for this schema, not a per-table one.
 
+`docs/runbooks/deployment.md` covers what a deployment configures, including
+the `DATABASE_URL` this runbook reads.
+
 ## Backup
 
 Run `pg_dump` in the custom format against the environment's `DATABASE_URL`:

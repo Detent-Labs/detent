@@ -25,11 +25,18 @@ bundle, where a runtime variable does not. An operator needs to know which
 kind they set. The argument `VITE_API_URL` in `docker/frontend.Dockerfile` is
 one of them.
 
-The table SHALL cover at minimum `DATABASE_URL`, `PORT`, `WEB_ROOT`,
-`AUTH_JWT_SECRET`, `AUTH_ISSUERS`, `ALLOW_INSECURE_DEV_AUTH`,
-`CORS_ALLOWED_ORIGINS`, `DATA_RETENTION_DAYS`, `LOG_LEVEL`,
-`MAX_ATTACHMENT_BYTES`, `ASSIGNMENT_RESOLUTION_TIMEOUT_MS` and the five
+The table SHALL cover at minimum the twenty variables `src/` reads today.
+Those are `DATABASE_URL`, `PORT`, `WEB_ROOT`, `AUTH_JWT_SECRET`,
+`AUTH_ISSUERS`, `ALLOW_INSECURE_DEV_AUTH`, `CORS_ALLOWED_ORIGINS`,
+`DATA_RETENTION_DAYS`, `LOG_LEVEL`, `MAX_ATTACHMENT_BYTES`,
+`ASSIGNMENT_RESOLUTION_TIMEOUT_MS`, `METRICS_TOKEN`, `TRUST_PROXY`,
+`HTTP_ACTION_ALLOWED_HOSTS`, `HTTP_ACTION_ALLOW_INSECURE` and the five
 `SMTP_*` variables.
+
+The table SHALL also cover `SEED_ALLOW`. The seed script reads it.
+`.dockerignore` excludes no part of `scripts/`, so that script reaches the
+engine image. The row SHALL mark it as a maintenance-script variable rather
+than a variable the server reads.
 
 A change that adds a variable SHALL add its row in the same commit. A change
 that removes one SHALL remove its row there.
@@ -58,6 +65,29 @@ that removes one SHALL remove its row there.
 - **WHEN** a change adds an environment variable the engine reads
 - **THEN** that change adds the variable's row to the runbook in the same
   commit
+
+### Requirement: The runbook is the one home for the variable list
+
+No other file in the repository SHALL carry a second list of these variables.
+`README.md` SHALL keep the commands that build and run the two images. It
+SHALL point at the runbook for what to set. It SHALL NOT restate a default, a
+meaning or a mandatory flag.
+
+Two lists means a change adds its row to one of them, and the other rots. The
+rule above needs the row in the same commit as the variable. That rule needs
+one destination, or nobody can check it.
+
+#### Scenario: A reader looks for the variables in the README
+
+- **WHEN** a reader opens `README.md` at its deployment section
+- **THEN** they find the build and run commands, and a pointer to the runbook
+- **AND** they find no second table of variables, defaults or meanings
+
+#### Scenario: An operator reaches the runbook from either entry point
+
+- **WHEN** an operator starts at `README.md`, or at
+  `docs/runbooks/backup-restore.md`
+- **THEN** each one links to `docs/runbooks/deployment.md`
 
 ### Requirement: The runbook states the proxy rule
 
