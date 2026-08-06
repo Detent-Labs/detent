@@ -1613,8 +1613,9 @@ Stage-by-stage status is in `ROADMAP.md`.
 
 - CI (`.githooks/pre-push`, `add-ci-and-dependency-hygiene`): no hosted
   service runs this repository, by the owner's decision. The gate is a
-  `pre-push` hook, which runs `bun run check` (typecheck, then `bun test`)
-  through `docker compose exec` in the dev container. A non-zero exit blocks
+  `pre-push` hook, which runs `bun run check` (typecheck, then the production
+  build, then `bun test`) through `docker compose exec` in the dev container.
+  A non-zero exit blocks
   the push. Running there closes the finding's real hazard: the container's
   environment already carries `DATABASE_URL`. So the 500+ database-backed
   test sites that make up most of the suite cannot skip silently and report a

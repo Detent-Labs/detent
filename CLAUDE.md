@@ -86,9 +86,9 @@ ordering derived from files nobody read.
 ## Verification (the gate before "done")
 Call a change done only after all four checks pass. Report what each one
 printed, not that you ran it.
-- `bun run typecheck`, then the **full** `bun test` with `DATABASE_URL` set.
-  Both rules under Conventions apply. A green without the variable is not
-  evidence. A single-file rerun is not the signal.
+- `bun run typecheck`, then `bun run build`, then the **full** `bun test` with
+  `DATABASE_URL` set. Both rules under Conventions apply. A green without the
+  variable is not evidence. A single-file rerun is not the signal.
 - The antislop linter, on every Markdown file the change touched. The push gate
   runs it too, over the changed Markdown: `scripts/gates/prose.sh`.
 - `git diff --check`, for trailing whitespace and blank-at-eof. It does NOT

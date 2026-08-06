@@ -19,9 +19,10 @@
     "prepare": "sh scripts/enable-hooks.sh",
     "typecheck:engine": "tsc --noEmit",
     "typecheck": "bun run typecheck:engine && bun run --filter './packages/*' typecheck",
+    "build": "bun run --filter './packages/*' build",
     "test": "bun test",
     "test:tz": "TZ=Europe/Zurich bun test packages/web/test/reporting-reportingLogic.test.ts",
-    "check": "bun run typecheck && bun test && bun run test:tz",
+    "check": "bun run typecheck && bun run build && bun test && bun run test:tz",
     "serve": "bun run src/http/server.ts",
     "seed": "bun run scripts/seed.ts"
   },
