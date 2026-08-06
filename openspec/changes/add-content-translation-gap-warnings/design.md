@@ -85,23 +85,43 @@ status aside. Rejected for that double-report reason.
 export function missingTranslationWarning(
   entry: DraftLocalizedText,
   locale: string,
-  baseLocale: string,
+  baseLocale: string | undefined,
 ): string | undefined {
-  if (locale === baseLocale) return undefined;
-  if (!entry?.[baseLocale]) return undefined;
+  const base = baseLocale ?? "en";
+  if (locale === base) return undefined;
+  if (!entry?.[base]) return undefined;
   if (entry?.[locale]) return undefined;
-  return `Missing translation for "${locale}".`;
+  return `No ${locale} translation yet. Publishing still works; a reader of ${locale} sees the ${base} text.`;
 }
 ```
+
+The text names the consequence. It closes with "Publishing still works",
+the way both sibling warnings do. A bare "Missing translation" leaves one
+question open: does publishing still work? That is the question a
+non-blocking warning exists to answer. `resolveDraftLocalizedText` falls
+back to the base-locale entry. The second clause states what a reader
+gets.
 
 Takes primitive values, not a whole `Draft` or `Step`. This matches
 `assignmentWarning`'s own `(terminal, assignment)` shape. Each render site
 passes only what it already has in scope. Both stay directly testable,
 with no full draft to construct.
 
+`baseLocale` accepts `undefined`. The function applies the `"en"` fallback
+itself. `Draft` is `DraftOf<AuthoredProcessBody>` (`draft/types.ts`), which
+makes every property optional. `draft.baseLocale` therefore has the type
+`string | undefined`. Each render site holds that value and nothing
+narrower. A `baseLocale` typed `string` fails `strict` at all six sites.
+
+The fallback is the one `collectUsedLocales` and `DraftProvider` already
+apply to the same property. `localeGapCount` above applies it too. Both
+functions read the same base locale in a draft that declares none.
+`assignmentWarning(terminal: boolean | undefined, ...)` accepts an absent
+value the same way.
+
 ### Rendering sites
 
-Five existing `LocalizedTextInput` call sites each render
+Six existing `LocalizedTextInput` call sites each render
 `missingTranslationWarning(...)` directly underneath, the way
 `StepsPanel.tsx` already renders `assignmentWarning`:
 
@@ -114,18 +134,42 @@ Five existing `LocalizedTextInput` call sites each render
 | Field description | `panels/FieldCatalogPanel.tsx` | `field.description` |
 | Option label | `panels/FieldCatalogPanel.tsx` | `option.label` |
 
+The warning renders after the closing `</label>`, never inside it. Five of
+the six inputs sit inside a `<label>` element, which takes phrasing content
+alone. A `<p>` is flow content, so a warning nested there is invalid markup.
+The `assignmentWarning` precedent this design follows sits outside any
+`<label>` already, next to `PluginEnvelopeEditor`.
+
+A `<div>` around each
+input and its warning answers the same question with a second mechanism.
+It also adds a level of markup. The warning goes after the label instead.
+
 Process `description` has no `LocalizedTextInput` render site today, even
 though `collectUsedLocales` already counts its locale keys. That gap
 predates this change. It gets no warning site here, since it has no editor
 to put one under.
 
-`ContentLocaleSwitcher` renders each `<option>` with a
-`localeGapCount(draft, code) > 0 ? \` (${count} missing)\` : ""` suffix,
-needing `draft` added to its existing `useDraft()` destructure.
+`ContentLocaleSwitcher` renders each `<option>` with a suffix built from
+`localeGapCount(draft, code)`, omitted at a count of zero. It needs `draft`
+added to its existing `useDraft()` destructure. `FieldRow` needs the same
+addition: it destructures `contentLocale` alone today.
 
-Message text stays a raw string literal, not a `catalog.ts` lookup. This
+Both message texts stay raw string literals, not `catalog.ts` lookups. This
 matches the studio's fixed-English UI-chrome decision
 (`collapse-editor-i18n`), and both sibling warnings' own choice.
+
+The switcher's suffix keeps the literal for a second reason. `t(key)`
+returns a fixed string and interpolates nothing. A count cannot pass
+through it. Both ways around that are worse than a literal. Interpolation
+in `t` builds a mechanism for one string. A suffix assembled from a catalog
+fragment and a number breaks another rule. The design language forbids
+building a sentence out of pieces.
+
+The studio already settled this. Every interpolated string a person reads
+there is a literal. `PluginEnvelopeEditor` has `min ${n} chars`,
+`ProcessesScreen` its published-version line, `TemplatesScreen` its version
+label. The catalog carries the fixed strings. A string with a value in it
+stays beside its call site.
 
 ## Risks / Trade-offs
 
@@ -137,6 +181,13 @@ matches the studio's fixed-English UI-chrome decision
   draft change. This design adds no memoization. A `ponytail:` comment
   marks the upgrade path, for a process large enough to make this
   measurable.
+
+  That comment lands in `packages/`, which the `ponytail-ledger-fresh` gate
+  reads. `scripts/gates/ponytail-ledger.sh` compares `PONYTAIL-DEBT.md`
+  against every file that holds a marker under `src` and `packages`. The new
+  marker makes the ledger stale, so `scripts/ponytail-ledgers.sh` runs
+  before the push. The ledger is a local file. This worktree carries none,
+  so the gate stays quiet here and rejects on a machine that has one.
 - [Risk] Process-level `description` stays unbranded by this warning,
   since it has no editor. → Mitigation: none needed here. Giving it an
   editor is a separate, unrelated change. It counts as a known

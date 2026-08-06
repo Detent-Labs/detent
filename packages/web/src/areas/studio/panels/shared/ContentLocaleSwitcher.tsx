@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useDraft } from "../../draft/store";
 import { t } from "../../catalog.js";
-import { resolveAddLocaleAttempt } from "../../draft/localized-text";
+import { localeGapCount, resolveAddLocaleAttempt } from "../../draft/localized-text";
 
 /**
  * Which locale of the *authored process content* is currently shown/edited —
@@ -10,7 +10,7 @@ import { resolveAddLocaleAttempt } from "../../draft/localized-text";
  * currently selected), not a fixed platform list.
  */
 export function ContentLocaleSwitcher() {
-  const { contentLocale, setContentLocale, usedLocales } = useDraft();
+  const { draft, contentLocale, setContentLocale, usedLocales } = useDraft();
   const [newLocale, setNewLocale] = useState("");
   const [error, setError] = useState<string | undefined>(undefined);
 
@@ -34,11 +34,18 @@ export function ContentLocaleSwitcher() {
     <fieldset className="content-locale-switcher">
       <legend>{t("contentLocale.legend")}</legend>
       <select aria-label="content locale" value={contentLocale} onChange={(e) => setContentLocale(e.target.value)}>
-        {options.map((code) => (
-          <option key={code} value={code}>
-            {code}
-          </option>
-        ))}
+        {/* The gap count rides in the option's own text: a native <select>
+            renders no markup inside an <option>, so there is no badge to
+            place. Omitted at zero, so a fully-translated locale reads
+            exactly as it did before. */}
+        {options.map((code) => {
+          const gaps = localeGapCount(draft, code);
+          return (
+            <option key={code} value={code}>
+              {gaps > 0 ? `${code} — ${gaps} missing` : code}
+            </option>
+          );
+        })}
       </select>
       <input
         type="text"
