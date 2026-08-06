@@ -547,7 +547,7 @@ Spec: `development-toolchain`.
     `data-list-administration`. Design:
     `docs/superpowers/specs/2026-08-02-db-data-lists-design.md`.
 
-27. **No-code / low-code process authoring: DONE (a–d).**
+27. **No-code / low-code process authoring: DONE (a–e).**
     Raised 2026-08-03 as the product direction the README and `CLAUDE.md` now
     state: a business analyst builds a process in the studio area without
     writing JSON or CEL. This is a stage, not a rewrite. The studio area already
@@ -569,7 +569,15 @@ Spec: `development-toolchain`.
     version immutability and migration stay untouched, and a hand-authored body
     stays first-class. The JSON view is the escape hatch and stays reachable
     from every screen a builder covers.
-    Four gaps, measured against the code rather than guessed, ordered cheapest
+    **Item (e) takes the one exception to that rule, and it is the only one.**
+    A form's column count and a field's span describe how a participant's form
+    draws. That form draws from the immutable version its instance pinned, long
+    after the draft that produced it is gone, so the two keys have to travel
+    inside the body. Both are optional and both mean 1, so every stored body
+    keeps its `definitionHash` and every published version stays immutable. What
+    the rule forbids is a second authoring language beside the JSON definition.
+    Two optional presentation keys are not that.
+    Five gaps, measured against the code rather than guessed, ordered cheapest
     and most valuable first:
     a. **A plugin config form: DONE.** `panels/shared/PluginEnvelopeEditor.tsx`
        edited every `{ type, config }` position — actions, data sources,
@@ -671,6 +679,30 @@ Spec: `development-toolchain`.
        `authorization`, `unified-shell`, `studio-app`, `database-seed-script`
        (all modified). Design:
        `docs/superpowers/specs/2026-08-05-process-templates-design.md`.
+    e. **Form layout and a visual form editor: DONE.** A step's view was an
+       ordered list of override rows with `↑`/`↓` buttons
+       (`panels/ViewEditor.tsx`), and a form drew one stacked column with no
+       way to say otherwise. An author read field names to picture a form.
+       `View` now carries `columns` and `ViewField` carries `span`, both
+       optional `1 | 2` and both layout only. Neither reaches a guard, a CEL
+       context or a submission check. `FieldForm` draws the grid, so the Player
+       and the participant's Task screen get one renderer and one collapse
+       threshold. `ViewEditor` is gone. The step's View entry now opens
+       `panels/FormEditorDialog.tsx`: a palette of unplaced catalog fields, a
+       canvas drawing the form at its column count, and a strip editing the
+       selected card. Drag reorders the view array, and move-up/move-down make
+       the same change without a pointer.
+       This is the stage's one entry into `src/schema/definition.ts`, for the
+       reason recorded above. `test/view-layout-hash.test.ts` pins each
+       `examples/` body to the `definitionHash` it had before the two keys
+       existed.
+       Deliberately out of scope: a third column count, a per-group column
+       count, and any publish-time rejection of a span wider than its form —
+       that clamps at render time instead, since the two keys change
+       independently.
+       Change: `view-layout-and-form-editor`. Specs: `studio-form-editor`
+       (new), `form-ui`, `runtime-api`, `studio-canvas`, `studio-player` (all
+       modified).
     Deliberately out of scope: a natural-language or AI-assisted authoring
     surface (it produces the same JSON, so it is a later surface over the same
     contract, not a reason to reshape one), executable code authored in the

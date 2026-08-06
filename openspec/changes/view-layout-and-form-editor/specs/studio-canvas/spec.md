@@ -2,6 +2,10 @@
 
 <!-- antislop: allow synonym-rotation -->
 <!-- The requirement title below must match the existing spec's title exactly for archive merge; it is not open for rewording here. -->
+<!-- This block is studio-edit-shared-modal's own MODIFIED text, carried
+     forward verbatim except for the view-entry carve-out. That change
+     archives first; this one archives second and its block wins, so every
+     paragraph and scenario the other change adds has to survive here. -->
 ### Requirement: Selecting a node or edge expands its detail in a permanent inspector beside the canvas
 
 `StepsPanel` SHALL mount as a fixed-width inspector column beside the
@@ -19,22 +23,43 @@ SHALL NOT drop the assignment section. `studio-app` requires a
 no-assignment warning beside the assignment editor. That requirement
 has no anchor without the section.
 
+The identity section SHALL keep the missing-translation warning beside
+the step's label input and beside its description input. Those are two
+of the six `LocalizedTextInput` sites `studio-app` requires a warning
+at.
+
+The subprocess spec section SHALL keep the cross-process check fieldset
+beside the spec editor. That fieldset holds the file input which loads a
+child body, and `checkSubprocessChildRefs` runs against nothing without
+it. Dropping the fieldset would remove the only route to that check.
+
 Selecting a path edge SHALL resolve to its *source* step and show that
 step's index the same way. A path is not independently addressable. It
 only exists nested under its step.
 
-Choosing any entry other than view SHALL scroll to and expand that one
-section beneath the canvas. Every other section stays collapsed.
-`StepsPanel` already nests `PathsPanel` under the paths section.
+Choosing any section other than view SHALL scroll to and expand that one
+section beneath the canvas. Every other section stays collapsed. `StepsPanel`
+already nests `PathsPanel` under the paths section. Deselecting SHALL
+collapse any expanded section, leaving the index visible. No panel's
+own fields, validation, or mutation logic SHALL change. Only how an
+author reaches each section changes.
 
 Choosing the view entry SHALL instead open the form editor (see the
 `studio-form-editor` capability). A step's form benefits from a canvas
 of its own, not an inline scroll target. This is the one section entry
-that opens a dialog instead of scrolling.
+that opens a dialog instead of scrolling. `StepsPanel` SHALL hold no
+inline view section beneath the canvas. The index then carries one
+route to a step's view, not two.
 
-Deselecting SHALL collapse any expanded section, leaving the index
-visible. No panel's own fields, validation, or mutation logic SHALL
-change. Only how an author reaches each section changes.
+A section entry is a disclosure. It SHALL therefore be a
+`<button type="button">`. It SHALL carry `aria-expanded` for its own
+state, and `aria-controls` naming the section it opens. The
+`spa-accessibility` capability requires that shape of every disclosure.
+
+The view entry opens a dialog rather than a section. It SHALL instead
+carry `aria-haspopup="dialog"` and no `aria-controls`. A disclosure's
+`aria-expanded` describes a region the document already holds. A modal
+dialog is not that region.
 
 #### Scenario: Selecting a step shows its section index
 
@@ -56,6 +81,34 @@ change. Only how an author reaches each section changes.
 - **THEN** the index lists an assignment section, and choosing it
   expands the assignment editor with its no-assignment warning beside
   it
+
+#### Scenario: The identity section keeps its translation warnings
+
+- **WHEN** the studio's `contentLocale` is `de`, a step's `label`
+  carries the base-locale value but no `de` value, and the developer
+  chooses the identity section
+- **THEN** the missing-translation warning renders beside that step's
+  label input
+
+#### Scenario: The subprocess spec section keeps the cross-process check
+
+- **WHEN** the developer selects a step of type `subprocess` and chooses
+  the subprocess spec section
+- **THEN** the cross-process check fieldset renders beside the spec
+  editor, and its file input still loads a child body
+
+#### Scenario: The step issue count covers an issue on its path
+
+- **WHEN** a step carries no issue of its own and one of its paths
+  carries a guard that fails validation
+- **THEN** the section index reports one issue for that step
+
+#### Scenario: A section entry expands with the keyboard
+
+- **WHEN** a keyboard user tabs to a non-view section entry and presses
+  Enter or Space
+- **THEN** the section expands, `aria-expanded` reads true, and pressing
+  again collapses it
 
 #### Scenario: Choosing the view entry opens the form editor
 

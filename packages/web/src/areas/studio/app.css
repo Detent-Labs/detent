@@ -874,6 +874,333 @@
   margin: var(--space-2) 0;
 }
 
+/* --- Form editor -------------------------------------------------------- */
+
+/* A tool surface, not a reading column: a palette beside a canvas. Same
+   measure as the panels modal, which carries the same two-part shape. */
+.studio-form-editor {
+  max-width: min(72rem, 92vw);
+  width: min(72rem, 92vw);
+  max-height: 88vh;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.studio-form-editor-header {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 2px solid var(--color-divider);
+}
+
+.studio-form-editor-header h2 {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+/* The step's key is an authored slug the engine matches, so it takes the mono
+   face beside the heading's own prose. */
+.studio-form-editor-step {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  color: var(--color-text-muted);
+}
+
+.studio-form-editor-body {
+  display: grid;
+  grid-template-columns: 16rem minmax(0, 1fr);
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.studio-form-palette {
+  border-right: 2px solid var(--color-divider);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.studio-form-palette-heading {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.studio-form-palette-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Register rows, like the panels rail: a hairline between them, content flush
+   left, the machine-matched type name right-aligned in mono. */
+.studio-form-palette-field {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  background: none;
+  color: inherit;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  text-align: left;
+  cursor: grab;
+}
+
+/* A drag that starts on a label selects the label instead, on every browser.
+   Both draggable surfaces opt out of selection for that reason. */
+.studio-form-palette-field,
+.studio-form-card-body {
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.studio-form-palette-field:hover {
+  background: var(--color-surface-muted);
+}
+
+.studio-form-palette-key {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.studio-form-palette-type {
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.studio-form-canvas-region {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-3) var(--space-4);
+  min-width: 0;
+}
+
+.studio-form-columns {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding-bottom: var(--space-3);
+  border-bottom: 2px solid var(--color-divider);
+  margin-bottom: var(--space-3);
+}
+
+.studio-form-columns-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+/* The chosen count reads off aria-pressed, the attribute the DOM already
+   carries. No state class exists for it. */
+.studio-form-columns-option[aria-pressed="true"] {
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+/* The canvas IS the form: cards sit where the view array puts them, read left
+   to right then down, at the count the toggle declares. */
+.studio-form-canvas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-2);
+}
+
+.studio-form-canvas[data-columns="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* `data-span` arrives already clamped to the grid, so a span-2 card on a
+   one-column canvas needs no rule of its own. */
+.studio-form-canvas[data-columns="2"] > [data-span="2"] {
+  grid-column: span 2;
+}
+
+.studio-form-canvas > .empty,
+.studio-form-canvas-tail {
+  grid-column: 1 / -1;
+  color: var(--color-text-muted);
+}
+
+/* The tail drop target reads as a slot waiting to be filled, so a dashed rule
+   rather than the solid one a placed card carries. */
+.studio-form-canvas-tail {
+  border: 1px dashed var(--color-border);
+  padding: var(--space-2) var(--space-3);
+}
+
+.studio-form-card {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--color-border);
+  min-width: 0;
+}
+
+.studio-form-card[data-selected] {
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+/* A conditionally hidden field is drawn, not absent: the dashed edge says the
+   step may or may not show it. */
+.studio-form-card[data-conditional] {
+  border-style: dashed;
+}
+
+/* The thin leading drop edge. It carries no label and no meaning of its own,
+   which is why it is aria-hidden in the markup. */
+.studio-form-card-edge {
+  flex: 0 0 var(--space-2);
+  border-right: 1px solid var(--color-border);
+}
+
+.studio-form-card-body {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+  background: none;
+  color: inherit;
+  border: none;
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  text-align: left;
+  cursor: grab;
+}
+
+.studio-form-card-body:hover {
+  background: var(--color-surface-muted);
+}
+
+.studio-form-card-key {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.studio-form-card-marks {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+
+/* An override mark names a JSON property, so it stays untranslated in the
+   catalog and takes the mono face here for the same reason. */
+.studio-form-mark,
+.studio-form-card-span,
+.studio-form-card-type {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.studio-form-card-span {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The CEL badge: an outlined stamp in the accent, marking that this override
+   is an expression rather than a literal. */
+.studio-form-cel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-accent);
+  border: 2px solid currentcolor;
+  padding: 0 var(--space-1);
+}
+
+.studio-form-card-moves {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-right: var(--space-2);
+}
+
+.studio-form-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 2px solid var(--color-divider);
+}
+
+.studio-form-strip-heading {
+  flex-basis: 100%;
+  font-family: var(--font-mono);
+  margin: 0;
+}
+
+/* Label above control, both flush left, 4px apart — the design language's own
+   field shape. */
+.studio-form-strip-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.studio-form-strip-empty {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 2px solid var(--color-divider);
+  color: var(--color-text-muted);
+}
+
+.studio-form-editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 2px solid var(--color-divider);
+}
+
+.studio-form-editor-footer .studio-dialog-note {
+  margin: 0;
+}
+
+/* --- Player two-pane reflow --------------------------------------------- */
+
+/* The screen is the size container the Player's own fold measures. A container
+   query matches descendants, so this cannot sit on the layout element it
+   governs. The threshold is the form pane's comfortable measure, not a device
+   width. */
+.studio-player-screen {
+  container-type: inline-size;
+  container-name: studio-player;
+}
+
+.studio-player-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+/* Below the threshold the two panes stack. DOM order already reads instance
+   access, form, record, so the stack needs no reordering. The form's own
+   internal grid folds separately, on `form-ui`'s own rule. */
+@container studio-player (max-width: 64rem) {
+  .studio-player-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 .step-section-issue-stamp {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;

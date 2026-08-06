@@ -91,6 +91,11 @@ export type ResolvedViewField = {
   readonly: boolean;
   group?: string;
   options?: FieldOption[];
+  // How many of the view's columns this field occupies, resolved from the
+  // matching `ViewField.span` and 1 when the view declares none. Presentation
+  // only: it reaches no guard and no submission check. The renderer clamps it
+  // to the grid it sits in, so this is the declared span, not the drawn one.
+  span: 1 | 2;
 };
 
 export type AvailablePath = { id: PathId; key: string; label?: string };
@@ -102,6 +107,10 @@ export type InstanceView = {
   status: InstanceStatus;
   step: { id: StepId; key: string; label: LocalizedText; type: StepType };
   fields: ResolvedViewField[];
+  // The current step's `view.columns`, or 1 when the view declares none.
+  // Reported for every status, the same way `step` is: it describes the step's
+  // declared layout rather than instance state.
+  columns: 1 | 2;
   availablePaths: AvailablePath[];
   // The instance's persisted claim state, in the shape InstanceSummary
   // carries. Absent when the current step declares no assignment: there is
@@ -439,7 +448,7 @@ async function resolveFields(body: ProcessBody, step: Step, instance: Instance, 
       if (!def) throw new Error(`data source not found: ${field.dataSource}`); // publish-time invariant guarantees resolution; defensive only
       options = await resolveDataSourceOptions(def, heldValuesOf(value), registry, dataSourceCache);
     }
-    out.push({ field, value, required, readonly, group: vf.group, options });
+    out.push({ field, value, required, readonly, group: vf.group, options, span: vf.span ?? 1 });
   }
   return out;
 }
@@ -755,6 +764,7 @@ export async function getInstanceView(instanceId: InstanceId, actor: Actor, regi
     status: instance.status,
     step: { id: step.id, key: step.key, label: step.label, type: step.type },
     fields: await resolveFields(body, step, instance, actor, registry),
+    columns: step.view?.columns ?? 1,
     availablePaths: instance.status === "running" ? resolveAvailablePaths(body, step, instance, actor) : [],
     assignment: instance.assignment,
     redactedAt: instance.redactedAt,

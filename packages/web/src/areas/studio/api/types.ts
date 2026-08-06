@@ -111,6 +111,9 @@ export interface InstanceView {
   status: "running" | "completed" | "cancelled" | "faulted";
   step: { id: string; key: string; label: LocalizedText; type: string };
   fields: ResolvedViewField[];
+  /** The step's declared form width. Optional here, unlike on the engine's own
+   * type: a response predating the key omits it, and the form reads that as 1. */
+  columns?: 1 | 2;
   availablePaths: AvailablePath[];
 }
 

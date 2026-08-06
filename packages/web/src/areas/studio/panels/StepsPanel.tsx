@@ -7,7 +7,7 @@ import { t, type TranslationKey } from "../catalog.js";
 import { mintId } from "../draft/ids";
 import { addToDraftArray, updateInDraftArray } from "../draft/draft-array-crud";
 import { ActionListEditor } from "./ActionListEditor";
-import { ViewEditor } from "./ViewEditor";
+import { FormEditorDialog } from "./FormEditorDialog";
 import { SubprocessSpecEditor } from "./SubprocessSpecEditor";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { useRegistry } from "./shared/useRegistry.js";
@@ -99,7 +99,16 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep }: Prop
     setPendingScrollSection(undefined);
   }, [pendingScrollSection]);
 
-  const chooseSection = (section: StepSection) => {
+  // Which step's form editor is open. The view entry is the one section entry
+  // that opens a dialog rather than expanding a section, so it needs its own
+  // state beside `openSection` rather than a value inside it.
+  const [formEditorStepIndex, setFormEditorStepIndex] = useState<number | undefined>(undefined);
+
+  const chooseSection = (section: StepSection, stepIndex: number) => {
+    if (section === "view") {
+      setFormEditorStepIndex(stepIndex);
+      return;
+    }
     const next = openSection === section ? undefined : section;
     setOpenSection(next);
     if (next) setPendingScrollSection(next);
@@ -227,14 +236,19 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep }: Prop
                 <ul className="step-section-index">
                   {sections.map((section) => {
                     const count = sectionCount(step, section);
+                    // The view entry opens a dialog, so it is not a disclosure:
+                    // `aria-expanded` describes a region the document already
+                    // holds, and a modal dialog is not that region.
+                    const opensDialog = section === "view";
                     return (
                       <li key={section}>
                         <button
                           type="button"
                           className="step-section-entry"
-                          aria-expanded={shows(section)}
-                          aria-controls={sectionId(section)}
-                          onClick={() => chooseSection(section)}
+                          aria-expanded={opensDialog ? undefined : shows(section)}
+                          aria-controls={opensDialog ? undefined : sectionId(section)}
+                          aria-haspopup={opensDialog ? "dialog" : undefined}
+                          onClick={() => chooseSection(section, index)}
                         >
                           <span className="step-section-name">{t(SECTION_LABEL[section])}</span>
                           {count !== undefined && <span className="step-section-count">{count}</span>}
@@ -405,9 +419,9 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep }: Prop
                   </section>
                 )}
 
-                <section id={sectionId("view")} ref={registerSection("view")} hidden={!shows("view")}>
-                  <ViewEditor view={step.view} fields={fields} stepId={step.id} onChange={(view) => updateStep(index, { view })} />
-                </section>
+                {/* No inline view section: the view entry opens the form
+                    editor dialog instead. Two routes to one step's view, one
+                    of them driven by nothing, is what this replaces. */}
 
                 <IssueList entityId={step.id} />
 
@@ -422,6 +436,19 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep }: Prop
       <button type="button" className="btn btn-secondary" onClick={addStep}>
         {t("steps.addStep")}
       </button>
+
+      {/* Mounted for the life of the panel, `open` driving showModal()/close() —
+          the same pattern EditPanelsModal follows, so a half-typed CEL
+          expression in the strip survives a reopen. */}
+      <FormEditorDialog
+        open={
+          formEditorStepIndex !== undefined && steps[formEditorStepIndex]
+            ? { step: steps[formEditorStepIndex]!, index: formEditorStepIndex }
+            : undefined
+        }
+        fields={fields}
+        onClose={() => setFormEditorStepIndex(undefined)}
+      />
     </div>
   );
 }

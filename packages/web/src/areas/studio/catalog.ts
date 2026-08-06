@@ -102,12 +102,36 @@ const en = {
   "contract.newOutcomePlaceholder": "new outcome name",
   "contract.addOutcome": "+ Add outcome",
 
-  "view.legend": "view (per-step field overrides)",
-  "view.empty": "No view overrides — every catalog field uses its default presentation.",
-  "view.moveUp": "move up",
-  "view.moveDown": "move down",
-  "view.remove": "Remove",
-  "view.addFieldOverride": "+ Add field override",
+  // The form editor. It replaced the override-row list, so the old `view.*`
+  // keys went with it. "visible"/"required"/"readonly"/"span"/"group" stay
+  // untranslated, per this file's header: they name the JSON being edited.
+  "formEditor.heading": "Form",
+  "formEditor.close": "Close",
+  "formEditor.closeKeepsChanges": "Every change is already in the draft. Save, Discard and Publish stay on the toolbar.",
+  "formEditor.paletteLabel": "Catalog fields not on this form",
+  "formEditor.paletteHeading": "Available fields",
+  "formEditor.paletteEmpty": "Every catalog field is on this form.",
+  "formEditor.canvasLabel": "Form layout",
+  "formEditor.canvasEmpty": "No fields yet. Drag one from the list, or choose it there.",
+  "formEditor.dropHere": "Drop a field here to place it last.",
+  "formEditor.columnsLabel": "Columns",
+  "formEditor.oneColumn": "One",
+  "formEditor.twoColumns": "Two",
+  "formEditor.moveUp": "Move up",
+  "formEditor.moveDown": "Move down",
+  "formEditor.remove": "Remove",
+  "formEditor.markRequired": "required",
+  "formEditor.markReadonly": "readonly",
+  "formEditor.markCel": "CEL",
+  "formEditor.stripLabel": "Selected field",
+  "formEditor.selectAField": "Choose a field on the canvas to edit how this step presents it.",
+  "formEditor.visible": "visible",
+  "formEditor.required": "required",
+  "formEditor.readonly": "readonly",
+  "formEditor.span": "span",
+  "formEditor.group": "group",
+  "formEditor.noGroup": "(none)",
+  "formEditor.unnamedField": "(unnamed field)",
 
   // The condition builder. "guard", "visible"/"required"/"readonly" and the CEL
   // operators stay untranslated, per this file's header: they name the JSON the
