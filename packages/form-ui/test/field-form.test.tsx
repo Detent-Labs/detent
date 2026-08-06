@@ -279,8 +279,12 @@ function renderGrid(fields: ResolvedViewField[], columns?: 1 | 2): string {
   return renderToStaticMarkup(<FieldForm fields={fields} values={{}} onChange={noop} locale="en" columns={columns} />);
 }
 
+/** The label carries the id so the rendered markup distinguishes one field
+ * from the next. The order assertion below needs an anchor that is always
+ * present; an issue list is not one, since a field with no issues renders
+ * none. */
 const plain = (id: string, span?: 1 | 2, group?: string): ResolvedViewField => ({
-  field: baseField({ id, key: id, type: "string" }),
+  field: baseField({ id, key: id, type: "string", label: { en: id } }),
   value: undefined,
   required: false,
   readonly: false,
@@ -304,9 +308,17 @@ describe("FieldForm: fields render across the view's column count, honoring span
   it("a two-column grid marks itself and keeps declaration order", () => {
     const html = renderGrid([plain("f1"), plain("f2"), plain("f3"), plain("f4")], 2);
     expect(html).toContain('data-columns="2"');
-    expect(html.indexOf('id="f1-issues"') < html.indexOf('id="f4-issues"')).toBe(true);
+    // Every anchor must actually be in the markup. Two absent anchors both
+    // report -1, and an order assertion over them proves nothing.
+    const at = (id: string) => {
+      const i = html.indexOf(`>${id}<`);
+      expect(i).toBeGreaterThan(-1);
+      return i;
+    };
     // Declaration order is the render order; the array's own sequence decides.
-    expect(html.indexOf(">f1<") < html.indexOf(">f2<")).toBe(true);
+    expect(at("f1")).toBeLessThan(at("f2"));
+    expect(at("f2")).toBeLessThan(at("f3"));
+    expect(at("f3")).toBeLessThan(at("f4"));
   });
 
   it("a span-2 field on a two-column grid renders at width 2", () => {
@@ -338,6 +350,17 @@ describe("FieldForm: fields render across the view's column count, honoring span
       plain("m1", undefined, "g1"),
     ], 2);
     // The group's own container carries the form's count; it declares none.
+    expect(html).toContain('<fieldset class="form-ui-field form-ui-field-group" data-span="2" data-columns="2"');
+  });
+
+  it("ignores a span declared on a group", () => {
+    // A group is a container, not a leaf. Its members lay out at the form's
+    // count inside it, and two tracks need the room two tracks take, so the
+    // frame is the form's full width whatever the span says.
+    const html = renderGrid([
+      { field: baseField({ id: "g1", key: "g1", type: "group" }), value: undefined, required: false, readonly: false, span: 1 },
+      plain("m1", undefined, "g1"),
+    ], 2);
     expect(html).toContain('<fieldset class="form-ui-field form-ui-field-group" data-span="2" data-columns="2"');
   });
 

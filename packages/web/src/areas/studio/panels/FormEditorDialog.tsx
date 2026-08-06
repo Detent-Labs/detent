@@ -134,6 +134,10 @@ export function FormEditorDialog({ open, fields, onClose }: Props) {
 
   const fieldFor = (ref_: FieldId | undefined) => fields.find((f) => f.id === ref_);
   const labelFor = (ref_: FieldId | undefined) => fieldFor(ref_)?.key || ref_ || t("formEditor.unnamedField");
+  /** A group's card always draws at the form's full width and `form-ui` reads
+   * no `span` on it, so the canvas draws it that way and the strip offers no
+   * span control for it. */
+  const isGroupRow = (row: DraftViewField) => fieldFor(row.ref)?.type === "group";
 
   const catalogIds = fields.map((f) => f.id).filter((id): id is FieldId => id !== undefined);
   const palette = unplacedRefs(catalogIds, rows);
@@ -213,7 +217,7 @@ export function FormEditorDialog({ open, fields, onClose }: Props) {
             {rows.length === 0 && <li className="empty">{t("formEditor.canvasEmpty")}</li>}
             {rows.map((row, index) => {
               const field = fieldFor(row.ref);
-              const span = clampSpan(row.span, columns);
+              const span = isGroupRow(row) ? columns : clampSpan(row.span, columns);
               const hiddenByExpression = isExpression(row.visible);
               const celMarked = isExpression(row.visible) || isExpression(row.required) || isExpression(row.readonly);
               const dropOn = (side: DropSide) => (e: DragEvent) => {
@@ -316,16 +320,21 @@ export function FormEditorDialog({ open, fields, onClose }: Props) {
                 value={selectedRow.readonly}
                 onChange={(readonly) => updateRow(selected!, { readonly })}
               />
-              <label className="studio-form-strip-field">
-                {t("formEditor.span")}
-                <select
-                  value={String(selectedRow.span ?? 1)}
-                  onChange={(e) => updateRow(selected!, { span: Number(e.target.value) as 1 | 2 })}
-                >
-                  <option value="1">1</option>
-                  <option value="2">2</option>
-                </select>
-              </label>
+              {/* No span control on a group: it draws at the form's full width
+                  and `form-ui` reads no span on it, so the control would write
+                  a value nothing renders. */}
+              {!isGroupRow(selectedRow) && (
+                <label className="studio-form-strip-field">
+                  {t("formEditor.span")}
+                  <select
+                    value={String(selectedRow.span ?? 1)}
+                    onChange={(e) => updateRow(selected!, { span: Number(e.target.value) as 1 | 2 })}
+                  >
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                  </select>
+                </label>
+              )}
               {/* Move-to-group, the third keyboard move command. A group is
                   named by its key, which is what `ViewField.group` carries. */}
               <label className="studio-form-strip-field">

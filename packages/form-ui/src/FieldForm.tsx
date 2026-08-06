@@ -70,11 +70,20 @@ interface FieldInputProps {
   columns?: 1 | 2;
 }
 
+/** A group is a container, not a leaf, so it draws at the form's full width
+ * rather than at a declared span. Its members lay out at the form's `columns`
+ * inside it, and two tracks need the room two tracks take. `span` on a group
+ * is therefore not read. On a one-column form full width IS one column, so an
+ * already-published group renders exactly as it did. */
+function isGroup(field: ResolvedViewField): boolean {
+  return field.field.type === "group";
+}
+
 export function FieldInput({ field, allFields, values, onChange, locale, baseLocale, issuesByField, columns = 1 }: FieldInputProps) {
   const def = field.field;
   const label = resolveText(def.label, locale, baseLocale) || def.key;
   const issues = issuesByField?.get(def.id) ?? [];
-  const span = effectiveSpan(field.span, columns);
+  const span = isGroup(field) ? columns : effectiveSpan(field.span, columns);
 
   if (def.type === "group") {
     const children = allFields.filter((f) => f.group === def.key);

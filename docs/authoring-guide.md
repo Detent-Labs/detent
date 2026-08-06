@@ -153,7 +153,9 @@ one-column form draws at width 1, and the stored value stays 2. Widen the form
 again and the field widens with it. Below a narrow measure the form drops to
 one column, whatever it declares. The stored values again stay as they are.
 
-A group takes the form's own column count. It declares none of its own.
+A group takes the form's own column count. It declares none of its own, and
+it always fills the form's width. A `span` on a group is not read: two columns
+inside the group need the room two columns take.
 
 ### Path
 
