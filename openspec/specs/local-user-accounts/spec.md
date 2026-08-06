@@ -444,4 +444,3 @@ a password stay outside it. Neither one is reachable except from the CLI.
 - **WHEN** `PATCH /admin/users/:id/roles` sets a user's roles
 - **AND** the CLI or a login then reads that user's roles
 - **THEN** the value read is the one the route wrote, from the same column
-

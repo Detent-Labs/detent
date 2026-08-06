@@ -219,4 +219,3 @@ context in this repository.
 - **WHEN** `docker build` runs for the engine image or a frontend image
 - **THEN** the build context sent to the Docker daemon contains no
   `node_modules`, `.git`, `.devcontainer`, `docs`, or test directory
-

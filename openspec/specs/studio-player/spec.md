@@ -152,4 +152,3 @@ the page's two panes fold into one.
 - **THEN** that field still renders across both of the form's own
   columns. The reflow folds the page's panes, not the form's internal
   grid
-

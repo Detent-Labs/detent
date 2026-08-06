@@ -476,4 +476,3 @@ operator reads the dead-letter view.
 - **WHEN** a contributor starts a target on `http://localhost:<port>` and
   points an `http.request` action at it, with that host in the list
 - **THEN** the plain-HTTP scheme does not refuse the delivery
-

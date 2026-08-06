@@ -549,4 +549,3 @@ admin screen already requires.
 
 - **WHEN** an actor without `system:admin` opens the screen
 - **THEN** the area shows its explanatory empty state
-

@@ -781,4 +781,3 @@ the draft's own field tree SHALL keep whatever depth it declares.
   a `label` carrying the base-locale value but no `de` value
 - **THEN** the modal's Fields view shows the missing-translation warning
   next to that field's label input
-

@@ -143,4 +143,3 @@ restricts something the other does not, so no page breaks under the pair.
 
 - **WHEN** a page on another origin puts the studio in an `iframe`
 - **THEN** the browser refuses to render it
-

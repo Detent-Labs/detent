@@ -159,4 +159,3 @@ the same way a drag does.
 - **WHEN** the developer uses a placed field's move-up command
 - **THEN** the view array's order changes exactly as it would from
   dragging that field one position up
-

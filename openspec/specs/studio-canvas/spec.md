@@ -339,4 +339,3 @@ a profile rather than added speculatively.
 
 - **WHEN** a step is added, removed, or repositioned in the stored layout
 - **THEN** the computations re-run and the canvas reflects the change
-

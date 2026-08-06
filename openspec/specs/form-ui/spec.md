@@ -388,4 +388,3 @@ the declared layout.
   threshold
 - **THEN** every root field renders in one column, and no field's
   stored `span` changes
-

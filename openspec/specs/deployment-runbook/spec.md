@@ -125,4 +125,3 @@ gate that reaches the network also breaks an offline push.
 - **WHEN** a reader asks why the push gate does not run `bun audit`
 - **THEN** the runbook gives the reason, so nobody re-opens it as an
   oversight
-
