@@ -367,6 +367,57 @@ test.skipIf(!DB)("a row that keeps failing exhausts attempts and dead-letters", 
   expect(await drainOutbox(sql, reg, okDeliver)).toBe(0); // dead-letter rows are excluded
 });
 
+// --- the per-row boundary ---
+
+// surface-worker-failures: drainOutbox's per-row catch (outbox.ts) used to
+// discard its error with no line, so a row failing every pass was invisible.
+//
+// Two seams do NOT reach that boundary. A throwing deliverFn is caught by the
+// inner try around the delivery race and becomes an ordinary retry. A corrupt
+// `action` column is unreachable too: `action` is jsonb, so Postgres validates
+// it on write and it can never hold text JSON.parse rejects.
+//
+// A throwing `resolveBody` does reach it. drainOutbox calls it inside tx2 (to
+// type-check the writeback), so the whole mark transaction aborts. It is keyed
+// by the row's own instance's processId, which makes the failure selective:
+// one instance's rows hit the boundary while another's deliver in the same pass.
+test.skipIf(!DB)("a row the drain skips logs an error line, stays claimed, and does not strand the batch", async () => {
+  const body = threeActionBody();
+  const createAs = (p: string) => createInstance(body, { processId: p as Instance["processId"], version: 1 });
+  const good = await createAs("proc_ob_good");
+  const bad = await createAs("proc_ob_bad");
+  await executeManualTransition(good, "path_ab", body, actor); // 3 rows
+  await executeManualTransition(bad, "path_ab", body, actor); // 3 rows
+
+  // A non-empty patch, so tx2 reaches the resolveBody call at all.
+  const patching: DeliverFn = async () => ({ field_val: 7 });
+  const flaky = (pid: string) => {
+    if (pid === "proc_ob_bad") throw new Error("simulated resolver failure");
+    return body;
+  };
+
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+  const delivered = await drainOutbox(sql, reg, patching, CLAIM_LEASE_MS, flaky);
+  const lines = errorSpy.mock.calls
+    .map((c) => JSON.parse(c[0] as string) as Record<string, unknown>)
+    .filter((l) => l.msg === "worker skipped a failing item");
+  errorSpy.mockRestore();
+
+  const badKeys = (await rows(bad.instanceId)).map((r) => r.idempotency_key as string);
+  expect(lines).toHaveLength(3); // one per skipped row
+  for (const line of lines) {
+    expect(line.level).toBe("error");
+    expect(line.worker).toBe("outbox");
+    expect(badKeys).toContain(line.idempotencyKey as string);
+    expect(line.error).toBe("simulated resolver failure");
+  }
+
+  // The drain moved on: the other instance's three rows still delivered.
+  expect(delivered).toBe(3);
+  expect((await rows(bad.instanceId)).every((r) => r.status === "claimed")).toBe(true); // left for lease reclaim
+  expect((await rows(good.instanceId)).every((r) => r.status === "delivered")).toBe(true);
+});
+
 test.skipIf(!DB)("an action's declared retry.maxAttempts overrides the default", async () => {
   const body = retryActionBody({ maxAttempts: 2, backoff: "exponential" } as Action["retry"]);
   const inst = await createFrom(body);

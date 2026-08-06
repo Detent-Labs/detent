@@ -5,7 +5,7 @@
  * created directly via `createInstance` (no publish needed): neither
  * `redactInstance` nor `sweepRetention` resolves a process body.
  */
-import { test, expect, beforeAll, beforeEach } from "bun:test";
+import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
@@ -224,4 +224,40 @@ test.skipIf(!DB)("a redacted instance scans clean via findOrphanKeys, and its da
   expect(scan.orphans).toEqual([]);
   expect(scan.unreadable).toEqual([]);
   expect(await rowData(i.instanceId)).toEqual({});
+});
+
+// --- the per-instance boundary logs -----------------------------------------
+
+// surface-worker-failures: sweepRetention's per-instance catch used to discard
+// its error with no line. The catch sits inside the sweep loop, so the tick
+// returns normally and pollForever's own line never fires — a sweep failing on
+// every instance was invisible.
+test.skipIf(!DB)("an instance the sweep skips logs an error line carrying its id", async () => {
+  const good = await mk();
+  await setStatus(good.instanceId, "completed");
+  await setEnteredAt(good.instanceId, "2020-01-01T00:00:00.000Z");
+
+  // Eligible for the sweep's WHERE clause (completed, not redacted, old), but
+  // `instanceSchema.parse` inside redactInstance rejects it. instance_id sorts
+  // ahead of the good row's `inst_...`, so the sweep reaches it first.
+  await sql`INSERT INTO instances (instance_id, transition_seq, body)
+    VALUES (${"inst_0_unparseable"}, ${0},
+      ${{ status: "completed", currentStepEnteredAt: "2020-01-01T00:00:00.000Z" }})`;
+
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+  await sweepRetention(sql, 30);
+  const lines = errorSpy.mock.calls
+    .map((c) => JSON.parse(c[0] as string) as Record<string, unknown>)
+    .filter((l) => l.msg === "worker skipped a failing item");
+  errorSpy.mockRestore();
+
+  expect(lines).toHaveLength(1);
+  expect(lines[0].level).toBe("error");
+  expect(lines[0].worker).toBe("retention");
+  expect(lines[0].instanceId).toBe("inst_0_unparseable");
+  expect(typeof lines[0].error).toBe("string");
+
+  // The sweep still redacted the rest of the batch.
+  expect(await rowRedactedAt(good.instanceId)).not.toBeNull();
+  expect(await rowData(good.instanceId)).toEqual({});
 });

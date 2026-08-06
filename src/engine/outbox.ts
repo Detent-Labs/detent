@@ -15,7 +15,7 @@
 import type { SQL } from "bun";
 import { sql } from "./store.js";
 import { resolve, type Registry } from "./registry.js";
-import { pollForever } from "./poll.js";
+import { pollForever, logSkippedItem } from "./poll.js";
 import { durationMs } from "./duration.js";
 import { evalOutput } from "../cel/eval.js";
 import { collectFieldsDeep, typeMatches, type FieldId, type FieldDef, type Literal } from "../schema/definition.js";
@@ -335,9 +335,13 @@ export async function drainOutbox(
           WHERE idempotency_key = ${row.idempotency_key} AND status = 'claimed'`;
       }
     });
-   } catch {
-     // Corrupt row or a failed mark transaction: leave it claimed (reclaimed
-     // after its lease) and move on to the rest of the batch.
+   } catch (e) {
+     // Corrupt row or a failed mark transaction: log it, leave it claimed
+     // (reclaimed after its lease) and move on to the rest of the batch. The
+     // line is the only record: the drain returns normally, so the tick
+     // boundary never sees this and a row failing every pass is otherwise
+     // invisible.
+     logSkippedItem("outbox", { idempotencyKey: raw.idempotency_key }, e);
    }
   }
   return delivered;
@@ -350,5 +354,5 @@ export function startOutboxWorker(
   intervalMs = 500,
   resolveBody: ResolveBody = () => undefined,
 ): { stop: () => void } {
-  return pollForever(() => drainOutbox(db, registry, deliver, CLAIM_LEASE_MS, resolveBody), intervalMs);
+  return pollForever("outbox", () => drainOutbox(db, registry, deliver, CLAIM_LEASE_MS, resolveBody), intervalMs);
 }
