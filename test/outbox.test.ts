@@ -367,6 +367,46 @@ test.skipIf(!DB)("a row that keeps failing exhausts attempts and dead-letters", 
   expect(await drainOutbox(sql, reg, okDeliver)).toBe(0); // dead-letter rows are excluded
 });
 
+// --- the per-row boundary ---
+
+// surface-worker-failures: drainOutbox's per-row catch (outbox.ts) used to
+// discard its error with no line, so a row failing every pass was invisible.
+// A throwing deliverFn does NOT reach that boundary — the inner try around the
+// delivery race catches it first and turns it into an ordinary retry. A row
+// whose `action` jsonb holds an unparseable string does reach it, through
+// parseAction.
+test.skipIf(!DB)("a row the drain skips logs an error line, stays claimed, and does not strand the batch", async () => {
+  const body = threeActionBody();
+  const inst = await create();
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  // Corrupt exactly one of the three rows. `action` is jsonb; a JSON string
+  // value comes back as a JS string, and parseAction's JSON.parse throws on it.
+  const all = await rows(inst.instanceId);
+  const corruptKey = all[0].idempotency_key as string;
+  await sql`UPDATE outbox SET action = ${'"not-json{"'}::jsonb WHERE idempotency_key = ${corruptKey}`;
+
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+  const delivered = await drainOutbox(sql, reg, okDeliver);
+  const lines = errorSpy.mock.calls
+    .map((c) => JSON.parse(c[0] as string) as Record<string, unknown>)
+    .filter((l) => l.msg === "worker skipped a failing item");
+  errorSpy.mockRestore();
+
+  expect(lines).toHaveLength(1);
+  expect(lines[0].level).toBe("error");
+  expect(lines[0].worker).toBe("outbox");
+  expect(lines[0].idempotencyKey).toBe(corruptKey);
+  expect(typeof lines[0].error).toBe("string");
+
+  // The drain moved on: the other two rows delivered.
+  expect(delivered).toBe(2);
+  const after = await rows(inst.instanceId);
+  const corrupt = after.find((r) => r.idempotency_key === corruptKey);
+  expect(corrupt?.status).toBe("claimed"); // left for lease reclaim, not marked
+  expect(after.filter((r) => r.status === "delivered")).toHaveLength(2);
+});
+
 test.skipIf(!DB)("an action's declared retry.maxAttempts overrides the default", async () => {
   const body = retryActionBody({ maxAttempts: 2, backoff: "exponential" } as Action["retry"]);
   const inst = await createFrom(body);

@@ -10,7 +10,7 @@ import type { SQL } from "bun";
 import { sql, withTransaction } from "./store.js";
 import { instance as instanceSchema, type Instance, type InstanceId } from "../schema/definition.js";
 import { NotFoundError, InstanceRunningError } from "../errors.js";
-import { pollForever } from "./poll.js";
+import { pollForever, logSkippedItem } from "./poll.js";
 
 const BATCH = 500;
 const SWEEP_INTERVAL_MS = 60 * 60 * 1000;
@@ -69,14 +69,18 @@ export async function sweepRetention(db: SQL, days: number): Promise<void> {
       last = id; // keyset advances regardless of outcome, matching migrateInstances
       try {
         await redactInstance(id as InstanceId, db);
-      } catch {
+      } catch (e) {
         // One instance's failure does not stop the rest of the batch — the
         // same per-row fault isolation migrateInstances/findOrphanKeys use.
+        // The line is the only record: the sweep returns normally, so the tick
+        // boundary never sees this and an instance failing every sweep is
+        // otherwise invisible.
+        logSkippedItem("retention", { instanceId: id }, e);
       }
     }
   }
 }
 
 export function startRetentionSweep(db: SQL, days: number): { stop: () => void } {
-  return pollForever(() => sweepRetention(db, days), SWEEP_INTERVAL_MS);
+  return pollForever("retention", () => sweepRetention(db, days), SWEEP_INTERVAL_MS);
 }
