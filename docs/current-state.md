@@ -1627,7 +1627,9 @@ Stage-by-stage status is in `ROADMAP.md`.
   `prepare`, `document-deployment-and-self-enable-the-hook`). `bun install`
   points `core.hooksPath` at `.githooks`, so nobody types that `git config`
   line. That value covers the directory, so it arms `post-commit` beside
-  `pre-push`.
+  `pre-push`. The same run arms an SSH keepalive on `core.sshCommand`
+  (`self-enable-the-push-keepalive`). The connection to the remote then
+  outlives the hook's own runtime, instead of dying mid-push.
 
 - The script asks `git rev-parse --git-dir`, never `[ -d .git ]`. In a
   linked worktree `.git` is a file. This repository works in worktrees. Two

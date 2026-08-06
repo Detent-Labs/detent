@@ -63,6 +63,11 @@ branches cover the cases, and each one exits 0.
 | `core.sshCommand` set to anything else | keeps it, prints the two options to add |
 | `GIT_SSH` set in the environment | keeps out, prints the two options to add |
 
+Where `core.sshCommand` already equals the target value and `GIT_SSH` is also
+set, the equal-value branch wins. The script prints the same-value message,
+not the keep-out message. It writes nothing either way. Mentioning `GIT_SSH`
+there would only confuse, since the value asked for is already in place.
+
 A foreign `core.sshCommand` may carry an identity file, a `ProxyCommand`, or
 a different ssh binary. Overwriting it breaks the contributor's access to
 every remote. The keepalive is worth less than that.
@@ -108,15 +113,9 @@ the hook window kills the connection. That is the connection the keepalive
 exists to hold. The default of 3 gives 60 seconds, which is under the runtime
 of `bun run check` alone.
 
-**What is still unmeasured.** Nobody has recorded the hook's wall clock as a
-number. The hook names its own parts. Four host gates run, then
-`preflight.sh core`, then the lockfile gate. Last comes a typecheck, a full suite of over 2000
-tests, and a second timezone-pinned run.
-
-Task 4.2 records the number on the first real push and checks 600 seconds
-against it. The spec states the rule as a relation between the product and
-the runtime. So a slower suite later does not make the spec wrong. It makes
-the value wrong, and the rule says so.
+**What is still unmeasured.** The Open Questions section below carries the
+detail. The hook's wall clock has no recorded number yet. Task 4.2 is where
+one lands.
 
 ## Decision 4: `development-toolchain`, as a new requirement
 
@@ -149,3 +148,25 @@ then. The failure it would catch is the push it runs in.
 No retry. Git retries nothing after SIGPIPE, and this change does not teach
 it to. A contributor who meets exit 141 after this lands has a different
 cause, and `proposal.md` names the line to read.
+
+## Migration Plan
+
+None. The change writes local git config, not persisted application state. The
+equal-value branch covers a clone that already carries `core.sshCommand` from
+an earlier manual install; nothing migrates.
+
+## Open Questions
+
+Is 600 seconds enough headroom for the hook's real wall-clock runtime?
+Unmeasured here; task 4.2 records the number on the first real push and
+settles it.
+
+Nobody has recorded the hook's wall clock as a number yet. The hook names its
+own parts. Four host gates run, then `preflight.sh core`, then the lockfile
+gate. Last comes a typecheck, a full suite of over 2000 tests, and a second
+timezone-pinned run.
+
+Task 4.2 checks 600 seconds against the recorded number. The spec states the
+rule as a relation between the product and the runtime. So a slower suite
+later does not make the spec wrong. It makes the value wrong, and the rule
+says so.
