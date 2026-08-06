@@ -20,6 +20,11 @@ own sections and their entity counts. Those sections are identity,
 assignment, paths, timers, actions, subprocess spec, and view. See the
 `studio-canvas` capability for how choosing an entry behaves.
 
+The process header SHALL stay on the Structure surface, above the
+editing well. It carries `baseLocale`, and this capability requires an
+author to declare a non-English base locale without leaving that
+surface. The shared modal SHALL NOT hold it.
+
 Three links SHALL sit at the top of the Structure surface: Fields, Data
 sources, Contract. Each SHALL open a shared modal dialog straight to
 its own view. These three views cover the whole process, not one step.
@@ -35,15 +40,29 @@ This change touches only where the screen mounts each panel and how an
 author reaches it. What each panel validates, mutates, or persists
 stays the same.
 
+Every inline missing-translation warning SHALL survive the move. Six
+`LocalizedTextInput` sites carry one.
+
+- the process label, which stays on the screen
+- a step's label and description, which move into the section index's
+  identity section
+- a field's label and description, and a field option's label, which
+  move into the modal's Fields view
+
 Live validation SHALL remain exactly what it is today. It runs the
 engine's own publish-time chain in the browser and reports issues in
 place. It SHALL NOT block saving, since a work-in-progress draft is
 normally invalid.
 
 The section index SHALL carry one issue count for the selected step as
-a whole. The shared modal's rail SHALL carry one per view. Both SHALL
-use the same visual tone. The rest of the studio area already uses that
-tone for issues.
+a whole. That count SHALL cover the step's own issues, and the issues of
+its paths, timers and actions. Here `resolveLoc` returns the deepest
+entity it finds. A guard's issue therefore names the path, not the step.
+A count over the step's own id alone would read zero on such a step.
+
+The shared modal's rail SHALL carry one issue count per view. Both
+counts SHALL use the same visual tone. The rest of the studio area
+already uses that tone for issues.
 
 Per-section issue counts are out of scope. `resolveLoc` resolves a
 view, assignment or subprocess-spec issue to the step itself. No
@@ -123,10 +142,29 @@ toolbar SHALL remain the only thing that persists.
 Close SHALL discard nothing. The footer SHALL state that plainly, so
 Close never reads as a cancel.
 
-A left rail SHALL list the three views with their entity counts. For
-the Fields view the rail SHALL also list the field catalogue and an Add
-entry. A group field's children indent one level under it. Contract
-holds a single editor, so its rail entry SHALL carry no sub-list.
+A panel's own unsubmitted input SHALL survive a Close too. The contract
+panel holds a half-typed outcome name in component state. The data
+sources panel fetches its list keys on mount. The modal therefore stays
+mounted for as long as the Structure surface is active. Opening it calls
+`showModal()` on the already-mounted element, and Close calls `close()`.
+
+A left rail SHALL list the three views. Each entry SHALL carry two
+numbers, and they SHALL read as different things. The entity count says
+how many fields, data sources or outcomes the view holds. The issue
+count says how many of them are wrong. Only the issue count takes the
+refusal tone. An entry SHALL surface no issue count when the view holds
+no issue.
+
+For the Fields view the rail SHALL also list the field catalogue and an
+Add entry. Choosing a field SHALL scroll that field's row into view
+inside the panel. The Add entry SHALL add a field, through the call the
+panel's own add control makes. A group field's children indent one
+level under it. Contract holds a single editor, so its rail entry SHALL
+carry no sub-list.
+
+The rail SHALL mark the open view with `aria-current`. A rail entry
+switches a view rather than disclosing adjacent content, so it SHALL
+NOT carry `aria-expanded`.
 
 The rail SHALL cap indentation at two levels. A group field's children
 indent once. A field nested deeper SHALL take its own top-level rail
@@ -138,6 +176,12 @@ the draft's own field tree SHALL keep whatever depth it declares.
 - **WHEN** the developer adds a field in the modal and then clicks Close
 - **THEN** the draft still carries that field, and the screen's toolbar
   still reports unsaved changes
+
+#### Scenario: Closing the modal keeps a half-typed outcome name
+
+- **WHEN** the developer types an outcome name in the Contract view,
+  clicks Close without adding it, then reopens that view
+- **THEN** the typed text is still in the input
 
 #### Scenario: The modal offers no Save of its own
 
@@ -152,8 +196,33 @@ the draft's own field tree SHALL keep whatever depth it declares.
 - **THEN** the rail's Fields entry reads three, its Data sources entry
   reads two, and its Contract entry carries no sub-list
 
+#### Scenario: The rail's issue count is separate from its entity count
+
+- **WHEN** a draft carries three fields and one of them holds a
+  validation issue
+- **THEN** the rail's Fields entry reads three for its entity count and
+  one for its issue count. Only the issue count takes the refusal tone
+
+#### Scenario: A view with no issue shows no issue count
+
+- **WHEN** a draft's two data sources both validate
+- **THEN** the rail's Data sources entry reads two and shows no issue
+  count
+
 #### Scenario: A twice-nested group field takes its own rail entry
 
 - **WHEN** a group field holds a group field holding a leaf field
 - **THEN** the leaf field takes a top-level rail entry, not a third
   indent level. The draft keeps its own nesting
+
+#### Scenario: The Fields rail adds a field
+
+- **WHEN** the developer chooses the rail's Add entry under Fields
+- **THEN** the draft carries one more field, and the rail lists it
+
+#### Scenario: The modal keeps every missing-translation warning
+
+- **WHEN** the studio's `contentLocale` is `de`, and a draft's field has
+  a `label` carrying the base-locale value but no `de` value
+- **THEN** the modal's Fields view shows the missing-translation warning
+  next to that field's label input

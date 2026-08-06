@@ -3,7 +3,7 @@ import type { Step, StepType } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { useDraft } from "../draft/store";
-import { t } from "../catalog.js";
+import { t, type TranslationKey } from "../catalog.js";
 import { mintId } from "../draft/ids";
 import { addToDraftArray, updateInDraftArray } from "../draft/draft-array-crud";
 import { ActionListEditor } from "./ActionListEditor";
@@ -18,8 +18,44 @@ import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { parseChildProcessJson } from "../draft/io";
 import { missingTranslationWarning, seedLocalizedText } from "../draft/localized-text";
 import { assignmentWarning } from "./assignmentWarningLogic.js";
+import { stepIssueCount } from "../draft/panel-rail";
 
 type DraftStep = DraftOf<Step>;
+
+/** The sections a step's own detail is divided into. The shared modal never
+ * opens one of these: they are step-scoped, and it carries only the three
+ * process-wide panels. */
+type StepSection = "identity" | "assignment" | "paths" | "timers" | "actions" | "subprocess" | "view";
+
+const SECTION_LABEL: Record<StepSection, TranslationKey> = {
+  identity: "stepSections.identity",
+  assignment: "stepSections.assignment",
+  paths: "stepSections.paths",
+  timers: "stepSections.timers",
+  actions: "stepSections.actions",
+  subprocess: "stepSections.subprocess",
+  view: "stepSections.view",
+};
+
+/** How many entities the section holds. `undefined` means the section holds no
+ * countable list — identity and assignment are single editors, so a number
+ * beside them would name nothing. */
+function sectionCount(step: DraftStep, section: StepSection): number | undefined {
+  switch (section) {
+    case "paths":
+      return (step.paths ?? []).length;
+    case "timers":
+      return (step.timers ?? []).length;
+    case "actions":
+      // One entry, summing all three step-scoped positions. A path's `onPath`
+      // and a timer's `onFire` belong to those sections, not this one.
+      return (step.onEntry ?? []).length + (step.onExit ?? []).length + (step.onCancel ?? []).length;
+    case "view":
+      return (step.view?.fields ?? []).length;
+    default:
+      return undefined;
+  }
+}
 
 interface Props {
   fields: DraftField[];
@@ -43,6 +79,31 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep }: Prop
     else setInternalExpanded(id);
   };
   const [childLoadError, setChildLoadError] = useState<string | null>(null);
+
+  // Which one section of the expanded step is open. Exactly one at a time, so
+  // this is a single value rather than a set. Cleared when the selection moves
+  // to another step: the section belongs to the step it was chosen on.
+  const [openSection, setOpenSection] = useState<StepSection | undefined>(undefined);
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const [pendingScrollSection, setPendingScrollSection] = useState<StepSection | undefined>(undefined);
+
+  useEffect(() => {
+    setOpenSection(undefined);
+  }, [expanded]);
+
+  // Scroll AFTER the section renders. Choosing an entry expands it in the same
+  // commit, so the target does not exist yet at click time.
+  useEffect(() => {
+    if (!pendingScrollSection) return;
+    sectionRefs.current[pendingScrollSection]?.scrollIntoView({ block: "nearest" });
+    setPendingScrollSection(undefined);
+  }, [pendingScrollSection]);
+
+  const chooseSection = (section: StepSection) => {
+    const next = openSection === section ? undefined : section;
+    setOpenSection(next);
+    if (next) setPendingScrollSection(next);
+  };
 
   // Keyed by step id, so a newly added step's header can receive focus once
   // it exists in the DOM — a pointer user sees the new card open where they
@@ -123,6 +184,21 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep }: Prop
       {steps.map((step, index) => {
         const isOpen = expanded === step.id;
         const bodyId = `step-card-body-${step.id ?? index}`;
+        const sectionId = (section: StepSection) => `step-section-${step.id ?? index}-${section}`;
+        const issueTotal = stepIssueCount(validation.issues, step);
+        const sections: StepSection[] = [
+          "identity",
+          "assignment",
+          "paths",
+          "timers",
+          "actions",
+          ...(step.type === "subprocess" ? (["subprocess"] as const) : []),
+          "view",
+        ];
+        const shows = (section: StepSection) => isOpen && openSection === section;
+        const registerSection = (section: StepSection) => (el: HTMLElement | null) => {
+          sectionRefs.current[section] = el;
+        };
         return (
           <div className="step-card" key={step.id ?? index}>
             <button
@@ -145,66 +221,166 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep }: Prop
 
             {isOpen && (
               <div className="step-card-body" id={bodyId}>
-                <label>
-                  key
-                  <input type="text" value={step.key ?? ""} onChange={(e) => updateStep(index, { key: e.target.value })} />
-                </label>
-                <label>
-                  label
-                  <LocalizedTextInput value={step.label} onChange={(label) => updateStep(index, { label })} />
-                </label>
-                {/* Sibling of the label, never nested inside it: a <label>
-                    takes phrasing content, and the design language keeps a
-                    field's own messages beside the label. */}
-                {missingTranslationWarning(step.label, contentLocale, draft.baseLocale) && (
-                  <p className="studio-warning">
-                    {missingTranslationWarning(step.label, contentLocale, draft.baseLocale)}
-                  </p>
-                )}
-                <label>
-                  description
-                  <LocalizedTextInput
-                    value={step.description}
-                    onChange={(description) => updateStep(index, { description })}
-                  />
-                </label>
-                {missingTranslationWarning(step.description, contentLocale, draft.baseLocale) && (
-                  <p className="studio-warning">
-                    {missingTranslationWarning(step.description, contentLocale, draft.baseLocale)}
-                  </p>
-                )}
-                <label>
-                  type
-                  <select
-                    value={step.type ?? "task"}
-                    onChange={(e) => updateStep(index, { type: e.target.value as StepType })}
-                  >
-                    <option value="task">task</option>
-                    <option value="subprocess">subprocess</option>
-                  </select>
-                </label>
-                <label>
-                  terminal
-                  <input
-                    type="checkbox"
-                    checked={step.terminal === true}
-                    onChange={(e) => updateStep(index, { terminal: e.target.checked || undefined })}
-                  />
-                </label>
-                {step.terminal && (
+                {/* The section index. Each entry is a real disclosure button
+                    carrying aria-expanded and aria-controls — spa-accessibility
+                    requires that shape of anything expanding adjacent content. */}
+                <ul className="step-section-index">
+                  {sections.map((section) => {
+                    const count = sectionCount(step, section);
+                    return (
+                      <li key={section}>
+                        <button
+                          type="button"
+                          className="step-section-entry"
+                          aria-expanded={shows(section)}
+                          aria-controls={sectionId(section)}
+                          onClick={() => chooseSection(section)}
+                        >
+                          <span className="step-section-name">{t(SECTION_LABEL[section])}</span>
+                          {count !== undefined && <span className="step-section-count">{count}</span>}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="step-section-issues">
+                  {issueTotal > 0 ? (
+                    <span className="step-section-issue-stamp">{t("stepSections.issueCount")}: {issueTotal}</span>
+                  ) : (
+                    <span className="step-section-issue-clear">{t("stepSections.noIssues")}</span>
+                  )}
+                </p>
+
+                <section id={sectionId("identity")} ref={registerSection("identity")} hidden={!shows("identity")}>
                   <label>
-                    outcome (only meaningful on a contracted process)
-                    <input type="text" value={step.outcome ?? ""} onChange={(e) => updateStep(index, { outcome: e.target.value })} />
+                    key
+                    <input type="text" value={step.key ?? ""} onChange={(e) => updateStep(index, { key: e.target.value })} />
                   </label>
-                )}
+                  <label>
+                    label
+                    <LocalizedTextInput value={step.label} onChange={(label) => updateStep(index, { label })} />
+                  </label>
+                  {/* Sibling of the label, never nested inside it: a <label>
+                      takes phrasing content, and the design language keeps a
+                      field's own messages beside the label. */}
+                  {missingTranslationWarning(step.label, contentLocale, draft.baseLocale) && (
+                    <p className="studio-warning">
+                      {missingTranslationWarning(step.label, contentLocale, draft.baseLocale)}
+                    </p>
+                  )}
+                  <label>
+                    description
+                    <LocalizedTextInput
+                      value={step.description}
+                      onChange={(description) => updateStep(index, { description })}
+                    />
+                  </label>
+                  {missingTranslationWarning(step.description, contentLocale, draft.baseLocale) && (
+                    <p className="studio-warning">
+                      {missingTranslationWarning(step.description, contentLocale, draft.baseLocale)}
+                    </p>
+                  )}
+                  <label>
+                    type
+                    <select
+                      value={step.type ?? "task"}
+                      onChange={(e) => updateStep(index, { type: e.target.value as StepType })}
+                    >
+                      <option value="task">task</option>
+                      <option value="subprocess">subprocess</option>
+                    </select>
+                  </label>
+                  <label>
+                    terminal
+                    <input
+                      type="checkbox"
+                      checked={step.terminal === true}
+                      onChange={(e) => updateStep(index, { terminal: e.target.checked || undefined })}
+                    />
+                  </label>
+                  {step.terminal && (
+                    <label>
+                      outcome (only meaningful on a contracted process)
+                      <input type="text" value={step.outcome ?? ""} onChange={(e) => updateStep(index, { outcome: e.target.value })} />
+                    </label>
+                  )}
+                </section>
+
+                <section id={sectionId("assignment")} ref={registerSection("assignment")} hidden={!shows("assignment")}>
+                  <PluginEnvelopeEditor
+                    label={t("steps.assignmentStrategyLabel")}
+                    value={step.assignment?.strategy}
+                    onChange={(strategy) => updateStep(index, { assignment: { strategy } })}
+                    registryTypes={registry?.assignmentStrategyTypes}
+                    registrySchemas={registry?.assignmentStrategySchemas}
+                  />
+                  {assignmentWarning(step.terminal, step.assignment) && (
+                    <p className="studio-warning">{assignmentWarning(step.terminal, step.assignment)}</p>
+                  )}
+                </section>
+
+                <section id={sectionId("paths")} ref={registerSection("paths")} hidden={!shows("paths")}>
+                  <h4>{t("steps.pathsHeading")}</h4>
+                  <PathsPanel
+                    paths={step.paths}
+                    steps={steps}
+                    fields={fields}
+                    stepId={step.id}
+                    onChange={(paths) => updateStep(index, { paths })}
+                    registryTypes={registry?.actionTypes}
+                    registrySchemas={registry?.actionSchemas}
+                  />
+                </section>
+
+                <section id={sectionId("timers")} ref={registerSection("timers")} hidden={!shows("timers")}>
+                  <h4>{t("steps.timersHeading")}</h4>
+                  <TimersPanel
+                    timers={step.timers}
+                    paths={step.paths ?? []}
+                    fields={fields}
+                    onChange={(timers) => updateStep(index, { timers })}
+                    registryTypes={registry?.actionTypes}
+                    registrySchemas={registry?.actionSchemas}
+                  />
+                </section>
+
+                <section id={sectionId("actions")} ref={registerSection("actions")} hidden={!shows("actions")}>
+                  <ActionListEditor
+                    label="onEntry"
+                    actions={step.onEntry}
+                    fields={fields}
+                    registryTypes={registry?.actionTypes}
+                    registrySchemas={registry?.actionSchemas}
+                    onChange={(onEntry) => updateStep(index, { onEntry })}
+                  />
+                  <ActionListEditor
+                    label="onExit"
+                    actions={step.onExit}
+                    fields={fields}
+                    registryTypes={registry?.actionTypes}
+                    registrySchemas={registry?.actionSchemas}
+                    onChange={(onExit) => updateStep(index, { onExit })}
+                  />
+                  <ActionListEditor
+                    label="onCancel"
+                    actions={step.onCancel}
+                    fields={fields}
+                    registryTypes={registry?.actionTypes}
+                    registrySchemas={registry?.actionSchemas}
+                    onChange={(onCancel) => updateStep(index, { onCancel })}
+                  />
+                </section>
 
                 {step.type === "subprocess" && (
-                  <>
+                  <section id={sectionId("subprocess")} ref={registerSection("subprocess")} hidden={!shows("subprocess")}>
                     <SubprocessSpecEditor
                       value={step.subprocess}
                       fields={fields}
                       onChange={(subprocess) => updateStep(index, { subprocess })}
                     />
+                    {/* The only route to a loaded child body in the whole
+                        studio. checkSubprocessChildRefs runs against nothing
+                        without it, so the section keeps it. */}
                     <fieldset>
                       <legend>{t("steps.crossProcessLegend")}</legend>
                       {step.id && validation.subprocessStepStatus[step.id] === "checked" ? (
@@ -226,67 +402,12 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep }: Prop
                       )}
                       {childLoadError && <p className="error">{childLoadError}</p>}
                     </fieldset>
-                  </>
+                  </section>
                 )}
 
-                <ViewEditor view={step.view} fields={fields} stepId={step.id} onChange={(view) => updateStep(index, { view })} />
-
-                <PluginEnvelopeEditor
-                  label={t("steps.assignmentStrategyLabel")}
-                  value={step.assignment?.strategy}
-                  onChange={(strategy) => updateStep(index, { assignment: { strategy } })}
-                  registryTypes={registry?.assignmentStrategyTypes}
-                  registrySchemas={registry?.assignmentStrategySchemas}
-                />
-                {assignmentWarning(step.terminal, step.assignment) && (
-                  <p className="studio-warning">{assignmentWarning(step.terminal, step.assignment)}</p>
-                )}
-
-                <ActionListEditor
-                  label="onEntry"
-                  actions={step.onEntry}
-                  fields={fields}
-                  registryTypes={registry?.actionTypes}
-                  registrySchemas={registry?.actionSchemas}
-                  onChange={(onEntry) => updateStep(index, { onEntry })}
-                />
-                <ActionListEditor
-                  label="onExit"
-                  actions={step.onExit}
-                  fields={fields}
-                  registryTypes={registry?.actionTypes}
-                  registrySchemas={registry?.actionSchemas}
-                  onChange={(onExit) => updateStep(index, { onExit })}
-                />
-                <ActionListEditor
-                  label="onCancel"
-                  actions={step.onCancel}
-                  fields={fields}
-                  registryTypes={registry?.actionTypes}
-                  registrySchemas={registry?.actionSchemas}
-                  onChange={(onCancel) => updateStep(index, { onCancel })}
-                />
-
-                <h4>{t("steps.pathsHeading")}</h4>
-                <PathsPanel
-                  paths={step.paths}
-                  steps={steps}
-                  fields={fields}
-                  stepId={step.id}
-                  onChange={(paths) => updateStep(index, { paths })}
-                  registryTypes={registry?.actionTypes}
-                  registrySchemas={registry?.actionSchemas}
-                />
-
-                <h4>{t("steps.timersHeading")}</h4>
-                <TimersPanel
-                  timers={step.timers}
-                  paths={step.paths ?? []}
-                  fields={fields}
-                  onChange={(timers) => updateStep(index, { timers })}
-                  registryTypes={registry?.actionTypes}
-                  registrySchemas={registry?.actionSchemas}
-                />
+                <section id={sectionId("view")} ref={registerSection("view")} hidden={!shows("view")}>
+                  <ViewEditor view={step.view} fields={fields} stepId={step.id} onChange={(view) => updateStep(index, { view })} />
+                </section>
 
                 <IssueList entityId={step.id} />
 
