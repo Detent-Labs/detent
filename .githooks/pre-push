@@ -63,23 +63,11 @@ else
   check_status=$?
 fi
 
-# Print the whole captured run only when it failed, which is the only time a
-# reader needs it. On success it runs to roughly 200 KB, and a hook cannot rely
-# on git draining that much from its stdout: the write breaks and `set -e` then
-# aborts a push whose gates all passed. Measured on this tree at 2071 tests,
-# three pushes died that way, each at exit 141 with no gate having rejected
-# anything, while the same hook exited 0 when run by hand.
-#
-# The counts still print, so a passing push still reports what it proved.
-# `check_status` decides the push, and silent-green reads the captured FILE
-# rather than this output, so suppressing the dump costs no gate its evidence.
+cat "$CHECK_OUT"
+
 if [ "$check_status" -ne 0 ]; then
-  cat "$CHECK_OUT"
   echo "pre-push: 'bun run check' failed. See the output above." >&2
   exit "$check_status"
 fi
-
-sed -n 's/^ *\([0-9][0-9]*\) \(pass\|fail\|skip\)$/  \1 \2/p' "$CHECK_OUT" || true
-grep '^\[test\] database:' "$CHECK_OUT" | sed 's/^/  /' || true
 
 sh "$GATES/silent-green.sh" "$CHECK_OUT"
