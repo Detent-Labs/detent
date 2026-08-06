@@ -52,7 +52,9 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
   const removeSubField = (i: number) => onChange({ fields: removeAt(field.fields ?? [], i) });
 
   return (
-    <div className="field-row">
+    // The anchor the shared modal's rail scrolls to. Recursive, so a nested
+    // group child carries its own id and the rail reaches it too.
+    <div className="field-row" id={field.id === undefined ? undefined : `field-row-${field.id}`}>
       <label>
         key
         <input type="text" value={field.key ?? ""} onChange={(e) => onChange({ key: e.target.value })} />

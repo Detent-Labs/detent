@@ -201,10 +201,12 @@ Spec: `development-toolchain`.
        concurrency, and a process list merging published processes with drafts.
        Change: `studio-shell-and-drafts`. Specs: `studio-app`, `process-drafts`.
     b. Canvas: DONE. The edit screen becomes canvas-primary — drag to
-       reposition, drag to connect — with the carried-over panels as a fixed
-       inspector beside it. The canvas adds no authoring operation the panels
-       could not already do.
-       Change: `studio-canvas`. Spec: `studio-canvas`.
+       reposition, drag to connect — with the canvas at the top of the editing
+       well, a per-step section index docked beside it, and the field
+       catalogue, data sources and contract behind one shared modal. The
+       canvas adds no authoring operation the panels could not already do.
+       Changes: `studio-canvas`, `studio-edit-shared-modal`.
+       Spec: `studio-canvas`.
     c. JSON view: DONE. The third editing surface, mutually exclusive with the
        structural one so a stale textarea cannot clobber a panel edit.
        Change: `studio-json-view`. Spec: `studio-json-view`.

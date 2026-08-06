@@ -151,6 +151,25 @@ const en = {
   "edit.structureTab": "Structure",
   "edit.jsonTab": "JSON",
 
+  "editPanels.linksLabel": "Process-wide editors",
+  "editPanels.linkFields": "Fields",
+  "editPanels.linkDataSources": "Data sources",
+  "editPanels.linkContract": "Contract",
+  "editPanels.railLabel": "Editors",
+  "editPanels.unnamedField": "(unnamed field)",
+  "editPanels.close": "Close",
+  "editPanels.closeKeepsChanges": "Close keeps every change. Save from the toolbar to persist it.",
+
+  "stepSections.identity": "Identity",
+  "stepSections.assignment": "Assignment",
+  "stepSections.paths": "Paths",
+  "stepSections.timers": "Timers",
+  "stepSections.actions": "Actions",
+  "stepSections.subprocess": "Subprocess spec",
+  "stepSections.view": "View",
+  "stepSections.issueCount": "Issues",
+  "stepSections.noIssues": "No issues on this step.",
+
   "jsonView.label": "Draft body (JSON)",
   "jsonView.apply": "Apply",
 

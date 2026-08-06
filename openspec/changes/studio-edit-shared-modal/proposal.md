@@ -49,6 +49,18 @@ inspector then carries every section of that step, wanted or not.
   terminal, outcome), assignment, paths, timers, actions, subprocess
   spec, and view. It also shows their entity counts, one issue count
   for the whole step, and Remove.
+- The process header stays where it is, above the canvas. It carries
+  `baseLocale`, and `studio-app` requires an author to declare a
+  non-English base locale without leaving the structural surface. The
+  rail holds no process view, so the header cannot move into the modal.
+  It carries three controls, so it costs the canvas little height.
+- Every inline missing-translation warning survives the move.
+  `add-content-translation-gap-warnings` requires one beside each
+  `LocalizedTextInput`. Six sit in the code this change restructures.
+  - the process label, which stays on the screen
+  - a step's label and description, which the identity section keeps
+  - a field's label and description, and a field option's label, which
+    the modal's Fields view keeps
 - Choosing a section scrolls to and expands it beneath the canvas. That
   is the same target the old accordion already rendered, but now only
   one section expands at a time. These step-scoped sections stay
@@ -56,13 +68,22 @@ inspector then carries every section of that step, wanted or not.
 - The canvas moves from the bottom of a long scroll to the top of the
   editing well. It no longer shares vertical space with the three panels
   that used to sit below it.
-- Each of the three modal views keeps its own in-place issue list. The
-  rail's per-view counts and the section index's step issue count carry
-  the same refusal tone. The rest of the studio area already uses that
-  tone for issues. An author can see what is incomplete without opening
-  every view. Per-section issue counts stay out of scope. `resolveLoc`
-  resolves a view, assignment or subprocess-spec issue to the step
-  itself. No per-section number exists yet.
+- Each of the three modal views keeps its own in-place issue list. A rail
+  entry carries two numbers, and they mean different things. The entity
+  count says how many fields, data sources or outcomes the view holds.
+  The issue count says how many of them are wrong.
+- Only the issue count takes the refusal tone. The section index's step
+  issue count takes it too. The rest of the studio area already uses that
+  tone. An author then sees what is incomplete without opening every
+  view.
+- Per-section issue counts stay out of scope. `resolveLoc` resolves a
+  view, assignment or subprocess-spec issue to the step itself. No
+  per-section number exists yet.
+- The step's issue count covers the step and everything under it.
+  `resolveLoc` resolves an issue to the deepest entity it finds. A
+  guard's CEL issue therefore names the path, not the step. A count over
+  the step's own id alone would read zero on such a step. The count reads
+  the step's id plus the ids of its paths, timers and actions.
 - Canvas selection and inspector selection remain one selection, unchanged.
 - Two questions the source wireframe left open get settled here instead of
   deferred further. The open rail view does not go in the URL. No
@@ -109,15 +130,24 @@ change.
   accordion detail with a section index. The index lists sections, their
   counts, one issue count for the step, and Remove. Choosing an entry
   scrolls to and expands that section beneath the canvas. Every other
-  section stays collapsed.
+  section stays collapsed. The subprocess spec section keeps the
+  cross-process check fieldset beside the spec editor.
 - New: a shared modal component (rail plus two-bar chrome) under
   `packages/web/src/areas/studio/`, following the existing D2/D3 native
   `<dialog>` pattern.
-- New: a pure module beside `draft/issues.ts` for the rail's
-  tree-flattening and its per-view issue grouping, with `bun:test`
-  coverage.
+- New: a pure module beside `draft/issues.ts`, with `bun:test` coverage.
+  It holds the rail's tree-flattening, its per-view issue grouping, and
+  the step's own nested-id collection.
 - `packages/web/src/areas/studio/draft/issues.ts`: read for the per-view
   and per-step issue counts. What it computes stays the same.
+- `packages/web/src/areas/studio/catalog.ts`: every string the modal, the
+  rail and the section index surface. The design language requires a
+  catalog key for each one.
+- `packages/web/src/areas/studio/app.css`: the modal, the rail and the
+  section index. `boundaries.test.ts` already rejects a class name two
+  areas define. Every new name keeps the `studio-` prefix.
+- New: `packages/web/test/studio-edit-panel-rail.test.ts`, covering the
+  new pure module.
 - `ROADMAP.md`: stage 11b's one-line layout description.
 - No change to `src/schema/definition.ts`, `src/engine/`, `src/http/`, or
   `packages/form-ui`.
