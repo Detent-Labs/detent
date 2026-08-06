@@ -15,9 +15,10 @@ so one place sets all four.
 A `HEAD` answer SHALL carry the same headers as the `GET` it describes.
 
 These four headers SHALL NOT reach the wrapper's JSON envelope. That
-envelope carries its own headers, which `http-wrapper` states. The
-attachment download carries its own `X-Content-Type-Options: nosniff` from
-that same capability, for its own reason.
+envelope carries its own headers, which `http-wrapper` states. A binary
+answer, such as an attachment download, carries its own headers from that
+same capability, for its own reasons. This requirement governs the static
+branch alone.
 
 #### Scenario: A file response carries the four headers
 

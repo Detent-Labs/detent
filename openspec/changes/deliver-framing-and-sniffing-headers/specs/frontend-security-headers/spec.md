@@ -120,3 +120,19 @@ since one policy covers the whole bundle.
 - **WHEN** a built page is loaded and markup containing an inline `<script>`
   is injected into the DOM
 - **THEN** the browser refuses to execute it under `script-src 'self'`
+
+#### Scenario: A lazily-loaded area chunk is not blocked
+
+- **WHEN** a built page loads an area's chunk through its dynamic import
+- **THEN** the chunk is same-origin and `script-src 'self'` permits it
+
+#### Scenario: The dev server is unaffected
+
+- **WHEN** a contributor runs `bun run dev`
+- **THEN** no policy is injected, and react-refresh works as before
+
+#### Scenario: A newly added browser package is not exempt
+
+- **WHEN** a workspace package that produces a browser bundle is added
+- **THEN** its own Vite config injects the policy in the same change that adds
+  the package, and no build of it ships without one

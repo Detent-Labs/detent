@@ -19,6 +19,30 @@ import { basename, resolve, sep } from "node:path";
 /** Safe because the build hashes asset filenames. `index.html` is the exception. */
 const IMMUTABLE = "max-age=31536000, immutable";
 
+/**
+ * The four headers a meta tag cannot deliver, or does not cover.
+ *
+ * `frame-ancestors`, `report-uri` and `sandbox` are honored only in an HTTP
+ * response header; a browser ignores all three in a `<meta http-equiv>`. The
+ * build-time policy in `packages/web/vite.config.ts` therefore keeps every
+ * directive a meta tag does honor, and this header carries `frame-ancestors`
+ * alone. The two policies restrict disjoint directives, so a browser enforcing
+ * both intersects them into their union and no page breaks.
+ *
+ * `X-Frame-Options` repeats `frame-ancestors` for a client older than CSP
+ * Level 2. `nosniff` stops a browser guessing a type this branch did not
+ * declare. `no-referrer` keeps an instance id in a URL from leaving the origin.
+ *
+ * These reach the static branch only. The JSON envelope (`server.ts::toResponse`)
+ * carries its own headers, and a binary answer carries its own.
+ */
+const SECURITY_HEADERS = {
+  "content-security-policy": "frame-ancestors 'none'",
+  "x-frame-options": "DENY",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "no-referrer",
+} as const;
+
 /** The stat of `path` if it is a regular file, else null. A directory is not servable. */
 function statFile(path: string): boolean {
   try {
@@ -57,6 +81,9 @@ function fileResponse(method: string, path: string): Response {
       // index.html keeps its name across builds and names the current asset
       // hashes; caching it immutably would pin a browser to one build forever.
       "cache-control": basename(path) === "index.html" ? "no-cache" : IMMUTABLE,
+      // One place covers all three answers: a direct hit, the index.html
+      // fallback, and the navigation answer that precedes route matching.
+      ...SECURITY_HEADERS,
     },
   });
 }
