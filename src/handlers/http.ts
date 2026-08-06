@@ -61,6 +61,43 @@ export const httpConfigSchema = z
 
 export type HttpActionResult = { status: number; headers: Record<string, string>; body: unknown };
 
+/**
+ * The deployment decides what an action may reach, not the process author.
+ * Answers the reason a target is refused, or `undefined` when it passes.
+ *
+ * Both variables are read per call, never at module load: a test sets them per
+ * case, and an operator's restart stays the only ceremony a policy change
+ * needs. An entry is a host — a hostname with an optional port, the shape
+ * `URL.host` carries (lower-case, default port dropped). Entries are trimmed
+ * and matched without case, since an operator writes this list by hand and a
+ * space after a comma would otherwise deny a host visibly present in it. Unset
+ * or empty denies every target, the way an unset CORS_ALLOWED_ORIGINS permits
+ * no origin.
+ *
+ * Exported so the next outbound caller (an HTTP-backed data source is parked
+ * in docs/decisions.md) imports this rule instead of writing a second copy of
+ * it under the same variable name.
+ */
+export function egressRefusal(url: string): string | undefined {
+  let target: URL;
+  try {
+    target = new URL(url);
+  } catch {
+    return `http.request cannot parse its target URL: ${url}`;
+  }
+  if (target.protocol !== "https:" && process.env.HTTP_ACTION_ALLOW_INSECURE !== "1") {
+    return `http.request refuses a non-https target: ${target.protocol} (set HTTP_ACTION_ALLOW_INSECURE=1 to permit it)`;
+  }
+  const allowed = (process.env.HTTP_ACTION_ALLOWED_HOSTS ?? "")
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+  if (!allowed.includes(target.host.toLowerCase())) {
+    return `http.request target host is not in HTTP_ACTION_ALLOWED_HOSTS: ${target.host}`;
+  }
+  return undefined;
+}
+
 const CONTENT_TYPE_HEADER = "Content-Type";
 
 /** Merge engine-computed headers on top of the author's, per the design's precedence rules. */
@@ -108,6 +145,14 @@ async function readBoundedBody(response: Response): Promise<unknown> {
 
 async function httpHandler(ctx: HandlerContext): Promise<HttpActionResult> {
   const config = httpConfigSchema.parse(ctx.config);
+
+  // Before the socket, not after: a refused target must reach no connection at
+  // all. Permanent because a retry meets the same policy — only an operator
+  // changing the environment makes the target reachable, and that needs a
+  // restart, after which the admin dead-letter view's retry re-delivers.
+  const refusal = egressRefusal(config.url);
+  if (refusal) throw new PermanentError(refusal);
+
   const headers = buildHeaders(config, ctx.idempotencyKey);
 
   // A timeout always applies — the action's declared value overrides the
@@ -124,16 +169,22 @@ async function httpHandler(ctx: HandlerContext): Promise<HttpActionResult> {
       headers,
       body: config.body !== undefined ? JSON.stringify(config.body) : undefined,
       signal: controller.signal,
+      // The load-bearing half of the egress policy. Following a redirect would
+      // check the first hop against the allowlist and no other hop, so an
+      // allowlisted host answering 302 to 169.254.169.254 would reach it.
+      redirect: "manual",
     });
 
     if (response.status === 429 || response.status >= 500) {
       throw new Error(`http.request transient failure: ${response.status} ${response.statusText}`);
     }
     // Only a genuine 2xx counts as success — anything else (1xx, 3xx, or the
-    // remaining 4xx) is permanent. fetch() follows redirects by default and
-    // never surfaces 1xx as a final status, so this branch is unreachable
-    // today; it's here so the check reads the same as the spec ("any 2xx"),
-    // not because either case is currently reachable.
+    // remaining 4xx) is permanent. `redirect: "manual"` makes the 3xx case
+    // real: Bun returns the target's own status and Location rather than a
+    // filtered opaque response, so a redirect lands here and dead-letters with
+    // its status in the message. fetch() never surfaces 1xx as a final status,
+    // so that half of the bound stays unreachable; it's here so the check
+    // reads the same as the spec ("any 2xx").
     if (response.status < 200 || response.status >= 300) {
       throw new PermanentError(`http.request permanent failure: ${response.status} ${response.statusText}`);
     }

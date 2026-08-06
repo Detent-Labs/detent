@@ -59,6 +59,9 @@ None.
 
 - `http-action-handler`: a new requirement covers the egress policy. The
   failure-classification requirement gains the two new permanent cases.
+- `development-toolchain`: a new requirement pins the devcontainer's own
+  allowlist to the hosts this repository's examples target. An existing
+  requirement pins its `CORS_ALLOWED_ORIGINS` the same way.
 
 ## Impact
 
@@ -66,6 +69,8 @@ None.
 - `docs/authoring-guide.md`: the `http.request` section states what an author
   may target.
 - `docs/current-state.md`: the handler entry.
+- `README.md`: the Deploy section lists the variables the engine image reads.
+  Both new ones join that list.
 - Two new environment variables, `HTTP_ACTION_ALLOWED_HOSTS` and
   `HTTP_ACTION_ALLOW_INSECURE`.
 - `.devcontainer/docker-compose.yml`: both variables, so the dev server and

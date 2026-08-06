@@ -26,6 +26,11 @@ optional port. The match is exact, and it covers no subdomain the list does
 not name. An unset or empty variable denies every target, the way an unset
 `CORS_ALLOWED_ORIGINS` permits no origin.
 
+The handler SHALL strip the space around an entry and SHALL compare letters
+without regard to case. A URL's host arrives lower-case and without a default
+port. A list the operator typed with a space after each comma, or with a
+capital letter, still matches what the URL carries.
+
 Second, the target scheme SHALL be `https:`. A deployment that sets
 `HTTP_ACTION_ALLOW_INSECURE` to `1` also accepts `http:`. That escape hatch
 exists for a development target and for the test suite.
@@ -57,6 +62,12 @@ redirect would check the first hop against the policy and no other hop.
   scheme is `https:`
 - **THEN** the handler sends the request and classifies the answer the way it
   classifies any other answer
+
+#### Scenario: A spaced, capitalized entry still matches
+
+- **WHEN** `HTTP_ACTION_ALLOWED_HOSTS` is `a.example.com, API.Example.com`
+  and an `http.request` action targets `https://api.example.com/hook`
+- **THEN** the policy permits the target
 
 #### Scenario: A plain-http target needs the escape hatch
 

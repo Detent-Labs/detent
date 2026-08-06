@@ -59,6 +59,13 @@ is more code, and one more place to get an edge case wrong. The existing
 non-2xx branch already dead-letters a 3xx. A target that redirects is a
 target the author configured wrongly.
 
+**The handler trims each entry and ignores case.** A URL's host arrives
+lower-case, without a default port. An operator writes the list by hand, in
+YAML or in a deployment console. That
+operator writes `a.example.com, b.example.com` with a space. A raw string
+comparison then refuses both. The dead-letter message names a host the
+operator can see in the list. The evidence points away from the cause.
+
 **No `configSchema` change.** The URL stays `z.string().url()`. Putting the
 list in the schema would move an environment-dependent rule into
 publish-time validation. The first decision rejects that.
@@ -75,6 +82,12 @@ publish-time validation. The first decision rejects that.
   the final URL. The dead-letter message carries the 3xx status.
 - An operator adds an internal host on purpose → the policy holds that
   decision where the deployment can audit it. That is the point.
+- The `http.request` handler is not the last outbound caller this engine will
+  hold. An HTTP-backed data-source type sits parked in `docs/decisions.md`.
+  That caller needs this same policy → `src/handlers/http.ts` exports the
+  helper. The second caller then imports the rule instead of writing a second
+  copy of it. One variable keeps one meaning. That change, not this one,
+  decides whether the helper moves to a file of its own.
 - ROADMAP stage 24 runs many tenant databases behind one shared `Bun.serve`
   process. One environment-held list would then cover every tenant. One
   tenant's permitted host becomes reachable from another tenant's body →
