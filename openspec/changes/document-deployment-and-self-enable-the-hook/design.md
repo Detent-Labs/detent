@@ -13,12 +13,20 @@ The production image copies the tree and installs. `docker/engine.Dockerfile`
 runs `COPY . .` then `bun install --production --frozen-lockfile`. A `.git`
 directory does not reach that stage, and `.dockerignore` keeps it out.
 
-The engine reads sixteen environment variables today. Four more arrive with
-the changes proposed beside this one. `harden-http-response-boundary` adds
-`METRICS_TOKEN`. `restrict-http-action-egress` adds
+The engine reads twenty environment variables today, counted from
+`process.env` in `src/`. Four of the twenty landed with the changes beside
+this one, and are already live. `harden-http-response-boundary` added
+`METRICS_TOKEN`. `restrict-http-action-egress` added
 `HTTP_ACTION_ALLOWED_HOSTS` and `HTTP_ACTION_ALLOW_INSECURE`.
-`harden-local-account-sessions` adds `TRUST_PROXY`. This change should land
-first, so each of those has a file to write its row into.
+`harden-local-account-sessions` added `TRUST_PROXY`. So the runbook writes all
+twenty rows now, and no row waits on a sibling.
+
+Two more values sit elsewhere in the tree. One is `VITE_API_URL`, a build
+argument. It lives in `docker/frontend.Dockerfile` and in
+`packages/web/vite.config.ts`. The other is `SEED_ALLOW`, which guards
+`scripts/seed.ts`. `.dockerignore` excludes `docs` and `test` from the images,
+and excludes no part of `scripts/`. So the seed script reaches the engine
+image, and its variable belongs in the table.
 
 The frontend image also takes one build argument, `VITE_API_URL`. A build
 argument is not a runtime variable, and the runbook says which is which.
@@ -41,10 +49,23 @@ argument is not a runtime variable, and the runbook says which is which.
 ## Decisions
 
 **A shell script, not an inline `prepare` command.** The command must not
-fail when `.git` is absent. It must not fail when `git` is missing either. An
-inline `git config ... || true` hides a real error as readily as an expected
-one. A four-line script tests for the directory first, and prints what it
-did.
+fail where no repository exists. It must not fail where `git` is missing
+either. An inline `git config ... || true` hides a real error as readily as an
+expected one. A short script tests first, and prints what it did.
+
+**The script asks `git`, never the filesystem.** `git rev-parse --git-dir` is
+the test, not `[ -d .git ]`. In a linked worktree `.git` is a FILE holding a
+`gitdir:` pointer. The directory test answers false there, which is where this
+repository does most of its work: every tree under `.claude/worktrees/`. The
+`rev-parse` call answers true in a worktree, and answers false outside a
+repository. A third case has no `git` at all, and a `command -v` test covers
+that one.
+
+**The runbook is the one home for the variable list.** `README.md` carries
+that list today, in prose. It spreads over two sections. Two homes means a
+change adds its row to one of them. The README keeps the
+build and run commands, since a reader reaches for those first. It points at
+the runbook for the table.
 
 **`prepare`, not `postinstall`.** Bun runs both. The `prepare` step is the
 lifecycle hook meant for repository setup. A `postinstall` also runs for a
@@ -74,6 +95,17 @@ nothing that exists today.
   the call is idempotent and takes milliseconds.
 - A contributor who set `core.hooksPath` elsewhere loses it → the script
   prints what it set, so the install output shows the change.
+- The install arms `.githooks/post-commit` too → that hook writes a `VERSION`
+  bump after each commit. It leaves the bump uncommitted, for the next commit
+  to carry. A contributor who armed the directory by hand already had it. The
+  ones who did not now get a `VERSION` line in `git status`. The hook is the
+  repository's stated convention, so this closes a second gap rather than
+  opening one. The install output must still name both hooks.
+- An install inside the devcontainer, in a linked worktree, arms nothing →
+  the worktree's `.git` file holds a host path. The container cannot resolve
+  it, so `git rev-parse` fails and the script exits 0. Measured, 2026-08-06.
+  The two cases that matter both work: a host install, and a container
+  install at `/workspace`. Git runs the hook on the host either way.
 - The runbook drifts as variables come and go → the spec requires the row in
   the same commit as the variable. That is the rule
   `docs/authoring-guide.md` already lives under.

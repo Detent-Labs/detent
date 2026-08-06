@@ -16,6 +16,7 @@
     "./engine/registry-check": "./src/engine/registry-check.ts"
   },
   "scripts": {
+    "prepare": "sh scripts/enable-hooks.sh",
     "typecheck:engine": "tsc --noEmit",
     "typecheck": "bun run typecheck:engine && bun run --filter './packages/*' typecheck",
     "test": "bun test",
