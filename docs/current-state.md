@@ -1637,6 +1637,24 @@ Stage-by-stage status is in `ROADMAP.md`.
   install inside `docker/engine.Dockerfile` stays green. Three tests in
   `test/enable-hooks.test.ts` drive all three shapes.
 
+- `.dockerignore` excludes by pattern shape, not by path
+  (`fix-the-frontend-image-build-context`). Docker anchors a pattern with no
+  slash and no `**` to the context root. A bare `node_modules` line therefore
+  excluded the root `node_modules` only. `bun install` writes one into every
+  workspace member too. BuildKit follows the symlinks those hold and reaches
+  a target the root-only filter had already removed. Both
+  `docker/engine.Dockerfile` and `docker/frontend.Dockerfile` failed on it,
+  since both `COPY . .` the whole context.
+
+- The recursive form now covers every depth: `**/node_modules`, `**/dist`,
+  `**/.git`, `**/test` and `**/.env`. `.claude` and `.worktrees` join it as
+  root-only entries. Each holds a full source copy per running agent. Keeping
+  them made a context vary by machine, not by commit. On this working tree
+  the context transferred fell from 838 MB, aborted mid-transfer, to 255 kB.
+  A new test, `test/dockerignore.test.ts`, rejects a bare entry for any name
+  that recurs in the tree. The same defect then fails `bun run check` before
+  it reaches a build.
+
 - Deployment configuration has one home (`docs/runbooks/deployment.md`, same
   change). It tables the twenty variables `src/` reads. Two more rows cover
   the `VITE_API_URL` build argument and the seed script's `SEED_ALLOW`. Each

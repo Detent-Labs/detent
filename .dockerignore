@@ -1,7 +1,11 @@
-node_modules
+**/node_modules
 **/dist
-.git
-.devcontainer
-docs
-test
+**/.git
 **/test
+**/.env
+.devcontainer
+.claude
+.worktrees
+docs
+openspec
+tmp

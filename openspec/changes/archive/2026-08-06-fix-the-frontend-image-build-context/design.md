@@ -169,6 +169,13 @@ The repair is the recursive form, which is correct in that case anyway.
 **A stale image already holds `.env`.** Any image built from this tree before
 the fix carries the secret. The migration plan below covers it.
 
+**`scripts/` reaches the image unchanged.** `deployment-runbook`'s spec relies
+on this claim. So does `docs/runbooks/deployment.md`. Both assume
+`.dockerignore` excludes no part of `scripts/`, backing the `SEED_ALLOW` row.
+`scripts/` holds only `enable-hooks.sh`, `seed.ts` and `gates/`. None matches a
+new or changed pattern. A directory listing confirms it: no new pattern in
+this change touches `scripts/`.
+
 ## Migration Plan
 
 This change touches no data, no schema and no running instance. Three steps, in
