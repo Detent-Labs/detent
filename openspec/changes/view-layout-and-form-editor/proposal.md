@@ -122,5 +122,15 @@ validates or submits.
 - `ROADMAP.md`: stage 27's "Nothing here enters
   `src/schema/definition.ts`" rule records this one exception, and the
   stage gains a sub-item for this change.
+- `packages/web/src/areas/studio/catalog.ts`: the new editor's strings,
+  and the `view.*` keys `ViewEditor` alone used come out.
+- Tests: `test/validate.test.ts` gains the two rejection cases. A new
+  `test/` case pins `definitionHash` against the `examples/` bodies.
+  `packages/form-ui/test/field-form.test.tsx` gains the grid scenarios.
+  A new `packages/web/test/` suite covers the drop-to-index mapping.
 - No change to `src/engine/`, `src/http/`, or how the engine validates
   a submission: `columns`/`span` never reach `submitAndTransition`.
+  `src/schema/compile.ts` needs no change either. Its unknown-key check
+  derives each key set from the Zod schema (`shapeKeys(view)`,
+  `shapeKeys(viewField)`). Both new keys become known keys the moment
+  `definition.ts` declares them.

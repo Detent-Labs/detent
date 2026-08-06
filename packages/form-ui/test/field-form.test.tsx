@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { FieldForm } from "../src/FieldForm.js";
+import { FieldForm, effectiveSpan } from "../src/FieldForm.js";
 import type { ResolvedViewField, SubmissionIssue } from "../src/types.js";
 
 /** `react-dom/server`'s `renderToStaticMarkup`, no jsdom/testing-library —
@@ -268,5 +268,133 @@ describe("FieldForm: required and invalid state conveyed programmatically", () =
     );
     expect(html).toContain('aria-required="true"');
     expect(html).toContain('aria-invalid="true"');
+  });
+});
+
+/** `columns` and `span` are layout only, so these assert the grid attributes
+ * the stylesheet keys on rather than computed geometry. `renderToStaticMarkup`
+ * applies no CSS. The rule that must not regress is that a view declaring
+ * neither key produces exactly the markup it produced before both existed. */
+function renderGrid(fields: ResolvedViewField[], columns?: 1 | 2): string {
+  return renderToStaticMarkup(<FieldForm fields={fields} values={{}} onChange={noop} locale="en" columns={columns} />);
+}
+
+/** The label carries the id so the rendered markup distinguishes one field
+ * from the next. The order assertion below needs an anchor that is always
+ * present; an issue list is not one, since a field with no issues renders
+ * none. */
+const plain = (id: string, span?: 1 | 2, group?: string): ResolvedViewField => ({
+  field: baseField({ id, key: id, type: "string", label: { en: id } }),
+  value: undefined,
+  required: false,
+  readonly: false,
+  ...(span === undefined ? {} : { span }),
+  ...(group === undefined ? {} : { group }),
+});
+
+describe("FieldForm: fields render across the view's column count, honoring span", () => {
+  it("defaults to a one-column grid when no columns prop is passed", () => {
+    const html = renderGrid([plain("f1"), plain("f2")]);
+    expect(html).toContain('data-columns="1"');
+    expect(html).not.toContain('data-columns="2"');
+  });
+
+  it("a field with no span renders at width 1", () => {
+    const html = renderGrid([plain("f1")], 1);
+    expect(html).toContain('data-span="1"');
+    expect(html).not.toContain('data-span="2"');
+  });
+
+  it("a two-column grid marks itself and keeps declaration order", () => {
+    const html = renderGrid([plain("f1"), plain("f2"), plain("f3"), plain("f4")], 2);
+    expect(html).toContain('data-columns="2"');
+    // Every anchor must actually be in the markup. Two absent anchors both
+    // report -1, and an order assertion over them proves nothing.
+    const at = (id: string) => {
+      const i = html.indexOf(`>${id}<`);
+      expect(i).toBeGreaterThan(-1);
+      return i;
+    };
+    // Declaration order is the render order; the array's own sequence decides.
+    expect(at("f1")).toBeLessThan(at("f2"));
+    expect(at("f2")).toBeLessThan(at("f3"));
+    expect(at("f3")).toBeLessThan(at("f4"));
+  });
+
+  it("a span-2 field on a two-column grid renders at width 2", () => {
+    const html = renderGrid([plain("f1", 2), plain("f2")], 2);
+    expect(html).toContain('data-span="2"');
+  });
+
+  it("an over-wide span clamps to a one-column grid", () => {
+    // min(span, columns): the stored span stays 2, the drawn span is 1.
+    const html = renderGrid([plain("f1", 2)], 1);
+    expect(html).toContain('data-span="1"');
+    expect(html).not.toContain('data-span="2"');
+  });
+
+  it("a group in a one-column form renders as it did before this change", () => {
+    const html = renderGrid([
+      { field: baseField({ id: "g1", key: "g1", type: "group" }), value: undefined, required: false, readonly: false },
+      plain("m1", undefined, "g1"),
+      plain("m2", undefined, "g1"),
+    ], 1);
+    expect(html).toContain('data-columns="1"');
+    expect(html).not.toContain('data-columns="2"');
+    expect(html).toContain("<fieldset");
+  });
+
+  it("a group inherits a two-column form's width", () => {
+    const html = renderGrid([
+      { field: baseField({ id: "g1", key: "g1", type: "group" }), value: undefined, required: false, readonly: false },
+      plain("m1", undefined, "g1"),
+    ], 2);
+    // The group's own container carries the form's count; it declares none.
+    expect(html).toContain('<fieldset class="form-ui-field form-ui-field-group" data-span="2" data-columns="2"');
+  });
+
+  it("ignores a span declared on a group", () => {
+    // A group is a container, not a leaf. Its members lay out at the form's
+    // count inside it, and two tracks need the room two tracks take, so the
+    // frame is the form's full width whatever the span says.
+    const html = renderGrid([
+      { field: baseField({ id: "g1", key: "g1", type: "group" }), value: undefined, required: false, readonly: false, span: 1 },
+      plain("m1", undefined, "g1"),
+    ], 2);
+    expect(html).toContain('<fieldset class="form-ui-field form-ui-field-group" data-span="2" data-columns="2"');
+  });
+
+  it("wraps the grid in the element the collapse rule measures", () => {
+    // The threshold is a container query, and a container query matches
+    // descendants of the container rather than the container itself. Without
+    // this wrapper the collapse rule would silently never fire on the grid.
+    const html = renderGrid([plain("f1")], 2);
+    expect(html).toContain('<div class="form-ui-form">');
+    // The wrapper is outside the grid, not beside it.
+    expect(html.indexOf('class="form-ui-form"')).toBeLessThan(html.indexOf('class="form-ui-field-form"'));
+  });
+
+  it("a group member's own span clamps inside the group's grid", () => {
+    const html = renderGrid([
+      { field: baseField({ id: "g1", key: "g1", type: "group" }), value: undefined, required: false, readonly: false },
+      plain("m1", 2, "g1"),
+    ], 1);
+    expect(html).not.toContain('data-span="2"');
+  });
+});
+
+describe("effectiveSpan clamps a span to the grid it sits in", () => {
+  it("treats an absent span as 1", () => {
+    expect(effectiveSpan(undefined, 1)).toBe(1);
+    expect(effectiveSpan(undefined, 2)).toBe(1);
+  });
+
+  it("passes a span that fits", () => {
+    expect(effectiveSpan(2, 2)).toBe(2);
+    expect(effectiveSpan(1, 2)).toBe(1);
+  });
+
+  it("clamps a span wider than the grid", () => {
+    expect(effectiveSpan(2, 1)).toBe(1);
   });
 });

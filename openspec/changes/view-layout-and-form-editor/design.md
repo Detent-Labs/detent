@@ -5,10 +5,10 @@ See `proposal.md` for the motivation. Today `View`
 Plugin }`. The `ViewField` type (`:412`) is `{ ref; visible?;
 required?; readonly?; group? }`. Neither carries a layout property. The renderer,
 `FieldForm` in `packages/form-ui/src/FieldForm.tsx`, renders every root
-field into one `<div>`, stacked. `resolveFields`
-(`src/runtime/api.ts:413`) builds `ResolvedViewField[]` from a step's
-`view.fields`. `getInstanceView` (`:726`) returns it as
-`InstanceView.fields`, with no layout data attached.
+field into one `<div>`, stacked. `resolveFields` in `src/runtime/api.ts`
+builds `ResolvedViewField[]` from a step's `view.fields`. The same
+file's `getInstanceView` returns it as `InstanceView.fields`. No layout
+data rides along.
 
 `StepsPanel.tsx` mounts `ViewEditor.tsx` for a step's View section. The
 `studio-canvas` capability now makes that section an entry in a compact
@@ -157,6 +157,15 @@ array is.
   members out in two columns, which is what the wireframe drew. Its
   own frame was a two-column form. A group's independent column count
   stays out of scope, and the editor never claims to offer one.
+- **Not a one-way door:** a later stage that wants three columns widens
+  `1 | 2` to `1 | 2 | 3`. Widening an optional literal union is safe on
+  the read path. `definition.ts` is that read path, for every stored
+  immutable body. A body valid against the narrow union stays valid
+  against the wide one.
+
+  The reverse does not hold. Narrowing the union later, or making either
+  key required, would make an already-published body throw on READ. No
+  later stage may do either.
 
 ## Migration Plan
 
@@ -180,9 +189,20 @@ only through a new published version.
 **This change archives after `studio-edit-shared-modal`.** Both carry a
 MODIFIED block for one `studio-canvas` requirement. That requirement is
 `Selecting a node or edge expands its detail in a permanent inspector
-beside the canvas`. This change wrote its block against the other
-one's merged text. It keeps that change's section index and scroll
-behavior, and adds one exception for the view entry.
+beside the canvas`. A MODIFIED block replaces the whole requirement.
+Whichever change archives second therefore decides the live text
+outright.
+
+This change carries the other change's block verbatim. It edits two
+things in it. The scroll paragraph and its scenario exclude the view
+entry. A paragraph and a scenario name what the view entry opens
+instead.
+
+Every paragraph the other change adds survives here. Those are the
+identity section's translation warnings, the subprocess spec's
+cross-process check fieldset, and the disclosure a11y shape. Dropping
+any of them would revert that change on archive. No diff would carry
+the loss.
 
 Archiving this one first merges a requirement describing a section
 index the live spec does not have yet. The other change would then
