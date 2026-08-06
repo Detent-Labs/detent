@@ -54,5 +54,7 @@ None. The build joins an existing capability's check command.
 - `package.json` (root): a new `build` script, and one word added to `check`.
 - `openspec/specs/development-toolchain/spec.md`, at archive time.
 - `CLAUDE.md`: the verification section names the checks a change must pass.
+- `README.md` and `docs/current-state.md`: the sentences enumerating `bun run
+  check`'s steps gain the build.
 - The pre-push hook runs about half a minute longer. Measured below.
 - No source file changes. No test changes. The build passes on the tree today.
