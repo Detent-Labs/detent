@@ -71,7 +71,7 @@ lets the same defect return with the next root-anchored line.
 - `.dockerignore` excludes dependency directories, build output, git metadata
   and test directories at every depth, not at the root alone.
 - It also excludes the two agent worktree roots (`.claude` and `.worktrees`),
-  the scratch directory `tmp`, and `.env`.
+  `openspec`, the scratch directory `tmp`, and `.env`.
 - A new test, `test/dockerignore.test.ts`, reads `.dockerignore` and rejects a
   root-anchored pattern for a name that occurs at more than one depth. It runs
   under `bun test`, so the existing push gate carries it.
@@ -94,13 +94,16 @@ None.
 ### Modified Capabilities
 
 - `production-docker-images`: the context requirement states the recursive form
-  and the added entries. A new requirement covers buildability on a machine
-  with dependencies installed.
+  and the added entries. Two new requirements cover buildability. One requires
+  both images build on a machine with dependencies installed. The other
+  requires a lint test that rejects a root-anchored pattern for a recurring
+  name.
 
 ## Impact
 
-- `.dockerignore`: every pattern that names a directory occurring below the
-  root gains the `**/` prefix; three entries join it.
+- `.dockerignore`: `node_modules`, `.git` and `test` gain the `**/` prefix,
+  three pattern conversions. Five wholly new lines join the file: `.env`,
+  `.claude`, `.worktrees`, `openspec` and `tmp`.
 - `test/dockerignore.test.ts` (new): the pattern lint, plus a case that feeds it
   the committed pre-fix text and asserts it reports `node_modules`.
 - `docs/current-state.md`: the docker-image entry gains what the ignore file
