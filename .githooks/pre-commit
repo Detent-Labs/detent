@@ -1,0 +1,13 @@
+#!/bin/sh
+# Reminds you to bump VERSION's Major.Minor.Revision when a commit changes
+# anything else. Non-blocking: whether a change warrants a bump is a judgment
+# call this hook can't make, so it warns instead of failing the commit. The
+# build segment is not this hook's concern — post-commit rewrites that.
+
+staged=$(git diff --cached --name-only)
+
+if [ -n "$staged" ] && ! printf '%s\n' "$staged" | grep -qx VERSION; then
+  echo "pre-commit: VERSION not staged — bump Major.Minor.Revision if this change warrants it." >&2
+fi
+
+exit 0

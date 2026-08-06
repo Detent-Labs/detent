@@ -1,0 +1,13 @@
+#!/bin/sh
+# Keeps VERSION's build field (the 4th dot-segment) in sync with HEAD's short
+# hash after every commit. Major.Minor.Revision are hand-maintained; only the
+# build segment is rewritten here.
+#
+# The new commit's own hash can't be known until after it exists, so this
+# hook leaves VERSION modified but uncommitted rather than amending (this
+# repo's convention: never amend, see CLAUDE.md). The next commit picks it up.
+
+hash=$(git rev-parse --short=8 HEAD)
+version_prefix=$(cut -d. -f1-3 VERSION)
+
+echo "$version_prefix.$hash" > VERSION
