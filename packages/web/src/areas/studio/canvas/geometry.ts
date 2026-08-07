@@ -29,3 +29,20 @@ export function hitTestNode(point: Point, nodes: NodePosition[]): string | undef
 export function dragDelta(start: Point, current: Point): Point {
   return { x: current.x - start.x, y: current.y - start.y };
 }
+
+/**
+ * Screen (client) coordinates to the SVG's own user space, through its
+ * current pan/zoom transform. `CanvasView.tsx`'s own node/handle drags used
+ * this inline before the palette (task 2.3) needed the same conversion from
+ * outside the canvas element — one function, so a screen point resolves to
+ * the same canvas point regardless of which drag gesture asks.
+ */
+export function svgPointFromClient(svg: SVGSVGElement, clientX: number, clientY: number): Point {
+  const pt = svg.createSVGPoint();
+  pt.x = clientX;
+  pt.y = clientY;
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return { x: 0, y: 0 };
+  const transformed = pt.matrixTransform(ctm.inverse());
+  return { x: transformed.x, y: transformed.y };
+}

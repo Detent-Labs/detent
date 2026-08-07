@@ -14,7 +14,7 @@
  * key rename is a same-artifact rewrite — internally consistent per version.
  */
 
-import { Environment, parse } from "@marcbachmann/cel-js";
+import { Environment, parse, serialize } from "@marcbachmann/cel-js";
 import type { ASTNode } from "@marcbachmann/cel-js";
 import { collectFieldsDeep } from "../schema/definition.js";
 import type { ProcessBody, FieldDef, BaseFieldType, Expression, MigrationSpec } from "../schema/definition.js";
@@ -434,6 +434,23 @@ export function parseAst(src: string): ASTNode | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Print a parsed AST node back to CEL text, canonically parenthesized by
+ * operator precedence.
+ *
+ * The studio condition builder's raw-row fallback needs this instead of
+ * slicing the original source by a node's `range`: the parser discards a
+ * parenthesized sub-expression's own paren positions
+ * (`#parseParenthesizedExpression` in the library returns the inner node
+ * unchanged), so a top-level fragment like `!(data.amount > 1000.0)` has a
+ * `range` that ends before its own closing `)`. Slicing the source by that
+ * range drops the paren; `serialize` regenerates valid CEL straight from the
+ * tree instead, so it carries no such gap.
+ */
+export function serializeAst(node: ASTNode): string {
+  return serialize(node);
 }
 
 /**

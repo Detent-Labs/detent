@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Panzoom, { type PanzoomObject } from "@panzoom/panzoom";
-import type { PathTrigger } from "workflow-engine/schema";
 import { useDraft } from "../draft/store";
 import { updateInDraftArray } from "../draft/draft-array-crud";
-import { mintId } from "../draft/ids";
-import { resolveDraftLocalizedText } from "../draft/localized-text";
+import { newStep } from "../draft/createStep";
+import { newPath } from "../draft/createPath";
+import { seedLocalizedText, resolveDraftLocalizedText } from "../draft/localized-text";
 import { t } from "../catalog.js";
 import { autoPlaceSteps, type LayoutStep } from "./layout";
-import { hitTestNode, dragDelta, NODE_WIDTH, NODE_HEIGHT, type Point, type NodePosition } from "./geometry";
-import { checkConnection } from "./connection";
+import { dragDelta, svgPointFromClient, NODE_WIDTH, NODE_HEIGHT, type Point, type NodePosition } from "./geometry";
+import { resolveDropGesture } from "./dropGesture";
+import { inlineRenamePatch } from "./inlineRename";
+import { buildOperands, guardEdgeLabel } from "../panels/shared/conditionLogic";
 
 const HANDLE_RADIUS = 7;
 const CLICK_THRESHOLD = 4;
@@ -18,7 +20,11 @@ interface Props {
   layout: Record<string, unknown>;
   onMoveStep: (stepId: string, point: Point) => void;
   selectedStepId: string | undefined;
-  onSelectStep: (stepId: string | undefined) => void;
+  /** The second argument carries the clicked path's id (task 3.13),
+   * `undefined` for a node click or a deselect — `PathsPanel` uses it to
+   * highlight one row rather than only expanding its section. */
+  onSelectStep: (stepId: string | undefined, pathId?: string) => void;
+  selectedPathId?: string;
 }
 
 function isPoint(value: unknown): value is Point {
@@ -31,8 +37,8 @@ function isPoint(value: unknown): value is Point {
  * (not the Draft model); path creation writes through `useDraft()`/
  * `mutate()`, the same surface `PathsPanel`'s "add path" action uses.
  */
-export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep }: Props) {
-  const { draft, mutate, contentLocale } = useDraft();
+export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, selectedPathId }: Props) {
+  const { draft, mutate, contentLocale, loadedChildren } = useDraft();
   const steps = draft.workflow?.steps ?? [];
   const initialStepId = draft.workflow?.initialStep;
   const baseLocale = draft.baseLocale ?? "en";
@@ -81,17 +87,14 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep }:
   const [nodeDrag, setNodeDrag] = useState<{ stepId: string; startPointer: Point; startPos: Point; current: Point } | null>(null);
   const [connectDrag, setConnectDrag] = useState<{ sourceStepId: string; current: Point } | null>(null);
   const [rejectMessage, setRejectMessage] = useState<{ text: string; x: number; y: number } | null>(null);
+  // The step node whose label is being renamed inline (task 3.8), and the
+  // text field's live value. Neither writes the draft until commit.
+  const [renaming, setRenaming] = useState<{ stepId: string; value: string } | null>(null);
 
   const toSvgPoint = (e: { clientX: number; clientY: number }): Point => {
     const svg = svgRef.current;
     if (!svg) return { x: 0, y: 0 };
-    const pt = svg.createSVGPoint();
-    pt.x = e.clientX;
-    pt.y = e.clientY;
-    const ctm = svg.getScreenCTM();
-    if (!ctm) return { x: 0, y: 0 };
-    const transformed = pt.matrixTransform(ctm.inverse());
-    return { x: transformed.x, y: transformed.y };
+    return svgPointFromClient(svg, e.clientX, e.clientY);
   };
 
   const fitToView = () => {
@@ -147,6 +150,21 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep }:
     setNodeDrag(null);
   };
 
+  const startRename = (stepId: string, currentLabel: string) => {
+    setRenaming({ stepId, value: currentLabel });
+  };
+
+  const commitRename = () => {
+    if (!renaming) return;
+    const index = steps.findIndex((s) => s.id === renaming.stepId);
+    const step = steps[index];
+    if (step) {
+      const patch = inlineRenamePatch(step.label, contentLocale, renaming.value);
+      if (patch) updateInDraftArray(mutate, (d) => d.workflow?.steps?.[index], { label: patch });
+    }
+    setRenaming(null);
+  };
+
   const onHandlePointerDown = (e: React.PointerEvent, stepId: string) => {
     e.stopPropagation();
     capturePointer(e);
@@ -159,32 +177,49 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep }:
     setConnectDrag({ ...connectDrag, current: toSvgPoint(e) });
   };
 
+  const showRejection = (e: { clientX: number; clientY: number }, text: string) => {
+    // Screen-relative, not the SVG's (panned/zoomed) user-space `point` — the
+    // message is an absolutely-positioned HTML sibling of the SVG.
+    const rect = svgRef.current?.getBoundingClientRect();
+    setRejectMessage({ text, x: rect ? e.clientX - rect.left : 0, y: rect ? e.clientY - rect.top : 0 });
+    setTimeout(() => setRejectMessage(null), REJECT_MESSAGE_MS);
+  };
+
   const onHandlePointerUp = (e: React.PointerEvent) => {
     e.stopPropagation();
     if (!connectDrag) return;
     const point = toSvgPoint(e);
-    const targetId = hitTestNode(point, nodePositions);
-    const targetStep = targetId ? steps.find((s) => s.id === targetId) : undefined;
     const sourceIndex = steps.findIndex((s) => s.id === connectDrag.sourceStepId);
     const sourceStep = steps[sourceIndex];
 
-    if (targetStep?.id && sourceStep) {
+    if (sourceStep?.id) {
       const existingPaths = sourceStep.paths ?? [];
-      const candidateTrigger: PathTrigger = existingPaths[0]?.trigger ?? "manual";
-      const check = checkConnection(existingPaths, candidateTrigger);
-      if (check.ok) {
-        const newPath = { id: mintId("path"), key: "", to: targetStep.id, trigger: candidateTrigger };
-        updateInDraftArray(mutate, (d) => d.workflow?.steps?.[sourceIndex], { paths: [...existingPaths, newPath] });
+      const candidateTrigger = existingPaths[0]?.trigger ?? "manual";
+      const result = resolveDropGesture(point, nodePositions, existingPaths, candidateTrigger);
+
+      if (result.kind === "rejected") {
+        showRejection(e, result.reason);
+      } else if (result.kind === "connect-to-step") {
+        const path = newPath(result.targetStepId, result.trigger);
+        updateInDraftArray(mutate, (d) => d.workflow?.steps?.[sourceIndex], { paths: [...existingPaths, path] });
       } else {
-        // Screen-relative, not the SVG's (panned/zoomed) user-space `point` —
-        // the message is an absolutely-positioned HTML sibling of the SVG.
-        const rect = svgRef.current?.getBoundingClientRect();
-        setRejectMessage({
-          text: check.reason ?? "invalid connection",
-          x: rect ? e.clientX - rect.left : 0,
-          y: rect ? e.clientY - rect.top : 0,
+        // create-step-and-connect: the step first, then the path (design.md)
+        // — a candidate already accepted by resolveDropGesture above never
+        // leaves an orphan step behind, but ordering it this way keeps that
+        // true even if a future change moves the check.
+        const step = newStep("task", seedLocalizedText(contentLocale));
+        const path = newPath(step.id, result.trigger);
+        mutate((d) => {
+          d.workflow ??= {};
+          d.workflow.steps ??= [];
+          d.workflow.steps.push(step);
+          const source = d.workflow.steps[sourceIndex];
+          if (source) {
+            source.paths ??= [];
+            source.paths.push(path);
+          }
         });
-        setTimeout(() => setRejectMessage(null), REJECT_MESSAGE_MS);
+        if (step.id) onMoveStep(step.id, result.point);
       }
     }
     setConnectDrag(null);
@@ -196,6 +231,14 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep }:
 
   const stepLabel = (s: (typeof steps)[number]) =>
     s.key || resolveDraftLocalizedText(s.label, contentLocale, baseLocale) || t("steps.unnamedStep");
+
+  // Guard labels render in their own pass, after every node (below), instead
+  // of inline in the edge that computes them: `.canvas-node-rect` is opaque,
+  // and nodes draw after edges, so a label inline in the edge group could
+  // sit partly behind a nearby node's fill and read as a clipped fragment.
+  // Collected here during the edge pass, rendered after the node pass.
+  const guardLabels: Array<{ key: string; x: number; y: number; maxWidth: number; text: string; stepId: string; pathId: string | undefined }> =
+    [];
 
   return (
     <div className="canvas-wrap">
@@ -225,6 +268,12 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep }:
           if (!step.id) return null;
           const source = positionOf(step.id);
           const sourceAnchor = { x: source.x + NODE_WIDTH, y: source.y + NODE_HEIGHT / 2 };
+          const operands = buildOperands({
+            fields: draft.fields,
+            locale: contentLocale,
+            baseLocale,
+            child: loadedChildren[step.id],
+          });
           return (step.paths ?? []).map((path, pathIndex) => {
             if (!path.to) return null;
             const target = positionOf(path.to);
@@ -233,13 +282,34 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep }:
             const midY = (sourceAnchor.y + targetAnchor.y) / 2;
             const automaticGuarded = path.trigger === "automatic" && path.guard !== undefined;
             const automaticDefault = path.trigger === "automatic" && path.guard === undefined;
+            const isSelected = path.id !== undefined && path.id === selectedPathId;
+            const guardSrc = path.guard?.src;
+            const guardLabel = automaticGuarded && guardSrc ? guardEdgeLabel(guardSrc, operands) : undefined;
+            if (guardLabel) {
+              // Cap the label to the free space between the two node
+              // anchors it sits between, so it never needs to spill onto a
+              // neighboring node in the first place; the post-node paint
+              // order (below) is the fallback for when that gap is too
+              // narrow for even the ellipsis to clear it.
+              const gap = Math.abs(targetAnchor.x - sourceAnchor.x);
+              const maxWidth = Math.min(220, Math.max(60, gap - 24));
+              guardLabels.push({
+                key: path.id ?? `${step.id}-${pathIndex}-guard`,
+                x: midX,
+                y: midY + 4,
+                maxWidth,
+                text: guardLabel,
+                stepId: step.id as string,
+                pathId: path.id,
+              });
+            }
             return (
               <g
                 key={path.id ?? `${step.id}-${pathIndex}`}
-                className="canvas-edge-group panzoom-exclude"
+                className={`canvas-edge-group panzoom-exclude${isSelected ? " canvas-edge-group-selected" : ""}`}
                 onPointerUp={(e) => {
                   e.stopPropagation();
-                  onSelectStep(step.id);
+                  onSelectStep(step.id, path.id);
                 }}
               >
                 <line
@@ -290,6 +360,7 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep }:
           const isSelected = selectedStepId === step.id;
           const isInitial = initialStepId === step.id;
           const isTerminal = step.terminal === true;
+          const isRenaming = renaming?.stepId === step.id;
 
           return (
             <g
@@ -298,6 +369,10 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep }:
               className="canvas-node panzoom-exclude"
               onPointerDown={(e) => onNodePointerDown(e, step.id as string)}
               onPointerUp={(e) => onNodePointerUp(e, step.id as string)}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                startRename(step.id as string, stepLabel(step));
+              }}
             >
               {isInitial && (
                 <line x1={-24} y1={NODE_HEIGHT / 2} x2={0} y2={NODE_HEIGHT / 2} className="canvas-initial-arrow" markerEnd="url(#canvas-arrow)" />
@@ -308,9 +383,28 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep }:
                 rx={2}
                 className={isSelected ? "canvas-node-rect canvas-node-selected" : "canvas-node-rect"}
               />
-              <text x={10} y={24} className="canvas-node-label">
-                {stepLabel(step)}
-              </text>
+              {isRenaming ? (
+                <foreignObject x={6} y={14} width={NODE_WIDTH - 12} height={22} className="panzoom-exclude">
+                  <input
+                    // eslint-disable-next-line jsx-a11y/no-autofocus
+                    autoFocus
+                    aria-label={t("stepSections.renameLabel")}
+                    className="canvas-rename-input"
+                    value={renaming.value}
+                    onChange={(e) => setRenaming({ stepId: step.id as string, value: e.target.value })}
+                    onBlur={commitRename}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitRename();
+                      else if (e.key === "Escape") setRenaming(null);
+                    }}
+                  />
+                </foreignObject>
+              ) : (
+                <text x={10} y={24} className="canvas-node-label">
+                  {stepLabel(step)}
+                </text>
+              )}
               <text x={10} y={44} className="canvas-node-key">
                 {step.key ?? ""}
               </text>
@@ -331,6 +425,28 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep }:
             </g>
           );
         })}
+
+        {guardLabels.map((label) => (
+          <foreignObject
+            key={label.key}
+            x={label.x - label.maxWidth / 2}
+            y={label.y}
+            width={label.maxWidth}
+            height={16}
+            className="panzoom-exclude"
+          >
+            <div
+              className="canvas-edge-guard-label"
+              title={label.text}
+              onPointerUp={(e) => {
+                e.stopPropagation();
+                onSelectStep(label.stepId, label.pathId);
+              }}
+            >
+              {label.text}
+            </div>
+          </foreignObject>
+        ))}
       </svg>
       {rejectMessage && (
         <div className="canvas-reject-message" style={{ left: rejectMessage.x, top: rejectMessage.y }}>

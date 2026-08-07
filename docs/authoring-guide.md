@@ -322,12 +322,14 @@ it belongs in an action.
 
 ### 4. Compose the view for each step
 
-Select a step and choose **View** in its section index. That opens the form
-editor over the canvas.
+Select a step and choose **View** in its section index. That navigates to the
+form editor, a full-screen page reached from the step's inspector.
 
 The editor has three parts. On the left, a palette lists every catalog field
-this step's view does not yet name. In the middle, a canvas draws the form as
-a participant will see it. Below the canvas, a strip edits whichever card you
+this step's view does not yet name. A second palette section mints a new
+field by type: text, choice, date, file, or section. It places the new field
+on the canvas in the same drag. In the middle, a canvas draws the form as a
+participant will see it. Below the canvas, a strip edits whichever card you
 select.
 
 Drag a field from the palette onto the canvas to add it. Drag a card to

@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, type DragEvent } from "react";
+import { useEffect, useState, type DragEvent } from "react";
 import type { FieldId, Step, View } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { useDraft } from "../draft/store";
-import { t } from "../catalog.js";
+import { t, type TranslationKey } from "../catalog.js";
 import { updateInDraftArray } from "../draft/draft-array-crud";
 import {
   clampSpan,
@@ -15,16 +15,19 @@ import {
   type DraftViewField,
   type DropSide,
 } from "../draft/view-layout";
-import { BooleanOrExpressionInput } from "./shared/BooleanOrExpressionInput";
-import { isExpression } from "./shared/overrideMode";
+import { PALETTE_FIELD_KINDS, mintCatalogField, type PaletteFieldKind } from "../draft/mintField";
+import { seedLocalizedText } from "../draft/localized-text";
+import { BooleanOrExpressionInput } from "../panels/shared/BooleanOrExpressionInput";
+import { isExpression, type BoolOrExpr } from "../panels/shared/overrideMode";
 
 type DraftStep = DraftOf<Step>;
 type DraftView = DraftOf<View>;
 
-/** What the pointer is currently carrying. A palette drag adds a field; a card
- * drag reorders one. Both land on the same drop targets, so the payload says
- * which array change to make. */
-type Dragging = { kind: "palette"; ref: FieldId } | { kind: "card"; index: number };
+/** What the pointer is currently carrying. A palette drag either places an
+ * existing catalog field or mints a new one; a card drag reorders one. All
+ * three land on the same drop targets, so the payload says which array
+ * change to make. */
+type Dragging = { kind: "palette"; ref: FieldId } | { kind: "card"; index: number } | { kind: "mint"; fieldKind: PaletteFieldKind };
 
 /** A field's `type` is either a literal type name or a `{ type, config }`
  * plugin envelope. A card shows the envelope's own `type`, and nothing at all
@@ -33,103 +36,141 @@ function typeLabel(type: DraftField["type"]): string | undefined {
   return typeof type === "string" ? type : type?.type;
 }
 
+const MINT_KIND_LABEL: Record<PaletteFieldKind, TranslationKey> = {
+  text: "formEditor.mintText",
+  choice: "formEditor.mintChoice",
+  date: "formEditor.mintDate",
+  file: "formEditor.mintFile",
+  section: "formEditor.mintSection",
+};
+
+/** One override field: a plain checkbox, always reachable, and a
+ * "Developer view" disclosure holding the same field's CEL escape hatch —
+ * collapsed by default, per this change's `studio-form-editor` addition.
+ * Flipping the checkbox writes a literal boolean regardless of what the
+ * value held before; an author who wants to keep or edit the CEL opens
+ * the disclosure instead. */
+function OverrideField({ label, value, stepId, onChange }: { label: string; value: BoolOrExpr; stepId?: string; onChange: (next: BoolOrExpr) => void }) {
+  const cel = isExpression(value);
+  return (
+    <div className="studio-form-strip-override">
+      <label className="studio-form-strip-field">
+        {label}
+        <input type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} />
+      </label>
+      {cel && <span className="studio-form-cel">{t("formEditor.markCel")}</span>}
+      <details className="studio-devview">
+        <summary>{t("formEditor.developerView")}</summary>
+        <BooleanOrExpressionInput label={label} value={value} stepId={stepId} onChange={onChange} />
+      </details>
+    </div>
+  );
+}
+
 interface Props {
-  /** The step whose view is open, and its index in `workflow.steps`.
-   * `undefined` while closed. */
-  open: { step: DraftStep; index: number } | undefined;
+  /** The step whose view this page builds, and its index in
+   * `workflow.steps` — the same pair `FormEditorDialog`'s `open` carried,
+   * now the screen's own required props instead of an optional open state
+   * (design.md: a routed sub-state of `edit`, not a toggled dialog). */
+  step: DraftStep;
+  index: number;
   fields: DraftField[];
-  onClose: () => void;
+  onBack: () => void;
 }
 
 /**
- * The visual form editor: a palette of unplaced catalog fields, a canvas that
- * draws the form at its declared column count, and a strip editing the
- * selected field's overrides.
- *
- * It replaces `ViewEditor`'s override-row list. An author arranges the form by
- * moving cards on the canvas rather than by reading an ordered list of names,
- * and the canvas is the form: position on it IS the view array's order, read
- * left to right then down.
- *
- * The native `<dialog>` pattern `EditPanelsModal` already uses, so the platform
- * supplies `showModal()`, the focus trap, Escape and the backdrop.
+ * The visual form editor, as a full-screen routed page (`studio-form-editor`
+ * capability): a palette of unplaced catalog fields plus an "add a field to
+ * the process" mint section, a canvas that draws the form at its declared
+ * column count, and a strip editing the selected field's overrides.
  *
  * No Save. Every change writes straight into the in-browser draft through
- * `mutate()`, the same call `ViewEditor`'s own `move()` used. The screen's
- * Save/Discard/Publish toolbar stays the only thing that persists.
+ * `mutate()`, the same call `ViewEditor`'s own `move()` used before it, and
+ * `FormEditorDialog` after that. The screen's Save/Discard/Publish toolbar
+ * stays the only thing that persists.
  */
-export function FormEditorDialog({ open, fields, onClose }: Props) {
-  const { mutate } = useDraft();
-  const ref = useRef<HTMLDialogElement>(null);
+export function FormEditorScreen({ step, index, fields, onBack }: Props) {
+  const { mutate, contentLocale } = useDraft();
   const [selected, setSelected] = useState<number | undefined>(undefined);
   const [dragging, setDragging] = useState<Dragging | undefined>(undefined);
 
-  // `showModal()` on an already-open dialog throws, and `close()` on a closed
-  // one fires a spurious `close` event, so both are guarded on `open`.
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    if (open !== undefined && !dialog.open) dialog.showModal();
-    if (open === undefined && dialog.open) dialog.close();
-  }, [open]);
-
-  // The selection belongs to the step it was made on.
+  // The selection belongs to the step this page was opened for.
   useEffect(() => {
     setSelected(undefined);
-  }, [open?.step.id]);
+  }, [step.id]);
 
-  const rows: DraftViewField[] = open?.step.view?.fields ?? [];
+  const rows: DraftViewField[] = step.view?.fields ?? [];
   // Absent means one column, which is the width every view had before
   // `view.columns` existed. A form built before this editor therefore opens
   // one-column with every card full width, in its existing array order.
-  const columns: 1 | 2 = open?.step.view?.columns === 2 ? 2 : 1;
+  const columns: 1 | 2 = step.view?.columns === 2 ? 2 : 1;
 
   const writeView = (next: DraftView) => {
-    if (!open) return;
-    updateInDraftArray<DraftStep>(mutate, (d) => d.workflow?.steps?.[open.index], { view: next });
+    updateInDraftArray<DraftStep>(mutate, (d) => d.workflow?.steps?.[index], { view: next });
   };
 
   const setRows = (next: DraftViewField[]) => {
     if (next === rows) return;
-    writeView({ ...(open?.step.view ?? {}), fields: next });
+    writeView({ ...(step.view ?? {}), fields: next });
   };
 
   const setColumns = (next: 1 | 2) => {
     // The count is written even when it is 1: an author who narrows a form
     // said so, and the JSON view should show it.
-    writeView({ ...(open?.step.view ?? { fields: [] }), fields: rows, columns: next });
+    writeView({ ...(step.view ?? { fields: [] }), fields: rows, columns: next });
   };
 
-  const updateRow = (index: number, patch: Partial<DraftViewField>) => {
-    setRows(rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  const updateRow = (rowIndex: number, patch: Partial<DraftViewField>) => {
+    setRows(rows.map((r, i) => (i === rowIndex ? { ...r, ...patch } : r)));
   };
 
-  const removeRow = (index: number) => {
-    setRows(rows.filter((_, i) => i !== index));
+  const removeRow = (rowIndex: number) => {
+    setRows(rows.filter((_, i) => i !== rowIndex));
     setSelected(undefined);
   };
 
-  /** One drop handler for both payloads: a palette field is inserted at the
-   * slot, a card is moved to it. */
+  /** Mints a catalog field and places it on this step's view, in one Draft
+   * mutation (task 3.2): both the new `fields` entry and the new `view`
+   * row commit together, so a mid-mutation reader never sees one without
+   * the other. */
+  const mintAndPlace = (kind: PaletteFieldKind, slot: number) => {
+    mutate((d) => {
+      const field = mintCatalogField(kind, seedLocalizedText(contentLocale));
+      d.fields ??= [];
+      d.fields.push(field);
+      const s = d.workflow?.steps?.[index];
+      if (!s) return;
+      s.view ??= { fields: [] };
+      s.view.fields = insertViewField(s.view.fields ?? [], field.id!, slot);
+    });
+    setSelected(undefined);
+  };
+
+  /** One drop handler for all three payloads: a palette field is inserted at
+   * the slot, a mint entry is minted and inserted there, a card is moved to
+   * it. */
   const dropAt = (slot: number) => {
     if (!dragging) return;
     if (dragging.kind === "palette") {
       setRows(insertViewField(rows, dragging.ref, slot));
+      setSelected(undefined);
+    } else if (dragging.kind === "mint") {
+      mintAndPlace(dragging.fieldKind, slot);
     } else {
       setRows(moveViewField(rows, dragging.index, slot));
+      // The selection is an array index, and a drop renumbers the array from
+      // the slot on. Keeping it would leave the strip editing a different
+      // field than the one the author last chose.
+      setSelected(undefined);
     }
     setDragging(undefined);
-    // The selection is an array index, and a drop renumbers the array from the
-    // slot on. Keeping it would leave the strip editing a different field than
-    // the one the author last chose.
-    setSelected(undefined);
   };
 
-  const move = (index: number, delta: -1 | 1) => {
-    const next = nudgeViewField(rows, index, delta);
+  const move = (rowIndex: number, delta: -1 | 1) => {
+    const next = nudgeViewField(rows, rowIndex, delta);
     if (next === rows) return;
     setRows(next);
-    setSelected(index + delta);
+    setSelected(rowIndex + delta);
   };
 
   const fieldFor = (ref_: FieldId | undefined) => fields.find((f) => f.id === ref_);
@@ -151,17 +192,14 @@ export function FormEditorDialog({ open, fields, onClose }: Props) {
   const selectedRow = selected !== undefined ? rows[selected] : undefined;
 
   return (
-    <dialog
-      ref={ref}
-      className="studio-dialog studio-form-editor"
-      aria-labelledby="form-editor-heading"
-      onCancel={onClose}
-      onClose={onClose}
-    >
+    <div className="studio-form-editor-page">
       <header className="studio-form-editor-header">
+        <button type="button" className="btn btn-ghost studio-back" onClick={onBack}>
+          {t("formEditor.backToCanvas")}
+        </button>
         <h2 id="form-editor-heading">
           {t("formEditor.heading")}
-          {open && <span className="studio-form-editor-step">{open.step.key || t("steps.unnamedStep")}</span>}
+          <span className="studio-form-editor-step">{step.key || t("steps.unnamedStep")}</span>
         </h2>
       </header>
 
@@ -191,6 +229,28 @@ export function FormEditorDialog({ open, fields, onClose }: Props) {
               ))}
             </ul>
           )}
+
+          <h3 className="studio-form-palette-heading">{t("formEditor.mintHeading")}</h3>
+          <ul className="studio-form-palette-list">
+            {PALETTE_FIELD_KINDS.map((kind) => (
+              <li key={kind}>
+                {/* A dashed border, not a new color: the same "not there yet"
+                    vocabulary a conditionally-visible card already carries
+                    (`data-conditional`). Nothing here exists in the catalog
+                    until the drop or the click mints it. */}
+                <button
+                  type="button"
+                  className="studio-form-palette-field studio-form-palette-field-mint"
+                  draggable
+                  onDragStart={() => setDragging({ kind: "mint", fieldKind: kind })}
+                  onDragEnd={() => setDragging(undefined)}
+                  onClick={() => mintAndPlace(kind, rows.length)}
+                >
+                  <span className="studio-form-palette-key">{t(MINT_KIND_LABEL[kind])}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
         </nav>
 
         <div className="studio-form-canvas-region">
@@ -215,7 +275,7 @@ export function FormEditorDialog({ open, fields, onClose }: Props) {
 
           <ol className="studio-form-canvas" data-columns={columns} aria-label={t("formEditor.canvasLabel")}>
             {rows.length === 0 && <li className="empty">{t("formEditor.canvasEmpty")}</li>}
-            {rows.map((row, index) => {
+            {rows.map((row, rowIndex) => {
               const field = fieldFor(row.ref);
               const span = isGroupRow(row) ? columns : clampSpan(row.span, columns);
               const hiddenByExpression = isExpression(row.visible);
@@ -223,15 +283,15 @@ export function FormEditorDialog({ open, fields, onClose }: Props) {
               const dropOn = (side: DropSide) => (e: DragEvent) => {
                 e.preventDefault();
                 e.stopPropagation();
-                dropAt(dropSlot(index, side));
+                dropAt(dropSlot(rowIndex, side));
               };
               const allowDrop = (e: DragEvent) => e.preventDefault();
               return (
                 <li
-                  key={row.ref ?? index}
+                  key={row.ref ?? rowIndex}
                   className="studio-form-card"
                   data-span={span}
-                  data-selected={selected === index || undefined}
+                  data-selected={selected === rowIndex || undefined}
                   data-conditional={hiddenByExpression || undefined}
                   onDragOver={allowDrop}
                   onDrop={dropOn("after")}
@@ -245,17 +305,19 @@ export function FormEditorDialog({ open, fields, onClose }: Props) {
                     type="button"
                     className="studio-form-card-body"
                     draggable
-                    onDragStart={() => setDragging({ kind: "card", index })}
+                    onDragStart={() => setDragging({ kind: "card", index: rowIndex })}
                     onDragEnd={() => setDragging(undefined)}
-                    aria-pressed={selected === index}
-                    onClick={() => setSelected(selected === index ? undefined : index)}
+                    aria-pressed={selected === rowIndex}
+                    onClick={() => setSelected(selected === rowIndex ? undefined : rowIndex)}
                   >
                     <span className="studio-form-card-key">{labelFor(row.ref)}</span>
                     <span className="studio-form-card-marks">
                       {row.required === true && <span className="studio-form-mark">{t("formEditor.markRequired")}</span>}
                       {row.readonly === true && <span className="studio-form-mark">{t("formEditor.markReadonly")}</span>}
                       {celMarked && <span className="studio-form-cel">{t("formEditor.markCel")}</span>}
-                      <span className="studio-form-card-span">{span}/{columns}</span>
+                      <span className="studio-form-card-span">
+                        {span}/{columns}
+                      </span>
                     </span>
                     <span className="studio-form-card-type">{typeLabel(field?.type)}</span>
                   </button>
@@ -263,23 +325,18 @@ export function FormEditorDialog({ open, fields, onClose }: Props) {
                       A drag handle alone leaves reordering unreachable without
                       a pointer. */}
                   <span className="studio-form-card-moves">
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      disabled={index === 0}
-                      onClick={() => move(index, -1)}
-                    >
+                    <button type="button" className="btn btn-secondary" disabled={rowIndex === 0} onClick={() => move(rowIndex, -1)}>
                       {t("formEditor.moveUp")}
                     </button>
                     <button
                       type="button"
                       className="btn btn-secondary"
-                      disabled={index === rows.length - 1}
-                      onClick={() => move(index, 1)}
+                      disabled={rowIndex === rows.length - 1}
+                      onClick={() => move(rowIndex, 1)}
                     >
                       {t("formEditor.moveDown")}
                     </button>
-                    <button type="button" className="btn btn-secondary" onClick={() => removeRow(index)}>
+                    <button type="button" className="btn btn-secondary" onClick={() => removeRow(rowIndex)}>
                       {t("formEditor.remove")}
                     </button>
                   </span>
@@ -302,21 +359,21 @@ export function FormEditorDialog({ open, fields, onClose }: Props) {
           {selectedRow ? (
             <section className="studio-form-strip" aria-label={t("formEditor.stripLabel")}>
               <h3 className="studio-form-strip-heading">{labelFor(selectedRow.ref)}</h3>
-              <BooleanOrExpressionInput
+              <OverrideField
                 label={t("formEditor.visible")}
-                stepId={open?.step.id}
+                stepId={step.id}
                 value={selectedRow.visible}
                 onChange={(visible) => updateRow(selected!, { visible })}
               />
-              <BooleanOrExpressionInput
+              <OverrideField
                 label={t("formEditor.required")}
-                stepId={open?.step.id}
+                stepId={step.id}
                 value={selectedRow.required}
                 onChange={(required) => updateRow(selected!, { required })}
               />
-              <BooleanOrExpressionInput
+              <OverrideField
                 label={t("formEditor.readonly")}
-                stepId={open?.step.id}
+                stepId={step.id}
                 value={selectedRow.readonly}
                 onChange={(readonly) => updateRow(selected!, { readonly })}
               />
@@ -359,13 +416,8 @@ export function FormEditorDialog({ open, fields, onClose }: Props) {
       </div>
 
       <footer className="studio-form-editor-footer">
-        <p className="studio-dialog-note">{t("formEditor.closeKeepsChanges")}</p>
-        {/* Ghost, not the accent-filled primary: the screen already spends its
-            one primary on Publish. */}
-        <button type="button" className="btn btn-ghost" onClick={onClose}>
-          {t("formEditor.close")}
-        </button>
+        <p className="studio-dialog-note">{t("formEditor.navigateAwayKeepsChanges")}</p>
       </footer>
-    </dialog>
+    </div>
   );
 }

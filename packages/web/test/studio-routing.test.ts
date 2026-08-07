@@ -8,6 +8,7 @@ const TEMPLATES_ROLE = "system:templates";
 const EVERY_ROUTE: Route[] = [
   { name: "processes" },
   { name: "edit", processId: "proc_1" },
+  { name: "edit", processId: "proc_1", formStepId: "step_1" },
   { name: "versions", processId: "proc_1" },
   { name: "migrate", processId: "proc_1", from: "1", to: "2" },
   { name: "tools" },
@@ -32,6 +33,22 @@ describe("the studio area's templates route", () => {
     expect(matchRoute("/processes/proc_1/edit")).toEqual({ name: "edit", processId: "proc_1" });
     expect(matchRoute("/processes/proc_1/versions")).toEqual({ name: "versions", processId: "proc_1" });
     expect(matchRoute("/processes/proc_1/play")).toEqual({ name: "play", processId: "proc_1" });
+  });
+});
+
+describe("the form editor's formStepId sub-state of the edit route", () => {
+  it("round-trips /processes/:id/edit/form/:stepId", () => {
+    const route: Route = { name: "edit", processId: "proc_1", formStepId: "step_1" };
+    expect(routePath(route)).toBe("/processes/proc_1/edit/form/step_1");
+    expect(matchRoute(routePath(route))).toEqual(route);
+  });
+
+  it("stays distinct from the plain edit path", () => {
+    const plain = matchRoute("/processes/proc_1/edit");
+    const withForm = matchRoute("/processes/proc_1/edit/form/step_1");
+    expect(plain).toEqual({ name: "edit", processId: "proc_1" });
+    expect(withForm).toEqual({ name: "edit", processId: "proc_1", formStepId: "step_1" });
+    expect(withForm).not.toEqual(plain);
   });
 });
 

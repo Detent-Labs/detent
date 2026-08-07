@@ -84,6 +84,60 @@ describe("DraftToolbar's savedBody transition (draftToolbarState.ts)", () => {
 });
 
 /**
+ * studio-canvas-first-structure-editor task 7.0: `EditorArea`'s
+ * `lastSavedAt` subscribes to a new `onSaved` callback, fired only from
+ * `doSave()`'s success branch — never from `reload()`'s conflict-recovery
+ * branch, which must keep calling `onSavedBodyChange`
+ * (`dispatchSavedBody`) alone. Same no-interactive-DOM constraint as the
+ * conflict -> reload -> publish test above: this drives the two call
+ * sites' own sequence of effects by hand, counting how many times each
+ * fires, rather than rendering `DraftToolbar` and clicking through it.
+ */
+describe("DraftToolbar's onSaved callback (design.md: onSaved vs dispatchSavedBody)", () => {
+  it("a successful save advances savedBody and fires onSaved once", () => {
+    let savedBody = initialSavedBody({ key: "p" });
+    let onSavedCount = 0;
+
+    // doSave()'s success branch: `if (result) { dispatchSavedBody(draft); onSaved?.(); }`
+    const draft = { key: "p", description: { en: "saved" } };
+    const result = { revision: 2, layout: {} };
+    if (result) {
+      savedBody = savedBodyReducer(savedBody, draft);
+      onSavedCount++;
+    }
+
+    expect(isDirty(draft, savedBody)).toBe(false);
+    expect(onSavedCount).toBe(1);
+  });
+
+  it("a save conflict (409) advances neither savedBody nor onSaved", () => {
+    const savedBody = initialSavedBody({ key: "p" });
+    let onSavedCount = 0;
+
+    // doSave()'s conflict branch: saveDraft() returns undefined, so the
+    // `if (result)` guard above never runs.
+    const result: { revision: number; layout: Record<string, unknown> } | undefined = undefined;
+    if (result) onSavedCount++;
+
+    expect(onSavedCount).toBe(0);
+    expect(savedBody).toEqual(initialSavedBody({ key: "p" }));
+  });
+
+  it("a reload advances savedBody but never fires onSaved", () => {
+    let savedBody = initialSavedBody({ key: "p" });
+    let onSavedCount = 0;
+
+    // reload()'s conflict-recovery branch: `dispatchSavedBody(body);` alone —
+    // no `onSaved?.()` call sits beside it.
+    const serverBody = { key: "p", description: { en: "someone else's" } };
+    savedBody = savedBodyReducer(savedBody, serverBody);
+
+    expect(isDirty(serverBody, savedBody)).toBe(false);
+    expect(onSavedCount).toBe(0);
+  });
+});
+
+/**
  * `isDirty`'s own cases, moved here from studio-publishGateLogic.test.ts when
  * `simplify-web-logic-modules` folded that 13-line module into this one.
  */

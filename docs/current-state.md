@@ -1442,9 +1442,11 @@ Stage-by-stage status is in `ROADMAP.md`.
   editor marks it as one the engine skips for that field type. It never
   drops it.
 
-  `rule` uses the plain `ExpressionInput`, not the condition builder. Stage
-  27b's builder may replace that one line later without changing this
-  capability's contract. The `pattern` control adds no check of its own. It
+  `rule` uses its own row builder (`RuleBuilder`/`RuleInput`,
+  `panels/shared/{ruleLogic,RuleBuilder,RuleInput}.ts(x)`,
+  `studio-canvas-first-form-builder`), not the plain `ExpressionInput` and
+  not `ConditionBuilder` reused. See that change's own entry below for the
+  builder's own shape. The `pattern` control adds no check of its own. It
   reads this field's own `pattern` entries straight from the draft's own
   `validation.issues`. That is the same array `IssueList` already shows for
   the field. `compile.ts::checkPatterns` computes them once, never a second
@@ -1454,6 +1456,69 @@ Stage-by-stage status is in `ROADMAP.md`.
   `validation: undefined` rather than `{}`, since `definitionHash` (the JCS
   hash of the body) hashes those two shapes differently.
 
+<!-- antislop: allow sentence-length -->
+<!-- Why: a citation line naming several file paths and specs reads as one
+     long "sentence" by word count, the same shape every other entry in
+     this file's citation line takes. Splitting it would break the file's
+     own `- Heading (paths, specs)` convention. -->
+- Process Studio, the form editor
+  (`packages/web/src/areas/studio/{screens/FormEditorScreen.tsx,
+  draft/mintField.ts,panels/shared/{ruleLogic,RuleBuilder,RuleInput}.ts(x)}`,
+  `studio-form-editor`, `studio-field-validation-form`, `studio-canvas`,
+  `studio-canvas-first-form-builder`).
+
+  The editor moved from a native `<dialog>` (`FormEditorDialog.tsx`,
+  deleted) to a full-screen page. It is a `formStepId` sub-state of the
+  existing `edit` route. It is not a new top-level route.
+  `routing.ts`'s `edit` variant gains an optional `formStepId`. It
+  matches `/processes/:id/edit/form/:stepId`. `EditorArea` branches on
+  it. It renders `FormEditorScreen` in place of the canvas and
+  inspector. Both sit inside the same mounted `DraftProvider`.
+
+  A navigation away and back shows the same draft state a re-opened
+  modal would have. The Draft never unmounts. `StepsPanel`'s view entry
+  navigates there now. It no longer opens local dialog state. It carries
+  no `aria-haspopup` any more. It is a navigation target now, not a
+  disclosure or a dialog trigger.
+
+  The palette gained a second section: "add a field to the process," by
+  type. `draft/mintField.ts`'s `PALETTE_FIELD_KINDS` names five: text,
+  choice, date, file, section. A drop mints a catalog field
+  (`mintCatalogField`). It places that field on the view. Both happen in
+  one `mutate()` call.
+
+  A mid-mutation reader never sees one change without the other. A mint
+  entry draws with a dashed border. That reuses the canvas card's own
+  "not there yet" vocabulary (`.studio-form-card[data-conditional]`). It
+  borrows no new color.
+
+  `field.validation.rule`'s row builder (`RuleBuilder`/`RuleInput`,
+  `panels/shared/ruleLogic.ts`) is a new component, not `ConditionBuilder`
+  reused. It shares `ConditionBuilder`'s parse-back approach.
+  `conditionLogic.ts` exports its AST-walk internals for that reuse:
+  `Node`, `isNode`, `memberPath`, `literalOf`, `conjuncts`, `CMP_OPS`,
+  `fieldOperand`.
+
+  A row's default operand is "this answer." That compiles to
+  `data.<the field's own key>`. It is sugar, not a new CEL binding.
+  `mergedData` already carries the field's own submitted value. That
+  happens before `checkConstraints` runs.
+
+  A row may compare against a literal, or another catalog field. The
+  field picker filters to a matching `celType` (`fieldValueOperandsFor`).
+  That reopens stage 27b's deferred field-against-field comparison,
+  scoped to `validation.rule` alone. `ConditionBuilder` and its own two
+  sites, path guards and view overrides, keep literal-only comparison.
+
+  Rows join by "and" only, never "or." A "Developer view" disclosure
+  holds the raw CEL text. It covers a fragment the builder cannot
+  represent. It also covers an author who wants to write CEL directly.
+
+  Two existing escape hatches also moved behind a collapsed-by-default
+  "Developer view" `<details>`. One is the view-override strip's CEL
+  fallback for `visible`/`required`/`readonly`. A plain checkbox stays
+  outside it, always reachable. The other is the field-catalog panel's
+  JSON textarea for a custom field type's plugin envelope.
 - Process Studio — JSON view (`packages/web/src/areas/studio/panels/{JsonView,
   draftJsonLogic}.ts(x)`, `src/draft/load-guard.ts`, `screens/EditScreen.tsx`,
   `studio-json-view`): stage 11's third of five changes, entirely

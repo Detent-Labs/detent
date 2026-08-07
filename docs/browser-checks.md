@@ -101,3 +101,45 @@ saved.
 
 Pass: all four hold. Each one is a visual or interaction judgment, not a
 property a `bun:test` assertion can observe.
+
+### Studio canvas-first components under dark scheme
+
+Source: `studio-canvas-first-dark-scheme-qa` tasks 2.1-3.5.
+
+Open the studio's canvas-first editor with the OS or browser color scheme
+set to dark (`prefers-color-scheme: dark`). Work through every component
+`studio-canvas-first-structure-editor` and `studio-canvas-first-form-builder`
+added:
+
+- **Checks rail**: default state, each source group (zod, structural, cel,
+  registry, duration). Check the held-back state too (a later group
+  waiting on an earlier one), and the all-clear state.
+- **Palette**: default state, drag-hover state (the ghost that follows the
+  pointer during a drag). Check each of Step/Subprocess/End.
+- **Selection-driven inspector**: no-selection state. Check a selected
+  step's sections, including its "Developer view" disclosure (expanded
+  and collapsed). Check a selected path's sections too, including its own
+  "Developer view" disclosure (raw CEL, expanded and collapsed).
+- **Canvas-edge guard label**: a plain-English summary and a raw-CEL
+  fallback.
+- **Process-identity header bar**: clean, dirty, and just-published states.
+- **Routed form editor**: the palette, the canvas, and the selected-field
+  strip.
+- **"Add a field" palette section**: default and drag-hover states.
+- **Rule-row builder**: a row in its default state, an incomplete row, and
+  the "Developer view" disclosure open and closed.
+- **Override-strip "Developer view"** (the `visible`/`required`/`readonly`
+  CEL escape hatch): open and closed states.
+- **Field-catalog panel "Developer view"** (the JSON escape hatch): open
+  and closed states. Select a custom-typed field first: this disclosure
+  renders only then.
+
+Pass: every state above reads well. Text against its background clears a
+comfortable contrast. No state shows a light-mode color left over in dark
+mode. No border or accent goes invisible.
+
+`tokens.css` defines dark mode entirely through `@media (prefers-color-scheme:
+dark)`, so a correct component needs no separate dark-mode styling of its
+own. A defect here means a component reached for a hardcoded color, or a
+primitive token, instead of the semantic layer. See
+`.claude/rules/design-language.md`.

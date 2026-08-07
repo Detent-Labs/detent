@@ -626,10 +626,15 @@ Spec: `development-toolchain`.
        the reader and writer alone; two rules keep that open, no sidecar and
        write-only-on-a-real-edit. `src/` gained two exports and no behavior
        (`parseAst`, and `export` on `ACTOR_SCHEMA`), so the CEL library keeps one
-       version pin. Grouping, field-against-field comparison and date ordering
-       stay deferred. `field.validation.rule` now has an authoring surface: the
-       `add-field-validation-editor` change mounts the plain `ExpressionInput`
-       there.
+       version pin. Grouping and date ordering stay deferred. Field-against-field
+       comparison no longer is, scoped to `field.validation.rule` alone:
+       `studio-canvas-first-form-builder` reopens it there, narrowly.
+       `ConditionBuilder` itself, and its other two sites (path guards, view
+       overrides), keep literal-only comparison. `field.validation.rule`'s own
+       authoring surface is a separate row builder over the same parse-back
+       pattern, `RuleBuilder`/`RuleInput`, not `ConditionBuilder` reused: its
+       default operand ("this answer," the field's own key) and its
+       field-against-field row have no counterpart on a guard or an override.
        Change: `add-condition-builder`. Specs: `studio-condition-builder` (new),
        `cel-expressions` (modified: an authoring surface reaches the AST through
        the engine's own CEL module).

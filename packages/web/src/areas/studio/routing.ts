@@ -1,6 +1,6 @@
 export type Route =
   | { name: "processes" }
-  | { name: "edit"; processId: string }
+  | { name: "edit"; processId: string; formStepId?: string }
   | { name: "versions"; processId: string }
   | { name: "migrate"; processId: string; from: string; to: string }
   | { name: "tools" }
@@ -17,6 +17,17 @@ export type Route =
 export function matchRoute(path: string): Route {
   if (path === "/tools") return { name: "tools" };
   if (path === "/templates") return { name: "templates" };
+  // Matched before the plain edit route: a form-editor path is a sub-state
+  // of `edit`, carried as an optional field on the same route, not a
+  // sibling top-level route (design.md's routing decision).
+  const editFormMatch = /^\/processes\/([^/]+)\/edit\/form\/([^/]+)$/.exec(path);
+  if (editFormMatch) {
+    return {
+      name: "edit",
+      processId: decodeURIComponent(editFormMatch[1]!),
+      formStepId: decodeURIComponent(editFormMatch[2]!),
+    };
+  }
   const editMatch = /^\/processes\/([^/]+)\/edit$/.exec(path);
   if (editMatch) return { name: "edit", processId: decodeURIComponent(editMatch[1]!) };
   const versionsMatch = /^\/processes\/([^/]+)\/versions$/.exec(path);
@@ -34,7 +45,9 @@ export function routePath(route: Route): string {
     case "processes":
       return "/";
     case "edit":
-      return `/processes/${encodeURIComponent(route.processId)}/edit`;
+      return route.formStepId
+        ? `/processes/${encodeURIComponent(route.processId)}/edit/form/${encodeURIComponent(route.formStepId)}`
+        : `/processes/${encodeURIComponent(route.processId)}/edit`;
     case "versions":
       return `/processes/${encodeURIComponent(route.processId)}/versions`;
     case "migrate":

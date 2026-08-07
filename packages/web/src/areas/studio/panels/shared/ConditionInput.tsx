@@ -13,6 +13,17 @@ interface Props {
   /** The step this condition sits on. Supplies `child.*` when its child resolved. */
   stepId?: string;
   placeholder?: string;
+  /**
+   * The CEL toggle's presentation. `"link"` (default) keeps today's plain
+   * "Edit as CEL" / "Use the builder" buttons — every view-override site
+   * (`visible`/`required`/`readonly`) keeps this, unchanged, per
+   * `studio-condition-builder`'s "path-guard site only" scope. `"disclosure"`
+   * relabels the same toggle "Developer view" with `aria-expanded`, for the
+   * path-guard site alone (task 6.3). Neither variant changes the toggle's
+   * behavior: the mode still does not persist to the draft or the published
+   * body.
+   */
+  toggleVariant?: "link" | "disclosure";
 }
 
 /**
@@ -24,7 +35,7 @@ interface Props {
  * byte for byte — the rule that keeps the database from filling with
  * flattened conditions.
  */
-export function ConditionInput({ value, onChange, stepId, placeholder }: Props) {
+export function ConditionInput({ value, onChange, stepId, placeholder, toggleVariant = "link" }: Props) {
   const { draft, loadedChildren, contentLocale } = useDraft();
 
   const operands = useMemo(
@@ -83,6 +94,23 @@ export function ConditionInput({ value, onChange, stepId, placeholder }: Props) 
     onChange(written === undefined ? undefined : { lang: "cel", src: written });
   };
 
+  const toggleButton = (expanded: boolean, onClick: () => void, disabled?: boolean) =>
+    toggleVariant === "disclosure" ? (
+      <button
+        type="button"
+        className="condition-mode condition-mode-disclosure"
+        aria-expanded={expanded}
+        onClick={onClick}
+        disabled={disabled}
+      >
+        {t("condition.developerView")}
+      </button>
+    ) : (
+      <button type="button" className="condition-mode" onClick={onClick} disabled={disabled}>
+        {expanded ? t("condition.useBuilder") : t("condition.editAsCel")}
+      </button>
+    );
+
   if (celMode || unparseable) {
     return (
       <div className="condition-input">
@@ -100,9 +128,7 @@ export function ConditionInput({ value, onChange, stepId, placeholder }: Props) 
               {t("condition.unparseable")}
             </p>
           )}
-          <button type="button" className="condition-mode" onClick={() => setCelMode(false)} disabled={unparseable}>
-            {t("condition.useBuilder")}
-          </button>
+          {toggleButton(true, () => setCelMode(false), unparseable)}
         </div>
       </div>
     );
@@ -116,9 +142,7 @@ export function ConditionInput({ value, onChange, stepId, placeholder }: Props) 
           <span className="condition-readout-label">{t("condition.celReadout")}</span>
           <code>{preview ?? t("condition.celEmpty")}</code>
         </p>
-        <button type="button" className="condition-mode" onClick={() => setCelMode(true)}>
-          {t("condition.editAsCel")}
-        </button>
+        {toggleButton(false, () => setCelMode(true))}
       </div>
     </div>
   );
