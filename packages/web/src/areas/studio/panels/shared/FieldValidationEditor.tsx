@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { DraftField } from "../../draft/fields";
 import { t } from "../../catalog.js";
-import { ExpressionInput } from "./ExpressionInput";
+import { RuleInput } from "./RuleInput";
 import {
   offeredKeys,
   carriedKeys,
@@ -12,17 +12,19 @@ import {
 import { useDraft } from "../../draft/store";
 
 interface Props {
-  fieldId: string | undefined;
-  type: DraftField["type"];
+  /** The field this `validation` belongs to — the row builder needs the
+   * whole field, not just its id and type, for "this answer"'s own key. */
+  field: DraftField;
   validation: DraftFieldValidation | undefined;
   onChange: (validation: DraftFieldValidation | undefined) => void;
 }
 
 /** A field's own `validation` object: a collapsed section inside `FieldRow`,
  * offering the keys its declared type suits plus any it already carries. */
-export function FieldValidationEditor({ fieldId, type, validation, onChange }: Props) {
+export function FieldValidationEditor({ field, validation, onChange }: Props) {
   const { validation: draft } = useDraft();
-  const offered = offeredKeys(type ?? "string");
+  const fieldId = field.id;
+  const offered = offeredKeys(field.type ?? "string");
   const carried = carriedKeys(validation);
   const keys = Array.from(new Set([...offered, ...carried]));
 
@@ -54,7 +56,7 @@ export function FieldValidationEditor({ fieldId, type, validation, onChange }: P
             <label>
               {key}
               {key === "rule" ? (
-                <ExpressionInput value={validation?.rule} onChange={(next) => patch("rule", next)} />
+                <RuleInput field={field} value={validation?.rule} onChange={(next) => patch("rule", next)} />
               ) : key === "pattern" ? (
                 <input
                   type="text"

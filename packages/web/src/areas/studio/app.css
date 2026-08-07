@@ -224,11 +224,19 @@
   color: var(--color-refusal);
 }
 
-.canvas-layout {
-  display: flex;
+/* Four columns, in the order studio-canvas's own requirement names them:
+   palette, canvas, inspector, checks. Fixed widths on the three side
+   columns and a flexible canvas between them, so widening the window grows
+   the one column that benefits from it. Widths are illustrative pixel
+   values from the mockup, translated onto the existing rem/space scale
+   rather than copied as raw pixels (design.md's open question, settled
+   here during implementation). */
+.studio-canvas-layout {
+  display: grid;
+  grid-template-columns: 12rem minmax(0, 1fr) 22rem 16rem;
   gap: var(--space-3);
   align-items: stretch;
-  height: 32rem;
+  height: 36rem;
 }
 
 .canvas-wrap {
@@ -348,7 +356,7 @@
 }
 
 .canvas-inspector {
-  flex: 0 0 20rem;
+  min-width: 0;
   overflow-y: auto;
   border: 1px solid var(--color-border);
   padding: var(--space-3);
@@ -421,39 +429,6 @@
   border: 2px solid currentcolor;
   padding: 4px 12px;
   transform: rotate(-2deg);
-}
-
-/* Step card disclosure header — a real <button>, reset to a full-width bar
-   rather than the default primary fill so it still reads as a header, not a
-   call-to-action. */
-.step-card-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  background: none;
-  color: inherit;
-  border: none;
-  border-bottom: 1px solid var(--color-border);
-  padding: var(--space-2) var(--space-3);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.step-card-header:hover {
-  background: var(--color-surface-muted);
-}
-
-/* The one deliberate visual addition beyond a plain reset: aria-expanded's
-   state needs a visual counterpart too, not color alone. */
-.step-card-chevron {
-  margin-left: auto;
-  transition: transform 0.15s ease;
-}
-
-.step-card-header[aria-expanded="true"] .step-card-chevron {
-  transform: rotate(90deg);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -664,6 +639,46 @@
   font-size: 0.85rem;
 }
 
+/* --- Rule-row builder (field.validation.rule) --------------------------- */
+
+/* The value-side toggle (a literal vs. another field), at row scale: the
+   same segmented-control primitive "performed by" and "triggered by" use,
+   tightened to sit inline in a row instead of standing as its own
+   fieldset. */
+.studio-segmented.rule-value-kind {
+  margin: 0;
+}
+
+.rule-value-kind .studio-segmented-option {
+  flex: none;
+  padding: 2px var(--space-2);
+  font-size: 0.8rem;
+}
+
+/* --- "Developer view" disclosures: override strip, field-catalog JSON --- */
+
+/* The same collapsed-by-default box `.field-validation` already uses for
+   its own advanced editor, reused rather than a fourth disclosure style. */
+.studio-devview {
+  margin: var(--space-2) 0;
+  border: 1px solid var(--color-border);
+  padding: var(--space-1) var(--space-2);
+}
+
+.studio-devview summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+.studio-form-strip-override {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 10rem;
+}
+
 /* --- Field validation editor --------------------------------------------- */
 
 .field-validation {
@@ -708,8 +723,15 @@
 
 /* Wider than .studio-dialog's 34rem reading measure: this one carries a rail
    beside a full structural editor, which is a tool surface, not a reading
-   column. */
-.studio-panels-modal {
+   column. `display` is gated on `[open]`: an unqualified `display: flex`
+   here is an author-stylesheet rule, which unconditionally overrides the
+   UA stylesheet's `dialog:not([open]) { display: none; }` regardless of
+   selector specificity (author beats UA in the cascade at any specificity),
+   so `EditPanelsModal` rendered visible, full width, no backdrop, even
+   while closed and `showModal()` never called. `.studio-dialog`, the
+   base class every studio dialog carries, sets no `display` of its own,
+   which is why none of the others had this bug. */
+.studio-panels-modal[open] {
   max-width: min(72rem, 92vw);
   width: min(72rem, 92vw);
   max-height: 88vh;
@@ -876,20 +898,26 @@
 
 /* --- Form editor -------------------------------------------------------- */
 
-/* A tool surface, not a reading column: a palette beside a canvas. Same
-   measure as the panels modal, which carries the same two-part shape. */
-.studio-form-editor {
-  max-width: min(72rem, 92vw);
-  width: min(72rem, 92vw);
-  max-height: 88vh;
-  padding: 0;
+/* A routed page (`studio-form-editor`), not a modal: no width/height cap,
+   no backdrop. The page scrolls with the document instead of faking a
+   viewport ceiling a browser already gives it for free. */
+.studio-form-editor-page {
   display: flex;
   flex-direction: column;
+  border: 1px solid var(--color-border);
+  margin-top: var(--space-3);
 }
 
 .studio-form-editor-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-bottom: 2px solid var(--color-divider);
+}
+
+.studio-form-editor-header .studio-back {
+  margin-bottom: 0;
 }
 
 .studio-form-editor-header h2 {
@@ -910,15 +938,14 @@
 .studio-form-editor-body {
   display: grid;
   grid-template-columns: 16rem minmax(0, 1fr);
-  min-height: 0;
-  flex: 1;
-  overflow: hidden;
+  /* The page scrolls as a whole (no cap here), unlike the modal this
+     replaced, which bounded this region so `.studio-form-palette` and
+     `.studio-form-canvas-region` could each scroll on their own. */
+  align-items: start;
 }
 
 .studio-form-palette {
   border-right: 2px solid var(--color-divider);
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
 
 .studio-form-palette-heading {
@@ -964,6 +991,22 @@
 
 .studio-form-palette-field:hover {
   background: var(--color-surface-muted);
+}
+
+/* The "add a field to the process" section's own heading, directly under
+   the placed-field list with no gap of its own — the hairline between rows
+   already separates the two lists, and a second border here would double
+   it. */
+.studio-form-palette-heading + .studio-form-palette-heading,
+.studio-form-palette-list + .studio-form-palette-heading {
+  border-top: 2px solid var(--color-divider);
+}
+
+/* A mint entry does not exist in the catalog yet — the same "not there"
+   vocabulary a conditionally-visible canvas card already carries
+   (`.studio-form-card[data-conditional]`), reused rather than a new color. */
+.studio-form-palette-field-mint {
+  border-style: dashed;
 }
 
 .studio-form-palette-key {
@@ -1211,4 +1254,349 @@
 
 .step-section-issue-clear {
   color: var(--color-text-muted);
+}
+
+/* --- Palette (studio-canvas: "A palette offers Step, Subprocess, and End") */
+
+.studio-palette {
+  min-width: 0;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  padding: var(--space-2) 0;
+}
+
+.studio-palette h2 {
+  margin: 0;
+  padding: 0 var(--space-3) var(--space-2);
+}
+
+.studio-palette-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* A register row, like the panels rail and the step section index: a
+   hairline between rows, content flush left. */
+.studio-palette-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  background: none;
+  color: inherit;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  text-align: left;
+  cursor: grab;
+  touch-action: none;
+}
+
+.studio-palette-entry:hover {
+  background: var(--color-surface-muted);
+}
+
+/* Follows the pointer during a palette drag. Screen-fixed (`position:
+   fixed`, client coordinates straight from the pointer event) since the
+   drag can cross from the palette column over the canvas, outside either
+   element's own local coordinate space. */
+.studio-palette-ghost {
+  position: fixed;
+  z-index: 3;
+  transform: translate(-50%, -50%);
+  background: var(--color-surface);
+  border: 2px solid var(--color-accent);
+  color: var(--color-text);
+  padding: var(--space-1) var(--space-2);
+  font-size: 0.85rem;
+  pointer-events: none;
+}
+
+/* --- Process-identity header bar (studio-canvas) ----------------------- */
+
+.studio-header-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 2px solid var(--color-divider);
+  margin-bottom: var(--space-3);
+}
+
+.studio-header-bar-name {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  font-size: 1rem;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-text);
+}
+
+.studio-header-bar-badge {
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.studio-header-bar-dirty {
+  color: var(--color-refusal);
+}
+
+.studio-header-bar-saved {
+  color: var(--color-text-muted);
+}
+
+.studio-header-bar-timestamp {
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.studio-header-bar-published {
+  font-family: var(--font-mono);
+  color: var(--color-text);
+}
+
+/* --- Checks rail (studio-checks-rail) ----------------------------------- */
+
+.studio-checks-rail {
+  min-width: 0;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  padding: var(--space-3);
+}
+
+.studio-checks-rail h2 {
+  margin-top: 0;
+}
+
+.studio-checks-rail-clear {
+  color: var(--color-text);
+  border: 2px solid var(--color-text);
+  padding: var(--space-2);
+  margin: 0 0 var(--space-3);
+}
+
+.studio-checks-group {
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.studio-checks-group:first-of-type {
+  border-top: none;
+}
+
+/* The source name is an untranslated machine value (the same one
+   IssueList already prints raw), so it takes the mono face. */
+.studio-checks-group-heading {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+/* Caution tone, not Refusal: a held-back group is not itself a failure —
+   it names a check that has not run yet, matching the design language's
+   own stamp-tone definition for "not checked". The border is a lighter
+   step than the text, derived from the same semantic --color-refusal via
+   color-mix (the --color-divider/--shadow-* pattern in tokens.css), so it
+   stays scheme-correct instead of pinning the fixed accent-400 ramp step
+   dark mode happens to share with light mode's refusal hue only by
+   coincidence. */
+.studio-checks-group-held-back {
+  margin: 0;
+  color: var(--color-refusal);
+  border-left: 3px solid color-mix(in srgb, var(--color-refusal) 55%, transparent);
+  padding-left: var(--space-2);
+  font-size: 0.85rem;
+}
+
+.studio-checks-group-clear {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.studio-checks-group-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.studio-checks-group-issue {
+  padding: var(--space-1) 0;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.85rem;
+}
+
+.studio-checks-group-issue:first-child {
+  border-top: none;
+}
+
+/* --- Selection-driven step inspector ------------------------------------ */
+
+.steps-panel-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.steps-panel-empty-copy {
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.step-inspector-heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 2px solid var(--color-divider);
+  margin-bottom: var(--space-2);
+}
+
+.step-section-view-build {
+  font-family: var(--font-body);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-accent);
+}
+
+.studio-developer-view pre {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  padding: var(--space-2);
+  margin: 0;
+}
+
+/* --- Segmented controls ("performed by", "triggered by") --------------- */
+
+.studio-segmented {
+  display: flex;
+  gap: 0;
+  border: none;
+  padding: 0;
+  margin: var(--space-2) 0;
+}
+
+.studio-segmented legend {
+  font-family: var(--font-body);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  padding: 0 0 var(--space-1);
+  width: 100%;
+}
+
+.studio-segmented-option {
+  flex: 1 1 auto;
+  background: none;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  padding: var(--space-1) var(--space-2);
+  font: inherit;
+  cursor: pointer;
+}
+
+.studio-segmented-option + .studio-segmented-option {
+  border-left: none;
+}
+
+.studio-segmented-option:hover {
+  background: var(--color-surface-muted);
+}
+
+/* The chosen option reads off aria-pressed, the attribute the DOM already
+   carries — the stamp, not a paint: an outline and the accent text, never
+   a filled background. */
+.studio-segmented-option[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+}
+
+/* --- Path inspector: "Only when" panel and the selected-path highlight - */
+
+.studio-only-when {
+  border: 1px solid var(--color-border);
+  padding: var(--space-2) var(--space-3);
+  margin: var(--space-2) 0;
+}
+
+.studio-only-when legend {
+  font-family: var(--font-body);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.paths-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.path-row {
+  border: 1px solid var(--color-border);
+  padding: var(--space-2) var(--space-3);
+}
+
+.path-row-selected {
+  box-shadow: inset 3px 0 0 var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.condition-mode-disclosure[aria-expanded="true"] {
+  color: var(--color-text);
+}
+
+/* --- Canvas: guard label, selected edge, inline rename ------------------ */
+
+/* Renders inside a <foreignObject> (CanvasView.tsx), not as SVG <text>: a
+   plain <text> neither wraps nor truncates, so a long guard summary between
+   two close nodes had nowhere to go but under a neighboring node's opaque
+   fill. This gets real CSS text-overflow instead, plus a background so it
+   stays legible if its box still ends up over a node. */
+.canvas-edge-guard-label {
+  width: 100%;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: 10px;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  padding: 0 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.canvas-edge-group-selected .canvas-edge {
+  stroke: var(--color-accent);
+}
+
+.canvas-rename-input {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid var(--color-accent);
+  padding: 0 var(--space-1);
+  background: var(--color-surface);
+  color: var(--color-text);
 }

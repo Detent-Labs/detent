@@ -4,6 +4,7 @@ import type { DraftOf } from "../draft/types";
 import { useDraft } from "../draft/store";
 import { t } from "../catalog.js";
 import { mintId } from "../draft/ids";
+import { mintCatalogField } from "../draft/mintField";
 import { removeAt, updateAt } from "../draft/list-ops";
 import { addToDraftArray, updateInDraftArray } from "../draft/draft-array-crud";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
@@ -97,11 +98,14 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
       </label>
 
       {custom && (
-        <PluginEnvelopeEditor
-          label={t("fieldCatalog.customTypeLabel")}
-          value={field.type as DraftOf<FieldDef>["type"] & object}
-          onChange={(type) => onChange({ type })}
-        />
+        <details className="studio-devview">
+          <summary>{t("fieldCatalog.developerView")}</summary>
+          <PluginEnvelopeEditor
+            label={t("fieldCatalog.customTypeLabel")}
+            value={field.type as DraftOf<FieldDef>["type"] & object}
+            onChange={(type) => onChange({ type })}
+          />
+        </details>
       )}
 
       <fieldset>
@@ -157,12 +161,7 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
         </div>
       </fieldset>
 
-      <FieldValidationEditor
-        fieldId={field.id}
-        type={field.type}
-        validation={field.validation}
-        onChange={(validation) => onChange({ validation })}
-      />
+      <FieldValidationEditor field={field} validation={field.validation} onChange={(validation) => onChange({ validation })} />
 
       {field.type === "group" && (
         <fieldset>
@@ -197,12 +196,7 @@ export function FieldCatalogPanel() {
   const dataSources = draft.dataSources ?? [];
 
   const addField = () => {
-    addToDraftArray(mutate, (d) => (d.fields ??= []), {
-      id: mintId("field"),
-      key: "",
-      label: seedLocalizedText(contentLocale),
-      type: "string",
-    });
+    addToDraftArray(mutate, (d) => (d.fields ??= []), mintCatalogField("text", seedLocalizedText(contentLocale)));
   };
 
   const removeField = (index: number) => {

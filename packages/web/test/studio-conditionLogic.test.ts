@@ -4,8 +4,10 @@ import {
   buildOperands,
   celLiteral,
   fromCel,
+  guardEdgeLabel,
   operandSignature,
   operatorsFor,
+  summarizeCondition,
   toCel,
   type Condition,
   type Operand,
@@ -326,5 +328,65 @@ describe("operandSignature", () => {
     const a = catalog([{ id: "field_x", key: "x", label: { en: "One" }, type: "string" } as never]);
     const b = catalog([{ id: "field_x", key: "x", label: { en: "Two" }, type: "string" } as never]);
     expect(operandSignature(a)).toBe(operandSignature(b));
+  });
+});
+
+describe("summarizeCondition", () => {
+  it("summarizes a single comparison row in plain English", () => {
+    const operands = catalog([field("amount", "number")]);
+    const condition = fromCel("data.amount > 1000.0", operands)!;
+    expect(summarizeCondition(condition, operands)).toBe("amount (amount) is greater than 1000");
+  });
+
+  it("uses an option's own label for a coded value", () => {
+    const operands = catalog([
+      field("status", "select", {
+        options: [
+          { value: "approved", label: { en: "Approved" } },
+          { value: "rejected", label: { en: "Rejected" } },
+        ],
+      }),
+    ]);
+    const condition = fromCel('data.status == "approved"', operands)!;
+    expect(summarizeCondition(condition, operands)).toBe("status (status) is Approved");
+  });
+
+  it("reads a bare boolean row as the label alone, negated when false", () => {
+    const operands = catalog([field("flagged", "boolean")]);
+    expect(summarizeCondition(fromCel("data.flagged", operands)!, operands)).toBe("flagged (flagged)");
+    expect(summarizeCondition(fromCel("data.flagged == false", operands)!, operands)).toBe("not flagged (flagged)");
+  });
+
+  it("joins two rows with the condition's own joiner, in English", () => {
+    const operands = catalog([field("amount", "number"), field("flagged", "boolean")]);
+    const condition = fromCel("data.amount > 1000.0 || data.flagged", operands)!;
+    expect(summarizeCondition(condition, operands)).toBe("amount (amount) is greater than 1000 or flagged (flagged)");
+  });
+
+  it("falls back to a raw row's own CEL text", () => {
+    const operands = catalog([field("amount", "number")]);
+    const src = "data.amount * 2.0 > 1000.0";
+    const condition = fromCel(src, operands)!;
+    expect(condition.rows[0].kind).toBe("raw");
+    expect(summarizeCondition(condition, operands)).toBe(src);
+  });
+
+  it("returns an empty string for a condition with no complete row", () => {
+    expect(summarizeCondition({ joiner: "&&", rows: [] }, [])).toBe("");
+  });
+});
+
+describe("guardEdgeLabel", () => {
+  it("prefers the plain-English summary when the guard parses", () => {
+    const operands = catalog([field("amount", "number")]);
+    expect(guardEdgeLabel("data.amount > 1000.0", operands)).toBe("amount (amount) is greater than 1000");
+  });
+
+  it("falls back to raw CEL for a fragment the builder cannot represent at all", () => {
+    const operands = catalog([field("amount", "number")]);
+    const src = "!(data.amount > 1000.0)";
+    const condition = fromCel(src, operands)!;
+    expect(condition.rows).toEqual([{ kind: "raw", src }]);
+    expect(guardEdgeLabel(src, operands)).toBe(src);
   });
 });

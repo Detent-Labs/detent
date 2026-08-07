@@ -24,6 +24,19 @@ export interface ValidationResult {
   registryChecked: boolean;
   /** Per subprocess-type step (keyed by its entity id): whether a child body is loaded to check cross-process refs against. */
   subprocessStepStatus: Record<string, "checked" | "not-checked">;
+  /** True iff `compileProcessBody` produced a compiled body (`compiled !==
+   * undefined`). False on a Zod-invalid draft, on a duration failure, and on
+   * a structural (`CompileValidationError`) failure alike. */
+  structurallyValid: boolean;
+  /** True iff the six structural checks (`compile.ts::structuralIssues`) ran
+   * at all — distinct from `structurallyValid`, which also reads false when
+   * they never ran. False on a Zod-invalid draft (nothing past Zod ran) and
+   * on a duration failure (`compileProcessBody` raises before reaching
+   * `structuralIssues`). True on a `CompileValidationError` (they ran and
+   * reported real issues) and when compilation raises nothing (they ran and
+   * passed). See design.md's "structural group needs its own 'did it run'
+   * flag" decision. */
+  structuralChecked: boolean;
 }
 
 /**
@@ -75,6 +88,10 @@ export function runValidation(
       })),
       registryChecked: false,
       subprocessStepStatus: {},
+      // Nothing past Zod ran for this load; the checks rail's structural,
+      // CEL, registry and duration groups all read as held back.
+      structurallyValid: false,
+      structuralChecked: false,
     };
   }
 
@@ -84,11 +101,15 @@ export function runValidation(
   pushIssues(issues, body, validateDurations(body), "duration");
 
   let compiled: ProcessBody | undefined;
+  let structuralChecked = true;
   try {
     compiled = compileProcessBody(body);
   } catch (e) {
     if (e instanceof DurationValidationError) {
       compiled = undefined; // already reported via the direct validateDurations call above
+      // compileProcessBody raises here before it ever calls structuralIssues
+      // (design.md): the structural checks did not run for this load.
+      structuralChecked = false;
     } else if (e instanceof CompileValidationError) {
       // harden-publish-validation: the six write-path structural checks
       // (unknown keys, reserved action prefix, pattern compile/length,
@@ -122,5 +143,12 @@ export function runValidation(
     pushIssues(issues, body, checkSubprocessChildRefs(body, stepIndex, childBody), "cel");
   });
 
-  return { zodValid: true, issues, registryChecked, subprocessStepStatus };
+  return {
+    zodValid: true,
+    issues,
+    registryChecked,
+    subprocessStepStatus,
+    structurallyValid: compiled !== undefined,
+    structuralChecked,
+  };
 }

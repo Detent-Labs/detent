@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useCallback, useState } from "react";
 import { matchShell, useLocation, areaHref, LOGIN_PATH } from "./routing.js";
 import { loadSession, persistSession, clearSession, browserStorage, type Session } from "./session.js";
 import { AREAS, landingArea, mayEnter, type Area } from "./areas.js";
@@ -40,11 +40,16 @@ export function App() {
     loadLocale(browserStorage(), typeof navigator === "undefined" ? undefined : navigator.language),
   );
 
-  const logout = () => {
+  // Memoized: passed down as `onUnauthorized`/`onLogout` and, through EditScreen's
+  // `load`, into a useCallback dependency array. An inline arrow here gets a new
+  // identity on every render, and `App` re-renders on every `go()` call (including
+  // an in-place route change like the form editor's), which would re-fire `load`'s
+  // effect and refetch the draft, discarding unsaved edits.
+  const logout = useCallback(() => {
     clearSession();
     setSession(undefined);
     go(LOGIN_PATH);
-  };
+  }, [go]);
 
   const changeLocale = (next: UiLocale) => {
     setLocale(next);

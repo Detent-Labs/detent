@@ -1,9 +1,9 @@
-import { useReducer, useState } from "react";
+import { useState } from "react";
 import { useDraft } from "../draft/store.js";
 import { t } from "../catalog.js";
 import { saveDraft, getDraft, deleteDraft, publishDraft, StudioClientError } from "../api/client.js";
 import { applySaveResult, applyReload, type DraftSaveState } from "../screens/draftSaveLogic.js";
-import { savedBodyReducer, initialSavedBody, isDirty } from "../screens/draftToolbarState.js";
+import { isDirty } from "../screens/draftToolbarState.js";
 import { describeCaughtError } from "../errors.js";
 import type { Draft } from "../draft/types.js";
 import type { PublishResult } from "../api/types.js";
@@ -13,6 +13,20 @@ interface DraftToolbarProps {
   token: string;
   saveState: DraftSaveState;
   onSaveState: (next: DraftSaveState) => void;
+  /** The body last known to be persisted, and its setter — lifted into
+   * `EditorArea` (design.md: "the header bar reads lifted DraftToolbar
+   * state") so the new process-identity header bar can read `isDirty`
+   * too. `DraftToolbar` still computes both; only where they live moved up
+   * one level, mirroring how `saveState`/`onSaveState` already work. */
+  savedBody: Draft;
+  onSavedBodyChange: (body: Draft) => void;
+  /** Fired only from `doSave()`'s success branch — never from `reload()`'s
+   * conflict-recovery branch, which calls `onSavedBodyChange` alone. A mere
+   * reload is not a save, and must not advance `EditorArea`'s
+   * `lastSavedAt`. */
+  onSaved?: () => void;
+  publishResult: PublishResult | null;
+  onPublishResult: (result: PublishResult | null) => void;
   onDiscarded: () => void;
   onUnauthorized: () => void;
 }
@@ -23,18 +37,23 @@ interface DraftToolbarProps {
  * never blocks saving (studio-app spec: "the save action remains available
  * and succeeds" for an invalid draft).
  */
-export function DraftToolbar({ processId, token, saveState, onSaveState, onDiscarded, onUnauthorized }: DraftToolbarProps) {
+export function DraftToolbar({
+  processId,
+  token,
+  saveState,
+  onSaveState,
+  savedBody,
+  onSavedBodyChange,
+  onSaved,
+  publishResult,
+  onPublishResult,
+  onDiscarded,
+  onUnauthorized,
+}: DraftToolbarProps) {
   const { draft, replace } = useDraft();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // The body last known to be persisted — initialized from the just-loaded draft (nothing
-  // edited yet, so "current" already equals "saved"), then advanced on every successful save
-  // and on every reload (see draftToolbarState.ts — one reducer, so both writes express the
-  // same rule instead of a copy of it that's easy to forget to update in step, as reload's
-  // originally was).
-  const [savedBody, dispatchSavedBody] = useReducer(savedBodyReducer, draft, initialSavedBody);
   const [publishing, setPublishing] = useState(false);
-  const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
 
   const withUnauthorized = async (action: () => Promise<void>) => {
     try {
@@ -54,7 +73,10 @@ export function DraftToolbar({ processId, token, saveState, onSaveState, onDisca
     setSaving(true);
     try {
       const result = await saveDraft(processId, { body: draft, layout: saveState.layout, revision: saveState.revision }, token);
-      if (result) dispatchSavedBody(draft);
+      if (result) {
+        onSavedBodyChange(draft);
+        onSaved?.();
+      }
       onSaveState(applySaveResult(saveState, result));
       return result !== undefined;
     } finally {
@@ -67,7 +89,7 @@ export function DraftToolbar({ processId, token, saveState, onSaveState, onDisca
   const doPublish = async () => {
     setPublishing(true);
     try {
-      setPublishResult(await publishDraft(processId, token));
+      onPublishResult(await publishDraft(processId, token));
     } finally {
       setPublishing(false);
     }
@@ -99,7 +121,9 @@ export function DraftToolbar({ processId, token, saveState, onSaveState, onDisca
       // (design.md) — without this, savedBody keeps pointing at the discarded
       // local edits, so a draft byte-identical to the server's reads as dirty
       // for the rest of the session and Publish always prompts to save first.
-      dispatchSavedBody(body);
+      // No onSaved() call here (design.md): a reload is not a save, and must
+      // not advance EditorArea's lastSavedAt.
+      onSavedBodyChange(body);
       onSaveState(applyReload({ revision: record.revision, layout: record.layout }));
     });
 

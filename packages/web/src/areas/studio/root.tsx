@@ -98,7 +98,15 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
       {may(required) && (
         <>
           {route.name === "processes" && <ProcessesScreen token={session.token} navigate={navigate} onUnauthorized={onUnauthorized} />}
-          {route.name === "edit" && <EditScreen processId={route.processId} token={session.token} navigate={navigate} onUnauthorized={onUnauthorized} />}
+          {route.name === "edit" && (
+            <EditScreen
+              processId={route.processId}
+              formStepId={route.formStepId}
+              token={session.token}
+              navigate={navigate}
+              onUnauthorized={onUnauthorized}
+            />
+          )}
           {route.name === "versions" && (
             <VersionsScreen processId={route.processId} token={session.token} navigate={navigate} onUnauthorized={onUnauthorized} />
           )}

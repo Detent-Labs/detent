@@ -13,7 +13,7 @@
  * subset of what a grouping reader would accept.
  */
 
-import { parseAst, celType, INSTANCE_SCHEMA, ACTOR_SCHEMA } from "workflow-engine/cel/check";
+import { parseAst, serializeAst, celType, INSTANCE_SCHEMA, ACTOR_SCHEMA } from "workflow-engine/cel/check";
 import type { ProcessBody } from "workflow-engine/schema";
 import type { DraftField } from "../../draft/fields";
 import { flattenDraftFields } from "../../draft/fields";
@@ -55,7 +55,9 @@ export interface Condition {
   rows: Row[];
 }
 
-const CMP_OPS: CmpOp[] = ["==", "!=", "<", "<=", ">", ">="];
+/** Exported for `ruleLogic.ts`'s reuse: the six plain comparators, the ones
+ * the rule-row builder writes too (it never writes `in`). */
+export const CMP_OPS: CmpOp[] = ["==", "!=", "<", "<=", ">", ">="];
 
 /** Operators offered per CEL type. A list gets `in` alone; it is the only mirrored form. */
 export function operatorsFor(celTypeName: string): CmpOp[] {
@@ -86,7 +88,10 @@ function fieldLabel(f: DraftField, locale: string, baseLocale: string): string {
   return label ? `${label} (${f.key ?? ""})` : (f.key ?? "");
 }
 
-function fieldOperand(f: DraftField, prefix: string, locale: string, baseLocale: string): Operand | undefined {
+/** Exported for `ruleLogic.ts`'s reuse (design.md: the rule-row builder
+ * "reuses ConditionBuilder's parse-back approach"), which builds its own
+ * operand list over a different prefix (`data`) and set of fields. */
+export function fieldOperand(f: DraftField, prefix: string, locale: string, baseLocale: string): Operand | undefined {
   if (!f.key) return undefined;
   const operand: Operand = {
     path: `${prefix}.${f.key}`,
@@ -199,18 +204,19 @@ export function operandSignature(operands: Operand[]): string {
 
 // --- reading --------------------------------------------------------------
 
-/** The AST shape this file walks. Narrower than the library's full union. */
-interface Node {
+/** The AST shape this file walks. Narrower than the library's full union.
+ * Exported for `ruleLogic.ts`'s reuse. */
+export interface Node {
   op: string;
   args: unknown;
-  range: { start: number; end: number };
 }
 
-const isNode = (v: unknown): v is Node =>
+export const isNode = (v: unknown): v is Node =>
   typeof v === "object" && v !== null && typeof (v as Node).op === "string";
 
-/** `{op:".", args:[{op:"id",args:"data"}, "amount"]}` -> `"data.amount"`, else undefined. */
-function memberPath(node: Node): string | undefined {
+/** `{op:".", args:[{op:"id",args:"data"}, "amount"]}` -> `"data.amount"`, else undefined.
+ * Exported for `ruleLogic.ts`'s reuse. */
+export function memberPath(node: Node): string | undefined {
   if (node.op === "id") return typeof node.args === "string" ? node.args : undefined;
   if (node.op !== ".") return undefined;
   const [target, name] = node.args as [unknown, unknown];
@@ -219,26 +225,33 @@ function memberPath(node: Node): string | undefined {
   return base === undefined ? undefined : `${base}.${name}`;
 }
 
-function literalOf(node: Node): string | number | boolean | undefined {
+/** Exported for `ruleLogic.ts`'s reuse. */
+export function literalOf(node: Node): string | number | boolean | undefined {
   if (node.op !== "value") return undefined;
   const v = node.args;
   return typeof v === "string" || typeof v === "number" || typeof v === "boolean" ? v : undefined;
 }
 
-function rawRow(src: string, node: Node): Row {
-  return { kind: "raw", src: src.slice(node.range.start, node.range.end) };
+/**
+ * A raw row prints the node back through `serializeAst`, never a slice of
+ * the original source by `node.range`: that range excludes a parenthesized
+ * sub-expression's own wrapping parens (see `serializeAst`'s doc), which
+ * would otherwise truncate a fragment like `!(data.amount > 1000.0)`.
+ */
+function rawRow(node: Node): Row {
+  return { kind: "raw", src: serializeAst(node as never) };
 }
 
-function readRow(src: string, node: Node, byPath: Map<string, Operand>): Row {
+function readRow(node: Node, byPath: Map<string, Operand>): Row {
   // A bare boolean operand reads as an explicit `== true`.
   const bare = memberPath(node);
   if (bare !== undefined && byPath.get(bare)?.celType === "bool") {
     return { kind: "cmp", operand: bare, op: "==", value: true };
   }
 
-  if (!Array.isArray(node.args) || node.args.length !== 2) return rawRow(src, node);
+  if (!Array.isArray(node.args) || node.args.length !== 2) return rawRow(node);
   const [left, right] = node.args as [unknown, unknown];
-  if (!isNode(left) || !isNode(right)) return rawRow(src, node);
+  if (!isNode(left) || !isNode(right)) return rawRow(node);
 
   // `"manager" in actor.roles`: the literal sits left, mirroring the CEL text.
   if (node.op === "in") {
@@ -247,18 +260,19 @@ function readRow(src: string, node: Node, byPath: Map<string, Operand>): Row {
     if (path !== undefined && byPath.has(path) && value !== undefined) {
       return { kind: "cmp", operand: path, op: "in", value };
     }
-    return rawRow(src, node);
+    return rawRow(node);
   }
 
-  if (!CMP_OPS.includes(node.op as CmpOp)) return rawRow(src, node);
+  if (!CMP_OPS.includes(node.op as CmpOp)) return rawRow(node);
   const path = memberPath(left);
   const value = literalOf(right);
-  if (path === undefined || !byPath.has(path) || value === undefined) return rawRow(src, node);
+  if (path === undefined || !byPath.has(path) || value === undefined) return rawRow(node);
   return { kind: "cmp", operand: path, op: node.op as CmpOp, value };
 }
 
-/** Flatten the left-associative chain of one operator; a nested other operator survives whole. */
-function conjuncts(node: Node, joiner: string): Node[] {
+/** Flatten the left-associative chain of one operator; a nested other operator
+ * survives whole. Exported for `ruleLogic.ts`'s reuse. */
+export function conjuncts(node: Node, joiner: string): Node[] {
   if (node.op !== joiner || !Array.isArray(node.args) || node.args.length !== 2) return [node];
   const [left, right] = node.args as [unknown, unknown];
   if (!isNode(left) || !isNode(right)) return [node];
@@ -277,7 +291,7 @@ export function fromCel(src: string | undefined, operands: Operand[]): Condition
   const byPath = new Map(operands.map((o) => [o.path, o]));
   const joiner = ast.op === "||" ? "||" : "&&";
   const nodes = ast.op === "&&" || ast.op === "||" ? conjuncts(ast, ast.op) : [ast];
-  return { joiner, rows: nodes.map((n) => readRow(src, n, byPath)) };
+  return { joiner, rows: nodes.map((n) => readRow(n, byPath)) };
 }
 
 // --- writing --------------------------------------------------------------
@@ -333,4 +347,78 @@ export function toCel(condition: Condition, operands: Operand[]): string | undef
   });
 
   return parts.length ? parts.join(` ${condition.joiner} `) : undefined;
+}
+
+// --- plain-English summary (studio-condition-builder) ---------------------
+
+/** One comparison operator's plain-English phrasing. `in` reads as
+ * "includes": the literal is the list operand's own member, and "includes"
+ * reads the same direction as the operand-first sentence every other row
+ * takes, unlike the CEL text (`"manager" in actor.roles`), which puts the
+ * literal first. */
+const OP_WORDS: Record<CmpOp, string> = {
+  "==": "is",
+  "!=": "is not",
+  "<": "is less than",
+  "<=": "is at most",
+  ">": "is greater than",
+  ">=": "is at least",
+  in: "includes",
+};
+
+/** The value half of a row's sentence: an option's own label when the
+ * operand offers a closed list (so a coded value like `"approved"` reads as
+ * whatever label the option carries), the raw value otherwise. */
+function summarizeValue(row: Extract<Row, { kind: "cmp" }>, operand: Operand | undefined): string {
+  const option = operand?.options?.find((o) => o.value === row.value);
+  if (option) return option.label;
+  return String(row.value ?? "");
+}
+
+/** One row's sentence fragment. A `raw` row falls back to its own CEL text —
+ * the same "unbuildable fragment" fallback `toCel` and the builder itself
+ * already apply per row, so a mixed condition (some rows readable, one not)
+ * degrades gracefully instead of losing the whole summary. */
+function summarizeRow(row: Row, byPath: Map<string, Operand>): string {
+  if (row.kind === "raw") return row.src;
+  const operand = byPath.get(row.operand);
+  const label = operand?.label ?? row.operand;
+  // A bare boolean reads as `== true`/`== false` (see `readRow`); the
+  // sentence drops the redundant "is yes"/"is no" and states the fact
+  // directly, negated for false.
+  if (operand?.celType === "bool" && row.op === "==") {
+    return row.value === true ? label : `not ${label}`;
+  }
+  return `${label} ${OP_WORDS[row.op]} ${summarizeValue(row, operand)}`;
+}
+
+/**
+ * A plain-English summary of a guard, for the canvas edge label
+ * (`studio-condition-builder` spec). Walks the same `Condition`/`Row` model
+ * `ConditionBuilder` already holds — never `celReadout`, which is CEL syntax,
+ * not a sentence.
+ *
+ * Returns `""` for a condition with no complete row (an empty guard, or one
+ * still mid-edit); the caller decides what an empty summary means for its
+ * placement.
+ */
+export function summarizeCondition(condition: Condition, operands: Operand[]): string {
+  const byPath = new Map(operands.map((o) => [o.path, o]));
+  const usable = condition.rows.filter((r) => isComplete(r, byPath));
+  if (!usable.length) return "";
+  const joinerWord = condition.joiner === "&&" ? "and" : "or";
+  return usable.map((r) => summarizeRow(r, byPath)).join(` ${joinerWord} `);
+}
+
+/**
+ * The canvas edge label for an automatic path's guard: a plain-English
+ * summary when the guard parses into rows, the raw CEL text otherwise (a
+ * fragment the builder cannot represent at all — see "A fragment the builder
+ * cannot represent survives as a raw row").
+ */
+export function guardEdgeLabel(src: string, operands: Operand[]): string {
+  const condition = fromCel(src, operands);
+  if (!condition) return src;
+  const summary = summarizeCondition(condition, operands);
+  return summary || src;
 }
