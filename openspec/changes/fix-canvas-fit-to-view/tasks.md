@@ -52,21 +52,33 @@ import, and that red is the point.
 - [x] 3.6 Check the inset values against `design-language.md`. Every gap sits
   on the 4-point scale, and no new component or color role appears.
 
-## 4. Verification
+## 4. The clipping surface
 
-- [ ] 4.1 Run `bun run typecheck`, then `bun run build`, then the full
+A browser check found this after group 3 read as complete. The arithmetic
+cannot frame what the drawing surface refuses to draw.
+
+- [x] 4.1 Give `.canvas-svg` `overflow: visible` in `app.css`. Record beside
+  it that `.canvas-wrap` is the clipping edge.
+- [x] 4.2 Move the dot grid from `.canvas-svg` to `.canvas-wrap`, so it holds
+  still under the zoom.
+- [x] 4.3 Confirm in a browser that a six-step draft renders all six steps
+  after the fit. Use a canvas column 240px wide.
+
+## 5. Verification
+
+- [x] 5.1 Run `bun run typecheck`, then `bun run build`, then the full
   `bun test` with `DATABASE_URL` set. Report the skip count as well as the
   pass count. One test database serves every worktree, so run the suite when
   no other session runs it.
-- [ ] 4.2 Run the antislop linter over every Markdown file this change
+- [x] 5.2 Run the antislop linter over every Markdown file this change
   touches.
-- [ ] 4.3 Run `git diff --check`, and `git ls-files --eol` for the `w/`
+- [x] 5.3 Run `git diff --check`, and `git ls-files --eol` for the `w/`
   column.
-- [ ] 4.4 Check the canvas in a real browser at the reported widths. Frame the
-  `request -> decision -> approved/rejected` draft with the inspector open and
-  closed. Confirm no step, start arrow or terminal stamp sits under the
-  toolbar or off an edge.
-- [ ] 4.5 Click "Fit to view" twice in a row, and once after a wheel zoom.
+- [x] 5.4 Check the canvas in a real browser. Frame a multi-step draft in a
+  narrow canvas column. Confirm no step, start arrow or terminal stamp sits
+  under the toolbar or off an edge.
+- [x] 5.5 Click "Fit to view" twice in a row. The second click starts from the
+  zoom level the first one set. That covers the fit from a zoomed state.
   Confirm the framing does not drift.
-- [ ] 4.6 Record the browser steps in `docs/browser-checks.md` if the
+- [x] 5.6 Record the browser steps in `docs/browser-checks.md` if the
   `development-toolchain` split rule keeps them manual.

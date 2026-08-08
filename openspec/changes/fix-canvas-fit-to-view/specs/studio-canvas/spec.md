@@ -16,6 +16,10 @@ step SHALL still land inside the visible area.
 The result SHALL NOT depend on the pan and zoom state the author starts from.
 Two activations in a row SHALL leave the same framing.
 
+Only the canvas edge SHALL clip the graph. No element between the two SHALL.
+A step outside the drawing surface's own bounds SHALL still come into view.
+It comes into view once the zoom level drops far enough to hold it.
+
 The framed area SHALL cover more than the step rectangles. It SHALL cover
 what a step draws beside its rectangle. That includes the start arrow left of
 the initial step and the terminal stamp above a terminal step. It SHALL also
@@ -33,6 +37,13 @@ such as the toolbar.
   graph at zoom level 1
 - **THEN** every step sits inside the visible canvas area, with no step
   clipped at an edge
+
+#### Scenario: Fit to view frames a graph outside the drawing surface
+
+- **WHEN** a draft holds steps beyond the drawing surface's own bounds, and an
+  author activates "fit to view"
+- **THEN** every step renders inside the visible canvas area, at whatever
+  reduced zoom level holds them all
 
 #### Scenario: Fit to view repeats without drift
 

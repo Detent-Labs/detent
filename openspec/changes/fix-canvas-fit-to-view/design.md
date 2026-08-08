@@ -107,6 +107,32 @@ product ships, and German labels run up to 40% longer. A two-line button then
 breaks a hardcoded number. That case argues for the measurement as well, but
 it is a future case, not a current one.
 
+### The SVG stops clipping, and the wrap keeps clipping
+
+The arithmetic alone does not frame the graph. An inline `<svg>` carries
+`overflow: hidden` from the UA stylesheet and clips at its own viewport.
+Panzoom transforms that element, so the clip window moves with the content.
+An off-viewport step stays invisible at every zoom level.
+
+`.canvas-svg` therefore takes `overflow: visible`. `.canvas-wrap` is the same
+size, sets `overflow: hidden` already, and becomes the one clipping edge. The
+fit arithmetic needs no change, because the element box and the wrap's content
+box are the same box.
+
+The alternative moves Panzoom onto an inner `<g>`, which is the library's
+documented SVG mode. It is the cleaner shape and it costs much more. The
+origin becomes `0 0`, so the pan formula changes. `svgPointFromClient` reads
+`svg.getScreenCTM()` today. It would have to read the group's matrix instead.
+That touches every drag, connect and drop gesture.
+
+One CSS declaration buys the same result here. Keep the `<g>` in reserve for
+the day the canvas
+needs a second transformed layer.
+
+The dot grid moves to `.canvas-wrap` in the same step. A grid painted on the
+transformed element shrinks with the zoom. At the 0.25 floor it covers a
+quarter of the canvas and leaves the rest bare.
+
 ### The scale cap stays at 1
 
 `fitToView` never magnifies. A two-step draft keeps its size instead of
