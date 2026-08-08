@@ -113,9 +113,11 @@ it is a future case, not a current one.
 filling the canvas. This matches the current behaviour. Nothing in GitHub #3
 asks to change it.
 
-The function clamps to the same bounds the `Panzoom` call sets, 0.25 and 2. A
-clamp inside the function keeps the returned scale honest. The pan does not
-depend on the clamp, because `t` uses the scale the caller applies.
+The function floors the scale at `MIN_SCALE`, the same 0.25 the `Panzoom` call
+sets. It does not clamp against `MAX_SCALE`. The cap at 1 already sits below
+that bound, so such a clamp would be dead code. Both constants live in
+`fit.ts`. The `Panzoom` call reads them from there, so the two agree. The pan
+does not depend on the floor, because `t` uses the scale the caller applies.
 
 ## Risks / Trade-offs
 
@@ -128,6 +130,18 @@ depend on the clamp, because `t` uses the scale the caller applies.
   canvas stays attached while the button accepts a click.
 - A wide draft still exceeds the canvas at the 0.25 floor. → The fit centers
   it and the author pans. The floor predates this change.
+- `clientWidth` is not free of the transform in every layout. A transform
+  grows an ancestor's scrollable overflow. A classic scrollbar then appears.
+  It re-lays out a `width: 100%` child. → Our `.canvas-wrap` sets
+  `overflow: hidden`. That rules the case out. `CanvasView` records the
+  dependency beside the reading.
+- `clientWidth` is the padding box. An SVG with no `viewBox` anchors user
+  space to the content box. → `.canvas-svg` carries no padding, so the two
+  agree. Padding on that rule would offset the origin and overstate the
+  viewport.
+- `clientWidth` rounds to a whole pixel. A flex child rarely lands on one. →
+  The framing sits up to a pixel off. The gutter is 16px, so no author sees
+  it.
 - `getBBox()` measures text, so a long step label widens the box. → That is
   the wanted behaviour. A label that runs off the canvas is the defect this
   change removes.
