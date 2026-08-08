@@ -5,9 +5,11 @@
 
 `src/auth/users.ts` SHALL expose `listUsers(page, db)` returning a `Page` of
 `auth_users` rows as `{ userId, email, roles, disabled, managerUserId, displayName }`,
-excluding `password_hash`. `GET /admin/users` SHALL expose this read, gated
-by `system:admin` through the same `requireRole` check every other
-`/admin/*` route uses.
+excluding `password_hash`. `displayName` SHALL be the resolved value the
+`local-user-accounts` capability defines (`COALESCE(display_name, email)`),
+never null or empty. `GET /admin/users` SHALL expose this read, gated by
+`system:admin` through the same `requireRole` check every other `/admin/*`
+route uses.
 
 The route SHALL translate `limit` and `cursor` query parameters, the same
 way `GET /admin/outbox` and `GET /admin/timers` do. A `limit` that is not a
@@ -22,6 +24,11 @@ ties between two accounts sharing no email.
 - **WHEN** an actor holding `system:admin` requests `GET /admin/users`
 - **THEN** the response is 200 with a page of users, each carrying `userId`,
   `email`, `roles`, `disabled`, `managerUserId` and `displayName`
+
+#### Scenario: A user with no display name lists with their email
+
+- **WHEN** `GET /admin/users` lists a user whose `display_name` is `NULL`
+- **THEN** that row's `displayName` equals that user's `email`
 
 #### Scenario: Password hashes are never returned
 
@@ -53,9 +60,9 @@ ties between two accounts sharing no email.
 ### Requirement: An operator can create a user account over HTTP
 
 `src/auth/users.ts` SHALL expose the existing `createUser(email, password,
-roles, db)`, unchanged. `POST /admin/users` SHALL expose it, gated by
-`system:admin`. Every other `/admin/*` route enforces that role through the
-same `requireRole` check.
+roles, displayName, db)`, unchanged. `POST /admin/users` SHALL expose it,
+gated by `system:admin`. Every other `/admin/*` route enforces that role
+through the same `requireRole` check.
 
 The request body SHALL be `{ email: string, password: string, roles?:
 string[] }`. `email` and `password` SHALL each be non-empty after trimming.

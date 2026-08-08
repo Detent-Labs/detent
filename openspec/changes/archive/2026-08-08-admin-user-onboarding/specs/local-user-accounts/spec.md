@@ -20,8 +20,14 @@ deployment that provisions accounts from a shell keeps working unchanged.
 
 `src/auth/cli.ts` SHALL provide a command-line tool
 (`bun run src/auth/cli.ts add-user …`). It SHALL create a user, set that user's
-roles, change a user's password, and set that user's manager. Each command SHALL
-keep its email key. A person at a terminal types an address, not a `user_id`.
+roles, change a user's password, and set that user's manager. It SHALL also set
+that user's display name. Each command SHALL keep its email key. A person at a
+terminal types an address, not a `user_id`.
+
+`add-user` SHALL accept an optional trailing display-name argument.
+`createUser` trims that argument the same way for every caller, per the
+requirement above. A whitespace-only value from the CLI therefore leaves
+`display_name` `NULL`, the same as an omitted argument.
 
 The engine SHALL provide no registration flow, no self-service password-reset
 flow and no MFA flow. No route SHALL let an unauthenticated caller create an
@@ -48,11 +54,30 @@ The CLI SHALL stay the recovery path for a deployment where no account holds
 - **THEN** a row exists in `auth_users` with that email, those roles, and a hash
   that verifies the given password
 
+#### Scenario: The CLI creates a user with a display name
+
+- **WHEN** the CLI's `add-user` command runs with an email, a password, roles,
+  and a display name
+- **THEN** a row exists in `auth_users` holding that trimmed display name
+
+#### Scenario: A whitespace-only display name from the CLI resolves to email
+
+- **WHEN** the CLI's `add-user` or `set-name` command runs with a
+  whitespace-only string as the display name
+- **THEN** that user's `display_name` is `NULL`, not an empty string, and the
+  resolved display name is that user's email
+
 #### Scenario: The CLI sets a manager
 
 - **WHEN** the CLI's manager command runs with a user's email and another
   account's email
 - **THEN** that user's `manager_user_id` holds the second account's `user_id`
+
+#### Scenario: The CLI sets a display name
+
+- **WHEN** the CLI's `set-name` command runs with a user's email and a display
+  name
+- **THEN** that user's `display_name` holds the trimmed value
 
 #### Scenario: No route outside the admin gate creates an account
 
