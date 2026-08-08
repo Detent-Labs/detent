@@ -201,6 +201,17 @@ docker run -p 8080:8080 app
 Both images declare a `HEALTHCHECK`: the engine calls `GET /readyz`, each
 frontend requests its served root.
 
+## Support
+
+Detent is free software under the AGPL. No company funds it. The work happens
+in unpaid time.
+
+A donation pays for the hosting, the domain and the tools. It also buys the
+hours the next `ROADMAP.md` stage needs. Every contribution helps, whatever its
+size.
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/H3R224KYSE)
+
 ## License
 
 [GNU AGPLv3](LICENSE) or later.
