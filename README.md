@@ -201,6 +201,10 @@ docker run -p 8080:8080 app
 Both images declare a `HEALTHCHECK`: the engine calls `GET /readyz`, each
 frontend requests its served root.
 
+## Support
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/H3R224KYSE)
+
 ## License
 
 [GNU AGPLv3](LICENSE) or later.
