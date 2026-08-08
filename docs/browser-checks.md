@@ -179,3 +179,34 @@ The federated `editable: false` state is out of reach here too, for its own
 reason. A login token always carries `iss: "bps"`, and such a token
 guarantees a local `auth_users` row. That state gets its coverage in
 `packages/web/test/profileFields.test.ts` instead.
+
+### Studio canvas: "Fit to view" frames every step
+
+Source: `fix-canvas-fit-to-view` task 4.3.
+
+Seed the database and open a draft of `expense_approval`, which holds six
+steps. Make the browser window narrow enough that the canvas column falls to
+about 240px, well under the graph. Activate "Fit to view".
+
+Pass: all six steps render, none clipped at an edge, none under the "Fit to
+view" button. Activate it a second time. Pass: the framing does not move.
+
+`packages/web/test/studio-canvas-fit.test.ts` covers the scale and pan as
+numbers, and it cannot see this. The defect was an SVG that refused to render
+outside its own viewport. Only a browser reports that. The second activation
+matters on its own. It starts from the zoom level the first one set. The old
+code read that state back through a transformed rect.
+
+Then drag a Step from the palette onto empty canvas, twice. Do it once at the
+opening zoom level, and once after a fit has zoomed out. Pass: each drop adds
+a step.
+
+The second drop is the one that earns its place. Panzoom scales the SVG
+element itself, so a zoomed-out canvas leaves most of the wrap outside the
+SVG's own box. The wrap paints the grid and shows the graph there, so an
+author reads that area as canvas. For that reason `onPaletteDrop` resolves the
+canvas through `.canvas-wrap`.
+
+A synthetic mouse drag does not exercise this. The palette listens for pointer
+events, and raw `mousedown`/`mousemove` leaves it inert. Use a real drag, or a
+tool that dispatches pointer events.
