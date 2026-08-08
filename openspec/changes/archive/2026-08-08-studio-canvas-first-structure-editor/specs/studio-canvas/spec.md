@@ -62,22 +62,22 @@ nests `PathsPanel` under the paths section. No panel's own fields,
 validation, or mutation logic SHALL differ from today's. Only how an
 author reaches each section is different.
 
-Choosing the view entry SHALL instead open the form editor (see the
-`studio-form-editor` capability). A step's form benefits from a canvas
-of its own, not an inline scroll target. This is the one section entry
-that opens a dialog instead of expanding inline. `StepsPanel` SHALL hold
-no inline view section. The inspector then carries one route to a step's
-view, not two.
+Choosing the view entry SHALL instead navigate to the form editor's
+routed page (see the `studio-form-editor` capability). A step's form
+benefits from a full-screen page of its own, not an inline scroll
+target. This is the one section entry that navigates away instead of
+expanding inline. `StepsPanel` SHALL hold no inline view section. The
+inspector then carries one route to a step's view, not two.
 
 A section entry is a disclosure. It SHALL therefore be a
 `<button type="button">`. It SHALL carry `aria-expanded` for its own
 state, and `aria-controls` naming the section it opens. The
 `spa-accessibility` capability requires that shape of every disclosure.
 
-The view entry opens a dialog rather than a section. It SHALL instead
-carry `aria-haspopup="dialog"` and no `aria-controls`. A disclosure's
-`aria-expanded` describes a region the document already holds. A modal
-dialog is not that region.
+The view entry navigates rather than opening a dialog or a section. It
+SHALL carry no `aria-haspopup` and no `aria-controls`. A disclosure's
+`aria-expanded` describes a region the document already holds. A
+navigation target is not that region either.
 
 Creating the first step in an empty draft SHALL NOT depend on a prior
 selection. The palette stays reachable no matter what is selected; see
@@ -155,8 +155,8 @@ to add a step.
 #### Scenario: Choosing the view entry opens the form editor
 
 - **WHEN** the developer chooses the view entry for the selected step
-- **THEN** the form editor dialog opens for that step, and no section
-  expands inline within the inspector
+- **THEN** the form editor's routed page opens for that step, and no
+  section expands inline within the inspector
 
 #### Scenario: Selecting a path edge shows its source step's inspector
 
@@ -333,9 +333,9 @@ The view entry SHALL show a status summary of the step's form. For
 example, the summary might read how many fields carry a view entry.
 It SHALL also show a "Build the form" label alongside that summary.
 
-This changes the entry's copy only. Choosing it still opens
-`FormEditorDialog` through the same call it uses today. No section
-expands inline.
+This changes the entry's copy only. Choosing it still navigates to the
+form editor's routed page, per the view-entry requirement above. No
+section expands inline.
 
 #### Scenario: The view entry shows a form-status summary
 
