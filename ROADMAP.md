@@ -175,10 +175,12 @@ Spec: `development-toolchain`.
        record were reachable by any authenticated actor and now require
        `system:admin`.
        Change: `admin-shell-and-ops`. Specs: `admin-app`, `admin-operations-api`.
-    b. User administration: DONE. The one HTTP carve-out from CLI-only account
-       administration — list users and disable/enable them. Creating a user,
-       changing a password and assigning roles stay CLI-only. Disabling blocks
-       the next login; it does not revoke an already-issued token.
+    b. User administration: DONE. The first HTTP carve-out from CLI-only account
+       administration — list users and disable/enable them. Disabling blocks
+       the next login; it does not revoke an already-issued token. Creating a
+       user, changing a password and assigning roles stayed CLI-only here;
+       25a took roles, and `admin-user-onboarding` took the other two, so the
+       carve-out now covers every account write.
        Change: `admin-users`. Spec: `admin-user-management`.
     c. Migration run: DONE. Running an already-registered migration plan and
        seeing the result grouped by bucket. Authoring the plan belongs to the

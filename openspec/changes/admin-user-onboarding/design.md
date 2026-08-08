@@ -104,10 +104,39 @@ Without that default, an unqualified `GET /admin/users` stays unbounded.
 That is the exact gap this change exists to close.
 
 **No role-bounds duplication.** `POST /admin/users`'s `roles` field reuses
-the exact bounds `PATCH /admin/users/:id/roles` already enforces: 64
-entries, 64 characters each, dedup on first occurrence. The implementation
-pulls `admin-routes.ts`'s existing `parseRoles` helper out for both call
-sites. Neither route copies its body.
+the bounds `PATCH /admin/users/:id/roles` enforces. Those are 64 entries, 64
+characters each, and dedup on first occurrence. `parseRoles` is already a
+module-level function in `admin-routes.ts`. The new handler lands in that
+same file, so it calls the helper as it stands. Nothing moves.
+
+**The route pages. The screen holds the whole set.** The screen renders its
+manager choices from `managerChoices(items, userId)`. It renders its manager
+column from `managerLabel(items, managerUserId)`. Both helpers sit in
+`screens/usersLogic.ts`. Both read `items` as the account directory, not as
+one page of it.
+
+Rendering one page would drop later accounts out of the choices. The label
+helper would fall back to the raw `user_id` for a pointer at one of them.
+Neither error surfaces. An operator sees a shorter dropdown and an opaque
+string.
+
+So the screen requests `MAX_LIST_LIMIT` and follows the cursor until none
+comes back. It then holds every account, and both helpers keep working
+unchanged.
+
+A "Load more" control was the first shape here, beside a second full walk for
+the candidates. It went out. The manager column reads the full set on every
+row at rest, so the screen holds every account either way. A control that hid
+rows already in memory was a second mechanism for nothing.
+
+The bound the route gained is still the point. An unbounded query is the
+error this change closes. A screen walking a bounded one in steps is not the
+same read.
+
+`auth_users` is an operator-scale table, so the walk is one request under 200
+accounts. A dedicated candidates route is the alternative if that stops
+holding. It carries a narrow projection and needs none of the work here to
+arrive later.
 
 ## Risks / Trade-offs
 
@@ -127,21 +156,43 @@ not wait on that decision.
 An operator with more than 50 accounts would see only the first page on an
 unupdated screen. Nothing past it would show.
 
-`UsersScreen.tsx`'s `load()` moves to the paginated call in this same
-change. It gains a "Load more" control at the same time (`tasks.md §
-5.4`). The default ships together with that control, in one commit.
-Shipping the default alone, without the control, would be the real
+`UsersScreen.tsx`'s `load()` moves to the paginated call in this same change,
+and it follows the cursor to the end (`tasks.md § 5.4`). The default and its
+one consumer ship in one commit. Shipping the default alone would be the real
 breaking change here.
+
+Any later caller of `GET /admin/users` reads a page unless it asks for more.
+That is the point of the bound, and it is a documented 50-row default rather
+than a silent truncation.
 
 **Pagination adds a field to the response. It does not change the
 response's shape.** `handleAdminListUsers` already returns `{ items:
 UserSummary[] }` (`admin-routes.ts`). The web client's `UserPage` type
 already matches that same shape (`packages/web/.../api/types.ts`).
 
-This change adds one optional field to that object: `cursor`.
-`OutboxPage` and `PendingTimerPage` already carry that same field. No
-caller reads a bare array today. `UserPage` and `UsersScreen.tsx` still
-change, but only to read the new `cursor` and page through it.
+This change adds one optional field to that object: `cursor`. `OutboxPage`
+and `PendingTimerPage` already carry that same field. No caller reads a bare
+array today.
+
+What moves for a caller is the meaning of `items`, not its type. It held
+every account. It now holds a page. `UsersScreen.tsx` reads it two ways. One
+reading is the rows to show. The other is the manager candidate set. The
+screen therefore splits them apart, the way the Decisions section states.
+
+**Two existing tests assert the state this work ends.** The first sits in
+`test/http-admin.test.ts`.
+
+<!-- The quoted string is a test name, not prose. Renaming it here would stop
+     it matching the file the task edits. -->
+<!-- antislop: allow synonym-rotation -->
+It reads "no route creates a user, sets a password, or registers one". It
+expects a 404 from `POST /admin/users`. It expects one from `POST
+/admin/users/user_x/password` too. Both answer for real after this.
+
+The second is the users-route preflight test. It expects
+`Access-Control-Allow-Methods: GET`. `server.ts` derives that answer from the
+route table. `POST /admin/users` joins `GET /admin/users` on one path, so the
+header names both. Each test moves with this work (`tasks.md § 6.6`).
 
 ## Migration Plan
 

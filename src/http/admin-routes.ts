@@ -1,8 +1,9 @@
 /**
  * Operator-facing routes behind `system:admin`: outbox listing/counts, the two
- * dead-letter repairs, pending timers, and listing/disabling/enabling local
- * users plus assigning their roles. Kept out of `routes.ts`, which stays the
- * participant-facing surface.
+ * dead-letter repairs, pending timers, and the local-account writes — listing,
+ * creating, disabling/enabling, assigning roles and a manager, and setting a
+ * password. Kept out of `routes.ts`, which stays the participant-facing
+ * surface.
  * Same framework-agnostic handler shape as `routes.ts`, and the same
  * `resolveActor`, `errorContext`, `guarded` and `parseLimit` helpers, imported
  * from it rather than copied. Each handler resolves the actor then requires
@@ -11,7 +12,7 @@
 import type { SQL } from "bun";
 import { sql, withTransaction } from "../engine/store.js";
 import { listOutbox, countOutboxByStatus, listPendingTimers, requeueOutboxRow, discardOutboxRow, getOutboxRow, MAX_LIST_LIMIT, type OutboxListFilter } from "../engine/admin-queries.js";
-import { listUsers, setDisabled, setRolesById, setManagerById, SelfManagerError } from "../auth/users.js";
+import { listUsers, createUser, setDisabled, setRolesById, setManagerById, setPasswordById, SelfManagerError } from "../auth/users.js";
 import { migrateInstances } from "../engine/migration.js";
 import { redactInstance } from "../engine/retention.js";
 import { localizedText, type ProcessId, type InstanceId, type LocalizedText } from "../schema/definition.js";
@@ -97,8 +98,11 @@ export async function handleAdminListUsers(req: Request, resolver: ActorResolver
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
     requireRole(actor, ADMIN_ROLE);
-    const users = await listUsers(db);
-    return { status: 200, body: { items: users } };
+    const url = new URL(req.url);
+    const limit = parseLimit(url, MAX_LIST_LIMIT);
+    const cursor = url.searchParams.get("cursor") ?? undefined;
+    const page = await listUsers({ limit, cursor }, db);
+    return { status: 200, body: page };
   });
 }
 
@@ -154,6 +158,92 @@ export async function handleAdminSetUserRoles(userId: string, req: Request, reso
       return { status: 409, body: { error: { type: "self-role-strip", message: `an actor cannot remove ${ADMIN_ROLE} from its own account` } } };
     }
     const updated = await setRolesById(userId, roles, db);
+    if (!updated) return { status: 404, body: { error: { type: "not-found", message: `no user: ${userId}` } } };
+    return { status: 200, body: updated };
+  });
+}
+
+/**
+ * A body field that must be present and hold something after trimming. Returns
+ * the value as sent, not the trimmed form: trimming a password would store a
+ * different secret than the operator typed. The caller trims where the stored
+ * value should be trimmed, as `email` does.
+ */
+function requireNonBlank(value: unknown, label: string): string {
+  if (typeof value !== "string") throw new RequestShapeError(`${label} must be a string`);
+  if (!value.trim()) throw new RequestShapeError(`${label} must not be empty`);
+  return value;
+}
+
+/**
+ * Create a local account. Wraps `createUser` unchanged, the way
+ * `handleAdminSetUserRoles` wraps `setRolesById`, and bounds `roles` through
+ * the same `parseRoles` that route uses.
+ *
+ * The 201 body is built here rather than read back: `createUser`'s INSERT sets
+ * `email` and `roles` to exactly these values, and `disabled`/`manager_user_id`
+ * to their column defaults. A follow-up SELECT would add a round trip to learn
+ * what the statement above it just wrote.
+ *
+ * A duplicate email answers 409 from the column's own UNIQUE constraint. A
+ * SELECT ahead of the insert would race a concurrent create for the same
+ * address, and the constraint decides the outcome either way.
+ */
+export async function handleAdminCreateUser(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    requireRole(actor, ADMIN_ROLE);
+    let body: { email?: unknown; password?: unknown; roles?: unknown };
+    try {
+      body = (await req.json()) as typeof body;
+    } catch {
+      throw new RequestShapeError("request body is not valid JSON");
+    }
+    const email = requireNonBlank(body.email, "email").trim();
+    const password = requireNonBlank(body.password, "password");
+    const roles = body.roles === undefined ? [] : parseRoles(body.roles);
+
+    let created: Awaited<ReturnType<typeof createUser>>;
+    try {
+      created = await createUser(email, password, roles, db);
+    } catch (err) {
+      if (isEmailUniqueViolation(err)) {
+        return { status: 409, body: { error: { type: "email-in-use", message: `an account already holds ${email}` } } };
+      }
+      throw err;
+    }
+    return { status: 201, body: { userId: created.userId, email, roles, disabled: false, managerUserId: undefined } };
+  });
+}
+
+/** Postgres SQLSTATE 23505 on `auth_users.email`'s own UNIQUE constraint. Reads `errno` and the constraint name, for the reason `isManagerForeignKeyViolation` states. */
+function isEmailUniqueViolation(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const e = err as { errno?: unknown; constraint?: unknown };
+  return e.errno === "23505" && e.constraint === "auth_users_email_key";
+}
+
+/**
+ * Set an account's password on its holder's behalf. No strength rule runs
+ * here: `cli.ts`'s `set-password` has never applied one, and a floor this route
+ * alone enforced would refuse a password the CLI still accepts.
+ *
+ * The write does not revoke a token already issued to that account. No JWT
+ * claim derives from the password, so an outstanding one keeps authenticating
+ * until it expires. Disable is the control that ends a session at once.
+ */
+export async function handleAdminSetUserPassword(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    requireRole(actor, ADMIN_ROLE);
+    let body: { password?: unknown };
+    try {
+      body = (await req.json()) as typeof body;
+    } catch {
+      throw new RequestShapeError("request body is not valid JSON");
+    }
+    const password = requireNonBlank(body.password, "password");
+    const updated = await setPasswordById(userId, password, db);
     if (!updated) return { status: 404, body: { error: { type: "not-found", message: `no user: ${userId}` } } };
     return { status: 200, body: updated };
   });

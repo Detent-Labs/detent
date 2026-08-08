@@ -31,6 +31,8 @@ export function describeError(error: ClientError, status?: number): string {
       return "A user cannot be their own manager. Pick a different account.";
     case "unknown-manager":
       return "That account no longer exists. Refresh and pick again.";
+    case "email-in-use":
+      return "An account already uses that email address. Pick a different one.";
     case "internal":
       return status === undefined
         ? "Could not reach the server. Check your connection and try again."

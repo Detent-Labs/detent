@@ -238,6 +238,32 @@
   max-width: 34rem;
 }
 
+/* An editor for a value that owns no column — the password reset. It sits as
+   its own row under the entry it belongs to, the way a ledger carries an
+   annotation line, rather than displacing a cell whose heading would then
+   name something else. */
+.admin-editor-row > td {
+  padding-block: var(--space-3);
+}
+
+/* Label above control, both flush left, one 4px step apart. The border is the
+   field: the control carries no filled surface behind it. */
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.admin-field-label {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.admin-editor-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
 /* A manager is a person, shown by the email an operator recognises, so this
    column takes the body face the email column already uses — unlike the
    roles column beside it, whose values the engine matches literally. */

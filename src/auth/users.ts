@@ -1,14 +1,17 @@
 /**
  * Project-local BPS user accounts, backed by the `auth_users` table
  * (`src/engine/store.ts::initSchema`). Passwords are hashed with
- * `Bun.password` (argon2id, built into Bun — no dependency). Creating a
- * user and changing a password are CLI-only (`src/auth/cli.ts`); listing
- * users, toggling `disabled` and assigning roles are the carve-out, also
- * reachable over HTTP through the `system:admin`-gated `/admin/users*`
- * routes (`src/http/admin-routes.ts`).
+ * `Bun.password` (argon2id, built into Bun — no dependency). Every account
+ * write is reachable over HTTP through the `system:admin`-gated
+ * `/admin/users*` routes (`src/http/admin-routes.ts`): listing, creating,
+ * toggling `disabled`, assigning roles, setting a manager, and setting a
+ * password. `src/auth/cli.ts` keeps its own email-keyed commands beside them,
+ * as the recovery path for a deployment where no account holds `system:admin`.
  */
 import { SQL } from "bun";
 import { sql } from "../engine/store.js";
+import { encodeCursor, decodeCursor } from "../pagination.js";
+import { MAX_LIST_LIMIT, type Page } from "../engine/admin-queries.js";
 
 export async function createUser(email: string, password: string, roles: string[] = [], db: SQL = sql): Promise<{ userId: string }> {
   const userId = `user_${crypto.randomUUID()}`;
@@ -113,9 +116,38 @@ const toSummary = (r: UserRow): UserSummary => ({
   managerUserId: r.manager_user_id ?? undefined,
 });
 
-export async function listUsers(db: SQL = sql): Promise<UserSummary[]> {
-  const rows = (await db`SELECT user_id, email, roles, disabled, manager_user_id FROM auth_users ORDER BY email`) as UserRow[];
-  return rows.map(toSummary);
+/**
+ * Its own copy of the constant `admin-queries.ts` keeps private, for the same
+ * reason `listOutbox` and `listPendingTimers` each apply one: `parseLimit`
+ * returns `undefined` for an absent `limit`, and an unbounded user list is the
+ * gap this default closes.
+ */
+const DEFAULT_LIST_LIMIT = 50;
+
+/**
+ * Accounts by email ascending, keyset-paged on `(email, user_id)` — `email` is
+ * unique, but the tiebreaker keeps the tuple comparison total and matches the
+ * shape `listOutbox` pages with. Never selects `password_hash`.
+ */
+export async function listUsers(page: { limit?: number; cursor?: string } = {}, db: SQL = sql): Promise<Page<UserSummary>> {
+  const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
+  const [cursorEmail, cursorUserId] = page.cursor ? decodeCursor(page.cursor, 2) : [undefined, undefined];
+  const rows = (await db`
+    SELECT user_id, email, roles, disabled, manager_user_id
+    FROM auth_users
+    WHERE (
+      ${cursorEmail ?? null}::text IS NULL
+      OR (email, user_id) > (${cursorEmail ?? null}::text, ${cursorUserId ?? null}::text)
+    )
+    ORDER BY email, user_id
+    LIMIT ${limit + 1}
+  `) as UserRow[];
+
+  const hasMore = rows.length > limit;
+  const pageRows = rows.slice(0, limit);
+  const last = pageRows[pageRows.length - 1];
+  const cursor = hasMore && last ? encodeCursor([last.email, last.user_id]) : undefined;
+  return { items: pageRows.map(toSummary), cursor };
 }
 
 /**
@@ -125,6 +157,21 @@ export async function listUsers(db: SQL = sql): Promise<UserSummary[]> {
  */
 export async function setRolesById(userId: string, roles: string[], db: SQL = sql): Promise<UserSummary | undefined> {
   const rows = (await db`UPDATE auth_users SET roles = ${db.array(roles, "TEXT")} WHERE user_id = ${userId} RETURNING user_id, email, roles, disabled, manager_user_id`) as UserRow[];
+  const row = rows[0];
+  return row ? toSummary(row) : undefined;
+}
+
+/**
+ * Keyed by `userId`, unlike `setPassword` — the browser holds ids, never
+ * emails. Returns the updated row, or `undefined` if no such `userId` exists.
+ *
+ * Writes `password_hash` alone. A reset does not touch `disabled`, and it does
+ * not reach a JWT already issued to the account: no token claim derives from
+ * the password, so an outstanding one keeps authenticating until it expires.
+ */
+export async function setPasswordById(userId: string, password: string, db: SQL = sql): Promise<UserSummary | undefined> {
+  const passwordHash = await Bun.password.hash(password);
+  const rows = (await db`UPDATE auth_users SET password_hash = ${passwordHash} WHERE user_id = ${userId} RETURNING user_id, email, roles, disabled, manager_user_id`) as UserRow[];
   const row = rows[0];
   return row ? toSummary(row) : undefined;
 }

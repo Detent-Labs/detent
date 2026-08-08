@@ -94,6 +94,18 @@ describe("managerLabel", () => {
   it("falls back to the raw id rather than rendering blank", () => {
     expect(managerLabel(users, "user_gone")).toBe("user_gone");
   });
+
+  // Both helpers read whatever array the screen hands them as the whole account
+  // directory. That is why `UsersScreen.tsx`'s `load()` follows the cursor to
+  // the end instead of showing one page: over a partial set the same manager
+  // reads as an opaque id here, and leaves the dropdown below.
+  it("resolves an email over the full set and falls back over a partial one", () => {
+    const partial = [users[0]!];
+    expect(managerLabel(users, "user_b")).toBe("b@example.com");
+    expect(managerLabel(partial, "user_b")).toBe("user_b");
+    expect(managerChoices(users, "user_a").map((u) => u.userId)).toEqual(["user_b"]);
+    expect(managerChoices(partial, "user_a")).toEqual([]);
+  });
 });
 
 describe("managerValueOf", () => {

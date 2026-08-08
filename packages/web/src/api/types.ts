@@ -62,6 +62,10 @@ export type ClientError =
   // because the repair differs: pick another account, or refresh first.
   | { type: "self-manager"; message: string }
   | { type: "unknown-manager"; message: string }
+  // `POST /admin/users` hitting `auth_users.email`'s UNIQUE constraint. A 409,
+  // and not a concurrency one: the repair is a different address, so retrying
+  // the same body changes nothing.
+  | { type: "email-in-use"; message: string }
   // Publish-time rejections. The server maps six distinct error classes here
   // (registry, CEL, duration, compile, schema, cross-process); five carry
   // located `issues`, cross-process carries a message. All six reach a

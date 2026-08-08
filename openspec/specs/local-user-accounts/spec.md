@@ -10,12 +10,11 @@ provider: the `auth_users` table, argon2id password hashing/verification
 non-disclosure rule shared by an unknown email, a wrong password and a
 disabled account, a per-email in-memory rate limiter on repeated login
 attempts, and the user-management CLI (`src/auth/cli.ts`). The engine does
-not become an identity provider: no registration, password reset, MFA,
-session store, refresh tokens or revocation list, and no HTTP route for
-creating a user, changing a password, or assigning roles — those stay
-CLI-only. Listing users and toggling `disabled` are the one carve-out,
-reachable over HTTP through the `system:admin`-gated `admin-user-management`
-capability.
+not become an identity provider: no registration, no self-service password
+reset, no MFA, no session store, no refresh tokens and no revocation list.
+Every account write is reachable over HTTP through the `system:admin`-gated
+`admin-user-management` capability, and the CLI keeps its own email-keyed
+commands beside them.
 ## Requirements
 ### Requirement: Local users are persisted in an auth_users table
 

@@ -81,7 +81,7 @@ async function seedProcess(
 
 async function seedUser(demo: { role: string; emailSuffix: string }): Promise<void> {
   const email = `demo-${demo.emailSuffix}@example.test`;
-  const users = await listUsers(sql);
+  const { items: users } = await listUsers({}, sql);
   const existing = users.find((u) => u.email === email);
   if (existing) {
     await setRoles(email, [demo.role], sql);

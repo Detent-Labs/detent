@@ -30,6 +30,11 @@ screen.
   register-row and inline-editor style the roles and manager editors already
   use. Each carries a caveat line the way `ROLE_CAVEAT` and `MANAGER_CAVEAT`
   do today.
+- Keep the Users screen's manager control offering every account once the list
+  pages. `UsersScreen.tsx` passes its loaded rows to `managerChoices` and
+  `managerLabel` (`screens/usersLogic.ts`). Both read that array as the whole
+  account set. A page of 50 would otherwise drop every account past it from the
+  choices. An existing pointer to one would show as a raw `user_id`.
 - This change does not add hard delete. Disable stays the only retirement
   path: `store.ts` states outright that nothing deletes an account today.
 - This change does not add a password-strength floor. `Bun.password.hash`
@@ -51,8 +56,17 @@ aside on purpose.
 
 - `admin-user-management`: adds account creation and admin-set password
   reset as HTTP-reachable operations, and adds pagination to the user list
-  read. No existing requirement changes. Disabling, role assignment and
-  manager assignment keep behaving exactly as specced today.
+  read. Disabling, role assignment and manager assignment keep behaving
+  exactly as specced today.
+- `local-user-accounts`: one requirement there names the HTTP carve-out as five
+  routes. It also states that no route creates a user or sets a password. This
+  change adds two such routes. That requirement leaves, and one naming seven
+  replaces it. The CLI commands, the absent registration flow and the absent
+  MFA flow stay as they are.
+- `admin-app`: its Users-screen requirement states the screen "SHALL NOT offer
+  creating a user or changing a password". It also states that the screen lists
+  every local user. This change adds both controls and pages the list. It also
+  pins the manager control's choices to the whole account set.
 
 ## Impact
 
@@ -73,8 +87,22 @@ aside on purpose.
 - `test/auth-users.test.ts`: the `listUsers()` signature change breaks its
   7 existing call sites. Each one moves to the new `Page<UserSummary>`
   shape.
+- `test/http-admin.test.ts`: two tests assert the state this change ends. "no
+  route creates a user, sets a password, or registers one" expects 404 from
+  `POST /admin/users`. It expects the same from `POST
+  /admin/users/user_x/password`. The users-route preflight test expects
+  `Access-Control-Allow-Methods: GET`. `server.ts` derives that answer from the
+  route table. A second method on one path moves it.
 - `scripts/seed.ts`: `seedUser`'s `listUsers(sql)` call moves to the new
   signature.
+- `src/auth/users.ts`'s module docstring states that creating a user and
+  changing a password are CLI-only. Both stop being true here.
+- `openspec/specs/local-user-accounts/spec.md` and
+  `openspec/specs/admin-app/spec.md`: each gains a delta. This change also
+  updates each capability's `## Purpose` in place. OpenSpec drops a delta's own
+  Purpose for a capability that already exists.
+- `ROADMAP.md` stage 10b and `docs/current-state.md` both state that account
+  creation and password change stay CLI-only.
 - No schema migration. `auth_users` already carries every column these
   routes need: `email`, `password_hash`, `roles`, `disabled`,
   `manager_user_id`.

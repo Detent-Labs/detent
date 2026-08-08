@@ -15,7 +15,7 @@ History-API routing hook, `session.ts` for the JWT), reusing the existing
 login mechanism, with a role-aware shell, the Operations screens
 (all-instances list, instance detail with the merged record and cancel,
 outbox with dead-letter retry/discard, pending timers), and a Users screen
-(list + disable/enable) — reaching the engine exclusively through the HTTP
+(list, create, disable/enable, roles, manager, password reset) — reaching the engine exclusively through the HTTP
 wrapper, never a direct database read or an imported engine runtime module.
 It renders records and system state, never step forms, so it does not depend
 on `form-ui`. See the `admin-operations-api` capability for the operations

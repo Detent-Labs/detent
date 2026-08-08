@@ -109,9 +109,32 @@ export async function listPendingTimers(token: string, opts: { limit?: number; c
   return (await res.json()) as PendingTimerPage;
 }
 
-export async function listUsers(token: string): Promise<UserPage> {
-  const res = await request("/admin/users", token);
+export async function listUsers(token: string, opts: { limit?: number; cursor?: string } = {}): Promise<UserPage> {
+  const query = new URLSearchParams();
+  if (opts.limit !== undefined) query.set("limit", String(opts.limit));
+  if (opts.cursor !== undefined) query.set("cursor", opts.cursor);
+  const res = await request(`/admin/users?${query}`, token);
   return (await res.json()) as UserPage;
+}
+
+/** Creates a local account. A 409 means an account already holds that email. The password travels to its holder out of band: the engine sends no mail. */
+export async function createUser(email: string, password: string, roles: string[], token: string): Promise<UserSummary> {
+  const res = await request("/admin/users", token, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email, password, roles }),
+  });
+  return (await res.json()) as UserSummary;
+}
+
+/** Sets an account's password on its holder's behalf. Does not revoke a token already issued to them: no JWT claim derives from the password. */
+export async function setUserPassword(userId: string, password: string, token: string): Promise<UserSummary> {
+  const res = await request(`/admin/users/${encodeURIComponent(userId)}/password`, token, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+  return (await res.json()) as UserSummary;
 }
 
 export async function disableUser(userId: string, token: string): Promise<UserSummary> {

@@ -1,7 +1,7 @@
 /**
  * `auth_users` schema (ensureSchema/initSchema) + `src/auth/users.ts`
- * (createUser/verifyLogin/setRoles/setRolesById/setPassword/listUsers/
- * setDisabled). DB-backed, skips when DATABASE_URL is unset.
+ * (createUser/verifyLogin/setRoles/setRolesById/setPassword/setPasswordById/
+ * listUsers/setDisabled). DB-backed, skips when DATABASE_URL is unset.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
@@ -11,6 +11,7 @@ import {
   setRoles,
   setRolesById,
   setPassword,
+  setPasswordById,
   listUsers,
   setDisabled,
   setManagerById,
@@ -105,7 +106,7 @@ test.skipIf(!DB)("setPassword changes the password that verifies", async () => {
 test.skipIf(!DB)("listUsers returns every user without password_hash", async () => {
   await createUser("h1@example.com", "pw", ["employee"]);
   await createUser("h2@example.com", "pw", []);
-  const users = await listUsers();
+  const { items: users } = await listUsers();
   expect(users.map((u) => u.email).sort()).toEqual(["h1@example.com", "h2@example.com"]);
   const h1 = users.find((u) => u.email === "h1@example.com")!;
   expect(h1.roles).toEqual(["employee"]);
@@ -117,7 +118,7 @@ test.skipIf(!DB)("setDisabled flips the flag and returns the updated row, or und
   const { userId } = await createUser("i@example.com", "pw", ["employee"]);
   const updated = await setDisabled(userId, true);
   expect(updated).toEqual({ userId, email: "i@example.com", roles: ["employee"], disabled: true, managerUserId: undefined });
-  const [after] = await listUsers();
+  const [after] = (await listUsers()).items;
   expect(after!.disabled).toBe(true);
   expect(await setDisabled("user_does_not_exist", true)).toBeUndefined();
 });
@@ -132,10 +133,10 @@ test.skipIf(!DB)("setRolesById replaces the whole set and returns the updated ro
 test.skipIf(!DB)("setRoles and setRolesById write the same column", async () => {
   const { userId } = await createUser("l@example.com", "pw", []);
   await setRoles("l@example.com", ["from-cli"]);
-  const [afterCli] = await listUsers();
+  const [afterCli] = (await listUsers()).items;
   expect(afterCli!.roles).toEqual(["from-cli"]);
   await setRolesById(userId, ["from-route"]);
-  const [afterRoute] = await listUsers();
+  const [afterRoute] = (await listUsers()).items;
   expect(afterRoute!.roles).toEqual(["from-route"]);
   expect((await verifyLogin("l@example.com", "pw"))?.roles).toEqual(["from-route"]);
 });
@@ -160,7 +161,7 @@ test.skipIf(!DB)("initSchema adds manager_user_id, and an existing row holds NUL
   await initSchema();
   const rows = (await sql`SELECT manager_user_id FROM auth_users WHERE user_id = ${userId}`) as { manager_user_id: string | null }[];
   expect(rows[0]!.manager_user_id).toBeNull();
-  const [listed] = await listUsers();
+  const [listed] = (await listUsers()).items;
   expect(listed!.managerUserId).toBeUndefined();
 });
 
@@ -228,7 +229,7 @@ test.skipIf(!DB)("getManagerOf is undefined for no manager and for an unknown ac
 test.skipIf(!DB)("an account with no manager still logs in and still lists", async () => {
   await createUser("plain@example.com", "pw", ["employee"]);
   expect(await verifyLogin("plain@example.com", "pw")).toMatchObject({ roles: ["employee"] });
-  const [listed] = await listUsers();
+  const [listed] = (await listUsers()).items;
   expect(listed!.managerUserId).toBeUndefined();
 });
 
@@ -236,7 +237,7 @@ test.skipIf(!DB)("setManagerByEmail is the CLI's email-keyed path, and clears wi
   await createUser("boss7@example.com", "pw", []);
   const staff = await createUser("staff7@example.com", "pw", []);
   await setManagerByEmail("staff7@example.com", "boss7@example.com");
-  const boss = (await listUsers()).find((u) => u.email === "boss7@example.com")!;
+  const boss = (await listUsers()).items.find((u) => u.email === "boss7@example.com")!;
   expect(await getManagerOf(staff.userId)).toBe(boss.userId);
   await setManagerByEmail("staff7@example.com", null);
   expect(await getManagerOf(staff.userId)).toBeUndefined();
@@ -246,4 +247,83 @@ test.skipIf(!DB)("setManagerByEmail names the email that does not exist", async 
   await createUser("staff8@example.com", "pw", []);
   expect(setManagerByEmail("staff8@example.com", "ghost@example.com")).rejects.toThrow("ghost@example.com");
   expect(setManagerByEmail("ghost@example.com", null)).rejects.toThrow("ghost@example.com");
+});
+
+test.skipIf(!DB)("setPasswordById replaces the hash and returns the row, or undefined for an unknown userId", async () => {
+  const { userId } = await createUser("pw1@example.com", "old-pw", ["employee"]);
+  const before = (await sql`SELECT password_hash FROM auth_users WHERE user_id = ${userId}`) as { password_hash: string }[];
+
+  const updated = await setPasswordById(userId, "new-pw");
+  expect(updated).toEqual({ userId, email: "pw1@example.com", roles: ["employee"], disabled: false, managerUserId: undefined });
+
+  const after = (await sql`SELECT password_hash FROM auth_users WHERE user_id = ${userId}`) as { password_hash: string }[];
+  expect(after[0]!.password_hash).not.toBe(before[0]!.password_hash);
+  expect(await setPasswordById("user_does_not_exist", "new-pw")).toBeUndefined();
+});
+
+test.skipIf(!DB)("a password set by setPasswordById logs in, and the previous one stops", async () => {
+  const { userId } = await createUser("pw2@example.com", "old-pw", []);
+  await setPasswordById(userId, "new-pw");
+  expect(await verifyLogin("pw2@example.com", "new-pw")).toMatchObject({ userId });
+  expect(await verifyLogin("pw2@example.com", "old-pw")).toBeUndefined();
+});
+
+test.skipIf(!DB)("setPasswordById writes password_hash alone", async () => {
+  const boss = await createUser("pw3-boss@example.com", "pw", []);
+  const { userId } = await createUser("pw3@example.com", "old-pw", ["a", "b"]);
+  await setManagerById(userId, boss.userId);
+  await setDisabled(userId, true);
+
+  const updated = await setPasswordById(userId, "new-pw");
+  expect(updated).toEqual({ userId, email: "pw3@example.com", roles: ["a", "b"], disabled: true, managerUserId: boss.userId });
+});
+
+/**
+ * `createUser` runs `Bun.password.hash` (argon2id) once per account, so 51
+ * calls would cost seconds of CPU inside a shared suite. The rows below assert
+ * a page size, never a credential, so they carry one constant hash string.
+ * `roles` takes its column default.
+ */
+async function seedAccounts(emails: string[]): Promise<void> {
+  const ids = emails.map((_, i) => `user_seed_${i}`);
+  await sql`
+    INSERT INTO auth_users (user_id, email, password_hash)
+    SELECT id, email, 'not-a-real-hash'
+    FROM UNNEST(${sql.array(ids, "TEXT")}::text[], ${sql.array(emails, "TEXT")}::text[]) AS t(id, email)
+  `;
+}
+
+test.skipIf(!DB)("listUsers orders by email and pages through the whole set with a cursor", async () => {
+  await seedAccounts(["c@example.com", "a@example.com", "b@example.com", "d@example.com"]);
+
+  const first = await listUsers({ limit: 2 });
+  expect(first.items.map((u) => u.email)).toEqual(["a@example.com", "b@example.com"]);
+  expect(first.cursor).toBeDefined();
+
+  const second = await listUsers({ limit: 2, cursor: first.cursor });
+  expect(second.items.map((u) => u.email)).toEqual(["c@example.com", "d@example.com"]);
+  expect(second.cursor).toBeUndefined();
+});
+
+test.skipIf(!DB)("listUsers defaults to 50 rows and hands back a cursor for the rest", async () => {
+  // 51 accounts: one past the default, so the default is what bounds the first
+  // page rather than the row count running out.
+  const emails = Array.from({ length: 51 }, (_, i) => `page-${String(i).padStart(3, "0")}@example.com`);
+  await seedAccounts(emails);
+
+  const page = await listUsers();
+  expect(page.items).toHaveLength(50);
+  expect(page.cursor).toBeDefined();
+
+  const rest = await listUsers({ cursor: page.cursor });
+  expect(rest.items).toHaveLength(1);
+  expect(rest.cursor).toBeUndefined();
+  expect([...page.items, ...rest.items].map((u) => u.email)).toEqual(emails);
+});
+
+test.skipIf(!DB)("listUsers caps limit at MAX_LIST_LIMIT rather than refusing it", async () => {
+  await seedAccounts(Array.from({ length: 3 }, (_, i) => `cap-${i}@example.com`));
+  const page = await listUsers({ limit: 10_000 });
+  expect(page.items).toHaveLength(3);
+  expect(page.cursor).toBeUndefined();
 });

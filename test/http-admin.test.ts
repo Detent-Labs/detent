@@ -13,7 +13,7 @@ import { createRegistry, createDataSourceRegistry } from "../src/engine/registry
 import { createServer } from "../src/http/server.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
 import { ADMIN_ROLE } from "../src/auth/authorize.js";
-import { createUser } from "../src/auth/users.js";
+import { createUser, verifyLogin } from "../src/auth/users.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { registerMigrationPlan } from "../src/engine/migration.js";
 import type { Actor } from "../src/cel/eval.js";
@@ -242,6 +242,161 @@ test.skipIf(!DB)("GET /admin/users with system:admin lists users without passwor
   expect(body.items[0]!.roles).toEqual(["employee"]);
   expect(body.items[0]!.disabled).toBe(false);
   expect(body.items[0]).not.toHaveProperty("password_hash");
+});
+
+test.skipIf(!DB)("GET /admin/users pages with limit plus cursor, dropping and repeating no row", async () => {
+  const emails = ["p1@example.com", "p2@example.com", "p3@example.com", "p4@example.com", "p5@example.com"];
+  await sql`
+    INSERT INTO auth_users (user_id, email, password_hash)
+    SELECT id, email, 'not-a-real-hash'
+    FROM UNNEST(${sql.array(emails.map((_, i) => `user_page_${i}`), "TEXT")}::text[], ${sql.array(emails, "TEXT")}::text[]) AS t(id, email)
+  `;
+
+  const seen: string[] = [];
+  let url = "http://x/admin/users?limit=2";
+  for (;;) {
+    const res = await fetch(authedReq(url, "GET", admin));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { items: { email: string }[]; cursor?: string };
+    seen.push(...body.items.map((u) => u.email));
+    if (!body.cursor) break;
+    url = `http://x/admin/users?limit=2&cursor=${encodeURIComponent(body.cursor)}`;
+  }
+  expect(seen).toEqual(emails);
+});
+
+test.skipIf(!DB)("GET /admin/users refuses a limit that is not a positive integer", async () => {
+  const res = await fetch(authedReq("http://x/admin/users?limit=0", "GET", admin));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+// ============================================================
+// POST /admin/users
+// ============================================================
+
+test.skipIf(!DB)("POST /admin/users with no resolvable credential maps to 401", async () => {
+  const res = await fetch(new Request("http://x/admin/users", { method: "POST" }));
+  expect(res.status).toBe(401);
+});
+
+test.skipIf(!DB)("POST /admin/users without system:admin maps to 403 and writes no row", async () => {
+  const res = await fetch(authedReq("http://x/admin/users", "POST", bystander, { email: "new@example.com", password: "pw" }));
+  expect(res.status).toBe(403);
+  const rows = (await sql`SELECT count(*)::int AS n FROM auth_users`) as { n: number }[];
+  expect(rows[0]!.n).toBe(0);
+});
+
+test.skipIf(!DB)("POST /admin/users creates the account, answers 201, and that account can log in", async () => {
+  const res = await fetch(authedReq("http://x/admin/users", "POST", admin, { email: "jane@example.com", password: "temp-pw-1", roles: ["finance:approver"] }));
+  expect(res.status).toBe(201);
+  const body = (await res.json()) as { userId: string; email: string; roles: string[]; disabled: boolean };
+  expect(body.email).toBe("jane@example.com");
+  expect(body.roles).toEqual(["finance:approver"]);
+  expect(body.disabled).toBe(false);
+  expect(body).not.toHaveProperty("password_hash");
+  expect(await verifyLogin("jane@example.com", "temp-pw-1")).toMatchObject({ userId: body.userId });
+});
+
+test.skipIf(!DB)("POST /admin/users with no roles field creates the account with an empty set", async () => {
+  const res = await fetch(authedReq("http://x/admin/users", "POST", admin, { email: "norole@example.com", password: "pw" }));
+  expect(res.status).toBe(201);
+  const body = (await res.json()) as { roles: string[] };
+  expect(body.roles).toEqual([]);
+});
+
+test.skipIf(!DB)("POST /admin/users maps a duplicate email to 409 and writes no second row", async () => {
+  await createUser("taken@example.com", "pw", []);
+  const res = await fetch(authedReq("http://x/admin/users", "POST", admin, { email: "taken@example.com", password: "other-pw" }));
+  expect(res.status).toBe(409);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("email-in-use");
+  const rows = (await sql`SELECT count(*)::int AS n FROM auth_users WHERE email = 'taken@example.com'`) as { n: number }[];
+  expect(rows[0]!.n).toBe(1);
+});
+
+test.skipIf(!DB)("POST /admin/users refuses a missing or blank email or password with 400", async () => {
+  const bodies = [
+    {},
+    { email: "a@example.com" },
+    { password: "pw" },
+    { email: "", password: "pw" },
+    { email: "   ", password: "pw" },
+    { email: "a@example.com", password: "" },
+    { email: "a@example.com", password: "   " },
+    { email: 7, password: "pw" },
+  ];
+  for (const body of bodies) {
+    const res = await fetch(authedReq("http://x/admin/users", "POST", admin, body));
+    expect(res.status).toBe(400);
+  }
+  const rows = (await sql`SELECT count(*)::int AS n FROM auth_users`) as { n: number }[];
+  expect(rows[0]!.n).toBe(0);
+});
+
+test.skipIf(!DB)("POST /admin/users refuses an out-of-bounds role set with 400 and writes no row", async () => {
+  const overLong = { email: "r1@example.com", password: "pw", roles: ["x".repeat(65)] };
+  const overMany = { email: "r2@example.com", password: "pw", roles: Array.from({ length: 65 }, (_, i) => `role-${i}`) };
+  for (const body of [overLong, overMany]) {
+    const res = await fetch(authedReq("http://x/admin/users", "POST", admin, body));
+    expect(res.status).toBe(400);
+  }
+  const rows = (await sql`SELECT count(*)::int AS n FROM auth_users`) as { n: number }[];
+  expect(rows[0]!.n).toBe(0);
+});
+
+test.skipIf(!DB)("POST /admin/users trims and deduplicates roles, like the roles route", async () => {
+  const res = await fetch(authedReq("http://x/admin/users", "POST", admin, { email: "dedup@example.com", password: "pw", roles: [" a ", "b", "a"] }));
+  expect(res.status).toBe(201);
+  const body = (await res.json()) as { roles: string[] };
+  expect(body.roles).toEqual(["a", "b"]);
+});
+
+// ============================================================
+// POST /admin/users/:id/password
+// ============================================================
+
+test.skipIf(!DB)("POST /admin/users/:id/password with no resolvable credential maps to 401", async () => {
+  const res = await fetch(new Request("http://x/admin/users/user_x/password", { method: "POST" }));
+  expect(res.status).toBe(401);
+});
+
+test.skipIf(!DB)("POST /admin/users/:id/password without system:admin maps to 403 and leaves the hash alone", async () => {
+  const { userId } = await createUser("keep@example.com", "old-pw", []);
+  const res = await fetch(authedReq(`http://x/admin/users/${userId}/password`, "POST", bystander, { password: "new-pw" }));
+  expect(res.status).toBe(403);
+  expect(await verifyLogin("keep@example.com", "old-pw")).toBeDefined();
+});
+
+test.skipIf(!DB)("POST /admin/users/:id/password answers 200, the new password logs in, and the old one stops", async () => {
+  const { userId } = await createUser("reset@example.com", "old-pw", ["employee"]);
+  const res = await fetch(authedReq(`http://x/admin/users/${userId}/password`, "POST", admin, { password: "new-pw" }));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as Record<string, unknown>;
+  expect(body.userId).toBe(userId);
+  expect(body.email).toBe("reset@example.com");
+  expect(body.roles).toEqual(["employee"]);
+  expect(body.disabled).toBe(false);
+  expect(body).not.toHaveProperty("password_hash");
+  expect(await verifyLogin("reset@example.com", "new-pw")).toMatchObject({ userId });
+  expect(await verifyLogin("reset@example.com", "old-pw")).toBeUndefined();
+});
+
+test.skipIf(!DB)("POST /admin/users/:id/password maps an unknown userId to 404", async () => {
+  const res = await fetch(authedReq("http://x/admin/users/user_does_not_exist/password", "POST", admin, { password: "new-pw" }));
+  expect(res.status).toBe(404);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("not-found");
+});
+
+test.skipIf(!DB)("POST /admin/users/:id/password refuses a missing or blank password with 400 and leaves the hash alone", async () => {
+  const { userId } = await createUser("blank@example.com", "old-pw", []);
+  for (const body of [{}, { password: "" }, { password: "   " }, { password: 7 }]) {
+    const res = await fetch(authedReq(`http://x/admin/users/${userId}/password`, "POST", admin, body));
+    expect(res.status).toBe(400);
+  }
+  expect(await verifyLogin("blank@example.com", "old-pw")).toBeDefined();
 });
 
 // ============================================================
@@ -599,10 +754,21 @@ test("OPTIONS preflight on the admin timers route returns 204 permitting GET", a
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
 });
 
-test("OPTIONS preflight on the admin users route returns 204 permitting GET", async () => {
+// Two routes share this path now: the list and the create. `server.ts` derives
+// the preflight answer from the route table, so the header names both without
+// a second entry anywhere.
+test("OPTIONS preflight on the admin users route returns 204 permitting GET and POST", async () => {
   const res = await fetch(new Request("http://x/admin/users", { method: "OPTIONS" }));
   expect(res.status).toBe(204);
-  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST");
+});
+
+// Without this the admin screen's password reset fails in a browser and
+// nowhere else: the POST never leaves, because its preflight has no handler.
+test("OPTIONS preflight on the admin users password route returns 204 permitting POST", async () => {
+  const res = await fetch(new Request("http://x/admin/users/user_x/password", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
 });
 
 test("OPTIONS preflight on the admin users disable route returns 204 permitting POST", async () => {
@@ -617,13 +783,13 @@ test("OPTIONS preflight on the admin users enable route returns 204 permitting P
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST");
 });
 
-// `local-user-accounts` holds creating a user and setting a password to the
-// CLI. Listing, disable/enable and roles are the whole HTTP carve-out.
-test.skipIf(!DB)("no route creates a user, sets a password, or registers one", async () => {
+// `POST /admin/users` and `POST /admin/users/:id/password` left this list in
+// `admin-user-onboarding`: both answer for real now, behind `system:admin`.
+// What stays absent is anything unauthenticated (`/auth/register`) and the
+// writes no route carries at all — a replaced collection, an email change.
+test.skipIf(!DB)("no route registers a caller, replaces the collection, or changes an email", async () => {
   const absent = [
-    ["POST", "http://x/admin/users"],
     ["PUT", "http://x/admin/users"],
-    ["POST", "http://x/admin/users/user_x/password"],
     ["PATCH", "http://x/admin/users/user_x/password"],
     ["POST", "http://x/admin/users/user_x/email"],
     ["POST", "http://x/auth/register"],

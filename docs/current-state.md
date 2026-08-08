@@ -1164,8 +1164,9 @@ Stage-by-stage status is in `ROADMAP.md`.
   /admin/users`, `POST /admin/users/:id/disable`, `POST
   /admin/users/:id/enable`, and (added later, see the role-editing entry
   below) `PATCH /admin/users/:id/roles` and `PATCH /admin/users/:id/manager`.
-  Creating a user and changing a
-  password remain CLI-only — no HTTP path reaches either. Disabling took
+  Creating a user and changing a password stayed CLI-only until
+  `admin-user-onboarding` added `POST /admin/users` and `POST
+  /admin/users/:id/password`, taking the count to seven routes. Disabling took
   effect on the user's *next* login attempt only, as this change left it;
   it revoked no JWT already issued to them, since token verification then
   performed no per-request database lookup (proven by an end-to-end test:

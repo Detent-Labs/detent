@@ -129,6 +129,8 @@ export interface UserSummary {
 
 export interface UserPage {
   items: UserSummary[];
+  /** Absent once the page is the last one, like `OutboxPage`/`PendingTimerPage`. */
+  cursor?: string;
 }
 
 /** Mirrors src/engine/migration.ts::MigrationResult. */

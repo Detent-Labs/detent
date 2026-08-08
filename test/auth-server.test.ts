@@ -7,7 +7,7 @@
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
-import { createUser, setRolesById } from "../src/auth/users.js";
+import { createUser, setRolesById, setPasswordById } from "../src/auth/users.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
 import { createServer, resolveAuthResolver, parseAuthIssuers } from "../src/http/server.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
@@ -197,6 +197,34 @@ test.skipIf(!DB)("a token issued before a grant keeps its old roles, and the nex
   const freshToken = await login();
   const fresh = await fetch(new Request("http://x/admin/users", { headers: { Authorization: `Bearer ${freshToken}` } }));
   expect(fresh.status).toBe(200);
+});
+
+// A password reset does not reach a token already issued to that account: no
+// JWT claim derives from the password, and verification reads only whether the
+// account is still live. Disable is the control that ends a session at once —
+// the test above it proves that one, this proves the reset does not.
+test.skipIf(!DB)("a token issued before a password reset keeps authenticating, and the old password stops", async () => {
+  const resolver = resolveAuthResolver({ AUTH_JWT_SECRET: SECRET });
+  const fetch = createServer(dataSourceReg, reg, sql, resolver, undefined, SECRET);
+  const login = async (password: string): Promise<Response> =>
+    fetch(
+      new Request("http://x/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "resettee@example.com", password }),
+      }),
+    );
+
+  const { userId } = await createUser("resettee@example.com", "old-pw", [ADMIN_ROLE]);
+  const staleToken = ((await (await login("old-pw")).json()) as { token: string }).token;
+
+  await setPasswordById(userId, "new-pw");
+
+  const stale = await fetch(new Request("http://x/admin/users", { headers: { Authorization: `Bearer ${staleToken}` } }));
+  expect(stale.status).toBe(200);
+
+  expect((await login("old-pw")).status).toBe(401);
+  expect((await login("new-pw")).status).toBe(200);
 });
 
 // GET /instances, GET /instances/:id/record, GET /processes and GET

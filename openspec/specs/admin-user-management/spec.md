@@ -2,13 +2,13 @@
 
 ## Purpose
 
-The HTTP carve-out from `local-user-accounts`'s CLI-only administration:
-listing local users, toggling their `disabled` state, and assigning their
-roles, gated by `system:admin` alongside every other `/admin/*` route
-(`admin-operations-api`). Creating a user and changing a password remain
-CLI-only (`src/auth/cli.ts`) — this capability adds no HTTP path for either.
-See the `admin-app` capability for the Users screen that consumes these
-routes.
+Account administration over HTTP: listing local users, creating one, toggling
+their `disabled` state, assigning their roles and manager, and setting their
+password. `system:admin` gates each route, alongside every other `/admin/*`
+route (`admin-operations-api`). `src/auth/cli.ts` keeps `add-user` and
+`set-password` as its own email-keyed commands, for a deployment where no
+account holds `system:admin`. See the `admin-app` capability for the Users
+screen that consumes these routes.
 ## Requirements
 ### Requirement: Users are listable by an operator over HTTP
 
