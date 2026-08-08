@@ -17,12 +17,11 @@ The engine stays headless and API-first behind that UI. It carries no UI
 dependency, and the browser package reaches it only over HTTP. So an
 integration drives a process with no browser at all.
 
-Where this is going: no-code and low-code process authoring (`ROADMAP.md` stage
-27). No-code is the target for what the builders cover. An analyst completes a
-process through forms and a canvas, typing no CEL and no JSON. Low-code is what
-stays underneath, permanently. The JSON view and the CEL input remain
-first-class for a developer, and for what a builder cannot express. CEL guards
-and action config still need a developer today.
+No-code and low-code process authoring shipped (`ROADMAP.md` stage 27). An
+analyst builds a process through forms and a canvas, typing no CEL and no JSON.
+The builders cover plugin config, conditions, migration plans, templates and
+form layout. Low-code stays underneath, permanently. The JSON view and the CEL
+text input remain first-class for a developer.
 
 The paradigm is a **state-based finite-state machine**: Steps (states) connected
 by explicit Paths (transitions). This is *not* BPMN token flow.
@@ -58,12 +57,12 @@ carries the four areas above.
 | `src/cel/check.ts` | Authoring-time CEL parse/type-check against the field catalog (`@marcbachmann/cel-js`). |
 | `src/cel/eval.ts` | Runtime CEL: guards (total — a runtime error is `false`), Action.output writeback, and migration `transforms` (total per entry). |
 | `src/schema/compile.ts` | Publish-time pass: injects the cancel-sink (+ reserved outcome for a contracted process) before hashing, deterministic and idempotent. |
-| `src/engine/` | Instance store, transactional outbox (delivery + writeback + retry/dead-letter + reclaim), transition executor (manual/automatic/timer), async wait-state re-resolution, timer arming + scheduler, crash recovery, runtime cancellation, subprocess execution (`subprocess.ts`: spawn + return + downward cancel cascade), instance migration (`migration.ts`: plan store + row-locked, keyset-paginated version migration), definition/version store (`definitions.ts`) + `startEngine` host. Three plugin registries (`registry.ts`) cover actions, data sources and assignment strategies. The `db.list` data source reads the `data_lists`/`data_list_values` tables. PostgreSQL via `Bun.sql`. |
+| `src/engine/` | Instance store, transactional outbox (delivery + writeback + retry/dead-letter + reclaim), transition executor (manual/automatic/timer), async wait-state re-resolution, timer arming + scheduler, crash recovery, runtime cancellation, subprocess execution (`subprocess.ts`: spawn + return + downward cancel cascade), instance migration (`migration.ts`: plan store + row-locked, keyset-paginated version migration), definition/version store (`definitions.ts`) + `startEngine` host, process templates in their own `templates` table. Three plugin registries (`registry.ts`) cover actions, data sources and assignment strategies. The `db.list` data source reads the `data_lists`/`data_list_values` tables. PostgreSQL via `Bun.sql`. |
 | `src/runtime/api.ts` | Runtime API Layer: instance creation, view resolution, submit-and-transition, claim/release, cancel, and the read/query surface (`listInstances` / `getInstanceRecord`) — the boundary a UI calls without touching engine internals. Every function takes an explicit `Actor`. |
-| `src/http/` | Thin REST/JSON wrapper over `Bun.serve` around the Runtime API Layer, plus the admin and studio route files. Typed-error-to-HTTP-status mapping, configurable CORS. |
-| `src/auth/` | `ActorResolver` seam with two implementations (a non-production dev-header resolver and a production-capable JWT resolver accepting local `auth_users` accounts and JWKS-backed external issuers), login + rate limiting, a user-admin CLI, and the six reserved roles (`system:publish`, `system:cancel-any`, `system:admin`, `system:developer`, `system:reports`, `system:datalists`). The server checks each role directly. None implies another. |
+| `src/http/` | Thin REST/JSON wrapper over `Bun.serve` around the Runtime API Layer. One route file per surface: admin, studio, reporting, account and UI strings. Health, readiness and metrics endpoints sit beside them, and `static.ts` serves the frontend from `WEB_ROOT`. Typed-error-to-HTTP-status mapping, configurable CORS. |
+| `src/auth/` | `ActorResolver` seam with two implementations (a non-production dev-header resolver and a production-capable JWT resolver accepting local `auth_users` accounts and JWKS-backed external issuers), login + rate limiting, a user-admin CLI, and the seven reserved roles (`system:publish`, `system:cancel-any`, `system:admin`, `system:developer`, `system:reports`, `system:datalists`, `system:templates`). The server checks each role directly. None implies another. An operator creates an account and resets a password over HTTP. The CLI stays the recovery path when no account holds `system:admin`. |
 | `src/handlers/` | Two action handlers ship. `http.request` is a vendor-neutral REST call with engine-set idempotency and outbox-aligned retry semantics. `notification.email` speaks SMTP directly and reads its connection details from the environment. |
-| `packages/web/` | The one browser package. `src/shell/` holds prefix routing, the one session and login, the account menu and the area switcher; `src/api/` and `src/i18n/` hold what every area shares; `src/areas/{app,admin,studio,reporting}/` hold the four audiences' screens, one URL prefix, one lazy chunk and one role gate each. An area never imports from another area. |
+| `packages/web/` | The one browser package. `src/shell/` holds prefix routing, the one session and login, the account menu and the area switcher; `src/api/` and `src/i18n/` hold what every area shares; `src/areas/{app,admin,studio,reporting}/` hold the four audiences' screens, one URL prefix and one lazy chunk each. The admin and studio areas gate each screen separately through a `ROUTE_ROLE` map. An area never imports from another area. |
 | `packages/form-ui/` | Source-only shared step-form renderer, so what an author previews is what a participant gets. |
 | `examples/expense-approval.json` | Complete Capture → Review → Book example. Runs end-to-end in the devcontainer against its `webhook-sink` service. |
 | `examples/subprocess-*.json` | A loan-application parent calling a credit-check subprocess (child) — spawn, `child.outcome` routing, return writeback. |
@@ -75,10 +74,13 @@ instance migration), the Runtime API Layer, the HTTP wrapper, authentication
 and authorization, assignment/claim enforcement, and the read/query API — plus
 the four frontend areas. Custom actions, data sources and assignment strategies
 are plugins behind one envelope, `{ type, config }`. Publish resolves each type
-against its registry and checks its config. A `db.list` data source keeps its
-option values in engine-owned tables. Business staff edit a list without
-publishing a new version. See `ROADMAP.md` for
-stage-by-stage status and what is deliberately deferred.
+against its registry and checks its config.
+
+A `db.list` data source keeps its option values in engine-owned tables.
+Business staff edit a list without publishing a new version. An author seeds a
+new process from a template rather than from an empty draft. A participant
+delegates a task, comments on an instance and edits a personal profile. See
+`ROADMAP.md` for stage-by-stage status and what is deliberately deferred.
 
 ## Develop
 
@@ -103,7 +105,7 @@ bun install
 DATABASE_URL=postgres://postgres:postgres@db:5432/workflow_engine bun test   # bun:test suites
 bun run typecheck                                                            # tsc --noEmit (Bun does not typecheck)
 bun run build                                                                # vite build, the frontend's production bundle
-bun run check                                                                # typecheck, build, then the suite, in one command
+bun run check                                                                # typecheck, build, the suite, then the timezone test
 ```
 
 Set `DATABASE_URL`. The database-backed suites carry `test.skipIf(!DATABASE_URL)`
