@@ -8,6 +8,7 @@ import { seedLocalizedText, resolveDraftLocalizedText } from "../draft/localized
 import { t } from "../catalog.js";
 import { autoPlaceSteps, type LayoutStep } from "./layout";
 import { dragDelta, svgPointFromClient, NODE_WIDTH, NODE_HEIGHT, type Point, type NodePosition } from "./geometry";
+import { computeFit, MIN_SCALE, MAX_SCALE, FIT_GUTTER } from "./fit";
 import { resolveDropGesture } from "./dropGesture";
 import { inlineRenamePatch } from "./inlineRename";
 import { buildOperands, guardEdgeLabel } from "../panels/shared/conditionLogic";
@@ -45,6 +46,9 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const panzoomRef = useRef<PanzoomObject | null>(null);
+  // The toolbar overlays the canvas, so `fitToView` measures it rather than
+  // framing content underneath it.
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!svgRef.current) return;
@@ -56,7 +60,7 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
     // handler is too late to stop it. `panzoom-exclude` (its own default
     // exclude class) is the sanctioned way to opt an element out of
     // Panzoom's own handling instead — every node and edge group carries it.
-    const panzoom = Panzoom(el, { minScale: 0.25, maxScale: 2 });
+    const panzoom = Panzoom(el, { minScale: MIN_SCALE, maxScale: MAX_SCALE });
     panzoomRef.current = panzoom;
     el.addEventListener("wheel", panzoom.zoomWithWheel);
     return () => {
@@ -101,18 +105,45 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
     const panzoom = panzoomRef.current;
     const svg = svgRef.current;
     if (!panzoom || !svg || nodePositions.length === 0) return;
-    const minX = Math.min(...nodePositions.map((n) => n.x));
-    const minY = Math.min(...nodePositions.map((n) => n.y));
-    const maxX = Math.max(...nodePositions.map((n) => n.x + NODE_WIDTH));
-    const maxY = Math.max(...nodePositions.map((n) => n.y + NODE_HEIGHT));
-    const rect = svg.getBoundingClientRect();
-    const contentWidth = maxX - minX || 1;
-    const contentHeight = maxY - minY || 1;
-    const scale = Math.min(rect.width / contentWidth, rect.height / contentHeight, 1);
-    panzoom.zoom(scale, { animate: false });
-    panzoom.pan((rect.width - contentWidth * scale) / 2 - minX * scale, (rect.height - contentHeight * scale) / 2 - minY * scale, {
-      animate: false,
+
+    // `getBBox()` reports what the canvas actually draws, in user space and
+    // free of Panzoom's transform. That covers the start arrow left of the
+    // initial step and the terminal stamp above a terminal step, neither of
+    // which the node rectangles contain.
+    const content = svg.getBBox();
+
+    // `clientWidth`/`clientHeight`, never `getBoundingClientRect()`: Panzoom
+    // transforms this same element, so a client rect shrinks with the zoom
+    // and a second fit would frame a smaller canvas than the first.
+    //
+    // Two properties of `.canvas-svg` and `.canvas-wrap` make these two the
+    // right reading, and a change to either would break this silently:
+    //   - `.canvas-wrap` is `overflow: hidden`. A transform can otherwise
+    //     grow an ancestor's scrollable overflow, and a classic scrollbar
+    //     appearing re-lays out a `width: 100%` child, which would feed the
+    //     zoom back into the measurement after all.
+    //   - `.canvas-svg` carries no padding. `clientWidth` is the padding box,
+    //     while an SVG with no `viewBox` anchors user space to the content
+    //     box; padding would offset the origin and overstate the viewport.
+    // Both round to whole pixels, so the framing can sit up to a pixel off.
+    // The gutter is 16px, so that is not visible.
+    const element = { width: svg.clientWidth, height: svg.clientHeight };
+
+    // The toolbar sits over the top left corner. `offsetTop`/`offsetHeight`
+    // are layout values against `.canvas-wrap`, the same origin the SVG box
+    // starts from, and no transform touches them.
+    const toolbar = toolbarRef.current;
+    const toolbarBottom = toolbar ? toolbar.offsetTop + toolbar.offsetHeight : 0;
+
+    const fit = computeFit(content, element, {
+      top: toolbarBottom + FIT_GUTTER,
+      right: FIT_GUTTER,
+      bottom: FIT_GUTTER,
+      left: FIT_GUTTER,
     });
+
+    panzoom.zoom(fit.scale, { animate: false });
+    panzoom.pan(fit.x, fit.y, { animate: false });
   };
 
   // Pointer capture keeps a fast drag tracking even if the pointer leaves
@@ -242,7 +273,7 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
 
   return (
     <div className="canvas-wrap">
-      <div className="canvas-toolbar">
+      <div className="canvas-toolbar" ref={toolbarRef}>
         <button type="button" className="btn btn-secondary" onClick={fitToView}>
           {t("canvas.fitToView")}
         </button>

@@ -179,3 +179,20 @@ The federated `editable: false` state is out of reach here too, for its own
 reason. A login token always carries `iss: "bps"`, and such a token
 guarantees a local `auth_users` row. That state gets its coverage in
 `packages/web/test/profileFields.test.ts` instead.
+
+### Studio canvas: "Fit to view" frames every step
+
+Source: `fix-canvas-fit-to-view` task 4.3.
+
+Seed the database and open a draft of `expense_approval`, which holds six
+steps. Make the browser window narrow enough that the canvas column falls to
+about 240px, well under the graph. Activate "Fit to view".
+
+Pass: all six steps render, none clipped at an edge, none under the "Fit to
+view" button. Activate it a second time. Pass: the framing does not move.
+
+`packages/web/test/studio-canvas-fit.test.ts` covers the scale and pan as
+numbers, and it cannot see this. The defect was an SVG that refused to render
+outside its own viewport. Only a browser reports that. The second activation
+matters on its own. It starts from the zoom level the first one set. The old
+code read that state back through a transformed rect.
