@@ -26,9 +26,9 @@ document. It SHALL describe every route a customer integration can call:
 `POST /instances/:id/delegate`, `POST /instances/:id/comments`,
 `GET /instances/:id/comments`, `POST /instances/:id/cancel`,
 `GET /instances/:id/record`, `POST /processes`, `GET /processes`,
-`GET /processes/:id/versions`, `GET /livez`, `GET /readyz`,
-`GET /ui-strings`. It SHALL NOT document `admin/*`, `drafts/*`,
-`migration-plans/*`, `reporting/*`, or `registry`.
+`GET /processes/:id/versions`, `GET /account/me`, `PATCH /account/me`,
+`GET /livez`, `GET /readyz`, `GET /ui-strings`. It SHALL NOT document
+`admin/*`, `drafts/*`, `migration-plans/*`, `reporting/*`, or `registry`.
 
 `reporting/*` falls under the same ground as `admin/*`. It is a role-gated
 surface backing a frontend this repository ships. It is not an integration
@@ -41,6 +41,11 @@ than a decision. It therefore joins the document, beside the two health
 routes. No token gates those two either, for the same reason.
 `GET /admin/ui-strings` and `PUT /admin/ui-strings` stay outside the
 document, under the `admin/*` exclusion.
+
+`GET` and `PATCH /account/me` join the document too. A token reaches them
+and no role gates them, so any integration holding a session can call them.
+They scope to the caller's own account, which is what keeps them outside the
+`admin/*` exclusion: they administer nobody.
 
 This requirement names the exclusion rather than leaving it implicit. A
 reader can then tell the absence is a decision, not an omission. Should a
@@ -64,6 +69,12 @@ extends this requirement. It does not redesign the routes.
 
 - **WHEN** a reader looks up `GET /ui-strings` in `docs/openapi.yaml`
 - **THEN** the entry states that the route needs no role and no token
+
+#### Scenario: The self-scoped account routes appear
+
+- **WHEN** a reader searches `docs/openapi.yaml` for `/account/me`
+- **THEN** both `GET` and `PATCH` appear, each stating that it needs a token
+  and no role
 
 ### Requirement: Each route documents auth, schema, and errors
 

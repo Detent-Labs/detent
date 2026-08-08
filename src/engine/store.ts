@@ -273,6 +273,18 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // unrepresentable; nothing deletes an account today, so ON DELETE SET NULL
   // states an intent rather than a path that runs.
   await db`ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS manager_user_id text REFERENCES auth_users(user_id) ON DELETE SET NULL`;
+  // The account's human-readable name (src/auth/users.ts). Nullable, and NULL on
+  // every pre-existing row: a caller reads the resolved COALESCE(display_name,
+  // email), so a row without one shows its email until someone sets a value. Its
+  // own statement for the same reason manager_user_id has one.
+  await db`ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS display_name text`;
+  // The account's own UI locale (src/http/account-routes.ts). Nullable, and NULL
+  // on every pre-existing row: a browser that reads no value keeps its own
+  // localStorage preference. The value set is bounded by the route, not by a
+  // check constraint — a locale the frontend later adds must not make an
+  // already-stored row unreadable. Its own statement for the same reason
+  // manager_user_id has one.
+  await db`ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS locale text`;
   // Studio's mutable draft store: one row per process, the authored (uncompiled)
   // body an author is still editing. Deliberately not `definitions` with
   // `status='draft'` — that table is what resolution.ts and the timer worker

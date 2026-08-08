@@ -168,7 +168,16 @@ function EditorArea({ processId, formStepId, token, initialRevision, initialLayo
    * the same conversion `CanvasView`'s own node/handle drags use. */
   const onPaletteDrop = (kind: StepKind, clientX: number, clientY: number) => {
     const target = document.elementFromPoint(clientX, clientY);
-    const svg = target?.closest<SVGSVGElement>("svg.canvas-svg");
+    // Resolve through `.canvas-wrap`, not through the SVG under the pointer.
+    // Panzoom scales the SVG element itself, so a zoomed-out canvas leaves
+    // most of the wrap outside the SVG's own box, while the wrap still paints
+    // the grid and still shows the graph. Every point the author reads as
+    // canvas therefore places a step. `svgPointFromClient` maps a point
+    // outside the box just as well: an inverse CTM is a linear map, not a
+    // bounded one.
+    const svg =
+      target?.closest(".canvas-wrap")?.querySelector<SVGSVGElement>("svg.canvas-svg") ??
+      target?.closest<SVGSVGElement>("svg.canvas-svg");
     if (!svg) return; // dropped outside the canvas — no placement
     const point = svgPointFromClient(svg, clientX, clientY);
     const created = newStep(kind, seedLocalizedText(contentLocale));

@@ -12,7 +12,18 @@
 import type { SQL } from "bun";
 import { sql, withTransaction } from "../engine/store.js";
 import { listOutbox, countOutboxByStatus, listPendingTimers, requeueOutboxRow, discardOutboxRow, getOutboxRow, MAX_LIST_LIMIT, type OutboxListFilter } from "../engine/admin-queries.js";
-import { listUsers, createUser, setDisabled, setRolesById, setManagerById, setPasswordById, SelfManagerError } from "../auth/users.js";
+import {
+  listUsers,
+  createUser,
+  setDisabled,
+  setRolesById,
+  setManagerById,
+  setPasswordById,
+  setDisplayName,
+  validateDisplayName,
+  DISPLAY_NAME_MAX_LENGTH,
+  SelfManagerError,
+} from "../auth/users.js";
 import { migrateInstances } from "../engine/migration.js";
 import { redactInstance } from "../engine/retention.js";
 import { localizedText, type ProcessId, type InstanceId, type LocalizedText } from "../schema/definition.js";
@@ -205,14 +216,19 @@ export async function handleAdminCreateUser(req: Request, resolver: ActorResolve
 
     let created: Awaited<ReturnType<typeof createUser>>;
     try {
-      created = await createUser(email, password, roles, db);
+      // No display name at creation: the account gets one from `PATCH
+      // /admin/users/:id/name`, or keeps its email as the resolved name. One
+      // field, one route, rather than a second way to set it.
+      created = await createUser(email, password, roles, null, db);
     } catch (err) {
       if (isEmailUniqueViolation(err)) {
         return { status: 409, body: { error: { type: "email-in-use", message: `an account already holds ${email}` } } };
       }
       throw err;
     }
-    return { status: 201, body: { userId: created.userId, email, roles, disabled: false, managerUserId: undefined } };
+    // `displayName` resolves to the email while `display_name` is NULL, the
+    // rule `resolveDisplayName` applies to every other user-returning read.
+    return { status: 201, body: { userId: created.userId, email, roles, disabled: false, managerUserId: undefined, displayName: email } };
   });
 }
 
@@ -289,6 +305,41 @@ export async function handleAdminSetUserManager(userId: string, req: Request, re
       }
       throw err;
     }
+    if (!updated) return { status: 404, body: { error: { type: "not-found", message: `no user: ${userId}` } } };
+    return { status: 200, body: updated };
+  });
+}
+
+/**
+ * Set or clear the account's human-readable name. `{ displayName: null }`
+ * clears it, so the resolved value falls back to the account's email.
+ *
+ * The trim and the 200-character bound come from `validateDisplayName`
+ * (`src/auth/users.ts`), not from a check written here: a later self-scoped
+ * route calls that same helper rather than re-deriving the bound. This route
+ * rejects an empty-after-trim value outright, while `setDisplayName` normalizes
+ * one to `NULL` — telling the caller beats silently accepting.
+ */
+export async function handleAdminSetUserName(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    requireRole(actor, ADMIN_ROLE);
+    let body: { displayName?: unknown };
+    try {
+      body = (await req.json()) as typeof body;
+    } catch {
+      throw new RequestShapeError("request body is not valid JSON");
+    }
+    const raw = body.displayName;
+    if (raw !== null && typeof raw !== "string") throw new RequestShapeError("displayName must be a string or null");
+    const checked = validateDisplayName(raw);
+    if (!checked.ok) {
+      throw new RequestShapeError(
+        checked.reason === "empty" ? "displayName must not be empty" : `displayName is at most ${DISPLAY_NAME_MAX_LENGTH} characters`,
+      );
+    }
+
+    const updated = await setDisplayName(userId, checked.displayName, db);
     if (!updated) return { status: 404, body: { error: { type: "not-found", message: `no user: ${userId}` } } };
     return { status: 200, body: updated };
   });

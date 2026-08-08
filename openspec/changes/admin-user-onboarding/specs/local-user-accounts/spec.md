@@ -27,7 +27,7 @@ The engine SHALL provide no registration flow, no self-service password-reset
 flow and no MFA flow. No route SHALL let an unauthenticated caller create an
 account or set a password.
 
-Seven routes SHALL administer accounts over HTTP. The `admin-user-management`
+Eight routes SHALL administer accounts over HTTP. The `admin-user-management`
 capability defines them, and `system:admin` gates each one.
 
 - `GET /admin/users`
@@ -36,10 +36,11 @@ capability defines them, and `system:admin` gates each one.
 - `POST /admin/users/:id/enable`
 - `PATCH /admin/users/:id/roles`
 - `PATCH /admin/users/:id/manager`
+- `PATCH /admin/users/:id/name`
 - `POST /admin/users/:id/password`
 
 The CLI SHALL stay the recovery path for a deployment where no account holds
-`system:admin`. That state locks all seven routes, and a shell is what remains.
+`system:admin`. That state locks all eight routes, and a shell is what remains.
 
 #### Scenario: The CLI creates a user
 
@@ -56,9 +57,9 @@ The CLI SHALL stay the recovery path for a deployment where no account holds
 #### Scenario: No route outside the admin gate creates an account
 
 - **WHEN** a reader walks the server's route table
-- **THEN** no route creates a user or sets a password outside the seven this
+- **THEN** no route creates a user or sets a password outside the eight this
   requirement lists
-- **AND** each of those seven refuses an actor whose roles omit `system:admin`
+- **AND** each of those eight refuses an actor whose roles omit `system:admin`
 
 #### Scenario: No route registers a caller
 

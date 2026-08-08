@@ -18,6 +18,24 @@ export interface LoginResponse {
   actor: Actor;
 }
 
+/**
+ * `GET`/`PATCH /account/me`, the actor's own account. A federated actor holds no
+ * local account row and gets `editable: false` with `id` and `roles` alone, which
+ * is why every other field is optional here rather than in two split types.
+ */
+export interface AccountView {
+  id: string;
+  roles: string[];
+  editable: boolean;
+  /** What to print: the stored name, or the email where the account set none. */
+  displayName?: string;
+  /** What the account actually set, `null` where it set nothing. The editable name box seeds from this, never from `displayName`. */
+  storedDisplayName?: string | null;
+  email?: string;
+  managerUserId?: string;
+  locale?: string;
+}
+
 /** One located publish rejection. `loc` is a JSON path into the submitted body. */
 export interface PublishIssue {
   loc: string;

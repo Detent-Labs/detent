@@ -25,9 +25,10 @@
       step" Draft mutation.
 - [x] 2.4 Confirm the palette's drag gesture uses Pointer Events
       (`onPointerDown`/`onPointerMove`/`onPointerUp`), consistent with
-      `CanvasView.tsx`'s existing node and handle drags, and is wired
-      into its `panzoom-exclude` handling. Do not use native HTML5
-      Drag-and-Drop.
+      `CanvasView.tsx`'s existing node and handle drags. Do not use
+      native HTML5 Drag-and-Drop. `StepPalette.tsx` needs no
+      `panzoom-exclude` class: it renders outside the canvas SVG
+      entirely, so Panzoom's pointer handling never reaches it.
 - [x] 2.5 Reflow `EditScreen.tsx` to four columns: palette, canvas,
       inspector, checks rail. Keep the reflow, palette included, nested
       inside the existing `surface === "structure"` conditional, in the

@@ -159,5 +159,7 @@ export async function handleLogin(req: Request, secret: string, db: SQL = sql, c
     .sign(key);
 
   const expiresAt = new Date(Date.now() + TOKEN_LIFETIME_MS).toISOString();
-  return { status: 200, body: { token, expiresAt, actor: { id: result.userId, roles: result.roles } } };
+  // `displayName` is a presentation field on this response only. It never joins
+  // the trusted `Actor` the resolver hands to CEL and authorization.
+  return { status: 200, body: { token, expiresAt, actor: { id: result.userId, roles: result.roles, displayName: result.displayName } } };
 }

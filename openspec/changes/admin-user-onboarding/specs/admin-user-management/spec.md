@@ -4,7 +4,7 @@
 ### Requirement: Users are listable by an operator over HTTP
 
 `src/auth/users.ts` SHALL expose `listUsers(page, db)` returning a `Page` of
-`auth_users` rows as `{ userId, email, roles, disabled, managerUserId }`,
+`auth_users` rows as `{ userId, email, roles, disabled, managerUserId, displayName }`,
 excluding `password_hash`. `GET /admin/users` SHALL expose this read, gated
 by `system:admin` through the same `requireRole` check every other
 `/admin/*` route uses.
@@ -21,7 +21,7 @@ ties between two accounts sharing no email.
 
 - **WHEN** an actor holding `system:admin` requests `GET /admin/users`
 - **THEN** the response is 200 with a page of users, each carrying `userId`,
-  `email`, `roles`, `disabled` and `managerUserId`
+  `email`, `roles`, `disabled`, `managerUserId` and `displayName`
 
 #### Scenario: Password hashes are never returned
 
@@ -60,7 +60,7 @@ same `requireRole` check.
 The request body SHALL be `{ email: string, password: string, roles?:
 string[] }`. `email` and `password` SHALL each be non-empty after trimming.
 
-`roles`, when present, SHALL pass the same bounds `PATCH
+A `roles` array the body carries SHALL pass the same bounds `PATCH
 /admin/users/:id/roles` already enforces. Each entry SHALL be a non-empty
 string of at most 64 characters after trimming. The array SHALL hold at most
 64 entries. The route SHALL deduplicate `roles` on first occurrence.
@@ -70,11 +70,17 @@ The route SHALL enforce no minimum length or character-set rule on
 `password`. `Bun.password.hash` accepts any input. This route adds no check
 the rest of the system lacks.
 
+The request body SHALL carry no display name. The route SHALL store none.
+`PATCH /admin/users/:id/name` is the one route that writes that column. A
+second way in would be a second way to drift. The created account's
+`displayName` therefore resolves to its email, the rule
+`resolveDisplayName` applies everywhere else.
+
 On success the route SHALL return 201. The body SHALL carry the created
-`{ userId, email, roles, disabled, managerUserId }`. `auth_users.email`
-carries a `UNIQUE NOT NULL` constraint. When that constraint rejects the
-insert, the route SHALL return 409. No existence check ahead of the insert
-races that constraint.
+`{ userId, email, roles, disabled, managerUserId, displayName }`.
+`auth_users.email` carries a `UNIQUE NOT NULL` constraint. When that
+constraint rejects the insert, the route SHALL return 409. No existence check
+ahead of the insert races that constraint.
 
 #### Scenario: Creating a user
 
@@ -90,10 +96,16 @@ races that constraint.
 - **WHEN** an actor requests `POST /admin/users` with no `roles` field
 - **THEN** the response is 201 and the created user's `roles` is `[]`
 
+#### Scenario: A created account's display name is its email
+
+- **WHEN** an actor requests `POST /admin/users`
+- **THEN** the response's `displayName` equals the submitted `email`, and
+  `auth_users.display_name` holds `NULL` for that row
+
 #### Scenario: The route refuses a duplicate email
 
-- **WHEN** an actor requests `POST /admin/users` naming an `email` already
-  present in `auth_users`
+- **WHEN** an actor requests `POST /admin/users` naming an `email` another
+  `auth_users` row already holds
 - **THEN** the response is 409 and the route writes no second row
 
 #### Scenario: The route refuses a missing email or password
@@ -120,7 +132,7 @@ races that constraint.
 keyed by `userId` like `setDisabled`/`setRolesById`/`setManagerById`. It
 SHALL hash `password` with `Bun.password.hash` and set
 `auth_users.password_hash` for the row matching `user_id = $1`. It SHALL
-return the updated `{ userId, email, roles, disabled, managerUserId }`, or
+return the updated `{ userId, email, roles, disabled, managerUserId, displayName }`, or
 `undefined` when no such `userId` exists. The existing `setPassword(email,
 password, db)` SHALL keep its behavior and its email key, since
 `src/auth/cli.ts` calls it.

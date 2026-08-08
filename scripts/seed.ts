@@ -88,7 +88,7 @@ async function seedUser(demo: { role: string; emailSuffix: string }): Promise<vo
     await setPassword(email, DEMO_PASSWORD, sql);
     console.log(`- ${email}: updated (role ${demo.role})`);
   } else {
-    await createUser(email, DEMO_PASSWORD, [demo.role], sql);
+    await createUser(email, DEMO_PASSWORD, [demo.role], undefined, sql);
     console.log(`- ${email}: created (role ${demo.role})`);
   }
 }

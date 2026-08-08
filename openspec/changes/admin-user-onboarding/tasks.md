@@ -158,15 +158,15 @@
 
 ## 8. Verification
 
-- [ ] 8.1 Run `bun run typecheck`.
-- [ ] 8.2 Run `bun run build`.
-- [ ] 8.3 Run the full `bun test` suite with `DATABASE_URL` set. Confirm the
+- [x] 8.1 Run `bun run typecheck`.
+- [x] 8.2 Run `bun run build`.
+- [x] 8.3 Run the full `bun test` suite with `DATABASE_URL` set. Confirm the
       skip count, not only the pass count, and read the verdict off named
       test results rather than a single-file rerun.
-- [ ] 8.4 Run the antislop linter (`scripts/gates/prose.sh` equivalent, or
+- [x] 8.4 Run the antislop linter (`scripts/gates/prose.sh` equivalent, or
       the `antislop` skill directly) over every Markdown file this change
       touched, including this change's own `openspec/changes/` artifacts.
-- [ ] 8.5 Run `git diff --check` for trailing whitespace and blank-at-EOF,
+- [x] 8.5 Run `git diff --check` for trailing whitespace and blank-at-EOF,
       and `git ls-files --eol` to confirm no CRLF landed in a touched file.
 - [ ] 8.6 Manually verify in a real browser: create a user, log in as that
       user, reset a password from another admin session, confirm the old

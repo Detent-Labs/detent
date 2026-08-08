@@ -1,6 +1,6 @@
 import { Inbox } from "lucide-react";
 import { matchRoute, routePath, type Route } from "./routing.js";
-import { useAreaRoute } from "../../shell/routing.js";
+import { useAreaRoute, PROFILE_PATH } from "../../shell/routing.js";
 import { Chrome } from "../../shell/Chrome.js";
 import { t } from "./catalog.js";
 import { TasksScreen } from "./screens/TasksScreen.js";
@@ -47,6 +47,7 @@ export function AppArea({ session, locale, localPath, go, onUnauthorized, onLoca
       onLocaleChange={onLocaleChange}
       onLogout={onLogout}
       onGoToArea={(a) => go(`/${a}`)}
+      onGoToProfile={() => go(PROFILE_PATH)}
       nav={nav}
     >
       {route.name === "tasks" && (

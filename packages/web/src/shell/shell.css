@@ -72,12 +72,16 @@
   box-shadow: var(--shadow-md);
 }
 
+/* The profile entry heads the menu, so the language row opens the next group
+   and carries the same hairline the switcher and logout groups already do. */
 .shell-menu-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
   font-size: 0.85rem;
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-2);
 }
 
 .shell-menu-group {
@@ -176,6 +180,68 @@
   transform: rotate(-2deg);
 }
 
+/*
+ * The profile page. One case in the register, and the case is the actor: a
+ * single column of ruled rows, term left of the rule and value right of it. The
+ * 2px rule under the heading is the structural one; the 1px rules between rows
+ * are the ledger ones. Machine-matched values — the actor id, the manager id,
+ * role names — take the mono face, and nothing else on the page does.
+ */
+.shell-profile-facts {
+  margin: 0;
+  border-top: 2px solid var(--color-divider);
+}
+
+.shell-profile-row {
+  display: grid;
+  /* The term column is bounded, not sized to a label: German runs up to 40%
+     longer than English and must wrap rather than push the value column. */
+  grid-template-columns: minmax(7rem, 11rem) 1fr;
+  gap: var(--space-1) var(--space-4);
+  align-items: baseline;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.shell-profile-term {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+}
+
+.shell-profile-value {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.shell-profile-machine {
+  font-family: var(--font-mono);
+}
+
+.shell-profile-value input {
+  width: 100%;
+  max-width: 22rem;
+}
+
+.shell-profile-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.shell-profile-status {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.shell-profile-note {
+  max-width: 34rem;
+  color: var(--color-text-muted);
+}
+
 @media (max-width: 30rem) {
   .shell-header {
     flex-wrap: wrap;
@@ -184,5 +250,9 @@
   .shell-nav {
     order: 3;
     flex-basis: 100%;
+  }
+
+  .shell-profile-row {
+    grid-template-columns: 1fr;
   }
 }

@@ -4,12 +4,18 @@ import { permittedAreas, type Area } from "./areas.js";
 import type { UiLocale } from "../i18n/locale.js";
 
 interface ChromeProps {
-  area: Area;
+  /**
+   * The open area, or `"profile"` for the one page that belongs to no area.
+   * The switcher filters this value out of the permitted set, and `"profile"`
+   * is in no actor's, so the profile page lists every area that actor may enter.
+   */
+  area: Area | "profile";
   roles: readonly string[];
   locale: UiLocale;
   onLocaleChange: (locale: UiLocale) => void;
   onLogout: () => void;
   onGoToArea: (area: Area) => void;
+  onGoToProfile: () => void;
   /** The area's own navigation, rendered on the left of the one header row. */
   nav?: ReactNode;
   children: ReactNode;
@@ -17,15 +23,15 @@ interface ChromeProps {
 
 /**
  * The one header. Left: the register tab naming the open area, then that area's
- * own navigation. Right: the account menu, holding language, the area switcher
- * and logout.
+ * own navigation. Right: the account menu, holding the profile entry, language,
+ * the area switcher and logout.
  *
  * The switcher lists only the other areas this actor may see and is absent
  * entirely for an actor permitted one area, so a participant sees no trace of
  * the consolidation. Current location shows in the URL prefix and the tab, not
  * as a separate label.
  */
-export function Chrome({ area, roles, locale, onLocaleChange, onLogout, onGoToArea, nav, children }: ChromeProps) {
+export function Chrome({ area, roles, locale, onLocaleChange, onLogout, onGoToArea, onGoToProfile, nav, children }: ChromeProps) {
   const [open, setOpen] = useState(false);
   const menu = useRef<HTMLDivElement>(null);
   const others = permittedAreas(roles).filter((a) => a !== area);
@@ -61,6 +67,16 @@ export function Chrome({ area, roles, locale, onLocaleChange, onLogout, onGoToAr
           </button>
           {open && (
             <div className="shell-menu" role="menu">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  onGoToProfile();
+                }}
+              >
+                {t(locale, "account.profile")}
+              </button>
               <label className="shell-menu-row">
                 {t(locale, "account.language")}
                 <select value={locale} onChange={(e) => onLocaleChange(e.target.value as UiLocale)}>

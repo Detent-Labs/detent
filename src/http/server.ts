@@ -55,6 +55,7 @@ import {
   handleAdminEnableUser,
   handleAdminSetUserRoles,
   handleAdminSetUserManager,
+  handleAdminSetUserName,
   handleAdminRunMigration,
   handleAdminRedactInstance,
   handleAdminListDataLists,
@@ -66,6 +67,7 @@ import {
   handleAdminListUiStrings,
   handleAdminPutUiString,
 } from "./admin-routes.js";
+import { handleGetAccount, handlePatchAccount } from "./account-routes.js";
 import {
   handleReportingListProcesses,
   handleReportingCycleTime,
@@ -479,6 +481,14 @@ export function createServer(
       handler: (_p, req) => handlePublish(req, resolver, registry, dataSourceRegistry, db, assignmentRegistry) },
     { method: "GET", segments: seg("/processes/:processId/versions"),
       handler: (p, req) => handleListVersions(p[0]!, req, resolver, db) },
+    // Self-scoped: resolves an actor, checks no role, and takes no id. The
+    // shell page that calls these sits at /profile, a path this table holds no
+    // entry for, so a browser navigation there reaches the bundle rather than
+    // an API answer.
+    { method: "GET", segments: seg("/account/me"),
+      handler: (_p, req) => handleGetAccount(req, resolver, db) },
+    { method: "PATCH", segments: seg("/account/me"),
+      handler: (_p, req) => handlePatchAccount(req, resolver, db) },
     { method: "GET", segments: seg("/admin/outbox"),
       handler: (_p, req) => handleAdminListOutbox(req, resolver, db) },
     { method: "POST", segments: seg("/admin/outbox/:idempotencyKey/retry"),
@@ -501,6 +511,8 @@ export function createServer(
       handler: (p, req) => handleAdminSetUserRoles(p[0]!, req, resolver, db) },
     { method: "PATCH", segments: seg("/admin/users/:userId/manager"),
       handler: (p, req) => handleAdminSetUserManager(p[0]!, req, resolver, db) },
+    { method: "PATCH", segments: seg("/admin/users/:userId/name"),
+      handler: (p, req) => handleAdminSetUserName(p[0]!, req, resolver, db) },
     { method: "POST", segments: seg("/admin/migrations/run"),
       handler: (_p, req) => handleAdminRunMigration(req, resolver, db) },
     { method: "POST", segments: seg("/admin/instances/:instanceId/redact"),

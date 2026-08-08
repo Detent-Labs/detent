@@ -17,6 +17,10 @@ import {
   setManagerById,
   setManagerByEmail,
   getManagerOf,
+  setDisplayName,
+  setDisplayNameByEmail,
+  getAccountById,
+  updateAccount,
   SelfManagerError,
 } from "../src/auth/users.js";
 
@@ -45,7 +49,7 @@ test.skipIf(!DB)("initSchema creates auth_users with a unique constraint on emai
 test.skipIf(!DB)("a created user's password verifies and returns userId/roles", async () => {
   const { userId } = await createUser("b@example.com", "correct-horse", ["employee"]);
   const result = await verifyLogin("b@example.com", "correct-horse");
-  expect(result).toEqual({ userId, roles: ["employee"] });
+  expect(result).toEqual({ userId, roles: ["employee"], displayName: "b@example.com" });
 });
 
 test.skipIf(!DB)("a wrong password does not verify", async () => {
@@ -117,7 +121,7 @@ test.skipIf(!DB)("listUsers returns every user without password_hash", async () 
 test.skipIf(!DB)("setDisabled flips the flag and returns the updated row, or undefined for an unknown userId", async () => {
   const { userId } = await createUser("i@example.com", "pw", ["employee"]);
   const updated = await setDisabled(userId, true);
-  expect(updated).toEqual({ userId, email: "i@example.com", roles: ["employee"], disabled: true, managerUserId: undefined });
+  expect(updated).toEqual({ userId, email: "i@example.com", roles: ["employee"], disabled: true, managerUserId: undefined, displayName: "i@example.com" });
   const [after] = (await listUsers()).items;
   expect(after!.disabled).toBe(true);
   expect(await setDisabled("user_does_not_exist", true)).toBeUndefined();
@@ -126,7 +130,7 @@ test.skipIf(!DB)("setDisabled flips the flag and returns the updated row, or und
 test.skipIf(!DB)("setRolesById replaces the whole set and returns the updated row, or undefined for an unknown userId", async () => {
   const { userId } = await createUser("k@example.com", "pw", ["a", "b"]);
   const updated = await setRolesById(userId, ["a"]);
-  expect(updated).toEqual({ userId, email: "k@example.com", roles: ["a"], disabled: false, managerUserId: undefined });
+  expect(updated).toEqual({ userId, email: "k@example.com", roles: ["a"], disabled: false, managerUserId: undefined, displayName: "k@example.com" });
   expect(await setRolesById("user_does_not_exist", ["a"])).toBeUndefined();
 });
 
@@ -163,6 +167,55 @@ test.skipIf(!DB)("initSchema adds manager_user_id, and an existing row holds NUL
   expect(rows[0]!.manager_user_id).toBeNull();
   const [listed] = (await listUsers()).items;
   expect(listed!.managerUserId).toBeUndefined();
+});
+
+test.skipIf(!DB)("initSchema adds locale, and an existing row holds NULL", async () => {
+  // Same shape as the manager_user_id migration above: its own ALTER, run over a
+  // table that already holds a row, which is how a deployed database upgrades.
+  const { userId } = await createUser("loc1@example.com", "pw", []);
+  await initSchema();
+  const rows = (await sql`SELECT locale FROM auth_users WHERE user_id = ${userId}`) as { locale: string | null }[];
+  expect(rows[0]!.locale).toBeNull();
+  expect((await getAccountById(userId))!.locale).toBeUndefined();
+});
+
+test.skipIf(!DB)("getAccountById returns one account, or undefined for an unknown id", async () => {
+  const boss = await createUser("loc-boss@example.com", "pw", []);
+  const { userId } = await createUser("loc2@example.com", "pw", ["a"], "Rita Alvarez");
+  await setManagerById(userId, boss.userId);
+  await updateAccount(userId, { locale: "de" });
+  expect(await getAccountById(userId)).toEqual({
+    userId,
+    email: "loc2@example.com",
+    roles: ["a"],
+    disabled: false,
+    managerUserId: boss.userId,
+    displayName: "Rita Alvarez",
+    storedDisplayName: "Rita Alvarez",
+    locale: "de",
+  });
+  expect(await getAccountById("user_does_not_exist")).toBeUndefined();
+});
+
+test.skipIf(!DB)("updateAccount leaves a column the change set omits untouched", async () => {
+  const { userId } = await createUser("loc3@example.com", "pw", [], "Rita Alvarez");
+  await updateAccount(userId, { locale: "de" });
+  const afterLocale = await updateAccount(userId, { locale: "en" });
+  expect(afterLocale!.displayName).toBe("Rita Alvarez");
+  const afterName = await updateAccount(userId, { displayName: null });
+  expect(afterName!.locale).toBe("en");
+  expect(afterName!.displayName).toBe("loc3@example.com");
+  expect(await updateAccount("user_does_not_exist", { locale: "de" })).toBeUndefined();
+});
+
+test.skipIf(!DB)("an account record carries the raw display_name column beside the resolved name", async () => {
+  const named = await createUser("raw1@example.com", "pw", [], "Rita Alvarez");
+  const unnamed = await createUser("raw2@example.com", "pw", []);
+  expect((await getAccountById(named.userId))!.storedDisplayName).toBe("Rita Alvarez");
+  const record = (await getAccountById(unnamed.userId))!;
+  expect(record.storedDisplayName).toBeNull();
+  expect(record.displayName).toBe("raw2@example.com");
+  expect((await updateAccount(named.userId, { displayName: null }))!.storedDisplayName).toBeNull();
 });
 
 test.skipIf(!DB)("a manager pointer round-trips through setManagerById and getManagerOf", async () => {
@@ -254,7 +307,7 @@ test.skipIf(!DB)("setPasswordById replaces the hash and returns the row, or unde
   const before = (await sql`SELECT password_hash FROM auth_users WHERE user_id = ${userId}`) as { password_hash: string }[];
 
   const updated = await setPasswordById(userId, "new-pw");
-  expect(updated).toEqual({ userId, email: "pw1@example.com", roles: ["employee"], disabled: false, managerUserId: undefined });
+  expect(updated).toEqual({ userId, email: "pw1@example.com", roles: ["employee"], disabled: false, managerUserId: undefined, displayName: "pw1@example.com" });
 
   const after = (await sql`SELECT password_hash FROM auth_users WHERE user_id = ${userId}`) as { password_hash: string }[];
   expect(after[0]!.password_hash).not.toBe(before[0]!.password_hash);
@@ -275,7 +328,7 @@ test.skipIf(!DB)("setPasswordById writes password_hash alone", async () => {
   await setDisabled(userId, true);
 
   const updated = await setPasswordById(userId, "new-pw");
-  expect(updated).toEqual({ userId, email: "pw3@example.com", roles: ["a", "b"], disabled: true, managerUserId: boss.userId });
+  expect(updated).toEqual({ userId, email: "pw3@example.com", roles: ["a", "b"], disabled: true, managerUserId: boss.userId, displayName: "pw3@example.com" });
 });
 
 /**
@@ -326,4 +379,96 @@ test.skipIf(!DB)("listUsers caps limit at MAX_LIST_LIMIT rather than refusing it
   const page = await listUsers({ limit: 10_000 });
   expect(page.items).toHaveLength(3);
   expect(page.cursor).toBeUndefined();
+});
+
+// ============================================================
+// The display name (COALESCE(display_name, email))
+// ============================================================
+
+const storedDisplayName = async (userId: string): Promise<string | null> => {
+  const rows = (await sql`SELECT display_name FROM auth_users WHERE user_id = ${userId}`) as { display_name: string | null }[];
+  return rows[0]!.display_name;
+};
+
+test.skipIf(!DB)("initSchema adds display_name, and an existing row holds NULL", async () => {
+  // Its own ALTER, like manager_user_id: CREATE TABLE IF NOT EXISTS does not
+  // touch a table that already exists, so a deployed database picks the column
+  // up on the next run over its populated table.
+  const { userId } = await createUser("n1@example.com", "pw", []);
+  await initSchema();
+  expect(await storedDisplayName(userId)).toBeNull();
+  const [listed] = (await listUsers()).items;
+  expect(listed!.displayName).toBe("n1@example.com");
+});
+
+test.skipIf(!DB)("createUser stores a display name, and verifyLogin returns it instead of the email", async () => {
+  const { userId } = await createUser("n2@example.com", "pw", [], "Rita Alvarez");
+  expect(await storedDisplayName(userId)).toBe("Rita Alvarez");
+  expect((await verifyLogin("n2@example.com", "pw"))?.displayName).toBe("Rita Alvarez");
+});
+
+test.skipIf(!DB)("createUser trims the display name, and stores NULL for an omitted, empty or whitespace-only one", async () => {
+  const trimmed = await createUser("n3@example.com", "pw", [], "  Rita Alvarez  ");
+  expect(await storedDisplayName(trimmed.userId)).toBe("Rita Alvarez");
+
+  // Each of these must leave NULL, never "": the resolution reads the column
+  // with `??`, so an empty string would resolve to an empty display name.
+  const omitted = await createUser("n4@example.com", "pw", []);
+  const empty = await createUser("n5@example.com", "pw", [], "");
+  const blank = await createUser("n6@example.com", "pw", [], "   ");
+  for (const { userId } of [omitted, empty, blank]) {
+    expect(await storedDisplayName(userId)).toBeNull();
+  }
+  expect((await verifyLogin("n6@example.com", "pw"))?.displayName).toBe("n6@example.com");
+});
+
+test.skipIf(!DB)("setDisplayName sets, trims and clears, and is undefined for an unknown userId", async () => {
+  const { userId } = await createUser("n7@example.com", "pw", []);
+  const set = await setDisplayName(userId, "  Rita Alvarez  ");
+  expect(set!.displayName).toBe("Rita Alvarez");
+  expect(await storedDisplayName(userId)).toBe("Rita Alvarez");
+
+  const cleared = await setDisplayName(userId, null);
+  expect(cleared!.displayName).toBe("n7@example.com");
+  expect(await storedDisplayName(userId)).toBeNull();
+
+  expect(await setDisplayName("user_does_not_exist", "Rita Alvarez")).toBeUndefined();
+});
+
+test.skipIf(!DB)("setDisplayName normalizes a whitespace-only value to NULL rather than an empty string", async () => {
+  // This function normalizes; refusing an empty submission is the HTTP route's
+  // job (see test/http-admin.test.ts).
+  const { userId } = await createUser("n8@example.com", "pw", []);
+  await setDisplayName(userId, "Rita Alvarez");
+  const updated = await setDisplayName(userId, "   ");
+  expect(await storedDisplayName(userId)).toBeNull();
+  expect(updated!.displayName).toBe("n8@example.com");
+});
+
+test.skipIf(!DB)("setDisplayNameByEmail is the CLI's email-keyed path, and names an email that does not exist", async () => {
+  const { userId } = await createUser("n9@example.com", "pw", []);
+  await setDisplayNameByEmail("n9@example.com", " Rita Alvarez ");
+  expect(await storedDisplayName(userId)).toBe("Rita Alvarez");
+  await setDisplayNameByEmail("n9@example.com", "   ");
+  expect(await storedDisplayName(userId)).toBeNull();
+  expect(setDisplayNameByEmail("ghost@example.com", "Rita Alvarez")).rejects.toThrow("ghost@example.com");
+});
+
+test.skipIf(!DB)("listUsers resolves displayName per row, falling back to email only where the column is NULL", async () => {
+  await createUser("n10@example.com", "pw", [], "Rita Alvarez");
+  await createUser("n11@example.com", "pw", []);
+  const { items: users } = await listUsers();
+  expect(users.find((u) => u.email === "n10@example.com")!.displayName).toBe("Rita Alvarez");
+  expect(users.find((u) => u.email === "n11@example.com")!.displayName).toBe("n11@example.com");
+});
+
+test.skipIf(!DB)("setRolesById, setDisabled, setManagerById and setPasswordById all return the stored display name, not the email", async () => {
+  // All four share `toSummary`; a column list missing `display_name` in one of
+  // them returns that row's email while the stored name says otherwise.
+  const boss = await createUser("n12-boss@example.com", "pw", []);
+  const { userId } = await createUser("n12@example.com", "pw", [], "Rita Alvarez");
+  expect((await setRolesById(userId, ["employee"]))!.displayName).toBe("Rita Alvarez");
+  expect((await setDisabled(userId, true))!.displayName).toBe("Rita Alvarez");
+  expect((await setManagerById(userId, boss.userId))!.displayName).toBe("Rita Alvarez");
+  expect((await setPasswordById(userId, "new-pw"))!.displayName).toBe("Rita Alvarez");
 });
