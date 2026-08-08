@@ -8,16 +8,33 @@ precedent for a route module: one file per route family, wired into the
 composition root in `src/http/server.ts`. This change adds
 `src/http/account-routes.ts` the same way.
 
-Every route today resolves an `Actor { id, roles }` through the
-`ActorResolver` seam (`src/auth/resolve.ts`) before it reaches a handler.
-No existing route scopes itself to the resolved actor's own id instead of
-a role. Every self-scoping check this change needs is new.
+Every route that acts on behalf of a person resolves an `Actor { id, roles }`
+through the `ActorResolver` seam (`src/auth/resolve.ts`) before reaching a
+handler. Five routes resolve no actor at all: `GET /livez`, `GET /readyz`,
+`GET /metrics`, `GET /ui-strings` and `POST /auth/login`.
+
+`GET /instances?scope=mine` already derives its filter from the resolved
+actor rather than from a role (`src/http/routes.ts:378`). It also refuses a
+request that pairs `scope=mine` with an explicit `assignedTo` (:366). No
+caller can name someone else's id there. The account routes follow the same
+shape. Each reads the id from the resolved actor alone and accepts nothing
+that overrides it.
 
 `jwt-authentication` already defines the signal this design reuses. A
 `"bps"`-issued token guarantees an active `auth_users` row; the resolver
 raises `ActorResolutionError` otherwise. An externally issued token
 carries no such guarantee, and the engine holds no directory entry for
 it.
+
+That reasoning holds for `jwtResolver` only. The second shipped resolver,
+`devHeaderResolver` (`src/auth/resolve.ts:36-43`), builds an `Actor` from an
+unsigned `X-Actor-Id` header and reads no directory.
+`.devcontainer/docker-compose.yml` selects it.
+
+Under that resolver a missing `auth_users` row means only that the header
+named no local account. It says nothing about an external issuer. The route
+answers the same way in both cases. Only the explanation the page shows
+differs.
 
 This change depends on `add-user-display-name` landing first. That change
 adds the `display_name` column and the `COALESCE(display_name, email)`
@@ -115,21 +132,53 @@ applies to every signed-in actor, regardless of role. It does not belong
 to one of the four role-gated areas. It sits beside the login screen and
 session module, both already shell-owned.
 
+**The shell page and the API routes take different paths.** The page is
+`/profile`. The routes stay `GET` and `PATCH /account/me`.
+`src/http/server.ts` matches its route table before it falls through to
+static serving (`:613-623`). A page path equal to an API path therefore
+answers a browser navigation with JSON instead of the app. An `/admin/*`
+route collision is one of three defects `CLAUDE.md` records as shipped past
+a green suite here. The chosen path matches no route-table entry and no
+prefix in `AREAS` (`packages/web/src/shell/areas.ts:9`).
+
+**The page keeps the ordinary header.** `ChromeProps.area` widens from
+`Area` to `Area | "profile"`. The shell catalog gains an `area.profile` key
+in EN and DE. The tab label at `Chrome.tsx:50` builds its key from the
+`area` prop, so it keeps working unchanged.
+
+The area switcher needs no change either. It lists `permittedAreas(roles)`
+minus the current value (`Chrome.tsx:31`). No actor's permitted set holds
+`"profile"`, so on this page the switcher lists every area that actor may
+enter. `unified-shell`'s "The area switcher shows only other permitted
+areas" stays true. On a page that is no area, every permitted area is
+another one.
+
+This design rejects the alternative, a reduced header for this one page. An
+actor there would have no account menu, no switcher and no logout. The page
+would be a dead end.
+
 **`auth_users` gains a typed `locale text` column, not a `preferences`
 jsonb blob.** Already decided in `proposal.md`; restated here as a design
 decision too. One additive column per concrete preference matches the
 existing `manager_user_id`/`display_name` pattern. A jsonb blob would
 speculate on preferences that do not exist yet.
 
-**`src/auth/users.ts` touch points for `locale`.** The `UserRow` and
-`UserSummary` interfaces need it, and so does the `toSummary` mapper.
-Four `SELECT`/`RETURNING` column lists need it too: `listUsers`,
-`setRolesById`, `setDisabled`, and `setManagerById`.
+**`src/auth/users.ts` touch points for `locale`: `UserRow` and one new
+query, nothing else.** `GET /account/me` needs its own single-row lookup
+keyed on `user_id`, not a reuse of `listUsers`. That function returns every
+account with no `id` filter. That fits the admin route's list view. A
+self-service read of one row needs its own query instead.
 
-`GET /account/me` needs its own single-row lookup keyed on `user_id`,
-not a reuse of `listUsers`. That function returns every account with no
-`id` filter. That fits the admin route's list view. A self-service read
-of one row needs its own query instead.
+`UserSummary`, `toSummary` and four `SELECT`/`RETURNING` column lists stay
+as they are. Those lists sit in `listUsers`, `setRolesById`, `setDisabled`
+and `setManagerById`. Widening them would change the body of `GET
+/admin/users` and of the four `/admin/users/:id/*` routes. Three
+requirements in `admin-user-management` pin that shape as `{ userId, email,
+roles, disabled }`. This change ships no delta for that capability and needs
+none. No requirement here reads `locale` through those four queries.
+
+Publishing a locale to the Users screen is a second reason to leave them
+alone. Nothing on that screen asks for it.
 
 ## Risks / Trade-offs
 
@@ -155,6 +204,18 @@ Mitigation: the profile page shows an explanatory state for that case,
 not a blank or broken form. See the `unified-shell` delta's "A federated
 actor sees an identity-only profile page" scenario.
 
+**Under `devHeaderResolver`, an unknown header value reads as federated.**
+That resolver consults no directory. Any `X-Actor-Id` naming no `auth_users`
+row therefore gets `editable: false`, and a `403` on write. A developer who
+types an arbitrary header value sees the external-identity state on a local
+install.
+
+Mitigation: none in code. The route behaves correctly in both cases, and the
+devcontainer's seeded accounts do have rows. Task 2.6's coverage creates a
+real `auth_users` row and sets `X-Actor-Id` to its `user_id`. That is the
+shape `test/http-admin.test.ts:302` already uses, so the tests exercise the
+local path.
+
 ## Migration Plan
 
 1. Apply `add-user-display-name` first (already a separate, drafted
@@ -166,17 +227,27 @@ actor sees an identity-only profile page" scenario.
 3. Add `src/http/account-routes.ts`. Wire it into `src/http/server.ts`,
    alongside the existing admin and studio route modules.
 4. Extend `packages/web/src/shell/session.ts`'s `Session` type with
-   optional `displayName`/`locale`. Add the post-login hydration call. A
+   optional `displayName`/`locale`. Pass both through `loadSession`'s
+   explicit object literal (`session.ts:41`), which rebuilds the object
+   field by field and would otherwise drop them. Add the hydration call. A
    stored session predating this change lacks both fields. The shell
-   treats it as valid, not malformed, and hydrates it on next use (see
-   the `unified-shell` delta).
+   treats it as valid, not malformed, and hydrates it on next use (see the
+   `unified-shell` delta).
 5. Extend `packages/web/src/shell/routing.ts`'s `ShellLocation`/
-   `matchShell` with a case for the profile page, and `App.tsx`'s render
-   branching to route it. Add the profile page component. Thread a new
-   profile-menu prop through `Chrome.tsx` and all 5 of its call sites
-   (`App.tsx`'s forbidden-area branch and the four area roots).
+   `matchShell` with a case for `/profile`, and `App.tsx`'s render
+   branching to route it. Add the profile page component, wrapped in a
+   second direct `<Chrome area="profile">` call in `App.tsx`. Thread a new
+   profile-menu prop through `Chrome.tsx` and all 6 of its call sites. Five
+   exist today: `App.tsx`'s forbidden-area branch at line 85, and the four
+   area roots. The sixth is that new profile branch, with the same prop set
+   line 85 already supplies.
 6. Wire the account menu's language picker to `PATCH /account/me` for a
-   signed-in actor, keeping the existing `localStorage` write.
+   signed-in actor, keeping the existing `localStorage` write. That wiring
+   lands in `App.tsx`'s `changeLocale` (`App.tsx:54-57`), which already
+   holds both the session and the `persistLocale` call.
+   `packages/web/src/i18n/locale.ts` stays unchanged. It is a pure,
+   storage-injectable module with no token. A fetch inside it would break
+   `packages/web/test/locale.test.ts`.
 
 Rollback: each step is independent and additive. Reverting the frontend
 steps (4-6) leaves the backend routes unused, but harmless. Reverting the
@@ -185,8 +256,6 @@ references it.
 
 ## Open Questions
 
-- Exact route path: `/account/me` versus `/profile/me` versus something
-  else. Cosmetic; it does not change the specs or the approach.
 - Whether the profile page's federated-actor explanatory state names the
   configured issuer, or stays generic. A UI-copy decision, deferrable to
   implementation.

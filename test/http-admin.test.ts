@@ -13,7 +13,7 @@ import { createRegistry, createDataSourceRegistry } from "../src/engine/registry
 import { createServer } from "../src/http/server.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
 import { ADMIN_ROLE } from "../src/auth/authorize.js";
-import { createUser } from "../src/auth/users.js";
+import { createUser, DISPLAY_NAME_MAX_LENGTH } from "../src/auth/users.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { registerMigrationPlan } from "../src/engine/migration.js";
 import type { Actor } from "../src/cel/eval.js";
@@ -509,6 +509,110 @@ test.skipIf(!DB)("PATCH /admin/users/:id/roles returns its 409 in the existing e
 });
 
 // ============================================================
+// PATCH /admin/users/:id/name
+// ============================================================
+
+const nameReq = (userId: string, body: unknown, actor: Actor) =>
+  new Request(`http://x/admin/users/${userId}/name`, {
+    method: "PATCH",
+    headers: {
+      "content-type": "application/json",
+      "X-Actor-Id": actor.id,
+      ...(actor.roles.length > 0 ? { "X-Actor-Roles": actor.roles.join(",") } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+const storedName = async (userId: string): Promise<string | null> => {
+  const rows = (await sql`SELECT display_name FROM auth_users WHERE user_id = ${userId}`) as { display_name: string | null }[];
+  return rows[0]!.display_name;
+};
+
+test.skipIf(!DB)("PATCH /admin/users/:id/name with system:admin sets the display name", async () => {
+  const { userId } = await createUser("n1@example.com", "pw", []);
+  const res = await fetch(nameReq(userId, { displayName: "Rita Alvarez" }, admin));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { displayName: string };
+  expect(body.displayName).toBe("Rita Alvarez");
+  expect(await storedName(userId)).toBe("Rita Alvarez");
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/name with null clears it and the returned row falls back to the email", async () => {
+  const { userId } = await createUser("n2@example.com", "pw", [], "Rita Alvarez");
+  const res = await fetch(nameReq(userId, { displayName: null }, admin));
+  expect(res.status).toBe(200);
+  expect(((await res.json()) as { displayName: string }).displayName).toBe("n2@example.com");
+  expect(await storedName(userId)).toBeNull();
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/name trims surrounding whitespace before storage", async () => {
+  const { userId } = await createUser("n3@example.com", "pw", []);
+  const res = await fetch(nameReq(userId, { displayName: "  Rita Alvarez  " }, admin));
+  expect(res.status).toBe(200);
+  expect(await storedName(userId)).toBe("Rita Alvarez");
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/name refuses each malformed or empty body with 400 and no write", async () => {
+  // The route rejects an empty-after-trim value rather than normalizing it to
+  // NULL the way `setDisplayName` does — telling the caller beats a silent clear.
+  const { userId } = await createUser("n4@example.com", "pw", [], "Keep Me");
+  for (const body of [{}, { displayName: 7 }, { displayName: [] }, { displayName: "" }, { displayName: "   " }]) {
+    const res = await fetch(nameReq(userId, body, admin));
+    expect(res.status).toBe(400);
+  }
+  expect(await storedName(userId)).toBe("Keep Me");
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/name refuses a name over the bound with 400 and no write, and accepts one at it", async () => {
+  const { userId } = await createUser("n5@example.com", "pw", [], "Keep Me");
+  const tooLong = await fetch(nameReq(userId, { displayName: "x".repeat(DISPLAY_NAME_MAX_LENGTH + 1) }, admin));
+  expect(tooLong.status).toBe(400);
+  expect(await storedName(userId)).toBe("Keep Me");
+
+  const atBound = "x".repeat(DISPLAY_NAME_MAX_LENGTH);
+  expect((await fetch(nameReq(userId, { displayName: atBound }, admin))).status).toBe(200);
+  expect(await storedName(userId)).toBe(atBound);
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/name on an unknown id maps to 404", async () => {
+  const res = await fetch(nameReq("user_does_not_exist", { displayName: "Rita Alvarez" }, admin));
+  expect(res.status).toBe(404);
+});
+
+test.skipIf(!DB)("PATCH /admin/users/:id/name without system:admin maps to 403 and performs no update", async () => {
+  const { userId } = await createUser("n6@example.com", "pw", []);
+  const res = await fetch(nameReq(userId, { displayName: "Rita Alvarez" }, bystander));
+  expect(res.status).toBe(403);
+  expect(await storedName(userId)).toBeNull();
+});
+
+test.skipIf(!DB)("GET /admin/users carries each account's resolved display name", async () => {
+  const named = await createUser("n7@example.com", "pw", [], "Rita Alvarez");
+  const unnamed = await createUser("n8@example.com", "pw", []);
+  const res = await fetch(authedReq("http://x/admin/users", "GET", admin));
+  expect(res.status).toBe(200);
+  const { items } = (await res.json()) as { items: { userId: string; displayName: string }[] };
+  expect(items.find((u) => u.userId === named.userId)!.displayName).toBe("Rita Alvarez");
+  expect(items.find((u) => u.userId === unnamed.userId)!.displayName).toBe("n8@example.com");
+});
+
+test.skipIf(!DB)("the roles, enable and manager routes each return the stored display name, not the email", async () => {
+  // All three share `toSummary`; a column list missing `display_name` in one of
+  // them answers with the email while the stored name says otherwise.
+  const boss = await createUser("n9-boss@example.com", "pw", []);
+  const { userId } = await createUser("n9@example.com", "pw", [], "Rita Alvarez");
+  const responses = [
+    await fetch(rolesReq(userId, { roles: ["employee"] }, admin)),
+    await fetch(authedReq(`http://x/admin/users/${userId}/enable`, "POST", admin)),
+    await fetch(managerReq(userId, { managerUserId: boss.userId }, admin)),
+  ];
+  for (const res of responses) {
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { displayName: string }).displayName).toBe("Rita Alvarez");
+  }
+});
+
+// ============================================================
 // POST /admin/migrations/run
 // ============================================================
 
@@ -618,7 +722,8 @@ test("OPTIONS preflight on the admin users enable route returns 204 permitting P
 });
 
 // `local-user-accounts` holds creating a user and setting a password to the
-// CLI. Listing, disable/enable and roles are the whole HTTP carve-out.
+// CLI. Listing, disable/enable, roles, manager and name are the whole HTTP
+// carve-out.
 test.skipIf(!DB)("no route creates a user, sets a password, or registers one", async () => {
   const absent = [
     ["POST", "http://x/admin/users"],
@@ -647,6 +752,18 @@ test("OPTIONS preflight on the admin users roles route returns 204 permitting PA
 // else: the PATCH never leaves, because its preflight has no handler.
 test("OPTIONS preflight on the admin users manager route returns 204 permitting PATCH", async () => {
   const res = await fetch(new Request("http://x/admin/users/user_x/manager", { method: "OPTIONS" }));
+  expect(res.status).toBe(204);
+  expect(res.headers.get("Access-Control-Allow-Methods")).toBe("PATCH");
+});
+
+// Nothing in packages/web calls this route yet: the admin area's client
+// (areas/admin/api/client.ts) covers the list, disable, enable, roles and
+// manager and stops there. The preflight still matters, because the first
+// caller added would hit the same browser-only failure the manager route's
+// preflight covers — the PATCH never leaves, since its preflight has no
+// handler, while a test calling the route directly keeps passing.
+test("OPTIONS preflight on the admin users name route returns 204 permitting PATCH", async () => {
+  const res = await fetch(new Request("http://x/admin/users/user_x/name", { method: "OPTIONS" }));
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("PATCH");
 });

@@ -68,6 +68,21 @@ test.skipIf(!DB)("a valid login returns 200 with a token, expiresAt ~8h ahead, a
   expect(expiresIn).toBeLessThan(8.1 * 60 * 60 * 1000);
 });
 
+test.skipIf(!DB)("the 200 actor carries the resolved display name, never null or empty", async () => {
+  await createUser("login-named@example.com", "correct-horse", [], "Rita Alvarez");
+  await createUser("login-unnamed@example.com", "correct-horse", []);
+
+  const named = await handleLogin(loginRequest("login-named@example.com", "correct-horse"), SECRET);
+  expect(named.status).toBe(200);
+  expect((named.body as { actor: { displayName: string } }).actor.displayName).toBe("Rita Alvarez");
+
+  // The fallback is the account's email, so the browser never has to render a
+  // blank name for an account nobody has named yet.
+  const unnamed = await handleLogin(loginRequest("login-unnamed@example.com", "correct-horse"), SECRET);
+  expect(unnamed.status).toBe(200);
+  expect((unnamed.body as { actor: { displayName: string } }).actor.displayName).toBe("login-unnamed@example.com");
+});
+
 test.skipIf(!DB)("the returned token authenticates a subsequent request", async () => {
   await createUser("login2@example.com", "correct-horse", ["employee", PUBLISH_ROLE]);
   const loginResult = await handleLogin(loginRequest("login2@example.com", "correct-horse"), SECRET);

@@ -90,7 +90,7 @@ with `Bun.password.verify`. On success it SHALL return the user's
 `iss: "bps"`, `sub: <user_id>`, the user's roles, and an `exp` 8 hours ahead.
 It SHALL return `200` with `{ token, expiresAt, actor: { id, roles,
 displayName } }`. `displayName` SHALL equal the resolved value `verifyLogin`
-returns, never null or empty. On failure it SHALL return `401`. No token
+returns, never null or empty. A rejected login SHALL return `401`. No token
 refresh, rotation or revocation mechanism SHALL exist.
 
 #### Scenario: A valid login returns a usable token
@@ -129,11 +129,12 @@ password, or registers anyone. No registration flow, password-reset flow or
 MFA flow SHALL exist.
 
 <!-- antislop: allow synonym-rotation -->
-Five actions ARE reachable over HTTP. Those are listing users, toggling a
-user's `disabled` state, and assigning a user's roles. They also include
-setting a user's manager and setting a user's display name. The
-`admin-user-management` capability defines six `system:admin`-gated routes
-for them. "User" names the account administered here.
+Five actions on another account ARE reachable over HTTP, all of them under
+`/admin/users`. Those are listing users, toggling a user's `disabled` state,
+and assigning a user's roles. They also include setting a user's manager and
+setting a user's display name. The `admin-user-management` capability defines
+six `system:admin`-gated routes for them. "User" names the account
+administered here.
 
 - `GET /admin/users`
 - `POST /admin/users/:id/disable`
@@ -181,8 +182,9 @@ setting a password stay outside it. Only the CLI reaches either one.
 #### Scenario: No route creates a user or changes a password
 
 - **WHEN** the server's route table shows every registered route
-- **THEN** no route creates a user or sets a password. The
-  account-administration routes are exactly the six this requirement lists
+- **THEN** no route creates a user or sets a password. The operator-facing
+  account-administration routes under `/admin/users` are exactly the six this
+  requirement lists
 
 #### Scenario: A user disabled via the HTTP route cannot log in
 
@@ -220,3 +222,27 @@ string.
 - **WHEN** a caller resolves the displayable name of a user whose
   `display_name` holds a non-null string
 - **THEN** the resolved value equals that string, not the email
+
+### Requirement: Every write path bounds the display name at 200 characters
+
+`src/auth/users.ts` SHALL normalize a display name from one place. That
+place SHALL trim the value. It SHALL also refuse a trimmed value longer than
+200 characters. Every write path SHALL use it. That covers `createUser`, the
+two setters below, and the self-service account write.
+
+A refusal SHALL raise an error the `src/auth` layer declares, not an HTTP
+error type. The two routes that accept a display name SHALL check the bound
+before they write. Each therefore answers `400`, and neither reaches that
+error. The CLI SHALL report the error message and exit non-zero.
+
+#### Scenario: The CLI refuses a display name past the bound
+
+- **WHEN** someone runs the CLI's `set-name` command with a display name
+  longer than 200 characters
+- **THEN** the command reports the refusal, exits non-zero, and that user's
+  `display_name` holds the value it held before
+
+#### Scenario: A display name of exactly 200 characters reaches the column
+
+- **WHEN** someone sets a display name of exactly 200 characters
+- **THEN** the column holds that value

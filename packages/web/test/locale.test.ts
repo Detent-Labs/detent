@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { detectLocale, loadLocale, persistLocale, LOCALE_STORAGE_KEY } from "../src/i18n/locale.js";
+import { adoptHydratedLocale, detectLocale, loadLocale, persistLocale, LOCALE_STORAGE_KEY } from "../src/i18n/locale.js";
 import { t } from "../src/areas/app/catalog.js";
 
 describe("detectLocale", () => {
@@ -39,6 +39,39 @@ describe("persistLocale", () => {
     const storage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
     persistLocale("de", storage);
     expect(store.get(LOCALE_STORAGE_KEY)).toBe("de");
+  });
+});
+
+describe("adoptHydratedLocale", () => {
+  function fakeStorage(seed?: string) {
+    const store = new Map<string, string>(seed ? [[LOCALE_STORAGE_KEY, seed]] : []);
+    return { store, getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
+  }
+
+  it("a new device adopts the account's locale and writes it to storage", () => {
+    const storage = fakeStorage();
+    expect(adoptHydratedLocale("de", storage)).toBe("de");
+    expect(storage.store.get(LOCALE_STORAGE_KEY)).toBe("de");
+  });
+
+  it("a language chosen on this browser survives hydration", () => {
+    const storage = fakeStorage("en");
+    expect(adoptHydratedLocale("de", storage)).toBeUndefined();
+    expect(storage.store.get(LOCALE_STORAGE_KEY)).toBe("en");
+  });
+
+  it("adopts nothing where the account holds no locale", () => {
+    const storage = fakeStorage();
+    expect(adoptHydratedLocale(undefined, storage)).toBeUndefined();
+    expect(storage.store.has(LOCALE_STORAGE_KEY)).toBe(false);
+  });
+
+  it("adopts over an unsupported stored value, and never adopts an unsupported account value", () => {
+    const stale = fakeStorage("fr");
+    expect(adoptHydratedLocale("de", stale)).toBe("de");
+    const empty = fakeStorage();
+    expect(adoptHydratedLocale("fr", empty)).toBeUndefined();
+    expect(empty.store.has(LOCALE_STORAGE_KEY)).toBe(false);
   });
 });
 

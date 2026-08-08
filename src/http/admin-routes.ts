@@ -11,7 +11,7 @@
 import type { SQL } from "bun";
 import { sql, withTransaction } from "../engine/store.js";
 import { listOutbox, countOutboxByStatus, listPendingTimers, requeueOutboxRow, discardOutboxRow, getOutboxRow, MAX_LIST_LIMIT, type OutboxListFilter } from "../engine/admin-queries.js";
-import { listUsers, setDisabled, setRolesById, setManagerById, SelfManagerError } from "../auth/users.js";
+import { listUsers, setDisabled, setRolesById, setManagerById, setDisplayName, validateDisplayName, DISPLAY_NAME_MAX_LENGTH, SelfManagerError } from "../auth/users.js";
 import { migrateInstances } from "../engine/migration.js";
 import { redactInstance } from "../engine/retention.js";
 import { localizedText, type ProcessId, type InstanceId, type LocalizedText } from "../schema/definition.js";
@@ -199,6 +199,41 @@ export async function handleAdminSetUserManager(userId: string, req: Request, re
       }
       throw err;
     }
+    if (!updated) return { status: 404, body: { error: { type: "not-found", message: `no user: ${userId}` } } };
+    return { status: 200, body: updated };
+  });
+}
+
+/**
+ * Set or clear the account's human-readable name. `{ displayName: null }`
+ * clears it, so the resolved value falls back to the account's email.
+ *
+ * The trim and the 200-character bound come from `validateDisplayName`
+ * (`src/auth/users.ts`), not from a check written here: a later self-scoped
+ * route calls that same helper rather than re-deriving the bound. This route
+ * rejects an empty-after-trim value outright, while `setDisplayName` normalizes
+ * one to `NULL` — telling the caller beats silently accepting.
+ */
+export async function handleAdminSetUserName(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver);
+    requireRole(actor, ADMIN_ROLE);
+    let body: { displayName?: unknown };
+    try {
+      body = (await req.json()) as typeof body;
+    } catch {
+      throw new RequestShapeError("request body is not valid JSON");
+    }
+    const raw = body.displayName;
+    if (raw !== null && typeof raw !== "string") throw new RequestShapeError("displayName must be a string or null");
+    const checked = validateDisplayName(raw);
+    if (!checked.ok) {
+      throw new RequestShapeError(
+        checked.reason === "empty" ? "displayName must not be empty" : `displayName is at most ${DISPLAY_NAME_MAX_LENGTH} characters`,
+      );
+    }
+
+    const updated = await setDisplayName(userId, checked.displayName, db);
     if (!updated) return { status: 404, body: { error: { type: "not-found", message: `no user: ${userId}` } } };
     return { status: 200, body: updated };
   });

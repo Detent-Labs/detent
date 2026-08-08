@@ -143,3 +143,39 @@ dark)`, so a correct component needs no separate dark-mode styling of its
 own. A defect here means a component reached for a hardcoded color, or a
 primitive token, instead of the semantic layer. See
 `.claude/rules/design-language.md`.
+
+### Profile page: `displayName` and locale
+
+Source: `add-personal-profile-page` task 7.6.
+
+Log in. Open the account menu and follow it to the profile page. Set a new
+`displayName` there and save. Change the language in the account menu. Reload
+the page.
+
+Pass: the profile page shows the new `displayName` after the reload. The
+chrome renders in the chosen language. `test/http-account.test.ts` already
+asserts what `GET` and `PATCH /account/me` store and return. This entry
+confirms the shell reads both values back on a real reload.
+
+Walk two more paths on an account that set no name. Its `display_name` column
+holds `NULL`. The page renders the email in place of the name.
+
+First, open the profile page and read the name control before typing. Pass: the
+control is empty. It never seeds the email. Then change only the language and
+save. Pass: the name control stays empty, and `display_name` stays `NULL`.
+
+Second, on an account that has a name, clear the name control and save. Pass:
+the control stays empty afterward, and the page renders the email again.
+
+Both paths guard one defect. A control seeded from the resolved name writes the
+email into the column on the next save. It also makes a name impossible to
+clear. `packages/web/test/profileFields.test.ts` covers the mapping, and
+`test/http-account.test.ts` covers the route. Neither one reaches the
+save-and-reseed round trip, which needs the DOM.
+
+This stays manual because the round trip crosses the browser's own address
+bar and `localStorage`. Every file in `packages/web/test/` assumes no DOM.
+The federated `editable: false` state is out of reach here too, for its own
+reason. A login token always carries `iss: "bps"`, and such a token
+guarantees a local `auth_users` row. That state gets its coverage in
+`packages/web/test/profileFields.test.ts` instead.

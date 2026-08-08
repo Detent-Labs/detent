@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChartNoAxesColumn } from "lucide-react";
 import { matchRoute, routePath, type Route, type ViewName } from "./routing.js";
-import { useAreaRoute } from "../../shell/routing.js";
+import { useAreaRoute, PROFILE_PATH } from "../../shell/routing.js";
 import { Chrome } from "../../shell/Chrome.js";
 import { defaultRange, rangeIsValid, type DateRange } from "./screens/reportingLogic.js";
 import { ProcessPickerScreen } from "./screens/ProcessPickerScreen.js";
@@ -74,6 +74,7 @@ export function ReportingArea({ session, locale, localPath, go, onLocaleChange, 
       onLocaleChange={onLocaleChange}
       onLogout={onLogout}
       onGoToArea={(a) => go(`/${a}`)}
+      onGoToProfile={() => go(PROFILE_PATH)}
       nav={nav}
     >
       {route.name === "picker" ? (

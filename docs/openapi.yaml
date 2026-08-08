@@ -6,7 +6,8 @@ info:
     The customer-facing HTTP surface of the workflow/BPM engine: login,
     process publish/list/versions, and the full instance lifecycle
     (create, view, submit, claim/release/delegate, comment, attach a
-    file, cancel, and the audit record). Excludes `admin/*`, `drafts/*`,
+    file, cancel, and the audit record), plus the caller's own account.
+    Excludes `admin/*`, `drafts/*`,
     `migration-plans/*`, `reporting/*`,
     and `registry`, which serve the operator, developer and process-owner
     areas of `packages/web`
@@ -36,6 +37,8 @@ tags:
     description: Publish and discover process definitions.
   - name: instances
     description: Create, drive, and read process instances.
+  - name: account
+    description: The caller's own account. Needs a token, no role.
   - name: health
     description: Unauthenticated liveness/readiness probes for orchestration.
   - name: observability
@@ -830,6 +833,90 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
+  /account/me:
+    get:
+      tags: [account]
+      operationId: getAccount
+      summary: Read the caller's own account
+      description: >-
+        Needs a token and no role: any resolvable session reaches it. The
+        route takes no id and scopes to the resolved actor alone, so no
+        caller can name another account.
+
+
+        An actor whose id matches a local account gets `editable: true`
+        and the full record. An actor whose id matches none gets
+        `{ id, roles, editable: false }` and the same `200`. A locally
+        issued token guarantees an active local account, so a missing one
+        names an externally issued identity rather than an error. This
+        route returns no `404` to a resolvable actor.
+      responses:
+        "200":
+          description: The caller's own account, or their identity alone.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/LocalAccount"
+                  - $ref: "#/components/schemas/FederatedAccount"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    patch:
+      tags: [account]
+      operationId: updateAccount
+      summary: Change the caller's own display name and locale
+      description: >-
+        Needs a token and no role, and scopes to the resolved actor the
+        same way the read does.
+
+
+        The body carries `displayName` and `locale`, each optional; an
+        omitted field is left as it stands. Any other key is refused with
+        `400` rather than ignored. A `displayName` of `null` clears the
+        stored name, so the resolved value falls back to the email.
+
+
+        Password self-service is not part of this route, or of any other.
+        Setting a password stays a CLI operation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountUpdate"
+      responses:
+        "200":
+          description: The updated account, in the shape the read returns for a local account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocalAccount"
+        "400":
+          description: >-
+            A key outside `displayName`/`locale`, a `displayName` that is
+            empty after trimming or longer than 200 characters, or a
+            `locale` outside the supported set. No column changes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: The actor's id matches no local account, so there is nothing to change.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
   /livez:
     get:
       tags: [health]
@@ -1373,6 +1460,24 @@ components:
           type: string
       required: [email, password]
 
+    LoginActor:
+      type: object
+      description: >-
+        The logged-in account as `POST /auth/login` reports it. Distinct from
+        `Actor`, the authorization identity a resolver produces per request:
+        this one carries a display name, `Actor` does not.
+      properties:
+        id:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        displayName:
+          type: string
+          description: The account's `display_name`, or its `email` when that column is null. Never empty.
+      required: [id, roles, displayName]
+
     LoginResponse:
       type: object
       properties:
@@ -1383,8 +1488,83 @@ components:
           type: string
           format: date-time
         actor:
-          $ref: "#/components/schemas/Actor"
+          $ref: "#/components/schemas/LoginActor"
       required: [token, expiresAt, actor]
+
+    LocalAccount:
+      type: object
+      description: >-
+        The caller's own account, as `GET`/`PATCH /account/me` report it for
+        an actor backed by a local account. `email`, `roles` and
+        `managerUserId` are read-only here; the operator's own `admin/*`
+        routes are what change them.
+      properties:
+        id:
+          type: string
+          description: The resolved actor's id, equal to the account's `user_id`.
+        displayName:
+          type: string
+          description: The stored name, or the email when no name is stored. Never empty.
+        storedDisplayName:
+          type: string
+          nullable: true
+          description: >-
+            The raw stored name, `null` where the account set none. An
+            editable name control seeds from this, never from `displayName`:
+            that one carries the email for an account with no name, and a
+            save would then store the email as the name.
+        email:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        managerUserId:
+          type: string
+          description: The account's manager. Absent where none is on record.
+        locale:
+          type: string
+          description: The account's own UI locale. Absent where the account never set one.
+          enum: [en, de]
+        editable:
+          type: boolean
+          enum: [true]
+      required: [id, displayName, storedDisplayName, email, roles, editable]
+
+    FederatedAccount:
+      type: object
+      description: >-
+        What `GET /account/me` reports for a resolvable actor the engine
+        holds no local account for. It carries the identity alone: no
+        `displayName`, `storedDisplayName`, `email`, `managerUserId` or
+        `locale`.
+      properties:
+        id:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        editable:
+          type: boolean
+          enum: [false]
+      required: [id, roles, editable]
+
+    AccountUpdate:
+      type: object
+      description: >-
+        Both fields are optional and an omitted one is left as it stands.
+        Any other key is refused with `400`.
+      properties:
+        displayName:
+          type: string
+          nullable: true
+          maxLength: 200
+          description: Trimmed before storage. `null` clears the stored name; a value that is empty after trimming is refused.
+        locale:
+          type: string
+          enum: [en, de]
+      additionalProperties: false
 
     PublishRequest:
       type: object

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { loadSession, persistSession, clearSession, SESSION_STORAGE_KEY } from "../src/shell/session.js";
+import {
+  loadSession,
+  persistSession,
+  clearSession,
+  hydrateSession,
+  needsHydration,
+  SESSION_STORAGE_KEY,
+} from "../src/shell/session.js";
 import { landingArea, mayEnter, permittedAreas } from "../src/shell/areas.js";
 
 function fakeStorage() {
@@ -7,10 +14,19 @@ function fakeStorage() {
   return { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) };
 }
 
-const session = { token: "tok_abc", actorId: "user_1", roles: ["system:admin"], expiresAt: "2026-08-02T00:00:00.000Z" };
+const session = {
+  token: "tok_abc",
+  actorId: "user_1",
+  roles: ["system:admin"],
+  expiresAt: "2026-08-02T00:00:00.000Z",
+  displayName: "Ada Lovelace",
+  locale: "de" as const,
+};
 
 describe("session persistence", () => {
-  it("round-trips a persisted session, roles and expiry included", () => {
+  it("round-trips a persisted session, roles, expiry and both hydrated fields included", () => {
+    // `loadSession` rebuilds the object field by field, so a field absent from
+    // that literal is dropped on every reload rather than on none.
     const storage = fakeStorage();
     persistSession(session, storage);
     expect(loadSession(storage)).toEqual(session);
@@ -55,6 +71,52 @@ describe("session persistence", () => {
     const storage = fakeStorage();
     persistSession({ ...session, expiresAt: "2000-01-01T00:00:00.000Z" }, storage);
     expect(loadSession(storage)?.token).toBe("tok_abc");
+  });
+
+  it("loads a session stored before hydration existed, and marks it for hydration", () => {
+    const storage = fakeStorage();
+    storage.setItem(
+      SESSION_STORAGE_KEY,
+      JSON.stringify({ token: "tok_abc", actorId: "user_1", roles: ["system:admin"], expiresAt: "2026-08-02T00:00:00.000Z" }),
+    );
+    const loaded = loadSession(storage);
+    expect(loaded?.actorId).toBe("user_1");
+    expect(loaded?.displayName).toBeUndefined();
+    expect(loaded?.locale).toBeUndefined();
+    expect(needsHydration(loaded!)).toBe(true);
+  });
+
+  it("drops a stored locale the catalogs do not cover", () => {
+    const storage = fakeStorage();
+    storage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ ...session, locale: "fr" }));
+    expect(loadSession(storage)?.locale).toBeUndefined();
+  });
+});
+
+describe("session hydration", () => {
+  const fresh = { token: "tok_abc", actorId: "user_1", roles: ["system:admin"], expiresAt: "2026-08-02T00:00:00.000Z" };
+
+  it("fills in displayName and locale from a GET /account/me response", () => {
+    const hydrated = hydrateSession(fresh, { displayName: "Ada Lovelace", locale: "de" });
+    expect(hydrated.displayName).toBe("Ada Lovelace");
+    expect(hydrated.locale).toBe("de");
+    expect(hydrated.token).toBe("tok_abc");
+    expect(needsHydration(hydrated)).toBe(false);
+  });
+
+  it("leaves a federated actor's session as it was — that response carries neither field", () => {
+    expect(hydrateSession(fresh, {})).toEqual(fresh);
+  });
+
+  it("keeps a name already on the session where the account carries no locale", () => {
+    const hydrated = hydrateSession({ ...fresh, displayName: "Ada Lovelace" }, { displayName: "Ada Lovelace" });
+    expect(hydrated.displayName).toBe("Ada Lovelace");
+    expect(hydrated.locale).toBeUndefined();
+    expect(needsHydration(hydrated)).toBe(true);
+  });
+
+  it("reports a session carrying both fields as hydrated", () => {
+    expect(needsHydration(session)).toBe(false);
   });
 });
 
