@@ -168,9 +168,18 @@
       touched, including this change's own `openspec/changes/` artifacts.
 - [x] 8.5 Run `git diff --check` for trailing whitespace and blank-at-EOF,
       and `git ls-files --eol` to confirm no CRLF landed in a touched file.
-- [ ] 8.6 Manually verify in a real browser: create a user, log in as that
+- [x] 8.6 Manually verify in a real browser: create a user, log in as that
       user, reset a password from another admin session, confirm the old
       password fails and the new one works, and confirm pagination on the
       Users screen with more accounts than one page holds. Record any new
       check this surfaces in `docs/browser-checks.md`, per that doc's split
       rule with `development-toolchain`.
+- [x] 8.7 Carry `email-in-use` through `parseErrorBody`
+      (`packages/web/src/api/client.ts`). 8.6 found the duplicate-email 409
+      reading as "The server hit an error". That switch is a third closed list
+      beside the `ClientError` union and the area's `describeError`, and a
+      type missing from it degrades to the generic text. Add the
+      `self-manager` and `unknown-manager` cases in the same pass: both
+      predate this change and carried the same gap. Cover all three in
+      `packages/web/test/errors.test.ts`, beside the `self-role-strip` case
+      that documents this exact defect class.

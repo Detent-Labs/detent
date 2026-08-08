@@ -210,3 +210,28 @@ canvas through `.canvas-wrap`.
 A synthetic mouse drag does not exercise this. The palette listens for pointer
 events, and raw `mousedown`/`mousemove` leaves it inert. Use a real drag, or a
 tool that dispatches pointer events.
+
+### Users screen: the manager control past one page
+
+Source: `admin-user-onboarding` task 8.6.
+
+Put more accounts in the database than one request returns. `listUsers` caps
+at `MAX_LIST_LIMIT`, which is 200, so 250 rows is enough. Insert them
+directly with one statement carrying a constant `password_hash`. These rows
+never log in.
+
+Open `/admin/users`. Pass: the table holds every account, the last one
+included. No "Load more" control appears.
+
+Then open the manager control on any row. Pass: the choices hold an account
+whose email sorts past the first 200. Pick it and save. Pass: the row's
+manager cell shows that account's email.
+
+The cell is the check. `managerLabel` falls back to the raw `user_id` for an
+account the loaded array does not hold. A screen that renders one page
+therefore prints `user_...` there. It also drops that account out of the
+dropdown. Neither defect raises anything an operator can see as a defect.
+
+`packages/web/test/admin-usersLogic.test.ts` pins both helpers against a full
+set and a partial one. `test/auth-users.test.ts` pins the paging. Neither
+reaches the screen's own cursor walk, which is what these two passes observe.

@@ -63,6 +63,35 @@ describe("a server error type maps through every layer", () => {
     expect(text).not.toBe("The server hit an error. Try again.");
   });
 
+  // The same gap the comment above describes, found the same way: a browser
+  // check on `admin-user-onboarding` showed "The server hit an error" where the
+  // duplicate-email refusal belongs. `self-manager` and `unknown-manager` were
+  // sitting in the union and in `describeError` with no parser case either, so
+  // the manager editor's two 400s had never reached an operator as their own
+  // text.
+  it("carries email-in-use through the parser rather than collapsing it to internal", async () => {
+    const parsed = await parse(409, "email-in-use", "an account already holds jane@co.test");
+    expect(parsed.type).toBe("email-in-use");
+  });
+
+  it("gives email-in-use its own operator-facing text, not the generic fallback", async () => {
+    const parsed = await parse(409, "email-in-use", "an account already holds jane@co.test");
+    const text = describeAdminError(parsed, 409);
+    expect(text).toContain("email address");
+    expect(text).not.toBe("Something went wrong.");
+    expect(text).not.toBe("The server hit an error. Try again.");
+  });
+
+  it("carries the manager editor's two refusals through the parser", async () => {
+    expect((await parse(400, "self-manager", "a user cannot be their own manager")).type).toBe("self-manager");
+    expect((await parse(400, "unknown-manager", "no user: user_x")).type).toBe("unknown-manager");
+  });
+
+  it("gives each manager refusal its own operator-facing text", async () => {
+    expect(describeAdminError(await parse(400, "self-manager", "x"), 400)).toContain("their own manager");
+    expect(describeAdminError(await parse(400, "unknown-manager", "x"), 400)).toContain("no longer exists");
+  });
+
   it("still collapses a type no layer knows into internal", async () => {
     const parsed = await parse(500, "type-from-the-future", "x");
     expect(parsed.type).toBe("internal");

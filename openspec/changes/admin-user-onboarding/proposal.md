@@ -97,6 +97,13 @@ aside on purpose.
   signature.
 - `src/auth/users.ts`'s module docstring states that creating a user and
   changing a password are CLI-only. Both stop being true here.
+- `packages/web/src/api/client.ts`'s `parseErrorBody` gains an `email-in-use`
+  case. The browser check found the 409 reading as "The server hit an error".
+  That switch is a third closed list, beside the `ClientError` union and the
+  area's `describeError`. The same pass added the missing `self-manager` and
+  `unknown-manager` cases. That gap predates this change. Both refusals of
+  `PATCH /admin/users/:id/manager` reached the screen as the generic text.
+  `packages/web/test/errors.test.ts` covers all three.
 - `openspec/specs/local-user-accounts/spec.md` and
   `openspec/specs/admin-app/spec.md`: each gains a delta. This change also
   updates each capability's `## Purpose` in place. OpenSpec drops a delta's own
