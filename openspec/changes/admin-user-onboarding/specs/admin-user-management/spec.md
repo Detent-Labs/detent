@@ -12,9 +12,10 @@ by `system:admin` through the same `requireRole` check every other
 The route SHALL translate `limit` and `cursor` query parameters, the same
 way `GET /admin/outbox` and `GET /admin/timers` do. A `limit` that is not a
 positive integer SHALL fail as a request error. The route SHALL cap `limit`
-at `MAX_LIST_LIMIT`. The list SHALL stay ordered by `email` ascending,
-keyset-paged on `(email, user_id)` to break ties between two accounts
-sharing no email.
+at `MAX_LIST_LIMIT`. An absent `limit` SHALL default to 50, the same
+default `listOutbox` and `listPendingTimers` apply. The list SHALL stay
+ordered by `email` ascending, keyset-paged on `(email, user_id)` to break
+ties between two accounts sharing no email.
 
 #### Scenario: Listing users
 
@@ -40,6 +41,12 @@ sharing no email.
   accounts exist
 - **THEN** the response carries two users and a cursor. The same route with
   that cursor carries the following users, in `email` order
+
+#### Scenario: An absent limit defaults to 50
+
+- **WHEN** an actor requests `GET /admin/users` with no `limit` and more
+  than 50 accounts exist
+- **THEN** the response carries 50 users and a cursor
 
 ## ADDED Requirements
 

@@ -70,6 +70,11 @@ aside on purpose.
   `screens/usersLogic.ts`: adds the "New user" and "Reset password" UI.
   Any new pure helpers get tests, the same way `parseRoles` and
   `managerChoices` do today.
+- `test/auth-users.test.ts`: the `listUsers()` signature change breaks its
+  7 existing call sites. Each one moves to the new `Page<UserSummary>`
+  shape.
+- `scripts/seed.ts`: `seedUser`'s `listUsers(sql)` call moves to the new
+  signature.
 - No schema migration. `auth_users` already carries every column these
   routes need: `email`, `password_hash`, `roles`, `disabled`,
   `manager_user_id`.

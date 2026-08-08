@@ -12,9 +12,10 @@ Each route follows the same guard. It resolves the actor. It calls
 `requireRole(actor, ADMIN_ROLE)`. Only then does it act.
 
 `src/pagination.ts` already holds the keyset cursor encoder every other
-admin list route shares: `encodeCursor` and `decodeCursor`. It also holds
-the `Page<T>` type `src/engine/admin-queries.ts` re-exports. Nothing in this
-change needs a new pattern.
+admin list route shares: `encodeCursor` and `decodeCursor`. The `Page<T>`
+type this change reuses lives in `src/engine/admin-queries.ts`, alongside
+`MAX_LIST_LIMIT`. `admin-routes.ts` already imports both from there. Nothing
+in this change needs a new pattern.
 
 ## Goals / Non-Goals
 
@@ -82,7 +83,7 @@ a sibling check for SQLSTATE 23505 (`unique_violation`) on
 
 **Pagination follows the outbox and timers shape exactly.** `listUsers`
 gains a `page: { limit?: number; cursor?: string }` parameter. It returns
-`Page<UserSummary>`.
+`Page<UserSummary>`, the type `src/engine/admin-queries.ts` already exports.
 
 The list keyset-pages on `(email, user_id)`. `email` alone carries no
 unique order without a tiebreaker. `(created_at, idempotency_key)` orders
@@ -90,8 +91,17 @@ outbox rows for the same reason.
 
 `GET /admin/users` translates `limit` and `cursor` through the existing
 `parseLimit` helper in `src/http/routes.ts`. It caps at the existing
-`MAX_LIST_LIMIT` (200) from `src/engine/admin-queries.ts`. This change adds
-no new constant.
+`MAX_LIST_LIMIT` (200) from `src/engine/admin-queries.ts`.
+
+`parseLimit` returns `undefined` when the request omits `limit`.
+
+`listOutbox` and `listPendingTimers` both cover that gap already. Each
+applies a private `DEFAULT_LIST_LIMIT` of 50 as its floor, still capped by
+`MAX_LIST_LIMIT`. That constant stays private to `admin-queries.ts`.
+`listUsers` needs its own copy in `src/auth/users.ts`.
+
+Without that default, an unqualified `GET /admin/users` stays unbounded.
+That is the exact gap this change exists to close.
 
 **No role-bounds duplication.** `POST /admin/users`'s `roles` field reuses
 the exact bounds `PATCH /admin/users/:id/roles` already enforces: 64
@@ -113,14 +123,25 @@ future floor is a one-line addition to `handleAdminCreateUser` and
 `handleAdminSetUserPassword`, once the product wants one. This change does
 not wait on that decision.
 
-**Pagination changes `GET /admin/users`'s response shape.** That is a
-breaking change on its own. The response moves from a bare array to a page
-object.
+**A default page size can hide accounts.** `listUsers` defaults to 50 rows.
+An operator with more than 50 accounts would see only the first page on an
+unupdated screen. Nothing past it would show.
 
-`GET /admin/outbox` and `GET /admin/timers` already return that same page
-shape. `packages/web/src/areas/admin/api/client.ts` and `UsersScreen.tsx`
-both move to the new shape here, in this same commit. No caller keeps
-reading the old shape once this ships.
+`UsersScreen.tsx`'s `load()` moves to the paginated call in this same
+change. It gains a "Load more" control at the same time (`tasks.md §
+5.4`). The default ships together with that control, in one commit.
+Shipping the default alone, without the control, would be the real
+breaking change here.
+
+**Pagination adds a field to the response. It does not change the
+response's shape.** `handleAdminListUsers` already returns `{ items:
+UserSummary[] }` (`admin-routes.ts`). The web client's `UserPage` type
+already matches that same shape (`packages/web/.../api/types.ts`).
+
+This change adds one optional field to that object: `cursor`.
+`OutboxPage` and `PendingTimerPage` already carry that same field. No
+caller reads a bare array today. `UserPage` and `UsersScreen.tsx` still
+change, but only to read the new `cursor` and page through it.
 
 ## Migration Plan
 
