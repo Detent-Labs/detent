@@ -846,6 +846,12 @@ Stage-by-stage status is in `ROADMAP.md`.
   accounts live in a new `auth_users` table (`user_id` PK — the value used as
   `Actor.id` — `email` unique, `password_hash`, `roles text[]`, `disabled`),
   added to the existing `ensureSchema`/`initSchema` DDL in `src/engine/store.ts`.
+  Three nullable columns came later: `manager_user_id`, `display_name` and
+  `locale`. Each has its own `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`. The
+  helper `users.ts::resolveDisplayName` reads the stored `display_name`. It
+  returns the `email` instead when that column is null. `locale` holds the
+  account's own UI language. A null there leaves the browser's stored choice
+  in charge.
   `src/auth/users.ts::createUser`/`verifyLogin` hash and verify passwords with
   `Bun.password` (argon2id, no new dependency); a wrong password, an unknown
   email and a `disabled` user all fail identically, so `verifyLogin`'s result
@@ -1154,17 +1160,21 @@ Stage-by-stage status is in `ROADMAP.md`.
   10's second of three changes, the one HTTP carve-out from
   `local-user-accounts`'s CLI-only administration. `src/auth/users.ts` gains
   `listUsers` (every `auth_users` row as
-  `{userId, email, roles, disabled, managerUserId}`,
+  `{userId, email, displayName, roles, disabled, managerUserId}`,
   never `password_hash`) and `setDisabled(userId, disabled, db)` — keyed by
   `userId`, unlike `setRoles`/`setPassword`'s `email`, since its caller is a
   row from a `listUsers` result rather than a human typing an address they
   know; it returns the updated row via `RETURNING`, or `undefined` for an
   unknown id, so the HTTP handler needs no follow-up query to answer 200/404.
-  Five `system:admin`-gated routes in `admin-routes.ts`: `GET
+  Six `system:admin`-gated routes in `admin-routes.ts`: `GET
   /admin/users`, `POST /admin/users/:id/disable`, `POST
-  /admin/users/:id/enable`, and (added later, see the role-editing entry
-  below) `PATCH /admin/users/:id/roles` and `PATCH /admin/users/:id/manager`.
-  Creating a user and changing a
+  /admin/users/:id/enable`, plus three added later (see the role-editing
+  entry below), `PATCH /admin/users/:id/roles`, `PATCH
+  /admin/users/:id/manager`, `PATCH /admin/users/:id/name`. The name route
+  has no caller in
+  `packages/web` today: the admin area's client
+  (`packages/web/src/areas/admin/api/client.ts`) reaches the other five and
+  stops there. Creating a user and changing a
   password remain CLI-only — no HTTP path reaches either. Disabling took
   effect on the user's *next* login attempt only, as this change left it;
   it revoked no JWT already issued to them, since token verification then
@@ -2931,3 +2941,45 @@ change that first asked for it. The address rule is `127.0.0.1`, not
 confirm-and-proceed path for an incomplete browser task. That task's
 content must move into `docs/browser-checks.md` first. The archive step
 created the 2026-08-06 debt. It now refuses the same class of debt.
+
+## Personal profile page (`add-personal-profile-page`)
+
+`src/http/account-routes.ts` is a third route module beside `admin-routes.ts`
+and `studio-routes.ts`. It holds two routes, `GET /account/me` and `PATCH
+/account/me`. Both read the caller's id off the resolved actor. Neither takes
+an id in the path, and neither checks a role. Any resolvable session reaches
+them. `admin-routes.ts` stays the operator's act-on-any-account surface.
+
+`GET /account/me` answers a local account with `id`, `displayName`,
+`storedDisplayName`, `email`, `roles`, `managerUserId`, `locale` and
+`editable: true`. An actor whose id matches no `auth_users` row reads as
+federated. That answer carries `id`, `roles` and `editable: false`, never a
+404. A `"bps"` token guarantees a live local row, so the absence names an
+externally issued identity.
+
+The body carries two names because they answer two questions. The resolved
+`displayName` is the value to print. The raw `storedDisplayName` is the value
+the account set, and it is `null` where the account set none. The profile
+page's editable name box seeds from the raw value. A box seeded from the
+resolved value shows the email to an account that set no name. The next save
+then stores that email.
+
+`PATCH /account/me` writes `displayName` and `locale`, both optional. It
+refuses an unknown body key, an out-of-bound `displayName` and an unsupported
+locale with 400. It refuses a federated actor's write with 403. That refusal
+reads off the update's own result, not off a separate existence check. The
+bound on `displayName` comes from `validateDisplayName`, the helper
+`PATCH /admin/users/:id/name` calls too. Two validators would drift.
+
+`normalizeDisplayName` carries that same 200-character bound, and it throws
+past it. Every write path runs it: `createUser`, both setters and
+`updateAccount`. The CLI therefore cannot store a name either route would
+refuse back. Both routes check the bound before they write, so each still
+answers 400 and neither reaches the throw.
+
+`SUPPORTED_LOCALES` restates the values `packages/web`'s `UiLocale` declares.
+The engine carries no dependency on the web package, so the list cannot come
+from an import. A locale added there without this list draws a 400.
+
+The shell serves the page at `/profile`. The route table holds no entry for
+that path. A browser navigation there reaches the bundle, not an API answer.

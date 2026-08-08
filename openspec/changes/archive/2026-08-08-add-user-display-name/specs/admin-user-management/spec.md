@@ -5,7 +5,8 @@
 ### Requirement: Users are listable by an operator over HTTP
 
 `src/auth/users.ts` SHALL expose `listUsers(db)`, returning every row of
-`auth_users` as `{ userId, email, roles, disabled, displayName }`, excluding
+`auth_users` as `{ userId, email, roles, disabled, managerUserId,
+displayName }`, excluding
 `password_hash`. `displayName` SHALL be the resolved value the
 `local-user-accounts` capability defines (`COALESCE(display_name, email)`),
 never null or empty. The engine SHALL expose this as `GET /admin/users`,
@@ -18,7 +19,7 @@ registration.
 
 - **WHEN** an actor holding `system:admin` requests `GET /admin/users`
 - **THEN** the response is 200 with every user's `userId`, `email`, `roles`,
-  `disabled` state, and resolved `displayName`
+  `disabled` state, `managerUserId`, and resolved `displayName`
 
 #### Scenario: A user with no display name lists with their email
 

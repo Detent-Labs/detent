@@ -3,17 +3,66 @@
  * (`src/engine/store.ts::initSchema`). Passwords are hashed with
  * `Bun.password` (argon2id, built into Bun — no dependency). Creating a
  * user and changing a password are CLI-only (`src/auth/cli.ts`); listing
- * users, toggling `disabled` and assigning roles are the carve-out, also
- * reachable over HTTP through the `system:admin`-gated `/admin/users*`
- * routes (`src/http/admin-routes.ts`).
+ * users, toggling `disabled`, assigning roles, setting a manager and setting
+ * a display name are the carve-out, also reachable over HTTP through the
+ * `system:admin`-gated `/admin/users*` routes (`src/http/admin-routes.ts`).
+ * `src/auth/cli.ts`'s header names the six routes one by one.
  */
 import { SQL } from "bun";
 import { sql } from "../engine/store.js";
 
-export async function createUser(email: string, password: string, roles: string[] = [], db: SQL = sql): Promise<{ userId: string }> {
+/**
+ * The one resolution of a user's displayable name: `COALESCE(display_name,
+ * email)`. Every function here that hands a name to a caller goes through it,
+ * so the login response and the admin listing cannot disagree about the same
+ * account. The result is never null and never empty — `email` is `NOT NULL`,
+ * and `normalizeDisplayName` keeps `""` out of the column.
+ */
+function resolveDisplayName(displayName: string | null, email: string): string {
+  return displayName ?? email;
+}
+
+/** The bound every write path enforces: generous for a human name, still short of pathological input. */
+export const DISPLAY_NAME_MAX_LENGTH = 200;
+
+/**
+ * Trim, store `NULL` rather than `""` for an empty result, and refuse a value
+ * past `DISPLAY_NAME_MAX_LENGTH`. Applied on every write path (`createUser`,
+ * `setDisplayName`, `setDisplayNameByEmail`, `updateAccount`), so a name the
+ * HTTP routes would reject cannot enter the column through the CLI either.
+ *
+ * The bound throws a plain `Error` rather than an HTTP error type: this layer
+ * carries no dependency on `src/http`. Both routes run `validateDisplayName`
+ * before the write, so they answer 400 and never reach this throw.
+ */
+function normalizeDisplayName(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > DISPLAY_NAME_MAX_LENGTH) throw new Error(`display name is at most ${DISPLAY_NAME_MAX_LENGTH} characters`);
+  return trimmed;
+}
+
+/**
+ * The trim-then-bound check a route applies before writing, so an over-long or
+ * empty submission answers 400 rather than reaching `normalizeDisplayName`'s
+ * throw. `null` passes through as the clear. Exported so both routes enforce
+ * one bound instead of re-deriving it — two validators drift the way two
+ * resolvers would.
+ */
+export type DisplayNameValidation = { ok: true; displayName: string | null } | { ok: false; reason: "empty" | "too-long" };
+
+export function validateDisplayName(value: string | null): DisplayNameValidation {
+  if (value === null) return { ok: true, displayName: null };
+  const trimmed = value.trim();
+  if (!trimmed) return { ok: false, reason: "empty" };
+  if (trimmed.length > DISPLAY_NAME_MAX_LENGTH) return { ok: false, reason: "too-long" };
+  return { ok: true, displayName: trimmed };
+}
+
+export async function createUser(email: string, password: string, roles: string[] = [], displayName?: string | null, db: SQL = sql): Promise<{ userId: string }> {
   const userId = `user_${crypto.randomUUID()}`;
   const passwordHash = await Bun.password.hash(password);
-  await db`INSERT INTO auth_users (user_id, email, password_hash, roles) VALUES (${userId}, ${email}, ${passwordHash}, ${db.array(roles, "TEXT")})`;
+  await db`INSERT INTO auth_users (user_id, email, password_hash, roles, display_name) VALUES (${userId}, ${email}, ${passwordHash}, ${db.array(roles, "TEXT")}, ${normalizeDisplayName(displayName)})`;
   return { userId };
 }
 
@@ -35,17 +84,19 @@ const DUMMY_HASH = Bun.password.hash(crypto.randomUUID());
  * `return` before verifying (the no-such-row shape) would make the unknown-
  * email path roughly two orders of magnitude faster than a known one.
  */
-export async function verifyLogin(email: string, password: string, db: SQL = sql): Promise<{ userId: string; roles: string[] } | undefined> {
-  const rows = (await db`SELECT user_id, password_hash, roles, disabled FROM auth_users WHERE email = ${email}`) as {
+export async function verifyLogin(email: string, password: string, db: SQL = sql): Promise<{ userId: string; roles: string[]; displayName: string } | undefined> {
+  const rows = (await db`SELECT user_id, email, password_hash, roles, disabled, display_name FROM auth_users WHERE email = ${email}`) as {
     user_id: string;
+    email: string;
     password_hash: string;
     roles: string[];
     disabled: boolean;
+    display_name: string | null;
   }[];
   const row = rows[0];
   const valid = await Bun.password.verify(password, row?.password_hash ?? (await DUMMY_HASH));
   if (!row || !valid || row.disabled) return undefined;
-  return { userId: row.user_id, roles: row.roles };
+  return { userId: row.user_id, roles: row.roles, displayName: resolveDisplayName(row.display_name, row.email) };
 }
 
 /**
@@ -94,6 +145,8 @@ export interface UserSummary {
   disabled: boolean;
   /** The account's manager, or `undefined` for no manager on record. One pointer to one other account, never a tree. */
   managerUserId: string | undefined;
+  /** The resolved display name (`resolveDisplayName`), never null and never empty. The stored `display_name`, or the email when that column is `NULL`. */
+  displayName: string;
 }
 
 /** The column list every user-returning query below selects, so one mapper serves them all. */
@@ -103,6 +156,15 @@ interface UserRow {
   roles: string[];
   disabled: boolean;
   manager_user_id: string | null;
+  display_name: string | null;
+  /**
+   * The account's own UI locale, `NULL` where it never set one. Selected by the
+   * two self-scoped queries alone (`getAccountById`, `updateAccount`): the four
+   * admin queries leave it out of their `SELECT`/`RETURNING` lists, and
+   * `toSummary` never reads it, so `GET /admin/users` and the four
+   * `/admin/users/:id/*` routes keep the body `admin-user-management` pins.
+   */
+  locale: string | null;
 }
 
 const toSummary = (r: UserRow): UserSummary => ({
@@ -111,10 +173,11 @@ const toSummary = (r: UserRow): UserSummary => ({
   roles: r.roles,
   disabled: r.disabled,
   managerUserId: r.manager_user_id ?? undefined,
+  displayName: resolveDisplayName(r.display_name, r.email),
 });
 
 export async function listUsers(db: SQL = sql): Promise<UserSummary[]> {
-  const rows = (await db`SELECT user_id, email, roles, disabled, manager_user_id FROM auth_users ORDER BY email`) as UserRow[];
+  const rows = (await db`SELECT user_id, email, roles, disabled, manager_user_id, display_name FROM auth_users ORDER BY email`) as UserRow[];
   return rows.map(toSummary);
 }
 
@@ -124,14 +187,14 @@ export async function listUsers(db: SQL = sql): Promise<UserSummary[]> {
  * updated row, or `undefined` if no such `userId` exists.
  */
 export async function setRolesById(userId: string, roles: string[], db: SQL = sql): Promise<UserSummary | undefined> {
-  const rows = (await db`UPDATE auth_users SET roles = ${db.array(roles, "TEXT")} WHERE user_id = ${userId} RETURNING user_id, email, roles, disabled, manager_user_id`) as UserRow[];
+  const rows = (await db`UPDATE auth_users SET roles = ${db.array(roles, "TEXT")} WHERE user_id = ${userId} RETURNING user_id, email, roles, disabled, manager_user_id, display_name`) as UserRow[];
   const row = rows[0];
   return row ? toSummary(row) : undefined;
 }
 
 /** Keyed by `userId`, unlike `setRoles`/`setPassword` — see design.md. Returns the updated row, or `undefined` if no such `userId` exists. */
 export async function setDisabled(userId: string, disabled: boolean, db: SQL = sql): Promise<UserSummary | undefined> {
-  const rows = (await db`UPDATE auth_users SET disabled = ${disabled} WHERE user_id = ${userId} RETURNING user_id, email, roles, disabled, manager_user_id`) as UserRow[];
+  const rows = (await db`UPDATE auth_users SET disabled = ${disabled} WHERE user_id = ${userId} RETURNING user_id, email, roles, disabled, manager_user_id, display_name`) as UserRow[];
   const row = rows[0];
   return row ? toSummary(row) : undefined;
 }
@@ -150,7 +213,7 @@ export async function setDisabled(userId: string, disabled: boolean, db: SQL = s
  */
 export async function setManagerById(userId: string, managerUserId: string | null, db: SQL = sql): Promise<UserSummary | undefined> {
   if (managerUserId !== null && managerUserId === userId) throw new SelfManagerError(userId);
-  const rows = (await db`UPDATE auth_users SET manager_user_id = ${managerUserId} WHERE user_id = ${userId} RETURNING user_id, email, roles, disabled, manager_user_id`) as UserRow[];
+  const rows = (await db`UPDATE auth_users SET manager_user_id = ${managerUserId} WHERE user_id = ${userId} RETURNING user_id, email, roles, disabled, manager_user_id, display_name`) as UserRow[];
   const row = rows[0];
   return row ? toSummary(row) : undefined;
 }
@@ -177,6 +240,96 @@ export async function setManagerByEmail(email: string, managerEmail: string | nu
     if (!managerUserId) throw new Error(`no such user: ${managerEmail}`);
   }
   await setManagerById(userId, managerUserId, db);
+}
+
+/**
+ * Set (or, with `null`, clear) the account's display name. Keyed by `userId`
+ * like `setRolesById`. An empty-after-trim value is normalized rather than
+ * rejected: it stores as `NULL`, never `""`, so the resolution invariant holds
+ * on this path as it does on `createUser`'s. A value past
+ * `DISPLAY_NAME_MAX_LENGTH` throws (`normalizeDisplayName`). Turning an empty
+ * submission into a 400 rather than a `NULL` is the HTTP route's job
+ * (`validateDisplayName`). Returns the updated row, or `undefined` if no such
+ * `userId` exists.
+ */
+export async function setDisplayName(userId: string, displayName: string | null, db: SQL = sql): Promise<UserSummary | undefined> {
+  const value = normalizeDisplayName(displayName);
+  const rows = (await db`UPDATE auth_users SET display_name = ${value} WHERE user_id = ${userId} RETURNING user_id, email, roles, disabled, manager_user_id, display_name`) as UserRow[];
+  const row = rows[0];
+  return row ? toSummary(row) : undefined;
+}
+
+/**
+ * The email-keyed sibling of `setDisplayName`, for `src/auth/cli.ts` — a human
+ * types an email, never a `user_id`. Throws when the email names no account, so
+ * the CLI reports which one. Delegates the write, so the trim and the `NULL`
+ * normalization stay in one place.
+ */
+export async function setDisplayNameByEmail(email: string, displayName: string | null, db: SQL = sql): Promise<void> {
+  const userId = await userIdForEmail(email, db);
+  if (!userId) throw new Error(`no such user: ${email}`);
+  await setDisplayName(userId, displayName, db);
+}
+
+/**
+ * What `GET`/`PATCH /account/me` read: a `UserSummary` plus the account's own
+ * UI locale. The admin listing carries no locale (see `UserRow`), so the extra
+ * field lives on its own type rather than widening `UserSummary`.
+ */
+export interface AccountRecord extends UserSummary {
+  /** The stored UI locale, or `undefined` where the account never set one. `account-self-service` bounds the accepted value set; this column stores whatever the route accepted. */
+  locale: string | undefined;
+  /**
+   * The raw `display_name` column, `null` where the account never set one —
+   * beside the inherited `displayName`, which is the resolved value and never
+   * null. The profile page's editable name box seeds from this one: seeding it
+   * from the resolved value pre-fills the email, and any save then stores that
+   * email as the account's name.
+   */
+  storedDisplayName: string | null;
+}
+
+const toAccount = (r: UserRow): AccountRecord => ({ ...toSummary(r), locale: r.locale ?? undefined, storedDisplayName: r.display_name });
+
+/**
+ * One account by `user_id`, for the self-scoped read. Deliberately not a filter
+ * added to `listUsers`: that function returns every account, which is the admin
+ * list view's job. Returns `undefined` when no row carries that id — the signal
+ * `GET /account/me` reads as a federated actor.
+ */
+export async function getAccountById(userId: string, db: SQL = sql): Promise<AccountRecord | undefined> {
+  const rows = (await db`SELECT user_id, email, roles, disabled, manager_user_id, display_name, locale FROM auth_users WHERE user_id = ${userId}`) as UserRow[];
+  const row = rows[0];
+  return row ? toAccount(row) : undefined;
+}
+
+/**
+ * The self-service write behind `PATCH /account/me`. A key absent from `changes`
+ * leaves its column untouched, which is what lets one statement serve a request
+ * carrying either field or both — and what keeps a locale change from clearing a
+ * display name. `display_name` is normalized the way `setDisplayName` normalizes
+ * it, so `""` never reaches the column on any write path. `locale` is stored
+ * verbatim; bounding its value set is the route's job.
+ *
+ * Returns the updated record, or `undefined` if no such `userId` exists.
+ */
+export async function updateAccount(
+  userId: string,
+  changes: { displayName?: string | null; locale?: string },
+  db: SQL = sql,
+): Promise<AccountRecord | undefined> {
+  // `undefined` means "leave it"; `null` is the explicit clear, so the check is
+  // against `undefined` rather than a `in` test.
+  const setsDisplayName = changes.displayName !== undefined;
+  const setsLocale = changes.locale !== undefined;
+  const rows = (await db`
+    UPDATE auth_users
+    SET display_name = CASE WHEN ${setsDisplayName}::boolean THEN ${normalizeDisplayName(changes.displayName)}::text ELSE display_name END,
+        locale       = CASE WHEN ${setsLocale}::boolean THEN ${changes.locale ?? null}::text ELSE locale END
+    WHERE user_id = ${userId}
+    RETURNING user_id, email, roles, disabled, manager_user_id, display_name, locale`) as UserRow[];
+  const row = rows[0];
+  return row ? toAccount(row) : undefined;
 }
 
 async function userIdForEmail(email: string, db: SQL): Promise<string | undefined> {

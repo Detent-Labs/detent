@@ -1,12 +1,23 @@
-import { lazy, Suspense, useCallback, useState } from "react";
-import { matchShell, useLocation, areaHref, LOGIN_PATH } from "./routing.js";
-import { loadSession, persistSession, clearSession, browserStorage, type Session } from "./session.js";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { matchShell, useLocation, areaHref, LOGIN_PATH, PROFILE_PATH } from "./routing.js";
+import {
+  loadSession,
+  persistSession,
+  clearSession,
+  browserStorage,
+  hydrateSession,
+  needsHydration,
+  type Session,
+} from "./session.js";
 import { AREAS, landingArea, mayEnter, type Area } from "./areas.js";
-import { loadLocale, persistLocale, type UiLocale } from "../i18n/locale.js";
+import { adoptHydratedLocale, loadLocale, persistLocale, type UiLocale } from "../i18n/locale.js";
+import { fetchAccount, patchAccount } from "../api/client.js";
+import { syncLocaleChange } from "./localeSync.js";
 import { t } from "./catalog.js";
 import { LoginScreen } from "./LoginScreen.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { Chrome } from "./Chrome.js";
+import { ProfilePage } from "./ProfilePage.js";
 
 /**
  * One dynamic import per area, so the build emits one chunk per area and a
@@ -51,10 +62,52 @@ export function App() {
     go(LOGIN_PATH);
   }, [go]);
 
+  // The account menu's picker. Whether the choice reaches `PATCH /account/me`
+  // is `syncLocaleChange`'s decision, not this one; what comes back is the
+  // session to hold, or nothing where there was no session to change.
   const changeLocale = (next: UiLocale) => {
     setLocale(next);
-    persistLocale(next, browserStorage());
+    const updated = syncLocaleChange(next, { session, storage: browserStorage(), patchAccount });
+    if (!updated) return;
+    setSession(updated);
+    persistSession(updated);
   };
+
+  // `displayName` and `locale` come from `GET /account/me`, not from the login
+  // response, and fill in after the fact: this runs both after a login and after
+  // `loadSession()` restored a stored session that predates hydration. Neither
+  // login nor the first render waits on it, so a failure costs the two fields and
+  // nothing else. A dead token surfaces as the 401 an area's own call already
+  // routes to `logout`.
+  //
+  // One attempt per token. A federated actor's response carries neither field, so
+  // `needsHydration` stays true afterwards and the guard below is what stops a
+  // resolved call from starting the next one.
+  const hydratedFor = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!session) {
+      hydratedFor.current = undefined;
+      return;
+    }
+    if (hydratedFor.current === session.token || !needsHydration(session)) return;
+    hydratedFor.current = session.token;
+    let live = true;
+    void fetchAccount(session.token)
+      .then((account) => {
+        if (!live) return;
+        const hydrated = hydrateSession(session, account);
+        setSession(hydrated);
+        persistSession(hydrated);
+        const adopted = adoptHydratedLocale(account.locale, browserStorage());
+        if (adopted) setLocale(adopted);
+      })
+      .catch(() => {
+        // Best-effort. The session is established from the login response alone.
+      });
+    return () => {
+      live = false;
+    };
+  }, [session]);
 
   const here = matchShell(pathname);
 
@@ -68,6 +121,45 @@ export function App() {
           go(`/${landingArea(s.roles)}`);
         }}
       />
+    );
+  }
+
+  // Identity belongs to every signed-in actor, so the profile page sits under
+  // the shell rather than inside a role-gated area. It renders inside `Chrome`,
+  // so the account menu and the area switcher stay reachable from it.
+  if (here.kind === "profile") {
+    return (
+      <Chrome
+        area="profile"
+        roles={session.roles}
+        locale={locale}
+        onLocaleChange={changeLocale}
+        onLogout={logout}
+        onGoToArea={(a) => go(areaHref(a, "/"))}
+        onGoToProfile={() => go(PROFILE_PATH)}
+        nav={undefined}
+      >
+        <ProfilePage
+          token={session.token}
+          locale={locale}
+          onSaved={(account) => {
+            // The account of record just moved, so the session follows it, and
+            // a locale chosen here becomes the active one at once. The form's
+            // own PATCH already carried it to the account, so this writes the
+            // browser's copy directly rather than through `changeLocale`, which
+            // would send a second PATCH and rebuild the session from the copy
+            // this callback closed over.
+            const next = hydrateSession(session, account);
+            setSession(next);
+            persistSession(next);
+            if (next.locale) {
+              setLocale(next.locale);
+              persistLocale(next.locale, browserStorage());
+            }
+          }}
+          onUnauthorized={logout}
+        />
+      </Chrome>
     );
   }
 
@@ -89,6 +181,7 @@ export function App() {
         onLocaleChange={changeLocale}
         onLogout={logout}
         onGoToArea={(a) => go(areaHref(a, "/"))}
+        onGoToProfile={() => go(PROFILE_PATH)}
         nav={undefined}
       >
         <main className="shell-empty">{t(locale, "area.forbidden")}</main>

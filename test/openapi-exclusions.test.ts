@@ -37,6 +37,27 @@ test("the public override read declares that it needs no role and no token", () 
   expect(entry).toContain("security: []");
 });
 
+test("the self-scoped account routes are documented, each needing a token and no role", () => {
+  // Any session reaches these two, and they administer nobody, so the `admin/*`
+  // exclusion does not cover them.
+  expect(documentedPaths).toContain("/account/me");
+  const entry = DOC.slice(DOC.indexOf("  /account/me:"), DOC.indexOf("  /livez:"));
+  expect(entry).toContain("get:");
+  expect(entry).toContain("patch:");
+  // Two statements of the auth requirement, one per method. Neither carries the
+  // `security: []` that says "no token here" — the document's default
+  // `bearerAuth` applies to both.
+  expect([...entry.matchAll(/Needs a token and no role/g)]).toHaveLength(2);
+  expect(entry).not.toContain("security: []");
+});
+
+test("neither account route claims a 404", () => {
+  // A resolvable actor the engine holds no local account for reads as
+  // federated, not as missing, so the read answers 200 and the write 403.
+  const entry = DOC.slice(DOC.indexOf("  /account/me:"), DOC.indexOf("  /livez:"));
+  expect(entry).not.toContain('"404"');
+});
+
 test("no internal-only prefix appears as a documented path", () => {
   for (const prefix of EXCLUDED) {
     const offenders = documentedPaths.filter((p) => p.startsWith(`/${prefix}/`) || p === `/${prefix}`);

@@ -1,21 +1,5 @@
-# http-api-documentation Specification
+## MODIFIED Requirements
 
-## Purpose
-
-The engine's REST/JSON wrapper (`src/http/`) has grown a customer-facing
-surface. It covers auth, process instances, comments, claims and delegation,
-process listing, and health checks. No machine-readable description of it
-exists.
-
-A customer integration had no single source for which routes exist and what
-auth they need. It also had no source for what each route accepts and
-returns, or which error statuses to expect.
-
-This spec is the contract for `docs/openapi.yaml`, a valid OpenAPI 3.0
-document. It covers exactly the customer-facing routes and none of the
-internal-only ones (`admin/*`, `drafts/*`, `migration-plans/*`, `registry`).
-No engine code changes. This is documentation of the existing HTTP surface.
-## Requirements
 ### Requirement: OpenAPI document exists and covers the customer-facing surface
 
 The repository SHALL contain `docs/openapi.yaml`, a valid OpenAPI 3.0
@@ -75,43 +59,3 @@ extends this requirement. It does not redesign the routes.
 - **WHEN** a reader searches `docs/openapi.yaml` for `/account/me`
 - **THEN** both `GET` and `PATCH` appear, each stating that it needs a token
   and no role
-
-### Requirement: Each route documents auth, schema, and errors
-
-Each documented route SHALL state its auth requirement: a reserved role
-from `authorization`, or none. Each route SHALL state its request body
-schema and its response schema. Each route SHALL list the error statuses
-it returns, drawn from 400, 401, 403, 409, 422, 429, 500, each with a
-one-line trigger.
-
-`POST /auth/login` draws its statuses from `src/auth/login.ts`, which
-builds its own responses and bypasses `src/http/errors.ts`. Every other
-route draws its statuses from `src/http/errors.ts`. No route entry SHALL
-claim 404. `src/http/errors.ts` never maps a specific route to that
-status. A not-found instance or process returns 500 by design.
-
-#### Scenario: A reader checks the auth requirement for an admin-role route
-
-- **WHEN** a reader looks up `POST /processes` in `docs/openapi.yaml`
-- **THEN** the entry states the `system:publish` role requirement, matching
-  `authorization`'s existing gate on that route
-
-#### Scenario: A reader checks an error trigger
-
-- **WHEN** a reader looks up the 409 status on `POST /instances/:id/submit`
-- **THEN** the entry gives a one-line trigger consistent with the
-  `runtime-api` concurrency-conflict behavior that route already has
-
-#### Scenario: A reader checks whether any route claims 404
-
-- **WHEN** a reader searches every route entry in `docs/openapi.yaml` for
-  a documented 404 response
-- **THEN** no route entry lists 404, matching `src/http/errors.ts`'s
-  mapping
-
-#### Scenario: A reader checks the login route's rate limit
-
-- **WHEN** a reader looks up the 429 status on `POST /auth/login`
-- **THEN** the entry gives a one-line trigger matching
-  `checkAndRecordAttempt`'s per-email rate limit in `src/auth/login.ts`,
-  and no other documented route lists 429

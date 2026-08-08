@@ -52,16 +52,31 @@ no name, resolving to email until someone sets one later. The `set-name
 Display name always sits last in the argument list, so a caller who wants
 to skip it just omits it.
 
+An account with no roles passes an empty roles argument. That reads
+`add-user <email> <password> "" <display-name>`. `cli.ts` reads a falsy
+roles argument as the empty set already.
+
 `createUser` and `setDisplayName` trim that argument. They store `NULL`
 when the trimmed result is empty, never the empty string itself. This
 applies whether the value arrives through the CLI or a direct call. It is
 what keeps the "never empty" resolution invariant true on every write path,
 not only the HTTP route's own 400.
 
-The route still rejects an empty value outright: telling the caller
-immediately beats silently accepting and normalizing it. The CLI has no
-such rejection, by existing convention (`set-roles` accepts any string
-unchecked). Normalization is the only guard available on that path.
+`normalizeDisplayName` is the helper behind that trim. It carries the
+200-character bound too, and it throws past that bound. Every write path
+runs it: `createUser`, `setDisplayName`, `setDisplayNameByEmail` and
+`updateAccount`. The bound is therefore one rule, and the CLI cannot store
+a name a route would refuse.
+
+Both routes still answer 400. Each checks the value with
+`validateDisplayName` before it writes, so neither reaches the throw. The
+CLI runs no such check. An over-long name there prints the thrown message
+and exits non-zero, the same way an unknown email already does.
+
+An empty value is the one case the two paths answer differently. The routes
+refuse it with 400, because telling the caller beats accepting a value and
+changing it. On the CLI path the helper stores `NULL`, which resolves back
+to the email.
 
 **`PATCH /admin/users/:id/name` accepts a body shaped `{ displayName:
 string | null }`, described below.** A `null` value clears the column and
@@ -70,6 +85,19 @@ already treats a `null` value. A non-null value gets trimmed first. The
 route then bounds it at 200 characters, the same trim-then-validate shape
 the roles route already applies. That bound is generous for a human name,
 and it still rejects pathological input.
+
+The bound and the empty-after-trim rejection ship as one exported helper in
+`src/auth/users.ts`. That helper is a `DISPLAY_NAME_MAX_LENGTH` constant
+plus a `validateDisplayName(value)`. It returns the trimmed value, or
+signals the 400. The route calls it. A later self-scoped route calls that
+same one. Two validators drift the way two resolvers would.
+
+**The CLI-only rule covers the `/admin/users` routes only.** The
+`local-user-accounts` delta enumerates the account-administration routes
+under `/admin/users`. It does not enumerate every route that writes an
+`auth_users` column. A later self-scoped route then extends that requirement
+instead of contradicting its count. One example is a route that writes the
+caller's own `display_name`.
 
 **No change reaches `Actor { id, roles }` or the `jwtResolver`
 implementation.** The display name is a response-body field on two

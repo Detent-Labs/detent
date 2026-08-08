@@ -52,7 +52,8 @@ header, needs a human-readable identity to display. Today no field holds one.
 - `src/engine/store.ts`: `initSchema`'s `auth_users` DDL gains one column.
 - `src/auth/users.ts`: a resolution helper. `verifyLogin`/`listUsers` use it,
   alongside `setRolesById`/`setDisabled`/`setManagerById`, which share the
-  same row mapping. A new `setDisplayName` function (or equivalent).
+  same row mapping. A new `setDisplayName` function, keyed by `user_id`, plus
+  its email-keyed sibling `setDisplayNameByEmail` for the CLI.
 - `src/auth/login.ts`: response shape gains `actor.displayName`.
 - `src/auth/cli.ts`: new `set-name` command.
 - `src/http/admin-routes.ts`: new `PATCH /admin/users/:id/name` route.
@@ -60,6 +61,20 @@ header, needs a human-readable identity to display. Today no field holds one.
   existing `/admin/users/:userId/manager` entry.
 - `scripts/seed.ts`: its `createUser` call site, which passes `db`
   positionally today and needs the new parameter accounted for.
+- `docs/openapi.yaml`: `LoginResponse.actor` gets its own schema carrying
+  `displayName`. The shared `Actor` schema stays as it is, since it also
+  documents the trusted authorization identity.
+- `docs/current-state.md`: the `auth_users` schema entry and the `listUsers`
+  field list.
+- `openspec/specs/admin-user-management/spec.md`: the Purpose paragraph at
+  lines 5-9 names listing, the `disabled` toggle and roles. It gains manager
+  and display name (task 7.3). Purpose carries no requirement text, so no
+  delta spec covers it. The edit lands at sync or archive time, not during
+  implementation.
+- `test/auth-users.test.ts`, `test/auth-login.test.ts`,
+  `test/http-admin.test.ts`, `test/auth-cli.test.ts`: new coverage, plus
+  three existing `toEqual` literals that the new `UserSummary`/`verifyLogin`
+  fields break.
 - No change to the `Actor { id, roles }` shape used for authorization
   (`src/cel/eval.ts`, `jwt-authentication`, `actor-resolution`). The display
   name is a presentation field on the login and admin HTTP responses only. It

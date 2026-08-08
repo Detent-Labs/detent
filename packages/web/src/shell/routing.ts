@@ -11,12 +11,20 @@ import { isArea, type Area } from "./areas.js";
  * ROADMAP.md item 12 assumed all four would be rewritten; stripping the prefix
  * here is what makes that unnecessary.
  */
-export type ShellLocation = { kind: "login" } | { kind: "root" } | { kind: "area"; area: Area; path: string } | { kind: "unknown" };
+export type ShellLocation =
+  | { kind: "login" }
+  | { kind: "profile" }
+  | { kind: "root" }
+  | { kind: "area"; area: Area; path: string }
+  | { kind: "unknown" };
 
 export function matchShell(pathname: string): ShellLocation {
   const [head, ...rest] = pathname.split("/").filter(Boolean);
   if (head === undefined) return { kind: "root" };
   if (head === "login") return { kind: "login" };
+  // The profile page is one page, not an area: it owns the whole segment and
+  // hands no remainder to anybody, so anything below it names nothing.
+  if (head === "profile") return rest.length === 0 ? { kind: "profile" } : { kind: "unknown" };
   if (isArea(head)) return { kind: "area", area: head, path: `/${rest.join("/")}` };
   return { kind: "unknown" };
 }
@@ -27,6 +35,9 @@ export function areaHref(area: Area, localPath: string): string {
 }
 
 export const LOGIN_PATH = "/login";
+
+/** Names no area, and differs from every API route path — the engine matches its route table before it falls through to static serving. */
+export const PROFILE_PATH = "/profile";
 
 /** Small hand-written History-API hook — one copy now, where there were four. */
 export function useLocation(): { pathname: string; go: (href: string) => void } {

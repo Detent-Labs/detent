@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { matchRoute, routePath } from "../src/areas/app/routing.js";
-import { matchShell, areaHref } from "../src/shell/routing.js";
+import { matchShell, areaHref, PROFILE_PATH } from "../src/shell/routing.js";
 
 describe("matchRoute", () => {
   it("resolves the inbox route", () => {
@@ -49,6 +49,16 @@ describe("matchShell", () => {
 
   it("gives an area's own root the local path /", () => {
     expect(matchShell("/app")).toEqual({ kind: "area", area: "app", path: "/" });
+  });
+
+  it("resolves the profile page from its whole first segment", () => {
+    expect(matchShell(PROFILE_PATH)).toEqual({ kind: "profile" });
+  });
+
+  it("leaves a path deeper than /profile unknown, rather than half-matching the segment", () => {
+    // The profile page hands no remainder to anybody, so `/profile/settings`
+    // names nothing and takes the same redirect an unknown prefix does.
+    expect(matchShell("/profile/settings")).toEqual({ kind: "unknown" });
   });
 });
 

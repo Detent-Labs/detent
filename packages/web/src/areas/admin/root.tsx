@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { ListChecks, Send, Timer, Users, GitCompareArrows, Table2, Languages } from "lucide-react";
 import { matchRoute, routePath, ROUTE_ROLE, type Route } from "./routing.js";
-import { useAreaRoute } from "../../shell/routing.js";
+import { useAreaRoute, PROFILE_PATH } from "../../shell/routing.js";
 import { Chrome } from "../../shell/Chrome.js";
 import { InstancesScreen } from "./screens/InstancesScreen.js";
 import { InstanceScreen } from "./screens/InstanceScreen.js";
@@ -84,6 +84,7 @@ export function AdminArea({ session, locale, localPath, go, onUnauthorized, onLo
       onLocaleChange={onLocaleChange}
       onLogout={onLogout}
       onGoToArea={(a) => go(`/${a}`)}
+      onGoToProfile={() => go(PROFILE_PATH)}
       nav={nav}
     >
       {!may(required) && <MissingRole role={required} />}

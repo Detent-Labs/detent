@@ -19,20 +19,19 @@ auth_users (
 )
 ```
 
-This requirement assumes `add-user-display-name` has already landed and
-added `display_name`. This change adds `locale` on top of it.
-
 `Actor.id` SHALL equal `user_id`. `assignment.candidates`,
 `assignment.claimedBy` and `startedBy` SHALL carry that same value. The
 table SHALL stay additive: an installation that never sets an auth
 environment variable never touches it.
 
-A migration SHALL add `locale` to an already-created table. Earlier
-migrations added `manager_user_id` and `display_name` the same way, since
-`CREATE TABLE IF NOT EXISTS` skips a table that already exists. That
-migration SHALL leave `NULL` in `locale` on every pre-existing row. The
-`account-self-service` capability defines what `locale` means and how a
-caller sets it.
+A migration SHALL add `manager_user_id`, `display_name` and `locale` to an
+already-created table, since `CREATE TABLE IF NOT EXISTS` skips a table that
+exists already. That migration SHALL leave `NULL` in all three columns on
+every pre-existing row. The `manager-of-starter-assignment` capability
+defines what `manager_user_id` means. This capability defines what
+`display_name` means and how it resolves (see "A user's display name
+resolves to a non-empty value"). The `account-self-service` capability
+defines what `locale` means and how a caller sets it.
 
 #### Scenario: initSchema creates the table
 
@@ -45,9 +44,16 @@ caller sets it.
   `auth_users`
 - **THEN** the creation fails and no second row exists afterward
 
+#### Scenario: An existing database gains the manager and display-name columns
+
+- **WHEN** `initSchema` runs against a database whose `auth_users`
+  predates the `manager_user_id` and `display_name` columns
+- **THEN** the table has `manager_user_id` and `display_name`, and every
+  pre-existing row holds `NULL` in both
+
 #### Scenario: An existing database gains the locale column
 
-- **WHEN** `initSchema` runs against a database whose `auth_users` predates
-  this change
+- **WHEN** `initSchema` runs against a database whose `auth_users`
+  predates the `locale` column
 - **THEN** the table has `locale`, and every pre-existing row holds `NULL`
   in it
