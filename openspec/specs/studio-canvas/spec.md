@@ -515,9 +515,9 @@ The view entry SHALL show a status summary of the step's form. For
 example, the summary might read how many fields carry a view entry.
 It SHALL also show a "Build the form" label alongside that summary.
 
-This changes the entry's copy only. Choosing it still opens
-`FormEditorDialog` through the same call it uses today. No section
-expands inline.
+This changes the entry's copy only. Choosing it still navigates to the
+form editor's routed page, per the view-entry requirement above. No
+section expands inline.
 
 #### Scenario: The view entry shows a form-status summary
 
