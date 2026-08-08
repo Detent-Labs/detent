@@ -63,18 +63,32 @@ device. No route anywhere scopes to the caller's own record.
 
 ## Impact
 
-- This change depends on `add-user-display-name` landing first (in
-  progress, not yet archived). It reuses that change's `display_name`
-  column and its `COALESCE(display_name, email)` helper in
-  `src/auth/users.ts`, instead of re-deriving either.
+- **Sequencing.** This change depends on `add-user-display-name` landing
+  first. That change is not yet applied or archived, and OpenSpec has no
+  dependency field to enforce the order. Apply and archive
+  `add-user-display-name` before applying or archiving this change. It
+  reuses that change's `display_name` column and its
+  `COALESCE(display_name, email)` helper in `src/auth/users.ts`, instead
+  of re-deriving either.
 - New: a self-scoped account route module (e.g.
   `src/http/account-routes.ts`) for `GET`/`PATCH /account/me`.
+- `src/http/server.ts`: wires the new route module into the composition
+  root's route table, alongside the existing admin and studio route
+  modules.
 - `src/auth/users.ts`: handles the new `locale` column alongside the
   existing display-name resolution.
 - `src/engine/store.ts`: `initSchema` gains the `locale` column, additive.
 - `packages/web/src/shell/session.ts`: `Session` type extended.
+- `packages/web/src/shell/routing.ts`: `ShellLocation`/`matchShell` gain a
+  case for the profile page.
+- `packages/web/src/shell/App.tsx`: its branching logic routes the new
+  `ShellLocation` case; its own direct `<Chrome>` call (the forbidden-area
+  branch) gains the new profile-menu prop.
 - `packages/web/src/shell/Chrome.tsx`: account menu gains a profile-page
-  link.
+  link and a new prop for it.
+- `packages/web/src/areas/{app,admin,studio,reporting}/root.tsx`: each of
+  the four area roots also instantiates `<Chrome>` and needs the same new
+  prop threaded through.
 - New shell-level page and route under `packages/web/src/shell/` for the
   profile screen itself.
 - `packages/web/src/i18n/locale.ts`: locale persistence gains an

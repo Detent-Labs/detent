@@ -65,6 +65,11 @@ act-on-your-own semantics, in one route family. Every other route in
 that family stays admin-only on purpose, so this design keeps a separate
 route family instead.
 
+This design needs no new dispatch primitive. `src/http/routes.ts`
+already has the right pattern. It pairs `guarded` with `resolveActor`
+and skips `requireRole`. `handleClaim` and `handleGetInstanceView` use
+exactly that today. `account-routes.ts` follows the same shape.
+
 **A federated actor's `GET /account/me` returns `200` with `editable:
 false`, never `404`.** A `"bps"`-issued token already guarantees an
 active local row, per `jwt-authentication`'s re-read requirement. A
@@ -81,10 +86,15 @@ string. Nothing downstream should receive a locale outside what the two
 shipped catalogs cover.
 
 **`PATCH /account/me` refuses an unknown body key with `400`,** rather
-than ignoring it. This mirrors `admin-user-management`'s bounded-input
-handling on `PATCH /admin/users/:id/roles`. A self-service write path is
-a trust boundary. Input validation there stays strict, even where the
-rest of this change favors the smaller approach.
+than ignoring it. No existing route follows this pattern.
+`admin-user-management`'s roles route bounds the *contents* of the
+`roles` array: trim, dedupe, length, count. Its manager route silently
+ignores any body key beyond `managerUserId`.
+
+This is a deliberate exception, not a mirror of either. A self-service
+write path is a trust boundary. Input validation there stays strict,
+even where the rest of this change favors the smaller approach. No
+sibling route validates this strictly, and that is fine here.
 
 **The shell hydrates `displayName`/`locale` with a `GET /account/me` call
 after login,** rather than growing the `POST /auth/login` response again.
@@ -110,6 +120,16 @@ jsonb blob.** Already decided in `proposal.md`; restated here as a design
 decision too. One additive column per concrete preference matches the
 existing `manager_user_id`/`display_name` pattern. A jsonb blob would
 speculate on preferences that do not exist yet.
+
+**`src/auth/users.ts` touch points for `locale`.** The `UserRow` and
+`UserSummary` interfaces need it, and so does the `toSummary` mapper.
+Four `SELECT`/`RETURNING` column lists need it too: `listUsers`,
+`setRolesById`, `setDisabled`, and `setManagerById`.
+
+`GET /account/me` needs its own single-row lookup keyed on `user_id`,
+not a reuse of `listUsers`. That function returns every account with no
+`id` filter. That fits the admin route's list view. A self-service read
+of one row needs its own query instead.
 
 ## Risks / Trade-offs
 
@@ -150,7 +170,11 @@ actor sees an identity-only profile page" scenario.
    stored session predating this change lacks both fields. The shell
    treats it as valid, not malformed, and hydrates it on next use (see
    the `unified-shell` delta).
-5. Add the profile page and its account-menu entry.
+5. Extend `packages/web/src/shell/routing.ts`'s `ShellLocation`/
+   `matchShell` with a case for the profile page, and `App.tsx`'s render
+   branching to route it. Add the profile page component. Thread a new
+   profile-menu prop through `Chrome.tsx` and all 5 of its call sites
+   (`App.tsx`'s forbidden-area branch and the four area roots).
 6. Wire the account menu's language picker to `PATCH /account/me` for a
    signed-in actor, keeping the existing `localStorage` write.
 
