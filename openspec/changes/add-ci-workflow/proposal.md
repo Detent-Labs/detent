@@ -35,10 +35,12 @@ trigger it.
   `pull_request`. Two jobs, both `runs-on: ubuntu-latest`:
   - **`check`**: brings up this project's existing devcontainer stack
     (`docker compose -f .devcontainer/docker-compose.yml up -d --wait`),
-    then inside the `app` service runs `bun run check`, `lockfile.sh`
-    (`frozen-lockfile`), and `silent-green.sh` (`no-silent-green`) against
-    that output, the same three the pre-push hook's container stage runs.
-    No teardown step: the VM is destroyed after the job regardless.
+    then inside the `app` service runs `bun install` (a fresh checkout
+    carries no `node_modules`, unlike a contributor's own devcontainer),
+    `bun run check`, `lockfile.sh` (`frozen-lockfile`), and
+    `silent-green.sh` (`no-silent-green`) against that output, the same
+    three the pre-push hook's container stage runs. No teardown step: the
+    VM is destroyed after the job regardless.
   - **`host-gates`**: runs the four gates that need only git and a shell,
     against the pushed or PR-diffed commit range: `ponytail-ledger.sh`,
     `whitespace.sh`, `prose.sh`, `machine-paths.sh`. Computes the range
