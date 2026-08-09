@@ -73,6 +73,6 @@
       baseline.
 - [x] 5.4 Run `git diff --check` over the change. Confirm no trailing
       whitespace or blank-line-at-EOF findings.
-- [ ] 5.5 Push a commit containing the new workflow, the Dependabot file,
+- [x] 5.5 Push a commit containing the new workflow, the Dependabot file,
       and the rewritten docs. Confirm both `host-gates` and `check` appear
       in the repository's Actions tab, and that both succeed.
