@@ -13,9 +13,9 @@
     "@panzoom/panzoom": "^4.6.0",
     "form-ui": "file:../form-ui",
     "immer": "^11.1.15",
-    "lucide-react": "0.446.0",
+    "lucide-react": "1.29.0",
     "react": "^18",
-    "react-dom": "^18",
+    "react-dom": "^19",
     "workflow-engine": "file:../..",
     "zod": "^3.23.8"
   },
@@ -24,6 +24,6 @@
     "@types/react-dom": "^18",
     "@vitejs/plugin-react": "^4",
     "typescript": "5.6.2",
-    "vite": "^6"
+    "vite": "^8"
   }
 }
