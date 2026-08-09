@@ -20,7 +20,7 @@
     "workflow-engine": "file:../.."
   },
   "devDependencies": {
-    "@types/react": "^18",
+    "@types/react": "^19",
     "@types/react-dom": "^19"
   }
 }
