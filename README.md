@@ -114,9 +114,15 @@ not loudly. A bare `bun test` then reports a pass count that omits most of what
 the suite tests. Inside the dev container the variable is already set, which is
 the second reason to run there.
 
-Nothing runs on a hosted CI service. `.githooks/pre-push` is the gate instead.
-It runs `bun run check` in the dev container. The push proceeds only when the
-typecheck, the build and the suite all pass.
+This repository used to run no CI beyond `.githooks/pre-push`, by
+deliberate choice. This change reverses that choice.
+`.github/workflows/check.yml` runs the same checks on GitHub's own
+infrastructure, on every push and every pull request. GitHub hosts it
+for free, since this repository is public.
+
+`.githooks/pre-push` still runs locally, first. It runs `bun run check`
+in the dev container. The typecheck, the build, and the suite must all
+pass. Only then does the push proceed.
 
 The `bun install` above arms it: the root
 `prepare` script runs `scripts/enable-hooks.sh`, which points

@@ -13,16 +13,23 @@ below drops its date prefix; the archive holds it at
 `openspec/changes/archive/<date>-<name>/`. Specs live in `openspec/specs/<name>/`.
 `docs/current-state.md` describes each subsystem.
 
-CI: DONE. A local push gate rather than a hosted service, by the owner's
-decision. `.githooks/pre-push` runs `bun run check` in the dev container. A
-non-zero exit blocks the push. Not a numbered stage: it gates every stage below
-instead of adding a capability.
+CI: DONE. A local push gate, by the owner's decision. GitHub Actions now
+also gates every push and pull request. That reverses part of the same
+decision, on purpose. It costs nothing. GitHub hosts it for free, since
+this repository is public.
+
+`.githooks/pre-push` runs `bun run check` in the dev container. It runs on
+every push. A non-zero exit blocks the push.
+
+`.github/workflows/check.yml` runs the same checks again, plus a
+`pull_request` run for a fork's PR. Not a numbered stage: it gates every
+stage below instead of adding a capability.
 
 A preflight now runs first. It names which of six ordered devcontainer
 preconditions is missing, instead of the push failing on a symptom.
 
 Change: `add-ci-and-dependency-hygiene`, `specify-the-real-push-gate`,
-`add-devcontainer-preflight`.
+`add-devcontainer-preflight`, `add-ci-workflow`.
 Spec: `development-toolchain`.
 
 1. **Validation layer (Zod-first): DONE.** The JSON contract as Zod schemas,

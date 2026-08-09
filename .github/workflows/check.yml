@@ -1,0 +1,94 @@
+# GitHub-hosted CI. Free for a public repository. Reverses the "no hosted
+# service" decision commit 4ff4382 recorded; see
+# openspec/changes/add-ci-workflow/proposal.md - Why for why, and
+# README.md / ROADMAP.md / docs/current-state.md for the rewritten record.
+#
+# pull_request is safe here specifically because the runner is
+# GitHub-hosted: each job gets a fresh, disposable VM, so a fork's PR code
+# never touches infrastructure this project owns. This workflow uses no
+# secrets, so there is nothing for a fork PR to read even in principle.
+name: check
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The four gates that need only git and a shell (CLAUDE.md's gate table).
+  host-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Feeds range.sh a line shaped like git's own pre-push protocol
+      # (<local ref> <local sha> <remote ref> <remote sha>). A push event
+      # supplies before/after; a pull_request event supplies base/head, so
+      # the diff is against the PR's base, not against whatever the fork's
+      # default branch happens to be.
+      - name: Compute the pushed range
+        env:
+          REF: ${{ github.ref }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$PR_HEAD" ]; then
+            LOCAL_SHA="$PR_HEAD"; REMOTE_SHA="$PR_BASE"
+          else
+            LOCAL_SHA="$GITHUB_SHA"; REMOTE_SHA="$PUSH_BEFORE"
+          fi
+          printf '%s %s %s %s\n' "$REF" "$LOCAL_SHA" "$REF" "$REMOTE_SHA" \
+            | sh scripts/gates/range.sh > "$RUNNER_TEMP/ranges.txt"
+          cat "$RUNNER_TEMP/ranges.txt"
+
+      - name: ponytail-ledger-fresh
+        run: sh scripts/gates/ponytail-ledger.sh
+
+      - name: pushed-whitespace
+        run: sh scripts/gates/whitespace.sh < "$RUNNER_TEMP/ranges.txt"
+
+      # No linter on a fresh GitHub-hosted VM: $ANTISLOP is unset and
+      # $HOME/AI/AntiSlop doesn't exist here. prose.sh's own documented
+      # behavior is to print a named skip and let the run proceed, same as
+      # a contributor's machine that never installed the linter.
+      - name: changed-markdown-prose
+        run: sh scripts/gates/prose.sh < "$RUNNER_TEMP/ranges.txt"
+
+      - name: no-machine-paths
+        run: sh scripts/gates/machine-paths.sh
+
+  # bun run check, plus the two gates that need the devcontainer
+  # (CLAUDE.md's gate table again): frozen-lockfile and no-silent-green.
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start the devcontainer stack
+        run: docker compose -f .devcontainer/docker-compose.yml up -d --wait
+
+      # No pipe into tee: `cmd | tee` returns tee's exit status, not bun's,
+      # the same reason .githooks/pre-push captures this way.
+      - name: bun run check
+        run: |
+          set +e
+          docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app \
+            bun run check > "$RUNNER_TEMP/check-out.txt" 2>&1
+          status=$?
+          cat "$RUNNER_TEMP/check-out.txt"
+          exit $status
+
+      - name: frozen-lockfile
+        run: sh scripts/gates/lockfile.sh
+
+      - name: no-silent-green
+        run: sh scripts/gates/silent-green.sh "$RUNNER_TEMP/check-out.txt"
+
+      # No teardown step: the runner VM is destroyed after the job either
+      # way, unlike the persistent self-hosted host this design first used.

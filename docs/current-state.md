@@ -1712,18 +1712,32 @@ Stage-by-stage status is in `ROADMAP.md`.
   `migration.ts::migrateOne` read it. Both close a sequential-scan gap the
   function's other jsonb-nested predicates already had an index for.
 
-- CI (`.githooks/pre-push`, `add-ci-and-dependency-hygiene`): no hosted
-  service runs this repository, by the owner's decision. The gate is a
-  `pre-push` hook, which runs `bun run check` (typecheck, then the production
-  build, then `bun test`) through `docker compose exec` in the dev container.
-  A non-zero exit blocks
-  the push. Running there closes the finding's real hazard: the container's
-  environment already carries `DATABASE_URL`. So the 500+ database-backed
-  test sites that make up most of the suite cannot skip silently and report a
-  meaningless green. It also pins Bun to the Dockerfile's version, so no
-  host-side drift.
+- CI, local (`.githooks/pre-push`, `add-ci-and-dependency-hygiene`): a
+  `pre-push` hook, which runs `bun run check` (typecheck, then the
+  production build, then `bun test`) through `docker compose exec` in the
+  dev container. A non-zero exit blocks the push. Running there closes
+  the finding's real hazard: the container's environment already carries
+  `DATABASE_URL`. So the 500+ database-backed test sites that make up
+  most of the suite cannot skip silently and report a meaningless green.
+  It also pins Bun to the Dockerfile's version, so no host-side drift.
 
-- One gap the hook has and a hosted gate would not: `--no-verify` bypasses it.
+- CI, hosted (`.github/workflows/check.yml`, `add-ci-workflow`): the same
+  host gates, and the same `bun run check`, now also run on GitHub's own
+  infrastructure. It runs on every push and every pull request. This
+  reverses a decision the local gate above once recorded, on purpose.
+  GitHub-hosted runners are free for a public repository.
+
+- A self-hosted alternative, tried first in the same change, needed a
+  runner and a persistent service. It also needed the organization to
+  unblock a setting. GitHub-hosted needed none of that.
+
+- `changed-markdown-prose` (`prose.sh`) skips on the hosted runner. A
+  fresh VM carries no antislop install. That matches the fallback a
+  contributor's own machine already gets without one.
+
+- One gap the local hook alone has: `--no-verify` bypasses it. The hosted
+  workflow does not depend on the hook running. A push still reaches it,
+  even past `--no-verify`.
 
 - The clone arms itself (`scripts/enable-hooks.sh`, `package.json`'s
   `prepare`, `document-deployment-and-self-enable-the-hook`). `bun install`
