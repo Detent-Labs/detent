@@ -1666,6 +1666,13 @@
 
 /* --- Selection-driven step inspector ------------------------------------ */
 
+.steps-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.9rem;
+}
+
 .steps-panel-empty {
   display: flex;
   flex-direction: column;
