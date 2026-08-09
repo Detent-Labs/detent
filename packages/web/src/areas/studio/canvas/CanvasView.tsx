@@ -8,7 +8,7 @@ import { seedLocalizedText, resolveDraftLocalizedText } from "../draft/localized
 import { t } from "../catalog.js";
 import { autoPlaceSteps, type LayoutStep } from "./layout";
 import { dragDelta, svgPointFromClient, NODE_WIDTH, NODE_HEIGHT, type Point, type NodePosition } from "./geometry";
-import { computeFit, MIN_SCALE, MAX_SCALE, FIT_GUTTER } from "./fit";
+import { computeFit, MIN_SCALE, MAX_SCALE, FIT_GUTTER, type Fit } from "./fit";
 import { resolveDropGesture } from "./dropGesture";
 import { inlineRenamePatch } from "./inlineRename";
 import { buildOperands, guardEdgeLabel } from "../panels/shared/conditionLogic";
@@ -55,6 +55,48 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
   // once the first step lands.
   const hasFitOnLoad = useRef(false);
 
+  // Shared by the initial `Panzoom()` construction below and by `fitToView`
+  // itself: both need the same scale/pan for the same content, measured the
+  // same way.
+  const measureFit = (svg: SVGSVGElement): Fit => {
+    // `getBBox()` reports what the canvas actually draws, in user space and
+    // free of Panzoom's transform. That covers the start arrow left of the
+    // initial step and the terminal stamp above a terminal step, neither of
+    // which the node rectangles contain.
+    const content = svg.getBBox();
+
+    // `clientWidth`/`clientHeight`, never `getBoundingClientRect()`: Panzoom
+    // transforms this same element, so a client rect shrinks with the zoom
+    // and a second fit would frame a smaller canvas than the first.
+    //
+    // Two properties of `.canvas-svg` and `.canvas-wrap` make these two the
+    // right reading, and a change to either would break this silently:
+    //   - `.canvas-wrap` is `overflow: hidden`. A transform can otherwise
+    //     grow an ancestor's scrollable overflow, and a classic scrollbar
+    //     appearing re-lays out a `width: 100%` child, which would feed the
+    //     zoom back into the measurement after all.
+    //   - `.canvas-svg` carries no padding. `clientWidth` is the padding box,
+    //     while an SVG with no `viewBox` anchors user space to the content
+    //     box; padding would offset the origin and overstate the viewport.
+    // Both round to whole pixels, so the framing can sit up to a pixel off.
+    // The gutter is 16px, so that is not visible.
+    const element = { width: svg.clientWidth, height: svg.clientHeight };
+
+    // The toolbar sits over the top left corner. `offsetTop`/`offsetHeight`
+    // are layout values against `.canvas-wrap`, the same origin the SVG box
+    // starts from, and no transform touches them.
+    //
+    // Read the bottom edge, not the height: the toolbar starts `--space-2`
+    // below the canvas top, and clearing the height alone leaves it
+    // overlapping by those 8px. Measuring the container rather than the
+    // button also covers a second control, which belongs in this same flex
+    // row.
+    const toolbar = toolbarRef.current;
+    const toolbarBottom = toolbar ? toolbar.offsetTop + toolbar.offsetHeight : 0;
+
+    return computeFit(content, element, { top: toolbarBottom + FIT_GUTTER, right: FIT_GUTTER, bottom: FIT_GUTTER, left: FIT_GUTTER });
+  };
+
   // Layout, not passive: the auto-fit effect below reads `panzoomRef` and
   // must find it already set. React always runs every layout effect before
   // any passive effect on mount, so that ordering holds only because this
@@ -78,7 +120,25 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
     // it, and so does `.canvas-toolbar` now that `.canvas-wrap` is its
     // ancestor too. A future control added over the canvas needs the same
     // class, plus the wheel guard's own exclusion below.
-    const panzoom = Panzoom(el, { minScale: MIN_SCALE, maxScale: MAX_SCALE, canvas: true });
+    //
+    // Panzoom's own constructor applies `startScale` synchronously but
+    // defers `pan(startX, startY)` to a `setTimeout` (its own source: it
+    // waits a tick so `zoom` has settled before it reads dimensions to
+    // constrain the initial pan). Left at the (0, 0) default, that deferred
+    // call would land after the auto-fit effect below has already panned
+    // the just-mounted graph into view, and silently reset it back to the
+    // top-left corner one tick later. Feeding the same fit in as the start
+    // position closes the race instead of trying to out-time it: the
+    // deferred call still fires, but lands on the values already showing.
+    const initialFit = measureFit(el);
+    const panzoom = Panzoom(el, {
+      minScale: MIN_SCALE,
+      maxScale: MAX_SCALE,
+      canvas: true,
+      startScale: initialFit.scale,
+      startX: initialFit.x,
+      startY: initialFit.y,
+    });
     panzoomRef.current = panzoom;
     // The manual `wheel` listener binds to the same `.canvas-wrap` element,
     // for the same reason. `zoomWithWheel` carries no `panzoom-exclude`
@@ -133,49 +193,7 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
     const panzoom = panzoomRef.current;
     const svg = svgRef.current;
     if (!panzoom || !svg || nodePositions.length === 0) return;
-
-    // `getBBox()` reports what the canvas actually draws, in user space and
-    // free of Panzoom's transform. That covers the start arrow left of the
-    // initial step and the terminal stamp above a terminal step, neither of
-    // which the node rectangles contain.
-    const content = svg.getBBox();
-
-    // `clientWidth`/`clientHeight`, never `getBoundingClientRect()`: Panzoom
-    // transforms this same element, so a client rect shrinks with the zoom
-    // and a second fit would frame a smaller canvas than the first.
-    //
-    // Two properties of `.canvas-svg` and `.canvas-wrap` make these two the
-    // right reading, and a change to either would break this silently:
-    //   - `.canvas-wrap` is `overflow: hidden`. A transform can otherwise
-    //     grow an ancestor's scrollable overflow, and a classic scrollbar
-    //     appearing re-lays out a `width: 100%` child, which would feed the
-    //     zoom back into the measurement after all.
-    //   - `.canvas-svg` carries no padding. `clientWidth` is the padding box,
-    //     while an SVG with no `viewBox` anchors user space to the content
-    //     box; padding would offset the origin and overstate the viewport.
-    // Both round to whole pixels, so the framing can sit up to a pixel off.
-    // The gutter is 16px, so that is not visible.
-    const element = { width: svg.clientWidth, height: svg.clientHeight };
-
-    // The toolbar sits over the top left corner. `offsetTop`/`offsetHeight`
-    // are layout values against `.canvas-wrap`, the same origin the SVG box
-    // starts from, and no transform touches them.
-    //
-    // Read the bottom edge, not the height: the toolbar starts `--space-2`
-    // below the canvas top, and clearing the height alone leaves it
-    // overlapping by those 8px. Measuring the container rather than the
-    // button also covers a second control, which belongs in this same flex
-    // row.
-    const toolbar = toolbarRef.current;
-    const toolbarBottom = toolbar ? toolbar.offsetTop + toolbar.offsetHeight : 0;
-
-    const fit = computeFit(content, element, {
-      top: toolbarBottom + FIT_GUTTER,
-      right: FIT_GUTTER,
-      bottom: FIT_GUTTER,
-      left: FIT_GUTTER,
-    });
-
+    const fit = measureFit(svg);
     panzoom.zoom(fit.scale, { animate: false });
     panzoom.pan(fit.x, fit.y, { animate: false });
   };

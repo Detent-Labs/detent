@@ -244,6 +244,30 @@ is the same defect, for a different gesture.
 the same reason it cannot see the palette-drop defect. It asserts numbers,
 not which DOM element a pointer event reaches.
 
+### Studio canvas: the graph centers on open, with no author action
+
+Source: `canvas-autofit-browser-check` task 1.1.
+
+Seed the database and open a draft holding one or more steps.
+
+Pass: the canvas renders already framed, matching an explicit "Fit to
+view" activation, with no action from the author.
+
+`packages/web/test/studio-canvas-fit.test.ts` cannot see this. The defect
+was a race in `@panzoom/panzoom` itself. Its own constructor applies
+`startScale` synchronously. It defers `pan(startX, startY)` to a
+`setTimeout`, at its default of `(0, 0)`.
+
+Left there, that deferred call fires after the auto-fit effect's own
+synchronous pan. It silently resets the graph to the top-left corner one
+tick after mount. Fixed by computing the fit before constructing
+`Panzoom`, and passing it as `startScale`/`startX`/`startY`. The deferred
+call then lands on the same values already showing.
+
+This check needs a real Panzoom instance racing its own internal timer
+against real `getBBox()`/`clientWidth`. `packages/web/test/` assumes no
+DOM at all. Nothing there can observe either side of the race.
+
 ### Users screen: the manager control past one page
 
 Source: `admin-user-onboarding` task 8.6.
