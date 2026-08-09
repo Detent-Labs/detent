@@ -727,6 +727,19 @@ Spec: `development-toolchain`.
     and relaxing any v1 boundary — no parallelism arrives because a canvas
     could draw it.
 
+28. Zod v4 migration: NOT STARTED. Dependabot opened a major-version bump
+    (zod 3.25.76 -> 4.4.3, PR #9) 2026-08-09 alongside a batch of otherwise
+    routine dependency PRs. v4 restructured Zod's internal API — the `_def`
+    shape, `AnyZodObject`, `ZodTypeDef` — and `src/schema/definition.ts` is
+    the JSON contract itself, built directly on those internals. `tsc`
+    fails in about twenty places across `src/schema/definition.ts`,
+    `src/schema/compile.ts`, `src/engine/config-descriptor.ts`,
+    `src/engine/migration.ts`, `src/engine/outbox.ts`, `src/http/routes.ts`
+    and `src/runtime/api.ts`. Per this project's own contract rule, a
+    deliberate change to `src/schema/definition.ts` needs its own OpenSpec
+    change, not a merged dependency PR. PR #9 stays open and unmerged until
+    that change lands. No OpenSpec change yet.
+
 ## Changes with no stage
 
 The archive also holds hardening, deduplication and bug-fix changes that belong
