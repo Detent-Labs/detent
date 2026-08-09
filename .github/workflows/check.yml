@@ -73,6 +73,13 @@ jobs:
       - name: Start the devcontainer stack
         run: docker compose -f .devcontainer/docker-compose.yml up -d --wait
 
+      # A contributor's devcontainer already has node_modules from its
+      # first provisioning (scripts/dev-up.sh). A fresh Actions checkout
+      # has none, so bun run check would fail before it even reaches
+      # typecheck, on a missing Bun type definition.
+      - name: bun install
+        run: docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app bun install
+
       # No pipe into tee: `cmd | tee` returns tee's exit status, not bun's,
       # the same reason .githooks/pre-push captures this way.
       - name: bun run check

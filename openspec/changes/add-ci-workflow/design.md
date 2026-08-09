@@ -78,6 +78,13 @@ the devcontainer's own, rather than installing Bun and Postgres a second
 way on the runner. Bun's version still comes from
 `.devcontainer/Dockerfile`'s pin, so no drift.
 
+**`bun install` runs before `bun run check`.** The devcontainer's `app`
+image carries Bun and its toolchain, but not `node_modules`. A
+contributor's devcontainer already has it, from `scripts/dev-up.sh`'s
+first provisioning. A fresh Actions checkout has none. Without this step,
+`tsc` fails immediately. It cannot find Bun's own type definitions,
+which live in the missing `node_modules`, not in the image.
+
 **No teardown step in the `check` job.** The self-hosted design this
 change first tried needed `docker compose down -v` after every run. That
 runner was a persistent machine. `ubuntu-latest` destroys the whole VM

@@ -25,10 +25,13 @@
 - [x] 2.3 Add the `check` job. Check out, then `docker compose -f
       .devcontainer/docker-compose.yml up -d --wait`. `ubuntu-latest`
       ships Docker and Compose v2 already, so this needs no setup step.
-      Run `bun run check` inside the `app` service and capture its
-      output. Run `lockfile.sh` next. It takes no input; it re-runs `bun
-      install --frozen-lockfile` inside the container on its own. Run
-      `silent-green.sh` against the captured `bun run check` output.
+      Run `bun install` inside the `app` service first. A fresh checkout
+      carries no `node_modules`, unlike a contributor's already-provisioned
+      devcontainer, and `bun run check` fails immediately without it. Then
+      run `bun run check` and capture its output. Run `lockfile.sh` next.
+      It takes no input; it re-runs `bun install --frozen-lockfile` inside
+      the container on its own. Run `silent-green.sh` against the captured
+      `bun run check` output.
 - [x] 2.4 Add no teardown step. `ubuntu-latest` destroys the whole VM
       after the job, so a `docker compose down -v` step would do nothing
       a GitHub-hosted runner doesn't already do for free.
