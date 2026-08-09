@@ -52,6 +52,12 @@ Always in this order. Do not push before step 5 passes.
    commit doesn't ship unchecked either.
 7. **`git push origin main`.** A second rejection means someone pushed again
    between your fetch and now — go back to step 4, don't force.
+8. **Confirm the pushed commit's CI run is green**:
+   `gh run list --workflow check.yml --branch main -L1`, or `gh run watch
+   <run-id>` to wait on it. Step 6 only proves the merge passed on this
+   machine's hook run. This step proves it on a clean checkout too. It's
+   also the one confirmation every machine and person on the project can
+   see, not just the one that pushed.
 
 ## Resolving a Conflict
 
