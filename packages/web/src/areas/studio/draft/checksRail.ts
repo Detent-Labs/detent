@@ -54,3 +54,16 @@ export function groupChecksBySource(validation: ValidationResult): CheckGroup[] 
 export function allChecksClear(groups: readonly CheckGroup[]): boolean {
   return groups.every((g) => !g.heldBack && g.issues.length === 0);
 }
+
+/** The collapsed checks summary's one read of `groups`: a count, "clear", or
+ * "held-back". Held-back outranks a raw sum on purpose — the collapsed-summary
+ * requirement (`studio-checks-rail`) forbids a held-back group from reading as
+ * clear or as a plain count of zero, the same rule the group-level held-back
+ * state already carries into the expanded view. */
+export type OpenIssueSummary = { kind: "count"; count: number } | { kind: "clear" } | { kind: "held-back" };
+
+export function totalOpenIssueCount(groups: readonly CheckGroup[]): OpenIssueSummary {
+  if (groups.some((g) => g.heldBack)) return { kind: "held-back" };
+  const count = groups.reduce((sum, g) => sum + g.issues.length, 0);
+  return count === 0 ? { kind: "clear" } : { kind: "count", count };
+}

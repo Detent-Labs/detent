@@ -177,18 +177,20 @@ without an outcome key.
 
 ### Requirement: Selecting a node or edge shows its detail in a permanent, selection-driven inspector beside the canvas
 
-`StepsPanel` SHALL mount as a fixed-width inspector column beside the
-canvas at all times.
+`StepsPanel` SHALL mount as a fixed-width column in the canvas edit
+screen's third position. It replaces the `studio-checks-rail`
+capability's checks rail there whenever the developer selects a step or
+a path.
 
-When the developer selects no step and no path, the inspector SHALL show a
-no-selection state. It SHALL NOT show a list of every step in the draft.
+When the developer selects no step and no path, the third column SHALL
+show the checks rail. It SHALL NOT show the inspector at all in that
+state.
 
 Selecting a step node on the canvas SHALL show that one step's sections
-in the inspector. This replaces any no-selection state, or a prior
-step's or path's sections. Each section SHALL carry its own entity
-count. The sections are identity (key, label, description, type,
-terminal, outcome), assignment, paths, timers, actions, subprocess spec,
-and view.
+in the inspector. This replaces the checks rail, and any prior step's or
+path's sections. Each section SHALL carry its own entity count. The
+sections are identity (key, label, description, type, terminal,
+outcome), assignment, paths, timers, actions, subprocess spec, and view.
 
 The inspector SHALL carry every section the step card body holds today.
 It SHALL NOT drop the assignment section. `studio-app` requires a
@@ -209,7 +211,7 @@ the control moves into the identity section instead.
 The subprocess spec section SHALL keep the cross-process check fieldset
 beside the spec editor. That fieldset holds the file input which loads a
 child body, and `checkSubprocessChildRefs` runs against nothing without
-it. Dropping the fieldset would remove the only route to that check.
+it. Dropping the fieldset would leave that check with no route.
 
 Selecting a path edge SHALL resolve to its *source* step and show that
 step's inspector the same way. A path is not independently addressable.
@@ -242,27 +244,22 @@ navigation target is not that region either.
 
 Creating the first step in an empty draft SHALL NOT depend on a prior
 selection. The palette stays reachable regardless of selection; see
-the palette requirement below. The inspector needs no always-visible
-step list of its own to satisfy this.
+the palette requirement below.
 
-The no-selection state SHALL carry `StepsPanel`'s existing "+ Add
-step" button. Removing the always-visible step list removes what
-hosts that button today. The button relocates to the no-selection
-state instead. It stays reachable there, beside the palette's own way
-to add a step.
+The checks rail's own no-selection presentation carries no "+ Add step"
+button. The palette's Step entry is the sole always-reachable way to add
+the first step; see the palette requirement below.
 
-#### Scenario: The empty draft shows a no-selection state
+#### Scenario: An empty draft with nothing selected shows the checks rail
 
 - **WHEN** a draft with no step selected and no path selected is open
-- **THEN** the inspector shows a no-selection state, not a list of
-  steps
-- **AND** the no-selection state shows the "+ Add step" button
+- **THEN** the third column shows the checks rail, not the inspector
 
 #### Scenario: Selecting a step shows its sections
 
 - **WHEN** the developer clicks a step node on the canvas
 - **THEN** the inspector shows that step's sections with their entity
-  counts, replacing whatever the inspector showed before
+  counts, replacing whatever the third column showed before
 
 #### Scenario: Choosing a non-view section expands it inline
 
@@ -327,11 +324,12 @@ to add a step.
 - **AND** the clicked path's own row highlights within the paths
   section
 
-#### Scenario: Deselecting returns the inspector to the no-selection state
+#### Scenario: Deselecting swaps the column back to the checks rail
 
 - **WHEN** the developer clicks empty canvas space while a step or path
   stays selected
-- **THEN** the inspector returns to the no-selection state
+- **THEN** the third column shows the checks rail again, not the
+  inspector
 
 #### Scenario: A first step is addable with nothing selected
 
@@ -364,6 +362,12 @@ the initial step and the terminal stamp above a terminal step. It SHALL also
 keep the framed content clear of any control the canvas overlays on itself,
 such as the toolbar.
 
+The entire visible canvas area SHALL stay interactive for panning and
+zooming. This holds at any pan or zoom state the canvas currently holds. A
+drag or a scroll started anywhere inside the visible canvas SHALL move or
+scale the graph the same way. This holds regardless of where the graph
+itself currently sits, or how much the current zoom level has shrunk it.
+
 #### Scenario: Fit to view frames all steps
 
 - **WHEN** an author activates "fit to view"
@@ -394,6 +398,79 @@ such as the toolbar.
 - **WHEN** an author activates "fit to view"
 - **THEN** no step, start arrow or terminal stamp comes to rest under the
   toolbar
+
+#### Scenario: Panning works from the margin a zoomed-out graph leaves behind
+
+- **WHEN** "fit to view" has reduced the zoom level, leaving empty canvas
+  space between the graph and the canvas edge
+- **AND** an author starts a drag inside that empty space, on any side of
+  the graph
+- **THEN** the drag pans the graph, the same as a drag started over the
+  graph itself
+
+#### Scenario: Zooming by wheel works from anywhere over the canvas
+
+- **WHEN** the current pan and zoom state leaves empty canvas space beside
+  the graph
+- **AND** an author scrolls the wheel while pointing at that empty space
+- **THEN** the graph zooms, the same as a wheel scroll pointed at the graph
+  itself
+
+#### Scenario: The toolbar keeps its own click and scroll behavior
+
+- **WHEN** an author clicks "Fit to view", or scrolls the wheel while
+  pointing at the toolbar
+- **THEN** the click activates "Fit to view" and the scroll does not pan or
+  zoom the graph
+
+### Requirement: The canvas centers the graph automatically the first time a draft's steps render
+
+The canvas SHALL run the "fit to view" computation once, automatically, the
+first time a loaded draft's steps render. The author need not activate the
+control for this first pass.
+
+The automatic pass SHALL create the same framing an explicit "fit to view"
+activation creates. Only the timing differs.
+
+Once the automatic pass has run, the canvas SHALL leave pan and zoom alone
+for the rest of that mount. Adding, moving, or removing a step afterward
+SHALL NOT trigger it again. An author's own pan or zoom survives a later
+edit.
+
+A draft with no steps yet SHALL leave the canvas at its default pan and
+zoom. The automatic pass SHALL wait for the first step to exist rather than
+running against nothing.
+
+The automatic pass SHALL leave the same full visible canvas area
+interactive as any other pan or zoom state does. An author opening a draft
+SHALL be able to pan or zoom from the first frame. No action of their own
+comes first.
+
+#### Scenario: A draft with steps centers on open, with no author action
+
+- **WHEN** the author opens a draft holding one or more steps
+- **THEN** the canvas renders already framed, matching an explicit
+  "fit to view" activation, with no action from the author
+
+#### Scenario: A later edit does not re-trigger the automatic fit
+
+- **WHEN** the automatic fit has already run
+- **AND** the author pans, zooms, or edits the graph afterward
+- **THEN** no further automatic fit occurs during that mount
+- **AND** the author's own pan and zoom state persists
+
+#### Scenario: An empty draft renders with no automatic fit
+
+- **WHEN** the author opens a draft with no steps yet
+- **THEN** the canvas renders at its default pan and zoom
+- **AND** the automatic fit runs only once the first step exists
+
+#### Scenario: The canvas is fully interactive right after the automatic fit
+
+- **WHEN** the automatic fit has just run on opening a draft
+- **AND** the author starts a drag in canvas space the automatic fit left
+  empty beside the graph
+- **THEN** the drag pans the graph
 
 ### Requirement: The canvas introduces no authoring operation unavailable through the panels
 
@@ -459,15 +536,37 @@ a profile rather than added speculatively.
 
 ### Requirement: The canvas edit screen lays out a palette, the canvas, the inspector, and a checks rail
 
-The canvas edit screen SHALL show four columns, in order. They are a
-place-on-canvas palette, the canvas, the selection-driven inspector, and
-the `studio-checks-rail` capability's checks rail.
+The canvas edit screen SHALL show three columns, in order. The first is
+a rail. It holds the place-on-canvas palette. Below the palette sits the
+`studio-app` capability's Process section: the Fields, Data sources, and
+Contract links.
 
-#### Scenario: All four columns appear
+The second column is the canvas. The third column shows either the
+`studio-checks-rail` capability's checks rail or the selection-driven
+inspector, never both at once.
+
+The third column SHALL show the checks rail when the developer has
+selected no step and no path. It SHALL show the inspector when the
+developer selects a step or a path. See the `studio-checks-rail`
+capability for the rail's own collapsed presentation in the
+step-selected state.
+
+#### Scenario: All three columns appear
 
 - **WHEN** the canvas edit screen loads
-- **THEN** the palette, the canvas, the inspector, and the checks rail
-  each appear as their own column
+- **THEN** the rail, the canvas, and the third column each appear as
+  their own column
+
+#### Scenario: The third column shows the checks rail with nothing selected
+
+- **WHEN** the developer has selected no step and no path
+- **THEN** the third column shows the checks rail, not the inspector
+
+#### Scenario: The third column shows the inspector once the developer selects a step
+
+- **WHEN** the developer selects a step or a path
+- **THEN** the third column shows the inspector, not the full checks
+  rail
 
 ### Requirement: A palette offers Step, Subprocess, and End as an always-available way to add a step
 
@@ -494,22 +593,38 @@ The palette SHALL stay visible and usable regardless of canvas selection.
 
 ### Requirement: A process-identity header bar shows draft and publish status
 
-The canvas edit screen SHALL show a header bar above the four-column
-layout. It SHALL show the process name and the draft's revision badge.
-It SHALL also show dirty state and, after a publish, the version and
-hash. Today, `DraftToolbar` computes both. This design lifts them into
-`EditorArea` as controlled props, the same way it already lifts
-`saveState`.
+The canvas edit screen SHALL show a header bar above the three-column
+layout. It SHALL show the process name and the key in the mono face.
+It SHALL also show the draft's revision badge and dirty state. It SHALL
+show the version and hash after a publish. `EditorArea` computes all of
+these as controlled props. It already lifts `saveState` the same way.
 
-The header bar SHALL also show a last-saved time. That time is new,
-client-only state: `EditorArea` sets it on every successful save.
-`DraftToolbar` does not track it today.
+The header bar SHALL also show a last-saved time. That time is
+client-only state. `EditorArea` sets it on every successful save.
+
+The header bar SHALL show the content-locale badge the `studio-app`
+capability's content-locale-switcher requirement governs. It SHALL also
+show the Structure/JSON toggle.
 
 <!-- antislop: allow synonym-rotation -->
 <!-- "Discard" below is the literal button label `DraftToolbar` renders, not a synonym choice against "remove" elsewhere in this file. -->
-The header bar SHALL NOT duplicate `DraftToolbar`'s Save, Discard, and
-Publish actions. It is a read-only summary of state `EditorArea` owns or
-passes through, not a second copy of `DraftToolbar`'s own logic.
+The header bar SHALL show a `⋮` overflow menu. The menu SHALL hold
+`DraftToolbar`'s Save, Discard draft, and Publish actions.
+`DraftToolbar` SHALL keep computing when each action is available and
+what each one does. The menu calls that logic. The menu holds no save,
+discard, or publish logic of its own.
+
+The menu SHALL group its remaining controls under two headings. "Process,
+saved with the draft" SHALL hold the editable process key and the
+base-locale control the `studio-app` capability's base-locale
+requirement governs. "This session only" SHALL hold the `RegistryPanel`
+action-registry selector, with a caption stating it is never written to
+the draft.
+
+The header bar's summary fields SHALL stay a read-only pass-through of
+state `EditorArea` owns. Those fields are the process name, the revision
+badge, the dirty state, and the published version and hash. None of
+them carries logic of its own.
 
 #### Scenario: The header bar shows an unsaved draft's state
 
@@ -522,6 +637,18 @@ passes through, not a second copy of `DraftToolbar`'s own logic.
 - **WHEN** a publish succeeds
 - **THEN** the header bar shows the published version and its hash
   prefix
+
+#### Scenario: The overflow menu invokes DraftToolbar's own save
+
+- **WHEN** the developer chooses Save from the `⋮` menu
+- **THEN** the draft saves through `DraftToolbar`'s existing save call
+
+#### Scenario: The overflow menu separates persisted settings from session-only settings
+
+- **WHEN** the developer opens the `⋮` menu
+- **THEN** the key and base-locale control appear under "Process, saved
+  with the draft"
+- **AND** the action-registry selector appears under "This session only"
 
 ### Requirement: A step node on the canvas offers an inline rename
 

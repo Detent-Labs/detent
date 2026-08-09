@@ -80,6 +80,7 @@ export function AdminArea({ session, locale, localPath, go, onUnauthorized, onLo
     <Chrome
       area="admin"
       roles={session.roles}
+      session={session}
       locale={locale}
       onLocaleChange={onLocaleChange}
       onLogout={onLogout}

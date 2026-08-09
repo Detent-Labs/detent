@@ -13,6 +13,21 @@
   margin-bottom: var(--space-3);
 }
 
+/* The edit screen's compact Back/Versions/Player strip, above the header
+   row (task 5.1): the three `.studio-back` buttons laid out in a row
+   instead of `.studio-back`'s own stacked default — a flex container lays
+   out its children by their flex-item box regardless of the item's own
+   `display`, so `.studio-back`'s `display: block` carries no effect here. */
+.studio-header-nav {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.studio-header-nav .studio-back {
+  margin-bottom: 0;
+}
+
 .studio-empty-role {
   display: flex;
   flex-direction: column;
@@ -224,8 +239,13 @@
   color: var(--color-refusal);
 }
 
-/* Four columns, in the order studio-canvas's own requirement names them:
-   palette, canvas, inspector, checks. Fixed widths on the three side
+/* Three columns, in the order studio-canvas's own requirement names them:
+   the merged rail, the canvas, and one context-sensitive third column that
+   holds either the inspector or the checks rail, never both (studio-canvas:
+   "the canvas edit screen lays out a palette, the canvas, the inspector,
+   and a checks rail" — one grid slot, not two, since design.md merged the
+   palette and Process section into one rail and made the inspector/checks
+   pair mutually exclusive by selection state). Fixed widths on the two side
    columns and a flexible canvas between them, so widening the window grows
    the one column that benefits from it. Widths are illustrative pixel
    values from the mockup, translated onto the existing rem/space scale
@@ -233,7 +253,7 @@
    here during implementation). */
 .studio-canvas-layout {
   display: grid;
-  grid-template-columns: 12rem minmax(0, 1fr) 22rem 16rem;
+  grid-template-columns: 12rem minmax(0, 1fr) 22rem;
   gap: var(--space-3);
   align-items: stretch;
   height: 36rem;
@@ -717,18 +737,6 @@
 }
 
 /* --- The shared editing modal and the step section index ----------------- */
-
-/* The three links into the shared modal. Inside the Structure branch only:
-   the surface tabs render on both surfaces, and studio-json-view forbids a
-   reachable draft-body-mutating control while JSON is active. */
-.studio-panel-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  padding-bottom: var(--space-3);
-  border-bottom: 2px solid var(--color-divider);
-  margin-bottom: var(--space-3);
-}
 
 /* Wider than .studio-dialog's 34rem reading measure: this one carries a rail
    beside a full structural editor, which is a tool surface, not a reading
@@ -1323,6 +1331,43 @@
   pointer-events: none;
 }
 
+/* --- EditRail (studio-canvas: "a palette, the canvas, the inspector, and
+   a checks rail" — the merged rail carries the palette plus the Process
+   section, design.md: "One rail component, not two side-by-side ones") */
+
+.studio-rail {
+  min-width: 0;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+}
+
+.studio-rail-section {
+  padding: var(--space-2) 0;
+}
+
+/* The structural rule between the two sections — the 2px divider,
+   never the 1px hairline the rows within a section use. */
+.studio-rail-section + .studio-rail-section {
+  border-top: 2px solid var(--color-border);
+}
+
+.studio-rail-section h2 {
+  margin: 0;
+  padding: 0 var(--space-3) var(--space-2);
+}
+
+/* A Process row's count and chevron sit flush right, sharing
+   `.studio-palette-entry`'s row shell (flex, hairline, flush-left label). */
+.studio-rail-row {
+  cursor: pointer;
+}
+
+.studio-rail-count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
 /* --- Process-identity header bar (studio-canvas) ----------------------- */
 
 .studio-header-bar {
@@ -1345,7 +1390,32 @@
   color: var(--color-text);
 }
 
+/* The label's own editable input, inline inside the h1 (studio-app: the
+   process label stays on the screen, not behind the ⋮ menu). Strips the
+   global input chrome so it reads as heading text until focused; the
+   global input:focus-visible rule still supplies the accent ring. */
+.studio-header-bar-name input {
+  border: none;
+  border-bottom: 1px dashed var(--color-border);
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  width: auto;
+  min-width: 8ch;
+}
+
+.studio-header-bar-name input:focus-visible {
+  border-bottom-color: var(--color-accent);
+}
+
 .studio-header-bar-badge {
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.studio-header-bar-key {
   font-family: var(--font-mono);
   color: var(--color-text-muted);
 }
@@ -1366,6 +1436,95 @@
 .studio-header-bar-published {
   font-family: var(--font-mono);
   color: var(--color-text);
+}
+
+/* The content-locale badge: a machine value (a locale code, matched exactly
+   against LocalizedText keys), so the mono face, not the body face. Flat
+   border, no radius, no shadow — the same chrome the `⋮` menu below uses. */
+.studio-header-bar-locale-badge {
+  font-family: var(--font-mono);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: var(--space-1) var(--space-2);
+}
+
+.studio-header-bar-menu {
+  position: relative;
+  margin-left: auto;
+}
+
+.studio-header-bar-menu-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-1));
+  z-index: 1;
+  min-width: 16rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+/* A menu row, not a committing action away from this surface, so it stays
+   out of the primary/secondary/ghost taxonomy: plain ink text with a hover
+   wash, matching the shell account menu's own `[role="menuitem"]` rule. */
+.studio-header-bar-menu-panel button[role="menuitem"] {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  color: var(--color-text);
+  padding: var(--space-1) var(--space-2);
+}
+
+.studio-header-bar-menu-panel button[role="menuitem"]:hover {
+  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+}
+
+.studio-header-bar-menu-panel button[role="menuitem"]:disabled {
+  opacity: 0.45;
+}
+
+/* The structural rule (design-language.md), not the ledger hairline: these
+   two groups are major sections of the menu, not rows of one register. */
+.studio-header-bar-menu-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 2px solid var(--color-divider);
+}
+
+/* Prose a person reads, so the body face — never mono, which stays reserved
+   for the machine values inside each group (the key, the locale codes). */
+.studio-header-bar-menu-label {
+  font-family: var(--font-body);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+}
+
+.studio-header-bar-menu-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.85rem;
+}
+
+.studio-header-bar-menu-add-locale {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.studio-header-bar-menu-caption {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin: 0;
 }
 
 /* --- Checks rail (studio-checks-rail) ----------------------------------- */
@@ -1444,6 +1603,65 @@
 
 .studio-checks-group-issue:first-child {
   border-top: none;
+}
+
+/* The docked, collapsed presentation: a one-line button standing in for the
+   full rail, per studio-checks-rail's collapsed-summary requirement. The 2px
+   top rule is the structural, major-section-boundary weight, separating the
+   summary from the inspector content docked above it. */
+.studio-checks-rail-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  background: none;
+  color: inherit;
+  border: none;
+  border-top: 2px solid var(--color-divider);
+  padding: var(--space-2) 0 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.studio-checks-rail-summary:hover {
+  background: var(--color-surface-muted);
+}
+
+.studio-checks-rail-summary-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.studio-checks-rail-summary-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+.studio-checks-rail-summary-held-back {
+  color: var(--color-refusal);
+  font-size: 0.85rem;
+}
+
+/* The docked instance `StepsPanel` mounts at its bottom edge (task 3.4):
+   `.canvas-inspector` already draws the bordered box around the whole
+   inspector, so this variant draws none of its own — a nested border/padding
+   box here would read as a second, disconnected panel rather than a docked
+   edge. A 2px divider stands in for that edge instead, the same structural
+   weight `.studio-checks-rail-summary`'s own top rule uses; that rule is
+   suppressed right below so the two dividers never stack. */
+.studio-checks-rail-docked {
+  border: none;
+  padding: var(--space-3) 0 0;
+  margin-top: var(--space-3);
+  border-top: 2px solid var(--color-divider);
+}
+
+.studio-checks-rail-docked .studio-checks-rail-summary {
+  border-top: none;
+  padding-top: 0;
 }
 
 /* --- Selection-driven step inspector ------------------------------------ */

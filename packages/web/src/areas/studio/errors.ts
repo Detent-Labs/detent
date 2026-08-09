@@ -3,16 +3,17 @@ import { StudioClientError } from "./api/client.js";
 import { t } from "./catalog.js";
 
 /**
- * Maps a client error to developer-facing text, keyed on `error.type` — and,
- * for "internal" (the type both a network failure and an unexpected 5xx
- * collapse into, see `api/client.ts::request`), on whether a status ever
- * arrived. Never reads `error.message`: the server does not guarantee that
- * string is safe to show, and after `correct-api-error-responses` an
- * unexpected 500 sends none at all. Same file position and name as
+ * Maps a client error to developer-facing text, keyed on `error.type`. Never
+ * reads `error.message`: the server does not guarantee that string is safe to
+ * show, and after `correct-api-error-responses` an unexpected 500 sends none
+ * at all. `status` is unused now that "network" (a fetch that never reached
+ * the server) and "internal" (the server answering with a failure) are
+ * distinct `ClientError` members — kept in the signature since both call
+ * sites pass `err.status` positionally. Same file position and name as
  * `packages/app/src/errors.ts::describeError`, so the three packages read
  * alike; narrower because studio does not drive a claim state machine.
  */
-export function describeError(error: ClientError, status?: number): string {
+export function describeError(error: ClientError, _status?: number): string {
   switch (error.type) {
     case "authorization":
       return t("error.authorization");
@@ -55,8 +56,10 @@ export function describeError(error: ClientError, status?: number): string {
         : `${t("error.publishRejected")}\n${error.issues.map((i) => (i.loc === "" ? i.message : `${i.loc}: ${i.message}`)).join("\n")}`;
     case "cross-process-validation":
       return `${t("error.crossProcess")}\n${error.message}`;
+    case "network":
+      return t("error.network");
     case "internal":
-      return status === undefined ? t("error.network") : t("error.serverError");
+      return t("error.serverError");
     default:
       // `ClientError` is the union of every server error type, so it carries
       // variants only another area provokes. If one reaches a developer screen

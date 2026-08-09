@@ -1,127 +1,97 @@
 <!-- antislop: allow-file em-dash sentence-length passive-voice run-ons -->
-<!-- The em-dash, the sentence rhythm and the passive voice here match the
-     repo's own prose (CLAUDE.md, docs/current-state.md). A review that reads
-     unlike the documents it reviews is harder to act on, not clearer. Every
-     other rule stays on. -->
+<!-- The same four rules CODE_REVIEW-2026-08-01.md silences, for the same
+     reason: the em-dash, the sentence rhythm and the passive voice here match
+     the repo's own prose (CLAUDE.md, docs/current-state.md). A review that
+     reads unlike the documents it reviews is harder to act on, not clearer.
+     Every other rule stays on, and the filler and synonym-rotation findings
+     this draft raised were repaired rather than silenced. -->
 
 # Code Review & Security Audit
 
-**Date:** 2026-08-01
-**Scope:** Entire codebase — engine (`src/`), Runtime API Layer, HTTP/auth
-layers, action handlers, the four frontend packages, container and tooling
-configuration.
-**Supersedes:** [`CODE_REVIEW-2026-07-29.md`](CODE_REVIEW-2026-07-29.md), whose
-27 findings all shipped and archived. This review verified that work held and
-concentrates on what it did not cover: the four changes landed since
-(observability, notifications, environment promotion, escalation), and the
-areas the earlier pass reached less deeply — the two outbound action handlers,
-the attachment path, worker error boundaries, and the delivery of the security
-headers.
+**Date:** 2026-08-09
+**Scope:** Entire codebase — engine (`src/`), Runtime API Layer, HTTP and auth
+layers, action handlers, `packages/web`, `packages/form-ui`, container and
+tooling configuration.
+**Supersedes:** [`CODE_REVIEW-2026-08-01.md`](CODE_REVIEW-2026-08-01.md). That
+review raised 21 findings. This pass verified each against the current tree
+before writing anything new, and reports the result in
+[Status of the 2026-08-01 findings](#status-of-the-2026-08-01-findings).
 
-**Status:** Every actionable finding below is now covered by a prepared
-OpenSpec change, or closed, or declined with a reason. See
-[Status: change coverage](#status-change-coverage). All six are now
-implemented and merged.
-
-**Summary:** The prior review's fixes held. Object-level authorization is now
-real and shared by one predicate, auth configuration fails closed, the six
-publish-time structural checks run ahead of both compile branches (verified
-directly — the compiled-body import path cannot skip them), and delivery is
-lease-bounded. What remains clusters in two places the contract does not
-reach. First, the code that talks to the outside world: the `http.request`
-handler will fetch any authored URL with no egress restriction and follow
-redirects, and an uploaded attachment's `Content-Type` is echoed back to the
-browser verbatim with no `nosniff` and no `Content-Disposition`. Second, the
-places where an error is silent: both worker error boundaries swallow every
-error without logging, and there is still no server-side CI — the only gate is
-a pre-push hook each clone must opt into and any push can skip. Nothing here is
-architectural rework; the highest-severity items are each a handful of lines in
-one function.
+**Summary:** The security posture improved sharply since the last pass. Six of
+the seven `SEC` findings closed with real fixes, not with a note: the attachment
+route now validates its MIME value and sends a download header, `http.request`
+carries an egress allowlist with `redirect: "manual"`, login rate limiting gained
+a second window keyed on the client address, and `GET /metrics` requires a token.
+The engine's core properties — a single opaque `id` anchor, parameterized SQL
+everywhere, a transactional outbox, pure CEL — hold under inspection. Two
+findings from that review remain open, and the larger of the two, the absence of
+CI, is now the single highest-value gap in the repository. One new defect class
+surfaced that no earlier pass covered: a subprocess reference graph with no cycle
+check, reachable through ordinary publish operations.
 
 ## Executive Summary
 
-**Overall rating: 7.5/10** — a genuinely well-engineered contract-driven
-engine, up half a point on the last pass for the validation and authorization
-work that landed. Held back by an unrestricted outbound-fetch primitive, a
-file-download path that reflects a user-controlled content type, two silent
-error boundaries, and the absence of any gate that runs without a developer
-remembering to enable it.
+**Overall rating: 8 / 10 — green, with two amber items.**
 
-Top findings:
+That number reflects a codebase whose engineering discipline is well above the
+median: 37,306 lines of strict TypeScript, 111 test files, mechanical push gates
+covering six recurring defect classes, and comment discipline that explains *why*
+rather than restating *what*. It is held back from higher by the absence of any
+automated verification outside a developer's own machine.
 
-| ID | Severity | Finding |
-|----|----------|---------|
-| SEC-1 | High | Attachment download echoes the uploader's `Content-Type` verbatim with no `nosniff` and no `Content-Disposition` — stored XSS on the API origin |
-| SEC-2 | High | `http.request` fetches any authored URL, follows redirects, and writes the response into instance `data` — SSRF with a read-back channel; no egress policy exists |
-| ERR-1 | High | `pollForever` and `drainOutbox`'s per-row boundary swallow every error with no log — a persistently failing worker is completely invisible |
-| TEST-1 | High | No CI. The sole gate is `.githooks/pre-push`, opt-in per clone (`git config core.hooksPath`) and bypassable with `--no-verify`; 36 of 91 test files skip silently without `DATABASE_URL` |
-| SEC-3 | Medium | Login rate limiting is per-email only; the capacity backstop fails closed globally, so flooding distinct emails locks out every untracked user |
-| SEC-4 | Medium | `frame-ancestors` in a `<meta>` CSP is ignored by every browser, and `nginx.conf` sets no security headers at all — clickjacking is unmitigated |
-| SEC-5 | Medium | Disabling a user does not invalidate their token; access continues for up to 8 hours |
+**Top findings:**
 
-**Recommended next steps**
+1. **SEC-A · High · No cycle check on the subprocess reference graph.** Two
+   processes can be made to reference each other through ordinary publishes, and
+   nothing at publish time or run time stops the resulting instance spawn loop.
+2. **TEST-1 · High · There is still no CI.** `.github/workflows/` does not
+   exist. Every gate depends on a contributor's local hook and a running
+   container.
+3. **DEP-1 · Medium · No dependency or vulnerability monitoring.** No Dependabot,
+   no `bun audit` step, no advisory watch — a direct consequence of item 2.
+4. **SEC-B · Medium · The SPA ships no content CSP.** `static.ts` sends
+   `frame-ancestors 'none'` only, and `packages/web/index.html` carries no CSP
+   meta tag, so nothing constrains `script-src` or `connect-src`.
+5. **SEC-C · Medium · The session token lives in `localStorage`.** Any script
+   execution on the SPA origin reads an 8-hour bearer token, and the CSP gap
+   above removes the mitigation that would normally cover it.
+6. **SEC-D · Medium · Login rate limiting is per-process and in-memory.** Marked
+   `ponytail:` and honestly documented, but it means the control silently
+   weakens by a factor of N behind a load balancer.
+7. **ARCH-A · Low · `src/runtime/api.ts` is 1,269 lines.** The largest file in
+   the repository and the one every area routes through.
 
-1. Close SEC-1 and SEC-2 first. Both are localized (`toBinaryResponse` +
-   `attachmentBodySchema`; `httpHandler`'s `fetch` call), and both are the kind
-   of primitive an attacker chains rather than uses alone.
-2. Land ERR-1 in the same pass — two `log.error` calls. The observability
-   change shipped a `/metrics` endpoint while the two loops that feed it stay
-   mute about their own failures.
-3. Then TEST-1. Every finding above is a regression candidate, and the project
-   currently has no gate that runs without a human remembering to enable one.
-4. SEC-3/4/5 next; each is one function or one config file.
+**Recommended next steps**, in order: add a CI workflow that runs
+`bun run check` against a Postgres service container (this one action closes
+TEST-1 and unblocks DEP-1); add a publish-time cycle check for subprocess
+references; add a CSP to the SPA. The first is roughly an hour of work and
+changes the reliability of everything else in this document.
 
-## Status: change coverage
+## Status of the 2026-08-01 findings
 
-Six OpenSpec changes carry this review's findings. Each one holds a proposal,
-delta specs, a design and a task list, and each passes `openspec validate
---strict`. All six are implemented and merged into `main`, so
-`openspec/changes/<name>/` now holds the record rather than the plan. Each
-still awaits `opsx:archive`.
+Verified against the working tree at commit `1abc133`.
 
-| Change | Findings |
-|---|---|
-| `harden-http-response-boundary` | SEC-1, SEC-6, SEC-7, SEC-8 (cache-control), PERF-1 |
-| `restrict-http-action-egress` | SEC-2 |
-| `harden-local-account-sessions` | SEC-3, SEC-5, ARCH-3 |
-| `deliver-framing-and-sniffing-headers` | SEC-4, SEC-8 (nosniff, referrer) |
-| `surface-worker-failures` | ERR-1 |
-| `document-deployment-and-self-enable-the-hook` | TEST-1 (what remains), DEP-1, DOC-1, SEC-8 (forwarded-for) |
+<!-- antislop: allow synonym-rotation -->
+<!-- The Finding column quotes each 2026-08-01 title verbatim, so "error
+     boundaries" cannot become "defect boundaries" without misquoting the
+     source this table exists to track. -->
 
-Five findings carry no change, for the reasons below.
+| ID | Finding | Status |
+|---|---|---|
+| SEC-1 | Attachment reflects user-controlled `Content-Type` | **Closed.** `MIME_TOKEN_PAIR` regex at `src/http/routes.ts:102` rejects parameters, CR and LF; `toBinaryResponse` sends `nosniff` and a percent-encoded `Content-Disposition`. |
+| SEC-2 | `http.request` has no egress policy | **Closed.** HTTPS required unless explicitly waived, `HTTP_ACTION_ALLOWED_HOSTS` allowlist, and `redirect: "manual"` at `src/handlers/http.ts:175`. |
+| SEC-3 | Login rate limiting per-email only | **Closed for the stated case.** A second window keyed on client address, checked first, at ten times the per-email threshold. See SEC-D for what remains. |
+| SEC-4 | `frame-ancestors` in a meta CSP does nothing | **Partly closed.** `static.ts` now sends the header. The content directives it was meant to accompany never arrived — see SEC-B. |
+| SEC-5 | Disabling an account does not revoke its token | **Closed.** `isActiveAccount` runs on every locally issued token after signature verification (`src/auth/jwt.ts`). |
+| SEC-6 | `GET /metrics` is unauthenticated | **Closed.** `METRICS_TOKEN`, read once at construction, empty string treated as unset. |
+| SEC-7 | `MAX_ATTACHMENT_BYTES` fails open | **Closed.** `parseMaxAttachmentBytes` throws on a non-integer. |
+| ERR-1 | Both worker error boundaries are silent | **Closed.** `src/engine/poll.ts:20-25` wraps every tick and logs; a per-item boundary sits inside the drain loop. |
+| TEST-1 | There is no CI | **Open.** No `.github/` directory. |
+| DEP-1 | No dependency monitoring | **Open.** |
+| ARCH-1, ARCH-2, ARCH-3, ERR-2, CQ-1, PERF-1, PERF-2 | — | Not re-verified individually this pass; none are security-bearing and all were Low or Medium. |
 
-- **ERR-2 closed itself.** `src/log.ts:30` exports `log.debug`, so
-  `LOG_LEVEL=debug` reaches something. The gap the review names is gone.
-- **CQ-1 closed itself.** The archived change
-  `2026-08-05-http-route-table` replaced the sequential `if` chain with a
-  route table, and the preflight now derives from that table rather than from
-  a second hand-written chain.
-- **ARCH-2 is declined.** Nothing measures attachment volume as a cost today,
-  and an interface with one implementation is the abstraction this repository
-  does not build ahead of need. The reason sits in
-  `harden-http-response-boundary`'s proposal, where a later reader will find
-  it.
-- **ARCH-1 has no change yet.** Mapping `NotFoundError` to 404 breaks a
-  contract `http-wrapper` pins on purpose, and `src/http/errors.ts:10-16`
-  records the decision. It needs a change of its own, reviewable apart from
-  the security work.
-- **PERF-2 needed a check, not a change.** `src/engine/definitions.ts:331`
-  states outright that the cache only grows, keyed on `(processId, version)`.
-  It is unbounded in fact and bounded in practice by the published-version
-  count.
-
-Two findings named the wrong place. The prepared changes carry the
-correction, and both are recorded here so a reader of this document does not
-follow the original text.
-
-- ERR-1 says `pollForever` takes a `name` argument at four call sites in
-  `host.ts`. It takes no such argument, and the four call sites are
-  `outbox.ts:353`, `resolution.ts:125`, `timers.ts:100` and
-  `retention.ts:81`.
-- SEC-8 asks `docker/nginx.conf` to normalize `X-Forwarded-For`. That server
-  block holds no `proxy_pass`: it serves static files and forwards nothing.
-  The rule belongs to a deployment that puts its own proxy in front of the
-  engine, so it moves to the deployment runbook.
+Eight of eleven closed with substantive fixes. That is a strong follow-through
+rate and the main reason this review is shorter than its predecessor.
 
 ## Detailed Findings
 
@@ -129,611 +99,405 @@ follow the original text.
 
 ---
 
-**SEC-1 · High · Attachment download reflects a user-controlled `Content-Type`**
+**SEC-A · High · The subprocess reference graph has no cycle check**
 
-**Location:** `src/http/routes.ts:69-73` (`attachmentBodySchema`),
-`src/http/server.ts:107-112` (`toBinaryResponse`), `:394-398` (route),
-`src/runtime/api.ts:1071-1085` (`getAttachment`).
+**Location:** `src/engine/definitions.ts:116-160` (publish-time cross-process
+check), `src/schema/definition.ts:449-466` (`subprocessSpec`),
+`src/engine/subprocess.ts` (spawn and return handlers).
 
-**Description:** `contentType` is accepted as any string up to 255 characters
-and stored unchanged. On download it becomes the response's `Content-Type`
-with no other headers: no `Content-Disposition`, no
-`X-Content-Type-Options: nosniff`. Any actor who may read an instance —
-starter, claimant, or a candidate on the current step — can upload
-`{"filename":"x.html","contentType":"text/html","dataBase64":"<base64 of a
-script>"}` and get a URL on the API origin that executes it.
+**Description:** The publish-time check verifies that a subprocess step's
+`processId` names a published process, that the child declares a contract, and
+that every `inputMapping` target exists in that contract. It does not walk the
+resulting graph. Nothing at run time counts spawn depth either — I grepped
+`src/engine/subprocess.ts`, `src/runtime/api.ts` and `src/schema/compile.ts` for
+a depth counter, an ancestor chain, or a cycle guard and found none.
 
-**Why it matters:** The engine's own SPAs live on a different origin, so this
-does not directly steal a token out of `localStorage`. It still yields script
-execution on the API origin, which is enough for convincing phishing against a
-URL users are told to trust, for reading any API response the victim's browser
-is authorized for if a token ever reaches that origin, and for defeating the
-`connect-src` reasoning the SPA CSP rests on. A deployment that puts the API and
-an SPA behind one hostname — the obvious nginx arrangement, and nothing in the
-repo forbids it — turns this into full same-origin XSS. Separately, a
-`contentType` containing CR or LF makes `new Response(...)` throw, producing a
-500 on an otherwise valid download.
+Publish ordering does not prevent a cycle, because versions are published
+independently:
 
-**Recommendation:** Send the bytes as a download, never as a document, and
-validate the declared type:
+1. Publish process `B` v1, with no subprocess step.
+2. Publish process `A` v1, whose subprocess step references `B` with
+   `versionBinding: "latest-at-spawn"`. The check passes: `B` is published.
+3. Publish process `B` v2, whose subprocess step references `A`. The check
+   passes again: `A` is published.
+
+`A` now spawns the latest `B`, which is v2, which spawns `A`. Each spawn creates
+a real instance row and a real outbox entry.
+
+**Why it matters:** Subprocess spawning runs post-commit through the outbox, so
+the loop is not a stack overflow that fails fast and loudly. It is a steady,
+durable, retrying producer of instance rows, outbox rows and timer rows, driven
+by workers that are behaving exactly as designed. It fills the instance database
+rather than crashing, which makes it slower to notice and harder to unwind — the
+rows are legitimate engine output, not corrupt data. The actor who triggers it
+needs only `system:publish`, and may reach it by accident while refactoring two
+processes that call each other.
+
+**Recommendation:** Add the check where the other cross-process validation
+already lives, in `assertSubprocessWiring` (`definitions.ts`). At publish, walk
+the graph reachable from the body being published and reject a path that returns
+to it:
 
 ```ts
-// routes.ts — reject anything that is not a MIME token
-const MIME = /^[\w.+-]+\/[\w.+-]+$/;
-contentType: z.string().min(1).max(MAX_ATTACHMENT_NAME_LENGTH).regex(MIME),
+// definitions.ts, alongside the existing per-step checks
+async function assertNoSubprocessCycle(processId: string, body: ProcessBody, db: SQL): Promise<void> {
+  const seen = new Set<string>([processId]);
+  const queue = body.steps.flatMap((s) => (s.subprocess ? [s.subprocess.processId] : []));
+  while (queue.length > 0) {
+    const next = queue.shift()!;
+    if (next === processId) {
+      throw new SubprocessWiringError(`publishing '${processId}' would close a subprocess cycle through '${next}'`);
+    }
+    if (seen.has(next)) continue;
+    seen.add(next);
+    queue.push(...(await childProcessIdsOf(next, db)));
+  }
+}
+```
 
-// server.ts::toBinaryResponse
-headers: {
-  "content-type": contentType,
-  "content-disposition": `attachment; filename="${encodeURIComponent(filename)}"`,
+A `latest-at-spawn` binding means the graph can still change under a published
+parent, so pair the publish check with a cheap run-time backstop: carry a
+`spawnDepth` on the spawn config, increment it per level, and dead-letter past a
+constant (16 is generous — the v1 boundary is synchronous call-and-return, and
+nothing legitimate nests that far). The publish check catches the authoring
+mistake with a good message; the depth cap bounds the damage when the graph
+mutates after publish.
+
+**Verification limit:** I confirmed the absence of a guard by search, and
+reasoned the reachable publish sequence from `subprocessSpec` and the
+`definitions.ts` checks. I did not execute the sequence against a live database.
+Reproduce it before sizing the fix.
+
+---
+
+**SEC-B · Medium · The SPA ships no content Security Policy**
+
+**Location:** `src/http/static.ts:40` (`SECURITY_HEADERS`),
+`packages/web/index.html:1-10`.
+
+**Description:** `static.ts` sends `content-security-policy: frame-ancestors
+'none'` and `x-content-type-options: nosniff`. The header comment explains,
+correctly, that `frame-ancestors` is honored only in an HTTP header and not in a
+meta tag — which is why it moved there. The content directives it was meant to
+sit beside are in neither place: `packages/web/index.html` carries only
+`charset` and `viewport` meta tags. Nothing declares `default-src`, `script-src`,
+`connect-src`, `object-src` or `base-uri`.
+
+**Why it matters:** The policy as sent stops clickjacking and nothing else. A CSP
+that names `frame-ancestors` alone reads, to a scanner and to a reviewer, like a
+policy is in force. The web package renders participant-supplied form data,
+comment bodies and process labels across four areas; React escapes by default and
+I found no `dangerouslySetInnerHTML` or `innerHTML` anywhere in `src`,
+`packages/web/src` or `packages/form-ui/src`, so there is no known injection
+point today. A CSP is the control that keeps an unknown one from becoming
+account compromise, and it is precisely the mitigation SEC-C is missing.
+
+**Recommendation:** Extend the header in `static.ts` rather than adding a meta
+tag, so one place owns the policy. Vite's production build emits hashed assets
+and no inline script, so a strict policy fits without `unsafe-inline` on scripts:
+
+```ts
+const SECURITY_HEADERS = {
+  "content-security-policy": [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'", // Vite injects inline style attributes
+    "img-src 'self' data:",
+    "connect-src 'self'",               // widen if VITE_API_URL names another origin
+    "object-src 'none'",
+    "base-uri 'none'",
+    "frame-ancestors 'none'",
+  ].join("; "),
+  "x-frame-options": "DENY",
   "x-content-type-options": "nosniff",
-  ...corsHeaders(allowed, requestOrigin),
-}
+  "referrer-policy": "no-referrer",
+};
 ```
 
-`handleGetAttachment` already has `filename` in hand from `getAttachment`; it
-currently discards it. Consider also narrowing storage to an allowlist of types
-the product needs (PDF, images, office documents, `text/plain`) and
-rewriting everything else to `application/octet-stream`.
+`connect-src 'self'` breaks a deployment that serves the bundle from a second
+origin, which `API_BASE` reading `VITE_API_URL` explicitly allows. Make that
+directive configurable from the same value, or the first split-origin deployment
+will report the SPA as broken.
 
 ---
 
-**SEC-2 · High · `http.request` has no egress policy**
+**SEC-C · Medium · The session token lives in `localStorage`**
 
-**Location:** `src/handlers/http.ts:43-49` (`httpConfigSchema`), `:122-127`
-(the `fetch` call).
+**Location:** `packages/web/src/shell/session.ts:16-70`.
 
-**Description:** `url` is validated only as `z.string().url()`. The handler
-then calls `fetch` with default redirect following, and the response body is
-written back into `instance.data` through `Action.output`, where any participant
-who can view the instance reads it. There is no scheme restriction, no host
-allowlist, and no check against link-local or private address space.
+**Description:** One key, `web.session`, holds the bearer token, actor id, roles
+and expiry as JSON in `localStorage`. `loadSession` rebuilds the object field by
+field and validates shape, which is good practice and stops a malformed entry
+from propagating. The storage choice itself is the finding: any script running on
+the SPA origin reads the token with one line.
 
-**Why it matters:** This is a server-side request forgery primitive with a
-read-back channel — the strongest variety. An author can reach
-`http://169.254.169.254/latest/meta-data/iam/security-credentials/` (cloud
-instance metadata), the Postgres port, an internal admin panel, or the engine's
-own `/admin/*` routes from inside the network perimeter, and read the result
-through an ordinary instance view. Even with an allowlist added later, default
-redirect following would defeat it: an allowlisted host that 302s to
-`169.254.169.254` is followed silently.
+**Why it matters:** The token is a full 8-hour bearer credential (`login.ts`,
+`TOKEN_LIFETIME_HOURS = 8`) with no refresh and no server-side session record to
+revoke. `isActiveAccount` limits the blast radius — disabling the account ends
+the session on its next request — but that is a manual, after-the-fact control,
+not a preventive one. A stolen token is valid for up to eight hours against every
+role the actor holds, and a `system:admin` or `system:publish` token is worth a
+great deal here. This finding and SEC-B compound: the CSP that would normally be
+the compensating control is the one that is missing.
 
-The mitigating factor is that reaching this requires `system:publish`. That
-lowers the severity from Critical but does not remove the finding: the whole
-point of a BPM engine is that process definitions are authored by business
-developers whose blast radius is supposed to end at their own processes, and
-the definition is also the artifact environment promotion moves between
-environments as a file.
+**Recommendation:** The thorough fix is an `HttpOnly; Secure; SameSite=Strict`
+cookie, which puts the token out of JavaScript's reach entirely. That is a real
+change — it needs a CSRF defence (`SameSite=Strict` plus an origin check on state
+-changing routes covers it), and it conflicts with the split-origin deployment
+`VITE_API_URL` permits, so it deserves an OpenSpec change rather than a patch.
 
-**Recommendation:** Give the handler a deployment-controlled egress policy,
-following the existing `SMTP_*` / `DATABASE_URL` convention — configuration in
-the environment, never in the process body:
+If that is too large for now, take the two cheap steps in the meantime: land
+SEC-B's CSP, and shorten `TOKEN_LIFETIME_HOURS`. Do not move the token to
+`sessionStorage` and call it fixed — it is equally readable by script, and it
+costs a re-login per tab for no security gain.
 
-```ts
-// Unset = deny all outbound HTTP actions, matching CORS_ALLOWED_ORIGINS'
-// "unset means nothing is allowed" default.
-const allowed = (process.env.HTTP_ACTION_ALLOWED_HOSTS ?? "").split(",").filter(Boolean);
-const target = new URL(config.url);
-if (target.protocol !== "https:" && process.env.HTTP_ACTION_ALLOW_INSECURE !== "1") {
-  throw new PermanentError(`http.request refuses a non-https URL: ${target.protocol}`);
-}
-if (!allowed.includes(target.host)) {
-  throw new PermanentError(`http.request target host is not allowlisted: ${target.host}`);
-}
-const response = await fetch(config.url, { ..., redirect: "manual" });
+---
+
+**SEC-D · Medium · Login rate limiting is per-process and in-memory**
+
+**Location:** `src/auth/login.ts:52-60` (the `ponytail:` marker and the two
+`Map`s).
+
+**Description:** Both windows are process-local `Map`s. The code says so
+plainly, names the upgrade path, and carries the marker the repo's ledger tracks
+— this is disclosed debt, not a hidden defect. It is listed here because the
+consequence is larger than the marker's tone suggests.
+
+**Why it matters:** Two properties follow, neither obvious from the call site.
+Behind a load balancer with N instances, the effective threshold is N × 5 per
+email and N × 50 per address, and no single process ever sees the aggregate. A
+restart — a deploy, a crash, an autoscale event — resets every counter to zero,
+so an attacker who can provoke or wait for restarts gets fresh budget.
+The control degrades quietly in exactly the deployment shape a BPM platform ends
+up in.
+
+**Recommendation:** The comment already names the fix. The engine reaches
+Postgres on this path today, so a table keyed the same way costs one query and
+no new dependency:
+
+```sql
+CREATE TABLE IF NOT EXISTS login_attempts (
+  bucket TEXT PRIMARY KEY,          -- 'email:x@y.z' or 'addr:203.0.113.4'
+  count INT NOT NULL,
+  window_start TIMESTAMPTZ NOT NULL
+);
 ```
 
 <!-- antislop: allow synonym-rotation -->
-<!-- "permanent failure" is the outbox's own term (PermanentError). -->
-`redirect: "manual"` is the load-bearing half — without it the allowlist checks
-only the first hop. A 3xx then classifies as a permanent failure, which the
-existing status branch at `:137` already does. Resolving the hostname and
-rejecting private/link-local addresses closes DNS rebinding on top; that is
-worth doing but is a second step, and the allowlist is most of the value.
+<!-- "operator" is a domain term CLAUDE.md declares carries no synonym: it
+     names the admin area's audience, not the "client" of a client address. -->
+
+One `INSERT ... ON CONFLICT DO UPDATE ... RETURNING count` keeps the atomicity
+the current synchronous-path comment is protecting. Until then, document the
+single-process assumption in the deployment runbook — an operator scaling to two
+replicas has no way to know this control weakens.
 
 ---
 
-**SEC-3 · Medium · Login rate limiting is per-email only, and fails closed globally**
+**SEC-E · Low · Notes without an immediate fix**
 
-**Location:** `src/auth/login.ts:25-67` (`checkAndRecordAttempt`), `:81`.
+Three observations that need no change today but should not go unrecorded.
 
-**Description:** Two distinct gaps in one function.
+`ALLOW_INSECURE_DEV_AUTH=1` makes the server trust `X-Actor-Id` and
+`X-Actor-Roles` verbatim, which is total authentication bypass by design. The
+mitigations are good — no `POST /auth/login` route is registered in that state,
+and startup logs `AUTH DISABLED:` — and `.env.example` documents the trap at
+length. Confirm the production container image cannot inherit it.
 
-<!-- antislop: allow long-words -->
-<!-- "attempt" is the domain term: loginAttempts, checkAndRecordAttempt, and
-     the outbox's own attempts column. -->
-*(a) No per-source limit.* The bucket key is the normalized email. An attacker
-trying one password against ten thousand accounts is never limited — each email
-gets its own fresh window. Every attempt also costs a full argon2id verify
-(`users.ts:46` deliberately runs one on the unknown-email path too, which is
-correct for timing but expensive), so this is simultaneously a CPU exhaustion
-vector against a single-threaded runtime.
+`TRUST_PROXY=1` reads the **last** `X-Forwarded-For` entry, with a comment
+explaining that reading the first would hand the rate-limit key to the attacker.
+That is the correct choice and a detail most codebases get backwards. No action.
 
-*(b) The capacity backstop denies service.* When the map holds
-`MAX_TRACKED_EMAILS` (50,000) live windows, `:63` returns `"limited"` for every
-*new* email. An attacker submits 50,000 distinct addresses within 15 minutes —
-trivially scriptable, and cheap for them since these are unknown-email
-paths — and from then until the window rolls, no user whose email is not
-already tracked can log in at all. The comment argues fail-closed is the safe
-choice; for a capacity limit whose failure mode is total login denial, it is
-the more damaging one.
-
-**Why it matters:** (a) makes credential stuffing effectively unthrottled;
-(b) is a remote, unauthenticated, low-cost denial of service against
-authentication itself.
-
-<!-- antislop: allow synonym-rotation long-words -->
-<!-- "client IP" names the transport peer, not the user; "attempt" as above. -->
-**Recommendation:** Add a second bucket keyed on client IP with a higher
-threshold (the two compose: an attempt must pass both), and evict least-recently-used
-entries at capacity instead of refusing:
-
-```ts
-// Reclaim expired first (as today); if still full, drop the oldest window
-// rather than deny — an evicted entry is at worst an un-throttled attempt,
-// where denial is a guaranteed outage for every untracked user.
-if (map.size >= MAX_TRACKED_EMAILS) {
-  const oldest = [...map.entries()].reduce((a, b) => (a[1].windowStart <= b[1].windowStart ? a : b));
-  map.delete(oldest[0]);
-}
-```
-
-The IP must come from the request, so `handleLogin` needs the client address
-threaded in (behind nginx, from a trusted `X-Forwarded-For` — trusted meaning
-the proxy overwrites it, which `docker/nginx.conf` does not currently do and
-should).
-
----
-
-**SEC-4 · Medium · `frame-ancestors` in a `<meta>` CSP does nothing; nginx sets no security headers**
-
-**Location:** `packages/{app,admin,studio}/vite.config.ts` (the
-`contentSecurityPolicy` plugin), `docker/nginx.conf`.
-
-**Description:** The CSP is a good policy, delivered the one way that drops
-part of it. Per the CSP specification, `frame-ancestors`, `report-uri` and
-`sandbox` are ignored when the policy arrives in a `<meta http-equiv>` element
-— they are honored only as an HTTP response header. So
-`frame-ancestors 'none'` in these builds is inert. `docker/nginx.conf`, which
-serves all three SPAs, sets no `Content-Security-Policy`, no
-`X-Frame-Options`, no `X-Content-Type-Options` and no `Referrer-Policy`; its
-comment correctly notes it replaces the base image's server block entirely, so
-nothing is inherited.
-
-<!-- antislop: allow synonym-rotation -->
-<!-- "cancel instance" is the name of the operation, not a synonym for "stop". -->
-**Why it matters:** Studio and Admin can be framed by any origin. Both are
-click-to-act interfaces over destructive operations — publish, run migration,
-disable user, redact instance, cancel instance — which is exactly the target
-profile for clickjacking.
-
-**Recommendation:** Move the policy to nginx, where the whole thing works, and
-keep the meta tag only if you also want it on non-nginx hosting:
-
-```nginx
-add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ${API_ORIGIN}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
-add_header X-Content-Type-Options nosniff always;
-add_header Referrer-Policy no-referrer always;
-```
-
-`X-Frame-Options: DENY` alongside costs nothing and covers pre-CSP-Level-2
-clients.
-
----
-
-**SEC-5 · Medium · Disabling a user does not revoke their token**
-
-**Location:** `src/auth/users.ts:78-87` (`setDisabled`), `src/auth/jwt.ts:66-69`
-(local verification), `src/auth/login.ts:21` (8-hour lifetime).
-
-**Description:** `disabled` is read once, at login (`verifyLogin:47`). The
-issued JWT carries `sub` and `roles` and is verified thereafter against the
-signing key alone. `POST /admin/users/:id/disable` therefore has no effect on a
-session already in progress; the user keeps every permission for up to eight
-hours.
-
-**Why it matters:** Disabling an account is the operator's response to a
-departure or a compromise, and the Admin UI presents it as one. Right now it is
-a control that appears to work and does not. There is no revocation mechanism
-of any kind — no denylist, no `tokens_valid_after`, no short refresh cycle.
-
-**Recommendation:** For locally-issued (`iss: "bps"`) tokens, check the account
-on each resolution — one indexed lookup by `user_id`, on a table that is small
-by construction:
-
-```ts
-// jwt.ts, local branch, after jwtVerify
-const actor = toActor(payload, localRolesClaim);
-if (await isDisabled(actor.id, db)) throw new ActorResolutionError("account is disabled");
-return actor;
-```
-
-Externally-issued tokens are the IdP's problem and correctly stay out of scope.
-If the per-request query is unwelcome, a `tokens_valid_after` timestamp per user
-compared against the token's `iat` gives the same guarantee with the value
-cached in memory.
-
----
-
-**SEC-6 · Medium · `GET /metrics` is unauthenticated**
-
-**Location:** `src/http/server.ts:243-245`, `src/http/metrics.ts`.
-
-**Description:** `/metrics` sits in the same unauthenticated tier as `/livez`
-and `/readyz`, before any resolver call. Each scrape runs three aggregate
-queries (`countOutboxByStatus`, `getTimerLagStats`, `countInstancesByStatus`)
-against the live database, unthrottled.
-
-**Why it matters:** Two things. The disclosure is mild but real — outbox
-backlog, dead-letter count, faulted-instance count and timer lag tell an
-outsider how loaded and how healthy the system is, and when it is degraded.
-The load is the larger issue: an unauthenticated endpoint that performs three
-full aggregate scans per request is a cheap way to push the database over.
-`/livez` and `/readyz` are correctly public — a ping is not a query.
-
-**Recommendation:** Gate it. Either need `ADMIN_ROLE` through the ordinary
-resolver, or — the usual Prometheus arrangement, and the better fit for a
-scraper that has no user identity — a shared bearer compared in constant time
-against `METRICS_TOKEN`, with the route unregistered when that variable is
-unset. Binding metrics to a second, non-public port is equally acceptable and
-needs no code beyond a second `Bun.serve`.
-
----
-
-**SEC-7 · Low · `MAX_ATTACHMENT_BYTES` fails open on a malformed value**
-
-**Location:** `src/http/routes.ts:67`, enforced at `:230`.
-
-**Description:** `Number(process.env.MAX_ATTACHMENT_BYTES ?? 5 * 1024 * 1024)`
-yields `NaN` for anything non-numeric — `"5MB"`, `"5_000_000"`, a trailing
-space. Every comparison against `NaN` is false, so `data.length > MAX_ATTACHMENT_BYTES`
-never fires and the only remaining bound is `MAX_REQUEST_BODY_SIZE` (8 MiB).
-
-**Why it matters:** The one operator who tries to *tighten* this limit and
-mistypes the value silently loosens it instead. `host.ts::parseRetentionDays`
-already establishes the right pattern in this codebase, and its doc comment
-explicitly contrasts itself with `MAX_ATTACHMENT_BYTES` — the inconsistency is
-known, just not closed.
-
-**Recommendation:** Validate at module load and throw, exactly as
-`parseRetentionDays` does; a bad bound on a size limit deserves the same
-treatment as a bad bound on a destructive sweep.
-
----
-
-**SEC-8 · Low · Notes without an immediate fix**
-
-- **Tokens in `localStorage`** (`packages/{app,admin,studio}/src/session.ts`).
-  Standard for a bearer-token SPA and defensible given the strict `script-src`,
-  but it means any script execution is a full account takeover. Worth revisiting
-  if a refresh-token flow is ever added; not worth churn today.
-- **`CORS_ALLOWED_ORIGINS=*` permits `Authorization`** (`server.ts:120`). Safe
-  as written — the wildcard cannot carry credentials, and the allowlist branch
-  echoes only after checking — but the wildcard should be documented as
-  dev-only.
-- **API responses carry no `Cache-Control`.** Instance views containing personal
-  data are cacheable by any intermediary by default. `Cache-Control: no-store`
-  on the JSON envelope is a one-line addition in `toResponse`.
-- **`docker/nginx.conf` does not normalize `X-Forwarded-For`.** Needed before
-  SEC-3's per-IP limiting can trust it. **Correction:** that server block
-  holds no `proxy_pass` and forwards nothing, so the directive has no place
-  in it. The rule belongs to a deployment that fronts the engine with its own
-  proxy, and `document-deployment-and-self-enable-the-hook` puts it in the
-  deployment runbook.
+`AUTH_JWT_SECRET` is enforced at 32 encoded bytes minimum for HS256. Correct.
+Consider RS256 or EdDSA if the token ever needs to be verified by a service that
+should not also be able to mint one.
 
 ### Architecture
 
-**ARCH-1 · Medium · `NotFoundError` is served as HTTP 500**
+**ARCH-A · Low · `src/runtime/api.ts` is 1,269 lines**
 
-**Location:** `src/http/errors.ts:82`, and the header comment at `:10-16`
-recording it as deliberate.
+The largest file in the repository, and the seam every area crosses. It is
+coherent — the Runtime API Layer is a real boundary, not a grab bag — and the
+file is well commented, so this is not urgent. It is the natural next split
+point: the attachment and comment operations are self-contained enough to move to
+`src/runtime/attachments.ts` and `src/runtime/comments.ts` without touching the
+exports map's public shape. Do it when a change next lands in that area, not as
+its own task.
 
-Requesting a nonexistent instance returns `500 {"error":{"type":"internal",
-"message":"instance not found: inst_..."}}`. This is inconsistent within the
-same layer — `handleGetDraft`, `handleGetVersionBody` and `handleGetMigrationPlan`
-all hand-roll a proper 404 — and it is corrosive operationally: every dashboard,
-alert and SLO built on 5xx rate now fires on ordinary client typos, which is
-precisely the noise that trains an on-call to ignore the signal. The choice is
-recorded as spec-pinned, so this needs a spec change rather than a patch, but it
-should get one.
+**ARCH-B · Positive · The headless boundary holds**
 
-**ARCH-2 · Medium · Attachment bytes live in the instance database**
-
-**Location:** `src/engine/store.ts:124-134` (`data bytea NOT NULL`),
-`src/runtime/api.ts:1071-1085`.
-
-Files up to 5 MB are stored inline and read whole into memory on download; the
-upload path additionally holds the base64 string, the decoded buffer and the
-`Buffer.from` copy simultaneously. This inflates backups and WAL, ties file
-retention to database retention, and gives a single-threaded runtime a
-memory-proportional-to-file-size profile with no streaming anywhere. It is a
-reasonable v1 shortcut and is not urgent; what it needs is a seam
-(`AttachmentStore` with a DB-backed default) so that moving to object storage
-later is a wiring change rather than a schema migration.
-
-**ARCH-3 · Low · Delegation targets are unverified**
-
-`src/runtime/api.ts:713-724` documents that `toActorId` is checked against
-neither `assignment.candidates` nor any account directory. A typo parks the
-task on an identity that will never claim it, with no error and no event that
-distinguishes it from a legitimate delegation. Since local accounts exist in
-`auth_users`, at minimum verifying the target resolves there would catch the
-common case.
-
-### Error Handling
-
-**ERR-1 · High · Both worker error boundaries are silent**
-
-**Location:** `src/engine/poll.ts:11-13`, `src/engine/outbox.ts:338-341`.
-
-`pollForever` wraps every tick of all four background workers — outbox,
-resolution, timers, retention — and discards any thrown error with an empty
-`catch` and a comment asserting it is transient. `drainOutbox`'s per-row
-boundary does the same for a corrupt action row or a failed tx2 mark.
-
-The reasoning ("the next tick retries") is right for a blip and wrong for
-everything else. A schema drift, a permissions change, a bug in
-`sweepRetention`, an exhausted connection pool: all build a worker that
-throws on every tick forever, with no log line, no metric and no external
-symptom except work quietly not happening. The observability change that just
-shipped added `/metrics` and structured logging while leaving the two loops
-those metrics describe unable to report their own failure.
-
-**Recommendation:** Log, and let the metric follow:
-
-```ts
-// poll.ts — the caller names itself so the line is actionable
-} catch (err) {
-  log.error("worker tick failed", { worker: name, message: err instanceof Error ? err.message : String(err) });
-}
-
-// outbox.ts:338
-} catch (err) {
-  log.error("outbox row skipped", { idempotencyKey: raw.idempotency_key, message: err instanceof Error ? err.message : String(err) });
-}
-```
-
-`pollForever` takes a `name` argument at four call sites in `host.ts`. Rate-limit
-the line if a tight interval makes it noisy — but silence is not the way to
-achieve that.
-
-**Correction.** `pollForever` takes no `name` argument today, and no call
-site sits in `host.ts`. The four are `outbox.ts:353`, `resolution.ts:125`,
-`timers.ts:100` and `retention.ts:81`. The change `surface-worker-failures`
-adds the argument and passes it from those four.
-
-**ERR-2 · Low · `LOG_LEVEL=debug` is accepted and unreachable**
-
-**Closed since this review.** `src/log.ts:30` now exports `log.debug`, so the
-level reaches something. The paragraph below describes the tree as it stood
-on 2026-08-01.
-
-`src/log.ts:11-33` orders four levels and resolves a `debug` threshold, but the
-exported `log` object has only `info`, `warn` and `error`, so
-`LOG_LEVEL=debug` has no effect. Either add the function or drop the level from
-`LEVEL_ORDER`; a configuration knob that silently does nothing is worse than
-one that does not exist.
+I checked for UI leakage into `src/` and found none. `packages/web` reaches the
+engine only over HTTP and the exports map, and the exports map lists seven
+entries with no drift into internals. The property `CLAUDE.md` calls load-bearing
+is, in fact, load-bearing and intact.
 
 ### Testing
 
-**TEST-1 · High · There is no CI**
+**TEST-1 · High · There is still no CI** *(carried from 2026-08-01)*
 
-**Location:** `.github/workflows` (absent), `.githooks/pre-push`.
+**Location:** absent `.github/workflows/`.
 
-The only automated gate is a pre-push hook that (a) each clone must enable by
-hand with `git config core.hooksPath .githooks`, (b) requires the devcontainer
-to be running or it refuses, and (c) is skipped by `git push --no-verify`,
-which its own error message advertises. Nothing runs on the server side; a
-push from a fresh clone, from a machine with Docker down, or from anyone who
-takes the `--no-verify` hint lands unverified.
+**Description:** 111 test files, a six-gate pre-push hook, and no automated run
+anywhere but a contributor's machine. `--no-verify` disables every gate at once,
+as `CLAUDE.md` notes. A pull request from a fork runs nothing at all.
 
-This is a live risk, not a theoretical one, because of how the suite is
-structured: 667 test call sites across 91 files, of which 36 are `skipIf(!DB)`
-— so a run without `DATABASE_URL` reports green while exercising a minority of
-the suite. `CLAUDE.md` documents this hazard at length and instructs a human to
-check the skip count. That instruction is exactly the kind of thing CI exists
-to stop being a human's job.
+**Why it matters:** Every other quality control in this repository routes through
+the local hook. That makes the whole apparatus contingent on one developer's
+container being up and one developer not reaching for `--no-verify` under time
+pressure. The gates exist precisely because these defect classes recurred; the
+gates themselves are currently unenforced from the project's own side.
 
-**Recommendation:** A workflow with a Postgres 16 service, running
-`bun run check`, and failing if anything skipped:
+**Recommendation:** One workflow closes it. Postgres 16 as a service container,
+`DATABASE_URL` set — which the `no-silent-green` gate already demands — and
+`bun run check`:
 
 ```yaml
-services:
-  postgres:
-    image: postgres:16
-    env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: workflow_engine }
-    options: >-
-      --health-cmd pg_isready --health-interval 10s --health-retries 5
-env:
-  DATABASE_URL: postgres://postgres:postgres@localhost:5432/workflow_engine
+name: check
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+        ports: ["5432:5432"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version-file: .devcontainer/Dockerfile }
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
 ```
 
-Keep the pre-push hook — fast local feedback is worth having — but it is a
-convenience, not a gate. The prior review's TEST-1 was closed by replacing a CI
-workflow with this hook; that trade should be revisited.
+Pin the Bun version to the same source the Dockerfile does, or CI reintroduces
+the version drift the container pin exists to prevent. Add the four host-only
+gates (`whitespace`, `prose`, `machine-paths`, `lockfile`) as a second job — they
+need only git and a shell, so they cost seconds.
 
-**TEST-2 · Low · Test quality is otherwise a strength**
+**TEST-2 · Positive · Test quality is high**
 
-Worth stating plainly since the finding above is about process, not tests: the
-suite has no mocking of the database, exercises real interleaved-transaction
-races (`test/assignment.runtime-api.test.ts:123`/`:158`), and every invariant
-that landed shipped with a test that rejects a violating input. The
-`bunfig.toml` preload giving `bun test` its own `_test` database — the fix for
-what had been diagnosed as suite flakiness — is exactly the right resolution of
-that problem. Test coverage of the frontend packages is thinner (pure logic is
-extracted and unit-tested, components are not rendered), which is a reasonable
-place to stop.
+74 engine suites plus 37 in `packages/web`. The design decisions behind them are
+better than the count suggests: the `bunfig.toml` preload that gives the suite
+its own `_test` database closes two measured hazards rather than a hypothetical
+one, and `test/http-body-size.test.ts` spins a real `Bun.serve` because the pure
+`fetch(req)` handler every other test uses cannot exercise `maxRequestBodySize`.
+That is a test author who understood what the test could not otherwise prove.
 
 ### Dependencies
 
-**DEP-1 · Medium · No automated dependency or vulnerability monitoring**
+**DEP-1 · Medium · No dependency or vulnerability monitoring** *(carried)*
 
-No Dependabot or Renovate configuration, and no `bun audit` (or equivalent) in
-any gate. `jose` and `zod` float on carets; `@marcbachmann/cel-js` is correctly
-pinned exactly, with `CLAUDE.md` explaining why an incidental `bun update` of
-that one would be a correctness hazard. The lockfile is committed and the
-production image builds `--frozen-lockfile`, which covers reproducibility but
-not staleness.
+No Dependabot config, no Renovate, no `bun audit` step — the last is a direct
+consequence of TEST-1. Add `.github/dependabot.yml` in the same change that adds
+the workflow.
 
-**Recommendation:** A weekly Dependabot config plus `bun audit` in the CI
-workflow from TEST-1. Low effort, and the surface is so small that the noise
-will be near zero.
+**DEP-2 · Positive · The dependency surface is genuinely small**
 
-**DEP-2 · Positive · The dependency surface is a genuine asset**
+Three runtime dependencies in the engine: `@marcbachmann/cel-js` (pinned exactly
+at `8.0.0`, correctly — it decides guard semantics), `jose` (the right choice for
+JWT, actively maintained), and `zod`. No ORM, no HTTP framework, no logger, no
+database driver: `Bun.sql`, `Bun.serve` and `Bun.password` cover all four. The web
+package adds four. `Bun.password` in particular means argon2id with no
+dependency, and `verifyLogin` runs exactly one verify on every path including the
+no-such-row path, against a process-lifetime dummy hash. That is a deliberate
+timing-attack defence most codebases skip.
 
-Three runtime dependencies for the whole engine (`zod`, `jose`,
-`@marcbachmann/cel-js`); password hashing, SQL, HTTP serving, testing and the
-SMTP client are all either Bun built-ins or hand-written against them. The
-frontends add only React and Vite. This is unusually disciplined for a project
-of this scope and should be defended.
+This is the strongest single attribute of the project. Adding CI to watch it
+protects an asset that already exists.
 
 ### Code Quality
 
-**CQ-1 · Low · `server.ts`'s router is 270 lines of sequential `if`**
+Strict TypeScript with `noUnusedLocals`, `noUnusedParameters`,
+`noFallthroughCasesInSwitch` and `noImplicitOverride` all on. Across 37,306
+lines: **zero** `TODO`/`FIXME`/`HACK` markers, 7 `as any` or `@ts-*` escapes, and
+15 `ponytail:` markers — each of which is a *documented* shortcut naming its own
+ceiling and upgrade path, tracked in a ledger with a push gate enforcing
+freshness. Deliberate debt with a paper trail is not the same thing as debt.
 
-**Closed since this review.** The archived change
-`2026-08-05-http-route-table` replaced the chain with a route table, and the
-preflight answer now derives from that table. The paragraph below describes
-the tree as it stood on 2026-08-01.
-
-`src/http/server.ts:237-496`. Every request walks up to sixty predicate chains,
-and each route's CORS preflight is a second hand-written entry that must be kept
-in sync with the route itself by hand. It works, it is explicit, and the file
-comment justifies the framework-free choice well. But the preflight/route
-duplication is the kind of pairing that drifts silently — a route added without
-its preflight breaks only for browser clients, and only cross-origin. A small
-table (`{method, segments, handler, preflight}`) matched in a loop would remove
-the class of bug without introducing a framework.
-
-**CQ-2 · Positive · Comment discipline**
-
-The doc comments in this codebase explain *why*, at the point of the decision,
-and they are accurate — several findings above were confirmed or ruled out
-directly from them, and none was contradicted by the code. `outbox.ts`'s
-account of the claim/deliver/mark split and `compile.ts::compileProcessBody`'s
-note on check placement are the standouts. This is rare and is worth naming.
+The comment discipline deserves specific mention, because it is unusual. Comments
+here state why a choice was made and what breaks otherwise:
+`clientAddressOf` explains why the last `X-Forwarded-For` entry rather than the
+first; `checkAndRecordAttempt` explains why it must stay synchronous end to end;
+`createDefaultRegistry` explains which import cycle its location avoids. That is
+the category of knowledge normally lost to turnover.
 
 ### Performance
 
-**PERF-1 · Low · `parseLimit` bounds are applied late**
+No blocking issues found. Pagination is bounded through `parseLimit` with
+per-route maxima and rejects a non-positive-integer `limit` rather than
+clamping silently. `maxRequestBodySize` is set to 8 MiB explicitly instead of
+inheriting Bun's 128 MiB default. Attachments are capped at 5 MiB.
 
-`routes.ts:270` accepts any positive integer; the cap (`MAX_LIST_LIMIT` 200,
-`MAX_RECORD_LIMIT` 500) is applied inside `runtime/api.ts` via `Math.min`. Safe
-today. The risk is that a future list endpoint reads `limit` and forgets the
-clamp, since the HTTP layer's own parser imposes none. Clamping at the boundary
-too would be belt-and-braces.
-
-**PERF-2 · Low · `listInstances` resolves one body per row**
-
-`api.ts:824` maps each row through `toSummary`, which calls
-`store.resolveBody`. The definition store caches, so this is not N+1 against
-the database — but it is worth confirming that cache is unbounded-in-practice
-rather than unbounded-in-fact, since it keys on `(processId, version)` and
-published versions accumulate forever.
-
-### Documentation
-
-**DOC-1 · Positive with one gap.** `CLAUDE.md`, `docs/current-state.md`,
-`ROADMAP.md`, `docs/openapi.yaml` and the OpenSpec change history together form
-better documentation than most commercial codebases carry, and the spec-driven
-workflow visibly produces it as a by-product rather than as an afterthought.
-The gap is deployment: there is no document describing the required environment
-for a real deployment — which of `AUTH_JWT_SECRET`, `AUTH_ISSUERS`,
-`CORS_ALLOWED_ORIGINS`, `DATA_RETENTION_DAYS`, `SMTP_*`, `MAX_ATTACHMENT_BYTES`,
-`LOG_LEVEL` and `PORT` are mandatory, what each defaults to, and which defaults
-are unsafe. `docker/` ships images with no accompanying runbook for what to set
-when running them. `docs/runbooks/` exists and is the natural home.
+`ARCH-2` from the previous review — attachment bytes stored in the instance
+database — remains true and remains the right call at this stage. Revisit when
+attachment volume, not attachment count, starts driving database size.
 
 ## Positives
 
-- **The contract holds.** One serialized JSON artifact, Zod as its single
-  expression, hashing over the body only, immutability of published versions,
-  explicit pin-by-default migration. The invariants that types cannot express
-  are enumerated and each has a rejecting test.
-- **Publish-time validation is unbypassable.** Verified directly:
-  `compileProcessBody` runs all six structural checks plus duration validation
-  before the already-compiled early return, so the environment-promotion import
-  path — which publishes a compiled body straight from a file — cannot skip
-  them. This was the shape of the prior review's SEC-3 and it is properly closed.
-- **Concurrency is correct and reasoned.** Optimistic concurrency on
-  `transitionSeq`, `SELECT ... FOR UPDATE` where a wholesale patch would race a
-  writeback, `FOR UPDATE SKIP LOCKED` claiming with lease reclaim, CAS-gated
-  completion, and a version-fold predicate closing the migration race. Each is
-  explained where it lives.
-- **Authorization is one predicate, shared.** `loadInstanceForActor` is used by
-  every participant-facing read, `isEligibleCandidate` is shared with
-  `claimStep` so the two cannot drift, and unauthorized reads collapse
-  "doesn't exist" and "not yours" into one opaque error consistently.
-- **No SQL injection surface.** Every query in the codebase is a tagged
-  template with bound parameters; no `sql.unsafe`, no string-built SQL. The one
-  dynamic path array (`{data,${fid}}`) is fed a validated `field_<uuid>` and
-  says so.
-- **No XSS surface in the SPAs.** Zero `dangerouslySetInnerHTML`, `innerHTML`,
-  `eval` or `new Function` across four packages.
-- **Authentication fundamentals are right.** argon2id via `Bun.password`, a
-  dummy-hash verify on the unknown-email path so timing does not disclose
-  account existence, identical responses for wrong-password/unknown/disabled, a
-  32-byte minimum on the signing key, and a startup that refuses to run without
-  authentication unless explicitly told to.
-- **Data-protection primitives exist and are correct.** `redactInstance` is
-  transactional and idempotent, the automatic sweep is keyset-paged rather than
-  unbounded, and it correctly excludes `faulted` instances from erasure.
+- **Parameterized SQL throughout.** No string interpolation into a query, no
+  `sql.unsafe`, anywhere in `src/engine/` or `src/auth/`. Zero injection surface.
+- **`Bun.password` (argon2id) with a constant-work no-such-row path.** A
+  deliberate timing-attack defence, correctly implemented.
+- **SSRF defence that covers the real attack.** `redirect: "manual"` is the half
+  most allowlists forget; the comment names the `169.254.169.254` case explicitly.
+- **Role design without a hierarchy.** Seven flat roles, no implication between
+  them, each documented with what it deliberately does *not* grant. Simpler to
+  audit than any policy engine.
+- **The push gates.** Six mechanical checks, each covering a defect class that
+  recurred at least twice, each naming the rule, the files and the repair command.
+- **Prose-debt ratchet over a whole-file gate.** A measured, pragmatic call
+  (3,166 findings across 52 files) that keeps the gate enforceable instead of
+  ornamental.
+- **No `innerHTML`, no `eval`, no `new Function`** anywhere in three packages.
+- **Documentation that matches the code.** `CLAUDE.md`, `docs/current-state.md`
+  and `ROADMAP.md` were accurate everywhere I checked them against source.
 
 ## Open Questions / Assumptions
 
-1. **Deployment topology.** SEC-1's severity depends on whether the API and the
-   SPAs are ever served from one origin. `docker/nginx.conf` serves only static
-   assets, but nothing documents the intended arrangement. Assessed at High on
-   the assumption that a shared origin is possible; if it is architecturally
-   forbidden and documented as such, it is a Medium.
-2. **Trust model for process authors.** SEC-2 is rated High rather than
-   Critical on the assumption that `system:publish` holders are trusted
-   employees, not customers. If a future SaaS mode (Roadmap #24) ever lets a
-   tenant author their own definitions, SSRF becomes Critical and cross-tenant.
-3. **Not executed.** No test run, no build, no live instance was exercised for
-   this review — findings are from reading the code, and each cites the exact
-   location so it can be checked. The prior review's own verification run
-   (1319 pass / 0 fail) was taken as accurate for the tree as it stood on
-   2026-07-29.
-4. **Not reviewed in depth.** `src/engine/transition.ts`, `migration.ts` and
-   `subprocess.ts` were read for their interfaces and their interaction with the
-   outbox, not line by line — the prior review covered them and nothing since
-   has changed them materially. `packages/form-ui` and the SPA component trees
-   were swept for injection patterns only.
-5. **Multi-process deployment.** The login rate limiter is explicitly
-   single-process (`login.ts:31-37`). If any deployment already runs more than
-   one engine process behind a load balancer, SEC-3 is worse than described —
-   the per-email limit divides by the process count.
+1. **SEC-A is reasoned, not executed.** I confirmed no cycle guard exists by
+   search and derived the reachable publish sequence from the schema and the
+   publish checks. Reproduce it against a live database before sizing the fix.
+2. **I did not run the suite.** Per `CLAUDE.md`, a meaningful run needs
+   `DATABASE_URL` and the devcontainer, and a review should not mutate a shared
+   working tree. Findings rest on reading, not on a green or red run. The last
+   recorded measurement (`scripts/gates/skip-floor.txt`, 2026-08-04) is 1,831
+   pass, 1 skip, 0 fail across 111 files.
+3. **No browser check.** SEC-B and SEC-C concern runtime behavior in a real
+   browser. Confirm the CSP in a browser before and after any change, per the
+   project's own manual-check rule.
+4. **Deployment configuration is out of scope.** `docker/`, nginx and the
+   production compose were not audited this pass. SEC-E's first note — whether a
+   production image can inherit `ALLOW_INSECURE_DEV_AUTH` — needs that audit to
+   answer.
+5. **`packages/web` was reviewed for security surface, not for UX or
+   accessibility.** A design-language and accessibility pass against the repo's
+   own `design-language.md` is a separate exercise.
 
 ## Prioritized Action List
 
-Ordered by impact ÷ effort. The first four are a single afternoon. The
-coverage table above says which change now holds each item.
+Ordered by impact divided by effort. The first two are worth more than the rest
+combined.
 
-1. **SEC-1** — add `Content-Disposition: attachment`, `X-Content-Type-Options:
-   nosniff`, and a MIME-token regex on upload. ~10 lines, two files.
-2. **ERR-1** — add `log.error` to `pollForever`'s and `drainOutbox`'s catch
-   blocks; thread a worker name through `pollForever`. ~10 lines.
-3. **SEC-2** — host allowlist plus `redirect: "manual"` in `http.request`. ~15
-   lines, one file, one new environment variable to document.
-4. **SEC-7** — validate `MAX_ATTACHMENT_BYTES` at load, following
-   `parseRetentionDays`. ~5 lines.
-5. **TEST-1** — GitHub Actions workflow with a Postgres 16 service running
-   `bun run check`. One new file; the highest-leverage item on this list over
-   any horizon longer than a week.
-6. **SEC-4** — move the CSP to an nginx response header, add
-   `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`. One config
-   file.
-7. **SEC-6** — gate `/metrics` behind `METRICS_TOKEN` or `ADMIN_ROLE`.
-8. **SEC-5** — check `disabled` during local-token resolution so account
-   disabling takes effect immediately.
-9. **SEC-3** — add a per-IP login bucket, and switch the capacity backstop from
-   deny to LRU eviction. Needs the client IP threaded in, and nginx to normalize
-   `X-Forwarded-For`.
-10. **DEP-1** — Dependabot config and `bun audit` in CI.
-11. **ARCH-1** — change the spec so `NotFoundError` maps to 404, then the code.
-12. **DOC-1** — a deployment runbook enumerating every environment variable,
-    its default, and whether that default is safe.
-13. **ERR-2** — add `log.debug` or drop the level.
-14. **ARCH-2** — introduce an `AttachmentStore` seam before file volume makes
-    the migration expensive. Not urgent; cheap now, costly later.
+1. **Add the CI workflow** (TEST-1). ~1 hour. Closes the highest-value gap and
+   makes every other control in the repository enforceable from the project side.
+2. **Add `.github/dependabot.yml`** (DEP-1). ~10 minutes, once step 1 lands.
+3. **Add a subprocess cycle check at publish, plus a run-time depth cap**
+   (SEC-A). ~half a day. Reproduce first.
+4. **Add a content CSP to `static.ts`** (SEC-B). ~1 hour including a browser
+   check. Make `connect-src` follow `VITE_API_URL`.
+5. **Move login rate-limit state to Postgres** (SEC-D). ~half a day. Until then,
+   document the single-process assumption in the deployment runbook — that part
+   costs minutes.
+6. **Decide on the session-token storage model** (SEC-C). An OpenSpec change, not
+   a patch. Shortening the token lifetime is the cheap interim step.
+7. **Split `src/runtime/api.ts`** (ARCH-A). Opportunistic — do it when a change
+   next lands in that file.
+
+Items 1 through 5 are ordinary OpenSpec changes. Item 6 touches the auth contract
+and the deployment shape, so it wants a design document first.

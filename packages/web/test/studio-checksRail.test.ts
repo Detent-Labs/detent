@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { allChecksClear, groupChecksBySource } from "../src/areas/studio/draft/checksRail.js";
+import { allChecksClear, groupChecksBySource, totalOpenIssueCount } from "../src/areas/studio/draft/checksRail.js";
 import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
 
 function validation(overrides: Partial<ValidationResult>): ValidationResult {
@@ -93,5 +93,32 @@ describe("allChecksClear", () => {
       validation({ issues: [{ entityType: "step", entityId: "s", message: "m", source: "cel" }] }),
     );
     expect(allChecksClear(groups)).toBe(false);
+  });
+});
+
+describe("totalOpenIssueCount", () => {
+  it("counts every open issue across groups", () => {
+    const groups = groupChecksBySource(
+      validation({
+        issues: [
+          { entityType: "step", entityId: "step_a", message: "m1", source: "structural" },
+          { entityType: "step", entityId: "step_a", message: "m2", source: "cel" },
+          { entityType: "step", entityId: "step_a", message: "m3", source: "cel" },
+        ],
+      }),
+    );
+    expect(totalOpenIssueCount(groups)).toEqual({ kind: "count", count: 3 });
+  });
+
+  it("is clear when every group ran and holds no issue", () => {
+    const groups = groupChecksBySource(validation({}));
+    expect(totalOpenIssueCount(groups)).toEqual({ kind: "clear" });
+  });
+
+  it("is held-back when any group holds back, never a plain count of zero", () => {
+    const groups = groupChecksBySource(
+      validation({ zodValid: false, structurallyValid: false, structuralChecked: false, issues: [] }),
+    );
+    expect(totalOpenIssueCount(groups)).toEqual({ kind: "held-back" });
   });
 });

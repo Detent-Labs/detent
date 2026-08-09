@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { describeError } from "../src/areas/app/errors.js";
 import { parseErrorBody } from "../src/api/client.js";
 import { describeError as describeAdminError } from "../src/areas/admin/errors.js";
+import { describeError as describeStudioError } from "../src/areas/studio/errors.js";
 
 describe("describeError", () => {
   it("maps already-claimed to refresh-and-remove", () => {
@@ -96,5 +97,34 @@ describe("a server error type maps through every layer", () => {
     const parsed = await parse(500, "type-from-the-future", "x");
     expect(parsed.type).toBe("internal");
     expect(describeAdminError(parsed, 500)).toBe("The server hit an error. Try again.");
+  });
+});
+
+/**
+ * `request()` (`api/client.ts`) tags a fetch that never reached the server as
+ * `{ type: "network" }`, distinct on purpose from `"internal"` (the server
+ * answering with a failure). Each area's `describeError` predates that split
+ * and has no `case "network"`, so it fell to the generic fallback instead of
+ * the dedicated "could not reach the server" text every catalog already
+ * carries — the same defect class as `self-role-strip`/`email-in-use` above,
+ * just against a client-originated union member instead of a server one.
+ */
+describe("a network failure keeps its own message, not the generic fallback", () => {
+  it("studio: does not collapse network into the generic default", () => {
+    const text = describeStudioError({ type: "network", message: "fetch failed" });
+    expect(text).not.toBe("Something went wrong.");
+    expect(text).toContain("reach the server");
+  });
+
+  it("app: does not collapse network into the generic fallback", () => {
+    const described = describeError({ type: "network", message: "fetch failed" }, "en");
+    expect(described.message).not.toBe("Something went wrong.");
+    expect(described.message).toContain("reach the server");
+  });
+
+  it("admin: does not collapse network into the generic fallback", () => {
+    const text = describeAdminError({ type: "network", message: "fetch failed" }, undefined);
+    expect(text).not.toBe("Something went wrong.");
+    expect(text).toContain("reach the server");
   });
 });

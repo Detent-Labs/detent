@@ -4,8 +4,7 @@ import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { useDraft } from "../draft/store";
 import { t, type TranslationKey } from "../catalog.js";
-import { addToDraftArray, updateInDraftArray } from "../draft/draft-array-crud";
-import { newStep, type StepKind } from "../draft/createStep";
+import { updateInDraftArray } from "../draft/draft-array-crud";
 import { performedByFor, performedByPatch, type PerformedBy } from "../draft/performedBy";
 import { ActionListEditor } from "./ActionListEditor";
 import { SubprocessSpecEditor } from "./SubprocessSpecEditor";
@@ -15,8 +14,9 @@ import { PathsPanel } from "./PathsPanel";
 import { TimersPanel } from "./TimersPanel";
 import { IssueList, NotCheckedBadge } from "./shared/IssueList";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput";
+import { ChecksRail } from "./ChecksRail.js";
 import { parseChildProcessJson } from "../draft/io";
-import { missingTranslationWarning, seedLocalizedText } from "../draft/localized-text";
+import { missingTranslationWarning } from "../draft/localized-text";
 import { assignmentWarning } from "./assignmentWarningLogic.js";
 import { stepIssueCount } from "../draft/panel-rail";
 import { openSectionForSelection } from "./stepInspectorLogic";
@@ -142,26 +142,6 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
     }
   };
 
-  /** One creation path (task 2.2/2.3): the no-selection state's own button
-   * calls this with no argument (a plain participant step, today's
-   * behavior); the palette (`EditorArea`) calls the underlying `newStep`
-   * directly with its own drop point, since it also needs to place the
-   * result on the canvas. */
-  const addStep = (kind: StepKind = "task") => {
-    const created = newStep(kind, seedLocalizedText(contentLocale));
-    addToDraftArray(
-      mutate,
-      (d) => {
-        d.workflow ??= {};
-        d.workflow.steps ??= [];
-        d.workflow.initialStep ??= created.id;
-        return d.workflow.steps;
-      },
-      created,
-    );
-    onSelectStep(created.id);
-  };
-
   const removeStep = (id: string | undefined) => {
     mutate((d) => {
       if (!d.workflow?.steps) return;
@@ -176,12 +156,17 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
   };
 
   if (!step) {
+    // Only reachable when a selection points at a step the draft no longer
+    // holds — the third column shows the checks rail, not this component,
+    // whenever nothing is selected (studio-canvas: "the inspector ... SHALL
+    // NOT show ... at all in that state"). The no-selection "+ Add step"
+    // button that used to live here is gone; the rail's Step entry
+    // (EditRail, design.md: "the palette's Step entry stays the one
+    // always-reachable way to add the first step") is the one remaining
+    // always-reachable way to add a step.
     return (
       <div className="steps-panel steps-panel-empty">
         <p className="steps-panel-empty-copy">{t("stepSections.noSelection")}</p>
-        <button type="button" className="btn btn-secondary" onClick={() => addStep()}>
-          {t("stepSections.addStep")}
-        </button>
       </div>
     );
   }
@@ -428,6 +413,13 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
       <button type="button" className="btn btn-secondary" onClick={() => removeStep(step.id)}>
         {t("steps.removeStep")}
       </button>
+
+      {/* Docked at the inspector's bottom edge whenever a step or a path is
+          selected (studio-checks-rail's collapsed-summary requirement).
+          `collapsed` reads the same `validation.issues[]` traversal the
+          standalone, expanded rail beside the canvas reads — one counting
+          path, per design.md. */}
+      <ChecksRail validation={validation} collapsed />
     </div>
   );
 }

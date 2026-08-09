@@ -1,5 +1,8 @@
+import { readFileSync } from "node:fs";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+
+const appVersion = readFileSync(new URL("../../VERSION", import.meta.url), "utf8").trim();
 
 /**
  * Production-only: `@vitejs/plugin-react` injects the react-refresh preamble
@@ -41,4 +44,5 @@ export function contentSecurityPolicy(): Plugin {
 export default defineConfig({
   plugins: [react(), contentSecurityPolicy()],
   server: { port: 5173, strictPort: true },
+  define: { __APP_VERSION__: JSON.stringify(appVersion) },
 });

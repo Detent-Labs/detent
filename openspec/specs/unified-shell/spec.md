@@ -236,6 +236,43 @@ as a label in the header.
   `/admin` and opens the account menu
 - **THEN** the switcher lists the studio area and not the admin area
 
+### Requirement: The header names the signed-in actor
+
+The shell header SHALL render the signed-in actor's identity as text
+immediately to the left of the account button. The account button SHALL
+keep its own label unchanged.
+
+The shell SHALL source the text from the session's `displayName`. Where
+`displayName` is unset, the shell SHALL fall back to the session's
+`actorId`. Two cases leave `displayName` unset. One is a federated actor,
+whose account carries no `displayName`. The other is the window between
+login and the `GET /account/me` hydration call resolving.
+
+The shell SHALL render a set `displayName` in the body type face. It SHALL
+render an `actorId` fallback in the mono type face.
+
+#### Scenario: A hydrated actor's name shows beside the account button
+
+- **WHEN** the signed-in actor's session carries a `displayName`
+- **THEN** the header shows that name to the left of the account button, in
+  the body face
+
+#### Scenario: A federated actor's id shows beside the account button
+
+- **WHEN** the signed-in actor holds a federated account, so the session
+  never carries a `displayName`
+- **THEN** the header shows the actor's `actorId` to the left of the account
+  button, in the mono face
+
+#### Scenario: The pre-hydration window shows the actor id
+
+- **WHEN** an actor has logged in and the `GET /account/me` hydration call
+  has not yet resolved
+- **THEN** the header shows the actor's `actorId` to the left of the account
+  button
+- **AND** the header switches to the hydrated `displayName` once hydration
+  resolves
+
 ### Requirement: Each area is its own lazily-loaded chunk
 
 Each area's root component SHALL be loaded through a dynamic import, so the
@@ -424,3 +461,28 @@ SHALL leave it alone. A language chosen on this browser stays chosen.
 - **WHEN** an actor whose account holds `locale: "de"` signs in on a browser
   whose `localStorage` already holds `"en"`
 - **THEN** the interface stays English, and `localStorage` still holds `"en"`
+
+### Requirement: The account menu shows the running build's version
+
+The account menu SHALL show the build version as a bare mono-face line
+below the Logout entry. A hairline rule SHALL separate the two. The line
+SHALL carry no label. It SHALL show for every signed-in actor, regardless
+of role.
+
+The version string SHALL be `Major.Minor.Revision.BuildHash`, read from the
+repository's `VERSION` file at `packages/web` build time. It stays fixed
+for the life of that build. The line SHALL NOT carry `role="menuitem"`: it
+names no action. It sits outside the menu's interactive semantics even
+though it renders inside the same popup.
+
+#### Scenario: Any signed-in actor sees the build version
+
+- **WHEN** a signed-in actor holding any role opens the account menu
+- **THEN** the menu shows a mono-face line below Logout carrying the
+  build's `Major.Minor.Revision.BuildHash` string
+- **AND** that line carries no `role="menuitem"`
+
+#### Scenario: The version line survives a rebuild
+
+- **WHEN** `packages/web` is rebuilt against a different `VERSION` file
+- **THEN** the account menu's version line shows the new build's string

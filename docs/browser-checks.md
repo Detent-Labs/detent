@@ -111,15 +111,28 @@ set to dark (`prefers-color-scheme: dark`). Work through every component
 `studio-canvas-first-structure-editor` and `studio-canvas-first-form-builder`
 added:
 
-- **Checks rail**: default state, each source group (zod, structural, cel,
-  registry, duration). Check the held-back state too (a later group
-  waiting on an earlier one), and the all-clear state.
-- **Palette**: default state, drag-hover state (the ghost that follows the
-  pointer during a drag). Check each of Step/Subprocess/End.
-- **Selection-driven inspector**: no-selection state. Check a selected
-  step's sections, including its "Developer view" disclosure (expanded
-  and collapsed). Check a selected path's sections too, including its own
-  "Developer view" disclosure (raw CEL, expanded and collapsed).
+- **Merged rail** (`EditRail`, `studio-edit-header-cleanup`): the "Add to
+  canvas" group's default state. Check its drag-hover state too (the
+  ghost that follows the pointer during a drag), for each of
+  Step/Subprocess/End. The "Process" group's three rows (Fields, Data
+  sources, Contract), each showing its own count.
+- **Checks rail, beside the canvas** (nothing selected): the expanded
+  grouped-list state, each source group (zod, structural, cel, registry,
+  duration). Check the held-back state too (a later group waiting on an
+  earlier one), and the all-clear state.
+- **Checks rail, docked in the inspector** (`studio-edit-header-cleanup`):
+  a step or a path selected. Check the collapsed one-line summary at the
+  inspector's bottom edge. It carries three states: a count, "no count"
+  when clear, the held-back indicator. Expand it in place. The grouped
+  list beneath must match the standalone rail's own states above. It
+  draws no border or padding of its own, so it never doubles the
+  inspector's box.
+- **Selection-driven inspector**: a selected step's sections, including
+  its "Developer view" disclosure (expanded and collapsed). A selected
+  path's sections too, including its own "Developer view" disclosure (raw
+  CEL, expanded and collapsed). The no-selection state is the checks rail
+  beside the canvas, covered above: the inspector itself never renders
+  with nothing selected (`studio-edit-header-cleanup`).
 - **Canvas-edge guard label**: a plain-English summary and a raw-CEL
   fallback.
 - **Process-identity header bar**: clean, dirty, and just-published states.
@@ -210,6 +223,26 @@ canvas through `.canvas-wrap`.
 A synthetic mouse drag does not exercise this. The palette listens for pointer
 events, and raw `mousedown`/`mousemove` leaves it inert. Use a real drag, or a
 tool that dispatches pointer events.
+
+Source: `fix-canvas-pan-dead-zone` tasks 3.1, 3.3, 3.4.
+
+After a fit has zoomed out, start a drag from the empty margin it leaves
+behind. Stay away from the graph and away from "Fit to view". Pass: the drag
+pans the graph.
+
+Scroll the wheel while pointing at that same margin. Pass: the graph zooms.
+Scroll the wheel while pointing at "Fit to view" itself. Pass: neither pan
+nor zoom happens.
+
+Panzoom's own pan-drag, and this app's wheel listener, used to bind directly
+to the SVG element. That is the same element the palette-drop defect above
+already names. A zoomed-out canvas left most of the wrap outside that
+element's own box. A drag or scroll started in the margin did nothing. That
+is the same defect, for a different gesture.
+
+`packages/web/test/studio-canvas-fit.test.ts` cannot see this either, for
+the same reason it cannot see the palette-drop defect. It asserts numbers,
+not which DOM element a pointer event reaches.
 
 ### Users screen: the manager control past one page
 

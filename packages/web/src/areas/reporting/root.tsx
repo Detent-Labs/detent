@@ -70,6 +70,7 @@ export function ReportingArea({ session, locale, localPath, go, onLocaleChange, 
     <Chrome
       area="reporting"
       roles={session.roles}
+      session={session}
       locale={locale}
       onLocaleChange={onLocaleChange}
       onLogout={onLogout}

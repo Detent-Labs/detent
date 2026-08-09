@@ -88,6 +88,7 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
     <Chrome
       area="studio"
       roles={session.roles}
+      session={session}
       locale={locale}
       onLocaleChange={onLocaleChange}
       onLogout={onLogout}

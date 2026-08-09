@@ -8,7 +8,7 @@ import { describeCaughtError } from "../errors.js";
 import type { Draft } from "../draft/types.js";
 import type { PublishResult } from "../api/types.js";
 
-interface DraftToolbarProps {
+export interface DraftToolbarProps {
   processId: string;
   token: string;
   saveState: DraftSaveState;
@@ -31,13 +31,28 @@ interface DraftToolbarProps {
   onUnauthorized: () => void;
 }
 
+/** What `useDraftToolbarActions` exposes: the four calls a trigger (a
+ * button, a menu item) invokes, plus the pending/error state a presentation
+ * reads to decide what to show. `saveState.conflict` stays the caller's own
+ * read (it already owns `saveState`) rather than duplicated here. */
+export interface DraftToolbarActions {
+  saving: boolean;
+  publishing: boolean;
+  error: string | null;
+  save: () => void;
+  discard: () => void;
+  publish: () => void;
+  reload: () => void;
+}
+
 /**
- * Replaces the editor's FileToolbar: explicit save/discard against the draft
- * routes instead of file I/O. Live validation stays exactly what it is and
- * never blocks saving (studio-app spec: "the save action remains available
- * and succeeds" for an invalid draft).
+ * The save/discard/publish logic `DraftToolbar` has always owned — pending
+ * flags, the network calls, the 401/conflict/confirm() handling — extracted
+ * so `ProcessHeaderBar`'s `⋮` menu can call it too, per design.md's
+ * "DraftToolbar keeps its logic. ProcessHeaderBar renders the buttons.".
+ * This is the one place the logic lives; neither caller reimplements it.
  */
-export function DraftToolbar({
+export function useDraftToolbarActions({
   processId,
   token,
   saveState,
@@ -45,11 +60,10 @@ export function DraftToolbar({
   savedBody,
   onSavedBodyChange,
   onSaved,
-  publishResult,
   onPublishResult,
   onDiscarded,
   onUnauthorized,
-}: DraftToolbarProps) {
+}: DraftToolbarProps): DraftToolbarActions {
   const { draft, replace } = useDraft();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,32 +148,13 @@ export function DraftToolbar({
       onDiscarded();
     });
 
-  return (
-    <fieldset className="draft-toolbar">
-      <legend>{t("draftToolbar.legend")}</legend>
-      <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => void save()}>
-        {saving ? t("draftToolbar.saving") : t("draftToolbar.save")}
-      </button>
-      <button type="button" className="btn btn-secondary btn-destructive" onClick={() => void discard()}>
-        {t("draftToolbar.discard")}
-      </button>
-      <button type="button" className="btn btn-primary" disabled={publishing} onClick={() => void publish()}>
-        {publishing ? t("draftToolbar.publishing") : t("draftToolbar.publish")}
-      </button>
-      {error && <p className="studio-error">{error}</p>}
-      {publishResult && (
-        <p className="studio-publish-result">
-          {t("draftToolbar.publishSuccess")} v{publishResult.version} ({publishResult.definitionHash.slice(0, 12)})
-        </p>
-      )}
-      {saveState.conflict && (
-        <p className="studio-conflict">
-          {t("draftToolbar.conflictMessage")}{" "}
-          <button type="button" className="btn btn-secondary" onClick={() => void reload()}>
-            {t("draftToolbar.conflictReload")}
-          </button>
-        </p>
-      )}
-    </fieldset>
-  );
+  return {
+    saving,
+    publishing,
+    error,
+    save: () => void save(),
+    discard: () => void discard(),
+    publish: () => void publish(),
+    reload: () => void reload(),
+  };
 }

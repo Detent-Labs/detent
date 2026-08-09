@@ -43,6 +43,7 @@ export function AppArea({ session, locale, localPath, go, onUnauthorized, onLoca
     <Chrome
       area="app"
       roles={session.roles}
+      session={session}
       locale={locale}
       onLocaleChange={onLocaleChange}
       onLogout={onLogout}

@@ -32,6 +32,8 @@ export function describeError(error: Exclude<ClientError, { type: "validation" }
       // cancel instance 'y'") — not end-user copy, so this is the one case
       // where the friendly string wins over the server's message outright.
       return { kind: "explain", message: t(locale, "error.authorization") };
+    case "network":
+      return { kind: "explain", message: t(locale, "error.network") };
     case "not-assigned":
     case "guard-refused":
     case "actor-resolution":
@@ -58,9 +60,8 @@ export function describeError(error: Exclude<ClientError, { type: "validation" }
  */
 export function describeCaughtError(err: unknown, locale: UiLocale): string {
   if (err instanceof AppClientError) {
-    if (err.error.type === "internal") {
-      return err.status === undefined ? t(locale, "error.network") : t(locale, "error.serverError");
-    }
+    if (err.error.type === "network") return t(locale, "error.network");
+    if (err.error.type === "internal") return t(locale, "error.serverError");
     if (err.error.type === "authorization") return t(locale, "error.authorization");
   }
   return t(locale, "error.generic");

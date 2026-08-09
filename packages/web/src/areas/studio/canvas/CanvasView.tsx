@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import Panzoom, { type PanzoomObject } from "@panzoom/panzoom";
 import { useDraft } from "../draft/store";
 import { updateInDraftArray } from "../draft/draft-array-crud";
@@ -49,22 +49,50 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
   // The toolbar overlays the canvas, so `fitToView` measures it rather than
   // framing content underneath it.
   const toolbarRef = useRef<HTMLDivElement | null>(null);
+  // Latches after the first successful auto-fit so the view then stays under
+  // the author's own pan/zoom. A ref, not a `[]` effect dep: a brand-new
+  // draft mounts with zero steps, and `nodePositions` only turns non-empty
+  // once the first step lands.
+  const hasFitOnLoad = useRef(false);
 
-  useEffect(() => {
+  // Layout, not passive: the auto-fit effect below reads `panzoomRef` and
+  // must find it already set. React always runs every layout effect before
+  // any passive effect on mount, so that ordering holds only because this
+  // effect is a layout effect too — a passive one here would still run
+  // after the auto-fit effect's own useLayoutEffect and leave it reading a
+  // null ref on the one render that matters.
+  useLayoutEffect(() => {
     if (!svgRef.current) return;
     const el = svgRef.current;
-    // Panzoom binds its own down-handler directly on `el` (native
-    // addEventListener), which runs and calls stopPropagation() *before*
+    const wrap = el.parentElement;
+    // Panzoom's own down-handler binds to `.canvas-wrap` (`canvas: true`),
+    // not to `el`: a non-identity transform moves `el`'s own hit-testable
+    // box away from the visible canvas, while `.canvas-wrap` never
+    // transforms and always covers it (design.md - Decisions). Native
+    // addEventListener there runs and calls stopPropagation() *before*
     // React's synthetic event system — bound higher up the tree — ever sees
     // the event, so a React-level e.stopPropagation() inside a node/handle
     // handler is too late to stop it. `panzoom-exclude` (its own default
     // exclude class) is the sanctioned way to opt an element out of
-    // Panzoom's own handling instead — every node and edge group carries it.
-    const panzoom = Panzoom(el, { minScale: MIN_SCALE, maxScale: MAX_SCALE });
+    // Panzoom's own handling instead — every node and edge group carries
+    // it, and so does `.canvas-toolbar` now that `.canvas-wrap` is its
+    // ancestor too. A future control added over the canvas needs the same
+    // class, plus the wheel guard's own exclusion below.
+    const panzoom = Panzoom(el, { minScale: MIN_SCALE, maxScale: MAX_SCALE, canvas: true });
     panzoomRef.current = panzoom;
-    el.addEventListener("wheel", panzoom.zoomWithWheel);
+    // The manual `wheel` listener binds to the same `.canvas-wrap` element,
+    // for the same reason. `zoomWithWheel` carries no `panzoom-exclude`
+    // check of its own, so the toolbar needs an explicit guard here — by
+    // class name, not a general `.closest(".panzoom-exclude")` walk, since
+    // every node and edge already carries that class and already receives
+    // wheel-zoom today (design.md - Decisions).
+    const onWheel = (e: WheelEvent) => {
+      if ((e.target as Element).closest(".canvas-toolbar")) return;
+      panzoom.zoomWithWheel(e);
+    };
+    wrap?.addEventListener("wheel", onWheel);
     return () => {
-      el.removeEventListener("wheel", panzoom.zoomWithWheel);
+      wrap?.removeEventListener("wheel", onWheel);
       panzoom.destroy();
       panzoomRef.current = null;
     };
@@ -151,6 +179,18 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
     panzoom.zoom(fit.scale, { animate: false });
     panzoom.pan(fit.x, fit.y, { animate: false });
   };
+
+  // Centers the graph on open, so an author never has to click "Fit to
+  // view" just to see what they opened. Layout, not passive, effect:
+  // `fitToView` reads `clientWidth`/`getBBox()` off the just-committed DOM,
+  // and running before paint means the very first frame is already framed,
+  // instead of flashing the raw top-left layout first.
+  useLayoutEffect(() => {
+    if (hasFitOnLoad.current || nodePositions.length === 0) return;
+    hasFitOnLoad.current = true;
+    fitToView();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodePositions]);
 
   // Pointer capture keeps a fast drag tracking even if the pointer leaves
   // the element; failure to acquire it (e.g. an already-released pointer)
@@ -279,7 +319,7 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
 
   return (
     <div className="canvas-wrap">
-      <div className="canvas-toolbar" ref={toolbarRef}>
+      <div className="canvas-toolbar panzoom-exclude" ref={toolbarRef}>
         <button type="button" className="btn btn-secondary" onClick={fitToView}>
           {t("canvas.fitToView")}
         </button>

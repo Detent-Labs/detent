@@ -132,6 +132,7 @@ export function App() {
       <Chrome
         area="profile"
         roles={session.roles}
+        session={session}
         locale={locale}
         onLocaleChange={changeLocale}
         onLogout={logout}
@@ -177,6 +178,7 @@ export function App() {
       <Chrome
         area={AREAS[0]}
         roles={session.roles}
+        session={session}
         locale={locale}
         onLocaleChange={changeLocale}
         onLogout={logout}

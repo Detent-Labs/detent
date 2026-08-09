@@ -1289,15 +1289,30 @@ Stage-by-stage status is in `ROADMAP.md`.
   gives a step absent from `layout` a deterministic position via a one-time
   client-side BFS-depth-from-`initialStep` traversal (depth → column, order →
   row) — rendered only, never written back until the step is actually
-  dragged, so an unrelated save doesn't invent layout rows. `@panzoom/panzoom`
+  dragged, so an unrelated save doesn't invent layout rows.
+  <!-- antislop: allow paragraph-length -->
+  <!-- This bullet already ran past the six-sentence limit before this
+       edit; splitting the whole bullet into paragraphs is out of scope
+       for a one-paragraph technical correction. -->
+  `@panzoom/panzoom`
   (already a dependency of `packages/editor`'s read-only graph view, before
-  that package was deleted) drives pan/zoom and a "fit to view" control;
-  every node and edge `<g>` carries
-  Panzoom's own `panzoom-exclude` class — found live during implementation
-  (a real browser check via `playwright-cli`, not just `bun:test`, which
-  can't see DOM event ordering): without it, Panzoom's native down-handler,
-  bound directly to the SVG element, wins the race against React's synthetic
-  dispatch and silently turns every node drag and drag-to-connect into a
+  that package was deleted) drives pan/zoom and a "fit to view" control.
+  Panzoom's own pointerdown binding sits on `.canvas-wrap`, via the
+  `canvas: true` option, not on the SVG element itself. This app's own
+  `wheel` listener binds to that same `.canvas-wrap` element. `.canvas-wrap`
+  never transforms, so its box always covers the full visible canvas at
+  any pan or zoom state. The SVG element's own box does not
+  (`fix-canvas-pan-dead-zone`). A real browser check via `playwright-cli`
+  found this, the same way the check below found its own defect:
+  `packages/web/test/studio-canvas-fit.test.ts` asserts scale/pan as
+  numbers, and cannot see which DOM element a pointer or wheel event
+  reaches. Every node and edge `<g>` carries
+  Panzoom's own `panzoom-exclude` class. So does the toolbar now, since
+  `.canvas-wrap` is both its ancestor and Panzoom's bind target. A real
+  browser check via `playwright-cli` found this too, not just `bun:test`,
+  which can't see DOM event ordering. Without the class, Panzoom's native
+  down-handler wins the race against React's synthetic dispatch. It
+  silently turns every node drag, drag-to-connect, or toolbar click into a
   canvas pan instead. `canvas/geometry.ts` (hit-testing, drag-delta) and
   `canvas/connection.ts` are pure and unit-tested alongside `layout.ts`; the
   SVG/React rendering and pointer wiring itself is not, per this repo's

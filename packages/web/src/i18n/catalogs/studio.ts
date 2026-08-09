@@ -259,6 +259,10 @@ export const en = {
   "headerBar.saved": "Saved",
   "headerBar.lastSaved": "Last saved",
   "headerBar.published": "Published",
+  "headerBar.menuTrigger": "More actions",
+  "headerBar.menuGroupDraft": "Process, saved with the draft",
+  "headerBar.menuGroupSession": "This session only",
+  "headerBar.registryCaption": "This registry choice is never written to the draft.",
 
   "checksRail.heading": "Checks",
   "checksRail.heldBack": "Held back until earlier checks pass.",

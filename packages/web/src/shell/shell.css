@@ -52,9 +52,27 @@
   background: color-mix(in srgb, var(--color-text) 7%, transparent);
 }
 
+.shell-account-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.shell-account-name {
+  font-family: var(--font-body);
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-account-name-id {
+  font-family: var(--font-mono);
+}
+
 .shell-account {
   position: relative;
-  margin-left: auto;
 }
 
 .shell-menu {
@@ -101,6 +119,14 @@
 }
 
 .shell-menu-logout {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-2);
+}
+
+.shell-menu-version {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
   border-top: 1px solid var(--color-border);
   padding-top: var(--space-2);
 }

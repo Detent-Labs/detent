@@ -291,24 +291,25 @@ own sections and their entity counts. Those sections are identity,
 assignment, paths, timers, actions, subprocess spec, and view. See the
 `studio-canvas` capability for how choosing an entry behaves.
 
-The process header SHALL stay on the Structure surface, above the
-editing well. It carries `baseLocale`, and this capability requires an
-author to declare a non-English base locale without leaving that
-surface. The shared modal SHALL NOT hold it.
+The process header's `⋮` overflow menu SHALL carry `baseLocale`. This
+capability requires an author to declare a non-English base locale
+without leaving the Structure surface. The shared modal SHALL NOT hold
+it.
 
-Three links SHALL sit at the top of the Structure surface: Fields, Data
-sources, Contract. Each SHALL open a shared modal dialog straight to
-its own view. These three views cover the whole process, not one step.
-The links stay reachable whether or not the author has selected a step
-on the canvas.
+Three links SHALL sit in the canvas edit screen's rail, under a Process
+heading: Fields, Data sources, Contract. See the `studio-canvas`
+capability's layout requirement for the rail. Each link SHALL open a
+shared modal dialog straight to its own view. These three views cover
+the whole process, not one step. The links stay reachable whether or
+not the author has selected a step on the canvas.
 
 The links SHALL belong to the Structure surface alone. The screen SHALL
 NOT offer them while the JSON surface is active. All three views mutate
 the draft body, and the `studio-json-view` capability requires that no
 draft-body-mutating control stays reachable there.
 
-This change touches only where the screen mounts each panel and how an
-author reaches it. What each panel validates, mutates, or persists
+This proposal touches only where the screen mounts each panel and how
+an author reaches it. What each panel validates, mutates, or persists
 stays the same.
 
 Every inline missing-translation warning SHALL survive the move. Six
@@ -368,7 +369,7 @@ success, the screen SHALL confirm the new version number and
 #### Scenario: A Structure-surface link opens the shared modal
 
 - **WHEN** the developer clicks the Fields, Data sources, or Contract
-  link at the top of the Structure surface
+  link in the rail's Process section
 - **THEN** the shared modal dialog opens to that view, and the canvas
   stays visible behind the dimmed backdrop
 
@@ -400,18 +401,18 @@ success, the screen SHALL confirm the new version number and
 
 ### Requirement: The process header declares the process's base locale
 
-The process header SHALL carry a control that reads and writes the process's
-`baseLocale`. An author SHALL be able to declare a non-English base locale
-without leaving the structural surface.
+The process header's `⋮` overflow menu SHALL carry a control that reads
+and writes the process's `baseLocale`. An author SHALL be able to
+declare a non-English base locale without leaving the Structure surface.
 
 `baseLocale` decides which entry of every `LocalizedText` in the body is
 mandatory, and publish requires it. Leaving it to the JSON surface alone made
 a process authored only through the structural panels unpublishable.
 
-The control SHALL write the typed value through, unvalidated. Live validation
-reports a value that is not a well-formed locale code. That is the route
-every other malformed authored value takes. The header SHALL NOT reject or
-correct the keystroke.
+The control SHALL write the typed value through, unvalidated. Live
+validation reports a value that is not a well-formed locale code. That
+is the route every other malformed authored value takes. The menu SHALL
+NOT reject or correct the keystroke.
 
 When the typed value is a well-formed locale code, the studio SHALL also move
 the edited content locale to it.
@@ -428,8 +429,9 @@ locale key. One character typed into any text field is enough.
 
 #### Scenario: The header shows the draft's declared base locale
 
-- **WHEN** a draft declaring `baseLocale: "de"` is loaded into the edit screen
-- **THEN** the process header's base-locale control shows `de`
+- **WHEN** the edit screen loads a draft declaring `baseLocale: "de"`
+- **THEN** opening the process header's `⋮` menu shows a base-locale
+  control reading `de`
 
 #### Scenario: Declaring a base locale moves the edited content locale
 
@@ -450,12 +452,12 @@ locale key. One character typed into any text field is enough.
 - **THEN** live validation reports a missing base-locale entry for every
   `LocalizedText` in the body that carries no `de` entry
 
-#### Scenario: A malformed base locale reports as a validation error
+#### Scenario: A malformed base locale reports as a validation issue
 
-- **WHEN** an author types a value into the base-locale control that is not a
-  well-formed locale code
-- **THEN** the draft body carries that value, and live validation reports the
-  error against `baseLocale`
+- **WHEN** an author types a value into the base-locale control that is
+  not a well-formed locale code
+- **THEN** the draft body carries that value, and live validation
+  reports the issue against `baseLocale`
 
 ### Requirement: A save conflict is surfaced and resolved by reloading, never merged
 

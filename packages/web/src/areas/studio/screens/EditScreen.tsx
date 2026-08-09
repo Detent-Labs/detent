@@ -1,40 +1,27 @@
 import { useCallback, useEffect, useReducer, useState } from "react";
 import { DraftProvider, useDraft } from "../draft/store.js";
 import { draftFields } from "../draft/fields.js";
-import { resolveBaseLocaleChange } from "./processHeaderLogic.js";
 import type { Draft } from "../draft/types.js";
-import { t, type TranslationKey } from "../catalog.js";
+import { t } from "../catalog.js";
 import { StepsPanel } from "../panels/StepsPanel.js";
-import { EditPanelsModal, PANEL_VIEWS, type PanelView } from "../panels/EditPanelsModal.js";
-import { RegistryPanel } from "../panels/RegistryPanel.js";
-import { DraftToolbar } from "../panels/DraftToolbar.js";
+import { EditPanelsModal, type PanelView } from "../panels/EditPanelsModal.js";
+import { useDraftToolbarActions } from "../panels/DraftToolbar.js";
 import { ProcessHeaderBar } from "../panels/ProcessHeaderBar.js";
 import { ChecksRail } from "../panels/ChecksRail.js";
-import { IssueList } from "../panels/shared/IssueList.js";
-import { LocalizedTextInput } from "../panels/shared/LocalizedTextInput.js";
-import { missingTranslationWarning, resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
-import { ContentLocaleSwitcher } from "../panels/shared/ContentLocaleSwitcher.js";
+import { seedLocalizedText } from "../draft/localized-text";
 import { getDraft, StudioClientError } from "../api/client.js";
 import type { DraftRecord, PublishResult } from "../api/types.js";
 import type { Route } from "../routing.js";
 import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
 import { savedBodyReducer, initialSavedBody, isDirty } from "./draftToolbarState.js";
 import { CanvasView } from "../canvas/CanvasView.js";
-import { StepPalette } from "../canvas/StepPalette.js";
+import { EditRail } from "../canvas/EditRail.js";
 import { svgPointFromClient, type Point } from "../canvas/geometry.js";
 import { newStep, type StepKind } from "../draft/createStep.js";
 import { addToDraftArray } from "../draft/draft-array-crud.js";
 import { JsonView } from "../panels/JsonView.js";
 import { describeCaughtError } from "../errors.js";
 import { FormEditorScreen } from "./FormEditorScreen.js";
-
-/** The three links read shorter than the panels' own headings: they name a
- * destination, not the editor they open. */
-const PANEL_LINK_LABEL: Record<PanelView, TranslationKey> = {
-  fields: "editPanels.linkFields",
-  dataSources: "editPanels.linkDataSources",
-  contract: "editPanels.linkContract",
-};
 
 interface EditScreenProps {
   processId: string;
@@ -47,64 +34,6 @@ interface EditScreenProps {
   onUnauthorized: () => void;
 }
 
-function ProcessHeader() {
-  const { draft, mutate, contentLocale, setContentLocale } = useDraft();
-
-  /** Both writes are unconditional: `resolveBaseLocaleChange` owns every
-   * decision, so this wiring carries no branch to get wrong (and re-setting
-   * the content locale to its current value is a React bail-out). */
-  const changeBaseLocale = (typed: string) => {
-    const change = resolveBaseLocaleChange(typed, contentLocale);
-    mutate((d) => {
-      d.baseLocale = change.baseLocale;
-    });
-    setContentLocale(change.contentLocale);
-  };
-
-  const labelWarning = missingTranslationWarning(draft.label, contentLocale, draft.baseLocale);
-
-  return (
-    <fieldset className="process-header">
-      <legend>{t("app.processLegend")}</legend>
-      <label>
-        key
-        <input
-          type="text"
-          value={draft.key ?? ""}
-          onChange={(e) =>
-            mutate((d) => {
-              d.key = e.target.value;
-            })
-          }
-        />
-      </label>
-      {/* Before `label`: baseLocale decides which entry of every LocalizedText
-          below it is mandatory, so the declaration precedes the first
-          localized value it governs. */}
-      <label>
-        baseLocale
-        <input type="text" value={draft.baseLocale ?? ""} onChange={(e) => changeBaseLocale(e.target.value)} />
-      </label>
-      <label>
-        label
-        <LocalizedTextInput
-          value={draft.label}
-          onChange={(next) =>
-            mutate((d) => {
-              d.label = next;
-            })
-          }
-        />
-      </label>
-      {/* Sibling of the label, never nested inside it: a <label> takes
-          phrasing content, and the design language puts a field's own
-          messages beside the label for the same reason. */}
-      {labelWarning && <p className="studio-warning">{labelWarning}</p>}
-      <IssueList entityId="process" />
-    </fieldset>
-  );
-}
-
 interface EditorAreaProps {
   processId: string;
   formStepId?: string;
@@ -115,7 +44,12 @@ interface EditorAreaProps {
   onUnauthorized: () => void;
 }
 
-/** Rendered inside DraftProvider, so it — and DraftToolbar, its child — can read/replace the Draft via useDraft(). */
+/** Rendered inside DraftProvider, so it can read/replace the Draft via
+ * useDraft() — and pass that access down to every panel it mounts, `EditRail`
+ * and `StepsPanel` included. `useDraftToolbarActions` (below) is the one
+ * remaining direct consumer of `DraftToolbarProps`; `DraftToolbar` itself no
+ * longer mounts here (design.md: "DraftToolbar keeps its logic.
+ * ProcessHeaderBar renders the buttons."). */
 function EditorArea({ processId, formStepId, token, initialRevision, initialLayout, navigate, onUnauthorized }: EditorAreaProps) {
   const { draft, mutate, validation, replace, contentLocale } = useDraft();
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
@@ -159,9 +93,9 @@ function EditorArea({ processId, formStepId, token, initialRevision, initialLayo
     setSelectedPathId(pathId);
   };
 
-  /** The palette's own drag-to-place (task 2.3), through the same
-   * newStep/addToDraftArray creation path `StepsPanel`'s "+ Add step" button
-   * calls. Screen coordinates in, since the palette holds no canvas
+  /** The rail's own drag-to-place (task 2.3), through the same `newStep`/
+   * `addToDraftArray` creation path every step-creating control in this
+   * screen shares. Screen coordinates in, since `EditRail` holds no canvas
    * geometry of its own: `elementFromPoint` finds the live `.canvas-svg`
    * element (or none, when the drop misses the canvas), and
    * `svgPointFromClient` converts through its current pan/zoom transform —
@@ -197,67 +131,67 @@ function EditorArea({ processId, formStepId, token, initialRevision, initialLayo
     }
   };
 
-  const processLabel = resolveDraftLocalizedText(draft.label, contentLocale, draft.baseLocale ?? "en") ?? draft.key ?? "";
+  // The save/discard/publish logic itself (design.md: "DraftToolbar keeps
+  // its logic. ProcessHeaderBar renders the buttons.") — called directly
+  // here, not through a mounted `<DraftToolbar>` element, so this is the
+  // only instance of that state. Mounting both would run two independent
+  // copies of saving/error/publishing state, the exact "second copy" design.md
+  // rejects.
+  const actions = useDraftToolbarActions({
+    processId,
+    token,
+    saveState,
+    onSaveState: setSaveState,
+    savedBody,
+    onSavedBodyChange: dispatchSavedBody,
+    onSaved: () => setLastSavedAt(new Date()),
+    publishResult,
+    onPublishResult: setPublishResult,
+    onDiscarded: () => navigate({ name: "processes" }),
+    onUnauthorized,
+  });
 
   return (
     <main className="studio-screen studio-edit-screen">
-      <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "processes" })}>
-        ← Back to processes
-      </button>
-      <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "versions", processId })}>
-        Versions
-      </button>
-      <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "play", processId })}>
-        Player
-      </button>
-      <h1>{t("app.title")}</h1>
+      <nav className="studio-header-nav">
+        <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "processes" })}>
+          ← Back to processes
+        </button>
+        <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "versions", processId })}>
+          Versions
+        </button>
+        <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "play", processId })}>
+          Player
+        </button>
+      </nav>
       {!validation.zodValid && <p className="draft-incomplete">{t("app.draftIncomplete")}</p>}
-      <DraftToolbar
-        processId={processId}
-        token={token}
-        saveState={saveState}
-        onSaveState={setSaveState}
-        savedBody={savedBody}
-        onSavedBodyChange={dispatchSavedBody}
-        onSaved={() => setLastSavedAt(new Date())}
+      {/* Renders on both surfaces (studio-json-view: DraftToolbar, the
+          registry selector, and the content-locale switcher "SHALL remain
+          visible and usable regardless of which surface is active") — only
+          its "Process, saved with the draft" menu group is surface-gated,
+          via `structureActive`, since that group's controls mutate the
+          draft body the same way the old Structure-only ProcessHeader did. */}
+      <ProcessHeaderBar
+        revision={saveState.revision}
+        isDirty={isDirty(draft, savedBody)}
+        lastSavedAt={lastSavedAt}
         publishResult={publishResult}
-        onPublishResult={setPublishResult}
-        onDiscarded={() => navigate({ name: "processes" })}
-        onUnauthorized={onUnauthorized}
+        conflict={saveState.conflict}
+        actions={actions}
+        structureActive={surface === "structure"}
+        surfaceToggle={
+          <div className="studio-surface-toggle" role="tablist">
+            <button type="button" role="tab" aria-selected={surface === "structure"} onClick={() => setSurface("structure")}>
+              {t("edit.structureTab")}
+            </button>
+            <button type="button" role="tab" aria-selected={surface === "json"} onClick={() => setSurface("json")}>
+              {t("edit.jsonTab")}
+            </button>
+          </div>
+        }
       />
-      <ContentLocaleSwitcher />
-      <RegistryPanel />
-      <div className="studio-surface-toggle" role="tablist">
-        <button type="button" role="tab" aria-selected={surface === "structure"} onClick={() => setSurface("structure")}>
-          {t("edit.structureTab")}
-        </button>
-        <button type="button" role="tab" aria-selected={surface === "json"} onClick={() => setSurface("json")}>
-          {t("edit.jsonTab")}
-        </button>
-      </div>
       {surface === "structure" ? (
         <>
-          {/* Inside the structure branch, never beside the surface tabs. The
-              tabs render on both surfaces, and studio-json-view forbids a
-              reachable draft-body-mutating control while JSON is active — a
-              link up there would let an author open the modal over a live
-              textarea and clobber it. The new header bar and palette nest
-              here for the same reason: both mutate/summarize the draft. */}
-          <nav className="studio-panel-links" aria-label={t("editPanels.linksLabel")}>
-            {PANEL_VIEWS.map((view) => (
-              <button key={view} type="button" className="btn btn-secondary" onClick={() => setOpenPanel(view)}>
-                {t(PANEL_LINK_LABEL[view])}
-              </button>
-            ))}
-          </nav>
-          <ProcessHeader />
-          <ProcessHeaderBar
-            processLabel={processLabel}
-            revision={saveState.revision}
-            isDirty={isDirty(draft, savedBody)}
-            lastSavedAt={lastSavedAt}
-            publishResult={publishResult}
-          />
           {formStepId !== undefined ? (
             formStep ? (
               <FormEditorScreen
@@ -271,7 +205,7 @@ function EditorArea({ processId, formStepId, token, initialRevision, initialLayo
             )
           ) : (
             <div className="studio-canvas-layout">
-              <StepPalette onDrop={onPaletteDrop} />
+              <EditRail onDrop={onPaletteDrop} onOpenPanel={setOpenPanel} fields={fields} />
               <CanvasView
                 layout={saveState.layout}
                 onMoveStep={onMoveStep}
@@ -279,17 +213,26 @@ function EditorArea({ processId, formStepId, token, initialRevision, initialLayo
                 onSelectStep={onSelectStep}
                 selectedPathId={selectedPathId}
               />
-              <aside className="canvas-inspector">
-                <StepsPanel
-                  fields={fields}
-                  token={token}
-                  selectedStepId={selectedStepId}
-                  onSelectStep={onSelectStep}
-                  selectedPathId={selectedPathId}
-                  navigate={(stepId) => navigate({ name: "edit", processId, formStepId: stepId })}
-                />
-              </aside>
-              <ChecksRail validation={validation} />
+              {/* The third column: the inspector when a step or a path is
+                  selected, the full checks rail otherwise — never both
+                  (studio-canvas: "the canvas edit screen lays out a
+                  palette, the canvas, the inspector, and a checks rail").
+                  `StepsPanel` docks its own collapsed `ChecksRail` at its
+                  bottom edge; this column never mounts a second copy. */}
+              {selectedStepId !== undefined || selectedPathId !== undefined ? (
+                <aside className="canvas-inspector">
+                  <StepsPanel
+                    fields={fields}
+                    token={token}
+                    selectedStepId={selectedStepId}
+                    onSelectStep={onSelectStep}
+                    selectedPathId={selectedPathId}
+                    navigate={(stepId) => navigate({ name: "edit", processId, formStepId: stepId })}
+                  />
+                </aside>
+              ) : (
+                <ChecksRail validation={validation} />
+              )}
             </div>
           )}
           <EditPanelsModal
