@@ -203,6 +203,8 @@ packages/form-ui/          shared step-form renderer (source-only, no build step
 ## Where the rest is documented
 - `.claude/rules/process-contract.md` — the load-bearing contract rules, in full.
 - `.claude/rules/authoring-invariants.md` — what the validation layer enforces.
+- `.claude/rules/ui-glossary.md` — the one word for each part of the UI, and the
+  domain term each rendering word maps to.
 - `docs/current-state.md` — per-subsystem descriptive counterpart to this file.
 - `docs/decisions.md` — open questions, and what is decided but not yet built.
 - `docs/authoring-guide.md` — teaches the contract to process authors.
