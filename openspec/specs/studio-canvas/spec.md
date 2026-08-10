@@ -72,12 +72,22 @@ default.
 
 ### Requirement: Dragging to a step creates a path; dragging to empty canvas creates a step and a path
 
-The canvas SHALL offer a connect handle on each step node. Dragging from
-a handle and releasing over another step SHALL create a path from the
-source to the target. It SHALL use the same path-creation method
-`PathsPanel`'s own "add path" action already calls. It SHALL default to
-that step's existing trigger type (manual or automatic) when one is
-already set.
+The canvas SHALL offer a connect handle on each step node. Releasing a
+drag started from a terminal step's handle SHALL create neither a step
+nor a path. This holds no matter where the release lands. It SHALL
+surface the same inline rejection other rejected gestures already
+surface. This check runs before any other check the gesture would
+otherwise run.
+
+The handle SHALL also carry a non-interactive visual state on a
+terminal step. The rejection SHALL NOT be the first signal an author
+sees.
+
+A drag from a non-terminal step's handle can still target another step.
+Releasing it there SHALL create a path from the source to the target.
+It SHALL use the same path-creation method `PathsPanel`'s own "add
+path" action already calls. It SHALL default to that step's existing
+trigger type (manual or automatic) when one is already set.
 
 Releasing a connect-handle drag over empty canvas SHALL first check
 the candidate path's trigger consistency. This is the same
@@ -96,15 +106,15 @@ leaves a step behind with no path to it.
 
 #### Scenario: A completed drag to an existing step creates a path
 
-- **WHEN** a connect-handle drag starts on step A and is released over
-  step B
+- **WHEN** a connect-handle drag starts on step A
+- **AND** the developer releases the drag over step B
 - **THEN** a path from A to B exists in the Draft model, creatable
   through the same call `PathsPanel` uses
 
 #### Scenario: A completed drag to empty canvas creates a step and a path
 
-- **WHEN** a connect-handle drag starts on step A and is released over
-  empty canvas
+- **WHEN** a connect-handle drag starts on step A
+- **AND** the developer releases the drag over empty canvas
 - **AND** the candidate path's trigger consistency passes
 - **THEN** a new step exists at the drop point
 - **AND** a path from A to that new step exists in the Draft model
@@ -118,6 +128,26 @@ leaves a step behind with no path to it.
 - **AND** no new path exists in the Draft model
 - **AND** the same inline rejection the drag-to-a-step gesture shows
   for a trigger-inconsistent candidate appears
+
+#### Scenario: A drag from a terminal step's handle creates nothing
+
+- **WHEN** a connect-handle drag starts on a terminal step
+- **AND** the developer releases the drag over another step
+- **THEN** no new path exists in the Draft model
+- **AND** an inline rejection appears at the drop point
+
+#### Scenario: A drag from a terminal step's handle to empty canvas creates nothing
+
+- **WHEN** a connect-handle drag starts on a terminal step
+- **AND** the developer releases the drag over empty canvas
+- **THEN** no new step and no new path exist in the Draft model
+- **AND** an inline rejection appears at the drop point
+
+#### Scenario: A terminal step's connect handle renders as non-interactive
+
+- **WHEN** the canvas renders a terminal step
+- **THEN** that step's connect handle carries a visual state distinct
+  from a non-terminal step's handle
 
 ### Requirement: A connection that would break the all-manual-or-all-automatic rule is rejected inline
 
@@ -146,6 +176,26 @@ shown at the drop location.
 - **WHEN** a drag-to-connect drop's trigger type matches the source step's
   existing paths (or the source step has no paths yet)
 - **THEN** the path is created
+
+### Requirement: A terminal step disables the inspector's "add path" control
+
+The paths section's "add path" control SHALL disable when the selected
+step carries `terminal: true`. This extends the control's existing
+disabled condition, which already covers the case of no step to
+target. Both share one reason: the resulting draft could never
+publish.
+
+#### Scenario: A terminal step disables the add-path control
+
+- **WHEN** the developer selects a terminal step and opens its paths
+  section
+- **THEN** the "add path" control renders disabled
+
+#### Scenario: A non-terminal step keeps the add-path control enabled
+
+- **WHEN** the developer selects a non-terminal step, in a process with
+  at least one other step
+- **THEN** the "add path" control renders enabled
 
 ### Requirement: Path lines visually encode trigger type, automatic-path priority, and terminal outcomes
 
@@ -357,10 +407,10 @@ A step outside the drawing surface's own bounds SHALL still come into view.
 It comes into view once the zoom level drops far enough to hold it.
 
 The framed area SHALL cover more than the step rectangles. It SHALL cover
-what a step draws beside its rectangle. That includes the start arrow left of
-the initial step and the terminal stamp above a terminal step. It SHALL also
-keep the framed content clear of any control the canvas overlays on itself,
-such as the toolbar.
+what a step draws beside its rectangle. That includes the start arrow and
+the start stamp beside the initial step. It also includes the terminal
+stamp above a terminal step. It SHALL also keep the framed content clear of
+any control the canvas overlays on itself, such as the toolbar.
 
 The entire visible canvas area SHALL stay interactive for panning and
 zooming. This holds at any pan or zoom state the canvas currently holds. A
@@ -396,8 +446,8 @@ itself currently sits, or how much the current zoom level has shrunk it.
 #### Scenario: Fit to view keeps the toolbar off the graph
 
 - **WHEN** an author activates "fit to view"
-- **THEN** no step, start arrow or terminal stamp comes to rest under the
-  toolbar
+- **THEN** no step, start arrow, start stamp or terminal stamp comes to rest
+  under the toolbar
 
 #### Scenario: Panning works from the margin a zoomed-out graph leaves behind
 
@@ -717,3 +767,48 @@ it is distinct from the path-guard's CEL "Developer view" toggle the
 - **WHEN** the developer expands a selected step's "Developer view"
   disclosure
 - **THEN** the step's raw underlying JSON renders read-only
+
+### Requirement: The initial step shows a distinct stamp
+
+The canvas SHALL draw a stamp on the node of the draft's
+`workflow.initialStep`, distinct from a terminal step's outcome stamp. This
+lets an author identify the process's entry point from the canvas alone. An
+author needs no JSON inspection and no per-step identity check.
+
+#### Scenario: The initial step shows its stamp
+
+- **WHEN** a step is the draft's `workflow.initialStep`
+- **THEN** the canvas draws that step's stamp, distinct from a terminal
+  step's outcome stamp
+
+#### Scenario: Changing the initial step moves the stamp
+
+- **WHEN** the developer sets a different step as `workflow.initialStep`
+- **THEN** the stamp moves to the newly chosen step and leaves the previous
+  one
+
+#### Scenario: A step that is both initial and terminal shows both stamps
+
+- **WHEN** a step is both the draft's `workflow.initialStep` and terminal
+- **THEN** the canvas draws both stamps, in opposite corners, with neither
+  stamp obscured by the other
+
+### Requirement: The identity section constrains a terminal step's outcome to the process's declared outcomes
+
+When the draft's contract declares one or more `outcomes`, the identity
+section's `outcome` field SHALL offer only those values, not free text.
+Without a contract, or with a contract that declares no outcomes, the field
+carries no validated meaning. It SHALL stay a free-text field.
+
+#### Scenario: The developer picks an outcome from the declared list
+
+- **WHEN** the developer selects a terminal step on a draft whose contract
+  declares one or more outcomes
+- **THEN** the identity section's outcome field offers only those declared
+  outcomes as choices
+
+#### Scenario: An outcome field stays free text without a declared outcome list
+
+- **WHEN** the developer selects a terminal step on a draft with no
+  contract, or a contract that declares no outcomes
+- **THEN** the identity section's outcome field accepts any text

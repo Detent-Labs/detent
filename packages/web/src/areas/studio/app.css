@@ -326,6 +326,11 @@
   cursor: crosshair;
 }
 
+.canvas-connect-handle-terminal {
+  fill: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
 .canvas-initial-arrow {
   stroke: var(--color-text-muted);
   stroke-width: 2;
@@ -377,6 +382,22 @@
 }
 
 .canvas-terminal-stamp text {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  text-anchor: middle;
+  fill: var(--color-neutral-900);
+}
+
+/* Unlike the terminal stamp, this never tilts: design-language.md reserves
+   tilt for error contexts, and a canvas node is not one. */
+.canvas-initial-stamp circle {
+  fill: none;
+  stroke: var(--color-neutral-900);
+  stroke-width: 1.5;
+}
+
+.canvas-initial-stamp text {
   font-family: var(--font-mono);
   font-size: 9px;
   text-transform: uppercase;

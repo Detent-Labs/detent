@@ -241,6 +241,7 @@ export const en = {
   "stepSections.performedBySubprocess": "a subprocess",
   "stepSections.performedByTerminal": "nothing — this ends the process",
   "stepSections.setInitialStep": "Set as the process's first step",
+  "stepSections.outcomePlaceholder": "choose an outcome…",
   "stepSections.isInitialStep": "This is the process's first step.",
   "stepSections.viewBuildForm": "Build the form",
   "stepSections.viewFieldsConfigured": "fields configured",
@@ -276,6 +277,7 @@ export const en = {
 
   "canvas.fitToView": "Fit to view",
   "canvas.elseMarker": "else",
+  "canvas.initialStamp": "start",
   "canvas.inspectorEmpty": "Select a step or a path to edit it.",
 
   "expression.placeholder": "CEL expression",

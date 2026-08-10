@@ -281,7 +281,21 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
         {step.terminal && (
           <label>
             outcome (only meaningful on a contracted process)
-            <input type="text" value={step.outcome ?? ""} onChange={(e) => updateStep({ outcome: e.target.value })} />
+            {draft.contract?.outcomes?.length ? (
+              <select
+                value={step.outcome ?? ""}
+                onChange={(e) => updateStep({ outcome: e.target.value || undefined })}
+              >
+                <option value="">{t("stepSections.outcomePlaceholder")}</option>
+                {draft.contract.outcomes.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input type="text" value={step.outcome ?? ""} onChange={(e) => updateStep({ outcome: e.target.value })} />
+            )}
           </label>
         )}
 
@@ -327,6 +341,7 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
           registryTypes={registry?.actionTypes}
           registrySchemas={registry?.actionSchemas}
           selectedPathId={selectedPathId}
+          terminal={step.terminal}
         />
       </section>
 

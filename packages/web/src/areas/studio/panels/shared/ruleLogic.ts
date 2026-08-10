@@ -19,12 +19,12 @@ import {
   CMP_OPS,
   conjuncts,
   fieldOperand,
-  isNode,
+  isCelNode,
   literalOf,
   memberPath,
   operatorsFor,
+  type CelNode,
   type CmpOp,
-  type Node,
   type Operand,
 } from "./conditionLogic";
 
@@ -86,11 +86,11 @@ export function fieldValueOperandsFor(leftPath: string, operands: RuleOperand[])
 
 // --- reading ----------------------------------------------------------------
 
-function rawRuleRow(node: Node): RuleRow {
+function rawRuleRow(node: CelNode): RuleRow {
   return { kind: "raw", src: serializeAst(node as never) };
 }
 
-function readRuleRow(node: Node, byPath: Map<string, RuleOperand>): RuleRow {
+function readRuleRow(node: CelNode, byPath: Map<string, RuleOperand>): RuleRow {
   // A bare boolean operand reads as an explicit `== true`, the same
   // normalisation `conditionLogic.readRow` applies.
   const bare = memberPath(node);
@@ -100,7 +100,7 @@ function readRuleRow(node: Node, byPath: Map<string, RuleOperand>): RuleRow {
 
   if (!Array.isArray(node.args) || node.args.length !== 2) return rawRuleRow(node);
   const [left, right] = node.args as [unknown, unknown];
-  if (!isNode(left) || !isNode(right)) return rawRuleRow(node);
+  if (!isCelNode(left) || !isCelNode(right)) return rawRuleRow(node);
   if (!CMP_OPS.includes(node.op as CmpOp)) return rawRuleRow(node);
 
   const leftPath = memberPath(left);
@@ -125,7 +125,7 @@ function readRuleRow(node: Node, byPath: Map<string, RuleOperand>): RuleRow {
 export function fromRuleCel(src: string | undefined, operands: RuleOperand[]): RuleCondition | null {
   if (!src?.trim()) return { rows: [] };
   const ast = parseAst(src);
-  if (!ast || !isNode(ast)) return null;
+  if (!ast || !isCelNode(ast)) return null;
   const byPath = new Map(operands.map((o) => [o.path, o]));
   const nodes = ast.op === "&&" ? conjuncts(ast, "&&") : [ast];
   return { rows: nodes.map((n) => readRuleRow(n, byPath)) };

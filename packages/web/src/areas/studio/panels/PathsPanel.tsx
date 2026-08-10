@@ -26,6 +26,10 @@ interface Props {
    * one row within this section, rather than only expanding the section
    * that holds it. */
   selectedPathId?: string;
+  /** Whether the owning step is terminal. A terminal step's paths list is
+   * always empty by contract; "add path" disables rather than letting an
+   * author reach the invalid state the schema rejects at publish. */
+  terminal?: boolean;
 }
 
 /**
@@ -33,7 +37,17 @@ interface Props {
  * abstracted away — the wait-state and guard-priority concepts stay
  * visible to the author.
  */
-export function PathsPanel({ paths, steps, fields, stepId, onChange, registryTypes, registrySchemas, selectedPathId }: Props) {
+export function PathsPanel({
+  paths,
+  steps,
+  fields,
+  stepId,
+  onChange,
+  registryTypes,
+  registrySchemas,
+  selectedPathId,
+  terminal,
+}: Props) {
   const list = paths ?? [];
 
   const addPath = () => onChange([...list, newPath(steps[0]?.id, "manual")]);
@@ -139,7 +153,7 @@ export function PathsPanel({ paths, steps, fields, stepId, onChange, registryTyp
           </button>
         </div>
       ))}
-      <button type="button" className="btn btn-secondary" onClick={addPath} disabled={steps.length === 0}>
+      <button type="button" className="btn btn-secondary" onClick={addPath} disabled={steps.length === 0 || terminal}>
         {t("paths.addPath")}
       </button>
     </div>

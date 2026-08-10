@@ -32,4 +32,19 @@ describe("resolveDropGesture", () => {
       reason: "a step's paths must be all-manual or all-automatic, not mixed",
     });
   });
+
+  it("rejects a terminal source dropped on an existing step", () => {
+    const result = resolveDropGesture({ x: 210, y: 110 }, nodes, [], "manual", true);
+    expect(result.kind).toBe("rejected");
+  });
+
+  it("rejects a terminal source dropped on empty canvas", () => {
+    const result = resolveDropGesture({ x: 900, y: 900 }, nodes, [], "manual", true);
+    expect(result.kind).toBe("rejected");
+  });
+
+  it("rejects a terminal source with the terminal reason, ahead of a checkConnection reason the same call would also produce", () => {
+    const result = resolveDropGesture({ x: 900, y: 900 }, nodes, [{ trigger: "automatic", priority: 1 }], "manual", true);
+    expect(result).toEqual({ kind: "rejected", reason: "a terminal step has no outgoing paths" });
+  });
 });

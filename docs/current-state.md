@@ -1520,8 +1520,10 @@ Stage-by-stage status is in `ROADMAP.md`.
   `panels/shared/ruleLogic.ts`) is a new component, not `ConditionBuilder`
   reused. It shares `ConditionBuilder`'s parse-back approach.
   `conditionLogic.ts` exports its AST-walk internals for that reuse:
-  `Node`, `isNode`, `memberPath`, `literalOf`, `conjuncts`, `CMP_OPS`,
-  `fieldOperand`.
+  `CelNode`, `isCelNode`, `memberPath`, `literalOf`, `conjuncts`, `CMP_OPS`,
+  `fieldOperand`. The CEL node type carries the `Cel` prefix because
+  `packages/web` compiles with `"DOM"` in `lib`, so a bare `Node` shadows
+  the global one in every consumer.
 
   A row's default operand is "this answer." That compiles to
   `data.<the field's own key>`. It is sugar, not a new CEL binding.

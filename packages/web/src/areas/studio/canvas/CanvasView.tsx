@@ -60,9 +60,9 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
   // same way.
   const measureFit = (svg: SVGSVGElement): Fit => {
     // `getBBox()` reports what the canvas actually draws, in user space and
-    // free of Panzoom's transform. That covers the start arrow left of the
-    // initial step and the terminal stamp above a terminal step, neither of
-    // which the node rectangles contain.
+    // free of Panzoom's transform. That covers the start arrow and start
+    // stamp beside the initial step, and the terminal stamp above a
+    // terminal step — none of which the node rectangles contain.
     const content = svg.getBBox();
 
     // `clientWidth`/`clientHeight`, never `getBoundingClientRect()`: Panzoom
@@ -290,7 +290,7 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
     if (sourceStep?.id) {
       const existingPaths = sourceStep.paths ?? [];
       const candidateTrigger = existingPaths[0]?.trigger ?? "manual";
-      const result = resolveDropGesture(point, nodePositions, existingPaths, candidateTrigger);
+      const result = resolveDropGesture(point, nodePositions, existingPaths, candidateTrigger, sourceStep.terminal === true);
 
       if (result.kind === "rejected") {
         showRejection(e, result.reason);
@@ -509,11 +509,17 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
                   <text y={4}>{(step.outcome ?? "").slice(0, 4) || "•"}</text>
                 </g>
               )}
+              {isInitial && (
+                <g transform="translate(22, -12)" className="canvas-initial-stamp">
+                  <circle r={16} />
+                  <text y={4}>{t("canvas.initialStamp")}</text>
+                </g>
+              )}
               <circle
                 cx={NODE_WIDTH}
                 cy={NODE_HEIGHT / 2}
                 r={HANDLE_RADIUS}
-                className="canvas-connect-handle"
+                className={isTerminal ? "canvas-connect-handle canvas-connect-handle-terminal" : "canvas-connect-handle"}
                 onPointerDown={(e) => onHandlePointerDown(e, step.id as string)}
                 onPointerUp={onHandlePointerUp}
               />

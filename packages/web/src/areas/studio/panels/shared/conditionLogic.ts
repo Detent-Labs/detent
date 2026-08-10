@@ -204,29 +204,31 @@ export function operandSignature(operands: Operand[]): string {
 
 // --- reading --------------------------------------------------------------
 
-/** The AST shape this file walks. Narrower than the library's full union.
- * Exported for `ruleLogic.ts`'s reuse. */
-export interface Node {
+/** The CEL AST shape this file walks. Narrower than the library's full union.
+ * Named `CelNode`, not `Node`: this package compiles with `"DOM"` in `lib`, so
+ * the global `Node` is in scope in every consumer and a bare local `Node`
+ * shadows it. Exported for `ruleLogic.ts`'s reuse. */
+export interface CelNode {
   op: string;
   args: unknown;
 }
 
-export const isNode = (v: unknown): v is Node =>
-  typeof v === "object" && v !== null && typeof (v as Node).op === "string";
+export const isCelNode = (v: unknown): v is CelNode =>
+  typeof v === "object" && v !== null && typeof (v as CelNode).op === "string";
 
 /** `{op:".", args:[{op:"id",args:"data"}, "amount"]}` -> `"data.amount"`, else undefined.
  * Exported for `ruleLogic.ts`'s reuse. */
-export function memberPath(node: Node): string | undefined {
+export function memberPath(node: CelNode): string | undefined {
   if (node.op === "id") return typeof node.args === "string" ? node.args : undefined;
   if (node.op !== ".") return undefined;
   const [target, name] = node.args as [unknown, unknown];
-  if (!isNode(target) || typeof name !== "string") return undefined;
+  if (!isCelNode(target) || typeof name !== "string") return undefined;
   const base = memberPath(target);
   return base === undefined ? undefined : `${base}.${name}`;
 }
 
 /** Exported for `ruleLogic.ts`'s reuse. */
-export function literalOf(node: Node): string | number | boolean | undefined {
+export function literalOf(node: CelNode): string | number | boolean | undefined {
   if (node.op !== "value") return undefined;
   const v = node.args;
   return typeof v === "string" || typeof v === "number" || typeof v === "boolean" ? v : undefined;
@@ -238,11 +240,11 @@ export function literalOf(node: Node): string | number | boolean | undefined {
  * sub-expression's own wrapping parens (see `serializeAst`'s doc), which
  * would otherwise truncate a fragment like `!(data.amount > 1000.0)`.
  */
-function rawRow(node: Node): Row {
+function rawRow(node: CelNode): Row {
   return { kind: "raw", src: serializeAst(node as never) };
 }
 
-function readRow(node: Node, byPath: Map<string, Operand>): Row {
+function readRow(node: CelNode, byPath: Map<string, Operand>): Row {
   // A bare boolean operand reads as an explicit `== true`.
   const bare = memberPath(node);
   if (bare !== undefined && byPath.get(bare)?.celType === "bool") {
@@ -251,7 +253,7 @@ function readRow(node: Node, byPath: Map<string, Operand>): Row {
 
   if (!Array.isArray(node.args) || node.args.length !== 2) return rawRow(node);
   const [left, right] = node.args as [unknown, unknown];
-  if (!isNode(left) || !isNode(right)) return rawRow(node);
+  if (!isCelNode(left) || !isCelNode(right)) return rawRow(node);
 
   // `"manager" in actor.roles`: the literal sits left, mirroring the CEL text.
   if (node.op === "in") {
@@ -272,10 +274,10 @@ function readRow(node: Node, byPath: Map<string, Operand>): Row {
 
 /** Flatten the left-associative chain of one operator; a nested other operator
  * survives whole. Exported for `ruleLogic.ts`'s reuse. */
-export function conjuncts(node: Node, joiner: string): Node[] {
+export function conjuncts(node: CelNode, joiner: string): CelNode[] {
   if (node.op !== joiner || !Array.isArray(node.args) || node.args.length !== 2) return [node];
   const [left, right] = node.args as [unknown, unknown];
-  if (!isNode(left) || !isNode(right)) return [node];
+  if (!isCelNode(left) || !isCelNode(right)) return [node];
   return [...conjuncts(left, joiner), right];
 }
 
@@ -286,7 +288,7 @@ export function conjuncts(node: Node, joiner: string): Node[] {
 export function fromCel(src: string | undefined, operands: Operand[]): Condition | null {
   if (!src?.trim()) return { joiner: "&&", rows: [] };
   const ast = parseAst(src);
-  if (!ast || !isNode(ast)) return null;
+  if (!ast || !isCelNode(ast)) return null;
 
   const byPath = new Map(operands.map((o) => [o.path, o]));
   const joiner = ast.op === "||" ? "||" : "&&";
