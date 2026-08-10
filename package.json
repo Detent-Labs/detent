@@ -33,6 +33,6 @@
   "dependencies": {
     "@marcbachmann/cel-js": "8.0.0",
     "jose": "^6.2.4",
-    "zod": "^3.23.8"
+    "zod": "4.4.3"
   }
 }

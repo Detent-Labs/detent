@@ -256,7 +256,7 @@ export type FieldDef = {
   default?: Literal | Expression;
   fields?: FieldDef[];
 };
-export const fieldDef: z.ZodType<FieldDef, z.ZodTypeDef, unknown> = z.lazy(() =>
+export const fieldDef: z.ZodType<FieldDef, unknown> = z.lazy(() =>
   z
     .object({
       id: fieldId,

@@ -86,6 +86,82 @@ describe("compile: unknown-key rejection", () => {
   it("a clean body raises no unknown-key issue", () => {
     expect(() => compileProcessBody(baseBody() as ProcessBody)).not.toThrow();
   });
+
+  // migrate-to-zod-v4: the key sets behind this check come from `shapeKeys`,
+  // which reads `.shape` off each schema at module load, so a Zod upgrade can
+  // move what they contain.
+  //
+  // Two failure modes, measured against mutants rather than assumed. An EMPTY
+  // key set is loud: it makes every key unknown, and eight tests in this file
+  // already fail on it, "a clean body raises no unknown-key issue" first. A
+  // level that stops being WALKED is silent: every other test in this file
+  // still passes. This case is the guard for that second mode, which is why
+  // each level is planted separately — the failure names the level that
+  // stopped rejecting.
+  it("rejects an unknown key at every level whose key set is derived from a schema", () => {
+    const planted: Array<[string, (b: any) => void]> = [
+      ["body", (b) => (b.zzBody = 1)],
+      ["field", (b) => (b.fields[0].zzField = 1)],
+      ["fieldValidation", (b) => (b.fields[0].validation = { min: 1, zzValidation: 1 })],
+      ["workflow", (b) => (b.workflow.zzWorkflow = 1)],
+      ["step", (b) => (b.workflow.steps[0].zzStep = 1)],
+      ["path", (b) => (b.workflow.steps[0].paths[0].zzPath = 1)],
+      ["expression", (b) => (b.workflow.steps[0].paths[0].guard = { ...cel("true"), zzExpr: 1 })],
+      [
+        "action",
+        (b) => (b.workflow.steps[0].onEntry = [{ id: "action_x", type: "t", config: {}, zzAction: 1 }]),
+      ],
+      [
+        "timer",
+        (b) =>
+          (b.workflow.steps[0].timers = [
+            { id: "timer_x", duration: "PT1H", onFire: { targetPath: "path_ab" }, zzTimer: 1 },
+          ]),
+      ],
+      [
+        "timerAction",
+        (b) =>
+          (b.workflow.steps[0].timers = [
+            {
+              id: "timer_x",
+              duration: "PT1H",
+              onFire: { targetPath: "path_ab", zzTimerAction: 1 },
+            },
+          ]),
+      ],
+      ["view", (b) => (b.workflow.steps[0].view = { fields: [], zzView: 1 })],
+      [
+        "viewField",
+        (b) => (b.workflow.steps[0].view = { fields: [{ ref: "field_amount", zzViewField: 1 }] }),
+      ],
+      ["assignment", (b) => (b.workflow.steps[0].assignment = { zzAssignment: 1 })],
+      ["plugin", (b) => (b.fields[0].type = { type: "custom", config: {}, zzPlugin: 1 })],
+      [
+        "fieldOption",
+        (b) => {
+          b.fields[0].type = "select";
+          b.fields[0].options = [{ value: "a", label: { en: "A" }, zzOption: 1 }];
+        },
+      ],
+      [
+        "dataSourceDef",
+        (b) => (b.dataSources = [{ id: "ds_x", key: "x", type: "static", config: {}, zzDs: 1 }]),
+      ],
+    ];
+
+    for (const [level, plant] of planted) {
+      const b = baseBody();
+      plant(b);
+      const err = rejects(b);
+      const keys = err.issues.map((i) => i.value);
+      expect(keys.some((k) => typeof k === "string" && k.startsWith("zz"))).toBe(true);
+      // Name the level in the assertion so a regression says which one broke.
+      expect([level, keys.some((k) => typeof k === "string" && k.startsWith("zz"))]).toEqual([
+        level,
+        true,
+      ]);
+    }
+  });
 });
 
 describe("compile: issues from different checks are all reported together, not just the first check's", () => {

@@ -109,6 +109,36 @@ test("a core.-prefixed action type is resolved against the registry like any oth
   expect(issues[0]!.message.toLowerCase()).toContain("not registered");
 });
 
+// migrate-to-zod-v4: the studio's generated form now covers a schema carrying a
+// cross-field rule, which Zod v3 kept on the raw JSON path. The form describes
+// per-field rules only, so publish stays the one place the cross-field rule
+// runs. These two cases pin that split: the same config passes every per-field
+// rule and still fails here.
+test("a cross-field rule on a configSchema is a publish error, not a form error", () => {
+  const reg = createRegistry();
+  register(reg, "window", {
+    handler: async () => ({}),
+    configSchema: z
+      .object({ min: z.number().min(0), max: z.number().min(0) })
+      .refine((c) => c.min <= c.max, { message: "min must not exceed max", path: ["min"] }),
+  });
+  const issues = checkActionRegistry(bodyWithActions({ onEntry: [action("window", { min: 9, max: 1 })] }), reg);
+  expect(issues.length).toBe(1);
+  expect(issues[0]!.type).toBe("window");
+  expect(issues[0]!.message).toContain("min must not exceed max");
+});
+
+test("a config satisfying the cross-field rule raises no publish issue", () => {
+  const reg = createRegistry();
+  register(reg, "window", {
+    handler: async () => ({}),
+    configSchema: z
+      .object({ min: z.number().min(0), max: z.number().min(0) })
+      .refine((c) => c.min <= c.max, { message: "min must not exceed max", path: ["min"] }),
+  });
+  expect(checkActionRegistry(bodyWithActions({ onEntry: [action("window", { min: 1, max: 9 })] }), reg)).toEqual([]);
+});
+
 test("a core.-prefixed action type registered with a configSchema is config-checked too", () => {
   const reg = createRegistry();
   register(reg, "core.spawnSubprocess", {

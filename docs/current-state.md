@@ -2404,20 +2404,35 @@ Stage-by-stage status is in `ROADMAP.md`.
   picker over `GET /registry`'s live type names. It also adds a generated
   form, for any type whose `configSchema` a new converter can represent.
 
-  `describeConfigSchema` walks a `ZodObject`'s shape. It recognizes
-  `ZodString` (plus `.email()`), `ZodNumber`, `ZodBoolean`, `ZodEnum` and
-  `ZodArray` of a string, each optionally wrapped in `ZodOptional` or
-  `ZodDefault`. It also reads each field's own length and format checks:
-  `minLength`/`maxLength`, `min`/`max`, `minItems`/`maxItems`, and an
-  email format flag.
+  `describeConfigSchema` walks a `ZodObject`'s shape. It recognizes a
+  string node (including `z.email()` and `z.string().email()`), a number
+  node, `ZodBoolean`, `ZodEnum` and `ZodArray` of a string, each
+  optionally wrapped in `ZodOptional` or `ZodDefault`. It also reads each
+  field's own length and format checks: `minLength`/`maxLength`,
+  `min`/`max`, `minItems`/`maxItems`, and an email format flag.
 
-  Some constructs fail the whole type's conversion, not just one field:
-  a `.refine()`/`.superRefine()`-wrapped object, a nested object
-  property, or `z.unknown()`. Any other unsupported construct fails it
-  too.
+  It dispatches on the node's own type tag rather than on `instanceof`.
+  Zod v4 gives a formatted string its own class. `z.email()` is a
+  `ZodEmail`. It answers `instanceof z.ZodString` with false, and still
+  reports `type: "string"`.
+
+  Some constructs fail the whole type's conversion, not just one field: a
+  nested object property, `z.unknown()`, or a non-email string format.
+  Any other unsupported construct fails it too.
   `GET /registry` then omits a schema description
   for it. The studio area falls back to the raw JSON textarea for that
   type, unchanged from before this capability.
+
+  A `.refine()`/`.superRefine()`-wrapped object does NOT fail it. Zod v4
+  declares `refine` as returning `this`, so a refined object stays a
+  `ZodObject` and reaches the per-property walk. Zod v3 wrapped it as a
+  `ZodEffects`. The top-level check rejected that before it read one
+  property.
+
+  Such a type used to reach the raw JSON textarea, however ordinary its
+  properties. The generated form describes per-field rules only. The
+  cross-field rule the refinement carries still runs at publish, through
+  `registry-check.ts`.
 
   This was a deliberate choice over two alternatives. One: a
   hand-written descriptor per registry entry, a second artifact beside

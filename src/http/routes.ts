@@ -53,7 +53,7 @@ import { z } from "zod";
  */
 const createInstanceBodySchema = z.object({
   version: z.number().int().positive().optional(),
-  data: z.record(z.unknown()).optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
 });
 const delegateBodySchema = z.object({
   toActorId: z.string().min(1),
@@ -107,7 +107,7 @@ const attachmentBodySchema = z.object({
 });
 const submitBodySchema = z.object({
   pathId: z.string(),
-  data: z.record(z.unknown()).default({}),
+  data: z.record(z.string(), z.unknown()).default({}),
 });
 
 /** Parses `req`'s JSON body against `schema`, raising `RequestShapeError` (400) for invalid JSON or a shape mismatch alike — never a bare `ZodError`, which `mapError` maps to 422, the field-validation status, not the request-shape one. */

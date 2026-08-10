@@ -19,7 +19,7 @@ export function createExampleRegistry(): Registry {
   register(registry, "http.call", {
     handler: async () => undefined,
     configSchema: z.object({
-      url: z.string().url(),
+      url: z.url(),
       method: z.enum(["GET", "POST", "PUT", "DELETE"]).default("GET"),
     }),
   });
@@ -27,7 +27,7 @@ export function createExampleRegistry(): Registry {
   register(registry, "notify.email", {
     handler: async () => undefined,
     configSchema: z.object({
-      to: z.string().email(),
+      to: z.email(),
       template: z.string(),
     }),
   });

@@ -171,27 +171,34 @@ export const MAX_PATTERN_LENGTH = 4000;
 const isPlainObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 
-// ---- Zod-shape introspection (task 3.2): derive each object schema's known
-// key set from `.shape` rather than transcribing key lists by hand, so a key
-// added to definition.ts does not silently make the walk reject it. Handles
-// the wrapper types the schemas actually use: `.refine()`/`.superRefine()`
-// (ZodEffects) and `z.lazy()` (fieldDef's self-reference). ----
+// ---- Zod-shape introspection: derive each object schema's known key set from
+// `.shape` rather than transcribing key lists by hand, so a key added to
+// definition.ts does not silently make the walk reject it. Handles the wrapper
+// types the schemas actually use: `z.lazy()` (fieldDef's self-reference) and
+// the optional/nullable/default wrappers.
+//
+// A refined schema needs no unwrapping. Zod v4 declares `refine` as returning
+// `this`, so `.refine()`/`.superRefine()` leave a ZodObject a ZodObject, and
+// the v3 ZodEffects branch this loop carried is gone with it. ----
 
 function unwrapSchema(schema: z.ZodTypeAny): z.ZodTypeAny {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let s: any = schema;
-  while (s?._def) {
-    const t = s._def.typeName;
-    if (t === "ZodEffects") { s = s._def.schema; continue; }
-    if (t === "ZodLazy") { s = s._def.getter(); continue; }
-    if (t === "ZodOptional" || t === "ZodNullable" || t === "ZodDefault") { s = s._def.innerType; continue; }
+  while (s?._zod?.def) {
+    const t = s._zod.def.type;
+    if (t === "lazy") { s = s._zod.def.getter(); continue; }
+    if (t === "optional" || t === "nullable" || t === "default") { s = s._zod.def.innerType; continue; }
     break;
   }
   return s;
 }
 
 function shapeKeys(schema: z.ZodTypeAny): Set<string> {
-  return new Set(Object.keys((unwrapSchema(schema) as z.AnyZodObject).shape));
+  const shape = (unwrapSchema(schema) as unknown as { shape?: Record<string, unknown> }).shape;
+  // An empty set would silently accept every unknown key at this level rather
+  // than failing loudly, so a schema that does not unwrap to an object throws.
+  if (!shape) throw new Error("shapeKeys: schema did not unwrap to an object");
+  return new Set(Object.keys(shape));
 }
 
 const PROCESS_BODY_KEYS = shapeKeys(processBody);

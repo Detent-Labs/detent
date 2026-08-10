@@ -538,6 +538,25 @@ immutable definitions instead of throwing.
 The reason SHALL sit next to the "one CEL library" rule it protects. An upgrade
 is then a deliberate commit that re-runs the CEL suite.
 
+`zod` is the second such dependency, and it carries the same treatment for a
+different reason. `src/schema/definition.ts` is the contract itself. A package
+that resolves zod SHALL name one exact version, so one workspace resolves one
+zod.
+
+A source-only package names a `peerDependency` range instead, under the rule
+above. Its range SHALL admit the resolved version, and SHALL exclude every
+earlier major. The contract's types reach that package as `z.infer` types, so a
+range admitting two majors resolves one type against two zods.
+
+`definitionHash` is the JCS hash of the parsed `ProcessBody`, not of the source
+text. A zod release can emit one key more than the pinned release, or one key
+less. Such a release changes the identity of an already-published version.
+Every instance pins `{processId, version, definitionHash}`, so a changed
+identity stops a pinned instance rehydrating.
+
+A caret range admits that release without a commit. An exact pin makes the
+upgrade a deliberate commit, which re-runs the hash test over `examples/`.
+
 #### Scenario: A production install can start the engine
 
 - **WHEN** dependencies are installed without development dependencies
@@ -555,6 +574,21 @@ is then a deliberate commit that re-runs the CEL suite.
 - **WHEN** the manifest is inspected for the CEL library
 - **THEN** it names an exact version, and the reason is recorded beside the
   rule that makes it load-bearing
+
+#### Scenario: The schema library is pinned where it resolves, and ranged where it is a peer
+
+- **WHEN** the engine root, `packages/web` and `packages/form-ui` manifests are
+  inspected for zod
+- **THEN** the engine root and `packages/web` name one exact version as a
+  `dependency`
+- **AND** `packages/form-ui` names a `peerDependency` range admitting that
+  version, and no earlier major
+
+#### Scenario: A published body keeps its hash across a schema-library upgrade
+
+- **WHEN** a change upgrades the pinned zod version
+- **THEN** each `examples/` body still hashes to the value the test records,
+  and no recorded value changes
 
 ### Requirement: The devcontainer provides an SMTP catcher
 

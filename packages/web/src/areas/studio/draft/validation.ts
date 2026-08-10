@@ -82,7 +82,12 @@ export function runValidation(
     return {
       zodValid: false,
       issues: parsed.error.issues.map((issue) => ({
-        ...resolveLoc(draft, issue.path),
+        // Zod v4 widened an issue path to `PropertyKey[]`. A JSON body carries
+        // no symbol key, so a symbol segment addresses nothing here.
+        ...resolveLoc(
+          draft,
+          issue.path.filter((seg): seg is string | number => typeof seg !== "symbol"),
+        ),
         message: issue.message,
         source: "zod",
       })),

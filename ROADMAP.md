@@ -727,18 +727,38 @@ Spec: `development-toolchain`.
     and relaxing any v1 boundary — no parallelism arrives because a canvas
     could draw it.
 
-28. Zod v4 migration: NOT STARTED. Dependabot opened a major-version bump
+28. **Zod v4 migration: DONE.** Dependabot opened a major-version bump
     (zod 3.25.76 -> 4.4.3, PR #9) 2026-08-09 alongside a batch of otherwise
     routine dependency PRs. v4 restructured Zod's internal API — the `_def`
     shape, `AnyZodObject`, `ZodTypeDef` — and `src/schema/definition.ts` is
-    the JSON contract itself, built directly on those internals. `tsc`
-    fails in about twenty places across `src/schema/definition.ts`,
-    `src/schema/compile.ts`, `src/engine/config-descriptor.ts`,
-    `src/engine/migration.ts`, `src/engine/outbox.ts`, `src/http/routes.ts`
-    and `src/runtime/api.ts`. Per this project's own contract rule, a
-    deliberate change to `src/schema/definition.ts` needs its own OpenSpec
-    change, not a merged dependency PR. PR #9 stays open and unmerged until
-    that change lands. No OpenSpec change yet.
+    the JSON contract itself, built directly on those internals. Per this
+    project's own contract rule, that needed its own OpenSpec change rather
+    than a merged dependency PR.
+    The bump is pinned exactly, in the engine root and `packages/web`, and
+    ranged as a `peerDependency` in the source-only `packages/form-ui`. That
+    closes a gap the spec already stated: `development-toolchain` required an
+    exact pin on a dependency the contract rests on, and named only the CEL
+    library. `definitionHash` is the JCS hash of the PARSED body, so a zod
+    release that emits one key more or fewer changes the identity of an
+    already-published version. `test/view-layout-hash.test.ts` was the gate,
+    and all three example bodies kept their hashes.
+    Measured, not predicted: 43 errors on the bump, 13 of which came from one
+    annotation. `fieldDef` carried v3's three-parameter `ZodType<Output, Def,
+    Input>`; v4's third parameter is `Internals`, so the array of fields
+    inferred `unknown[]` and the error surfaced in `src/cel/check.ts`,
+    `src/cel/eval.ts`, `src/engine/migration.ts`, `src/engine/outbox.ts` and
+    `src/runtime/api.ts` — files that read no Zod internal at all. Correcting
+    the one annotation cleared all thirteen.
+    One behavior widened, deliberately. `refine` returns `this` in v4, so a
+    refined config schema stays a `ZodObject` and now yields a generated form
+    where v3 sent it to the studio's raw JSON textarea. The form still
+    describes per-field rules alone; the cross-field rule runs at publish.
+    `describeConfigSchema` also stopped dispatching on `instanceof`, since
+    `z.email()` is a `ZodEmail` that answers `instanceof z.ZodString` with
+    false while reporting `type: "string"`.
+    Change: `migrate-to-zod-v4`. Specs: `development-toolchain`,
+    `studio-plugin-config-form` (both modified). Design:
+    `docs/superpowers/specs/2026-08-10-zod-v4-migration-design.md`.
 
 ## Changes with no stage
 
