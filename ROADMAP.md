@@ -760,6 +760,103 @@ Spec: `development-toolchain`.
     `studio-plugin-config-form` (both modified). Design:
     `docs/superpowers/specs/2026-08-10-zod-v4-migration-design.md`.
 
+29. Table-shaped data sources: NOT STARTED. Raised 2026-08-10 in conversation.
+    Stage 26's `"db.list"` type gives every row exactly `value` + `label`; a
+    data source whose rows carry more attributes than that has no fit today,
+    since `db.list`'s config schema is fixed, not composable. Needs a design
+    pass before a change: whether the extra columns are a fixed additional set
+    or free-form (jsonb), how the studio's data-source picker and a consuming
+    field surface more than one column, and whether it is a new sibling type
+    beside `db.list` or a generalization of it. No design doc, no OpenSpec
+    change yet.
+
+30. Canvas edge routing styles (step/smoothstep): NOT STARTED. Raised
+    2026-08-10 in conversation. The canvas draws every Path as a straight SVG
+    `<line>` between two fixed anchors (`canvas/CanvasView.tsx`); an author
+    asked for the orthogonal routing React Flow's edge-types example calls
+    `step` and `smoothstep`. Brainstormed to this point, not yet a design doc:
+    one canvas-wide toolbar toggle, not per-Path; two styles only, no straight
+    option, default `step`; the choice persists as a reserved key
+    (`layout.canvasEdgeStyle`) inside the existing opaque `layout` jsonb blob,
+    the same round-trip `saveState.layout` already uses for node positions, so
+    it needs no schema or API change. The routing geometry stays an open
+    question, not a decision. A custom 3-segment path function was sketched
+    during brainstorming. An existing connector-routing library may cost less
+    than hand-rolled math, so the design phase must weigh one against the
+    other before either lands. `libavoid-js`
+    (https://github.com/Aksem/libavoid-js), a WASM port of libavoid's
+    orthogonal connector routing with obstacle avoidance, is one candidate;
+    nothing here commits to it. Pure `canvas/` presentation, per the UI
+    glossary rule that "edge" never means anything outside that layer. No
+    design doc, no OpenSpec change yet.
+
+31. Custom and floating canvas edges: NOT STARTED. Raised 2026-08-10 in
+    conversation, alongside stage 30. Today's anchors are fixed: every Path
+    leaves a step's right-middle and enters the target's left-middle
+    (`sourceAnchor`/`targetAnchor` in `canvas/CanvasView.tsx`), even when the
+    target sits above, below, or left of the source. React Flow's
+    "floating edges" example computes the anchor from the angle between the
+    two node centers instead, so each node's border point actually faces the
+    other node. React Flow's "custom edges" example renders arbitrary content
+    along an edge, not only a stroke; here that could mean a delete or insert
+    affordance on the edge itself, beyond today's guard-label and priority
+    badges. Overlaps stage 30 and is better evaluated together: a
+    routing-library choice there also decides how much of this comes for
+    free. No design doc, no OpenSpec change yet.
+
+32. Shape per step/path kind on the canvas: NOT STARTED. Raised 2026-08-10 in
+    conversation, alongside stages 30 and 31. The ask spans both node and
+    edge, in this repo's own vocabulary (`.claude/rules/ui-glossary.md`):
+    Start and End are step properties (`workflow.initialStep`,
+    `step.terminal`) and Subprocess is a step type (`stepType`,
+    `src/schema/definition.ts:198`), so all three are node shapes; "a step
+    with an automatic path" reads off `Path.trigger`, an edge property. Today
+    every node draws as the same rectangle regardless of kind. Initial and
+    terminal steps get a small stamp overlay (`canvas-initial-stamp`,
+    `canvas-terminal-stamp` in `app.css`); a subprocess step gets no marker at
+    all, identical to a task step. An automatic path already renders as a
+    solid stroke against a manual path's dashed one
+    (`canvas-edge-automatic`/`canvas-edge-manual`), so that half of the ask
+    already has a baseline, just not a distinct shape. Overlaps stages 30 and
+    31: floating anchors and a routing-library choice change the SVG
+    structure a node/edge shape would attach to, so the three want one
+    evaluation, not three. No design doc, no OpenSpec change yet.
+
+33. Editable edges with draggable control points: NOT STARTED. Raised
+    2026-08-10 in conversation, alongside stages 30 through 32. An author
+    drags a point on a Path's route to bend it around an obstacle, the way
+    React Flow's editable-edges example lets a control point move. Path
+    carries no waypoint field and none is proposed here; per the contract
+    rules a hand-drawn route is presentation, so it belongs in the opaque
+    `layout` blob, keyed per Path id, the same way stage 30's
+    `layout.canvasEdgeStyle` and today's per-step positions already live
+    there without a schema change.
+    One open tension stage 30 already decided the opposite way: that stage
+    picked one routing style for the whole canvas, not per Path, precisely to
+    avoid per-edge state. A dragged control point is per-edge by nature, so
+    the design must say whether dragging one edge silently opts it out of the
+    canvas-wide style, and what a reset back to that style looks like.
+    Overlaps stages 30 through 32 for the same reason they overlap each
+    other: floating anchors, a routing-library choice and a per-kind shape
+    all touch the same path geometry a control point would bend. No design
+    doc, no OpenSpec change yet.
+
+34. Selection grouping (group/ungroup nodes): NOT STARTED. Raised 2026-08-10
+    in conversation. An author selects several steps at once and groups them
+    into one movable, collapsible unit, the way React Flow's grouping example
+    turns a multi-selection into a parent group node, and later ungroups it.
+    Node, not edge, unlike stages 30 through 33; it shares only the same file
+    and the same "presentation, not contract" pattern.
+    A prerequisite gap: today's canvas selects one step at a time
+    (`selectedStepId: string | undefined` in `canvas/CanvasView.tsx`), with no
+    marquee or shift-click multi-select. That has to exist before grouping
+    does. No v1 FSM concept changes: a group is an organizational device on
+    the canvas, not a new runtime concept, and the hard v1 boundary against
+    parallelism stays untouched. Group membership is presentation only, so it
+    fits the opaque `layout` blob beside the other canvas-only state (node
+    positions, and stages 30/33's proposed edge style and waypoints), not
+    `src/schema/definition.ts`. No design doc, no OpenSpec change yet.
+
 ## Changes with no stage
 
 The archive also holds hardening, deduplication and bug-fix changes that belong
