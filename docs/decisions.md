@@ -46,3 +46,18 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   without making it impossible. It also costs a second read of the parent
   row on every return delivery. Do not re-propose the hoist without a
   measurement showing the bounded hold is itself the problem.
+- **Studio canvas fills only horizontally, not vertically.**
+  `.studio-canvas-layout` (`packages/web/src/areas/studio/app.css`) sits in a
+  grid whose middle column is `minmax(0, 1fr)`, so it grows with window width —
+  but the grid's own `height: 36rem` is fixed, so a taller browser window
+  leaves the canvas capped at 576px with dead space below it. No flex height
+  chain reaches it: `.shell` (`packages/web/src/shell/shell.css`) is
+  `min-height: 100vh` but not a flex column, so nothing above
+  `.studio-canvas-layout` has a height to grow into in the first place.
+  Decided fix: make `.shell` a flex column, give `.studio-edit-screen`
+  (`EditScreen.tsx`) `flex: 1 1 auto` and its own flex-column layout, and
+  replace `.studio-canvas-layout`'s fixed height with `flex: 1 1 auto;
+  min-height: <floor>` so it fills whatever the shell leaves it. Scoped to the
+  studio edit screen alone — `app`/`admin`/`reporting`'s own `<main>` elements
+  opt into no `flex-grow`, so they keep their current natural-height layout
+  unchanged.
