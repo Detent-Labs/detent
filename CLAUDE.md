@@ -75,6 +75,19 @@ Everything else is a change, whatever it looked like at first glance. Count the
 files before you call something a one-liner. A self-declared "one-liner" here
 touched four files and a spec.
 
+**A UI change is never trivial.** A screen touches its area, the area's i18n
+catalog, and often the shell or the tokens. It gets a change, and that change
+writes its delta against the capability spec of the area it touches:
+`end-user-app` for
+`areas/app/`, `admin-app` for `areas/admin/`, `reporting-app` for
+`areas/reporting/`, `unified-shell` for shell, login, routing and chrome,
+`form-ui` for the renderer. Studio work goes to the specific capability —
+`studio-canvas`, `studio-json-view`, `studio-form-editor`, `studio-publish` and
+the rest — and `studio-app` keeps the frame, navigation and drafts list.
+`spa-accessibility`, `ui-string-overrides` and `authored-content-localization`
+cut across all of them. A screen that needs new data adds the API-side spec too,
+`instance-query` or `admin-operations-api` for example.
+
 **No phase inside the cycle is optional.** Do not propose skipping the spec or
 the plan phase. That holds for `opsx:propose` and for the brainstorming skill.
 Run the `openspec-review-change` skill before `opsx:apply`, every time. Resolve
