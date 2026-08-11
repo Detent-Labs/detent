@@ -29,7 +29,7 @@ import {
   type DegradedInstanceSummary,
 } from "../src/runtime/api.js";
 import { redactInstance } from "../src/engine/retention.js";
-import { ADMIN_ROLE, DEVELOPER_ROLE, AuthorizationError } from "../src/auth/authorize.js";
+import { ADMIN_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE, AuthorizationError } from "../src/auth/authorize.js";
 import { RequestShapeError } from "../src/errors.js";
 import type { ProcessBody, ProcessId, PathId, InstanceId, FieldId, Instance, StepId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
@@ -1673,6 +1673,34 @@ test.skipIf(!DB)("getInstanceRecord is refused for a developer who did not start
   let raised: unknown;
   try {
     await getInstanceRecord(created.instanceId, developer);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(AuthorizationError);
+});
+
+test.skipIf(!DB)("getInstanceRecord succeeds for an author who started the instance, without ADMIN_ROLE", async () => {
+  // The studio Player renders this record beside the form, and `system:author`
+  // reaches the Player. The starter condition is what still bounds the read.
+  const PID = pid("proc_record_author_starter");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const author: Actor = { id: "user_author_record", roles: [AUTHOR_ROLE] };
+  const created = await createProcessInstance(PID, author, dataSourceReg);
+  await submitAndTransition(created.instanceId, "path_x" as PathId, {} as Instance["data"], author, dataSourceReg);
+
+  const page = await getInstanceRecord(created.instanceId, author);
+  expect(page.items.length).toBeGreaterThan(0);
+});
+
+test.skipIf(!DB)("getInstanceRecord is refused for an author who did not start the instance", async () => {
+  const PID = pid("proc_record_author_not_starter");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  const author: Actor = { id: "user_author_not_starter", roles: [AUTHOR_ROLE] };
+
+  let raised: unknown;
+  try {
+    await getInstanceRecord(created.instanceId, author);
   } catch (e) {
     raised = e;
   }

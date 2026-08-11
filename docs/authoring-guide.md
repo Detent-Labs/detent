@@ -21,7 +21,7 @@ watch the result in the other three.
 | Area | Role you need | Who works here | What happens here |
 |---|---|---|---|
 | Tasks | none, a login is enough | participant | complete tasks, start a process |
-| Studio | `system:developer` | **author** | build, test and publish processes |
+| Studio | `system:author` or `system:developer` | **author** | build, test and publish processes |
 | Operations | `system:admin` | operator | instances, outbox, timers, users, migrations |
 | Reports | `system:reports` | process owner | cycle time, bottlenecks, SLA |
 

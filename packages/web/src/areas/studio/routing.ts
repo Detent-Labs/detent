@@ -62,22 +62,32 @@ export function routePath(route: Route): string {
 }
 
 /**
- * The role each route's screen needs. Area entry admits either role (see
- * `shell/areas.ts`), so this is the second, narrower gate: an actor holding
- * only `system:templates` reaches the templates screen and nothing else.
+ * The roles each route's screen admits — any one of them reaches it. Area
+ * entry admits any of three (see `shell/areas.ts`), so this is the second,
+ * narrower gate: an actor holding only `system:templates` reaches the
+ * templates screen and nothing else, and an actor holding only
+ * `system:author` reaches the four authoring screens but neither migration
+ * planning nor Tools.
+ *
+ * A set per screen, unlike the admin area's one string per screen. Admin's two
+ * roles partition its screens cleanly; the two authoring roles here do not,
+ * since both reach the same four screens.
  *
  * Homed here rather than in `root.tsx` so it stays readable without React —
  * `root.tsx` pulls in every screen and the area stylesheet. The same placement
- * the admin area's map takes, and for the same reason. The server's
- * `requireRole` on every studio route stays the enforcement; this is display
- * logic.
+ * the admin area's map takes, and for the same reason. The server's role check
+ * on every studio route stays the enforcement; this is display logic.
  */
-export const ROUTE_ROLE: Record<Route["name"], string> = {
-  processes: "system:developer",
-  edit: "system:developer",
-  versions: "system:developer",
-  migrate: "system:developer",
-  tools: "system:developer",
-  play: "system:developer",
-  templates: "system:templates",
+const AUTHORING = ["system:developer", "system:author"] as const;
+
+export const ROUTE_ROLE: Record<Route["name"], readonly string[]> = {
+  processes: AUTHORING,
+  edit: AUTHORING,
+  versions: AUTHORING,
+  play: AUTHORING,
+  // Developer-only: migration planning rewrites the state of every running
+  // instance on a version, and Tools reads the running deployment's registry.
+  migrate: ["system:developer"],
+  tools: ["system:developer"],
+  templates: ["system:templates"],
 };

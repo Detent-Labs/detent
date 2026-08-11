@@ -3,7 +3,15 @@ import { matchRoute, routePath, ROUTE_ROLE, type Route } from "../src/areas/stud
 import { mayEnter } from "../src/shell/areas.js";
 
 const DEVELOPER_ROLE = "system:developer";
+const AUTHOR_ROLE = "system:author";
 const TEMPLATES_ROLE = "system:templates";
+
+/** The four screens both authoring roles reach. */
+const AUTHORING_ROUTES = ["processes", "edit", "versions", "play"] as const;
+/** The two the map keeps behind the developer role alone. */
+const DEVELOPER_ONLY_ROUTES = ["migrate", "tools"] as const;
+
+const reaches = (name: Route["name"], roles: string[]) => ROUTE_ROLE[name].some((role) => roles.includes(role));
 
 const EVERY_ROUTE: Route[] = [
   { name: "processes" },
@@ -54,41 +62,62 @@ describe("the form editor's formStepId sub-state of the edit route", () => {
 
 describe("the studio area's per-screen role gate", () => {
   it("names a role for every route, so no screen is ungated by omission", () => {
-    for (const route of EVERY_ROUTE) expect(ROUTE_ROLE[route.name]).toBeTruthy();
+    for (const route of EVERY_ROUTE) expect(ROUTE_ROLE[route.name].length).toBeGreaterThan(0);
   });
 
-  it("puts the six authoring screens behind the developer role", () => {
-    for (const route of EVERY_ROUTE.filter((r) => r.name !== "templates")) {
-      expect(ROUTE_ROLE[route.name]).toBe(DEVELOPER_ROLE);
+  it("admits both authoring roles to the four authoring screens", () => {
+    for (const name of AUTHORING_ROUTES) {
+      expect(reaches(name, [DEVELOPER_ROLE])).toBe(true);
+      expect(reaches(name, [AUTHOR_ROLE])).toBe(true);
+    }
+  });
+
+  it("keeps migration planning and Tools behind the developer role alone", () => {
+    for (const name of DEVELOPER_ONLY_ROUTES) {
+      expect(ROUTE_ROLE[name]).toEqual([DEVELOPER_ROLE]);
     }
   });
 
   it("puts the templates screen behind the templates role alone", () => {
-    expect(ROUTE_ROLE.templates).toBe(TEMPLATES_ROLE);
+    expect(ROUTE_ROLE.templates).toEqual([TEMPLATES_ROLE]);
   });
 
-  // The gate this change exists to keep: widening area entry must not widen the
-  // screens inside it.
+  // The gate stage 27d added: widening area entry must not widen the screens
+  // inside it.
   it("reaches no authoring screen for an actor holding only the templates role", () => {
-    const roles = [TEMPLATES_ROLE];
     for (const route of EVERY_ROUTE.filter((r) => r.name !== "templates")) {
-      expect(roles.includes(ROUTE_ROLE[route.name]!)).toBe(false);
+      expect(reaches(route.name, [TEMPLATES_ROLE])).toBe(false);
     }
-    expect(roles.includes(ROUTE_ROLE.templates)).toBe(true);
+    expect(reaches("templates", [TEMPLATES_ROLE])).toBe(true);
   });
 
   it("reaches no templates screen for an actor holding only the developer role", () => {
-    expect([DEVELOPER_ROLE].includes(ROUTE_ROLE.templates)).toBe(false);
+    expect(reaches("templates", [DEVELOPER_ROLE])).toBe(false);
+  });
+
+  // The gate this change exists for: an author authors, and does not migrate.
+  it("reaches neither migration planning nor Tools for an actor holding only the author role", () => {
+    for (const name of DEVELOPER_ONLY_ROUTES) {
+      expect(reaches(name, [AUTHOR_ROLE])).toBe(false);
+    }
+    expect(reaches("templates", [AUTHOR_ROLE])).toBe(false);
+  });
+
+  it("keeps every screen the developer role reached before", () => {
+    for (const route of EVERY_ROUTE.filter((r) => r.name !== "templates")) {
+      expect(reaches(route.name, [DEVELOPER_ROLE])).toBe(true);
+    }
   });
 });
 
 describe("studio area entry", () => {
-  it("admits either studio role", () => {
+  it("admits any of the three studio roles", () => {
     expect(mayEnter("studio", [DEVELOPER_ROLE])).toBe(true);
+    expect(mayEnter("studio", [AUTHOR_ROLE])).toBe(true);
     expect(mayEnter("studio", [TEMPLATES_ROLE])).toBe(true);
   });
 
-  it("refuses an actor holding neither", () => {
+  it("refuses an actor holding none of them", () => {
     expect(mayEnter("studio", [])).toBe(false);
     expect(mayEnter("studio", ["system:admin"])).toBe(false);
   });
@@ -101,6 +130,11 @@ describe("studio area entry", () => {
   it("falls back to a route the curator's own role does not open", () => {
     const fallback = matchRoute("/");
     expect(fallback).toEqual({ name: "processes" });
-    expect(ROUTE_ROLE[fallback.name]).toBe(DEVELOPER_ROLE);
+    expect(reaches(fallback.name, [TEMPLATES_ROLE])).toBe(false);
+  });
+
+  /** An author needs no such redirect: the map admits them to the default. */
+  it("falls back to a route the author's own role does open", () => {
+    expect(reaches(matchRoute("/").name, [AUTHOR_ROLE])).toBe(true);
   });
 });

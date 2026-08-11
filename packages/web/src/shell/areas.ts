@@ -15,16 +15,18 @@ export type Area = (typeof AREAS)[number];
  * session is enough.
  *
  * The admin area carries two because the data list screens live in it while
- * their maintainers must not hold `system:admin`. The studio area carries two
- * for the same reason: the templates screen lives in it while a template
- * curator must not hold `system:developer`. Area entry is therefore the weaker
- * gate in both, and each screen inside keeps its own role check — see the
- * `ROUTE_ROLE` map each area's `routing.ts` declares.
+ * their maintainers must not hold `system:admin`. The studio area carries
+ * three for the same reason: the templates screen lives in it while a template
+ * curator must not hold `system:developer`, and the authoring screens live in
+ * it while an author must not hold `system:developer` either — that role also
+ * opens migration planning. Area entry is therefore the weaker gate in both,
+ * and each screen inside keeps its own role check — see the `ROUTE_ROLE` map
+ * each area's `routing.ts` declares.
  */
 const REQUIRED_ROLE: Record<Area, readonly string[]> = {
   app: [],
   admin: ["system:admin", "system:datalists"],
-  studio: ["system:developer", "system:templates"],
+  studio: ["system:developer", "system:author", "system:templates"],
   reporting: ["system:reports"],
 };
 

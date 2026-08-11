@@ -1,7 +1,7 @@
 # One-command devcontainer bring-up (PowerShell 7+ variant of dev-up.sh, for
 # Windows systems without Git Bash / WSL). Starts the compose services,
 # installs deps, seeds the example processes + demo users, ensures a
-# demo-superuser with all six system:* roles, and (re)starts the HTTP
+# demo-superuser with all eight system:* roles, and (re)starts the HTTP
 # server. Safe to re-run — every step is idempotent, and the JWT signing
 # secret is generated once and reused, so restarts don't invalidate
 # existing logins.
@@ -15,7 +15,7 @@ Set-Location (Join-Path $PSScriptRoot "..")
 
 $SuperuserEmail = "demo-superuser@example.test"
 $SuperuserPassword = "seed-demo-password"
-$SuperuserRoles = "system:publish,system:cancel-any,system:admin,system:developer,system:reports,system:datalists"
+$SuperuserRoles = "system:publish,system:cancel-any,system:admin,system:developer,system:author,system:reports,system:datalists,system:templates"
 $SecretFile = ".devcontainer/.auth-secret"
 
 $overridePath = ".devcontainer/docker-compose.override.yml"

@@ -13,62 +13,72 @@ import { TemplatesScreen } from "./screens/TemplatesScreen.js";
 import type { AreaRootProps } from "../../shell/App.js";
 import "./app.css";
 
-const DEVELOPER_ROLE = "system:developer";
+// The only role this file names on its own. Every other per-screen role comes
+// from `ROUTE_ROLE`, so the nav and the guard cannot disagree with the map.
 const TEMPLATES_ROLE = "system:templates";
 
-/** The same explanatory state the shell shows an actor with no studio role, named per screen. */
-function MissingRole({ role }: { role: string }) {
+/**
+ * The same explanatory state the shell shows an actor with no studio role,
+ * named per screen. Names every role that admits the screen, not just one: a
+ * screen admitting two roles that named one would tell an author they need a
+ * role they may already hold.
+ */
+function MissingRole({ roles }: { roles: readonly string[] }) {
   return (
     <main className="studio-empty-role">
       <h1>Not your screen</h1>
-      <p>This screen needs the {role} role. Your account does not have it.</p>
+      <p>
+        This screen needs the {roles.join(" or ")} role. Your account does not have it.
+      </p>
     </main>
   );
 }
 
 /**
- * The developer area's root. Area entry is the shell's, read from one table
- * (`shell/areas.ts`), and it admits `system:developer` or `system:templates`.
- * Entry is therefore the weaker gate: `ROUTE_ROLE` in `routing.ts` is the
- * narrower one, so a template curator reaches the templates screen alone. The
- * server's `requireRole` on every route it calls stays the enforcement.
+ * The studio area's root. Area entry is the shell's, read from one table
+ * (`shell/areas.ts`), and it admits `system:developer`, `system:author` or
+ * `system:templates`. Entry is therefore the weaker gate: `ROUTE_ROLE` in
+ * `routing.ts` is the narrower one, so a template curator reaches the
+ * templates screen alone and an author reaches neither migration planning nor
+ * Tools. The server's role check on every route it calls stays the
+ * enforcement.
  */
 export function StudioArea({ session, locale, localPath, go, onUnauthorized, onLocaleChange, onLogout }: AreaRootProps) {
   const { route, navigate } = useAreaRoute<Route>("studio", localPath, matchRoute, routePath, go);
-  const may = (role: string) => session.roles.includes(role);
+  const may = (roles: readonly string[]) => roles.some((role) => session.roles.includes(role));
 
   // `matchRoute` falls back to the process list, which a curator holding only
   // `system:templates` cannot read. Move them to the screen they can, rather
   // than landing them on an explanation of why their own area refuses them.
-  const strandedOnDefault = route.name === "processes" && !may(DEVELOPER_ROLE) && may(TEMPLATES_ROLE);
+  const strandedOnDefault = route.name === "processes" && !may(ROUTE_ROLE.processes) && may([TEMPLATES_ROLE]);
   useEffect(() => {
     if (strandedOnDefault) navigate({ name: "templates" });
   }, [strandedOnDefault, navigate]);
 
   const nav = (
     <nav className="shell-nav">
-      {may(DEVELOPER_ROLE) && (
-        <>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            aria-current={route.name === "processes" || route.name === "edit" ? "page" : undefined}
-            onClick={() => navigate({ name: "processes" })}
-          >
-            <Workflow size={18} strokeWidth={1.75} aria-hidden="true" />
-            Processes
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            aria-current={route.name === "tools" ? "page" : undefined}
-            onClick={() => navigate({ name: "tools" })}
-          >
-            Tools
-          </button>
-        </>
+      {may(ROUTE_ROLE.processes) && (
+        <button
+          type="button"
+          className="btn btn-secondary"
+          aria-current={route.name === "processes" || route.name === "edit" ? "page" : undefined}
+          onClick={() => navigate({ name: "processes" })}
+        >
+          <Workflow size={18} strokeWidth={1.75} aria-hidden="true" />
+          Processes
+        </button>
       )}
-      {may(TEMPLATES_ROLE) && (
+      {may(ROUTE_ROLE.tools) && (
+        <button
+          type="button"
+          className="btn btn-secondary"
+          aria-current={route.name === "tools" ? "page" : undefined}
+          onClick={() => navigate({ name: "tools" })}
+        >
+          Tools
+        </button>
+      )}
+      {may(ROUTE_ROLE.templates) && (
         <button
           type="button"
           className="btn btn-secondary"
@@ -83,6 +93,10 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
   );
 
   const required = ROUTE_ROLE[route.name];
+  // The migration screen is developer-only, so the versions screen must not
+  // offer a control that leads there for an author (design.md § "The author
+  // reaches the version list, not migration planning").
+  const mayPlanMigration = may(ROUTE_ROLE.migrate);
 
   return (
     <Chrome
@@ -96,7 +110,7 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
       onGoToProfile={() => go(PROFILE_PATH)}
       nav={nav}
     >
-      {!may(required) && <MissingRole role={required} />}
+      {!may(required) && <MissingRole roles={required} />}
       {may(required) && (
         <>
           {route.name === "processes" && <ProcessesScreen token={session.token} navigate={navigate} onUnauthorized={onUnauthorized} />}
@@ -110,7 +124,13 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
             />
           )}
           {route.name === "versions" && (
-            <VersionsScreen processId={route.processId} token={session.token} navigate={navigate} onUnauthorized={onUnauthorized} />
+            <VersionsScreen
+              processId={route.processId}
+              token={session.token}
+              navigate={navigate}
+              onUnauthorized={onUnauthorized}
+              mayPlanMigration={mayPlanMigration}
+            />
           )}
           {route.name === "migrate" && (
             <MigrationPlanScreen

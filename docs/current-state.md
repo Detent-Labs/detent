@@ -2346,11 +2346,11 @@ Stage-by-stage status is in `ROADMAP.md`.
   the editing pressure a draft on a canvas does.
 
   Four routes maintain a template, behind a seventh reserved role,
-  `TEMPLATES_ROLE = "system:templates"`. It implies none of the other six, and
-  none of them implies it. Reads also accept `DEVELOPER_ROLE`, so the start
-  picker offers the templates to every author.
+  `TEMPLATES_ROLE = "system:templates"`. It implies none of the others, and
+  none of them implies it. Reads also accept either authoring role, so the
+  start picker offers the templates to every author.
 
-  `GET /processes/:processId/versions/:version` accepts the pair too. A
+  `GET /processes/:processId/versions/:version` accepts the same three roles. A
   curator creates a template from a published version. Refusing that body
   would leave the role able to write a template and unable to get one. A
   browser walk caught exactly that.
@@ -2370,18 +2370,60 @@ Stage-by-stage status is in `ROADMAP.md`.
   template. A later edit changes no draft already seeded from it. Deleting one
   strands nothing.
 
-- Two-role studio area (`packages/web/src/shell/areas.ts`,
+- Three-role studio area (`packages/web/src/shell/areas.ts`,
   `packages/web/src/areas/studio/routing.ts`): the studio entry lists
-  `system:developer` and `system:templates`. The templates screen lives in the
-  area while a curator must not hold `system:developer`. Entry is therefore
-  the weaker gate, so the area gained the `ROUTE_ROLE` map the admin area
-  already had. The six authoring screens take `system:developer` and the
+  `system:developer`, `system:author` and `system:templates`. The templates
+  screen lives in the area while a curator must not hold `system:developer`.
+  The authoring screens live in it too. An author must not hold that role
+  either, since it also opens migration planning. Entry is therefore the weaker
+  gate, so the area gained the `ROUTE_ROLE` map the admin area already had.
+
+  That map carries a SET of roles per screen, unlike the admin area's one
+  string per screen. Admin's two roles partition its screens cleanly. The two
+  authoring roles do not, since both reach the same four screens. Those four
+  are the process list, the editor, the versions screen and the player. The
+  migration screen and the tools screen take `system:developer` alone, and the
   templates screen takes `system:templates`.
 
-  The nav lists only what the actor's roles reach, and a denied screen shows
-  the area's explanatory state. A curator who lands on the area's default
-  route goes to the templates screen, rather than to a refusal. The server's
-  `requireRole` on every studio route stays the enforcement.
+  The nav lists only what the actor's roles reach. A denied screen shows the
+  area's explanatory state, naming every role that admits it. A curator who
+  lands on the area's default route goes to the templates screen, rather than
+  to a refusal. An author needs no such move, since the map admits that role to
+  the default.
+
+  The versions screen hides its migration-plan button for an actor lacking
+  `system:developer`. The product then never offers a control it refuses. The
+  server's role check on every studio route stays the enforcement.
+
+- The `system:author` role (`src/auth/authorize.ts`,
+  `src/http/studio-routes.ts`): an eighth reserved role, admitting the no-code
+  authoring subset. Two named predicates in `studio-routes.ts` carry it.
+  `requireAuthoring` (author OR developer) gates the four draft routes, the
+  publish route beside `PUBLISH_ROLE`, and `GET /registry`. `requireStudioRead`
+  (those two OR templates) gates the two template reads and the published
+  version body.
+
+  The two migration-plan routes and the orphan-key scan keep
+  `requireRole(actor, DEVELOPER_ROLE)` alone. Those three rewrite the state of
+  every running instance on a version.
+
+  `GET /registry` widens while the Tools SCREEN does not. The route has two
+  consumers. One is the Tools screen. The other is the inspector's
+  plugin-config form, which turns a registered type's config schema into a
+  form. An author refused the route falls back to raw JSON for every action
+  config.
+
+  Two routes outside the studio prefix widen with it, because studio screens
+  call them. `GET /admin/data-lists` fills the `"db.list"` picker
+  (`admin-routes.ts::requireDataListRead`). And `getInstanceRecord`'s starter
+  fallback (`src/runtime/api.ts`) now admits either authoring role for an
+  instance that actor started. The Player renders that record beside the form.
+
+  Neither data list write moves, and the starter condition still bounds the
+  record read.
+
+  The role implies nothing and nothing implies it. It is a widening: every
+  account holding `system:developer` reaches exactly what it reached before.
 
 - Two-role admin area (`packages/web/src/shell/areas.ts`,
   `packages/web/src/areas/admin/`): the shell's area table now carries a set

@@ -34,15 +34,17 @@ const RESET_CAVEAT =
   "A reset does not end an already-active session. A token issued before it remains valid until it expires (up to 8 hours). Disable the account to cut a session off now.";
 
 /**
- * The six reserved roles, spelled the way `src/auth/authorize.ts` exports them.
- * Hardcoded here as the area's other screens hardcode theirs (`root.tsx`,
- * `routing.ts`): no route serves the list, and a role string is otherwise free.
+ * The eight reserved roles, spelled the way `src/auth/authorize.ts` exports
+ * them. Hardcoded here as the area's other screens hardcode theirs
+ * (`root.tsx`, `routing.ts`): no route serves the list, and a role string is
+ * otherwise free.
  */
 const RESERVED_ROLES = [
   "system:admin",
   "system:publish",
   "system:cancel-any",
   "system:developer",
+  "system:author",
   "system:reports",
   "system:datalists",
   "system:templates",

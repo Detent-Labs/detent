@@ -10,7 +10,7 @@ import { createRegistry } from "../src/engine/registry.js";
 import { createDefaultDataSourceRegistry, DB_LIST_DATA_SOURCE_TYPE, MAX_DATA_LIST_VALUES } from "../src/engine/host.js";
 import { createServer } from "../src/http/server.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
-import { ADMIN_ROLE, DATALISTS_ROLE, DEVELOPER_ROLE } from "../src/auth/authorize.js";
+import { ADMIN_ROLE, DATALISTS_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE } from "../src/auth/authorize.js";
 import { publishBody } from "../src/engine/definitions.js";
 import type { Actor } from "../src/cel/eval.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
@@ -24,6 +24,7 @@ const maintainer: Actor = { id: "user_maintainer", roles: [DATALISTS_ROLE] };
 const developer: Actor = { id: "user_developer", roles: [DEVELOPER_ROLE] };
 const admin: Actor = { id: "user_admin", roles: [ADMIN_ROLE] };
 const bystander: Actor = { id: "user_bystander", roles: [] };
+const author: Actor = { id: "user_author", roles: [AUTHOR_ROLE] };
 
 const BASE = "http://localhost/admin/data-lists";
 
@@ -194,6 +195,19 @@ test.skipIf(!DB)("a developer reads but cannot write", async () => {
   expect((await putValues("cost_centres", [v("cc1")], developer)).status).toBe(403);
   expect((await fetch(req(`${BASE}/cost_centres`, "PUT", developer, { label: "x" }))).status).toBe(403);
   expect((await fetch(req(`${BASE}/cost_centres`, "DELETE", developer))).status).toBe(403);
+});
+
+// The read is what fills the `"db.list"` picker in the studio's data source
+// panel, and an author authors data sources. The write stays the maintainer's.
+test.skipIf(!DB)("an author reads but cannot write", async () => {
+  await createList("cost_centres");
+  expect((await fetch(req(BASE, "GET", author))).status).toBe(200);
+  expect((await fetch(req(`${BASE}/cost_centres`, "GET", author))).status).toBe(200);
+
+  expect((await createList("from_author", author)).status).toBe(403);
+  expect((await putValues("cost_centres", [v("cc1")], author)).status).toBe(403);
+  expect((await fetch(req(`${BASE}/cost_centres`, "PUT", author, { label: "x" }))).status).toBe(403);
+  expect((await fetch(req(`${BASE}/cost_centres`, "DELETE", author))).status).toBe(403);
 });
 
 test.skipIf(!DB)("an admin cannot write a data list", async () => {

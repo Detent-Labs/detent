@@ -14,6 +14,14 @@ interface VersionsScreenProps {
   token: string;
   navigate: (route: Route) => void;
   onUnauthorized: () => void;
+  /**
+   * Whether to offer the control leading to the migration screen. That screen
+   * is developer-only while this one admits an author too, so offering it
+   * unconditionally would walk an author into a refusal from a control the
+   * product handed them. `root.tsx` reads it from the same `ROUTE_ROLE` map
+   * the nav and the guard read.
+   */
+  mayPlanMigration: boolean;
 }
 
 /**
@@ -32,7 +40,7 @@ function downloadJson(filename: string, payload: unknown): void {
 }
 
 /** process-version-inspection spec: list published versions, diff any two (or a draft against its base_version). */
-export function VersionsScreen({ processId, token, navigate, onUnauthorized }: VersionsScreenProps) {
+export function VersionsScreen({ processId, token, navigate, onUnauthorized, mayPlanMigration }: VersionsScreenProps) {
   const [versions, setVersions] = useState<VersionSummary[]>([]);
   const [baseVersion, setBaseVersion] = useState<number | null>(null);
   const [selection, setSelection] = useState<VersionSelection>({});
@@ -220,7 +228,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
             <button type="button" className="btn btn-secondary" disabled={!canDiff(selection)} onClick={() => void diffSelected()}>
               Diff selected
             </button>
-            {canDiff(selection) && (
+            {mayPlanMigration && canDiff(selection) && (
               <button
                 type="button"
                 className="btn btn-secondary"

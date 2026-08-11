@@ -1,10 +1,17 @@
 /**
- * Developer-facing draft routes behind `system:developer`. Kept out of
- * `routes.ts`, which stays the participant-facing surface — same reasoning as
- * `admin-routes.ts`. Same framework-agnostic handler shape, and the same
- * `resolveActor` and `guarded` helpers, imported from `routes.ts` rather than
- * copied. Each handler resolves the actor then requires `DEVELOPER_ROLE`
- * before any read or write.
+ * The authoring routes. Kept out of `routes.ts`, which stays the
+ * participant-facing surface — same reasoning as `admin-routes.ts`. Same
+ * framework-agnostic handler shape, and the same `resolveActor` and `guarded`
+ * helpers, imported from `routes.ts` rather than copied.
+ *
+ * Each handler resolves the actor, then applies one of three gates before any
+ * read or write:
+ * - `requireAuthoring` (author OR developer) on the four draft routes, the
+ *   publish route (beside `PUBLISH_ROLE`) and `GET /registry`.
+ * - `requireStudioRead` (those two OR templates) on the two template reads and
+ *   the published version body.
+ * - `requireRole(actor, DEVELOPER_ROLE)` alone on the two migration-plan
+ *   routes and the orphan-key scan.
  */
 import type { SQL } from "bun";
 import { sql, withTransaction } from "../engine/store.js";
@@ -23,7 +30,7 @@ import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies
 import { describeConfigSchema, type ConfigFieldDescriptor } from "../engine/config-descriptor.js";
 import type { ZodTypeAny } from "zod";
 import type { ActorResolver } from "../auth/resolve.js";
-import { requireRole, AuthorizationError, DEVELOPER_ROLE, PUBLISH_ROLE, TEMPLATES_ROLE } from "../auth/authorize.js";
+import { requireRole, AuthorizationError, DEVELOPER_ROLE, PUBLISH_ROLE, TEMPLATES_ROLE, AUTHOR_ROLE } from "../auth/authorize.js";
 import { RequestShapeError, type HttpResult } from "./errors.js";
 import { resolveActor, guarded } from "./routes.js";
 import type { ProcessId, ProcessBody, MigrationSpec } from "../schema/definition.js";
@@ -36,23 +43,39 @@ function parseVersion(raw: string, label: string): number {
 }
 
 /**
- * Either studio role admits. Three reads take it: the two template reads, and
- * the published version body a curator creates a template from. Writing a
- * template still needs `TEMPLATES_ROLE` alone, and every other studio route
- * still needs `DEVELOPER_ROLE` alone.
+ * Either authoring role admits. The whole no-code authoring surface takes it:
+ * the four draft routes, the publish route (which separately needs
+ * `PUBLISH_ROLE`) and `GET /registry`, whose config-schema descriptions drive
+ * the inspector's plugin-config form.
  *
  * Not a general `requireAnyRole`: this names one specific pair, so a later
- * route cannot reach for it and quietly widen itself.
+ * route cannot reach for it and quietly widen itself. The two migration-plan
+ * routes and the orphan-key scan deliberately do NOT take it.
  */
-function requireEitherStudioRole(actor: { id: string; roles: readonly string[] }): void {
-  if (actor.roles.includes(TEMPLATES_ROLE) || actor.roles.includes(DEVELOPER_ROLE)) return;
-  throw new AuthorizationError(`actor '${actor.id}' lacks required role '${TEMPLATES_ROLE}' or '${DEVELOPER_ROLE}'`);
+function requireAuthoring(actor: { id: string; roles: readonly string[] }): void {
+  if (actor.roles.includes(AUTHOR_ROLE) || actor.roles.includes(DEVELOPER_ROLE)) return;
+  throw new AuthorizationError(`actor '${actor.id}' lacks required role '${AUTHOR_ROLE}' or '${DEVELOPER_ROLE}'`);
+}
+
+/**
+ * Any studio role admits. Three reads take it: the two template reads, and
+ * the published version body a curator creates a template from. Writing a
+ * template still needs `TEMPLATES_ROLE` alone.
+ *
+ * The same rule as `requireAuthoring` above: this names one specific trio, and
+ * a later route may not reach for it to widen itself.
+ */
+function requireStudioRead(actor: { id: string; roles: readonly string[] }): void {
+  if (actor.roles.includes(TEMPLATES_ROLE) || actor.roles.includes(AUTHOR_ROLE) || actor.roles.includes(DEVELOPER_ROLE)) return;
+  throw new AuthorizationError(
+    `actor '${actor.id}' lacks required role '${TEMPLATES_ROLE}', '${AUTHOR_ROLE}' or '${DEVELOPER_ROLE}'`,
+  );
 }
 
 export async function handleListDrafts(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
-    requireRole(actor, DEVELOPER_ROLE);
+    requireAuthoring(actor);
     return { status: 200, body: await listDrafts(db) };
   });
 }
@@ -60,7 +83,7 @@ export async function handleListDrafts(req: Request, resolver: ActorResolver, db
 export async function handleGetDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
-    requireRole(actor, DEVELOPER_ROLE);
+    requireAuthoring(actor);
     const draft = await getDraft(processId as ProcessId, db);
     if (!draft) return { status: 404, body: { error: { type: "not-found", message: `no draft: ${processId}` } } };
     return { status: 200, body: draft };
@@ -70,7 +93,7 @@ export async function handleGetDraft(processId: string, req: Request, resolver: 
 export async function handleSaveDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
-    requireRole(actor, DEVELOPER_ROLE);
+    requireAuthoring(actor);
     let parsed: { body?: unknown; layout?: unknown; revision?: unknown; baseVersion?: unknown };
     try {
       parsed = (await req.json()) as { body?: unknown; layout?: unknown; revision?: unknown; baseVersion?: unknown };
@@ -96,7 +119,7 @@ export async function handleSaveDraft(processId: string, req: Request, resolver:
 export async function handleDeleteDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
-    requireRole(actor, DEVELOPER_ROLE);
+    requireAuthoring(actor);
     const removed = await deleteDraft(processId as ProcessId, db);
     if (!removed) return { status: 404, body: { error: { type: "not-found", message: `no draft: ${processId}` } } };
     return { status: 204, body: null };
@@ -105,10 +128,10 @@ export async function handleDeleteDraft(processId: string, req: Request, resolve
 
 /**
  * Publishes the *persisted* draft, not any body the caller supplies — there is
- * nothing to accept beyond the process id. Requires `DEVELOPER_ROLE` (every
- * studio route does) and, separately, `PUBLISH_ROLE` — `system:developer`
- * implies nothing else, so publishing from Studio stays gated exactly as
- * publishing from anywhere else. `publishBody` and the `base_version` stamp
+ * nothing to accept beyond the process id. Needs an authoring role (either one)
+ * and, separately, `PUBLISH_ROLE` — neither authoring role implies anything
+ * else, so publishing from Studio stays gated exactly as publishing from
+ * anywhere else. `publishBody` and the `base_version` stamp
  * run inside one `withTransaction` so a stamp failure can never leave a
  * published version with an un-stamped draft — the publish itself would roll
  * back too, matching the "both or neither" a caller expects from one HTTP call.
@@ -124,7 +147,7 @@ export async function handlePublishDraft(
 ): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
-    requireRole(actor, DEVELOPER_ROLE);
+    requireAuthoring(actor);
     requireRole(actor, PUBLISH_ROLE);
     const draft = await getDraft(processId as ProcessId, db);
     if (!draft) return { status: 404, body: { error: { type: "not-found", message: `no draft: ${processId}` } } };
@@ -144,7 +167,7 @@ export async function handlePublishDraft(
  * The compiled body `resolveBody` already resolves for engine use, unlike the
  * metadata-only sibling `GET /processes/:processId/versions`.
  *
- * Either studio role admits. A curator creates a template from a published
+ * Any studio role admits. A curator creates a template from a published
  * version, so refusing the body would leave the role able to write a template
  * and unable to obtain one — a browser walk caught exactly that. A published
  * body is the one every participant already runs, so it is the safe half of
@@ -153,7 +176,7 @@ export async function handlePublishDraft(
 export async function handleGetVersionBody(processId: string, versionRaw: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
-    requireEitherStudioRole(actor);
+    requireStudioRead(actor);
     const version = parseVersion(versionRaw, "version");
     const body = await createDefinitionStore(db).resolveBody(processId as ProcessId, version);
     if (!body) return { status: 404, body: { error: { type: "not-found", message: `no published version ${version} for ${processId}` } } };
@@ -161,7 +184,14 @@ export async function handleGetVersionBody(processId: string, versionRaw: string
   });
 }
 
-/** Reads a registered migration plan. 404 when no plan has ever been registered for the key. */
+/**
+ * Reads a registered migration plan. 404 when no plan has ever been registered
+ * for the key.
+ *
+ * `DEVELOPER_ROLE` alone, deliberately: this route and its two siblings below
+ * rewrite the state of every running instance on a version, which is not part
+ * of the no-code authoring subset `AUTHOR_ROLE` grants.
+ */
 export async function handleGetMigrationPlan(
   processId: string,
   fromRaw: string,
@@ -207,7 +237,7 @@ export async function handlePutMigrationPlan(
   });
 }
 
-/** Read-only orphan-key dry run, wrapping `findOrphanKeys` unchanged. Version-keyed, not plan-keyed — the scan is independent of any specific migration target. */
+/** Read-only orphan-key dry run, wrapping `findOrphanKeys` unchanged. Version-keyed, not plan-keyed — the scan is independent of any specific migration target. `DEVELOPER_ROLE` alone, for the reason `handleGetMigrationPlan` states. */
 export async function handleGetOrphanKeys(processId: string, versionRaw: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
@@ -242,6 +272,11 @@ function describeRegistry(reg: Map<string, { configSchema?: ZodTypeAny }>): Reco
  * The Tools screen renders only the type-name arrays; `actionSchemas` /
  * `dataSourceSchemas` / `assignmentStrategySchemas` serve the studio area's
  * `studio-plugin-config-form` capability instead.
+ *
+ * Either authoring role admits, because of that second consumer: the
+ * plugin-config form is exactly what lets an author configure an action
+ * without JSON. The Tools SCREEN stays behind `system:developer` — that gate
+ * lives in the studio area's `ROUTE_ROLE` map, not here.
  */
 export async function handleGetRegistry(
   req: Request,
@@ -252,7 +287,7 @@ export async function handleGetRegistry(
 ): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
-    requireRole(actor, DEVELOPER_ROLE);
+    requireAuthoring(actor);
     return {
       status: 200,
       body: {
@@ -270,7 +305,7 @@ export async function handleGetRegistry(
 export async function handleListTemplates(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
-    requireEitherStudioRole(actor);
+    requireStudioRead(actor);
     return { status: 200, body: await listTemplates(db) };
   });
 }
@@ -278,7 +313,7 @@ export async function handleListTemplates(req: Request, resolver: ActorResolver,
 export async function handleGetTemplate(templateKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver);
-    requireEitherStudioRole(actor);
+    requireStudioRead(actor);
     const template = await getTemplate(templateKey, db);
     if (!template) return { status: 404, body: { error: { type: "not-found", message: `no template: ${templateKey}` } } };
     return { status: 200, body: template };

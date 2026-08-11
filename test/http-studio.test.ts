@@ -12,7 +12,7 @@ import { createDefinitionStore } from "../src/engine/definitions.js";
 import { migrateInstances } from "../src/engine/migration.js";
 import { createServer } from "../src/http/server.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
-import { DEVELOPER_ROLE, PUBLISH_ROLE, TEMPLATES_ROLE, ADMIN_ROLE, REPORTS_ROLE } from "../src/auth/authorize.js";
+import { DEVELOPER_ROLE, PUBLISH_ROLE, TEMPLATES_ROLE, ADMIN_ROLE, REPORTS_ROLE, AUTHOR_ROLE, DATALISTS_ROLE } from "../src/auth/authorize.js";
 import type { Actor } from "../src/cel/eval.js";
 import type { ProcessId } from "../src/schema/definition.js";
 
@@ -32,6 +32,8 @@ const bystander: Actor = { id: "user_bystander", roles: [] };
 const publisher: Actor = { id: "user_publisher", roles: [DEVELOPER_ROLE, PUBLISH_ROLE] };
 const publishOnly: Actor = { id: "user_publish_only", roles: [PUBLISH_ROLE] };
 const curator: Actor = { id: "user_curator", roles: [TEMPLATES_ROLE] };
+const author: Actor = { id: "user_author", roles: [AUTHOR_ROLE] };
+const authorPublisher: Actor = { id: "user_author_publisher", roles: [AUTHOR_ROLE, PUBLISH_ROLE] };
 
 let n = 0;
 const pid = () => `proc_http_studio_${++n}`;
@@ -677,4 +679,84 @@ test.skipIf(!DB)("a PUT under a key outside the slug grammar maps to 400", async
   const res = await fetch(authedReq("http://x/templates/Not%20A%20Slug", "PUT", curator, { body: templateBody("x"), layout: {} }));
   expect(res.status).toBe(400);
   expect(((await res.json()) as { error: { type: string } }).error.type).toBe("request-shape");
+});
+
+/* --------------------------------------------------- the author role's reach
+ * `system:author` admits the no-code authoring subset and nothing beyond it.
+ * These pair with the `system:developer` cases above: no route below loses a
+ * developer, and none of them gains a curator.
+ */
+
+test.skipIf(!DB)("an author reads and writes a draft", async () => {
+  const processId = pid();
+  const put = await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", author, { body: authoredBody("v1"), layout: {}, revision: 0 }));
+  expect(put.status).toBe(200);
+  const got = await fetch(authedReq(`http://x/drafts/${processId}`, "GET", author));
+  expect(got.status).toBe(200);
+  expect(((await got.json()) as { body: { label: { en: string } } }).body.label.en).toBe("v1");
+  expect((await fetch(authedReq("http://x/drafts", "GET", author))).status).toBe(200);
+  expect((await fetch(authedReq(`http://x/drafts/${processId}`, "DELETE", author))).status).toBe(204);
+});
+
+test.skipIf(!DB)("an author reads the registry, which drives the plugin-config form", async () => {
+  const res = await fetch(authedReq("http://x/registry", "GET", author));
+  expect(res.status).toBe(200);
+  expect(((await res.json()) as { actionTypes: string[] }).actionTypes).toContain("http.request");
+});
+
+test.skipIf(!DB)("an actor holding neither authoring role reaches no registry", async () => {
+  expect((await fetch(authedReq("http://x/registry", "GET", bystander))).status).toBe(403);
+  expect((await fetch(authedReq("http://x/registry", "GET", curator))).status).toBe(403);
+});
+
+test.skipIf(!DB)("an author reaches no migration route, while a developer still does", async () => {
+  const processId = pid();
+  const plan = `http://x/migration-plans/${processId}/1/2`;
+  const orphans = `http://x/processes/${processId}/versions/1/orphan-keys`;
+  expect((await fetch(authedReq(plan, "GET", author))).status).toBe(403);
+  expect((await fetch(authedReq(plan, "PUT", author, { fieldMap: {} }))).status).toBe(403);
+  expect((await fetch(authedReq(orphans, "GET", author))).status).toBe(403);
+  // The developer keeps every one of them: 404 and 200 both mean the gate passed.
+  expect((await fetch(authedReq(plan, "GET", developer))).status).toBe(404);
+});
+
+test.skipIf(!DB)("an author publishes only with the publish role", async () => {
+  const processId = pid();
+  expect(
+    (await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", author, { body: publishableBody("Authored"), layout: {}, revision: 0 })))
+      .status,
+  ).toBe(200);
+  expect((await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", author))).status).toBe(403);
+  expect((await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", authorPublisher))).status).toBe(200);
+});
+
+test.skipIf(!DB)("an author reads the templates and a published version body, and writes no template", async () => {
+  await fetch(authedReq("http://x/templates/approval", "PUT", curator, { body: templateBody("Approval"), layout: {} }));
+  expect((await fetch(authedReq("http://x/templates", "GET", author))).status).toBe(200);
+  expect((await fetch(authedReq("http://x/templates/approval", "GET", author))).status).toBe(200);
+  expect(
+    (await fetch(authedReq("http://x/templates/other", "PUT", author, { body: templateBody("x"), layout: {} }))).status,
+  ).toBe(403);
+  expect((await fetch(authedReq("http://x/templates/approval", "DELETE", author))).status).toBe(403);
+
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", author, { body: publishableBody("Seedable"), layout: {}, revision: 0 }));
+  expect((await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", authorPublisher))).status).toBe(200);
+  expect((await fetch(authedReq(`http://x/processes/${processId}/versions/1`, "GET", author))).status).toBe(200);
+});
+
+test.skipIf(!DB)("an author reads the data list keys the picker offers, and writes none", async () => {
+  // The read is what fills the `"db.list"` picker in the data source panel.
+  expect((await fetch(authedReq("http://x/admin/data-lists", "GET", author))).status).toBe(200);
+  const write = await fetch(authedReq("http://x/admin/data-lists/cost_centres/values", "PUT", author, { values: [] }));
+  expect(write.status).toBe(403);
+  // The maintainer still writes, and the developer still reads.
+  expect((await fetch(authedReq("http://x/admin/data-lists", "GET", developer))).status).toBe(200);
+  expect((await fetch(authedReq("http://x/admin/data-lists", "GET", { id: "user_dl", roles: [DATALISTS_ROLE] } as Actor))).status).toBe(200);
+});
+
+test.skipIf(!DB)("an author reaches no other admin route and no reporting route", async () => {
+  expect((await fetch(authedReq("http://x/admin/outbox", "GET", author))).status).toBe(403);
+  expect((await fetch(authedReq("http://x/admin/users", "GET", author))).status).toBe(403);
+  expect((await fetch(authedReq("http://x/reporting/processes", "GET", author))).status).toBe(403);
 });

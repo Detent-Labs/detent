@@ -326,3 +326,45 @@ them.
 
 A `bun:test` assertion cannot see any of this. Every pass reads a resolved
 height or width, and `packages/web/test/` assumes no DOM at all.
+
+### Studio: what the author role reaches, and what it refuses
+
+Source: `split-studio-role-gate` task 9.5.
+
+Seed the database. It provisions `demo-author@example.test`, holding
+`system:author` alone. Log in as that account.
+
+Pass: the shell lands on `/studio`. The nav offers Processes alone. Neither
+Tools nor Templates appears. The drafts table renders its rows.
+
+Open a process with two published versions, then its versions screen. Select
+one version as diff side A. Select the other as side B. Pass: "Diff selected"
+enables, and no "Plan migration" control renders beside it. Log in as
+`demo-developer@example.test` and repeat. Pass: that control renders there.
+
+That pass is the one that earns its place. The migration screen refuses the
+author. A control leading there hands that account a refusal the product
+itself offered. `ROUTE_ROLE` alone does not catch it. The map gates the
+screen, and the button lives on a screen the map admits.
+
+Navigate directly to `/studio/tools` and to a `/studio/processes/:id/migrate/1/2`
+path. Pass: each renders "Not your screen", naming `system:developer`.
+
+Open a draft on the canvas. Open the data sources panel. Add a data source.
+Pass: the type picker lists `static` and `db.list`. Pick `db.list`. Pass: the
+data list control renders and reports no defect.
+
+Both controls read a route outside the studio prefix. A refusal there shows as
+an empty control rather than a message, so read the network log to confirm.
+Pass: `GET /registry` and `GET /admin/data-lists` both answer 200.
+
+Open the Player. Build an instance there. Pass: the Record panel renders at
+least one entry beside the form. `GET /instances/:id/record` answers 200. That read
+admits the account only because it started the instance.
+
+Last, log in as `demo-templates@example.test`. Pass: the shell lands on the
+templates screen rather than on a refusal, and the nav offers Templates alone.
+
+A `bun:test` assertion covers each route's status code already. It cannot see a
+control the product renders beside a screen it then refuses. It cannot see an
+empty picker that a 403 and an empty table render alike.

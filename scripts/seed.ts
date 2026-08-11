@@ -29,6 +29,7 @@ import {
   REPORTS_ROLE,
   DATALISTS_ROLE,
   TEMPLATES_ROLE,
+  AUTHOR_ROLE,
 } from "../src/auth/authorize.js";
 import type { ProcessId, ProcessBody } from "../src/schema/definition.js";
 
@@ -46,6 +47,7 @@ export const DEMO_USERS: { role: string; emailSuffix: string }[] = [
   { role: REPORTS_ROLE, emailSuffix: "reports" },
   { role: DATALISTS_ROLE, emailSuffix: "datalists" },
   { role: TEMPLATES_ROLE, emailSuffix: "templates" },
+  { role: AUTHOR_ROLE, emailSuffix: "author" },
 ];
 
 const EXAMPLES: { path: string; fixedProcessId?: ProcessId }[] = [

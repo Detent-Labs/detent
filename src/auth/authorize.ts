@@ -16,14 +16,28 @@ export const PUBLISH_ROLE = "system:publish";
 export const CANCEL_ANY_ROLE = "system:cancel-any";
 /** Required for `scope=all` on `GET /instances`, `GET /instances/:id/record`, and every `/admin/*` route. */
 export const ADMIN_ROLE = "system:admin";
-/** Required for every studio route (`/drafts/*`). Implies nothing else — publishing still separately requires `system:publish`. */
+/** Admits every studio route (`/drafts/*`), and is the ONLY role admitting the two migration-plan routes and the orphan-key scan. Implies nothing else — publishing still separately requires `system:publish`. */
 export const DEVELOPER_ROLE = "system:developer";
 /** Required for every `/reporting/*` route. Implies nothing else: a process owner holding only this cannot publish, administer users, or read the operator's instance list. */
 export const REPORTS_ROLE = "system:reports";
 /** Required to write a data list (`/admin/data-lists/*`); reads also accept `DEVELOPER_ROLE`, so the studio can offer the existing keys. Implies nothing else: staff who maintain cost centres must not gain the power to cancel instances. */
 export const DATALISTS_ROLE = "system:datalists";
-/** Required to write a process template (`PUT`/`DELETE /templates/:key`); reads also accept `DEVELOPER_ROLE`, so every author can seed a process from one. Implies nothing else: staff who curate templates must not gain the power to publish a process. */
+/** Required to write a process template (`PUT`/`DELETE /templates/:key`); reads also accept `DEVELOPER_ROLE` and `AUTHOR_ROLE`, so every author can seed a process from one. Implies nothing else: staff who curate templates must not gain the power to publish a process. */
 export const TEMPLATES_ROLE = "system:templates";
+/**
+ * The no-code authoring subset of the studio surface: the four draft routes,
+ * the publish route (beside `PUBLISH_ROLE`), `GET /registry`, the two template
+ * reads and the published version body. Two routes outside the studio prefix
+ * join it, because studio screens call them — the data list read (the
+ * `"db.list"` picker) and the record read for an instance the actor started
+ * (the panel beside the Player).
+ *
+ * Deliberately NOT the two migration-plan routes or the orphan-key scan: those
+ * rewrite the state of every running instance on a version, and stay
+ * `DEVELOPER_ROLE`-only. Implies nothing else, and nothing implies it —
+ * publishing still separately requires `PUBLISH_ROLE`.
+ */
+export const AUTHOR_ROLE = "system:author";
 
 /** The resolved Actor lacks a role an operation requires. Distinct from ActorResolutionError (no valid identity at all). */
 export class AuthorizationError extends Error {

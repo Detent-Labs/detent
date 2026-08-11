@@ -30,7 +30,7 @@ import {
   isEligibleCandidate,
 } from "../engine/transition.js";
 import { buildGuardContext, evalGuard, type Actor } from "../cel/eval.js";
-import { requireRole, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, AuthorizationError } from "../auth/authorize.js";
+import { requireRole, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE, AuthorizationError } from "../auth/authorize.js";
 import { knownUserIds } from "../auth/users.js";
 import { definitionHash } from "../schema/hash.js";
 import { NotFoundError, InstanceNotRunningError } from "../errors.js";
@@ -1025,10 +1025,15 @@ export async function listInstances(
  *
  * Authorization mirrors `cancelInstance`'s two-path shape: `ADMIN_ROLE` is
  * tried first and needs no instance load at all (this query never joins on
- * `instances`); only the fallback — the caller is `DEVELOPER_ROLE` and
+ * `instances`); only the fallback — the caller holds an authoring role and
  * started the instance themselves — needs `loadInstanceForRead` to learn
  * `startedBy`. A caller satisfying neither collapses "doesn't exist" and
  * "not mine" into the same opaque `AuthorizationError`.
+ *
+ * Either authoring role satisfies that fallback, `DEVELOPER_ROLE` and
+ * `AUTHOR_ROLE` alike: the studio Player renders this record beside the form,
+ * and both roles reach the Player. The starter condition is what bounds it —
+ * neither role reads a record it did not create.
  */
 export async function getInstanceRecord(
   instanceId: InstanceId,
@@ -1046,7 +1051,8 @@ export async function getInstanceRecord(
     } catch {
       throw new AuthorizationError(`actor '${actor.id}' may not read the record of instance '${instanceId}'`);
     }
-    if (!actor.roles.includes(DEVELOPER_ROLE) || instance.startedBy !== actor.id) {
+    const authoring = actor.roles.includes(DEVELOPER_ROLE) || actor.roles.includes(AUTHOR_ROLE);
+    if (!authoring || instance.startedBy !== actor.id) {
       throw new AuthorizationError(`actor '${actor.id}' may not read the record of instance '${instanceId}'`);
     }
   }

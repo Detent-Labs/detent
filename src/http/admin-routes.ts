@@ -32,7 +32,7 @@ import { DB_LIST_DATA_SOURCE_TYPE, MAX_DATA_LIST_VALUES } from "../engine/host.j
 import { listUiStringOverrides, setUiStringOverride, countUiStringOverrides, uiStringOverrideExists } from "../engine/ui-strings.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
-import { requireRole, ADMIN_ROLE, DATALISTS_ROLE, DEVELOPER_ROLE } from "../auth/authorize.js";
+import { requireRole, ADMIN_ROLE, DATALISTS_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE } from "../auth/authorize.js";
 import { RequestShapeError, type HttpResult } from "./errors.js";
 import { resolveActor, guarded, parseLimit } from "./routes.js";
 
@@ -398,13 +398,16 @@ export async function handleAdminRedactInstance(instanceId: string, req: Request
  * The `"db.list"` data source's values, maintained without a publish. These
  * routes carry `DATALISTS_ROLE` rather than `ADMIN_ROLE`: the grant is narrow
  * on purpose, so staff who own cost centres cannot also cancel instances.
- * Reads additionally accept `DEVELOPER_ROLE`, which is what lets the studio's
- * data source panel offer the existing keys without a second route.
+ * Reads additionally accept either authoring role, `DEVELOPER_ROLE` and
+ * `AUTHOR_ROLE`, which is what lets the studio's data source panel offer the
+ * existing keys without a second route. An author refused this read could not
+ * bind a field to a data list at all, which is a no-code path `AUTHOR_ROLE`
+ * exists to open. Writes stay `DATALISTS_ROLE`-only.
  */
 
-/** Either role admits a read; neither does not. `requireRole` reports the data list role, the one a maintainer is meant to hold. */
+/** Any of the three admits a read; none does not. `requireRole` reports the data list role, the one a maintainer is meant to hold. */
 function requireDataListRead(actor: Actor): void {
-  if (actor.roles.includes(DEVELOPER_ROLE)) return;
+  if (actor.roles.includes(DEVELOPER_ROLE) || actor.roles.includes(AUTHOR_ROLE)) return;
   requireRole(actor, DATALISTS_ROLE);
 }
 

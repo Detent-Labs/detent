@@ -89,10 +89,12 @@ A list carrying every body would answer a picker with megabytes it never
 reads. The draft list already draws that line the same way.
 
 The write route and the delete route SHALL need `system:templates`. The list
-route and the read route SHALL accept `system:templates` or
-`system:developer`. An author can therefore read what a curator writes.
+route and the read route SHALL accept `system:templates`, `system:developer`
+or `system:author`. An author of either kind can therefore read what a curator
+writes.
 
-The route returning a published version's body SHALL accept the same pair. A
+The route returning a published version's body SHALL accept the same three
+roles. A
 curator creates a template from a published version. Refusing that body would
 leave the role able to write a template and unable to get one.
 
@@ -117,9 +119,15 @@ template.
 - **THEN** each entry carries the template key and the body's `label`
 - **AND** no entry carries the body
 
-#### Scenario: An author reads a template but writes none
+#### Scenario: A developer reads a template but writes none
 
 - **WHEN** an actor holding only `system:developer` lists the templates
+- **THEN** the read succeeds
+- **AND** a write by that actor fails with an authorization error
+
+#### Scenario: An author reads a template but writes none
+
+- **WHEN** an actor holding only `system:author` lists the templates
 - **THEN** the read succeeds
 - **AND** a write by that actor fails with an authorization error
 

@@ -166,6 +166,19 @@ describe("area gating", () => {
     expect(landingArea(["system:datalists"])).toBe("admin");
   });
 
+  it("admits an author to the studio area and nowhere else gated", () => {
+    // The authoring screens live in the studio area, so entry admits the role;
+    // `ROUTE_ROLE` inside keeps migration planning and Tools out of reach.
+    expect(mayEnter("studio", ["system:author"])).toBe(true);
+    expect(mayEnter("admin", ["system:author"])).toBe(false);
+    expect(mayEnter("reporting", ["system:author"])).toBe(false);
+    expect(permittedAreas(["system:author"])).toEqual(["app", "studio"]);
+  });
+
+  it("lands an author in the studio area", () => {
+    expect(landingArea(["system:author"])).toBe("studio");
+  });
+
   it("offers the admin area in the switcher of a data list maintainer standing in the app area", () => {
     // Chrome.tsx's switcher is exactly `permittedAreas(roles)` minus the open area.
     const others = permittedAreas(["system:datalists"]).filter((a) => a !== "app");

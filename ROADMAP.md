@@ -559,7 +559,7 @@ Spec: `development-toolchain`.
     `data-list-administration`. Design:
     `docs/superpowers/specs/2026-08-02-db-data-lists-design.md`.
 
-27. **No-code / low-code process authoring: DONE (a–e).**
+27. **No-code / low-code process authoring: DONE (a–f).**
     Raised 2026-08-03 as the product direction the README and `CLAUDE.md` now
     state: a business analyst builds a process in the studio area without
     writing JSON or CEL. This is a stage, not a rewrite. The studio area already
@@ -608,14 +608,11 @@ Spec: `development-toolchain`.
        manual JSON escape hatch available even for a schema-backed type. The
        custom field-type position stays free-text, since no registry backs
        it.
-       Shipping this exposed an open question the stage has not yet answered:
-       the studio area sits behind one coarse role. `system:developer` reaches
+       Shipping this exposed an open question, since answered in (f): the
+       studio area sat behind one coarse role. `system:developer` reached
        drafts, the registry, migration planning and the Player alike, and
        publishing needs `system:publish` on top. A business analyst authoring
-       a process is exactly the actor that role was not shaped for. Either
-       the analyst gets `system:developer` (and with it migration planning),
-       or the area splits its gate the way stage 26 split the admin area's —
-       a set of roles per area, each screen keeping its own check.
+       a process is exactly the actor that role was not shaped for.
        Change: `studio-plugin-config-form`. Specs: `studio-plugin-config-form`
        (new), `studio-tools` (modified: `GET /registry`'s response shape, the
        Tools screen's registered-registry count).
@@ -720,6 +717,30 @@ Spec: `development-toolchain`.
        Change: `view-layout-and-form-editor`. Specs: `studio-form-editor`
        (new), `form-ui`, `runtime-api`, `studio-canvas`, `studio-player` (all
        modified).
+    f. **A role for the author, split from the developer's: DONE.** Item (a)
+       left the question open and (d) paid most of its cost by adding the
+       studio area's per-screen `ROUTE_ROLE` map. `system:author` is the
+       eighth reserved role. It admits the four authoring screens — the
+       process list, the editor, the versions screen and the player — plus
+       the routes behind them: the four draft routes, publish (beside
+       `system:publish`, which does not move), `GET /registry` and the two
+       template reads. Migration planning and the Tools screen stay
+       `system:developer` alone.
+       Two routes outside the studio prefix widen with it, because studio
+       screens call them: the data list read that fills the `"db.list"`
+       picker, and the record read beside the Player for an instance the
+       actor started. Neither data list write moves, and the record read
+       keeps its starter condition.
+       `GET /registry` widens while the Tools screen does not. The route also
+       feeds the inspector's plugin-config form, which is what lets an author
+       configure an action without JSON.
+       A widening throughout: every account holding `system:developer`
+       reaches exactly what it reached before.
+       Change: `split-studio-role-gate`. Specs: `authorization`,
+       `unified-shell`, `studio-app`, `studio-tools`, `studio-player`,
+       `process-drafts`, `process-templates`, `process-version-inspection`,
+       `studio-publish`, `data-list-administration`, `database-seed-script`
+       (all modified).
     Deliberately out of scope: a natural-language or AI-assisted authoring
     surface (it produces the same JSON, so it is a later surface over the same
     contract, not a reason to reshape one), executable code authored in the

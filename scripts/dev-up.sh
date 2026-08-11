@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-command devcontainer bring-up: start the compose services, install
 # deps, seed the example processes + demo users, ensure a demo-superuser
-# with all six system:* roles, and (re)start the HTTP server. Safe to
+# with all eight system:* roles, and (re)start the HTTP server. Safe to
 # re-run — every step is idempotent, and the JWT signing secret is
 # generated once and reused, so restarts don't invalidate existing logins.
 #
@@ -17,7 +17,7 @@ export MSYS_NO_PATHCONV=1
 
 SUPERUSER_EMAIL="demo-superuser@example.test"
 SUPERUSER_PASSWORD="seed-demo-password"
-SUPERUSER_ROLES="system:publish,system:cancel-any,system:admin,system:developer,system:reports,system:datalists"
+SUPERUSER_ROLES="system:publish,system:cancel-any,system:admin,system:developer,system:author,system:reports,system:datalists,system:templates"
 SECRET_FILE=".devcontainer/.auth-secret"
 
 COMPOSE_FILES=(-f .devcontainer/docker-compose.yml)
