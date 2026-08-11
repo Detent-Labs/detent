@@ -67,7 +67,10 @@ describe("canvas fit: a canvas wider than the graph", () => {
 
 describe("canvas fit: a canvas narrower than the graph", () => {
   // 500px wide is the studio canvas with the inspector open, which is the
-  // case issue #3 reports and the case the shipped formula gets wrong.
+  // case issue #3 reports and the case the shipped formula gets wrong. 576px
+  // is the canvas's 36rem floor, not its height: the column grows with the
+  // window above that floor. `computeFit` takes the size as an argument, so
+  // this case holds whatever the real column measures.
   const element = { width: 500, height: 576 };
 
   it("reduces the scale below 1", () => {

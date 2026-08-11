@@ -292,3 +292,37 @@ dropdown. Neither defect raises anything an operator can see as a defect.
 `packages/web/test/admin-usersLogic.test.ts` pins both helpers against a full
 set and a partial one. `test/auth-users.test.ts` pins the paging. Neither
 reaches the screen's own cursor walk, which is what these two passes observe.
+
+### Studio canvas: the columns fill a tall window, and the other areas do not
+
+Source: `studio-canvas-fills-vertically` tasks 2.1, 2.2 and 2.6.
+
+<!-- "canvas edit screen" is the glossary name of the screen. The linter reads
+     its "edit" as a synonym of "change". -->
+<!-- antislop: allow synonym-rotation -->
+
+Seed the database. Open a draft on the canvas edit screen, in a window 1440px
+tall or taller.
+
+Pass: the three columns end at the window's bottom edge, less the screen's own
+`padding-bottom`. The canvas stands taller than 36rem. No page scrollbar
+appears.
+
+Resize the window under 700px tall. Pass: the columns hold at 36rem, and the
+page scrolls to reach their bottom edge. That is the floor, and it renders what
+the fixed `height: 36rem` rendered before this change.
+
+Then open one screen in each of the other three areas, in a tall window. Those
+are app My-tasks, admin instances, and reporting. Pass: each keeps its own
+`max-width`, stays centered, and stands at its content height. Empty space
+below it is correct.
+
+The third pass is the one that earns its place. The shell is a flex column now,
+so every area screen is a flex item. A flex item whose inline margins are auto
+is never stretched. It shrink-wraps to its content instead. Each screen centers
+itself with `margin: 0 auto`, so all four shrink-wrapped. The canvas column
+fell from about 1000px to 302px. `.shell > * { width: 100% }` is what holds
+them.
+
+A `bun:test` assertion cannot see any of this. Every pass reads a resolved
+height or width, and `packages/web/test/` assumes no DOM at all.

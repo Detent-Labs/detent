@@ -12,12 +12,28 @@
  */
 @import "./tokens.css";
 
+/* A column, so the screen below the header has a height to grow into. A screen
+   opts in with its own `flex-grow`; one that asks for nothing keeps its content
+   height, and the page scrolls as before. */
 .shell {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
+}
+
+/* Every area screen centers itself with `margin: 0 auto` under a `max-width`.
+   A flex item with auto inline margins is never stretched: it shrink-wraps to
+   its content and the margins absorb the rest. That collapsed the canvas
+   column from about 1000px to 302px. An explicit width restores what these
+   screens had as block boxes, and the auto margins still center them under
+   their own `max-width`. */
+.shell > * {
+  width: 100%;
 }
 
 .shell-header {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);

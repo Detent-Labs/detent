@@ -601,6 +601,13 @@ developer selects a step or a path. See the `studio-checks-rail`
 capability for the rail's own collapsed presentation in the
 step-selected state.
 
+The three columns SHALL fill the window's height that the screen's own
+header rows leave, above a floor of 36rem. A window taller than that floor
+therefore shows a taller canvas, and no empty band below the columns. A
+window shorter than the floor holds the columns at the floor, and the page
+scrolls. The columns keep their widths. The two side columns stay fixed,
+and the canvas between them takes the rest.
+
 #### Scenario: All three columns appear
 
 - **WHEN** the canvas edit screen loads
@@ -617,6 +624,20 @@ step-selected state.
 - **WHEN** the developer selects a step or a path
 - **THEN** the third column shows the inspector, not the full checks
   rail
+
+#### Scenario: A tall window grows the columns rather than leaving a band below them
+
+- **WHEN** the canvas edit screen loads in a window whose remaining height
+  is above the floor
+- **THEN** the three columns end at the bottom of the window, and the
+  canvas is taller than 36rem
+
+#### Scenario: A short window holds the columns at the floor
+
+- **WHEN** the canvas edit screen loads in a window whose remaining height
+  is below the floor
+- **THEN** the three columns keep the 36rem floor and the page scrolls to
+  reach their bottom edge
 
 ### Requirement: A palette offers Step, Subprocess, and End as an always-available way to add a step
 
