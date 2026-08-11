@@ -913,6 +913,36 @@ Spec: `development-toolchain`.
     screen makes it a UI change, so it writes deltas against `end-user-app`
     and `instance-query`.
 
+36. Edit panels modal rework: NOT STARTED. Raised 2026-08-12 in conversation.
+    The three process-wide views — field catalog, data sources, contract — sit
+    behind one overlay, `panels/EditPanelsModal.tsx`, and the ask is to reshape
+    it. The direction stays open on purpose. A design session with Claude
+    Design sets it, and `.claude/rules/design-language.md` plus the
+    `/frontend-design:frontend-design` skill govern that session, per the
+    conventions in `CLAUDE.md`.
+    What stands today, so the session starts from the code rather than from
+    memory. Stage 11b's `studio-edit-shared-modal` put all three views in one
+    native `<dialog>`, and the glossary fixes the name: *edit panels modal*.
+    The dialog measures `min(72rem, 92vw)` wide and `88vh` tall. A 16rem rail
+    on the left lists the three views, each with an entity count and an issue
+    count, and nests a flat list of every catalog field under the first one,
+    indented by `data-depth`. The view fills the rest. The three panels behind
+    it are small: `FieldCatalogPanel` 230 lines, `DataSourcesPanel` 103,
+    `ContractPanel` 111.
+    Two properties any rework has to keep. The element stays mounted for the
+    life of the screen, so a half-typed outcome name in `ContractPanel` and
+    `DataSourcesPanel`'s fetched list keys survive a view switch. And the
+    overlay carries no Save: every panel writes into the in-browser draft
+    through `useDraft()`, and the screen's own toolbar stays the only thing
+    that persists. The footer states that promise to the author.
+    One precedent belongs in the session. Stage 27e faced the same question for
+    the form editor and answered it by leaving the overlay: `FormEditorScreen`
+    is a routed sub-state of the edit screen, not a toggled dialog. Whether the
+    three views follow it is exactly what the design has to decide.
+    No design doc, no OpenSpec change yet. A UI change is never trivial here,
+    so it writes deltas against the capability specs of the views it moves —
+    `studio-app` for the frame, and the specific capability for each view.
+
 ## Changes with no stage
 
 The archive also holds hardening, deduplication and bug-fix changes that belong
