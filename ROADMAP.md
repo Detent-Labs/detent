@@ -878,6 +878,41 @@ Spec: `development-toolchain`.
     positions, and stages 30/33's proposed edge style and waypoints), not
     `src/schema/definition.ts`. No design doc, no OpenSpec change yet.
 
+35. Starter access to a started instance: NOT STARTED. Raised 2026-08-12 in
+    conversation, as the question of whether a process instance records who
+    started it. It does, and the read access the question asked for already
+    holds. What is missing is the list.
+    `Instance.startedBy` is optional in the contract
+    (`src/schema/definition.ts:1079`) and `createProcessInstance` writes the
+    calling actor's id into it (`src/runtime/api.ts:687`). A subprocess spawn
+    passes `startedBy: undefined` on purpose (`src/engine/subprocess.ts:132`),
+    since a child instance has no human starter.
+    `loadInstanceForActor` (`src/runtime/api.ts:726`) already admits a
+    non-admin caller who is the starter, the current claimant, or an eligible
+    candidate on the current step. So the starter reads the instance view for
+    the whole run, including after the step moves to somebody else. Two other
+    rules key on the same field: only the starter or an admin cancels an
+    instance (`api.ts:944`), and a step carrying no assignment accepts a
+    submission from the starter or an admin alone (`api.ts:831`).
+    The gap is discovery. `GET /instances` carries a `startedBy` filter
+    (`src/http/routes.ts:376`), but `parseScope` defaults to `scope=all`,
+    which demands `system:admin`. The only other scope is `scope=mine`, and
+    that one forces `assignedTo = actor.id` plus the actor's roles. A
+    participant therefore reads an instance they started when they hold its
+    id, and finds it nowhere. The app area matches: `TasksScreen` lists
+    assigned tasks, and no screen lists started instances.
+    Three questions the design owes an answer. Whether the scope is a third
+    value beside `mine` and `all` or a separate filter, since `scope=mine`
+    already means "assigned to me" and must keep meaning it. Whether the
+    starter's access stays read-only, which it is not today — the comment and
+    attachment routes share `loadInstanceForActor`'s predicate
+    (`api.ts:1104`, `api.ts:1179`), so a starter already writes both. And
+    whether a started list shows completed and cancelled instances, which the
+    task inbox does not.
+    No design doc, no OpenSpec change yet. The engine-side move is small; the
+    screen makes it a UI change, so it writes deltas against `end-user-app`
+    and `instance-query`.
+
 ## Changes with no stage
 
 The archive also holds hardening, deduplication and bug-fix changes that belong
