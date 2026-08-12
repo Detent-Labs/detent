@@ -3265,3 +3265,39 @@ the admin ones on purpose, rather than sharing them.
 
 Nothing about who may read, comment on, cancel or write changed. A reader who
 meets `scope=started` should infer no new permission tier from it.
+
+- Multi-tenancy (`src/tenancy/`, roadmap #24): one database per tenant, behind
+  `TENANT_CONTROL_PLANE_URL`. Unset, none of it runs. No control-plane
+  connection opens. `initSchema` builds one schema. Every request and every
+  worker tick gets the process handle.
+
+  `store.ts` holds the control plane. It carries a `tenants` table (`id`, `key`,
+  `name`, `database_url`) and nothing else. That table stays out of
+  `initSchema`, so a tenant's own database cannot list its siblings.
+
+  `connections.ts` maps a key to a handle. It opens a pool lazily and caches by
+  key. Every tenant crosses this one surface. It carries the heaviest test here
+  for that reason. `UnknownTenant` answers 401, the answer a bad token gets.
+  `TenantUnreachable` answers 503. A deployment fault and a caller fault must
+  not read alike.
+
+  `provision.ts` lists the tenant LAST. A break part-way therefore leaves
+  nothing a request can reach. `cli.ts` is the only way to create one.
+
+  Three seams carry the tenant. `Route.handler` takes the database as a fourth
+  parameter the dispatcher supplies. That follows the `clientAddress` pattern
+  the type's own comment documents. `createServer`'s own parameter carries the
+  name `processDb`. A closure that forgot to declare the new one is therefore a
+  compile error. It is not a silent read of the wrong tenant.
+
+  `ActorResolver` and `isActiveAccount` take the handle per call. The liveness
+  check therefore reads the actor's own directory. `startEngine` takes a
+  `TenantSource`, asked per tick. The worker count stays four whatever the
+  tenant count. A tenant whose tick throws gets one warning and a skip. The
+  rest are not starved.
+
+  A locally-issued token carries a `tenant` claim. `LOCAL_ISSUER` is one
+  constant every deployment shares. The issuer therefore cannot name a tenant.
+  `tenantKeyOf` reads that claim before verification. That is safe: the claim
+  sits inside the signed payload. `/auth/login` holds no token yet. It takes
+  its tenant from the request host.

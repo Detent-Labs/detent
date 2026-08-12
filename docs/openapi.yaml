@@ -1055,6 +1055,12 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: >-
+        A token this engine issued, or one from a configured external issuer.
+        In a multi-tenant deployment an engine-issued token also carries a
+        `tenant` claim, naming the tenant whose data the request reaches;
+        `POST /auth/login` mints it from the host the login arrived on. A
+        single-tenant deployment issues no such claim and ignores one.
     metricsToken:
       type: http
       scheme: bearer

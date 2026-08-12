@@ -79,7 +79,7 @@
 ## 7. The SaaS bootstrap
 
 - [x] 7.1 Wire the control-plane tenant source when a deployment sets the variable.
-- [x] 7.2 Read the variable once at bootstrap and fail startup with a message
+- [x] 7.2 Read the variable once at bootstrap. Fail startup with a message
   naming the control plane when it is unreachable. Task 1.2's per-call read
   stays, for the tenant lookups.
 - [x] 7.3 Test the isolation case end to end: two tenants each holding an
@@ -87,23 +87,23 @@
 
 ## 8. Documentation
 
-- [ ] 8.1 Add the SaaS-mode section to `docs/runbooks/deployment.md`, naming
+- [x] 8.1 Add the SaaS-mode section to `docs/runbooks/deployment.md`, naming
   the variable and the provisioning command.
-- [ ] 8.1a Add `TENANT_CONTROL_PLANE_URL` to that runbook's variable list, and
+- [x] 8.1a Add `TENANT_CONTROL_PLANE_URL` to that runbook's variable list, and
   to no other file. `deployment-runbook` requires the runbook list every
   variable. It also requires the runbook be its one home.
-- [ ] 8.2 Add the `tenant` claim to `docs/openapi.yaml`'s security description.
-- [ ] 8.3 Change stage 24 in `ROADMAP.md` to DONE, naming this change, its
+- [x] 8.2 Add the `tenant` claim to `docs/openapi.yaml`'s security description.
+- [x] 8.3 Change stage 24 in `ROADMAP.md` to DONE, naming this change, its
   specs and the replacement design doc.
-- [ ] 8.4 Add the tenancy modules to `docs/current-state.md`.
-- [ ] 8.5 Add the two-tenant walk to `docs/browser-checks.md`.
+- [x] 8.4 Add the tenancy modules to `docs/current-state.md`.
+- [x] 8.5 Add the two-tenant walk to `docs/browser-checks.md`.
 
 ## 9. Verification
 
-- [ ] 9.1 Run `bun run typecheck`, then `bun run build`.
-- [ ] 9.2 Run the full `bun test` with `DATABASE_URL` set and the control-plane
+- [x] 9.1 Run `bun run typecheck`, then `bun run build`.
+- [x] 9.2 Run the full `bun test` with `DATABASE_URL` set and the control-plane
   variable UNSET. Report pass, skip and fail counts.
-- [ ] 9.3 Run the antislop linter over every Markdown file this change touches.
-- [ ] 9.4 Run `git diff --check` and `git ls-files --eol`.
+- [x] 9.3 Run the antislop linter over every Markdown file this change touches.
+- [x] 9.4 Run `git diff --check` and `git ls-files --eol`.
 - [ ] 9.5 Browser check: log in against two tenants and confirm neither sees
   the other's cases.

@@ -30,6 +30,7 @@ default is safe for a deployment.
 | `METRICS_TOKEN` | The bearer token `GET /metrics` needs. An empty value counts as unset. | No | Unset, which leaves `GET /metrics` unregistered. | |
 | `TRUST_PROXY` | `1` reads the caller's address from `X-Forwarded-For`. | No | Unset, which reads the peer address. | `1` without a proxy that overwrites the header. Read "The proxy rule" below first. |
 | `HTTP_ACTION_ALLOWED_HOSTS` | A comma-separated list. It names the hosts the `http.request` action may reach. | Yes, for a definition using `http.request`. | Unset, which refuses every host. | |
+| `TENANT_CONTROL_PLANE_URL` | The control-plane connection string. Its presence turns SaaS mode on. | No | Unset, which runs one tenant on `DATABASE_URL`. | Read "Serving many tenants" below first. |
 | `HTTP_ACTION_ALLOW_INSECURE` | `1` permits a plain-HTTP target. | No | Unset. Then `https` alone. | `1` sends the request in the clear. Give the target a TLS certificate instead. |
 | `SMTP_HOST` | The relay the `notification.email` action connects to. | Yes, for a definition using `notification.email`. | None. | |
 | `SMTP_PORT` | The relay's port. | No | `587` | |
@@ -145,3 +146,44 @@ which no other gate does.
 
 - `docs/runbooks/backup-restore.md` covers the database dump and the restore.
 - `README.md` carries the commands that build and run the two images.
+
+## Serving many tenants
+
+Leave `TENANT_CONTROL_PLANE_URL` unset for a single-tenant install. The engine
+then opens no control-plane connection. It builds one schema from
+`DATABASE_URL`, and runs every request and every worker tick against it. That
+is the deployment shape this runbook describes everywhere above.
+
+Set it to serve many tenants from one process. Each tenant gets a database of
+its own. The control plane holds nothing but the list of them: `id`, `key`,
+`name` and `database_url`. No table anywhere gains a tenant column, and no
+query gains a tenant filter. Isolation comes from the connection, so a
+forgotten filter cannot leak one tenant's data into another's response.
+
+Provision a tenant before it can sign in:
+
+```
+TENANT_CONTROL_PLANE_URL=... bun run src/tenancy/cli.ts add-tenant <key> <name> <database-url>
+```
+
+That creates the database and builds its schema. It lists the tenant last. A
+break part-way therefore leaves nothing a request can reach. `list-tenants`
+prints what the control plane holds. No HTTP route creates a tenant:
+provisioning is yours, never a signup form.
+
+A request finds its own database two ways. A token this engine issued carries
+its tenant, minted at login. A token from an external issuer resolves by that
+issuer, which `AUTH_ISSUERS` already maps.
+
+The login request itself carries no token yet. It takes its tenant from the
+host it arrived on, reading `acme` from `acme.example.com`. Point each tenant's
+host at the same process.
+
+Two answers are worth telling apart in a log. An unknown tenant reads 401, the
+answer a bad token gets, so nobody learns your tenant list by probing. A known
+tenant whose database is down reads 503. The first is the caller's to fix. The
+second is yours.
+
+Re-run the provisioning command's schema step after an upgrade that adds a
+column, once per tenant database. Every schema statement is idempotent, so a
+run against a current database changes nothing.

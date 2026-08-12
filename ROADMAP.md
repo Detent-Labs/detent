@@ -452,8 +452,7 @@ Spec: `development-toolchain`.
        `docs/superpowers/specs/2026-07-30-instance-attachments-design.md`.
     Both new tables are cleared by stage 20's redaction.
 
-24. Multi-tenancy: design DONE, implementation NOT STARTED (see
-    `docs/superpowers/specs/2026-07-30-multi-tenancy-design.md`). Raised
+24. **Multi-tenancy: DONE.** Raised
     2026-07-28, deferred twice as a business decision. Re-brainstormed
     2026-07-30 once that decision was made: the engine must support both a
     shared SaaS deployment and today's on-premise, per-customer deployment,
@@ -476,7 +475,28 @@ Spec: `development-toolchain`.
     turns SaaS mode on; unset, the server behaves exactly as it does today.
     Deliberately out of scope: cross-tenant billing/usage dashboards,
     self-service signup, forced migration of an on-premise deployment into the
-    SaaS control plane, and per-tenant quotas. No OpenSpec change yet.
+    SaaS control plane, and per-tenant quotas.
+    The design doc that entry named never reached git: `.gitignore` covers
+    `docs/superpowers/`, so no clone carries it. The change's own `design.md` is
+    the design of record and is deliberately self-contained.
+    Three premises the summary above left open, each settled against the code.
+    `db` did not arrive per request: `createServer` built one route table and
+    about forty closures captured one handle, as did the resolver, the
+    definition-store cache and all three registry factories. The four workers
+    polled one handle for the life of the process. And a locally-issued token
+    named no tenant, because `LOCAL_ISSUER` is one constant every deployment
+    shares.
+    `Route.handler` now takes the database as a fourth parameter the dispatcher
+    supplies. `startEngine` takes a `TenantSource`, asked per tick, so the
+    worker count stays four whatever the tenant count. A local token carries a
+    `tenant` claim, and the login request takes its tenant from its host.
+    Every db-reading plugin reads `ctx.db` instead of a bound handle. That
+    covers `db.list` too, which the proposal missed and the review caught: it
+    reads the `data_lists` tables, so a bound handle would have offered one
+    tenant's option values to every tenant.
+    Change: `multi-tenancy`. Specs: `multi-tenancy`, `http-wrapper`,
+    `jwt-authentication`, `local-user-accounts`, `action-handlers`,
+    `assignment-strategy-registry`, `data-source-resolution`, `persistence`.
 
 25. **Per-instance step assignment: DONE (a–c)** (design approved 2026-08-02,
     see `docs/superpowers/specs/2026-08-02-pluggable-step-assignment-design.md`).

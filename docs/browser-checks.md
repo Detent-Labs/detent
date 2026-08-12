@@ -472,3 +472,33 @@ its position, as `steps[6].onEntry[1].config.to`.
 A `bun:test` assertion covers the descriptor and the schema already. It cannot
 see a checkbox group that renders as a bare fieldset border. Nor can it see a
 generated form that quietly reverted to a text area.
+
+### Two tenants, one process
+
+Needs SaaS mode, so this one costs setup. Build a control-plane database and
+two tenant databases. Set `TENANT_CONTROL_PLANE_URL`. Provision both tenants
+with `bun run src/tenancy/cli.ts add-tenant`. Then seed an account and a process
+in each.
+
+Point two hosts at the one server. `acme.localhost` and `globex.localhost` both
+resolve to `127.0.0.1` on most systems. The first label is what the login reads.
+
+Log in at `acme.localhost` as Acme's account. Pass: the login succeeds, and My
+tasks lists Acme's cases.
+
+Read the token's tenant from the network tab's login response. Pass: the token
+carries `acme`.
+
+Now open `globex.localhost` in a second browser profile. Log in as Globex's
+account. Pass: that session lists Globex's cases and none of Acme's. This is
+the check the whole model exists for. A green suite cannot make it for you: the
+suite proves the lookup, not that two live sessions stay apart.
+
+Take Acme's token and send it to `globex.localhost`. Pass: it still reads
+Acme's data. The token names the tenant, and the host does not override it.
+
+Stop one tenant's database and reload that session. Pass: the screen states a
+defect where the data would sit, and the other tenant's session keeps working.
+
+Unset `TENANT_CONTROL_PLANE_URL` and restart. Pass: the app behaves as it did
+before any of this. One database, and no host requirement.
