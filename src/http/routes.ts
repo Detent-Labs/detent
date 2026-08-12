@@ -348,10 +348,10 @@ function parseStatuses(url: URL): Instance["status"][] | undefined {
 }
 
 /** An omitted scope resolves to "all" — that is what it has always meant. Any other value is a request error. */
-function parseScope(url: URL): "mine" | "all" {
+function parseScope(url: URL): "mine" | "started" | "all" {
   const raw = url.searchParams.get("scope");
   if (raw === null) return "all";
-  if (raw !== "mine" && raw !== "all") throw new RequestShapeError(`unknown scope '${raw}'`);
+  if (raw !== "mine" && raw !== "started" && raw !== "all") throw new RequestShapeError(`unknown scope '${raw}'`);
   return raw;
 }
 
@@ -361,10 +361,17 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
     const url = new URL(req.url);
     const scope = parseScope(url);
     const assignedTo = url.searchParams.get("assignedTo") ?? undefined;
+    const startedBy = url.searchParams.get("startedBy") ?? undefined;
     // scope=mine derives "mine" from the resolved actor — a caller cannot
     // pair it with its own assignedTo value to see another actor's instances.
     if (scope === "mine" && assignedTo !== undefined) {
       throw new RequestShapeError("scope=mine cannot be combined with an explicit assignedTo");
+    }
+    // Same rule one filter over: scope=started derives the starter from the
+    // credential, so an explicit startedBy beside it would be the one way to
+    // read another actor's cases without a role.
+    if (scope === "started" && startedBy !== undefined) {
+      throw new RequestShapeError("scope=started cannot be combined with an explicit startedBy");
     }
     if (scope === "all") {
       requireRole(actor, ADMIN_ROLE);
@@ -373,13 +380,18 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
       processId: (url.searchParams.get("processId") as ProcessId) ?? undefined,
       status: parseStatuses(url),
       currentStepId: (url.searchParams.get("currentStepId") as StepId) ?? undefined,
-      startedBy: url.searchParams.get("startedBy") ?? undefined,
+      // scope=started applies no assignment predicate of its own. An explicit
+      // assignedTo still narrows conjunctively, and reaches nothing outside
+      // what this caller started.
+      startedBy: scope === "started" ? actor.id : startedBy,
       claimedBy: url.searchParams.get("claimedBy") ?? undefined,
       assignedTo: scope === "mine" ? actor.id : assignedTo,
       assignedToRoles: scope === "mine" ? actor.roles : undefined,
       // scope=all already required ADMIN_ROLE above — reusing that check
       // instead of adding a second one. See design.md "Gate visibility with
-      // an includeDegraded filter field".
+      // an includeDegraded filter field". Neither scope=mine nor
+      // scope=started sets it; each lists one actor's own instances, and the
+      // screens behind them render a resolved summary alone.
       includeDegraded: scope === "all",
     };
     const limit = parseLimit(url, MAX_LIST_LIMIT);

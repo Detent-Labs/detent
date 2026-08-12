@@ -44,6 +44,35 @@
   color: var(--color-accent);
 }
 
+/* Settled tone: the case reached a terminal step by its normal path — ink,
+   never green. Same role the admin area's own badges carry, duplicated here
+   on purpose: an area never styles another area's prefix. */
+.app-stamp-settled {
+  color: var(--color-text);
+}
+
+/* Dormant tone: closed without finishing, kept on the list rather than
+   hidden. The literal is the admin area's, darkened from neutral-500 to the
+   exact point that clears 4.5:1 on the light ground at this 11px size; dark
+   mode keeps neutral-500, which already passes there. */
+.app-stamp-dormant {
+  color: #726e6e;
+}
+
+@media (prefers-color-scheme: dark) {
+  .app-stamp-dormant {
+    color: var(--color-neutral-500);
+  }
+}
+
+/* Refusal tone: the one filled stamp, for a faulted case. Straight, not
+   tilted, since it sits in a register row. */
+.app-stamp-refusal {
+  color: var(--color-surface);
+  background: var(--color-refusal);
+  border-color: var(--color-refusal);
+}
+
 /* The task screen's own instance/step identifier — the case open on this
    screen right now, so it reads as the same live/Open tone. */
 .app-stamp-case {
@@ -286,4 +315,15 @@
   .app-task-waiting {
     text-align: left;
   }
+}
+
+/* The started-cases register. Same three-column row as the task list — a
+   stamp, an identity, a right-aligned date in the mono face — so the two
+   read as one register rather than two list styles. */
+.app-started-date {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
 }

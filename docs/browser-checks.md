@@ -410,3 +410,33 @@ save, and open the screen that shows it. Pass: the override renders.
 A `bun:test` assertion covers the key sets and the formatters already. It
 cannot see a clipped column. It cannot see a literal somebody missed. And it
 cannot see a German sentence that reads wrong beside its own control.
+
+### Cases I started
+
+Source: `starter-instance-list` task 6.2.
+
+Seed the database and log in as a participant holding no reserved role.
+
+Start a process from Start a process. Pass: the nav offers Cases I started
+beside My tasks. Open it. Pass: the case is on the list, with a Running stamp
+and its start date.
+
+Activate the case's identifying control. Pass: the task screen opens for that
+instance.
+
+Now start a process whose first step names somebody else. Pass: My tasks does
+not carry it, and Cases I started does. That is the gap this screen closes. An
+inbox-shaped screen would hide it.
+
+Discard a case from its task screen, then return. Pass: it stays on the list,
+now stamped Cancelled, in the dormant tone rather than the refusal one.
+
+Switch the account menu to German. Pass: the heading, the nav entry, every
+stamp and the empty state read German. The date follows the German format.
+
+Log in as an account that has started nothing. Pass: the screen states that in
+words, not as an empty list.
+
+A `bun:test` assertion covers the scope, the tone mapping and the route
+already. It cannot see a stamp whose tone reads as a defect where a cancelled
+case belongs. It cannot see a nav entry that wraps.

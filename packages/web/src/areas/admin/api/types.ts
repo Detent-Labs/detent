@@ -25,7 +25,8 @@ export interface InstanceSummary {
 /**
  * Mirrors src/runtime/api.ts::DegradedInstanceSummary — stands in for an
  * `InstanceSummary` the engine could not resolve. Only ever appears in an
- * admin-scoped `InstancePage`; `scope=mine` never returns one.
+ * admin-scoped `InstancePage`. `scope=all` is the one scope that asks for a
+ * degraded item; neither `scope=mine` nor `scope=started` ever returns one.
  */
 export interface DegradedInstanceSummary {
   degraded: true;

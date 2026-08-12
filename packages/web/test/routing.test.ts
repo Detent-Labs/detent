@@ -11,6 +11,16 @@ describe("matchRoute", () => {
     expect(matchRoute("/start")).toEqual({ name: "start" });
   });
 
+  it("resolves the started-cases route", () => {
+    expect(matchRoute("/started")).toEqual({ name: "started" });
+  });
+
+  it("keeps /start and /started apart", () => {
+    // One prefixes the other, so a startsWith match would collapse them.
+    expect(matchRoute("/start")).toEqual({ name: "start" });
+    expect(matchRoute("/started")).toEqual({ name: "started" });
+  });
+
   it("resolves a task route, decoding the instance id", () => {
     expect(matchRoute("/tasks/inst_abc%20123")).toEqual({ name: "task", instanceId: "inst_abc 123" });
   });
@@ -32,6 +42,10 @@ describe("routePath", () => {
 
   it("encodes the instance id in a task route's path", () => {
     expect(routePath({ name: "task", instanceId: "inst abc" })).toBe("/tasks/inst%20abc");
+  });
+
+  it("round-trips the started-cases route", () => {
+    expect(matchRoute(routePath({ name: "started" }))).toEqual({ name: "started" });
   });
 });
 

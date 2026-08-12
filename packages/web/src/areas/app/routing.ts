@@ -1,4 +1,4 @@
-export type Route = { name: "tasks" } | { name: "task"; instanceId: string } | { name: "start" };
+export type Route = { name: "tasks" } | { name: "task"; instanceId: string } | { name: "start" } | { name: "started" };
 
 /**
  * Pure — testable without a DOM, and prefix-unaware: the shell strips `/app`
@@ -7,6 +7,7 @@ export type Route = { name: "tasks" } | { name: "task"; instanceId: string } | {
  */
 export function matchRoute(path: string): Route {
   if (path === "/start") return { name: "start" };
+  if (path === "/started") return { name: "started" };
   const taskMatch = /^\/tasks\/([^/]+)$/.exec(path);
   if (taskMatch) return { name: "task", instanceId: decodeURIComponent(taskMatch[1]!) };
   return { name: "tasks" };
@@ -20,5 +21,7 @@ export function routePath(route: Route): string {
       return `/tasks/${encodeURIComponent(route.instanceId)}`;
     case "start":
       return "/start";
+    case "started":
+      return "/started";
   }
 }

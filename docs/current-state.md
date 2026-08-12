@@ -3185,3 +3185,54 @@ catches. `test/i18n-substitution.test.ts` covers both helpers.
 
 The German is a first pass, not a reviewed translation. The override mechanism
 is the repair: a deployment corrects a word with no redeploy.
+
+## Starter access to a started instance (`starter-instance-list`)
+
+The access half already worked. `loadInstanceForActor` admits the starter. A
+participant holding an instance id reads it, comments on it and cancels it.
+
+A participant looking for it found nothing. `scope=all` demands
+`system:admin`, and `scope=mine` matches a claim or a candidacy. The app area
+carried no screen for the question either. Roadmap stage 35.
+
+`parseScope` in `src/http/routes.ts` now recognizes a third value,
+`"started"`. It needs no role. The wrapper derives `startedBy` from the
+resolved actor and refuses an explicit `startedBy` beside it, the rule
+`scope=mine` already carries for `assignedTo`.
+
+An explicit `assignedTo` still narrows a started page conjunctively. It
+reaches nothing outside what the caller started, so it needs no role either.
+
+The scope applies no assignment predicate and no status predicate of its own.
+A case another actor is working on lists, and so does a finished one. That is
+the point. The inbox answers what waits on you. This answers what became of
+what you sent.
+
+`includeDegraded` stays off, as it does under `scope=mine`. Every row is the
+caller's own instance, so a degraded item would leak nothing. The reason is
+cost. The screen would need a second rendering path for a row with no
+`processLabel`. Nothing deletes a version while an instance references it.
+
+The engine changed nothing. `InstanceListFilter.startedBy` and its SQL
+predicate both shipped already. `instance-query`'s spec already stated that
+filter, so that capability carries no delta.
+
+`packages/web/src/areas/app` gained `/app/started`, its `StartedScreen`, a
+`startedLogic.ts` view model and a nav entry.
+
+The screen is a register, not a second inbox. No filter, no sort, no
+grouping, and therefore no load-more caveat about a sort it does not apply.
+Each row is a stamp, an identity that is itself the control, and a
+right-aligned date. A row opens `/app/tasks/:instanceId`, the screen that
+already renders an instance for a non-claimant.
+
+`app.css` gained three stamp tones beside the accent one it had. Together
+they are four roles: open, settled, dormant, refusal. The admin area's badges
+carry the same four. `design-language.md` fixes that set, and this adds no
+fifth.
+
+An area never styles another area's prefix. These rules therefore duplicate
+the admin ones on purpose, rather than sharing them.
+
+Nothing about who may read, comment on, cancel or write changed. A reader who
+meets `scope=started` should infer no new permission tier from it.

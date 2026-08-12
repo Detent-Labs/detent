@@ -1366,6 +1366,89 @@ test.skipIf(!DB)("GET /instances?scope=sideways is a 400 request error", async (
   expect(body.error.type).toBe("request-shape");
 });
 
+// scope=started: a participant finds a case they raised. The access half
+// already worked — loadInstanceForActor admits the starter — so these cover
+// the list half alone.
+
+test.skipIf(!DB)("GET /instances?scope=started needs no role and lists the caller's own cases", async () => {
+  const PID = pid("proc_http_scope_started");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances?scope=started`, "GET", user1));
+  expect(res.status).toBe(200);
+  const page = (await res.json()) as { items: { instanceId: string }[] };
+  expect(page.items.map((i) => i.instanceId)).toContain(created.instanceId);
+});
+
+test.skipIf(!DB)("GET /instances?scope=started never carries another actor's case", async () => {
+  const PID = pid("proc_http_scope_started_isolated");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const mine = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  const theirs = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", { id: "user_2", roles: [] }))).json()) as {
+    instanceId: string;
+  };
+
+  const res = await fetch(authedReq(`http://x/instances?scope=started`, "GET", user1));
+  const page = (await res.json()) as { items: { instanceId: string }[] };
+  const ids = page.items.map((i) => i.instanceId);
+  expect(ids).toContain(mine.instanceId);
+  expect(ids).not.toContain(theirs.instanceId);
+});
+
+test.skipIf(!DB)("GET /instances?scope=started carries a case assigned to somebody else", async () => {
+  // The whole point of the scope: `assignedBody`'s step names "approver" and
+  // "user_1" as candidates, so a case user_2 starts never reaches user_2's
+  // own inbox. It still reaches their started list.
+  const PID = pid("proc_http_scope_started_unassigned");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const starter: Actor = { id: "user_outsider", roles: [] };
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", starter))).json()) as { instanceId: string };
+
+  const inbox = (await (await fetch(authedReq(`http://x/instances?scope=mine`, "GET", starter))).json()) as { items: { instanceId: string }[] };
+  expect(inbox.items.map((i) => i.instanceId)).not.toContain(created.instanceId);
+
+  const started = (await (await fetch(authedReq(`http://x/instances?scope=started`, "GET", starter))).json()) as {
+    items: { instanceId: string }[];
+  };
+  expect(started.items.map((i) => i.instanceId)).toContain(created.instanceId);
+});
+
+test.skipIf(!DB)("GET /instances?scope=started carries a finished case", async () => {
+  const PID = pid("proc_http_scope_started_finished");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  const cancelled = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", user1));
+  expect(cancelled.status).toBe(200);
+
+  const res = await fetch(authedReq(`http://x/instances?scope=started`, "GET", user1));
+  const page = (await res.json()) as { items: { instanceId: string; status: string }[] };
+  const row = page.items.find((i) => i.instanceId === created.instanceId);
+  expect(row?.status).toBe("cancelled");
+});
+
+test.skipIf(!DB)("GET /instances?scope=started&startedBy=<id> is a 400 request error", async () => {
+  const res = await fetch(authedReq(`http://x/instances?scope=started&startedBy=someone_else`, "GET", user1));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("GET /instances?scope=started accepts an explicit assignedTo, which narrows rather than widens", async () => {
+  // It reaches nothing outside what this caller started, so it needs no role.
+  const PID = pid("proc_http_scope_started_assigned_to");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const wide = (await (await fetch(authedReq(`http://x/instances?scope=started`, "GET", user1))).json()) as { items: { instanceId: string }[] };
+  expect(wide.items.map((i) => i.instanceId)).toContain(created.instanceId);
+
+  const res = await fetch(authedReq(`http://x/instances?scope=started&assignedTo=nobody_at_all`, "GET", user1));
+  expect(res.status).toBe(200);
+  const narrow = (await res.json()) as { items: { instanceId: string }[] };
+  expect(narrow.items.map((i) => i.instanceId)).not.toContain(created.instanceId);
+});
+
 test.skipIf(!DB)("GET /instances?status=running&status=cancelled widens the filter", async () => {
   const PID = pid("proc_http_list_multistatus");
   await publishBody(PID, simpleBody(), reg, dataSourceReg);

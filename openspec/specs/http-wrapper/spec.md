@@ -611,10 +611,10 @@ route rejects a missing or invalid bearer token when the JWT resolver is
 active").
 
 The route SHALL additionally accept a `scope` query parameter whose recognized
-values are `"mine"` and `"all"`; any other value SHALL be rejected as a request
-error. An omitted `scope` SHALL resolve to `"all"` — that is what an omitted
-`scope` has always meant — rather than defaulting to `"mine"`, so an existing
-request's meaning is never silently narrowed.
+values are `"mine"`, `"started"` and `"all"`; any other value SHALL be rejected
+as a request error. An omitted `scope` SHALL resolve to `"all"` — that is what
+an omitted `scope` has always meant — rather than defaulting to `"mine"`, so an
+existing request's meaning is never silently narrowed.
 
 `scope=all` (explicit or by omission) SHALL require `ADMIN_ROLE` on the
 resolved actor, checked with `requireRole` before the filter is applied, so an
@@ -630,15 +630,30 @@ query parameter, and SHALL reject a request that combines `scope=mine` with an
 explicit `assignedTo` value as a request error — `scope=mine` and `assignedTo`
 are alternatives, never combined.
 
+`scope=started` needs no role either. The wrapper SHALL derive `startedBy`
+from the resolved actor rather than from a query parameter. It SHALL reject a
+request combining `scope=started` with an explicit `startedBy` value as a
+request error, the rule `scope=mine` already carries for `assignedTo`.
+
+`scope=started` SHALL add no assignment predicate of its own. An instance the
+actor started matches whatever its current step's assignment says, and
+whatever its status is. The engine already authorizes that actor to read each
+one. The scope therefore lists what a `GET /instances/:id` would answer for.
+
+An explicit `assignedTo` SHALL still narrow the page conjunctively, as it does
+under `scope=all`. It reaches nothing outside what the caller started, so it
+needs no role of its own.
+
 The response SHALL carry the page of summaries and the next cursor, with the
 cursor absent on the last page.
 
 `scope=all` SHALL set `instance-query`'s `includeDegraded` filter, since that
 scope already requires `ADMIN_ROLE`. An instance whose summary cannot be
 produced then comes back as a degraded item, per that capability's own
-requirement. `scope=mine` SHALL NOT set it. An instance whose summary cannot
-be produced under that scope is absent from the page instead. No degraded
-item represents it, and the response still carries no error over it.
+requirement. Neither `scope=mine` nor `scope=started` SHALL set it. An
+instance whose summary cannot be produced under either scope is absent from
+the page instead. No degraded item represents it, and the response still
+carries no error over it.
 
 #### Scenario: Listing with no query parameters
 
@@ -723,6 +738,47 @@ item represents it, and the response still carries no error over it.
   credential
 - **AND** one instance among that actor's own assignments has a summary that
   cannot be produced
+- **THEN** the response is 200
+- **AND** that instance is absent from the page
+- **AND** no item in the page is a degraded summary
+
+#### Scenario: scope=started needs no role
+
+- **WHEN** `GET /instances?scope=started` is requested with a resolvable
+  credential holding no reserved role
+- **THEN** the response is 200 and carries the instances that actor started
+
+#### Scenario: scope=started rejects an explicit startedBy
+
+- **WHEN** `GET /instances?scope=started&startedBy=user-1` is requested with a
+  resolvable credential
+- **THEN** the response is a request error, and neither value is applied
+
+#### Scenario: scope=started ignores the assignment
+
+- **WHEN** an actor started an instance whose current step names another actor
+  as its only candidate
+- **AND** that actor requests `GET /instances?scope=started`
+- **THEN** the page carries that instance
+
+#### Scenario: scope=started carries a finished case
+
+- **WHEN** an actor started an instance that has since completed, and another
+  that has since been cancelled
+- **AND** that actor requests `GET /instances?scope=started`
+- **THEN** the page carries both
+
+#### Scenario: scope=started never carries another actor's case
+
+- **WHEN** two actors have each started an instance
+- **AND** one of them requests `GET /instances?scope=started`
+- **THEN** the page carries that actor's own instance alone
+
+#### Scenario: A degraded summary is absent under scope=started
+
+- **WHEN** `GET /instances?scope=started` is requested with a resolvable
+  credential
+- **AND** one instance that actor started has a summary that cannot be produced
 - **THEN** the response is 200
 - **AND** that instance is absent from the page
 - **AND** no item in the page is a degraded summary

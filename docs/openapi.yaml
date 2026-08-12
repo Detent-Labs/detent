@@ -235,14 +235,16 @@ paths:
       summary: List instances
       description: >-
         `scope=mine` is open to any authenticated actor and is derived
-        from that actor's id/roles. `scope=all`, and an omitted `scope`
-        alike, require the `system:admin` role.
+        from that actor's id/roles. `scope=started` is open to any
+        authenticated actor too, and is derived from that actor's id.
+        `scope=all`, and an omitted `scope` alike, require the
+        `system:admin` role.
       parameters:
         - name: scope
           in: query
           schema:
             type: string
-            enum: [mine, all]
+            enum: [mine, started, all]
           description: Omitted means `all`.
         - name: processId
           in: query
@@ -264,6 +266,7 @@ paths:
           in: query
           schema:
             type: string
+          description: Rejected (400) when combined with `scope=started`.
         - name: claimedBy
           in: query
           schema:
@@ -283,7 +286,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/InstanceSummaryPage"
         "400":
-          description: An invalid `limit`/`status` value, or `scope=mine` combined with `assignedTo`.
+          description: >-
+            An invalid `limit`/`status` value, `scope=mine` combined with
+            `assignedTo`, or `scope=started` combined with `startedBy`.
           content:
             application/json:
               schema:

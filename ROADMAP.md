@@ -887,7 +887,7 @@ Spec: `development-toolchain`.
     positions, and stages 30/33's proposed edge style and waypoints), not
     `src/schema/definition.ts`. No design doc, no OpenSpec change yet.
 
-35. Starter access to a started instance: NOT STARTED. Raised 2026-08-12 in
+35. **Starter access to a started instance: DONE.** Raised 2026-08-12 in
     conversation, as the question of whether a process instance records who
     started it. It does, and the read access the question asked for already
     holds. What is missing is the list.
@@ -918,9 +918,21 @@ Spec: `development-toolchain`.
     (`api.ts:1104`, `api.ts:1179`), so a starter already writes both. And
     whether a started list shows completed and cancelled instances, which the
     task inbox does not.
-    No design doc, no OpenSpec change yet. The engine-side move is small; the
-    screen makes it a UI change, so it writes deltas against `end-user-app`
-    and `instance-query`.
+    The change answered all three. The scope is a third value, `scope=started`,
+    because relaxing the role check for a self-referential `startedBy` would
+    put an authorization rule inside a filter parameter. The starter's access
+    is unchanged, which is the answer rather than a decision: this adds a way
+    to find an instance and no rule about what a finder may then do. And the
+    list carries every status, since a finished case is the common answer to
+    "what became of the thing I sent".
+    `instance-query` took no delta after all. Its spec already states the
+    `startedBy` filter as conjunctive and role-free, and the engine changed
+    nothing, so a delta there would have restated existing behaviour.
+    `/app/started` and its `StartedScreen` carry the list. It is a register,
+    not a second inbox: no filter, no sort, no grouping. `app.css` gained the
+    three stamp tones it lacked, matching the four roles the admin badges
+    already carry.
+    Change: `starter-instance-list`. Specs: `http-wrapper`, `end-user-app`.
 
 36. Edit panels modal rework: NOT STARTED. Raised 2026-08-12 in conversation.
     The three process-wide views — field catalog, data sources, contract — sit

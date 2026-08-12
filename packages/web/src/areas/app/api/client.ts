@@ -11,6 +11,19 @@ export async function listMyTasks(token: string, opts: { limit?: number; cursor?
   return (await res.json()) as InstancePage;
 }
 
+/**
+ * Every case this actor started, whatever its status. `scope=started` derives
+ * the starter from the credential, so this sends no `startedBy` of its own —
+ * the route rejects the pair.
+ */
+export async function listStartedByMe(token: string, opts: { limit?: number; cursor?: string } = {}): Promise<InstancePage> {
+  const params = new URLSearchParams({ scope: "started" });
+  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
+  if (opts.cursor !== undefined) params.set("cursor", opts.cursor);
+  const res = await request(`/instances?${params}`, token);
+  return (await res.json()) as InstancePage;
+}
+
 export async function getInstanceView(instanceId: string, token: string): Promise<InstanceView> {
   const res = await request(`/instances/${encodeURIComponent(instanceId)}`, token);
   return (await res.json()) as InstanceView;
