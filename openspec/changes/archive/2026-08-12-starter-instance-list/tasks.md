@@ -47,7 +47,7 @@
 - [x] 4.4 Add `areas/app/screens/startedLogic.ts`: the pure view model, the
   convention `inboxLogic.ts` already sets
 - [x] 4.5 Map each instance status onto a stamp tone `app.css` already ships.
-  `design-language.md` fixes the tone count, so this adds no new one. Add a
+  `design-language.md` fixes the tone count, so this adds none. Add a
   status-stamp class only where an existing tone carries the wrong meaning
 - [x] 4.6 Add `areas/app/screens/StartedScreen.tsx`. It renders register rows
   in `createdAt` order, a status stamp per row, and the identifying content as

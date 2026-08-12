@@ -74,8 +74,8 @@
 
 ## 5. Tests
 
-- [x] 5.1 Add a catalog test asserting the `en` and `de` key sets match in
-  both directions, for the admin and the reporting catalog
+- [x] 5.1 Add a catalog test for the admin and the reporting catalog. It
+  asserts the `en` and `de` key sets match in both directions
 - [x] 5.2 Change `test/admin-uiStringsLogic.test.ts`: `localesOf("admin")` and
   `localesOf("reporting")` now answer `["de", "en"]`. Drop the comment that
   names this change as pending
@@ -83,16 +83,16 @@
   `formatDuration` and `formatPercent` signatures. Keep the English
   expectations, and add a German case asserting the comma separator and a
   translated unit
-- [x] 5.4 Add a test that the excluded-count sentence answers a different
+- [x] 5.4 Add a test for the excluded-count sentence. It answers a different
   string for one instance and for two, in both locales
 - [x] 5.5 Add a test that `describeError` in the reporting area answers a
   catalog value for each `ClientError.type` it maps
 
 ## 6. Documentation
 
-- [x] 6.1 Add a `docs/current-state.md` section for this retrofit, naming the
-  two new catalogs, the two new area `catalog.ts` wrappers and every changed
-  signature
+- [x] 6.1 Add a `docs/current-state.md` section for this retrofit. It names
+  the two new catalogs, the two new area `catalog.ts` wrappers and every
+  changed signature
 - [x] 6.2 Add a `docs/browser-checks.md` entry: walk both areas in German at a
   narrow window. Check the instances, outbox, timers and users tables for a
   clipped column, and every screen for a leftover English word
