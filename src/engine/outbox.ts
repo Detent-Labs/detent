@@ -90,9 +90,9 @@ export class PermanentError extends Error {
  * patch. An unregistered type is a PermanentError (dead-letter, no retry). Runs
  * outside any DB transaction; MUST stay idempotent on the idempotency key.
  */
-export type DeliverFn = (row: ClaimedRow, registry: Registry) => Promise<Record<string, unknown>>;
+export type DeliverFn = (row: ClaimedRow, registry: Registry, db: SQL) => Promise<Record<string, unknown>>;
 
-export const deliver: DeliverFn = async (row, registry) => {
+export const deliver: DeliverFn = async (row, registry, db) => {
   const def = resolve(registry, row.action.type);
   if (!def) throw new PermanentError(`no handler registered for type: ${row.action.type}`);
   const result = await def.handler({
@@ -101,6 +101,7 @@ export const deliver: DeliverFn = async (row, registry) => {
     idempotencyKey: row.idempotency_key,
     instanceId: row.instance_id,
     ...(row.actors ? { actors: row.actors } : {}),
+    db,
   });
   return evalOutput(row.action.output, result);
 };
@@ -234,7 +235,7 @@ export async function drainOutbox(
     let failureMessage: string | undefined;
     const deadline = rejectAfter(leaseMs);
     try {
-      patch = await Promise.race([deliverFn(row, registry), deadline.promise]);
+      patch = await Promise.race([deliverFn(row, registry, db), deadline.promise]);
     } catch (e) {
       permanent = e instanceof PermanentError;
       failureMessage = e instanceof Error ? e.message : String(e);

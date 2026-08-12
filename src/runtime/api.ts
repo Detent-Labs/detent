@@ -401,6 +401,7 @@ function resolveDataSourceOptions(
   heldValues: string[],
   registry: DataSourceRegistry,
   cache: Map<string, Promise<FieldOption[]>>,
+  db: SQL,
 ): Promise<FieldOption[]> {
   const sorted = [...heldValues].sort();
   const key = JSON.stringify([def.id as string, sorted]);
@@ -408,7 +409,7 @@ function resolveDataSourceOptions(
   if (!pending) {
     const handler = resolveDataSource(registry, def.type);
     if (!handler) throw new Error(`data source type '${def.type}' is not registered in the runtime registry`);
-    pending = handler.resolve({ config: def.config, heldValues: sorted });
+    pending = handler.resolve({ config: def.config, heldValues: sorted, db });
     cache.set(key, pending);
   }
   return pending;
@@ -428,7 +429,7 @@ function resolveDataSourceOptions(
  * rendering) reads options from, instead of reading `FieldDef.options`
  * directly.
  */
-async function resolveFields(body: ProcessBody, step: Step, instance: Instance, actor: Actor, registry: DataSourceRegistry): Promise<ResolvedViewField[]> {
+async function resolveFields(body: ProcessBody, step: Step, instance: Instance, actor: Actor, registry: DataSourceRegistry, db: SQL): Promise<ResolvedViewField[]> {
   const ctx = buildGuardContext(body, instance, actor);
   const fieldsById = new Map(collectFieldsDeep(body.fields).map((f) => [f.id as string, f]));
   const dataSourcesById = new Map((body.dataSources ?? []).map((d) => [d.id as string, d]));
@@ -446,7 +447,7 @@ async function resolveFields(body: ProcessBody, step: Step, instance: Instance, 
     if (field.dataSource) {
       const def = dataSourcesById.get(field.dataSource as string);
       if (!def) throw new Error(`data source not found: ${field.dataSource}`); // publish-time invariant guarantees resolution; defensive only
-      options = await resolveDataSourceOptions(def, heldValuesOf(value), registry, dataSourceCache);
+      options = await resolveDataSourceOptions(def, heldValuesOf(value), registry, dataSourceCache, db);
     }
     out.push({ field, value, required, readonly, group: vf.group, options, span: vf.span ?? 1 });
   }
@@ -563,9 +564,10 @@ async function validateSubmissionData(
   actor: Actor,
   data: Record<string, Literal>,
   registry: DataSourceRegistry,
+  db: SQL,
   opts: { checkRequired: boolean } = { checkRequired: true },
 ): Promise<void> {
-  const resolved = await resolveFields(body, step, instance, actor, registry);
+  const resolved = await resolveFields(body, step, instance, actor, registry, db);
   const fieldsById = new Map(resolved.map((r) => [r.field.id as string, r]));
   const editable = editableFieldIds(resolved);
   const required = requiredFieldIds(resolved);
@@ -677,16 +679,17 @@ export async function createProcessInstance(
     startedAt: new Date().toISOString(),
   };
 
-  await validateSubmissionData(body, initial, stub, actor, submitted, registry, { checkRequired: false });
+  await validateSubmissionData(body, initial, stub, actor, submitted, registry, db, { checkRequired: false });
 
   // Creation is a step entry, so the initial step's candidates resolve here —
   // before `createInstance`, which calls no resolver — over the same minted id
   // and validated seed data the instance is actually created with.
-  const { assignment, unresolved } = await resolveStepAssignment(initial, assignmentRegistry, {
-    id: mintedId,
-    startedBy: actor.id,
-    data: submitted as Instance["data"],
-  });
+  const { assignment, unresolved } = await resolveStepAssignment(
+    initial,
+    assignmentRegistry,
+    { id: mintedId, startedBy: actor.id, data: submitted as Instance["data"] },
+    db,
+  );
   // Recorded at seq 0, which creation does not advance, and inside
   // createInstance's own transaction so it cannot outlive a rolled-back creation.
   const events: InstanceEvent[] = unresolved
@@ -763,7 +766,7 @@ export async function getInstanceView(instanceId: InstanceId, actor: Actor, regi
     version: instance.version,
     status: instance.status,
     step: { id: step.id, key: step.key, label: step.label, type: step.type },
-    fields: await resolveFields(body, step, instance, actor, registry),
+    fields: await resolveFields(body, step, instance, actor, registry, db),
     columns: step.view?.columns ?? 1,
     availablePaths: instance.status === "running" ? resolveAvailablePaths(body, step, instance, actor) : [],
     assignment: instance.assignment,
@@ -832,7 +835,7 @@ export async function submitAndTransition(
       throw new AuthorizationError(`actor '${actor.id}' may not submit instance '${instanceId}'`);
     }
 
-    await validateSubmissionData(body, step, instance, actor, submitted, registry);
+    await validateSubmissionData(body, step, instance, actor, submitted, registry, tx);
 
     return commitManualTransition(instance, pathId, body, actor, tx, data, assignmentRegistry);
   });

@@ -120,7 +120,7 @@ const mkInstance = async (pid: Instance["processId"], version: number, data?: Re
     id: instanceId,
     startedBy: undefined,
     data: (data ?? {}) as Instance["data"],
-  });
+  }, sql);
   return createInstance(
     body,
     { processId: pid, version, instanceId, assignment, ...(data ? { data: data as Instance["data"] } : {}) },

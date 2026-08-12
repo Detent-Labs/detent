@@ -4,6 +4,7 @@
  * by the outbox row's `action.type`; an unregistered type dead-letters.
  */
 
+import type { SQL } from "bun";
 import { z } from "zod";
 import type { Action, AssignmentUnresolvedReason, FieldOption, Instance, Step } from "../schema/definition.js";
 
@@ -52,6 +53,13 @@ export interface HandlerContext {
   idempotencyKey: string;
   instanceId: string;
   actors?: OutboxActors;
+  /**
+   * The database this delivery belongs to. Required, unlike `actors`: an absent
+   * handle has no sane fallback once one process serves many tenants, since a
+   * handler would quietly read whichever database built the registry. A handler
+   * needing no database ignores it, the way `http.request` does.
+   */
+  db: SQL;
 }
 
 /** A registered handler plus its plugin config JSON Schema. */
@@ -103,14 +111,20 @@ export const STATIC_ASSIGNMENT_STRATEGY_TYPE = "static";
  * concrete need, the rule the CEL context follows. Passing the whole instance
  * would make every internal field part of the plugin contract by accident.
  * `data` is the data the entering instance will carry, with any submitted patch
- * already merged. No connection or transaction handle travels here: a strategy
- * needing its own database access uses the shared pool, as `src/auth/users.ts`
- * does.
+ * already merged.
+ *
+ * `db` travels here, which reverses what this comment said until multi-tenancy
+ * landed: a strategy used to reach the shared pool itself. Under one database
+ * per tenant a handle bound when the registry was built resolves every tenant's
+ * manager against one directory, and the wrong actor lands in the wrong inbox.
+ * It is a plain handle, never a transaction: resolution runs before the entry's
+ * own transaction opens on three of its four paths.
  */
 export interface AssignmentContext {
   config: Record<string, unknown>;
   stepId: string;
   instance: { id: string; startedBy: string | undefined; data: Instance["data"] };
+  db: SQL;
 }
 
 /** `resolve` is async even for the pure config-echo `static` entry, so a future I/O-backed strategy is a drop-in, not an interface change (same reason as `DataSourceHandlerDef.resolve`). */
@@ -212,6 +226,7 @@ export async function resolveStepAssignment(
   step: Step,
   reg: AssignmentRegistry,
   instance: AssignmentContext["instance"],
+  db: SQL,
 ): Promise<ResolvedAssignment> {
   if (!step.assignment) return { assignment: undefined };
   const strategy = step.assignment.strategy;
@@ -226,7 +241,7 @@ export async function resolveStepAssignment(
     const timedOut = Symbol("assignment-resolution-timeout");
     try {
       const raced = await Promise.race([
-        def.resolve({ config: strategy.config, stepId: step.id, instance }),
+        def.resolve({ config: strategy.config, stepId: step.id, instance, db }),
         new Promise<typeof timedOut>((resolve) => {
           timer = setTimeout(() => resolve(timedOut), resolutionTimeoutMs());
         }),
@@ -258,6 +273,12 @@ export async function resolveStepAssignment(
  */
 export interface DataSourceContext {
   config: Record<string, unknown>;
+  /**
+   * The database this resolution belongs to. Required for the reason
+   * `HandlerContext.db` is: `db.list` reads the `data_lists` tables, and a
+   * bound handle would offer one tenant's values to every tenant.
+   */
+  db: SQL;
   /**
    * The values the instance already holds for the field under resolution, so a
    * handler can return one its own store has since retired. A handler with no

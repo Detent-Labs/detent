@@ -40,14 +40,15 @@ import { MAX_KEY_LENGTH } from "../schema/compile.js";
  * default registry here is acyclic; registry.ts stays the leaf module it
  * already was.
  *
- * `db` defaults to the shared pool, matching `createDefaultDataSourceRegistry`
- * below: `notification.email` resolves an actor id to an account address, so it
- * reads `auth_users`. `http.request` takes no database and ignores it.
+ * It takes no database. `notification.email` reads `ctx.db` per delivery, so
+ * one registry serves every tenant — a handle bound here would resolve every
+ * tenant's addresses against one account directory. `http.request` takes no
+ * database at all and ignores the field.
  */
-export function createDefaultRegistry(db: SQL = sql): Registry {
+export function createDefaultRegistry(): Registry {
   const reg = createRegistry();
   register(reg, HTTP_ACTION_TYPE, httpHandlerDef);
-  register(reg, NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef(db));
+  register(reg, NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef);
   return reg;
 }
 
@@ -71,11 +72,13 @@ export const dbListDataSourceConfigSchema = z.object({ listKey: z.string().min(1
  * `"db.list"` reads them from `data_lists`/`data_list_values`, so an operator
  * changes them with no publish and no migration.
  *
- * `db` is closed over here rather than carried on `DataSourceContext`: only
- * this one type needs a handle, and putting it in the context would make every
- * caller supply one for types that do not.
+ * It takes no database. `db.list` reads `ctx.db` per resolution, so one
+ * registry serves every tenant — a handle closed over here would offer one
+ * tenant's option values to every tenant. `"static"` needs none and ignores
+ * the field. This reverses the comment that stood here until multi-tenancy
+ * landed, which argued the opposite when one process meant one database.
  */
-export function createDefaultDataSourceRegistry(db: SQL = sql): DataSourceRegistry {
+export function createDefaultDataSourceRegistry(): DataSourceRegistry {
   const reg = createDataSourceRegistry();
   registerDataSource(reg, "static", {
     configSchema: staticDataSourceConfigSchema,
@@ -87,6 +90,7 @@ export function createDefaultDataSourceRegistry(db: SQL = sql): DataSourceRegist
     resolve: async (ctx) => {
       const { listKey } = ctx.config as { listKey: string };
       const held = ctx.heldValues ?? [];
+      const db = ctx.db;
       // The LEFT JOIN is what separates "no such list" (no rows at all) from
       // "a list with nothing to offer" (one row whose value is null). A
       // retired value the instance holds comes back so its label still

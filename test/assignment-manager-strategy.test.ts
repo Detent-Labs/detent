@@ -51,7 +51,7 @@ test.skipIf(!DB)("the strategy resolves the starter's manager as the single cand
   const anna = await createUser("anna@example.com", "pw", []);
   await setManagerById(anna.userId, boss.userId);
 
-  const got = await resolveStepAssignment(stepWith(MANAGER_OF_STARTER_STRATEGY_TYPE), createDefaultAssignmentRegistry(sql), ctx(anna.userId));
+  const got = await resolveStepAssignment(stepWith(MANAGER_OF_STARTER_STRATEGY_TYPE), createDefaultAssignmentRegistry(), ctx(anna.userId), sql);
   expect(got.assignment!.candidates).toEqual([boss.userId]);
   expect(got.unresolved).toBeUndefined();
 });
@@ -67,9 +67,9 @@ test.skipIf(!DB)("two starters with different managers resolve to different cand
   await setManagerById(bernd.userId, bossB.userId);
 
   const step = stepWith(MANAGER_OF_STARTER_STRATEGY_TYPE);
-  const reg = createDefaultAssignmentRegistry(sql);
-  const forAnna = await resolveStepAssignment(step, reg, ctx(anna.userId));
-  const forBernd = await resolveStepAssignment(step, reg, ctx(bernd.userId));
+  const reg = createDefaultAssignmentRegistry();
+  const forAnna = await resolveStepAssignment(step, reg, ctx(anna.userId), sql);
+  const forBernd = await resolveStepAssignment(step, reg, ctx(bernd.userId), sql);
 
   expect(forAnna.assignment!.candidates).toEqual([bossA.userId]);
   expect(forBernd.assignment!.candidates).toEqual([bossB.userId]);
@@ -79,16 +79,16 @@ test.skipIf(!DB)("two starters with different managers resolve to different cand
 
 test.skipIf(!DB)("a starter with no manager resolves to nobody, classified no-candidates", async () => {
   const anna = await createUser("anna3@example.com", "pw", []);
-  const got = await resolveStepAssignment(stepWith(MANAGER_OF_STARTER_STRATEGY_TYPE), createDefaultAssignmentRegistry(sql), ctx(anna.userId));
+  const got = await resolveStepAssignment(stepWith(MANAGER_OF_STARTER_STRATEGY_TYPE), createDefaultAssignmentRegistry(), ctx(anna.userId), sql);
   expect(got.assignment!.candidates).toEqual([]);
   expect(got.unresolved).toBe("no-candidates");
 });
 
 test.skipIf(!DB)("an absent or unknown startedBy resolves to nobody", async () => {
-  const reg = createDefaultAssignmentRegistry(sql);
+  const reg = createDefaultAssignmentRegistry();
   const step = stepWith(MANAGER_OF_STARTER_STRATEGY_TYPE);
-  const absent = await resolveStepAssignment(step, reg, ctx(undefined));
-  const unknown = await resolveStepAssignment(step, reg, ctx("user_does_not_exist"));
+  const absent = await resolveStepAssignment(step, reg, ctx(undefined), sql);
+  const unknown = await resolveStepAssignment(step, reg, ctx("user_does_not_exist"), sql);
   expect(absent.assignment!.candidates).toEqual([]);
   expect(absent.unresolved).toBe("no-candidates");
   expect(unknown.assignment!.candidates).toEqual([]);
@@ -102,7 +102,7 @@ test.skipIf(!DB)("the strategy reads one hop and does not walk a chain", async (
   await setManagerById(mid.userId, top.userId);
   await setManagerById(low.userId, mid.userId);
 
-  const got = await resolveStepAssignment(stepWith(MANAGER_OF_STARTER_STRATEGY_TYPE), createDefaultAssignmentRegistry(sql), ctx(low.userId));
+  const got = await resolveStepAssignment(stepWith(MANAGER_OF_STARTER_STRATEGY_TYPE), createDefaultAssignmentRegistry(), ctx(low.userId), sql);
   expect(got.assignment!.candidates).toEqual([mid.userId]);
   expect(got.assignment!.candidates).not.toContain(top.userId);
 });
@@ -114,7 +114,7 @@ test.skipIf(!DB)("a resolved list does not change when the manager changes after
   await setManagerById(anna.userId, boss.userId);
 
   const step = stepWith(MANAGER_OF_STARTER_STRATEGY_TYPE);
-  const frozen = await resolveStepAssignment(step, createDefaultAssignmentRegistry(sql), ctx(anna.userId));
+  const frozen = await resolveStepAssignment(step, createDefaultAssignmentRegistry(), ctx(anna.userId), sql);
   await setManagerById(anna.userId, other.userId);
 
   // The written answer is a value, not a live query: the entry that already
@@ -128,7 +128,7 @@ test("the strategy's config schema is strict and empty", () => {
 });
 
 test("the shipped registry holds both the static entry and the org one", () => {
-  const reg = createDefaultAssignmentRegistry(sql);
+  const reg = createDefaultAssignmentRegistry();
   expect([...reg.keys()]).toEqual(["static", MANAGER_OF_STARTER_STRATEGY_TYPE]);
 });
 
@@ -148,7 +148,7 @@ afterEach(() => {
 
 test("a step declaring no assignment resolves to undefined and records nothing", async () => {
   const bare = { id: "step_x", key: "x", label: { en: "X" }, type: "task" } as unknown as Step;
-  const got = await resolveStepAssignment(bare, registryOf(async () => ["nobody"]), ctx("user_1"));
+  const got = await resolveStepAssignment(bare, registryOf(async () => ["nobody"]), ctx("user_1"), sql);
   expect(got.assignment).toBeUndefined();
   expect(got.unresolved).toBeUndefined();
 });
@@ -160,19 +160,20 @@ test("a resolver that raises yields empty candidates and the resolver-raised rea
       throw new Error("directory unreachable");
     }),
     ctx("user_1"),
+    sql,
   );
   expect(got.assignment!.candidates).toEqual([]);
   expect(got.unresolved).toBe("resolver-raised");
 });
 
 test("a resolver returning an empty list yields the no-candidates reason", async () => {
-  const got = await resolveStepAssignment(stepWith("test.strategy"), registryOf(async () => []), ctx("user_1"));
+  const got = await resolveStepAssignment(stepWith("test.strategy"), registryOf(async () => []), ctx("user_1"), sql);
   expect(got.assignment!.candidates).toEqual([]);
   expect(got.unresolved).toBe("no-candidates");
 });
 
 test("an unregistered type resolves to empty rather than raising", async () => {
-  const got = await resolveStepAssignment(stepWith("test.not-registered"), createAssignmentRegistry(), ctx("user_1"));
+  const got = await resolveStepAssignment(stepWith("test.not-registered"), createAssignmentRegistry(), ctx("user_1"), sql);
   expect(got.assignment!.candidates).toEqual([]);
   expect(got.unresolved).toBe("no-candidates");
 });
@@ -191,7 +192,7 @@ test("a resolver exceeding the deadline is abandoned, and its late answer is ign
   );
 
   const started = performance.now();
-  const got = await resolveStepAssignment(stepWith("test.strategy"), reg, ctx("user_1"));
+  const got = await resolveStepAssignment(stepWith("test.strategy"), reg, ctx("user_1"), sql);
   const elapsed = performance.now() - started;
 
   expect(got.unresolved).toBe("timed-out");
@@ -212,7 +213,7 @@ test("the deadline default applies when the environment variable is unset or jun
   process.env.ASSIGNMENT_RESOLUTION_TIMEOUT_MS = "not-a-number";
   // A prompt resolver still answers, so the junk value falls back rather than
   // rejecting the resolution outright.
-  const got = await resolveStepAssignment(stepWith("test.strategy"), registryOf(async () => ["a"]), ctx("user_1"));
+  const got = await resolveStepAssignment(stepWith("test.strategy"), registryOf(async () => ["a"]), ctx("user_1"), sql);
   expect(got.assignment!.candidates).toEqual(["a"]);
 });
 
@@ -222,6 +223,7 @@ test("a resolver answering within the configured deadline is not abandoned", asy
     stepWith("test.strategy"),
     registryOf(() => new Promise<string[]>((resolve) => setTimeout(() => resolve(["in-time"]), 20))),
     ctx("user_1"),
+    sql,
   );
   expect(got.assignment!.candidates).toEqual(["in-time"]);
   expect(got.unresolved).toBeUndefined();
@@ -231,6 +233,6 @@ test.skipIf(!DB)("the org strategy accepts an injected db, so a test never reach
   const boss = await createUser("boss5@example.com", "pw", []);
   const anna = await createUser("anna5@example.com", "pw", []);
   await setManagerById(anna.userId, boss.userId);
-  const def = managerOfStarterStrategyDef(sql);
-  expect(await def.resolve({ config: {}, stepId: "step_approve", instance: ctx(anna.userId) })).toEqual([boss.userId]);
+  const def = managerOfStarterStrategyDef;
+  expect(await def.resolve({ config: {}, stepId: "step_approve", instance: ctx(anna.userId), db: sql })).toEqual([boss.userId]);
 });

@@ -446,7 +446,7 @@ async function commitTransition(
   extraFields?: Record<string, unknown>,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
-  const { assignment, unresolved } = await resolveStepAssignment(target, assignmentRegistry, assignmentContextFor(instance));
+  const { assignment, unresolved } = await resolveStepAssignment(target, assignmentRegistry, assignmentContextFor(instance), db);
   // The seq and version this entry lands on, mirroring planStepEntry's own
   // derivation so the event and the entry's HistoryEntry agree.
   const events = unresolved
@@ -694,7 +694,7 @@ export async function startInstance(
   const instanceId = `inst_${crypto.randomUUID()}`;
   const initial = body.workflow.steps.find((s) => s.id === body.workflow.initialStep);
   const resolved = initial
-    ? await resolveStepAssignment(initial, assignmentRegistry, { id: instanceId, startedBy: undefined, data: {} })
+    ? await resolveStepAssignment(initial, assignmentRegistry, { id: instanceId, startedBy: undefined, data: {} }, db)
     : undefined;
   // Recorded at seq 0, which creation does not advance, and inside
   // createInstance's own transaction (the `subprocess.spawn-enqueued` placement).

@@ -707,7 +707,7 @@ export async function startHttpServer(
 }
 
 if (import.meta.main) {
-  startHttpServer(createDefaultRegistry(sql), createDefaultDataSourceRegistry(sql))
+  startHttpServer(createDefaultRegistry(), createDefaultDataSourceRegistry())
     .then(({ stop }) => {
       // Registered here rather than in `startHttpServer`, which every test
       // calls: a listener per call would leak one per test file. This block

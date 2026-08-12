@@ -80,14 +80,14 @@ test.skipIf(!DB)("an identical re-publish of an already-stored body stays a no-o
 });
 
 test.skipIf(!DB)("a body naming a db.list listKey with no row publishes — the check reads the registry, never the tables", async () => {
-  const reg = createDefaultDataSourceRegistry(sql);
+  const reg = createDefaultDataSourceRegistry();
   await sql`DELETE FROM data_lists WHERE list_key = ${"no_such_list"}`;
   const v = await publishBody(PID, bodyWithDataSource(DB_LIST_DATA_SOURCE_TYPE, { listKey: "no_such_list" }), actionReg, reg);
   expect(v.version).toBe(1);
 });
 
 test.skipIf(!DB)("a db.list config with no listKey fails the publish", async () => {
-  const reg = createDefaultDataSourceRegistry(sql);
+  const reg = createDefaultDataSourceRegistry();
   let caught: unknown;
   try {
     await publishBody(PID, bodyWithDataSource(DB_LIST_DATA_SOURCE_TYPE, {}), actionReg, reg);

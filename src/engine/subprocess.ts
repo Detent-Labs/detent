@@ -127,11 +127,12 @@ function makeSpawnHandler(
       // must not run while a connection and a row lock are held.
       const childInitial = childBody.workflow.steps.find((s) => s.id === childBody.workflow.initialStep);
       const childResolved = childInitial
-        ? await resolveStepAssignment(childInitial, assignmentRegistry, {
-            id: childId,
-            startedBy: undefined,
-            data: childData as Instance["data"],
-          })
+        ? await resolveStepAssignment(
+            childInitial,
+            assignmentRegistry,
+            { id: childId, startedBy: undefined, data: childData as Instance["data"] },
+            db,
+          )
         : undefined;
       // A resolution that produced no candidate is the CHILD's fact, so this
       // event carries the child's id, the child's version and seq 0. It rides

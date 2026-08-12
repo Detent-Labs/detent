@@ -17,7 +17,7 @@ import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
-const dataSourceReg = createDefaultDataSourceRegistry(sql);
+const dataSourceReg = createDefaultDataSourceRegistry();
 const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
 const maintainer: Actor = { id: "user_maintainer", roles: [DATALISTS_ROLE] };

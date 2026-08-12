@@ -29,29 +29,29 @@
 
 ## 4. Unbind the plugins
 
-- [ ] 4.1 Add `db` to `HandlerContext` and pass it from `deliver`.
-- [ ] 4.2 Add `db` to `AssignmentContext` and pass it from
+- [x] 4.1 Add `db` to `HandlerContext` and pass it from `deliver`.
+- [x] 4.2 Add `db` to `AssignmentContext` and pass it from
   `resolveStepAssignment`.
-- [ ] 4.3 Change `notification.email` to read `ctx.db`, and drop the factory's
+- [x] 4.3 Change `notification.email` to read `ctx.db`, and drop the factory's
   `db` parameter.
-- [ ] 4.4 Change `org.manager-of-starter` to read `ctx.db`, and drop its
+- [x] 4.4 Change `org.manager-of-starter` to read `ctx.db`, and drop its
   factory's `db` parameter.
-- [ ] 4.4a Add `db` to `DataSourceContext` and pass it from the resolution
+- [x] 4.4a Add `db` to `DataSourceContext` and pass it from the resolution
   call site.
-- [ ] 4.4b Change the `db.list` data source to read `ctx.db`. It reads the
+- [x] 4.4b Change the `db.list` data source to read `ctx.db`. It reads the
   `data_lists` tables, so a bound handle leaks one tenant's options.
-- [ ] 4.5 Drop the `db` parameter from `createDefaultRegistry`,
+- [x] 4.5 Drop the `db` parameter from `createDefaultRegistry`,
   `createDefaultAssignmentRegistry` and `createDefaultDataSourceRegistry`.
-- [ ] 4.5a Change every call site of those three. They are
+- [x] 4.5a Change every call site of those three. They are
   `src/http/server.ts`, `scripts/seed.ts`, `scripts/demo-expense-approval.ts`
   and the tests that create a registry.
-- [ ] 4.6 Change every context construction site the required handle breaks:
+- [x] 4.6 Change every context construction site the required handle breaks:
   `src/engine/subprocess.ts`, `test/handlers-http.test.ts`,
   `test/handlers-notification-email.test.ts` and the assignment suites.
-- [ ] 4.7 Change `registry.ts`'s comment and
+- [x] 4.7 Change `registry.ts`'s comment and
   `.claude/rules/process-contract.md`'s assignment-context line. Both state
   that no connection handle travels there.
-- [ ] 4.8 Test that one registry serves two tenants, each reading its own
+- [x] 4.8 Test that one registry serves two tenants, each reading its own
   accounts and its own lists.
 
 ## 5. Tenant resolution

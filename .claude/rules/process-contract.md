@@ -119,8 +119,11 @@ core validates only the envelope; each plugin ships its own JSON Schema.
 author gets by default, and the only one that ships — not a literal any engine
 code compares against. An entry declares a candidate resolver
 (`(ctx) => Promise<string[]>`, async even for `static`, over the narrow context
-`{ config, stepId, instance: { id, startedBy, data } }`) and may declare a
-config schema. The
+`{ config, stepId, instance: { id, startedBy, data }, db }`) and may declare a
+config schema. `db` is the instance's OWN database, and it is required: under
+multi-tenancy a handle bound when the registry was built would resolve every
+tenant's manager against one directory. The same rule holds for a handler
+(`HandlerContext.db`) and a data source (`DataSourceContext.db`). The
 registry maps `type -> { config schema }` (`registry.ts`,
 `HandlerDef.configSchema`) and is validated at PUBLISH time:
 `checkActionRegistry` (`src/engine/registry-check.ts`) resolves every action's

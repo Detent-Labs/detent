@@ -39,8 +39,8 @@ function accountsDb(accounts: Account[]): SQL {
   return fn as unknown as SQL;
 }
 
-/** The default: no account table, which every literal-`to` test below leaves untouched. */
-const mailDef = notificationEmailHandlerDef(accountsDb([]));
+/** The def is plain now: the database rides on each context below as `db`. */
+const mailDef = notificationEmailHandlerDef;
 
 const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = process.env.SMTP_PORT;
@@ -52,13 +52,16 @@ const action = (config: Record<string, unknown>, timeout?: string): Action =>
 
 const ctxFor = (
   config: Record<string, unknown>,
-  opts: { idempotencyKey?: string; timeout?: string; actors?: OutboxActors } = {},
+  opts: { idempotencyKey?: string; timeout?: string; actors?: OutboxActors; db?: SQL } = {},
 ): HandlerContext => ({
   action: action(config, opts.timeout),
   config,
   idempotencyKey: opts.idempotencyKey ?? "idem_1",
   instanceId: "inst_1",
   ...(opts.actors ? { actors: opts.actors } : {}),
+  // Empty by default: every literal-`to` case below resolves no actor, so the
+  // account lookup short-circuits and never reaches this handle.
+  db: opts.db ?? accountsDb([]),
 });
 
 const validConfig = { to: ["ops@example.test"], subject: "Task waiting", body: "Please review." };
@@ -207,7 +210,7 @@ test("createDefaultRegistry resolves notification.email", () => {
 test("a caller-supplied registry without the handler is unaffected", async () => {
   // The same row against a registry that never registered the type: it
   // dead-letters as unregistered, exactly as it would have before this change.
-  const err = await rejects(deliver(rowFor(validConfig), createRegistry()));
+  const err = await rejects(deliver(rowFor(validConfig), createRegistry(), accountsDb([])));
   expect(err).toBeInstanceOf(PermanentError);
   expect((err as Error).message).toContain(NOTIFICATION_EMAIL_ACTION_TYPE);
 });
@@ -398,7 +401,7 @@ test("deliver evaluates an Action.output mapping over the handler's result", asy
     const reg = createRegistry();
     register(reg, NOTIFICATION_EMAIL_ACTION_TYPE, mailDef);
     const row = rowFor(validConfig, { field_sent: { lang: "cel", src: "result.messageId" } });
-    const patch = await deliver(row, reg);
+    const patch = await deliver(row, reg, accountsDb([]));
     expect(patch).toEqual({ field_sent: "<idem_row@example.test>" });
   });
 });
@@ -407,7 +410,7 @@ test("deliver succeeds with no Action.output mapping and writes no field", async
   await withFake({}, async (server) => {
     const reg = createRegistry();
     register(reg, NOTIFICATION_EMAIL_ACTION_TYPE, mailDef);
-    const patch = await deliver(rowFor(validConfig), reg);
+    const patch = await deliver(rowFor(validConfig), reg, accountsDb(ACCOUNTS));
     expect(patch).toEqual({});
     expect(server.messages).toHaveLength(1);
   });
@@ -418,7 +421,7 @@ test("an output mapping that cannot read the result fails transiently, after the
     const reg = createRegistry();
     register(reg, NOTIFICATION_EMAIL_ACTION_TYPE, mailDef);
     const row = rowFor(validConfig, { field_sent: { lang: "cel", src: "result.noSuchKey" } });
-    const err = await rejects(deliver(row, reg));
+    const err = await rejects(deliver(row, reg, accountsDb([])));
     // Transient, so the outbox retries and the message goes out again. This is
     // the duplicate-mail hazard the declared result shape exists to keep an
     // author away from, demonstrated rather than only described.
@@ -545,13 +548,19 @@ const rcptAddresses = (server: FakeServer): string[] =>
   server.commands.filter((c) => c.toUpperCase().startsWith("RCPT")).map((c) => c.replace(/^RCPT TO:<(.*)>$/i, "$1"));
 
 /** The handler bound to the fixed account table above. */
-const resolvingDef = notificationEmailHandlerDef(accountsDb(ACCOUNTS));
+const resolvingDef = notificationEmailHandlerDef;
 
 const actorConfig = (toActors: string[], to: string[] = []) => ({ to, toActors, subject: "s", body: "b" });
 
+/** Every actor-resolution case below reads the fixed account table above. */
+const ctxForAccounts = (
+  config: Record<string, unknown>,
+  opts: { idempotencyKey?: string; actors?: OutboxActors } = {},
+): HandlerContext => ctxFor(config, { ...opts, db: accountsDb(ACCOUNTS) });
+
 test("one candidate resolves to that candidate's address", async () => {
   await withFake({}, async (server) => {
-    const result = await resolvingDef.handler(ctxFor(actorConfig(["candidate"]), { actors: { candidates: ["user_alice"] } }));
+    const result = await resolvingDef.handler(ctxForAccounts(actorConfig(["candidate"]), { actors: { candidates: ["user_alice"] } }));
     expect((result as { recipients: string[] }).recipients).toEqual(["alice@example.test"]);
     expect(rcptAddresses(server)).toEqual(["alice@example.test"]);
   });
@@ -560,7 +569,7 @@ test("one candidate resolves to that candidate's address", async () => {
 test("several candidates all receive the message", async () => {
   await withFake({}, async () => {
     const actors = { candidates: ["user_alice", "user_bob", "user_carol"] };
-    const result = await resolvingDef.handler(ctxFor(actorConfig(["candidate"]), { actors }));
+    const result = await resolvingDef.handler(ctxForAccounts(actorConfig(["candidate"]), { actors }));
     expect((result as { recipients: string[] }).recipients).toEqual([
       "alice@example.test",
       "bob@example.test",
@@ -572,7 +581,7 @@ test("several candidates all receive the message", async () => {
 test("a literal address and a resolved address deduplicate", async () => {
   await withFake({}, async (server) => {
     const config = actorConfig(["candidate"], ["ops@example.test"]);
-    const result = await resolvingDef.handler(ctxFor(config, { actors: { candidates: ["user_ops", "user_alice"] } }));
+    const result = await resolvingDef.handler(ctxForAccounts(config, { actors: { candidates: ["user_ops", "user_alice"] } }));
     // `to` first, then the tokens' addresses in candidate order, each once.
     expect((result as { recipients: string[] }).recipients).toEqual(["ops@example.test", "alice@example.test"]);
     expect(rcptAddresses(server)).toEqual(["ops@example.test", "alice@example.test"]);
@@ -582,7 +591,7 @@ test("a literal address and a resolved address deduplicate", async () => {
 test("a disabled account contributes no address", async () => {
   await withFake({}, async () => {
     const actors = { candidates: ["user_dana", "user_bob"] };
-    const result = await resolvingDef.handler(ctxFor(actorConfig(["candidate"]), { actors }));
+    const result = await resolvingDef.handler(ctxForAccounts(actorConfig(["candidate"]), { actors }));
     expect((result as { recipients: string[] }).recipients).toEqual(["bob@example.test"]);
   });
 });
@@ -590,7 +599,7 @@ test("a disabled account contributes no address", async () => {
 test("an actor id with no account contributes no address", async () => {
   await withFake({}, async () => {
     const actors = { candidates: ["user_ghost", "user_bob"] };
-    const result = await resolvingDef.handler(ctxFor(actorConfig(["candidate"]), { actors }));
+    const result = await resolvingDef.handler(ctxForAccounts(actorConfig(["candidate"]), { actors }));
     expect((result as { recipients: string[] }).recipients).toEqual(["bob@example.test"]);
   });
 });
@@ -598,7 +607,7 @@ test("an actor id with no account contributes no address", async () => {
 test("the claimant token reaches the actor holding the claim", async () => {
   await withFake({}, async () => {
     const actors = { candidates: ["user_alice", "user_bob"], claimant: "user_bob" };
-    const result = await resolvingDef.handler(ctxFor(actorConfig(["claimant"]), { actors }));
+    const result = await resolvingDef.handler(ctxForAccounts(actorConfig(["claimant"]), { actors }));
     expect((result as { recipients: string[] }).recipients).toEqual(["bob@example.test"]);
   });
 });
@@ -606,7 +615,7 @@ test("the claimant token reaches the actor holding the claim", async () => {
 test("the starter token reaches the actor that started the instance", async () => {
   await withFake({}, async () => {
     const actors = { candidates: [], starter: "user_carol" };
-    const result = await resolvingDef.handler(ctxFor(actorConfig(["starter"]), { actors }));
+    const result = await resolvingDef.handler(ctxForAccounts(actorConfig(["starter"]), { actors }));
     expect((result as { recipients: string[] }).recipients).toEqual(["carol@example.test"]);
   });
 });
@@ -614,7 +623,7 @@ test("the starter token reaches the actor that started the instance", async () =
 test("no candidate resolves, so no session opens and the delivery succeeds", async () => {
   await withFake({}, async (server) => {
     const actors = { candidates: [] };
-    const result = await resolvingDef.handler(ctxFor(actorConfig(["candidate"]), { actors, idempotencyKey: "idem_none" }));
+    const result = await resolvingDef.handler(ctxForAccounts(actorConfig(["candidate"]), { actors, idempotencyKey: "idem_none" }));
     expect((result as { recipients: string[] }).recipients).toEqual([]);
     // The Message-ID keeps its declared shape, so an Action.output mapping over
     // `result.messageId` still evaluates rather than throwing a transient error.
@@ -626,7 +635,7 @@ test("no candidate resolves, so no session opens and the delivery succeeds", asy
 
 test("a row carrying no frozen actor ids resolves nothing", async () => {
   await withFake({}, async (server) => {
-    const result = await resolvingDef.handler(ctxFor(actorConfig(["candidate", "claimant", "starter"])));
+    const result = await resolvingDef.handler(ctxForAccounts(actorConfig(["candidate", "claimant", "starter"])));
     expect((result as { recipients: string[] }).recipients).toEqual([]);
     expect(server.commands).toEqual([]);
   });
@@ -635,7 +644,7 @@ test("a row carrying no frozen actor ids resolves nothing", async () => {
 test("a literal recipient still sends when a token resolves nothing", async () => {
   await withFake({}, async (server) => {
     const config = actorConfig(["candidate"], ["ops@example.test"]);
-    const result = await resolvingDef.handler(ctxFor(config, { actors: { candidates: [] } }));
+    const result = await resolvingDef.handler(ctxForAccounts(config, { actors: { candidates: [] } }));
     expect((result as { recipients: string[] }).recipients).toEqual(["ops@example.test"]);
     expect(rcptAddresses(server)).toEqual(["ops@example.test"]);
   });
@@ -644,7 +653,7 @@ test("a literal recipient still sends when a token resolves nothing", async () =
 test("the To header lists every resolved address", async () => {
   await withFake({}, async (server) => {
     const actors = { candidates: ["user_alice", "user_bob"] };
-    await resolvingDef.handler(ctxFor(actorConfig(["candidate"]), { actors }));
+    await resolvingDef.handler(ctxForAccounts(actorConfig(["candidate"]), { actors }));
     expect(server.messages[0]).toContain("To: alice@example.test, bob@example.test");
   });
 });

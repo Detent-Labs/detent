@@ -15,10 +15,8 @@
  * HTTP surface onto the org-aware set is a change of import, with no
  * default-parameter expression touched.
  */
-import { SQL } from "bun";
 import { z } from "zod";
 import { getManagerOf } from "../auth/users.js";
-import { sql } from "./store.js";
 import {
   type AssignmentRegistry,
   type AssignmentStrategyDef,
@@ -49,28 +47,26 @@ export const managerOfStarterConfigSchema = z.object({}).strict();
  * `scope=mine` inbox filter with no translation — the property that makes a
  * later switch to an external directory a swap of this lookup alone.
  */
-export function managerOfStarterStrategyDef(db: SQL = sql): AssignmentStrategyDef {
-  return {
-    configSchema: managerOfStarterConfigSchema,
-    resolve: async (ctx) => {
-      const starter = ctx.instance.startedBy;
-      if (!starter) return [];
-      const manager = await getManagerOf(starter, db);
-      return manager ? [manager] : [];
-    },
-  };
-}
+export const managerOfStarterStrategyDef: AssignmentStrategyDef = {
+  configSchema: managerOfStarterConfigSchema,
+  resolve: async (ctx) => {
+    const starter = ctx.instance.startedBy;
+    if (!starter) return [];
+    const manager = await getManagerOf(starter, ctx.db);
+    return manager ? [manager] : [];
+  },
+};
 
 /**
  * The registry the engine ships: the built-in `static` entry plus
  * `org.manager-of-starter`.
  *
- * `db` defaults to the shared pool, the convention `src/auth/users.ts` already
- * follows, so the no-argument call every default parameter makes still reaches a
- * real database. A test injects its own.
+ * It takes no database. Each resolution reads `ctx.db`, so one registry serves
+ * every tenant — a handle bound here would resolve every tenant's manager
+ * against one directory.
  */
-export function createDefaultAssignmentRegistry(db: SQL = sql): AssignmentRegistry {
+export function createDefaultAssignmentRegistry(): AssignmentRegistry {
   const reg = createStaticAssignmentRegistry();
-  registerAssignmentStrategy(reg, MANAGER_OF_STARTER_STRATEGY_TYPE, managerOfStarterStrategyDef(db));
+  registerAssignmentStrategy(reg, MANAGER_OF_STARTER_STRATEGY_TYPE, managerOfStarterStrategyDef);
   return reg;
 }

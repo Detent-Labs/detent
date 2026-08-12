@@ -11,22 +11,20 @@
  * `auth_users`. That reaches the actor holding a step, which a literal list
  * cannot.
  *
- * The db-injectable factory below follows `assignment-strategies.ts`'s
- * `managerOfStarterStrategyDef`, the shipped precedent for a plugin that reads
- * the database. No new module is needed for it: that file exists only because
- * `registry.ts` is a leaf three modules default a parameter to, and this file
- * is no such leaf.
+ * The account lookup reads `ctx.db`, the handle the delivery itself carries.
+ * No new module is needed for it: `assignment-strategies.ts` exists only
+ * because `registry.ts` is a leaf three modules default a parameter to, and
+ * this file is no such leaf.
  *
  * Connection details come from the environment, never from the process body,
  * following the DATABASE_URL / AUTH_JWT_SECRET convention.
  */
 
-import { SQL } from "bun";
+import type { SQL } from "bun";
 import { z } from "zod";
 import { emailsForUserIds } from "../auth/users.js";
 import { durationMs } from "../engine/duration.js";
 import { PermanentError } from "../engine/outbox.js";
-import { sql } from "../engine/store.js";
 import type { HandlerContext, HandlerDef, OutboxActors } from "../engine/registry.js";
 import { log } from "../log.js";
 
@@ -393,10 +391,10 @@ async function resolveRecipients(
   return out;
 }
 
-async function notificationEmailHandler(ctx: HandlerContext, db: SQL): Promise<NotificationEmailResult> {
+async function notificationEmailHandler(ctx: HandlerContext): Promise<NotificationEmailResult> {
   const config = notificationEmailConfigSchema.parse(ctx.config);
   const env = readSmtpEnv();
-  const recipients = await resolveRecipients(config, ctx.actors, db);
+  const recipients = await resolveRecipients(config, ctx.actors, ctx.db);
 
   // No recipient resolved: send nothing and succeed. A step that resolved to no
   // candidate already records an `assignment.unresolved` event, so dead-lettering
@@ -437,16 +435,12 @@ async function notificationEmailHandler(ctx: HandlerContext, db: SQL): Promise<N
 }
 
 /**
- * `db` defaults to the shared pool, the convention `src/auth/users.ts` follows,
- * so a no-argument call still reaches a real database. A test injects its own.
- *
- * The binding happens once, when the registry is built. That is
- * `managerOfStarterStrategyDef`'s property too, and stage 24 (one database per
- * tenant) revisits both together — see this change's design doc.
+ * A plain def, not a factory. The database arrives on every invocation as
+ * `ctx.db`, so one registry serves every tenant: a handle bound when the
+ * registry was built would resolve every tenant's addresses against one
+ * account directory. Stage 24 replaced the factory this file briefly carried.
  */
-export function notificationEmailHandlerDef(db: SQL = sql): HandlerDef {
-  return {
-    handler: (ctx) => notificationEmailHandler(ctx, db),
-    configSchema: notificationEmailConfigSchema,
-  };
-}
+export const notificationEmailHandlerDef: HandlerDef = {
+  handler: notificationEmailHandler,
+  configSchema: notificationEmailConfigSchema,
+};

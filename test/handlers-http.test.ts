@@ -4,6 +4,7 @@
  * no DB work). Mirrors registry-check.test.ts's style — flat test(), no
  * describe blocks.
  */
+import type { SQL } from "bun";
 import { test, expect } from "bun:test";
 import {
   httpHandlerDef,
@@ -16,6 +17,9 @@ import {
 } from "../src/handlers/http.js";
 import { deliver, PermanentError, type ClaimedRow } from "../src/engine/outbox.js";
 import { createRegistry, register, type HandlerContext } from "../src/engine/registry.js";
+
+/** http.request reads no database, so a stand-in handle satisfies the required field. */
+const noDb = (() => Promise.resolve([])) as unknown as SQL;
 import type { Action } from "../src/schema/definition.js";
 
 type CapturedRequest = { method: string; headers: Record<string, string>; bodyText: string };
@@ -89,6 +93,7 @@ const ctxFor = (config: Record<string, unknown>, opts: { idempotencyKey?: string
   config,
   idempotencyKey: opts.idempotencyKey ?? "idem_1",
   instanceId: "inst_1",
+  db: noDb,
 });
 
 async function rejects(p: Promise<unknown>): Promise<unknown> {
@@ -289,7 +294,7 @@ test("an over-size response dead-letters via deliver(), the classification the o
         field_version: 1,
         actors: null,
       };
-      const err = await rejects(deliver(row, reg));
+      const err = await rejects(deliver(row, reg, noDb));
       expect(err).toBeInstanceOf(PermanentError); // -> outbox dead-letters, never retries, writes no data
     },
   );
@@ -323,8 +328,8 @@ test("a retried delivery sends the same Idempotency-Key as the original", async 
         field_version: 1,
         actors: null,
       };
-      await deliver(row, reg);
-      await deliver({ ...row, attempts: row.attempts + 1 }, reg); // simulated retry
+      await deliver(row, reg, noDb);
+      await deliver({ ...row, attempts: row.attempts + 1 }, reg, noDb); // simulated retry
       expect(requests).toHaveLength(2);
       const keyHeader = IDEMPOTENCY_HEADER.toLowerCase();
       expect(requests[0]!.headers[keyHeader]).toBe("idem_stable");

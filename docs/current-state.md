@@ -675,11 +675,15 @@ Stage-by-stage status is in `ROADMAP.md`.
 
   Through `emailsForUserIds` (`src/auth/users.ts`) the handler turns a token
   into an address. That lookup drops an unknown id and a disabled account. The
-  def is therefore a factory, `notificationEmailHandlerDef(db = sql)`, the shape
-  `managerOfStarterStrategyDef` already uses. The pool arrives through
-  `createDefaultRegistry(db = sql)`. Every candidate gets the message, and
-  addresses deduplicate with `to` first. A delivery resolving none opens no
-  socket, returns `recipients: []`, succeeds, and logs one warning.
+  handler reads `ctx.db`, the handle each delivery carries, so one registry
+  serves every tenant. `createDefaultRegistry()` takes no database. Stage 24
+  replaced the brief factory this def carried between 16b and it. The same rule
+  now holds for `org.manager-of-starter` and for the `db.list` data source: all
+  three read their handle from the context.
+
+  Every candidate gets the message, and addresses deduplicate with `to` first. A
+  delivery resolving none opens no socket, returns `recipients: []`, succeeds,
+  and logs one warning.
 
   The actor ids reach the handler frozen, never read at delivery. The stamp
   comes from `registry.ts::outboxActorsOf`. All three enqueue sites write it to
