@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { listProcesses } from "../api/client.js";
 import { describeCaughtError, stepName } from "./reportingLogic.js";
-import { EmptyState, ErrorNote } from "../components.js";
+import { EmptyState, ErrorNote, WaitingNote } from "../components.js";
+import { t } from "../catalog.js";
+import type { UiLocale } from "../../../i18n/locale.js";
 import type { ClientError, ProcessSummary } from "../api/types.js";
 
 /**
@@ -10,7 +12,15 @@ import type { ClientError, ProcessSummary } from "../api/types.js";
  * only those with instances in range: an empty report is a legitimate answer
  * to "how is this process doing".
  */
-export function ProcessPickerScreen({ token, onPick }: { token: string; onPick: (processId: string, label: string) => void }) {
+export function ProcessPickerScreen({
+  token,
+  locale,
+  onPick,
+}: {
+  token: string;
+  locale: UiLocale;
+  onPick: (processId: string, label: string) => void;
+}) {
   const [processes, setProcesses] = useState<ProcessSummary[] | undefined>();
   const [error, setError] = useState<ClientError | undefined>();
 
@@ -24,10 +34,10 @@ export function ProcessPickerScreen({ token, onPick }: { token: string; onPick: 
 
   return (
     <main className="rep-screen">
-      <h1>Choose a process</h1>
-      {error && <ErrorNote error={error} />}
-      {!error && processes === undefined && <p className="rep-scope">Loading…</p>}
-      {!error && processes?.length === 0 && <EmptyState>No processes are published yet.</EmptyState>}
+      <h1>{t(locale, "picker.title")}</h1>
+      {error && <ErrorNote error={error} locale={locale} />}
+      {!error && processes === undefined && <WaitingNote locale={locale} />}
+      {!error && processes?.length === 0 && <EmptyState>{t(locale, "picker.empty")}</EmptyState>}
       {!error && processes && processes.length > 0 && (
         <ul className="rep-picker">
           {processes.map((p) => {

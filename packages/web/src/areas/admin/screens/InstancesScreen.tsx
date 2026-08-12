@@ -5,9 +5,12 @@ import type { Route } from "../routing.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
 import { EMPTY_INSTANCE_FILTER, toListParams, labelText, type InstanceFilterState } from "./instancesLogic.js";
+import { t, tFill } from "../catalog.js";
+import type { UiLocale } from "../../../i18n/locale.js";
 
 interface InstancesScreenProps {
   token: string;
+  locale: UiLocale;
   navigate: (route: Route) => void;
   onUnauthorized: () => void;
 }
@@ -19,7 +22,7 @@ function isDegraded(item: InstanceSummaryItem): item is DegradedInstanceSummary 
   return "degraded" in item;
 }
 
-export function InstancesScreen({ token, navigate, onUnauthorized }: InstancesScreenProps) {
+export function InstancesScreen({ token, locale, navigate, onUnauthorized }: InstancesScreenProps) {
   const [items, setItems] = useState<InstanceSummaryItem[]>([]);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
@@ -36,11 +39,11 @@ export function InstancesScreen({ token, navigate, onUnauthorized }: InstancesSc
       setCursor(page.cursor);
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setLoading(false);
     }
-  }, [token, filter, onUnauthorized]);
+  }, [token, filter, locale, onUnauthorized]);
 
   const loadMore = useCallback(async () => {
     if (!cursor) return;
@@ -52,11 +55,11 @@ export function InstancesScreen({ token, navigate, onUnauthorized }: InstancesSc
       setCursor(page.cursor);
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setLoading(false);
     }
-  }, [token, filter, cursor, onUnauthorized]);
+  }, [token, filter, cursor, locale, onUnauthorized]);
 
   useEffect(() => {
     void load();
@@ -67,47 +70,64 @@ export function InstancesScreen({ token, navigate, onUnauthorized }: InstancesSc
 
   return (
     <main className="admin-screen">
-      <h1>Instances</h1>
+      <h1>{t(locale, "instances.title")}</h1>
 
       <div className="admin-controls">
+        {/* Every `value` here is the status token the route matches; only the label follows the locale. */}
         <select value={filter.status} onChange={(e) => setFilter((f) => ({ ...f, status: e.target.value }))}>
-          <option value="">All statuses</option>
-          <option value="running">Running</option>
-          <option value="completed">Completed</option>
-          <option value="cancelled">Cancelled</option>
-          <option value="faulted">Faulted</option>
+          <option value="">{t(locale, "common.allStatuses")}</option>
+          <option value="running">{t(locale, "instances.statusRunning")}</option>
+          <option value="completed">{t(locale, "instances.statusCompleted")}</option>
+          <option value="cancelled">{t(locale, "instances.statusCancelled")}</option>
+          <option value="faulted">{t(locale, "instances.statusFaulted")}</option>
         </select>
-        <input placeholder="Process id" value={filter.processId} onChange={(e) => setFilter((f) => ({ ...f, processId: e.target.value }))} />
-        <input placeholder="Current step id" value={filter.currentStepId} onChange={(e) => setFilter((f) => ({ ...f, currentStepId: e.target.value }))} />
-        <input placeholder="Started by" value={filter.startedBy} onChange={(e) => setFilter((f) => ({ ...f, startedBy: e.target.value }))} />
-        <input placeholder="Claimed by" value={filter.claimedBy} onChange={(e) => setFilter((f) => ({ ...f, claimedBy: e.target.value }))} />
+        <input
+          placeholder={t(locale, "instances.filterProcessId")}
+          value={filter.processId}
+          onChange={(e) => setFilter((f) => ({ ...f, processId: e.target.value }))}
+        />
+        <input
+          placeholder={t(locale, "instances.filterStepId")}
+          value={filter.currentStepId}
+          onChange={(e) => setFilter((f) => ({ ...f, currentStepId: e.target.value }))}
+        />
+        <input
+          placeholder={t(locale, "instances.filterStartedBy")}
+          value={filter.startedBy}
+          onChange={(e) => setFilter((f) => ({ ...f, startedBy: e.target.value }))}
+        />
+        <input
+          placeholder={t(locale, "instances.filterClaimedBy")}
+          value={filter.claimedBy}
+          onChange={(e) => setFilter((f) => ({ ...f, claimedBy: e.target.value }))}
+        />
         <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
-          Refresh
+          {t(locale, "common.refresh")}
         </button>
       </div>
 
       {error && (
         <div className="admin-error-banner" role="alert">
-          <span className="admin-error-banner-stamp">Failed</span>
+          <span className="admin-error-banner-stamp">{t(locale, "common.failed")}</span>
           <span className="admin-error-banner-message">{error}</span>
           <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
-            Retry
+            {t(locale, "common.retry")}
           </button>
         </div>
       )}
 
-      {items.length === 0 && !loading && !error && <p className="admin-empty">No instances match these filters.</p>}
+      {items.length === 0 && !loading && !error && <p className="admin-empty">{t(locale, "instances.empty")}</p>}
 
       {items.length > 0 && (
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Process</th>
-              <th>Step</th>
-              <th>Status</th>
-              <th>Started by</th>
-              <th>Claimed by</th>
-              <th>Created</th>
+              <th>{t(locale, "instances.colProcess")}</th>
+              <th>{t(locale, "instances.colStep")}</th>
+              <th>{t(locale, "instances.colStatus")}</th>
+              <th>{t(locale, "instances.colStartedBy")}</th>
+              <th>{t(locale, "instances.colClaimedBy")}</th>
+              <th>{t(locale, "instances.colCreated")}</th>
             </tr>
           </thead>
           <tbody>
@@ -123,7 +143,7 @@ export function InstancesScreen({ token, navigate, onUnauthorized }: InstancesSc
                   </td>
                   <td>{item.startedBy ?? "—"}</td>
                   <td>—</td>
-                  <td>{new Date(item.createdAt).toLocaleString()}</td>
+                  <td>{new Date(item.createdAt).toLocaleString(locale)}</td>
                 </tr>
               ) : (
                 <tr key={item.instanceId}>
@@ -131,7 +151,11 @@ export function InstancesScreen({ token, navigate, onUnauthorized }: InstancesSc
                     <button
                       type="button"
                       className="admin-row-link"
-                      aria-label={`Open instance: ${labelText(item.processLabel, item.processBaseLocale)} — ${labelText(item.stepLabel, item.processBaseLocale)} (${item.status})`}
+                      aria-label={tFill(locale, "instances.openRow", {
+                        process: labelText(item.processLabel, item.processBaseLocale),
+                        step: labelText(item.stepLabel, item.processBaseLocale),
+                        status: item.status,
+                      })}
                       onClick={() => navigate({ name: "instance", instanceId: item.instanceId })}
                     >
                       {labelText(item.processLabel, item.processBaseLocale)}
@@ -143,7 +167,7 @@ export function InstancesScreen({ token, navigate, onUnauthorized }: InstancesSc
                   </td>
                   <td>{item.startedBy ?? "—"}</td>
                   <td>{item.assignment?.claimedBy ?? "—"}</td>
-                  <td>{new Date(item.createdAt).toLocaleString()}</td>
+                  <td>{new Date(item.createdAt).toLocaleString(locale)}</td>
                 </tr>
               ),
             )}
@@ -154,7 +178,7 @@ export function InstancesScreen({ token, navigate, onUnauthorized }: InstancesSc
       {cursor && (
         <div className="admin-load-more">
           <button type="button" className="btn btn-secondary" onClick={() => void loadMore()} disabled={loading}>
-            Load more
+            {t(locale, "common.loadMore")}
           </button>
         </div>
       )}

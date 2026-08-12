@@ -3,18 +3,18 @@ import { discardOutboxRow, listOutbox, retryOutboxRow, AdminClientError } from "
 import type { OutboxRow } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
+import { t } from "../catalog.js";
+import type { UiLocale } from "../../../i18n/locale.js";
 
 interface OutboxScreenProps {
   token: string;
+  locale: UiLocale;
   onUnauthorized: () => void;
 }
 
 const PAGE_LIMIT = 50;
 
-const RETRY_CONFIRM =
-  "Retrying re-runs this action's side effect. A handler that honours the idempotency key (e.g. http.request's Idempotency-Key header) deduplicates it downstream — one that doesn't may repeat it. Continue?";
-
-export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
+export function OutboxScreen({ token, locale, onUnauthorized }: OutboxScreenProps) {
   const [items, setItems] = useState<OutboxRow[]>([]);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -39,11 +39,11 @@ export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
       setCounts(page.counts);
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setLoading(false);
     }
-  }, [token, statusFilter, instanceIdFilter, onUnauthorized]);
+  }, [token, statusFilter, instanceIdFilter, locale, onUnauthorized]);
 
   const loadMore = useCallback(async () => {
     if (!cursor) return;
@@ -60,25 +60,25 @@ export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
       setCursor(page.cursor);
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setLoading(false);
     }
-  }, [token, statusFilter, instanceIdFilter, cursor, onUnauthorized]);
+  }, [token, statusFilter, instanceIdFilter, cursor, locale, onUnauthorized]);
 
   useEffect(() => {
     void load();
   }, [load, reloadToken]);
 
   const doRetry = async (key: string) => {
-    if (!window.confirm(RETRY_CONFIRM)) return;
+    if (!window.confirm(t(locale, "outbox.retryConfirm"))) return;
     setBusyKey(key);
     try {
       await retryOutboxRow(key, token);
       refresh();
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setBusyKey(undefined);
     }
@@ -91,7 +91,7 @@ export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
       refresh();
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setBusyKey(undefined);
     }
@@ -99,7 +99,7 @@ export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
 
   return (
     <main className="admin-screen">
-      <h1>Outbox</h1>
+      <h1>{t(locale, "outbox.title")}</h1>
 
       <div className="admin-counts">
         {Object.entries(counts).map(([status, n]) => (
@@ -110,42 +110,43 @@ export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
       </div>
 
       <div className="admin-controls">
+        {/* Every `value` here is the status token the route matches; only the label follows the locale. */}
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="">All statuses</option>
-          <option value="pending">Pending</option>
-          <option value="claimed">Claimed</option>
-          <option value="delivered">Delivered</option>
-          <option value="dead-letter">Dead letter</option>
-          <option value="discarded">Discarded</option>
+          <option value="">{t(locale, "common.allStatuses")}</option>
+          <option value="pending">{t(locale, "outbox.statusPending")}</option>
+          <option value="claimed">{t(locale, "outbox.statusClaimed")}</option>
+          <option value="delivered">{t(locale, "outbox.statusDelivered")}</option>
+          <option value="dead-letter">{t(locale, "outbox.statusDeadLetter")}</option>
+          <option value="discarded">{t(locale, "outbox.statusDiscarded")}</option>
         </select>
-        <input placeholder="Instance id" value={instanceIdFilter} onChange={(e) => setInstanceIdFilter(e.target.value)} />
+        <input placeholder={t(locale, "outbox.filterInstanceId")} value={instanceIdFilter} onChange={(e) => setInstanceIdFilter(e.target.value)} />
         <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
-          Refresh
+          {t(locale, "common.refresh")}
         </button>
       </div>
 
       {error && (
         <div className="admin-error-banner" role="alert">
-          <span className="admin-error-banner-stamp">Failed</span>
+          <span className="admin-error-banner-stamp">{t(locale, "common.failed")}</span>
           <span className="admin-error-banner-message">{error}</span>
           <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
-            Retry
+            {t(locale, "common.retry")}
           </button>
         </div>
       )}
 
-      {items.length === 0 && !loading && !error && <p className="admin-empty">No outbox rows match these filters.</p>}
+      {items.length === 0 && !loading && !error && <p className="admin-empty">{t(locale, "outbox.empty")}</p>}
 
       {items.length > 0 && (
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Type</th>
-              <th>Instance</th>
-              <th>Status</th>
-              <th>Attempts</th>
-              <th>Last error</th>
-              <th>Idempotency key</th>
+              <th>{t(locale, "outbox.colType")}</th>
+              <th>{t(locale, "outbox.colInstance")}</th>
+              <th>{t(locale, "outbox.colStatus")}</th>
+              <th>{t(locale, "outbox.colAttempts")}</th>
+              <th>{t(locale, "outbox.colLastError")}</th>
+              <th>{t(locale, "outbox.colIdempotencyKey")}</th>
               <th />
             </tr>
           </thead>
@@ -169,7 +170,7 @@ export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
                         onClick={() => void doRetry(row.idempotencyKey)}
                         disabled={busyKey === row.idempotencyKey}
                       >
-                        Retry
+                        {t(locale, "common.retry")}
                       </button>{" "}
                       <button
                         type="button"
@@ -177,7 +178,7 @@ export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
                         onClick={() => void doDiscard(row.idempotencyKey)}
                         disabled={busyKey === row.idempotencyKey}
                       >
-                        Discard
+                        {t(locale, "outbox.discard")}
                       </button>
                     </>
                   )}
@@ -191,7 +192,7 @@ export function OutboxScreen({ token, onUnauthorized }: OutboxScreenProps) {
       {cursor && (
         <div className="admin-load-more">
           <button type="button" className="btn btn-secondary" onClick={() => void loadMore()} disabled={loading}>
-            Load more
+            {t(locale, "common.loadMore")}
           </button>
         </div>
       )}

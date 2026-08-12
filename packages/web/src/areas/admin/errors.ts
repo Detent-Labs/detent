@@ -1,5 +1,7 @@
 import type { ClientError } from "./api/types.js";
 import { AdminClientError } from "./api/client.js";
+import type { UiLocale } from "../../i18n/locale.js";
+import { t } from "./catalog.js";
 
 /**
  * Maps a client error to operator-facing text, keyed on `error.type`. Never
@@ -12,37 +14,37 @@ import { AdminClientError } from "./api/client.js";
  * `packages/app/src/errors.ts::describeError`, so the three packages read
  * alike; narrower because admin does not drive a claim state machine.
  */
-export function describeError(error: ClientError, _status?: number): string {
+export function describeError(error: ClientError, locale: UiLocale, _status?: number): string {
   switch (error.type) {
     case "authorization":
-      return "You don't have permission to do that.";
+      return t(locale, "error.authorization");
     case "actor-resolution":
-      return "Your session could not be resolved. Sign in again.";
+      return t(locale, "error.actorResolution");
     case "request-shape":
-      return "That request was malformed.";
+      return t(locale, "error.requestShape");
     case "not-found":
-      return "Not found.";
+      return t(locale, "error.notFound");
     case "conflict":
-      return "This was changed elsewhere. Refresh and try again.";
+      return t(locale, "error.conflict");
     case "migration-plan":
-      return "No migration plan is registered for that version pair.";
+      return t(locale, "error.migrationPlan");
     case "self-role-strip":
-      return "You cannot remove system:admin from your own account. Ask another administrator, or use the server CLI.";
+      return t(locale, "error.selfRoleStrip");
     case "self-manager":
-      return "A user cannot be their own manager. Pick a different account.";
+      return t(locale, "error.selfManager");
     case "unknown-manager":
-      return "That account no longer exists. Refresh and pick again.";
+      return t(locale, "error.unknownManager");
     case "email-in-use":
-      return "An account already uses that email address. Pick a different one.";
+      return t(locale, "error.emailInUse");
     case "network":
-      return "Could not reach the server. Check your connection and try again.";
+      return t(locale, "error.network");
     case "internal":
-      return "The server hit an error. Try again.";
+      return t(locale, "error.internal");
     default:
       // `ClientError` is the union of every server error type, so it carries
       // variants only another area provokes. If one reaches an operator screen
       // it reads as a generic failure rather than falling off the switch.
-      return "Something went wrong.";
+      return t(locale, "error.generic");
   }
 }
 
@@ -53,7 +55,7 @@ export function describeError(error: ClientError, _status?: number): string {
  * still must not rethrow one, so it gets the same generic text rather than
  * an unhandled rejection.
  */
-export function describeCaughtError(err: unknown): string {
-  if (err instanceof AdminClientError) return describeError(err.error, err.status);
-  return "Something went wrong. Try again.";
+export function describeCaughtError(err: unknown, locale: UiLocale): string {
+  if (err instanceof AdminClientError) return describeError(err.error, locale, err.status);
+  return t(locale, "error.genericRetry");
 }

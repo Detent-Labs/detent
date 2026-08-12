@@ -5,9 +5,13 @@ import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
 import { loadUiStringOverrides } from "../../../i18n/overrides.js";
 import { OVERRIDABLE_AREAS, localesOf, rowsFor, pendingWrites } from "./uiStringsLogic.js";
+import { t, tFill } from "../catalog.js";
+import type { UiLocale } from "../../../i18n/locale.js";
 
 interface UiStringsScreenProps {
   token: string;
+  /** The chrome's locale. The locale being edited is `locale` state below, and the two are independent. */
+  locale: UiLocale;
   onUnauthorized: () => void;
 }
 
@@ -25,7 +29,7 @@ interface UiStringsScreenProps {
  * holds the new wording. Screens already rendered keep the old value until
  * React renders them again — the same reason the boot fetch sits in `main.tsx`.
  */
-export function UiStringsScreen({ token, onUnauthorized }: UiStringsScreenProps) {
+export function UiStringsScreen({ token, locale: uiLocale, onUnauthorized }: UiStringsScreenProps) {
   const [area, setArea] = useState<string>(OVERRIDABLE_AREAS[0]);
   const [locale, setLocale] = useState<string>(localesOf(OVERRIDABLE_AREAS[0])[0] ?? "en");
   const [overrides, setOverrides] = useState<UiStringOverrideMap>({});
@@ -44,11 +48,11 @@ export function UiStringsScreen({ token, onUnauthorized }: UiStringsScreenProps)
       setDrafts({});
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, uiLocale));
     } finally {
       setLoading(false);
     }
-  }, [token, onUnauthorized]);
+  }, [token, uiLocale, onUnauthorized]);
 
   useEffect(() => {
     void load();
@@ -80,7 +84,7 @@ export function UiStringsScreen({ token, onUnauthorized }: UiStringsScreenProps)
       refresh();
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, uiLocale));
     } finally {
       setSaving(false);
     }
@@ -88,21 +92,22 @@ export function UiStringsScreen({ token, onUnauthorized }: UiStringsScreenProps)
 
   return (
     <main className="admin-screen">
-      <h1>UI strings</h1>
+      <h1>{t(uiLocale, "uiStrings.title")}</h1>
 
       {error && (
         <div className="admin-error-banner" role="alert">
-          <span className="admin-error-banner-stamp">Failed</span>
+          <span className="admin-error-banner-stamp">{t(uiLocale, "common.failed")}</span>
           <span className="admin-error-banner-message">{error}</span>
           <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
-            Retry
+            {t(uiLocale, "common.retry")}
           </button>
         </div>
       )}
 
       <div className="admin-controls">
         <label className="admin-field">
-          Area
+          {t(uiLocale, "uiStrings.area")}
+          {/* The area name and the locale code below are stored keys, so both lists print them as stored. */}
           <select value={area} onChange={(e) => pickArea(e.target.value)}>
             {OVERRIDABLE_AREAS.map((name) => (
               <option key={name} value={name}>
@@ -112,7 +117,7 @@ export function UiStringsScreen({ token, onUnauthorized }: UiStringsScreenProps)
           </select>
         </label>
         <label className="admin-field">
-          Locale
+          {t(uiLocale, "uiStrings.locale")}
           <select
             value={locale}
             onChange={(e) => {
@@ -131,14 +136,14 @@ export function UiStringsScreen({ token, onUnauthorized }: UiStringsScreenProps)
       </div>
 
       {rows.length === 0 ? (
-        <p className="admin-empty">This area ships no catalog for that locale.</p>
+        <p className="admin-empty">{t(uiLocale, "uiStrings.emptyCatalog")}</p>
       ) : (
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Key</th>
-              <th>Shipped wording</th>
-              <th>This deployment says</th>
+              <th>{t(uiLocale, "uiStrings.colKey")}</th>
+              <th>{t(uiLocale, "uiStrings.colShipped")}</th>
+              <th>{t(uiLocale, "uiStrings.colDeployment")}</th>
             </tr>
           </thead>
           <tbody>
@@ -153,7 +158,7 @@ export function UiStringsScreen({ token, onUnauthorized }: UiStringsScreenProps)
                       setSaved(false);
                       setDrafts((prev) => ({ ...prev, [row.key]: e.target.value }));
                     }}
-                    aria-label={`Override for ${row.key}`}
+                    aria-label={tFill(uiLocale, "uiStrings.overrideAria", { key: row.key })}
                     placeholder={row.builtin}
                     autoComplete="off"
                     spellCheck={false}
@@ -167,16 +172,14 @@ export function UiStringsScreen({ token, onUnauthorized }: UiStringsScreenProps)
 
       <div className="admin-controls">
         <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={saving || writes.length === 0}>
-          {saving ? "Saving…" : "Save changes"}
+          {saving ? t(uiLocale, "common.saving") : t(uiLocale, "common.saveChanges")}
         </button>
         <span className="admin-note" aria-live="polite">
-          {saved ? "Saved." : writes.length > 0 ? `${writes.length} unsaved` : ""}
+          {saved ? t(uiLocale, "common.saved") : writes.length > 0 ? tFill(uiLocale, "uiStrings.unsaved", { n: writes.length }) : ""}
         </span>
       </div>
 
-      <p className="admin-note">
-        Clearing an input removes the override, and the shipped wording applies again. Everyone sees a change on their next page load.
-      </p>
+      <p className="admin-note">{t(uiLocale, "uiStrings.note")}</p>
     </main>
   );
 }

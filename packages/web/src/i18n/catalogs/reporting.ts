@@ -1,0 +1,121 @@
+import type { UiLocale } from "../locale.js";
+
+/**
+ * The process-owner area's own screen strings. Same placement as
+ * `catalogs/app.ts`, and for the same reason: the admin area's UI-strings
+ * screen lists these keys, and `packages/web/test/boundaries.test.ts` forbids
+ * an area importing another area.
+ *
+ * A step label, a process key and a version are not here. The engine stores
+ * each one, so the area prints it as stored.
+ */
+export const en = {
+  "nav.processes": "Processes",
+  "nav.cycleTime": "Cycle time",
+  "nav.bottleneck": "Bottlenecks",
+  "nav.sla": "SLA",
+  "range.from": "From",
+  "range.to": "To",
+  "range.invalid": "The start date must not be after the end date.",
+  "common.loading": "Loading…",
+  "picker.title": "Choose a process",
+  "picker.empty": "No processes are published yet.",
+  "cycle.totalTitle": "Total duration",
+  "cycle.totalScope": "Completed instances only — a cancelled or faulted instance did not finish its normal path.",
+  "cycle.totalEmpty": "No completed instances started in this range.",
+  "cycle.sampleOne": "over {n} completed instance",
+  "cycle.sampleMany": "over {n} completed instances",
+  "cycle.perStepTitle": "Average dwell per step",
+  "cycle.perStepScope": "In workflow order, over the same completed instances.",
+  "cycle.perStepEmpty": "No completed instance has passed through a step in this range.",
+  "cycle.averageDwell": "Average dwell",
+  "bottleneck.title": "Median dwell per step",
+  "bottleneck.scope": "Every instance started in this range, whatever its status — a step's own speed is observable as soon as an instance has passed through it.",
+  "bottleneck.empty": "No instance has passed through a step in this range.",
+  "bottleneck.medianDwell": "Median dwell",
+  "bottleneck.wipTitle": "Waiting right now",
+  "bottleneck.wipScope": "Running instances currently parked in each step. Not bounded by the date range — this is a present-tense count.",
+  "bottleneck.wipEmpty": "No instance is running in any step.",
+  "sla.title": "Breach rate per step",
+  "sla.scope":
+    "A step's threshold is its own declared reminder or escalation timer. A step that declares no timer carries no SLA and is absent from this list — it is not passing, it is unmeasured.",
+  "sla.empty": "No step in this process declares a timer, so there is no SLA to report.",
+  "sla.breachRate": "Breach rate",
+  "sla.breached": "Breached",
+  "table.step": "Step",
+  "table.traversals": "Traversals",
+  "skipped.one": "{n} instance is excluded: its pinned definition version no longer resolves.",
+  "skipped.many": "{n} instances are excluded: their pinned definition version no longer resolves.",
+  "duration.ms": "ms",
+  "duration.s": "s",
+  "duration.min": "min",
+  "duration.h": "h",
+  "duration.d": "d",
+  "error.failed": "Failed",
+  "error.authorization": "You don't have permission to read this report.",
+  "error.actorResolution": "Your session could not be resolved. Sign in again.",
+  "error.requestShape": "That request was malformed.",
+  "error.notFound": "Not found.",
+  "error.conflict": "This was changed elsewhere. Refresh and try again.",
+  "error.network": "Could not reach the server. Check your connection and try again.",
+  "error.internal": "The server hit an error. Try again.",
+  "error.generic": "Something went wrong.",
+} as const;
+
+export const de: Record<keyof typeof en, string> = {
+  "nav.processes": "Prozesse",
+  "nav.cycleTime": "Durchlaufzeit",
+  "nav.bottleneck": "Engpässe",
+  "nav.sla": "SLA",
+  "range.from": "Von",
+  "range.to": "Bis",
+  "range.invalid": "Das Startdatum darf nicht nach dem Enddatum liegen.",
+  "common.loading": "Wird geladen…",
+  "picker.title": "Prozess auswählen",
+  "picker.empty": "Es ist noch kein Prozess veröffentlicht.",
+  "cycle.totalTitle": "Gesamtdauer",
+  "cycle.totalScope": "Nur abgeschlossene Instanzen — eine abgebrochene oder gestörte Instanz hat ihren regulären Weg nicht beendet.",
+  "cycle.totalEmpty": "In diesem Zeitraum wurde keine abgeschlossene Instanz gestartet.",
+  "cycle.sampleOne": "über {n} abgeschlossene Instanz",
+  "cycle.sampleMany": "über {n} abgeschlossene Instanzen",
+  "cycle.perStepTitle": "Durchschnittliche Verweildauer je Schritt",
+  "cycle.perStepScope": "In Prozessreihenfolge, über dieselben abgeschlossenen Instanzen.",
+  "cycle.perStepEmpty": "In diesem Zeitraum hat keine abgeschlossene Instanz einen Schritt durchlaufen.",
+  "cycle.averageDwell": "Ø Verweildauer",
+  "bottleneck.title": "Mediane Verweildauer je Schritt",
+  "bottleneck.scope":
+    "Jede in diesem Zeitraum gestartete Instanz, unabhängig vom Status — die Geschwindigkeit eines Schritts ist messbar, sobald eine Instanz ihn durchlaufen hat.",
+  "bottleneck.empty": "In diesem Zeitraum hat keine Instanz einen Schritt durchlaufen.",
+  "bottleneck.medianDwell": "Mediane Verweildauer",
+  "bottleneck.wipTitle": "Wartet gerade",
+  "bottleneck.wipScope": "Laufende Instanzen, die derzeit in einem Schritt stehen. Nicht auf den Zeitraum begrenzt — eine Momentaufnahme.",
+  "bottleneck.wipEmpty": "Es läuft keine Instanz in einem Schritt.",
+  "sla.title": "Verletzungsrate je Schritt",
+  "sla.scope":
+    "Der Schwellwert eines Schritts ist sein eigener Erinnerungs- oder Eskalations-Timer. Ein Schritt ohne Timer hat kein SLA und fehlt in dieser Liste — er besteht nicht, er ist ungemessen.",
+  "sla.empty": "Kein Schritt dieses Prozesses erklärt einen Timer, daher gibt es kein SLA zu berichten.",
+  "sla.breachRate": "Verletzungsrate",
+  "sla.breached": "Verletzt",
+  "table.step": "Schritt",
+  "table.traversals": "Durchläufe",
+  "skipped.one": "{n} Instanz fehlt: ihre angeheftete Definitionsversion ist nicht mehr auflösbar.",
+  "skipped.many": "{n} Instanzen fehlen: ihre angehefteten Definitionsversionen sind nicht mehr auflösbar.",
+  "duration.ms": "ms",
+  "duration.s": "s",
+  "duration.min": "Min",
+  "duration.h": "Std",
+  "duration.d": "T",
+  "error.failed": "Fehlgeschlagen",
+  "error.authorization": "Sie dürfen diesen Bericht nicht lesen.",
+  "error.actorResolution": "Ihre Sitzung konnte nicht aufgelöst werden. Melden Sie sich erneut an.",
+  "error.requestShape": "Diese Anfrage war fehlerhaft.",
+  "error.notFound": "Nicht gefunden.",
+  "error.conflict": "Das wurde an anderer Stelle geändert. Laden Sie neu und versuchen Sie es erneut.",
+  "error.network": "Der Server war nicht erreichbar. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+  "error.internal": "Der Server hat einen Fehler gemeldet. Versuchen Sie es erneut.",
+  "error.generic": "Etwas ist schiefgelaufen.",
+};
+
+export type CatalogKey = keyof typeof en;
+
+export const reportingCatalog: Record<UiLocale, Record<CatalogKey, string>> = { en, de };

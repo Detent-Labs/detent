@@ -15,6 +15,7 @@ import {
   scaleTo,
   rankByMedian,
   describeCaughtError,
+  describeError,
 } from "../src/areas/reporting/screens/reportingLogic.js";
 import { ReportingClientError } from "../src/areas/reporting/api/client.js";
 
@@ -86,24 +87,62 @@ test.skipIf(!ZURICH)("a picked day spans that day in local time, not in UTC", ()
 });
 
 test("durations use the largest fitting unit", () => {
-  expect(formatDuration(450)).toBe("450 ms");
-  expect(formatDuration(4500)).toBe("4.5 s");
-  expect(formatDuration(90_000)).toBe("1.5 min");
-  expect(formatDuration(45 * 60_000)).toBe("45 min");
-  expect(formatDuration(5.5 * 3_600_000)).toBe("5.5 h");
-  expect(formatDuration(3 * 86_400_000)).toBe("3 d");
-  expect(formatDuration(30 * 86_400_000)).toBe("30 d");
+  expect(formatDuration(450, "en")).toBe("450 ms");
+  expect(formatDuration(4500, "en")).toBe("4.5 s");
+  expect(formatDuration(90_000, "en")).toBe("1.5 min");
+  expect(formatDuration(45 * 60_000, "en")).toBe("45 min");
+  expect(formatDuration(5.5 * 3_600_000, "en")).toBe("5.5 h");
+  expect(formatDuration(3 * 86_400_000, "en")).toBe("3 d");
+  expect(formatDuration(30 * 86_400_000, "en")).toBe("30 d");
+});
+
+test("a German duration takes its unit from the catalog and its separator from the locale", () => {
+  // `d` is `T` in German, and the decimal separator is a comma. Both would be
+  // wrong under a locale-free formatter.
+  expect(formatDuration(3 * 86_400_000, "de")).toBe("3 T");
+  expect(formatDuration(5.5 * 3_600_000, "de")).toBe("5,5 Std");
+  expect(formatDuration(90_000, "de")).toBe("1,5 Min");
 });
 
 test("a negative or non-finite duration renders as an em dash, not as a number", () => {
-  expect(formatDuration(-1)).toBe("—");
-  expect(formatDuration(Number.NaN)).toBe("—");
+  expect(formatDuration(-1, "en")).toBe("—");
+  expect(formatDuration(Number.NaN, "en")).toBe("—");
+  expect(formatDuration(-1, "de")).toBe("—");
 });
 
 test("a breach rate renders as a whole percent", () => {
-  expect(formatPercent(0)).toBe("0%");
-  expect(formatPercent(0.5)).toBe("50%");
-  expect(formatPercent(1)).toBe("100%");
+  expect(formatPercent(0, "en")).toBe("0%");
+  expect(formatPercent(0.5, "en")).toBe("50%");
+  expect(formatPercent(1, "en")).toBe("100%");
+});
+
+test("a German percent carries the space the locale puts before the sign", () => {
+  expect(formatPercent(0.5, "de")).toBe("50 %");
+});
+
+test("every ClientError type a report can meet answers a catalog value", () => {
+  for (const error of [
+    { type: "authorization", message: "raw" },
+    { type: "actor-resolution", message: "raw" },
+    { type: "request-shape", message: "raw" },
+    { type: "not-found", message: "raw" },
+    { type: "conflict", message: "raw" },
+    { type: "network", message: "raw" },
+    { type: "internal", message: "raw" },
+    { type: "guard-refused", message: "raw" },
+  ] as const) {
+    for (const locale of ["en", "de"] as const) {
+      const text = describeError(error, locale);
+      expect(text.length, `${error.type}/${locale}`).toBeGreaterThan(0);
+      // Never the server's own string: it arrives in English and no catalog reaches it.
+      expect(text, `${error.type}/${locale}`).not.toBe("raw");
+    }
+  }
+});
+
+test("the same error reads differently in each locale", () => {
+  const error = { type: "not-found", message: "raw" } as const;
+  expect(describeError(error, "en")).not.toBe(describeError(error, "de"));
 });
 
 test("a step falls back to its key when the base locale is absent", () => {

@@ -4,6 +4,8 @@
  */
 import { ReportingClientError } from "../api/client.js";
 import type { ClientError, StepLabel } from "../api/types.js";
+import type { UiLocale } from "../../../i18n/locale.js";
+import { t } from "../catalog.js";
 
 export type DateRange = { from: string; to: string };
 
@@ -69,29 +71,41 @@ export function rangeIsValid(range: DateRange): boolean {
   return !Number.isNaN(from) && !Number.isNaN(to) && from <= to;
 }
 
+/** The unit catalog keys, largest first, with the millisecond size each one names. */
+const DURATION_UNITS = [
+  ["duration.d", 86_400_000],
+  ["duration.h", 3_600_000],
+  ["duration.min", 60_000],
+  ["duration.s", 1000],
+] as const;
+
 /**
  * Durations here span seconds to weeks, so a fixed unit would read as either
  * noise or zero. Largest fitting unit, one decimal below ten, never more than
  * two components — a process owner comparing steps needs the magnitude, not
  * the milliseconds.
+ *
+ * The unit suffix comes from the catalog (`d` is `T` in German), and the
+ * number goes through `Intl.NumberFormat`, so German reads `4,5 Std`. The `—`
+ * stays a literal: it is a typographic mark, not a word.
  */
-export function formatDuration(ms: number): string {
+export function formatDuration(ms: number, locale: UiLocale): string {
   if (!Number.isFinite(ms) || ms < 0) return "—";
-  if (ms < 1000) return `${Math.round(ms)} ms`;
-  const units: [string, number][] = [["d", 86_400_000], ["h", 3_600_000], ["min", 60_000], ["s", 1000]];
-  for (const [suffix, size] of units) {
+  const num = (value: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(value);
+  if (ms < 1000) return `${num(Math.round(ms))} ${t(locale, "duration.ms")}`;
+  for (const [key, size] of DURATION_UNITS) {
     if (ms >= size) {
       const whole = Math.floor(ms / size);
-      if (whole >= 10) return `${whole} ${suffix}`;
-      const tenths = Math.round((ms / size) * 10) / 10;
-      return `${tenths} ${suffix}`;
+      if (whole >= 10) return `${num(whole)} ${t(locale, key)}`;
+      return `${num(Math.round((ms / size) * 10) / 10)} ${t(locale, key)}`;
     }
   }
-  return `${Math.round(ms)} ms`;
+  return `${num(Math.round(ms))} ${t(locale, "duration.ms")}`;
 }
 
-export function formatPercent(rate: number): string {
-  return `${Math.round(rate * 100)}%`;
+/** Whole percent in the locale's own form: German sets a space before the sign. */
+export function formatPercent(rate: number, locale: UiLocale): string {
+  return new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 }).format(rate);
 }
 
 /** Base-locale label with the key as the fallback, so a step never renders blank. */
@@ -123,6 +137,41 @@ export function rankByMedian<T extends { medianMs: number }>(rows: T[]): T[] {
 export function describeCaughtError(cause: unknown): ClientError {
   if (cause instanceof ReportingClientError) return cause.error;
   return { type: "internal", message: cause instanceof Error ? cause.message : "Unexpected error" };
+}
+
+/**
+ * Process-owner-facing text for a `ClientError`, keyed on `error.type`. Same
+ * shape and same reasoning as `areas/admin/errors.ts::describeError`: it never
+ * reads `error.message`, since the server does not guarantee that string is
+ * safe to show and sends none at all for an unexpected 500.
+ *
+ * The shared `api/client.ts::errorText` cannot serve here. Its last arm
+ * returns `error.message`, which arrives from the server in English, and no
+ * catalog reaches it.
+ *
+ * `ClientError` is the union of every server error type, so it carries
+ * variants only another area provokes. One reaching a read-only report reads
+ * as a generic failure rather than falling off the switch.
+ */
+export function describeError(error: ClientError, locale: UiLocale): string {
+  switch (error.type) {
+    case "authorization":
+      return t(locale, "error.authorization");
+    case "actor-resolution":
+      return t(locale, "error.actorResolution");
+    case "request-shape":
+      return t(locale, "error.requestShape");
+    case "not-found":
+      return t(locale, "error.notFound");
+    case "conflict":
+      return t(locale, "error.conflict");
+    case "network":
+      return t(locale, "error.network");
+    case "internal":
+      return t(locale, "error.internal");
+    default:
+      return t(locale, "error.generic");
+  }
 }
 
 /** The reports role, mirroring src/auth/authorize.ts::REPORTS_ROLE. The server enforces; this is presentational only. */

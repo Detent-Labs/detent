@@ -368,3 +368,45 @@ templates screen rather than on a refusal, and the nav offers Templates alone.
 A `bun:test` assertion covers each route's status code already. It cannot see a
 control the product renders beside a screen it then refuses. It cannot see an
 empty picker that a 403 and an empty table render alike.
+
+### Admin and reporting in German
+
+Source: `i18n-catalogs-admin-reporting` task 6.2.
+
+Log in as an account holding `system:admin`, `system:datalists` and
+`system:reports`. Pick German in the account menu.
+
+Walk every admin screen: instances, outbox, timers, users, migrations, data
+lists, one data list's detail screen, and UI strings. Pass: no English word
+remains. The date columns print German dates.
+
+Narrow the window to about 1100px and read the four tables again: instances,
+outbox, timers, users. Pass: no column clips its heading. A heading that wraps
+to two lines is correct. A heading cut off at the column edge is not.
+
+Measured on 2026-08-12. No heading clipped at any width. The users table is
+the widest. It drives the page's own horizontal scrollbar at 1100px: 152px of
+overflow in German against 4px in English. At 1280px and above German
+overflows by 0. An operator tool goes wide, so that is graceful degradation
+rather than a defect.
+
+Read the number again if the users table gains a column.
+
+Open a row's editors on the users screen: roles, manager, password. Pass: each
+caveat line renders in German, and each `system:*` chip still reads as the
+engine spells it.
+
+Walk the three reporting views for a process with instances. Pass: each
+heading, scope note and column heading is German. A duration prints `5,5 Std`
+rather than `5.5 h`, and the SLA percent carries a space before the sign.
+
+Switch back to English in the account menu, without reloading. Pass: the screen
+under you re-renders in English at once.
+
+Last, open the UI-strings screen. Pass: the area picker offers five entries,
+ending with `admin` and `reporting`. Pick `admin` and `de`, override one key,
+save, and open the screen that shows it. Pass: the override renders.
+
+A `bun:test` assertion covers the key sets and the formatters already. It
+cannot see a clipped column. It cannot see a literal somebody missed. And it
+cannot see a German sentence that reads wrong beside its own control.

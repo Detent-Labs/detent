@@ -23,7 +23,7 @@ describe("parseVersionInput", () => {
 
 describe("buildRunConfirmation", () => {
   it("names the process and both versions", () => {
-    const text = buildRunConfirmation("proc_expense", 1, 2);
+    const text = buildRunConfirmation("proc_expense", 1, 2, "en");
     expect(text).toContain("proc_expense");
     expect(text).toContain("version 1");
     expect(text).toContain("version 2");
@@ -32,7 +32,7 @@ describe("buildRunConfirmation", () => {
 
 describe("migrationBuckets", () => {
   it("orders buckets migrated/skipped/conflicted/failed, including empty ones", () => {
-    const buckets = migrationBuckets({ migrated: ["inst_1"], skipped: [], conflicted: [], failed: ["inst_2"] });
+    const buckets = migrationBuckets({ migrated: ["inst_1"], skipped: [], conflicted: [], failed: ["inst_2"] }, "en");
     expect(buckets.map((b) => b.key)).toEqual(["migrated", "skipped", "conflicted", "failed"]);
     expect(buckets[0]!.ids).toEqual(["inst_1"]);
     expect(buckets[1]!.ids).toEqual([]);

@@ -5,16 +5,17 @@ import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
 import { readLabel, toPayload, validateValues, type ValueRow } from "./dataListsLogic.js";
 import type { Route } from "../routing.js";
+import { t, tFill } from "../catalog.js";
+import type { UiLocale } from "../../../i18n/locale.js";
 
 interface DataListScreenProps {
   listKey: string;
   token: string;
-  locale: string;
+  /** Both the chrome's locale and the one a value's label is edited under. */
+  locale: UiLocale;
   navigate: (route: Route) => void;
   onUnauthorized: () => void;
 }
-
-const DELETE_CONFIRM = "Deleting removes the list and every value in it. A list a published process references cannot be deleted. Continue?";
 
 /**
  * One list: its name, its values, and the published versions that read it.
@@ -47,7 +48,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
       setRows(next.values.map((v) => ({ value: v.value, label: readLabel(v.label, locale), retired: !v.active })));
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setLoading(false);
     }
@@ -57,7 +58,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
     void load();
   }, [load, reloadToken]);
 
-  const problems = validateValues(rows);
+  const problems = validateValues(rows, locale);
 
   const patch = (index: number, change: Partial<ValueRow>) => {
     setSaved(false);
@@ -76,14 +77,14 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
       refresh();
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setSaving(false);
     }
   };
 
   const remove = async () => {
-    if (!window.confirm(DELETE_CONFIRM)) return;
+    if (!window.confirm(t(locale, "dataList.deleteConfirm"))) return;
     setSaving(true);
     setError(undefined);
     try {
@@ -91,7 +92,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
       navigate({ name: "dataLists" });
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setSaving(false);
     }
@@ -100,16 +101,16 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
   return (
     <main className="admin-screen">
       <button type="button" className="admin-row-link" onClick={() => navigate({ name: "dataLists" })}>
-        ← Data lists
+        {t(locale, "dataList.back")}
       </button>
       <h1>{listKey}</h1>
 
       {error && (
         <div className="admin-error-banner" role="alert">
-          <span className="admin-error-banner-stamp">Failed</span>
+          <span className="admin-error-banner-stamp">{t(locale, "common.failed")}</span>
           <span className="admin-error-banner-message">{error}</span>
           <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
-            Retry
+            {t(locale, "common.retry")}
           </button>
         </div>
       )}
@@ -118,7 +119,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
         <>
           <div className="admin-controls">
             <label className="admin-field">
-              Name
+              {t(locale, "dataList.name")}
               <input
                 value={label}
                 onChange={(e) => {
@@ -128,7 +129,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
               />
             </label>
             <label className="admin-field">
-              Description
+              {t(locale, "dataList.description")}
               <input
                 value={description}
                 onChange={(e) => {
@@ -139,13 +140,13 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
             </label>
           </div>
 
-          <h2>Values</h2>
+          <h2>{t(locale, "dataList.valuesTitle")}</h2>
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Value</th>
-                <th>Label ({locale})</th>
-                <th>State</th>
+                <th>{t(locale, "dataList.colValue")}</th>
+                <th>{tFill(locale, "dataList.colLabel", { locale })}</th>
+                <th>{t(locale, "dataList.colState")}</th>
                 <th />
               </tr>
             </thead>
@@ -160,21 +161,23 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
                     <input
                       value={row.value}
                       onChange={(e) => patch(i, { value: e.target.value })}
-                      aria-label={`Value ${i + 1} key`}
+                      aria-label={tFill(locale, "dataList.valueKeyAria", { n: i + 1 })}
                       autoComplete="off"
                       spellCheck={false}
                       placeholder="cost_centre_a…"
                     />
                   </td>
                   <td>
-                    <input value={row.label} onChange={(e) => patch(i, { label: e.target.value })} aria-label={`Value ${i + 1} label`} />
+                    <input value={row.label} onChange={(e) => patch(i, { label: e.target.value })} aria-label={tFill(locale, "dataList.valueLabelAria", { n: i + 1 })} />
                   </td>
                   <td>
-                    <span className={`admin-badge admin-badge-${row.retired ? "disabled" : "enabled"}`}>{row.retired ? "retired" : "offered"}</span>
+                    <span className={`admin-badge admin-badge-${row.retired ? "disabled" : "enabled"}`}>
+                      {t(locale, row.retired ? "dataList.stateRetired" : "dataList.stateOffered")}
+                    </span>
                   </td>
                   <td>
                     <button type="button" className="btn btn-secondary" onClick={() => patch(i, { retired: !row.retired })}>
-                      {row.retired ? "Offer again" : "Retire"}
+                      {t(locale, row.retired ? "dataList.offerAgain" : "dataList.retire")}
                     </button>
                   </td>
                 </tr>
@@ -199,23 +202,21 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
                 setRows((prev) => [...prev, { value: "", label: "", retired: false }]);
               }}
             >
-              Add value
+              {t(locale, "dataList.addValue")}
             </button>
             <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={saving || problems.length > 0}>
-              {saving ? "Saving…" : "Save changes"}
+              {saving ? t(locale, "common.saving") : t(locale, "common.saveChanges")}
             </button>
             <span className="admin-note" aria-live="polite">
-              {saved ? "Saved." : ""}
+              {saved ? t(locale, "common.saved") : ""}
             </span>
           </div>
 
-          <p className="admin-note">
-            A retired value stays in this table. Instances that already hold it keep seeing its label, and it is no longer offered to anyone else.
-          </p>
+          <p className="admin-note">{t(locale, "dataList.retiredNote")}</p>
 
-          <h2>Used by</h2>
+          <h2>{t(locale, "dataList.usedByTitle")}</h2>
           {detail.usedBy.length === 0 ? (
-            <p className="admin-empty">No published version reads this list. It can be deleted.</p>
+            <p className="admin-empty">{t(locale, "dataList.usedByEmpty")}</p>
           ) : (
             <ul className="admin-timeline">
               {detail.usedBy.map((use) => (
@@ -228,7 +229,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
 
           <div className="admin-controls">
             <button type="button" className="btn btn-secondary btn-destructive" onClick={() => void remove()} disabled={saving || detail.usedBy.length > 0}>
-              Delete list
+              {t(locale, "dataList.delete")}
             </button>
           </div>
         </>

@@ -3,6 +3,8 @@
  * itself (`admin-routes.ts::parseValues`); checking them here turns a 400 into
  * an inline message before the operator loses their edits.
  */
+import type { UiLocale } from "../../../i18n/locale.js";
+import { t, tFill } from "../catalog.js";
 
 /**
  * The engine's `MAX_DATA_LIST_VALUES`. Restated rather than imported: the
@@ -38,15 +40,15 @@ export function activeRows(rows: readonly ValueRow[]): ValueRow[] {
  * Every reason this set cannot be saved, in the order an operator would fix
  * them. An empty array means the payload is well formed.
  */
-export function validateValues(rows: readonly ValueRow[]): string[] {
+export function validateValues(rows: readonly ValueRow[], locale: UiLocale): string[] {
   const problems: string[] = [];
   const payload = activeRows(rows);
   if (payload.length > MAX_DATA_LIST_VALUES) {
-    problems.push(`A list holds at most ${MAX_DATA_LIST_VALUES} values. This one has ${payload.length}.`);
+    problems.push(tFill(locale, "dataList.problemTooMany", { max: MAX_DATA_LIST_VALUES, n: payload.length }));
   }
-  if (rows.some((r) => r.value.trim() === "")) problems.push("Every value needs a key.");
-  if (payload.some((r) => r.label.trim() === "")) problems.push("Every value needs a label.");
-  for (const dupe of duplicateValues(rows)) problems.push(`'${dupe}' appears more than once.`);
+  if (rows.some((r) => r.value.trim() === "")) problems.push(t(locale, "dataList.problemNoKey"));
+  if (payload.some((r) => r.label.trim() === "")) problems.push(t(locale, "dataList.problemNoLabel"));
+  for (const dupe of duplicateValues(rows)) problems.push(tFill(locale, "dataList.problemDuplicate", { value: dupe }));
   return problems;
 }
 

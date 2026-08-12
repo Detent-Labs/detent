@@ -5,16 +5,19 @@ import type { Route } from "../routing.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
 import { isOverdue } from "./timersLogic.js";
+import { t, tFill } from "../catalog.js";
+import type { UiLocale } from "../../../i18n/locale.js";
 
 interface TimersScreenProps {
   token: string;
+  locale: UiLocale;
   navigate: (route: Route) => void;
   onUnauthorized: () => void;
 }
 
 const PAGE_LIMIT = 50;
 
-export function TimersScreen({ token, navigate, onUnauthorized }: TimersScreenProps) {
+export function TimersScreen({ token, locale, navigate, onUnauthorized }: TimersScreenProps) {
   const [items, setItems] = useState<PendingTimer[]>([]);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
@@ -30,11 +33,11 @@ export function TimersScreen({ token, navigate, onUnauthorized }: TimersScreenPr
       setCursor(page.cursor);
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setLoading(false);
     }
-  }, [token, onUnauthorized]);
+  }, [token, locale, onUnauthorized]);
 
   const loadMore = useCallback(async () => {
     if (!cursor) return;
@@ -46,11 +49,11 @@ export function TimersScreen({ token, navigate, onUnauthorized }: TimersScreenPr
       setCursor(page.cursor);
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setLoading(false);
     }
-  }, [token, cursor, onUnauthorized]);
+  }, [token, cursor, locale, onUnauthorized]);
 
   useEffect(() => {
     void load();
@@ -58,53 +61,55 @@ export function TimersScreen({ token, navigate, onUnauthorized }: TimersScreenPr
 
   return (
     <main className="admin-screen">
-      <h1>Timers</h1>
+      <h1>{t(locale, "timers.title")}</h1>
 
       <div className="admin-controls">
         <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
-          Refresh
+          {t(locale, "common.refresh")}
         </button>
       </div>
 
       {error && (
         <div className="admin-error-banner" role="alert">
-          <span className="admin-error-banner-stamp">Failed</span>
+          <span className="admin-error-banner-stamp">{t(locale, "common.failed")}</span>
           <span className="admin-error-banner-message">{error}</span>
           <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
-            Retry
+            {t(locale, "common.retry")}
           </button>
         </div>
       )}
 
-      {items.length === 0 && !loading && !error && <p className="admin-empty">No pending timers.</p>}
+      {items.length === 0 && !loading && !error && <p className="admin-empty">{t(locale, "timers.empty")}</p>}
 
       {items.length > 0 && (
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Instance</th>
-              <th>Process</th>
-              <th>Current step</th>
-              <th>Fire time</th>
+              <th>{t(locale, "timers.colInstance")}</th>
+              <th>{t(locale, "timers.colProcess")}</th>
+              <th>{t(locale, "timers.colStep")}</th>
+              <th>{t(locale, "timers.colFireTime")}</th>
             </tr>
           </thead>
           <tbody>
-            {items.map((t) => (
-              <tr key={t.instanceId}>
+            {/* `row`, not `t`: the catalog lookup owns that name in this file now. */}
+            {items.map((row) => (
+              <tr key={row.instanceId}>
                 <td>
                   <button
                     type="button"
                     className="admin-row-link"
-                    aria-label={`Open instance: ${t.instanceId} — ${t.processId} at ${t.currentStepId}`}
-                    onClick={() => navigate({ name: "instance", instanceId: t.instanceId })}
+                    aria-label={tFill(locale, "timers.openRow", { instance: row.instanceId, process: row.processId, step: row.currentStepId })}
+                    onClick={() => navigate({ name: "instance", instanceId: row.instanceId })}
                   >
-                    {t.instanceId}
+                    {row.instanceId}
                   </button>
                 </td>
-                <td>{t.processId}</td>
-                <td>{t.currentStepId}</td>
+                <td>{row.processId}</td>
+                <td>{row.currentStepId}</td>
                 <td>
-                  {isOverdue(t.nextTimerAt) && <span className="admin-badge admin-badge-overdue">overdue</span>} {new Date(t.nextTimerAt).toLocaleString()}
+                  {isOverdue(row.nextTimerAt) && <span className="admin-badge admin-badge-overdue">{t(locale, "timers.overdue")}</span>}{" "}
+                  {new Date(row.nextTimerAt).toLocaleString(locale)}
                 </td>
               </tr>
             ))}
@@ -115,7 +120,7 @@ export function TimersScreen({ token, navigate, onUnauthorized }: TimersScreenPr
       {cursor && (
         <div className="admin-load-more">
           <button type="button" className="btn btn-secondary" onClick={() => void loadMore()} disabled={loading}>
-            Load more
+            {t(locale, "common.loadMore")}
           </button>
         </div>
       )}

@@ -31,7 +31,11 @@ export function toListParams(filter: InstanceFilterState, limit: number, cursor?
   };
 }
 
-/** No i18n in the admin area (unlike packages/app) — resolves to the process's own baseLocale entry. */
+/**
+ * A process's authored label, not a catalog string: it resolves to the
+ * process's own `baseLocale` entry, which the author wrote and the UI locale
+ * does not change.
+ */
 export function labelText(label: LocalizedText, baseLocale: LocaleCode): string {
   return label[baseLocale] ?? Object.values(label)[0] ?? "";
 }

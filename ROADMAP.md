@@ -279,12 +279,21 @@ Spec: `development-toolchain`.
        Change: `add-ui-chrome-white-label-overrides`. Specs:
        `ui-string-overrides`, `admin-app`, `http-api-documentation`.
     The builtin catalogs moved up to `packages/web/src/i18n/catalogs/` in (b),
-    one file per area. The admin screen needs all three key lists, and the
-    package forbids an area importing another area. `admin` and `reporting`
-    carry no catalog yet, so neither is overridable. That retrofit is the
-    next step here, and it adds two entries to
-    `i18n/catalogs/index.ts` and writes `area = 'admin'` rows with no
-    schema change.
+    one file per area. The admin screen needs every key list, and the
+    package forbids an area importing another area.
+    c. Catalogs for `admin` and `reporting`: DONE. The retrofit (b) named as
+       its next step. Both areas rendered their wording from literals, so an
+       operator could override neither, and a German account read English
+       screens under German chrome. Adds `i18n/catalogs/admin.ts` and
+       `i18n/catalogs/reporting.ts` (each `en` and `de`), a `t(locale, key)`
+       wrapper per area, and both names in `BUILTIN_CATALOGS` and
+       `OVERRIDABLE_AREAS`, which the UI-strings picker reads. The screens
+       take a `locale` prop; the date, duration and percent formatters take
+       one too. The reporting area gains its own `describeError`, since the
+       shared `errorText` ends in the server's own English string. No schema
+       change and no API change: `ui_string_overrides.area` is plain text
+       already. Change: `i18n-catalogs-admin-reporting`. Specs: `admin-app`,
+       `reporting-app`, `ui-string-overrides`.
 
 14. **Deployment & operations readiness: DONE (a–c).** What shipping to a real
     customer needs beyond a devcontainer. Three independent sub-projects, each

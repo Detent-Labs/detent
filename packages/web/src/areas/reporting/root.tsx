@@ -9,13 +9,14 @@ import { CycleTimeScreen } from "./screens/CycleTimeScreen.js";
 import { BottleneckScreen } from "./screens/BottleneckScreen.js";
 import { SlaScreen } from "./screens/SlaScreen.js";
 import { DateRangeControl } from "./components.js";
+import { t, type CatalogKey } from "./catalog.js";
 import type { AreaRootProps } from "../../shell/App.js";
 import "./app.css";
 
-const VIEWS: { name: ViewName; label: string }[] = [
-  { name: "cycle-time", label: "Cycle time" },
-  { name: "bottleneck", label: "Bottlenecks" },
-  { name: "sla", label: "SLA" },
+const VIEWS: { name: ViewName; labelKey: CatalogKey }[] = [
+  { name: "cycle-time", labelKey: "nav.cycleTime" },
+  { name: "bottleneck", labelKey: "nav.bottleneck" },
+  { name: "sla", labelKey: "nav.sla" },
 ];
 
 /**
@@ -49,7 +50,7 @@ export function ReportingArea({ session, locale, localPath, go, onLocaleChange, 
         onClick={() => navigate({ name: "picker" })}
       >
         <ChartNoAxesColumn size={18} strokeWidth={1.75} aria-hidden="true" />
-        Processes
+        {t(locale, "nav.processes")}
       </button>
       {route.name === "view" &&
         VIEWS.map((v) => (
@@ -60,7 +61,7 @@ export function ReportingArea({ session, locale, localPath, go, onLocaleChange, 
             aria-current={route.view === v.name ? "page" : undefined}
             onClick={() => navigate({ name: "view", view: v.name, processId: route.processId })}
           >
-            {v.label}
+            {t(locale, v.labelKey)}
           </button>
         ))}
     </nav>
@@ -81,6 +82,7 @@ export function ReportingArea({ session, locale, localPath, go, onLocaleChange, 
       {route.name === "picker" ? (
         <ProcessPickerScreen
           token={session.token}
+          locale={locale}
           onPick={(processId, label) => {
             setProcessLabel(label);
             navigate({ name: "view", view: "cycle-time", processId });
@@ -89,17 +91,17 @@ export function ReportingArea({ session, locale, localPath, go, onLocaleChange, 
       ) : (
         <main className="rep-screen">
           <h1>{processLabel ?? route.processId}</h1>
-          <DateRangeControl range={range} onChange={setRange} />
+          <DateRangeControl range={range} onChange={setRange} locale={locale} />
           {!rangeIsValid(range) ? (
             <p className="rep-error" role="alert">
-              The start date must not be after the end date.
+              {t(locale, "range.invalid")}
             </p>
           ) : route.view === "cycle-time" ? (
-            <CycleTimeScreen processId={route.processId} range={range} token={session.token} baseLocale={BASE_LOCALE} />
+            <CycleTimeScreen processId={route.processId} range={range} token={session.token} baseLocale={BASE_LOCALE} locale={locale} />
           ) : route.view === "bottleneck" ? (
-            <BottleneckScreen processId={route.processId} range={range} token={session.token} baseLocale={BASE_LOCALE} />
+            <BottleneckScreen processId={route.processId} range={range} token={session.token} baseLocale={BASE_LOCALE} locale={locale} />
           ) : (
-            <SlaScreen processId={route.processId} range={range} token={session.token} baseLocale={BASE_LOCALE} />
+            <SlaScreen processId={route.processId} range={range} token={session.token} baseLocale={BASE_LOCALE} locale={locale} />
           )}
         </main>
       )}

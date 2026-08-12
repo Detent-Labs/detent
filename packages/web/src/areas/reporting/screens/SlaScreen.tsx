@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { fetchSla } from "../api/client.js";
 import { describeCaughtError, formatPercent, stepName, type DateRange } from "./reportingLogic.js";
-import { DurationRule, EmptyState, ErrorNote, ScopeNote, SkippedNote } from "../components.js";
+import { DurationRule, EmptyState, ErrorNote, ScopeNote, SkippedNote, WaitingNote } from "../components.js";
+import { t } from "../catalog.js";
+import type { UiLocale } from "../../../i18n/locale.js";
 import type { ClientError, SlaView } from "../api/types.js";
 
 /**
@@ -10,7 +12,19 @@ import type { ClientError, SlaView } from "../api/types.js";
  * "every traversal breached". Colour appears only here, and it means breached,
  * not large.
  */
-export function SlaScreen({ processId, range, token, baseLocale }: { processId: string; range: DateRange; token: string; baseLocale: string }) {
+export function SlaScreen({
+  processId,
+  range,
+  token,
+  baseLocale,
+  locale,
+}: {
+  processId: string;
+  range: DateRange;
+  token: string;
+  baseLocale: string;
+  locale: UiLocale;
+}) {
   const [view, setView] = useState<SlaView | undefined>();
   const [error, setError] = useState<ClientError | undefined>();
 
@@ -24,26 +38,23 @@ export function SlaScreen({ processId, range, token, baseLocale }: { processId: 
     return () => { cancelled = true; };
   }, [processId, range, token]);
 
-  if (error) return <ErrorNote error={error} />;
-  if (!view) return <p className="rep-scope">Loading…</p>;
+  if (error) return <ErrorNote error={error} locale={locale} />;
+  if (!view) return <WaitingNote locale={locale} />;
 
   return (
     <>
-      <h2>Breach rate per step</h2>
-      <ScopeNote>
-        A step&apos;s threshold is its own declared reminder or escalation timer. A step that declares no timer carries no SLA and is absent from this
-        list — it is not passing, it is unmeasured.
-      </ScopeNote>
+      <h2>{t(locale, "sla.title")}</h2>
+      <ScopeNote>{t(locale, "sla.scope")}</ScopeNote>
       {view.steps.length === 0 ? (
-        <EmptyState>No step in this process declares a timer, so there is no SLA to report.</EmptyState>
+        <EmptyState>{t(locale, "sla.empty")}</EmptyState>
       ) : (
         <table className="rep-table">
           <thead>
             <tr>
-              <th scope="col">Step</th>
-              <th scope="col">Breach rate</th>
-              <th scope="col">Breached</th>
-              <th scope="col">Traversals</th>
+              <th scope="col">{t(locale, "table.step")}</th>
+              <th scope="col">{t(locale, "sla.breachRate")}</th>
+              <th scope="col">{t(locale, "sla.breached")}</th>
+              <th scope="col">{t(locale, "table.traversals")}</th>
             </tr>
           </thead>
           <tbody>
@@ -52,7 +63,7 @@ export function SlaScreen({ processId, range, token, baseLocale }: { processId: 
                 <th scope="row">{stepName(step, baseLocale)}</th>
                 <td className="rep-measure">
                   <DurationRule fraction={step.breachRate} tone="danger" />
-                  <span className="rep-figure">{formatPercent(step.breachRate)}</span>
+                  <span className="rep-figure">{formatPercent(step.breachRate, locale)}</span>
                 </td>
                 <td className="rep-figure">{step.breached}</td>
                 <td className="rep-figure">{step.traversals}</td>
@@ -61,7 +72,7 @@ export function SlaScreen({ processId, range, token, baseLocale }: { processId: 
           </tbody>
         </table>
       )}
-      <SkippedNote count={view.skippedInstances} />
+      <SkippedNote count={view.skippedInstances} locale={locale} />
     </>
   );
 }

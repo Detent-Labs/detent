@@ -4,13 +4,16 @@ import type { ProcessSummary, VersionSummary, MigrationResult } from "../api/typ
 import { describeCaughtError } from "../errors.js";
 import { labelText } from "./instancesLogic.js";
 import { parseVersionInput, buildRunConfirmation, migrationBuckets } from "./migrationsLogic.js";
+import { t } from "../catalog.js";
+import type { UiLocale } from "../../../i18n/locale.js";
 
 interface MigrationsScreenProps {
   token: string;
+  locale: UiLocale;
   onUnauthorized: () => void;
 }
 
-export function MigrationsScreen({ token, onUnauthorized }: MigrationsScreenProps) {
+export function MigrationsScreen({ token, locale, onUnauthorized }: MigrationsScreenProps) {
   const [processes, setProcesses] = useState<ProcessSummary[]>([]);
   const [processId, setProcessId] = useState("");
   const [versions, setVersions] = useState<VersionSummary[]>([]);
@@ -23,9 +26,9 @@ export function MigrationsScreen({ token, onUnauthorized }: MigrationsScreenProp
   const handleUnauthorized = useCallback(
     (err: unknown) => {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     },
-    [onUnauthorized],
+    [locale, onUnauthorized],
   );
 
   useEffect(() => {
@@ -50,7 +53,7 @@ export function MigrationsScreen({ token, onUnauthorized }: MigrationsScreenProp
 
   const run = async () => {
     if (!canRun) return;
-    if (!window.confirm(buildRunConfirmation(processId, from!, to!))) return;
+    if (!window.confirm(buildRunConfirmation(processId, from!, to!, locale))) return;
     setRunning(true);
     setError(undefined);
     setResult(undefined);
@@ -65,13 +68,13 @@ export function MigrationsScreen({ token, onUnauthorized }: MigrationsScreenProp
 
   return (
     <main className="admin-screen">
-      <h1>Migrations</h1>
+      <h1>{t(locale, "migrations.title")}</h1>
 
       <div className="admin-controls">
         <label>
-          Process
+          {t(locale, "migrations.process")}
           <select value={processId} onChange={(e) => setProcessId(e.target.value)}>
-            <option value="">Select a process</option>
+            <option value="">{t(locale, "migrations.selectProcess")}</option>
             {processes.map((p) => (
               <option key={p.processId} value={p.processId}>
                 {labelText(p.label, p.baseLocale)}
@@ -80,9 +83,9 @@ export function MigrationsScreen({ token, onUnauthorized }: MigrationsScreenProp
           </select>
         </label>
         <label>
-          From version
+          {t(locale, "migrations.fromVersion")}
           <select value={fromVersion} onChange={(e) => setFromVersion(e.target.value)} disabled={!processId}>
-            <option value="">Select a version</option>
+            <option value="">{t(locale, "migrations.selectVersion")}</option>
             {versions.map((v) => (
               <option key={v.version} value={v.version}>
                 {v.version}
@@ -91,9 +94,9 @@ export function MigrationsScreen({ token, onUnauthorized }: MigrationsScreenProp
           </select>
         </label>
         <label>
-          To version
+          {t(locale, "migrations.toVersion")}
           <select value={toVersion} onChange={(e) => setToVersion(e.target.value)} disabled={!processId}>
-            <option value="">Select a version</option>
+            <option value="">{t(locale, "migrations.selectVersion")}</option>
             {versions.map((v) => (
               <option key={v.version} value={v.version}>
                 {v.version}
@@ -102,13 +105,13 @@ export function MigrationsScreen({ token, onUnauthorized }: MigrationsScreenProp
           </select>
         </label>
         <button type="button" className="btn btn-primary" onClick={() => void run()} disabled={!canRun || running}>
-          Run migration
+          {t(locale, "migrations.run")}
         </button>
       </div>
 
       {error && (
         <div className="admin-error-banner" role="alert">
-          <span className="admin-error-banner-stamp">Failed</span>
+          <span className="admin-error-banner-stamp">{t(locale, "common.failed")}</span>
           <span className="admin-error-banner-message">{error}</span>
         </div>
       )}
@@ -117,12 +120,12 @@ export function MigrationsScreen({ token, onUnauthorized }: MigrationsScreenProp
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Outcome</th>
-              <th>Instances</th>
+              <th>{t(locale, "migrations.colOutcome")}</th>
+              <th>{t(locale, "migrations.colInstances")}</th>
             </tr>
           </thead>
           <tbody>
-            {migrationBuckets(result).map((bucket) => (
+            {migrationBuckets(result, locale).map((bucket) => (
               <tr key={bucket.key}>
                 <td>{bucket.label}</td>
                 <td>{bucket.ids.length === 0 ? "—" : bucket.ids.join(", ")}</td>

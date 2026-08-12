@@ -1,6 +1,7 @@
 import type { ClientError } from "./api/types.js";
-import { errorText } from "../../api/client.js";
-import { toDateInput, fromDateInput, type DateRange } from "./screens/reportingLogic.js";
+import type { UiLocale } from "../../i18n/locale.js";
+import { t, tCount } from "./catalog.js";
+import { describeError, toDateInput, fromDateInput, type DateRange } from "./screens/reportingLogic.js";
 
 /**
  * The duration rule — this package's one visual device, reused by all three
@@ -20,11 +21,11 @@ export function DurationRule({ fraction, tone = "neutral" }: { fraction: number;
 }
 
 /** Shared by all three views: changing it reloads the current view, and it survives a view switch because App owns it. */
-export function DateRangeControl({ range, onChange }: { range: DateRange; onChange: (next: DateRange) => void }) {
+export function DateRangeControl({ range, onChange, locale }: { range: DateRange; onChange: (next: DateRange) => void; locale: UiLocale }) {
   return (
     <div className="rep-controls">
       <label>
-        <span>From</span>
+        <span>{t(locale, "range.from")}</span>
         <input
           type="date"
           name="from"
@@ -34,7 +35,7 @@ export function DateRangeControl({ range, onChange }: { range: DateRange; onChan
         />
       </label>
       <label>
-        <span>To</span>
+        <span>{t(locale, "range.to")}</span>
         <input
           type="date"
           name="to"
@@ -57,21 +58,29 @@ export function EmptyState({ children }: { children: React.ReactNode }) {
   return <p className="rep-empty">{children}</p>;
 }
 
+/** One line where the content will appear: no skeleton, no spinner (design-language.md). */
+export function WaitingNote({ locale }: { locale: UiLocale }) {
+  return <p className="rep-scope">{t(locale, "common.loading")}</p>;
+}
+
 /** A failed load renders as a failure, never as an empty result (spa-error-reporting). */
-export function ErrorNote({ error }: { error: ClientError }) {
+export function ErrorNote({ error, locale }: { error: ClientError; locale: UiLocale }) {
   return (
     <p className="rep-error" role="alert">
-      <span className="rep-stamp rep-stamp-danger">Failed</span> {errorText(error)}
+      <span className="rep-stamp rep-stamp-danger">{t(locale, "error.failed")}</span> {describeError(error, locale)}
     </p>
   );
 }
 
-/** Instances whose pinned version no longer resolves shrink the population; a partial view says so rather than quietly reporting less. */
-export function SkippedNote({ count }: { count: number }) {
+/**
+ * Instances whose pinned version no longer resolves shrink the population; a
+ * partial view says so rather than quietly reporting less.
+ *
+ * One key per grammatical form, each holding the whole sentence. German splits
+ * a count-bearing sentence differently from English, so a concatenation of
+ * fragments does not survive translation.
+ */
+export function SkippedNote({ count, locale }: { count: number; locale: UiLocale }) {
   if (count === 0) return null;
-  return (
-    <p className="rep-scope">
-      {count} {count === 1 ? "instance is" : "instances are"} excluded: their pinned definition version no longer resolves.
-    </p>
-  );
+  return <p className="rep-scope">{tCount(locale, count === 1 ? "skipped.one" : "skipped.many", count)}</p>;
 }

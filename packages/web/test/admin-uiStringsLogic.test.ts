@@ -15,13 +15,13 @@ describe("localesOf", () => {
   it("offers only the locales an area actually ships", () => {
     expect(localesOf("shell")).toEqual(["de", "en"]);
     expect(localesOf("app")).toEqual(["de", "en"]);
+    expect(localesOf("admin")).toEqual(["de", "en"]);
+    expect(localesOf("reporting")).toEqual(["de", "en"]);
     // Studio is fixed `en` by the existing collapse-editor-i18n decision.
     expect(localesOf("studio")).toEqual(["en"]);
   });
 
   it("answers an empty list for an area with no catalog rather than throwing", () => {
-    // `admin` and `reporting` render raw JSX today; their catalog retrofit is a later change.
-    expect(localesOf("admin")).toEqual([]);
     expect(localesOf("nonsense")).toEqual([]);
   });
 

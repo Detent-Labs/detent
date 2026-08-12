@@ -3112,3 +3112,76 @@ password stacked in the identity cell. The reset is a row under the account
 it belongs to, since a password matches no column. Each carries its caveat
 line. The operator hands the password over out of band. A reset leaves an
 open session running.
+
+## Catalogs for the admin and reporting areas (`i18n-catalogs-admin-reporting`)
+
+Both areas rendered their wording from literals until this change. Neither
+carried a catalog. So an operator could override neither one, and a German
+account read English screens under German chrome. Roadmap stage 13b named the
+retrofit as its next step.
+
+`i18n/catalogs/admin.ts` and `i18n/catalogs/reporting.ts` now sit beside the
+three that shipped before them. Each carries an `en` map and a `de` map. Each
+derives `CatalogKey` from `en`. `BUILTIN_CATALOGS` and `OVERRIDABLE_AREAS` list
+five areas. `localesOf(area)` reads the first of those. The UI-strings screen
+therefore offers `admin` and `reporting` without a change of its own.
+
+`areas/admin/catalog.ts` and `areas/reporting/catalog.ts` export `t(locale,
+key)` over `resolveOverride`, the shape `areas/app/catalog.ts` already had. The
+studio's fixed-`en` `t(key)` stays as it is.
+
+Each area also gained one substitution helper. `tFill(locale, key, values)` in
+the admin area fills `{role}`, `{email}`, `{process}` and the rest.
+`tCount(locale, key, n)` in the reporting area fills `{n}`. Each grammatical
+form is one key holding a whole sentence. A translator therefore never
+reassembles one. An unfilled placeholder stays visible rather than leaving a
+gap.
+
+Nine admin screens and four reporting screens now take a `locale` prop from
+their area root. `DataListScreen` already had one. It named the content locale
+an operator edits a value's label under. That prop now serves both purposes.
+
+Five signatures changed. `describeError(error, locale, status?)` and
+`describeCaughtError(err, locale)` in `areas/admin/errors.ts` return catalog
+values from every switch arm. Neither reads `error.message`, as before.
+`buildRunConfirmation(processId, from, to, locale)` and
+`migrationBuckets(result, locale)` in `migrationsLogic.ts` take the locale.
+`validateValues(rows, locale)` in `dataListsLogic.ts` takes it too.
+
+`reportingLogic.ts` gained `describeError(error, locale)`. The reporting area
+had never had one. `ErrorNote` printed the shared `api/client.ts::errorText`
+before. That function ends in `return error.message`. The server sends that
+string in English, and no catalog reaches it. The new map mirrors the admin
+one. `errorText` itself stays as it was. The shell and the studio read it
+too.
+
+`formatDuration(ms, locale)` reads its unit suffixes from the catalog and
+formats its number through `Intl.NumberFormat`. German prints `5,5 Std` where
+English prints `5.5 h`; `d` is `T`. `formatPercent(rate, locale)` goes through
+`Intl.NumberFormat` with `style: "percent"`, so German carries the space before
+the sign. The `—` for a negative or non-finite duration stays a literal.
+
+Every `new Date(x).toLocaleString()` in the admin area now passes the chosen
+locale. The bare call took the browser's language, so an operator who picked
+German still read English dates.
+
+A machine value stayed out of both catalogs. That covers every id, definition
+hash, version, `system:*` role name, data list key, outbox status token, filter
+`value` attribute and CSS class.
+
+`describeElement` in `InstanceScreen.tsx` stays locale-free for the same
+reason. `transition` and `event` name the two record kinds. `actions` and
+`attempts` name fields. The cause and the event kind are values the engine
+stores.
+
+Two placeholders stay literal on purpose. One is `finance:approver,
+system:admin` in the roles input. The other is `cost_centres…` in the data list
+key input. Each shows the grammar a stored value follows.
+
+`test/i18n-catalog-parity.test.ts` asserts the key sets match in both
+directions, per area. `CatalogKey` already rejects a missing `de` key at
+compile time. It accepts a `de` key `en` never declared. That is what the test
+catches. `test/i18n-substitution.test.ts` covers both helpers.
+
+The German is a first pass, not a reviewed translation. The override mechanism
+is the repair: a deployment corrects a word with no redeploy.

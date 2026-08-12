@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { fetchBottleneck } from "../api/client.js";
 import { describeCaughtError, formatDuration, rankByMedian, scaleTo, stepName, type DateRange } from "./reportingLogic.js";
-import { DurationRule, EmptyState, ErrorNote, ScopeNote, SkippedNote } from "../components.js";
+import { DurationRule, EmptyState, ErrorNote, ScopeNote, SkippedNote, WaitingNote } from "../components.js";
+import { t } from "../catalog.js";
+import type { UiLocale } from "../../../i18n/locale.js";
 import type { BottleneckView, ClientError } from "../api/types.js";
 
 /**
@@ -9,7 +11,19 @@ import type { BottleneckView, ClientError } from "../api/types.js";
  * picture, since both read the same per-step traversals. The two scopes differ
  * on purpose (this one counts every status), so each states its own.
  */
-export function BottleneckScreen({ processId, range, token, baseLocale }: { processId: string; range: DateRange; token: string; baseLocale: string }) {
+export function BottleneckScreen({
+  processId,
+  range,
+  token,
+  baseLocale,
+  locale,
+}: {
+  processId: string;
+  range: DateRange;
+  token: string;
+  baseLocale: string;
+  locale: UiLocale;
+}) {
   const [view, setView] = useState<BottleneckView | undefined>();
   const [error, setError] = useState<ClientError | undefined>();
 
@@ -23,25 +37,25 @@ export function BottleneckScreen({ processId, range, token, baseLocale }: { proc
     return () => { cancelled = true; };
   }, [processId, range, token]);
 
-  if (error) return <ErrorNote error={error} />;
-  if (!view) return <p className="rep-scope">Loading…</p>;
+  if (error) return <ErrorNote error={error} locale={locale} />;
+  if (!view) return <WaitingNote locale={locale} />;
 
   const ranked = rankByMedian(view.ranking);
   const scale = scaleTo(ranked.map((s) => s.medianMs));
 
   return (
     <>
-      <h2>Median dwell per step</h2>
-      <ScopeNote>Every instance started in this range, whatever its status — a step&apos;s own speed is observable as soon as an instance has passed through it.</ScopeNote>
+      <h2>{t(locale, "bottleneck.title")}</h2>
+      <ScopeNote>{t(locale, "bottleneck.scope")}</ScopeNote>
       {ranked.length === 0 ? (
-        <EmptyState>No instance has passed through a step in this range.</EmptyState>
+        <EmptyState>{t(locale, "bottleneck.empty")}</EmptyState>
       ) : (
         <table className="rep-table">
           <thead>
             <tr>
-              <th scope="col">Step</th>
-              <th scope="col">Median dwell</th>
-              <th scope="col">Traversals</th>
+              <th scope="col">{t(locale, "table.step")}</th>
+              <th scope="col">{t(locale, "bottleneck.medianDwell")}</th>
+              <th scope="col">{t(locale, "table.traversals")}</th>
             </tr>
           </thead>
           <tbody>
@@ -50,7 +64,7 @@ export function BottleneckScreen({ processId, range, token, baseLocale }: { proc
                 <th scope="row">{stepName(step, baseLocale)}</th>
                 <td className="rep-measure">
                   <DurationRule fraction={scale(step.medianMs)} />
-                  <span className="rep-figure">{formatDuration(step.medianMs)}</span>
+                  <span className="rep-figure">{formatDuration(step.medianMs, locale)}</span>
                 </td>
                 <td className="rep-figure">{step.traversals}</td>
               </tr>
@@ -59,10 +73,10 @@ export function BottleneckScreen({ processId, range, token, baseLocale }: { proc
         </table>
       )}
 
-      <h2>Waiting right now</h2>
-      <ScopeNote>Running instances currently parked in each step. Not bounded by the date range — this is a present-tense count.</ScopeNote>
+      <h2>{t(locale, "bottleneck.wipTitle")}</h2>
+      <ScopeNote>{t(locale, "bottleneck.wipScope")}</ScopeNote>
       {view.workInProgress.length === 0 ? (
-        <EmptyState>No instance is running in any step.</EmptyState>
+        <EmptyState>{t(locale, "bottleneck.wipEmpty")}</EmptyState>
       ) : (
         <ul className="rep-wip">
           {view.workInProgress.map((step) => (
@@ -73,7 +87,7 @@ export function BottleneckScreen({ processId, range, token, baseLocale }: { proc
           ))}
         </ul>
       )}
-      <SkippedNote count={view.skippedInstances} />
+      <SkippedNote count={view.skippedInstances} locale={locale} />
     </>
   );
 }

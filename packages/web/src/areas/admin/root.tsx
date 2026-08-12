@@ -12,6 +12,8 @@ import { MigrationsScreen } from "./screens/MigrationsScreen.js";
 import { DataListsScreen } from "./screens/DataListsScreen.js";
 import { DataListScreen } from "./screens/DataListScreen.js";
 import { UiStringsScreen } from "./screens/UiStringsScreen.js";
+import { t, tFill, type CatalogKey } from "./catalog.js";
+import type { UiLocale } from "../../i18n/locale.js";
 import type { AreaRootProps } from "../../shell/App.js";
 import "./app.css";
 
@@ -19,22 +21,25 @@ const ADMIN_ROLE = "system:admin";
 const DATALISTS_ROLE = "system:datalists";
 
 /** The role each tab's screen needs; `ROUTE_ROLE` in `routing.ts` carries the same rule per route. */
-const TABS = [
-  { name: "instances", label: "Instances", role: ADMIN_ROLE, Icon: ListChecks },
-  { name: "outbox", label: "Outbox", role: ADMIN_ROLE, Icon: Send },
-  { name: "timers", label: "Timers", role: ADMIN_ROLE, Icon: Timer },
-  { name: "users", label: "Users", role: ADMIN_ROLE, Icon: Users },
-  { name: "migrations", label: "Migrations", role: ADMIN_ROLE, Icon: GitCompareArrows },
-  { name: "dataLists", label: "Data lists", role: DATALISTS_ROLE, Icon: Table2 },
-  { name: "uiStrings", label: "UI strings", role: ADMIN_ROLE, Icon: Languages },
-] as const;
+const TABS: { name: Route["name"]; labelKey: CatalogKey; role: string; Icon: typeof ListChecks }[] = [
+  { name: "instances", labelKey: "nav.instances", role: ADMIN_ROLE, Icon: ListChecks },
+  { name: "outbox", labelKey: "nav.outbox", role: ADMIN_ROLE, Icon: Send },
+  { name: "timers", labelKey: "nav.timers", role: ADMIN_ROLE, Icon: Timer },
+  { name: "users", labelKey: "nav.users", role: ADMIN_ROLE, Icon: Users },
+  { name: "migrations", labelKey: "nav.migrations", role: ADMIN_ROLE, Icon: GitCompareArrows },
+  { name: "dataLists", labelKey: "nav.dataLists", role: DATALISTS_ROLE, Icon: Table2 },
+  { name: "uiStrings", labelKey: "nav.uiStrings", role: ADMIN_ROLE, Icon: Languages },
+];
 
-/** The same explanatory state the area shows an actor with no operator role, named per screen. */
-function MissingRole({ role }: { role: string }) {
+/**
+ * The same explanatory state the area shows an actor with no operator role,
+ * named per screen. The role name itself stays as the engine spells it.
+ */
+function MissingRole({ role, locale }: { role: string; locale: UiLocale }) {
   return (
     <main className="admin-empty-role">
-      <h1>Not your screen</h1>
-      <p>This screen needs the {role} role. Your account does not have it.</p>
+      <h1>{t(locale, "role.title")}</h1>
+      <p>{tFill(locale, "role.body", { role })}</p>
     </main>
   );
 }
@@ -68,7 +73,7 @@ export function AdminArea({ session, locale, localPath, go, onUnauthorized, onLo
           onClick={() => navigate({ name: tab.name } as Route)}
         >
           <tab.Icon size={18} strokeWidth={1.75} aria-hidden="true" />
-          {tab.label}
+          {t(locale, tab.labelKey)}
         </button>
       ))}
     </nav>
@@ -88,19 +93,19 @@ export function AdminArea({ session, locale, localPath, go, onUnauthorized, onLo
       onGoToProfile={() => go(PROFILE_PATH)}
       nav={nav}
     >
-      {!may(required) && <MissingRole role={required} />}
+      {!may(required) && <MissingRole role={required} locale={locale} />}
       {may(required) && (
         <>
-          {route.name === "instances" && <InstancesScreen token={session.token} navigate={navigate} onUnauthorized={onUnauthorized} />}
+          {route.name === "instances" && <InstancesScreen token={session.token} locale={locale} navigate={navigate} onUnauthorized={onUnauthorized} />}
           {route.name === "instance" && (
-            <InstanceScreen instanceId={route.instanceId} token={session.token} navigate={navigate} onUnauthorized={onUnauthorized} />
+            <InstanceScreen instanceId={route.instanceId} token={session.token} locale={locale} navigate={navigate} onUnauthorized={onUnauthorized} />
           )}
-          {route.name === "outbox" && <OutboxScreen token={session.token} onUnauthorized={onUnauthorized} />}
-          {route.name === "timers" && <TimersScreen token={session.token} navigate={navigate} onUnauthorized={onUnauthorized} />}
-          {route.name === "users" && <UsersScreen token={session.token} onUnauthorized={onUnauthorized} />}
-          {route.name === "migrations" && <MigrationsScreen token={session.token} onUnauthorized={onUnauthorized} />}
-          {route.name === "dataLists" && <DataListsScreen token={session.token} navigate={navigate} onUnauthorized={onUnauthorized} />}
-          {route.name === "uiStrings" && <UiStringsScreen token={session.token} onUnauthorized={onUnauthorized} />}
+          {route.name === "outbox" && <OutboxScreen token={session.token} locale={locale} onUnauthorized={onUnauthorized} />}
+          {route.name === "timers" && <TimersScreen token={session.token} locale={locale} navigate={navigate} onUnauthorized={onUnauthorized} />}
+          {route.name === "users" && <UsersScreen token={session.token} locale={locale} onUnauthorized={onUnauthorized} />}
+          {route.name === "migrations" && <MigrationsScreen token={session.token} locale={locale} onUnauthorized={onUnauthorized} />}
+          {route.name === "dataLists" && <DataListsScreen token={session.token} locale={locale} navigate={navigate} onUnauthorized={onUnauthorized} />}
+          {route.name === "uiStrings" && <UiStringsScreen token={session.token} locale={locale} onUnauthorized={onUnauthorized} />}
           {route.name === "dataList" && (
             <DataListScreen
               listKey={route.listKey}

@@ -31,25 +31,25 @@ describe("activeRows", () => {
 
 describe("validateValues", () => {
   it("accepts a well-formed set", () => {
-    expect(validateValues([row("a"), row("b")])).toEqual([]);
+    expect(validateValues([row("a"), row("b")], "en")).toEqual([]);
   });
 
   it("refuses a set over the bound, counting only what is sent", () => {
     const over = Array.from({ length: MAX_DATA_LIST_VALUES + 1 }, (_, i) => row(`v${i}`));
-    expect(validateValues(over)).toHaveLength(1);
+    expect(validateValues(over, "en")).toHaveLength(1);
     over[0]!.retired = true;
-    expect(validateValues(over)).toEqual([]);
+    expect(validateValues(over, "en")).toEqual([]);
   });
 
   it("refuses an empty key, and an empty label on a row being sent", () => {
-    expect(validateValues([row("")])).toContain("Every value needs a key.");
-    expect(validateValues([row("a", "")])).toContain("Every value needs a label.");
+    expect(validateValues([row("")], "en")).toContain("Every value needs a key.");
+    expect(validateValues([row("a", "")], "en")).toContain("Every value needs a label.");
     // A retired row is not sent, so its blank label blocks nothing.
-    expect(validateValues([row("a", "A"), row("b", "", true)])).toEqual([]);
+    expect(validateValues([row("a", "A"), row("b", "", true)], "en")).toEqual([]);
   });
 
   it("names each duplicate", () => {
-    expect(validateValues([row("a"), row("a")])).toContain("'a' appears more than once.");
+    expect(validateValues([row("a"), row("a")], "en")).toContain("'a' appears more than once.");
   });
 });
 
@@ -78,5 +78,16 @@ describe("readLabel", () => {
     // A list is global while a process is not, so a missing locale is legitimate.
     expect(readLabel({ en: "One" }, "de")).toBe("One");
     expect(readLabel({}, "de")).toBe("");
+  });
+});
+
+describe("validateValues follows the locale", () => {
+  it("names the same problem differently in German", () => {
+    // A label, so the missing key is the one problem in the list.
+    const en = validateValues([row("", "A")], "en");
+    const de = validateValues([row("", "A")], "de");
+    expect(en).toHaveLength(1);
+    expect(de).toHaveLength(1);
+    expect(de[0]).not.toBe(en[0]);
   });
 });

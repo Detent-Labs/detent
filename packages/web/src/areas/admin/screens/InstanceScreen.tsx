@@ -5,15 +5,16 @@ import type { Route } from "../routing.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
 import { labelText } from "./instancesLogic.js";
+import { t, tFill } from "../catalog.js";
+import type { UiLocale } from "../../../i18n/locale.js";
 
 interface InstanceScreenProps {
   instanceId: string;
   navigate: (route: Route) => void;
   token: string;
+  locale: UiLocale;
   onUnauthorized: () => void;
 }
-
-const REDACT_CONFIRM = "This permanently clears the instance's submitted field data, comments, and attachments. The transition and event history stays visible. This cannot be undone. Continue?";
 
 const RECORD_PAGE_LIMIT = 200;
 // ponytail: no per-instance timer read exists over HTTP (GET /admin/timers has
@@ -36,6 +37,12 @@ function deriveFromRecord(items: InstanceRecordElement[]): { transitionSeq?: num
   return { transitionSeq, claimedBy };
 }
 
+/**
+ * One record line, built from engine vocabulary alone. `transition` and `event`
+ * name the two record kinds, `actions` and `attempts` name fields, and the
+ * cause, the event kind and every id are values the engine stores. None of it
+ * enters the catalog, so this stays pure and locale-free.
+ */
 function describeElement(el: InstanceRecordElement): { at: string; summary: string; detail: string } {
   if (el.kind === "transition") {
     const e = el.entry;
@@ -50,7 +57,7 @@ function describeElement(el: InstanceRecordElement): { at: string; summary: stri
   return { at: ev.at, summary: `event — ${ev.kind}`, detail: JSON.stringify(ev.payload) };
 }
 
-export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: InstanceScreenProps) {
+export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthorized }: InstanceScreenProps) {
   const [view, setView] = useState<InstanceView | undefined>(undefined);
   const [versions, setVersions] = useState<VersionSummary[]>([]);
   // baseLocale is process-level, not carried by InstanceView itself — resolved
@@ -85,11 +92,11 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
       setBaseLocale(processes.find((p) => p.processId === v.processId)?.baseLocale);
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setLoading(false);
     }
-  }, [instanceId, token, onUnauthorized]);
+  }, [instanceId, token, locale, onUnauthorized]);
 
   const loadMoreRecord = useCallback(async () => {
     if (!recordCursor) return;
@@ -101,11 +108,11 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
       setRecordCursor(rec.cursor);
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setLoading(false);
     }
-  }, [instanceId, token, recordCursor, onUnauthorized]);
+  }, [instanceId, token, recordCursor, locale, onUnauthorized]);
 
   useEffect(() => {
     void load();
@@ -118,21 +125,21 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
       refresh();
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setCancelling(false);
     }
   };
 
   const doRedact = async () => {
-    if (!window.confirm(REDACT_CONFIRM)) return;
+    if (!window.confirm(t(locale, "instance.redactConfirm"))) return;
     setRedacting(true);
     try {
       await redactInstance(instanceId, token);
       refresh();
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setRedacting(false);
     }
@@ -142,19 +149,19 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
     return (
       <main className="admin-screen">
         <button type="button" className="btn btn-ghost admin-back" onClick={() => navigate({ name: "instances" })}>
-          ← Instances
+          {t(locale, "instance.back")}
         </button>
-        {loading && <p>Loading…</p>}
+        {loading && <p>{t(locale, "common.loading")}</p>}
         {!loading && error && (
           <div className="admin-error-banner" role="alert">
-            <span className="admin-error-banner-stamp">Failed</span>
+            <span className="admin-error-banner-stamp">{t(locale, "common.failed")}</span>
             <span className="admin-error-banner-message">{error}</span>
             <button type="button" className="btn btn-secondary" onClick={refresh}>
-              Retry
+              {t(locale, "common.retry")}
             </button>
           </div>
         )}
-        {!loading && !error && <p className="admin-empty">Instance not found.</p>}
+        {!loading && !error && <p className="admin-empty">{t(locale, "instance.notFound")}</p>}
       </main>
     );
   }
@@ -165,50 +172,52 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
   return (
     <main className="admin-screen">
       <button type="button" className="btn btn-ghost admin-back" onClick={() => navigate({ name: "instances" })}>
-        ← Instances
+        {t(locale, "instance.back")}
       </button>
       <h1>{instanceId}</h1>
 
       <dl className="admin-detail-header">
         <div>
-          <dt>Process</dt>
+          <dt>{t(locale, "instance.process")}</dt>
           <dd>{view.processId}</dd>
         </div>
         <div>
-          <dt>Version</dt>
+          <dt>{t(locale, "instance.version")}</dt>
           <dd>{view.version}</dd>
         </div>
         <div>
-          <dt>Definition hash</dt>
+          <dt>{t(locale, "instance.definitionHash")}</dt>
           <dd>{definitionHash}</dd>
         </div>
         <div>
-          <dt>Status</dt>
+          <dt>{t(locale, "instance.status")}</dt>
           <dd>
             <span className={`admin-badge admin-badge-${view.status}`}>{view.status}</span>
           </dd>
         </div>
         <div>
-          <dt>Current step</dt>
+          <dt>{t(locale, "instance.currentStep")}</dt>
           <dd>{(baseLocale ? labelText(view.step.label, baseLocale) : "") || view.step.key}</dd>
         </div>
         <div>
-          <dt>Transition seq</dt>
+          <dt>{t(locale, "instance.transitionSeq")}</dt>
           <dd>{derived.transitionSeq ?? "—"}</dd>
         </div>
         <div>
-          <dt>Claim state</dt>
-          <dd>{derived.claimedBy ? `claimed by ${derived.claimedBy}` : "unclaimed"}</dd>
+          <dt>{t(locale, "instance.claimState")}</dt>
+          <dd>{derived.claimedBy ? tFill(locale, "instance.claimedBy", { actor: derived.claimedBy }) : t(locale, "instance.unclaimed")}</dd>
         </div>
         <div>
-          <dt>Armed timer</dt>
-          <dd>{timer ? new Date(timer.nextTimerAt).toLocaleString() : "none"}</dd>
+          <dt>{t(locale, "instance.armedTimer")}</dt>
+          <dd>{timer ? new Date(timer.nextTimerAt).toLocaleString(locale) : t(locale, "instance.noTimer")}</dd>
         </div>
         {view.redactedAt && (
           <div>
-            <dt>Data redaction</dt>
+            <dt>{t(locale, "instance.dataRedaction")}</dt>
             <dd>
-              <span className="admin-badge admin-badge-redacted">Data redacted on {new Date(view.redactedAt).toLocaleString()}</span>
+              <span className="admin-badge admin-badge-redacted">
+                {tFill(locale, "instance.redactedOn", { at: new Date(view.redactedAt).toLocaleString(locale) })}
+              </span>
             </dd>
           </div>
         )}
@@ -216,36 +225,36 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
 
       {view.status === "running" && (
         <button type="button" className="btn btn-secondary btn-destructive" onClick={() => void doCancel()} disabled={cancelling}>
-          Cancel instance
+          {t(locale, "instance.cancel")}
         </button>
       )}
       {view.status !== "running" && (
         <button type="button" className="btn btn-secondary btn-destructive" onClick={() => void doRedact()} disabled={redacting || !!view.redactedAt}>
-          Redact data
+          {t(locale, "instance.redact")}
         </button>
       )}
       <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
-        Refresh
+        {t(locale, "common.refresh")}
       </button>
 
       {error && (
         <div className="admin-error-banner" role="alert">
-          <span className="admin-error-banner-stamp">Failed</span>
+          <span className="admin-error-banner-stamp">{t(locale, "common.failed")}</span>
           <span className="admin-error-banner-message">{error}</span>
           <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
-            Retry
+            {t(locale, "common.retry")}
           </button>
         </div>
       )}
 
-      <h2>Record</h2>
-      {record.length === 0 && !loading && !error && <p className="admin-empty">No history yet.</p>}
+      <h2>{t(locale, "instance.recordTitle")}</h2>
+      {record.length === 0 && !loading && !error && <p className="admin-empty">{t(locale, "instance.recordEmpty")}</p>}
       <ul className="admin-timeline">
         {record.map((el, i) => {
           const d = describeElement(el);
           return (
             <li key={i}>
-              <div className="admin-timeline-meta">{new Date(d.at).toLocaleString()}</div>
+              <div className="admin-timeline-meta">{new Date(d.at).toLocaleString(locale)}</div>
               <div>{d.summary}</div>
               {d.detail && <div className="admin-timeline-meta">{d.detail}</div>}
             </li>
@@ -255,7 +264,7 @@ export function InstanceScreen({ instanceId, navigate, token, onUnauthorized }: 
       {recordCursor && (
         <div className="admin-load-more">
           <button type="button" className="btn btn-secondary" onClick={() => void loadMoreRecord()} disabled={loading}>
-            Load more history
+            {t(locale, "instance.loadMoreHistory")}
           </button>
         </div>
       )}

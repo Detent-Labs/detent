@@ -4,9 +4,12 @@ import type { UserSummary } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
 import { parseRoles, appendRole, managerChoices, managerLabel, managerValueOf } from "./usersLogic.js";
+import { t, tFill } from "../catalog.js";
+import type { UiLocale } from "../../../i18n/locale.js";
 
 interface UsersScreenProps {
   token: string;
+  locale: UiLocale;
   onUnauthorized: () => void;
 }
 
@@ -20,18 +23,15 @@ const PAGE_LIMIT = 200;
 /** The `busyId` a pending create holds. No account id collides with it: every `user_id` carries the `user_` prefix. */
 const NEW_USER_ROW = "new-user";
 
-const DISABLE_CONFIRM =
-  "Disabling blocks this user's next login attempt. It does not end an already-active session — a token issued before this remains valid until it expires (up to 8 hours). Continue?";
-
-const ROLE_CAVEAT = "A role change takes effect at the user's next login. Their active session keeps the roles it was issued with.";
-
-const MANAGER_CAVEAT =
-  "A manager change applies to instances started from now on. An instance already waiting at an approval step keeps the manager resolved when it got there.";
-
-const CREATE_CAVEAT = "The engine sends no mail. Give the password to the account holder yourself.";
-
-const RESET_CAVEAT =
-  "A reset does not end an already-active session. A token issued before it remains valid until it expires (up to 8 hours). Disable the account to cut a session off now.";
+/**
+ * What the roles input shows when empty. Role names are values the engine
+ * matches exactly, so this example stays as the engine spells it.
+ *
+ * The email input's `jane@example.com` stays a literal for the same kind of
+ * reason: an address is a shape, not a word, and it reads alike in either
+ * locale.
+ */
+const ROLES_PLACEHOLDER = "finance:approver, system:admin";
 
 /**
  * The eight reserved roles, spelled the way `src/auth/authorize.ts` exports
@@ -50,7 +50,7 @@ const RESERVED_ROLES = [
   "system:templates",
 ];
 
-export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
+export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps) {
   const [items, setItems] = useState<UserSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -93,18 +93,18 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
       setItems(all);
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setLoading(false);
     }
-  }, [token, onUnauthorized]);
+  }, [token, locale, onUnauthorized]);
 
   useEffect(() => {
     void load();
   }, [load, reloadToken]);
 
   const toggle = async (user: UserSummary) => {
-    if (!user.disabled && !window.confirm(DISABLE_CONFIRM)) return;
+    if (!user.disabled && !window.confirm(t(locale, "users.disableConfirm"))) return;
     setBusyId(user.userId);
     try {
       if (user.disabled) await enableUser(user.userId, token);
@@ -112,7 +112,7 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
       refresh();
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setBusyId(undefined);
     }
@@ -169,7 +169,7 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
       // A self-strip refusal reads through `describeError`'s `self-role-strip`
       // case, like every other typed failure on this screen.
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setBusyId(undefined);
     }
@@ -185,7 +185,7 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
       // A refusal leaves the editor open and the row's stored manager on
       // screen: nothing was written, so nothing should read as written.
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setBusyId(undefined);
     }
@@ -201,7 +201,7 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
       refresh();
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setBusyId(undefined);
     }
@@ -217,7 +217,7 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
       // A taken email reads through `describeError`'s `email-in-use` case. The
       // form stays open holding what was typed, so only the address changes.
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      else setError(describeCaughtError(err, locale));
     } finally {
       setBusyId(undefined);
     }
@@ -225,37 +225,37 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
 
   return (
     <main className="admin-screen">
-      <h1>Users</h1>
+      <h1>{t(locale, "users.title")}</h1>
 
       <div className="admin-controls">
         <button type="button" className="btn btn-primary" onClick={startCreating} disabled={loading || creating}>
-          New user
+          {t(locale, "users.new")}
         </button>
         <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
-          Refresh
+          {t(locale, "common.refresh")}
         </button>
       </div>
 
       {error && (
         <div className="admin-error-banner" role="alert">
-          <span className="admin-error-banner-stamp">Failed</span>
+          <span className="admin-error-banner-stamp">{t(locale, "common.failed")}</span>
           <span className="admin-error-banner-message">{error}</span>
           <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
-            Retry
+            {t(locale, "common.retry")}
           </button>
         </div>
       )}
 
-      {items.length === 0 && !creating && !loading && !error && <p className="admin-empty">No users.</p>}
+      {items.length === 0 && !creating && !loading && !error && <p className="admin-empty">{t(locale, "users.empty")}</p>}
 
       {(items.length > 0 || creating) && (
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Email</th>
-              <th>Roles</th>
-              <th>Manager</th>
-              <th>Status</th>
+              <th>{t(locale, "users.colEmail")}</th>
+              <th>{t(locale, "users.colRoles")}</th>
+              <th>{t(locale, "users.colManager")}</th>
+              <th>{t(locale, "users.colStatus")}</th>
               <th />
             </tr>
           </thead>
@@ -266,7 +266,7 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
                   <div className="admin-role-editor">
                     {/* autoFocus: the first field of a form the operator just opened by an explicit click. */}
                     <label className="admin-field">
-                      <span className="admin-field-label">Email</span>
+                      <span className="admin-field-label">{t(locale, "users.email")}</span>
                       <input
                         type="email"
                         className="admin-role-input"
@@ -282,7 +282,7 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
                       />
                     </label>
                     <label className="admin-field">
-                      <span className="admin-field-label">Password</span>
+                      <span className="admin-field-label">{t(locale, "users.password")}</span>
                       <input
                         type="text"
                         className="admin-role-input"
@@ -298,7 +298,7 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
                         spellCheck={false}
                       />
                     </label>
-                    <p className="admin-role-caveat">{CREATE_CAVEAT}</p>
+                    <p className="admin-role-caveat">{t(locale, "users.createCaveat")}</p>
                   </div>
                 </td>
                 <td>
@@ -311,13 +311,13 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
                       onKeyDown={(e) => {
                         if (e.key === "Escape") cancelCreating();
                       }}
-                      placeholder="finance:approver, system:admin"
-                      aria-label="Roles for the new account, separated by commas"
+                      placeholder={ROLES_PLACEHOLDER}
+                      aria-label={t(locale, "users.rolesAriaNew")}
                       autoComplete="off"
                       spellCheck={false}
                     />
                     <p className="admin-role-hint">
-                      <span>Reserved:</span>
+                      <span>{t(locale, "users.reserved")}</span>
                       {RESERVED_ROLES.map((role) => (
                         <button key={role} type="button" className="admin-role-chip" onClick={() => setNewRoles((text) => appendRole(text, role))}>
                           {role}
@@ -337,10 +337,10 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
                     onClick={() => void saveNewUser()}
                     disabled={busyId === NEW_USER_ROW || !newEmail.trim() || !newPassword.trim()}
                   >
-                    Create user
+                    {t(locale, "users.createUser")}
                   </button>
                   <button type="button" className="btn btn-ghost" onClick={cancelCreating} disabled={busyId === NEW_USER_ROW}>
-                    Cancel
+                    {t(locale, "common.cancel")}
                   </button>
                 </td>
               </tr>
@@ -362,21 +362,21 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
                             if (e.key === "Enter") void saveRoles(user);
                             if (e.key === "Escape") cancelEditing();
                           }}
-                          placeholder="finance:approver, system:admin"
-                          aria-label={`Roles for ${user.email}, separated by commas`}
+                          placeholder={ROLES_PLACEHOLDER}
+                          aria-label={tFill(locale, "users.rolesAria", { email: user.email })}
                           autoComplete="off"
                           spellCheck={false}
                           autoFocus
                         />
                         <p className="admin-role-hint">
-                          <span>Reserved:</span>
+                          <span>{t(locale, "users.reserved")}</span>
                           {RESERVED_ROLES.map((role) => (
                             <button key={role} type="button" className="admin-role-chip" onClick={() => setDraftRoles((text) => appendRole(text, role))}>
                               {role}
                             </button>
                           ))}
                         </p>
-                        <p className="admin-role-caveat">{ROLE_CAVEAT}</p>
+                        <p className="admin-role-caveat">{t(locale, "users.roleCaveat")}</p>
                       </div>
                     ) : (
                       <span className="admin-role-list">{user.roles.join(", ") || "—"}</span>
@@ -394,59 +394,61 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
                             if (e.key === "Enter") void saveManager(user);
                             if (e.key === "Escape") cancelEditing();
                           }}
-                          aria-label={`Manager for ${user.email}`}
+                          aria-label={tFill(locale, "users.managerAria", { email: user.email })}
                           autoFocus
                         >
-                          <option value="">No manager</option>
+                          <option value="">{t(locale, "users.noManager")}</option>
                           {managerChoices(items, user.userId).map((choice) => (
                             <option key={choice.userId} value={choice.userId}>
                               {choice.email}
                             </option>
                           ))}
                         </select>
-                        <p className="admin-role-caveat">{MANAGER_CAVEAT}</p>
+                        <p className="admin-role-caveat">{t(locale, "users.managerCaveat")}</p>
                       </div>
                     ) : (
                       <span className="admin-manager-name">{managerLabel(items, user.managerUserId)}</span>
                     )}
                   </td>
                   <td>
-                    <span className={`admin-badge admin-badge-${user.disabled ? "disabled" : "enabled"}`}>{user.disabled ? "disabled" : "enabled"}</span>
+                    <span className={`admin-badge admin-badge-${user.disabled ? "disabled" : "enabled"}`}>
+                      {t(locale, user.disabled ? "users.statusDisabled" : "users.statusEnabled")}
+                    </span>
                   </td>
                   <td>
                     {editingRoles(user.userId) && (
                       <>
                         <button type="button" className="btn btn-primary" onClick={() => void saveRoles(user)} disabled={busyId === user.userId}>
-                          Save roles
+                          {t(locale, "users.saveRoles")}
                         </button>
                         <button type="button" className="btn btn-ghost" onClick={cancelEditing} disabled={busyId === user.userId}>
-                          Cancel
+                          {t(locale, "common.cancel")}
                         </button>
                       </>
                     )}
                     {editingManager(user.userId) && (
                       <>
                         <button type="button" className="btn btn-primary" onClick={() => void saveManager(user)} disabled={busyId === user.userId}>
-                          Save manager
+                          {t(locale, "users.saveManager")}
                         </button>
                         <button type="button" className="btn btn-ghost" onClick={cancelEditing} disabled={busyId === user.userId}>
-                          Cancel
+                          {t(locale, "common.cancel")}
                         </button>
                       </>
                     )}
                     {editing?.userId !== user.userId && (
                       <>
                         <button type="button" className="btn btn-secondary" onClick={() => startEditing(user)} disabled={busyId === user.userId}>
-                          Edit roles
+                          {t(locale, "users.editRoles")}
                         </button>
                         <button type="button" className="btn btn-secondary" onClick={() => startEditingManager(user)} disabled={busyId === user.userId}>
-                          Edit manager
+                          {t(locale, "users.editManager")}
                         </button>
                         <button type="button" className="btn btn-secondary" onClick={() => startEditingPassword(user)} disabled={busyId === user.userId}>
-                          Reset password
+                          {t(locale, "users.resetPassword")}
                         </button>
                         <button type="button" className="btn btn-secondary" onClick={() => void toggle(user)} disabled={busyId === user.userId}>
-                          {user.disabled ? "Enable" : "Disable"}
+                          {t(locale, user.disabled ? "users.enable" : "users.disable")}
                         </button>
                       </>
                     )}
@@ -460,7 +462,7 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
                     <td colSpan={5}>
                       <div className="admin-role-editor">
                         <label className="admin-field">
-                          <span className="admin-field-label">New password for {user.email}</span>
+                          <span className="admin-field-label">{tFill(locale, "users.newPasswordFor", { email: user.email })}</span>
                           {/* autoFocus: the single input of an editor the operator just opened by an explicit click. */}
                           <input
                             type="text"
@@ -476,7 +478,7 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
                             autoFocus
                           />
                         </label>
-                        <p className="admin-role-caveat">{RESET_CAVEAT}</p>
+                        <p className="admin-role-caveat">{t(locale, "users.resetCaveat")}</p>
                         <div className="admin-editor-actions">
                           <button
                             type="button"
@@ -484,10 +486,10 @@ export function UsersScreen({ token, onUnauthorized }: UsersScreenProps) {
                             onClick={() => void savePassword(user)}
                             disabled={busyId === user.userId || !draftPassword.trim()}
                           >
-                            Set password
+                            {t(locale, "users.setPassword")}
                           </button>
                           <button type="button" className="btn btn-ghost" onClick={cancelEditing} disabled={busyId === user.userId}>
-                            Cancel
+                            {t(locale, "common.cancel")}
                           </button>
                         </div>
                       </div>
