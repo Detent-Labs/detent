@@ -115,7 +115,13 @@ export function checkAndRecordAttempt(
   return "ok";
 }
 
-export async function handleLogin(req: Request, secret: string, db: SQL = sql, clientAddress?: string): Promise<HttpResult> {
+export async function handleLogin(
+  req: Request,
+  secret: string,
+  db: SQL = sql,
+  clientAddress?: string,
+  tenant?: string,
+): Promise<HttpResult> {
   let body: { email?: unknown; password?: unknown };
   try {
     body = (await req.json()) as { email?: unknown; password?: unknown };
@@ -150,7 +156,12 @@ export async function handleLogin(req: Request, secret: string, db: SQL = sql, c
   loginAttempts.delete(normalizedEmail);
 
   const key = new TextEncoder().encode(secret);
-  const token = await new SignJWT({ roles: result.roles })
+  // The tenant this database belongs to, so every later request resolves its
+  // own without another host lookup. Absent in a single-tenant deployment, and
+  // the resolver reads its absence as "the process database". LOCAL_ISSUER
+  // stays one constant: every deployment issues under it, so the issuer cannot
+  // name a tenant and this claim must.
+  const token = await new SignJWT({ roles: result.roles, ...(tenant ? { tenant } : {}) })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuer(LOCAL_ISSUER)
     .setSubject(result.userId)

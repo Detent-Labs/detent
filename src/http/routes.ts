@@ -132,8 +132,8 @@ async function parseJsonBody<T>(req: Request, schema: z.ZodType<T>): Promise<T> 
  * Exported: the three sibling route modules import it. Each carried its own
  * copy until `dedup-server-helpers`.
  */
-export async function resolveActor(req: Request, resolver: ActorResolver): Promise<Actor> {
-  return resolver(req.headers);
+export async function resolveActor(req: Request, resolver: ActorResolver, db: SQL): Promise<Actor> {
+  return resolver(req.headers, db);
 }
 
 /**
@@ -180,7 +180,7 @@ export async function handleCreateInstance(
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     const body = await parseJsonBody(req, createInstanceBodySchema);
     const created = await createProcessInstance(processId as ProcessId, actor, dataSourceRegistry, { version: body.version, data: body.data as Instance["data"] | undefined }, db, assignmentRegistry);
     return { status: 201, body: created };
@@ -195,7 +195,7 @@ export async function handleGetInstanceView(
   db: SQL = sql,
 ): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     const view = await getInstanceView(instanceId as InstanceId, actor, dataSourceRegistry, db);
     return { status: 200, body: view };
   });
@@ -211,7 +211,7 @@ export async function handleSubmit(
 ): Promise<HttpResult> {
   let actor: Actor | undefined;
   try {
-    actor = await resolveActor(req, resolver);
+    actor = await resolveActor(req, resolver, db);
     const body = await parseJsonBody(req, submitBodySchema);
     const updated = await submitAndTransition(instanceId as InstanceId, body.pathId as PathId, body.data as Instance["data"], actor, dataSourceRegistry, db, assignmentRegistry);
     return { status: 200, body: updated };
@@ -228,7 +228,7 @@ export async function handleSubmit(
 
 export async function handleClaim(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     const updated = await claimStep(instanceId as InstanceId, actor, db);
     return { status: 200, body: updated };
   });
@@ -236,7 +236,7 @@ export async function handleClaim(instanceId: string, req: Request, resolver: Ac
 
 export async function handleRelease(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     const updated = await releaseClaim(instanceId as InstanceId, actor, db);
     return { status: 200, body: updated };
   });
@@ -244,7 +244,7 @@ export async function handleRelease(instanceId: string, req: Request, resolver: 
 
 export async function handleDelegate(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     const body = await parseJsonBody(req, delegateBodySchema);
     const updated = await delegateClaim(instanceId as InstanceId, actor, body.toActorId, db);
     return { status: 200, body: updated };
@@ -253,7 +253,7 @@ export async function handleDelegate(instanceId: string, req: Request, resolver:
 
 export async function handlePostComment(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     const body = await parseJsonBody(req, commentBodySchema);
     const created = await postComment(instanceId as InstanceId, actor, body.text, db);
     return { status: 201, body: created };
@@ -262,7 +262,7 @@ export async function handlePostComment(instanceId: string, req: Request, resolv
 
 export async function handleListComments(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     const url = new URL(req.url);
     const limit = parseLimit(url, MAX_LIST_LIMIT);
     const cursor = url.searchParams.get("cursor") ?? undefined;
@@ -273,7 +273,7 @@ export async function handleListComments(instanceId: string, req: Request, resol
 
 export async function handleUploadAttachment(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     const body = await parseJsonBody(req, attachmentBodySchema);
     const data = Buffer.from(body.dataBase64, "base64");
     if (data.length > MAX_ATTACHMENT_BYTES) {
@@ -291,7 +291,7 @@ export async function handleUploadAttachment(instanceId: string, req: Request, r
 
 export async function handleListAttachments(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     const url = new URL(req.url);
     const limit = parseLimit(url, MAX_LIST_LIMIT);
     const cursor = url.searchParams.get("cursor") ?? undefined;
@@ -309,7 +309,7 @@ export async function handleGetAttachment(
   db: SQL = sql,
 ): Promise<HttpBinaryResult | HttpResult> {
   return guarded(req, async (): Promise<HttpBinaryResult> => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     const attachment = await getAttachment(instanceId as InstanceId, attachmentId, actor, db);
     return { status: 200, contentType: attachment.contentType, data: attachment.data, filename: attachment.filename };
   });
@@ -357,7 +357,7 @@ function parseScope(url: URL): "mine" | "started" | "all" {
 
 export async function handleListInstances(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     const url = new URL(req.url);
     const scope = parseScope(url);
     const assignedTo = url.searchParams.get("assignedTo") ?? undefined;
@@ -403,7 +403,7 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
 
 export async function handleInstanceRecord(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     const url = new URL(req.url);
     const limit = parseLimit(url, MAX_RECORD_LIMIT);
     const cursor = url.searchParams.get("cursor") ?? undefined;
@@ -414,7 +414,7 @@ export async function handleInstanceRecord(instanceId: string, req: Request, res
 
 export async function handleCancel(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     const updated = await cancelInstance(instanceId as InstanceId, actor, db);
     return { status: 200, body: updated };
   });
@@ -442,7 +442,7 @@ export async function handlePublish(
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, PUBLISH_ROLE);
     let parsed: { processId?: unknown; body?: unknown };
     try {
@@ -463,14 +463,14 @@ export async function handlePublish(
 
 export async function handleListProcesses(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    await resolveActor(req, resolver);
+    await resolveActor(req, resolver, db);
     return { status: 200, body: await listProcesses(db) };
   });
 }
 
 export async function handleListVersions(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    await resolveActor(req, resolver);
+    await resolveActor(req, resolver, db);
     return { status: 200, body: await listVersions(processId as ProcessId, db) };
   });
 }

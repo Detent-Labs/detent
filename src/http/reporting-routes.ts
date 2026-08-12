@@ -43,7 +43,7 @@ function notFound(processId: string): HttpResult {
 
 export async function handleReportingListProcesses(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, REPORTS_ROLE);
     return { status: 200, body: { processes: await listProcesses(db) } };
   });
@@ -62,7 +62,7 @@ async function handleView(
   db: SQL,
 ): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, REPORTS_ROLE);
     const range = parseRange(new URL(req.url));
     const id = processId as ProcessId;

@@ -56,13 +56,13 @@
 
 ## 5. Tenant resolution
 
-- [ ] 5.1 Mint a `tenant` claim in `src/auth/login.ts`, naming the tenant whose
+- [x] 5.1 Mint a `tenant` claim in `src/auth/login.ts`, naming the tenant whose
   database authenticated the account.
-- [ ] 5.2 Read the claim in `src/auth/jwt.ts`, leaving `LOCAL_ISSUER` alone.
+- [x] 5.2 Read the claim in `src/auth/jwt.ts`, leaving `LOCAL_ISSUER` alone.
 - [ ] 5.3 Resolve the login's own tenant from the request host.
 - [ ] 5.4 Keep an unknown host indistinguishable from a wrong password, in both
   answer and cost.
-- [ ] 5.5 Change `isActiveAccount` to take `db` per call.
+- [x] 5.5 Change `isActiveAccount` to take `db` per call.
 - [ ] 5.6 Answer 401 for an unknown tenant key, and 503 for a listed tenant
   whose database refuses.
 

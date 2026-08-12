@@ -60,7 +60,7 @@ async function notFoundOrConflict(idempotencyKey: string, db: SQL): Promise<Http
 
 export async function handleAdminListOutbox(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
     const url = new URL(req.url);
     const status = url.searchParams.getAll("status");
@@ -77,7 +77,7 @@ export async function handleAdminListOutbox(req: Request, resolver: ActorResolve
 
 export async function handleAdminOutboxRetry(idempotencyKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
     const updated = await requeueOutboxRow(idempotencyKey, db);
     return updated ? { status: 200, body: updated } : await notFoundOrConflict(idempotencyKey, db);
@@ -86,7 +86,7 @@ export async function handleAdminOutboxRetry(idempotencyKey: string, req: Reques
 
 export async function handleAdminOutboxDiscard(idempotencyKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
     const updated = await discardOutboxRow(idempotencyKey, db);
     return updated ? { status: 200, body: updated } : await notFoundOrConflict(idempotencyKey, db);
@@ -95,7 +95,7 @@ export async function handleAdminOutboxDiscard(idempotencyKey: string, req: Requ
 
 export async function handleAdminListTimers(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
     const url = new URL(req.url);
     const limit = parseLimit(url, MAX_LIST_LIMIT);
@@ -107,7 +107,7 @@ export async function handleAdminListTimers(req: Request, resolver: ActorResolve
 
 export async function handleAdminListUsers(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
     const url = new URL(req.url);
     const limit = parseLimit(url, MAX_LIST_LIMIT);
@@ -119,7 +119,7 @@ export async function handleAdminListUsers(req: Request, resolver: ActorResolver
 
 async function handleSetUserDisabled(userId: string, disabled: boolean, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
     const updated = await setDisabled(userId, disabled, db);
     if (!updated) return { status: 404, body: { error: { type: "not-found", message: `no user: ${userId}` } } };
@@ -156,7 +156,7 @@ function parseRoles(value: unknown): string[] {
  */
 export async function handleAdminSetUserRoles(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
     let body: { roles?: unknown };
     try {
@@ -202,7 +202,7 @@ function requireNonBlank(value: unknown, label: string): string {
  */
 export async function handleAdminCreateUser(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
     let body: { email?: unknown; password?: unknown; roles?: unknown };
     try {
@@ -250,7 +250,7 @@ function isEmailUniqueViolation(err: unknown): boolean {
  */
 export async function handleAdminSetUserPassword(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
     let body: { password?: unknown };
     try {
@@ -279,7 +279,7 @@ export async function handleAdminSetUserPassword(userId: string, req: Request, r
  */
 export async function handleAdminSetUserManager(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
     let body: { managerUserId?: unknown };
     try {
@@ -322,7 +322,7 @@ export async function handleAdminSetUserManager(userId: string, req: Request, re
  */
 export async function handleAdminSetUserName(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
     let body: { displayName?: unknown };
     try {
@@ -368,7 +368,7 @@ export async function handleAdminEnableUser(userId: string, req: Request, resolv
 /** Wraps `migrateInstances` unchanged. No new engine logic: `MigrationPlanError` (e.g. no registered plan) falls through to `mapError`, mapped 409 the same way `PUT /migration-plans/...` already maps it. */
 export async function handleAdminRunMigration(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
     let body: { processId?: unknown; fromVersion?: unknown; toVersion?: unknown };
     try {
@@ -387,7 +387,7 @@ export async function handleAdminRunMigration(req: Request, resolver: ActorResol
 /** Wraps `redactInstance` unchanged. `InstanceRunningError`/`NotFoundError` fall through to `mapError`. */
 export async function handleAdminRedactInstance(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
     const updated = await redactInstance(instanceId as InstanceId, db);
     return { status: 200, body: updated };
@@ -490,7 +490,7 @@ const notFoundList = (listKey: string): HttpResult => ({
 
 export async function handleAdminListDataLists(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    requireDataListRead(await resolveActor(req, resolver));
+    requireDataListRead(await resolveActor(req, resolver, db));
     const items = (await db`
       SELECT l.list_key AS "listKey", l.label, l.description, l.updated_at AS "updatedAt", l.updated_by AS "updatedBy",
              count(v.value) FILTER (WHERE v.active)::int AS "activeValueCount"
@@ -505,7 +505,7 @@ export async function handleAdminListDataLists(req: Request, resolver: ActorReso
 
 export async function handleAdminCreateDataList(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, DATALISTS_ROLE);
     const body = await readJson(req);
     const listKey = requireString(body.listKey, "listKey");
@@ -530,7 +530,7 @@ export async function handleAdminCreateDataList(req: Request, resolver: ActorRes
 
 export async function handleAdminGetDataList(listKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    requireDataListRead(await resolveActor(req, resolver));
+    requireDataListRead(await resolveActor(req, resolver, db));
     const list = await readList(listKey, db);
     if (!list) return notFoundList(listKey);
     // Inactive values are reported, not hidden: an operator needs to see what a
@@ -546,7 +546,7 @@ export async function handleAdminGetDataList(listKey: string, req: Request, reso
 
 export async function handleAdminUpdateDataList(listKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, DATALISTS_ROLE);
     const body = await readJson(req);
     const label = requireString(body.label, "label");
@@ -569,7 +569,7 @@ export async function handleAdminUpdateDataList(listKey: string, req: Request, r
  */
 export async function handleAdminPutDataListValues(listKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, DATALISTS_ROLE);
     const body = await readJson(req);
     const values = parseValues(body.values);
@@ -592,7 +592,7 @@ export async function handleAdminPutDataListValues(listKey: string, req: Request
 /** Refuses while a published body references the key, the same shape as the guard that protects a version an instance pins. */
 export async function handleAdminDeleteDataList(listKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, DATALISTS_ROLE);
     if (!(await readList(listKey, db))) return notFoundList(listKey);
     const usedBy = await referencingProcesses(listKey, db);
@@ -644,7 +644,7 @@ function parseOverrideValue(raw: unknown): string | null {
 /** The admin screen's own read. Same data as the public route, behind the role, so the screen needs no second shape. */
 export async function handleAdminListUiStrings(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
     const overrides = await listUiStringOverrides(db);
     return { status: 200, body: { overrides } };
@@ -662,7 +662,7 @@ export async function handleAdminListUiStrings(req: Request, resolver: ActorReso
  */
 export async function handleAdminPutUiString(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
     const body = await readJson(req);
     const area = requireString(body.area, "area");

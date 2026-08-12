@@ -74,7 +74,7 @@ function requireStudioRead(actor: { id: string; roles: readonly string[] }): voi
 
 export async function handleListDrafts(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireAuthoring(actor);
     return { status: 200, body: await listDrafts(db) };
   });
@@ -82,7 +82,7 @@ export async function handleListDrafts(req: Request, resolver: ActorResolver, db
 
 export async function handleGetDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireAuthoring(actor);
     const draft = await getDraft(processId as ProcessId, db);
     if (!draft) return { status: 404, body: { error: { type: "not-found", message: `no draft: ${processId}` } } };
@@ -92,7 +92,7 @@ export async function handleGetDraft(processId: string, req: Request, resolver: 
 
 export async function handleSaveDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireAuthoring(actor);
     let parsed: { body?: unknown; layout?: unknown; revision?: unknown; baseVersion?: unknown };
     try {
@@ -118,7 +118,7 @@ export async function handleSaveDraft(processId: string, req: Request, resolver:
 
 export async function handleDeleteDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireAuthoring(actor);
     const removed = await deleteDraft(processId as ProcessId, db);
     if (!removed) return { status: 404, body: { error: { type: "not-found", message: `no draft: ${processId}` } } };
@@ -146,7 +146,7 @@ export async function handlePublishDraft(
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireAuthoring(actor);
     requireRole(actor, PUBLISH_ROLE);
     const draft = await getDraft(processId as ProcessId, db);
@@ -175,7 +175,7 @@ export async function handlePublishDraft(
  */
 export async function handleGetVersionBody(processId: string, versionRaw: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireStudioRead(actor);
     const version = parseVersion(versionRaw, "version");
     const body = await createDefinitionStore(db).resolveBody(processId as ProcessId, version);
@@ -201,7 +201,7 @@ export async function handleGetMigrationPlan(
   db: SQL = sql,
 ): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, DEVELOPER_ROLE);
     const fromVersion = parseVersion(fromRaw, "fromVersion");
     const toVersion = parseVersion(toRaw, "toVersion");
@@ -221,7 +221,7 @@ export async function handlePutMigrationPlan(
   db: SQL = sql,
 ): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, DEVELOPER_ROLE);
     const fromVersion = parseVersion(fromRaw, "fromVersion");
     const toVersion = parseVersion(toRaw, "toVersion");
@@ -240,7 +240,7 @@ export async function handlePutMigrationPlan(
 /** Read-only orphan-key dry run, wrapping `findOrphanKeys` unchanged. Version-keyed, not plan-keyed — the scan is independent of any specific migration target. `DEVELOPER_ROLE` alone, for the reason `handleGetMigrationPlan` states. */
 export async function handleGetOrphanKeys(processId: string, versionRaw: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, DEVELOPER_ROLE);
     const version = parseVersion(versionRaw, "version");
     const scan = await findOrphanKeys(processId as ProcessId, version, db);
@@ -283,10 +283,13 @@ export async function handleGetRegistry(
   resolver: ActorResolver,
   registry: Registry,
   dataSourceRegistry: DataSourceRegistry,
+  db: SQL,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    // Reads no process data, but resolving the actor checks that account is
+    // still live, and that check belongs in the actor's OWN tenant directory.
+    const actor = await resolveActor(req, resolver, db);
     requireAuthoring(actor);
     return {
       status: 200,
@@ -304,7 +307,7 @@ export async function handleGetRegistry(
 
 export async function handleListTemplates(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireStudioRead(actor);
     return { status: 200, body: await listTemplates(db) };
   });
@@ -312,7 +315,7 @@ export async function handleListTemplates(req: Request, resolver: ActorResolver,
 
 export async function handleGetTemplate(templateKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireStudioRead(actor);
     const template = await getTemplate(templateKey, db);
     if (!template) return { status: 404, body: { error: { type: "not-found", message: `no template: ${templateKey}` } } };
@@ -322,7 +325,7 @@ export async function handleGetTemplate(templateKey: string, req: Request, resol
 
 export async function handleSaveTemplate(templateKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, TEMPLATES_ROLE);
     let parsed: { body?: unknown; layout?: unknown };
     try {
@@ -337,7 +340,7 @@ export async function handleSaveTemplate(templateKey: string, req: Request, reso
 
 export async function handleDeleteTemplate(templateKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     requireRole(actor, TEMPLATES_ROLE);
     const removed = await deleteTemplate(templateKey, db);
     if (!removed) return { status: 404, body: { error: { type: "not-found", message: `no template: ${templateKey}` } } };

@@ -370,7 +370,6 @@ export function resolveAuthResolver(
     AUTH_ISSUERS?: string;
     ALLOW_INSECURE_DEV_AUTH?: string;
   },
-  db: SQL = sql,
 ): ActorResolver {
   const issuers = parseAuthIssuers(env.AUTH_ISSUERS);
   if (!env.AUTH_JWT_SECRET && !issuers) {
@@ -392,7 +391,9 @@ export function resolveAuthResolver(
   return jwtResolver({
     localSecret: env.AUTH_JWT_SECRET,
     issuers,
-    isActiveAccount: (userId) => isActiveUser(userId, db),
+    // `db` arrives per call: an actor's liveness is a fact of that actor's own
+    // tenant, and a handle bound here would check one directory for every tenant.
+    isActiveAccount: (userId, db) => isActiveUser(userId, db),
   });
 }
 
@@ -575,7 +576,7 @@ export function createServer(
     { method: "PUT", segments: seg("/migration-plans/:processId/:fromVersion/:toVersion"),
       handler: (p, req, _c, db) => handlePutMigrationPlan(p[0]!, p[1]!, p[2]!, req, resolver, db) },
     { method: "GET", segments: seg("/registry"),
-      handler: (_p, req) => handleGetRegistry(req, resolver, registry, dataSourceRegistry, assignmentRegistry) },
+      handler: (_p, req, _c, db) => handleGetRegistry(req, resolver, registry, dataSourceRegistry, db, assignmentRegistry) },
     { method: "GET", segments: seg("/templates"),
       handler: (_p, req, _c, db) => handleListTemplates(req, resolver, db) },
     { method: "GET", segments: seg("/templates/:templateKey"),
@@ -687,17 +688,13 @@ export async function startHttpServer(
   registry: Registry,
   dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
-  // `db` is declared above this parameter, so this default expression can read
-  // it: the resolver's account lookup runs against the same handle the rest of
-  // the server uses.
-  resolver: ActorResolver = resolveAuthResolver(
-    {
+  // The resolver binds no database of its own: its account lookup takes the
+  // handle of the request being resolved, so it reads that actor's own tenant.
+  resolver: ActorResolver = resolveAuthResolver({
       AUTH_JWT_SECRET: process.env.AUTH_JWT_SECRET,
       AUTH_ISSUERS: process.env.AUTH_ISSUERS,
       ALLOW_INSECURE_DEV_AUTH: process.env.ALLOW_INSECURE_DEV_AUTH,
-    },
-    db,
-  ),
+    }),
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<{ stop: () => Promise<void> }> {
   await initSchema(db);

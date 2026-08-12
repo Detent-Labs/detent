@@ -131,7 +131,7 @@ test.skipIf(!DB)("a token issued before the user is disabled via the admin route
 
   const reg = createRegistry();
   const dataSourceReg = createDataSourceRegistry();
-  const resolver = resolveAuthResolver({ AUTH_JWT_SECRET: SECRET }, sql);
+  const resolver = resolveAuthResolver({ AUTH_JWT_SECRET: SECRET });
   const fetch = createServer(dataSourceReg, reg, sql, resolver);
 
   // A real account, not a hand-signed subject: the admin's own token now has
@@ -168,7 +168,7 @@ test.skipIf(!DB)("an admin's own disabling request still answers 200, and only t
   const { userId } = await createUser("login-self-disable@example.com", "correct-horse", [ADMIN_ROLE]);
   const { token } = (await handleLogin(loginRequest("login-self-disable@example.com", "correct-horse"), SECRET)).body as { token: string };
 
-  const fetch = createServer(createDataSourceRegistry(), createRegistry(), sql, resolveAuthResolver({ AUTH_JWT_SECRET: SECRET }, sql));
+  const fetch = createServer(createDataSourceRegistry(), createRegistry(), sql, resolveAuthResolver({ AUTH_JWT_SECRET: SECRET }));
 
   const disableRes = await fetch(
     new Request(`http://x/admin/users/${userId}/disable`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
@@ -184,7 +184,7 @@ test.skipIf(!DB)("an account deleted from the directory loses its live session t
   const { userId } = await createUser("login-deleted@example.com", "correct-horse", ["employee"]);
   const { token } = (await handleLogin(loginRequest("login-deleted@example.com", "correct-horse"), SECRET)).body as { token: string };
 
-  const fetch = createServer(createDataSourceRegistry(), createRegistry(), sql, resolveAuthResolver({ AUTH_JWT_SECRET: SECRET }, sql));
+  const fetch = createServer(createDataSourceRegistry(), createRegistry(), sql, resolveAuthResolver({ AUTH_JWT_SECRET: SECRET }));
   expect((await fetch(new Request("http://x/instances?scope=mine", { headers: { Authorization: `Bearer ${token}` } }))).status).toBe(200);
 
   await sql`DELETE FROM auth_users WHERE user_id = ${userId}`;
@@ -197,7 +197,7 @@ test.skipIf(!DB)("re-enabling an account restores its live session, since nothin
   const { userId } = await createUser("login-reenable@example.com", "correct-horse", ["employee"]);
   const { token } = (await handleLogin(loginRequest("login-reenable@example.com", "correct-horse"), SECRET)).body as { token: string };
 
-  const fetch = createServer(createDataSourceRegistry(), createRegistry(), sql, resolveAuthResolver({ AUTH_JWT_SECRET: SECRET }, sql));
+  const fetch = createServer(createDataSourceRegistry(), createRegistry(), sql, resolveAuthResolver({ AUTH_JWT_SECRET: SECRET }));
   const request = (): Request => new Request("http://x/instances?scope=mine", { headers: { Authorization: `Bearer ${token}` } });
 
   await sql`UPDATE auth_users SET disabled = true WHERE user_id = ${userId}`;

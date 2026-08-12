@@ -62,7 +62,7 @@ const localBody = (id: string, account: AccountRecord) => ({
  */
 export async function handleGetAccount(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     const account = await getAccountById(actor.id, db);
     if (!account) return { status: 200, body: { id: actor.id, roles: actor.roles, editable: false } };
     return { status: 200, body: localBody(actor.id, account) };
@@ -113,7 +113,7 @@ function parseAccountChanges(body: Record<string, unknown>): { displayName?: str
  */
 export async function handlePatchAccount(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver);
+    const actor = await resolveActor(req, resolver, db);
     let raw: unknown;
     try {
       raw = await req.json();

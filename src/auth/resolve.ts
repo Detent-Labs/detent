@@ -11,10 +11,11 @@
  * host wires exactly one at startup; which is a composition-root decision
  * (`src/http/server.ts`), never both at once.
  */
+import type { SQL } from "bun";
 import type { Actor } from "../cel/eval.js";
 
 /** The credential is the request's `Headers`; each resolver reads whatever it needs. */
-export type ActorResolver = (credential: unknown) => Promise<Actor>;
+export type ActorResolver = (credential: unknown, db: SQL) => Promise<Actor>;
 
 /** A credential could not be resolved into a trusted Actor. */
 export class ActorResolutionError extends Error {

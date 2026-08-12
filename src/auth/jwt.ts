@@ -12,10 +12,37 @@
  * still live, when configured with an `isActiveAccount` callback. That is what
  * makes an operator's disable end an open session on the next request.
  */
+import type { SQL } from "bun";
 import { decodeJwt, jwtVerify, createRemoteJWKSet } from "jose";
 import { ActorResolutionError, type ActorResolver } from "./resolve.js";
 
 export const LOCAL_ISSUER = "bps";
+
+/**
+ * The tenant a request belongs to, or `undefined` for a single-tenant
+ * deployment. Read BEFORE verification, because it decides which database the
+ * request runs against, and the verification that follows is what proves it: a
+ * `tenant` claim sits inside the signed payload, so an edited one fails the
+ * signature and the request is refused before it reads anything.
+ *
+ * A locally-issued token carries the claim, since `LOCAL_ISSUER` is one
+ * constant every deployment shares and so cannot name a tenant. An externally
+ * issued token needs none: its `iss` identifies its tenant, and the caller maps
+ * it.
+ */
+export function tenantKeyOf(credential: unknown): string | undefined {
+  const authorization = (credential as Headers).get?.("Authorization");
+  if (!authorization || !authorization.startsWith(BEARER_PREFIX)) return undefined;
+  const token = authorization.slice(BEARER_PREFIX.length).trim();
+  if (!token) return undefined;
+  try {
+    const payload = decodeJwt(token) as { iss?: unknown; tenant?: unknown };
+    if (payload.iss === LOCAL_ISSUER) return typeof payload.tenant === "string" ? payload.tenant : undefined;
+    return typeof payload.iss === "string" ? payload.iss : undefined;
+  } catch {
+    return undefined;
+  }
+}
 const BEARER_PREFIX = "Bearer ";
 
 /** One `AUTH_ISSUERS` entry: an externally-issued token verified via JWKS. */
@@ -48,7 +75,7 @@ export interface JwtResolverConfig {
    * Never called for an externally issued token: that issuer owns revocation,
    * and this engine holds no row for its subjects.
    */
-  isActiveAccount?: (userId: string) => Promise<boolean>;
+  isActiveAccount?: (userId: string, db: SQL) => Promise<boolean>;
 }
 
 function claimToRoles(payload: Record<string, unknown>, rolesClaim: string): string[] {
@@ -66,7 +93,7 @@ export function jwtResolver(config: JwtResolverConfig): ActorResolver {
   const localRolesClaim = config.localRolesClaim ?? "roles";
   const jwksSets = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 
-  return async (credential) => {
+  return async (credential, db) => {
     const headers = credential as Headers;
     const authorization = headers.get("Authorization");
     if (!authorization || !authorization.startsWith(BEARER_PREFIX)) {
@@ -91,7 +118,7 @@ export function jwtResolver(config: JwtResolverConfig): ActorResolver {
         // claim, so a grant still reaches the actor at their next login and not
         // before — see the admin-user-management spec, "A role change does not
         // reach an already-issued token".
-        if (config.isActiveAccount && !(await config.isActiveAccount(actor.id))) {
+        if (config.isActiveAccount && !(await config.isActiveAccount(actor.id, db))) {
           throw new ActorResolutionError("account is disabled or no longer exists");
         }
         return actor;

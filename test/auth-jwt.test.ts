@@ -5,10 +5,19 @@
  * actually fetches (no fetch mocking, since that would only prove the mock
  * shape, not the real fetch/JWKS-parse path).
  */
+import type { SQL } from "bun";
 import { test, expect, describe } from "bun:test";
 import { SignJWT, generateKeyPair, exportJWK } from "jose";
 import { jwtResolver, LOCAL_ISSUER, type IssuerConfig } from "../src/auth/jwt.js";
 import { ActorResolutionError } from "../src/auth/resolve.js";
+
+/**
+ * These suites are pure: no resolver under test here reads a database except
+ * through an injected `isActiveAccount`, which the cases below supply
+ * themselves. The handle is a stand-in that satisfies the required parameter.
+ */
+const noDb = (() => Promise.resolve([])) as unknown as SQL;
+
 
 const SECRET = "test-signing-secret-at-least-32-bytes-long";
 
@@ -52,31 +61,31 @@ describe("local (bps) issuer", () => {
   test("a valid locally-signed token resolves to the expected Actor", async () => {
     const resolver = jwtResolver({ localSecret: SECRET });
     const token = await localToken({ roles: ["employee", "finance-approver"] });
-    const actor = await resolver(headers(`Bearer ${token}`));
+    const actor = await resolver(headers(`Bearer ${token}`), noDb);
     expect(actor).toEqual({ id: "user_1", roles: ["employee", "finance-approver"] });
   });
 
   test("a missing Authorization header is rejected", async () => {
     const resolver = jwtResolver({ localSecret: SECRET });
-    await expectRejects(() => resolver(headers()));
+    await expectRejects(() => resolver(headers(), noDb));
   });
 
   test("a malformed bearer value is rejected", async () => {
     const resolver = jwtResolver({ localSecret: SECRET });
-    await expectRejects(() => resolver(headers("NotBearer abc")));
-    await expectRejects(() => resolver(headers("Bearer not-a-jwt")));
+    await expectRejects(() => resolver(headers("NotBearer abc"), noDb));
+    await expectRejects(() => resolver(headers("Bearer not-a-jwt"), noDb));
   });
 
   test("an expired token is rejected", async () => {
     const resolver = jwtResolver({ localSecret: SECRET });
     const token = await localToken({ expired: true });
-    await expectRejects(() => resolver(headers(`Bearer ${token}`)));
+    await expectRejects(() => resolver(headers(`Bearer ${token}`), noDb));
   });
 
   test("a wrongly-signed token is rejected", async () => {
     const resolver = jwtResolver({ localSecret: SECRET });
     const token = await localToken({ secret: "a-completely-different-secret-value" });
-    await expectRejects(() => resolver(headers(`Bearer ${token}`)));
+    await expectRejects(() => resolver(headers(`Bearer ${token}`), noDb));
   });
 
   test("an unknown issuer is rejected", async () => {
@@ -87,19 +96,19 @@ describe("local (bps) issuer", () => {
       .setSubject("user_1")
       .setExpirationTime("8h")
       .sign(new TextEncoder().encode(SECRET));
-    await expectRejects(() => resolver(headers(`Bearer ${token}`)));
+    await expectRejects(() => resolver(headers(`Bearer ${token}`), noDb));
   });
 
   test("iss: bps is rejected when no local secret is configured", async () => {
     const resolver = jwtResolver({});
     const token = await localToken();
-    await expectRejects(() => resolver(headers(`Bearer ${token}`)));
+    await expectRejects(() => resolver(headers(`Bearer ${token}`), noDb));
   });
 
   test("the configured roles claim populates Actor.roles", async () => {
     const resolver = jwtResolver({ localSecret: SECRET, localRolesClaim: "groups" });
     const token = await localToken({ rolesClaim: "groups", roles: ["employee"] });
-    const actor = await resolver(headers(`Bearer ${token}`));
+    const actor = await resolver(headers(`Bearer ${token}`), noDb);
     expect(actor.roles).toEqual(["employee"]);
   });
 
@@ -112,7 +121,7 @@ describe("local (bps) issuer", () => {
       .setExpirationTime("8h")
       .sign(key);
     const resolver = jwtResolver({ localSecret: SECRET });
-    const actor = await resolver(headers(`Bearer ${token}`));
+    const actor = await resolver(headers(`Bearer ${token}`), noDb);
     expect(actor.roles).toEqual([]);
   });
 });
@@ -149,7 +158,7 @@ describe("JWKS-backed external issuer", () => {
         .sign(privateKey);
 
       const resolver = jwtResolver({ issuers: [issuer] });
-      const actor = await resolver(headers(`Bearer ${token}`));
+      const actor = await resolver(headers(`Bearer ${token}`), noDb);
       expect(actor).toEqual({ id: "oid-abc-123", roles: ["employee"] });
     });
   });
@@ -165,7 +174,7 @@ describe("JWKS-backed external issuer", () => {
         .sign(privateKey);
 
       const resolver = jwtResolver({ issuers: [issuer] });
-      await expectRejects(() => resolver(headers(`Bearer ${token}`)));
+      await expectRejects(() => resolver(headers(`Bearer ${token}`), noDb));
     });
   });
 
@@ -174,7 +183,7 @@ describe("JWKS-backed external issuer", () => {
       const resolver = jwtResolver({ localSecret: SECRET, issuers: [issuer] });
 
       const localTok = await localToken({ roles: ["employee"] });
-      expect(await resolver(headers(`Bearer ${localTok}`))).toEqual({ id: "user_1", roles: ["employee"] });
+      expect(await resolver(headers(`Bearer ${localTok}`), noDb)).toEqual({ id: "user_1", roles: ["employee"] });
 
       const externalTok = await new SignJWT({ roles: ["finance-approver"] })
         .setProtectedHeader({ alg: "RS256" })
@@ -183,7 +192,7 @@ describe("JWKS-backed external issuer", () => {
         .setAudience(issuer.audience)
         .setExpirationTime("8h")
         .sign(privateKey);
-      expect(await resolver(headers(`Bearer ${externalTok}`))).toEqual({ id: "oid-xyz", roles: ["finance-approver"] });
+      expect(await resolver(headers(`Bearer ${externalTok}`), noDb)).toEqual({ id: "oid-xyz", roles: ["finance-approver"] });
     });
   });
 
@@ -202,7 +211,7 @@ describe("JWKS-backed external issuer", () => {
       // must resolve anyway: that issuer owns revocation, and this engine holds
       // no row for it.
       const resolver = jwtResolver({ issuers: [issuer], isActiveAccount });
-      expect(await resolver(headers(`Bearer ${token}`))).toEqual({ id: "oid-abc-123", roles: ["employee"] });
+      expect(await resolver(headers(`Bearer ${token}`), noDb)).toEqual({ id: "oid-abc-123", roles: ["employee"] });
       expect(seen).toEqual([]);
     });
   });
@@ -212,7 +221,7 @@ describe("the account directory behind a locally issued token", () => {
   test("a live account resolves to the Actor it always did", async () => {
     const { seen, isActiveAccount } = calls(true);
     const resolver = jwtResolver({ localSecret: SECRET, isActiveAccount });
-    const actor = await resolver(headers(`Bearer ${await localToken({ roles: ["employee"] })}`));
+    const actor = await resolver(headers(`Bearer ${await localToken({ roles: ["employee"] })}`), noDb);
     expect(actor).toEqual({ id: "user_1", roles: ["employee"] });
     expect(seen).toEqual(["user_1"]); // asked about the token's `sub`, once
   });
@@ -221,7 +230,7 @@ describe("the account directory behind a locally issued token", () => {
     const { seen, isActiveAccount } = calls(false);
     const resolver = jwtResolver({ localSecret: SECRET, isActiveAccount });
     const token = await localToken();
-    await expectRejects(() => resolver(headers(`Bearer ${token}`)));
+    await expectRejects(() => resolver(headers(`Bearer ${token}`), noDb));
     expect(seen).toEqual(["user_1"]);
   });
 
@@ -230,7 +239,7 @@ describe("the account directory behind a locally issued token", () => {
     // `roles` from that same row would make a grant reach a live session,
     // which `admin-user-management` requires it must not.
     const resolver = jwtResolver({ localSecret: SECRET, isActiveAccount: async () => true });
-    const actor = await resolver(headers(`Bearer ${await localToken({ roles: ["stale-role"] })}`));
+    const actor = await resolver(headers(`Bearer ${await localToken({ roles: ["stale-role"] })}`), noDb);
     expect(actor.roles).toEqual(["stale-role"]);
   });
 
@@ -238,7 +247,7 @@ describe("the account directory behind a locally issued token", () => {
     // The shape a unit test uses, and the shape any caller holding no database
     // uses. It must keep resolving exactly as it did before this change.
     const resolver = jwtResolver({ localSecret: SECRET });
-    expect(await resolver(headers(`Bearer ${await localToken({ roles: ["employee"] })}`))).toEqual({ id: "user_1", roles: ["employee"] });
+    expect(await resolver(headers(`Bearer ${await localToken({ roles: ["employee"] })}`), noDb)).toEqual({ id: "user_1", roles: ["employee"] });
   });
 
   test("an unverifiable token is rejected before the directory is consulted", async () => {
@@ -247,7 +256,7 @@ describe("the account directory behind a locally issued token", () => {
     const { seen, isActiveAccount } = calls(true);
     const resolver = jwtResolver({ localSecret: SECRET, isActiveAccount });
     const token = await localToken({ secret: "a-different-secret-at-least-32-bytes!!" });
-    await expectRejects(() => resolver(headers(`Bearer ${token}`)));
+    await expectRejects(() => resolver(headers(`Bearer ${token}`), noDb));
     expect(seen).toEqual([]);
   });
 });
