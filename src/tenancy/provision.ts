@@ -41,6 +41,36 @@ export interface ProvisionOptions {
 }
 
 /**
+ * `CREATE DATABASE` for the tenant, run against the server's own `postgres`
+ * database: a connection to the target cannot create the target.
+ *
+ * The name is interpolated rather than bound, because `CREATE DATABASE` takes
+ * no parameter. `provisionTenant` has already checked `key` against
+ * `KEY_PATTERN`, but the database NAME comes from the URL rather than the key,
+ * so it is checked here too — a caller reaching this function directly must not
+ * be able to smuggle SQL through a connection string.
+ *
+ * An existing database is left alone: `initSchema` runs next and is idempotent,
+ * which is what makes re-provisioning onto a prepared database work.
+ */
+const DB_NAME_PATTERN = /^[a-z_][a-z0-9_]*$/;
+
+async function createDatabaseFor(databaseUrl: string): Promise<void> {
+  const url = new URL(databaseUrl);
+  const name = url.pathname.replace(/^\//, "");
+  if (!DB_NAME_PATTERN.test(name)) {
+    throw new Error(`tenancy: '${name}' is not a valid database name (${DB_NAME_PATTERN.source})`);
+  }
+  const admin = new SQL(`${url.protocol}//${url.username}:${url.password}@${url.host}/postgres`);
+  try {
+    const existing = (await admin`SELECT 1 FROM pg_database WHERE datname = ${name}`) as unknown[];
+    if (existing.length === 0) await admin.unsafe(`CREATE DATABASE "${name}"`);
+  } finally {
+    await admin.end();
+  }
+}
+
+/**
  * Create a tenant's database, build its schema, and list it.
  *
  * The pre-read below is a courtesy that gives a clear message; the unique
@@ -51,7 +81,7 @@ export async function provisionTenant(control: SQL, opts: ProvisionOptions): Pro
   if (!KEY_PATTERN.test(opts.key)) throw new InvalidTenantKey(opts.key);
   if (await tenantByKey(opts.key, control)) throw new TenantKeyTaken(opts.key);
 
-  const createDatabase = opts.createDatabase ?? (async () => {});
+  const createDatabase = opts.createDatabase ?? createDatabaseFor;
   const connect = opts.connect ?? ((url: string) => new SQL(url));
   const buildSchema = opts.buildSchema ?? initSchema;
 

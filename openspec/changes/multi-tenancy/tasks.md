@@ -105,5 +105,5 @@
   variable UNSET. Report pass, skip and fail counts.
 - [x] 9.3 Run the antislop linter over every Markdown file this change touches.
 - [x] 9.4 Run `git diff --check` and `git ls-files --eol`.
-- [ ] 9.5 Browser check: log in against two tenants and confirm neither sees
+- [x] 9.5 Browser check: log in against two tenants and confirm neither sees
   the other's cases.

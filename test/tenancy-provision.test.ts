@@ -129,3 +129,26 @@ test.skipIf(!DB)("initSchema does not create tenants in a tenant database", asyn
   const source = await Bun.file("src/engine/store.ts").text();
   expect(source).not.toContain("CREATE TABLE IF NOT EXISTS tenants");
 });
+
+// `CREATE DATABASE` takes no bound parameter, so the name is interpolated. The
+// database NAME comes from the connection string rather than from `key`, which
+// `KEY_PATTERN` already checks, so it is checked on its own. These run against
+// the real `createDatabase` default — the check runs before any connection
+// opens, so no database is created and none is needed.
+for (const [label, url] of [
+  ["a quoted injection", "postgres://u:p@h:5432/x\"; DROP DATABASE cp; --"],
+  ["a hyphen", "postgres://u:p@h:5432/t-acme"],
+  ["a leading digit", "postgres://u:p@h:5432/1acme"],
+  ["an empty name", "postgres://u:p@h:5432/"],
+] as const) {
+  test.skipIf(!DB)(`provisioning refuses ${label} in the database name`, async () => {
+    let caught: unknown;
+    try {
+      await provisionTenant(sql, { key: "acme", name: "Acme", databaseUrl: url });
+    } catch (e) {
+      caught = e;
+    }
+    expect((caught as Error).message).toContain("is not a valid database name");
+    expect(await tenantByKey("acme", sql)).toBeUndefined();
+  });
+}
