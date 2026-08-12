@@ -1,21 +1,21 @@
 ## 1. The control plane
 
-- [ ] 1.1 Add `src/tenancy/store.ts` with the control-plane schema: `tenants`
+- [x] 1.1 Add `src/tenancy/store.ts` with the control-plane schema: `tenants`
   holding `id`, `key` (unique), `name`, `database_url`.
-- [ ] 1.2 Add `TENANT_CONTROL_PLANE_URL` reading, per call rather than at
+- [x] 1.2 Add `TENANT_CONTROL_PLANE_URL` reading, per call rather than at
   module load, the convention `readSmtpEnv` follows.
-- [ ] 1.3 Add `listTenants` and `tenantByKey` over that table.
-- [ ] 1.4 Add `src/tenancy/connections.ts`: a key-to-handle map opening a pool
+- [x] 1.3 Add `listTenants` and `tenantByKey` over that table.
+- [x] 1.4 Add `src/tenancy/connections.ts`: a key-to-handle map opening a pool
   lazily per tenant.
-- [ ] 1.5 Test the map: a key reaches its own database and no other.
+- [x] 1.5 Test the map: a key reaches its own database and no other.
 
 ## 2. Provisioning
 
-- [ ] 2.1 Add `src/tenancy/cli.ts`, mirroring `src/auth/cli.ts`'s shape.
-- [ ] 2.2 Provision in order: create the database, run `initSchema`, insert the
+- [x] 2.1 Add `src/tenancy/cli.ts`, mirroring `src/auth/cli.ts`'s shape.
+- [x] 2.2 Provision in order: create the database, run `initSchema`, insert the
   control-plane row last.
-- [ ] 2.3 Test that a fault before the row lands leaves nothing resolvable.
-- [ ] 2.4 Confirm `initSchema` never creates `tenants` in a tenant database.
+- [x] 2.3 Test that a fault before the row lands leaves nothing resolvable.
+- [x] 2.4 Confirm `initSchema` never creates `tenants` in a tenant database.
 
 ## 3. Thread the database through the route table
 
