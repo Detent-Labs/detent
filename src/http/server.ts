@@ -207,8 +207,23 @@ type Route = {
    * login route reads. TypeScript lets a closure declare fewer parameters, so
    * no other entry mentions it. The alternative — a special case for the login
    * path inside the request loop — puts one route's business in the router.
+   *
+   * `db` is the fourth, and the dispatcher resolves it per request: in SaaS
+   * mode from the caller's own tenant, otherwise the process handle. It follows
+   * `clientAddress`'s pattern, so a route needing no database declares three
+   * parameters.
+   *
+   * The enclosing parameter is named `processDb`, not `db`, on purpose. A
+   * closure that forgot to declare this one would otherwise capture the
+   * construction-time handle, compile, and read the wrong tenant in silence.
+   * With the names split, forgetting is a compile error.
    */
-  handler: (params: string[], req: Request, clientAddress: string | undefined) => Promise<HttpResult | HttpBinaryResult>;
+  handler: (
+    params: string[],
+    req: Request,
+    clientAddress: string | undefined,
+    db: SQL,
+  ) => Promise<HttpResult | HttpBinaryResult>;
 };
 
 /**
@@ -412,7 +427,7 @@ export function resolveAuthResolver(
 export function createServer(
   dataSourceRegistry: DataSourceRegistry,
   registry: Registry,
-  db: SQL = sql,
+  processDb: SQL = sql,
   resolver: ActorResolver,
   allowedOrigins: AllowedOrigins = undefined,
   loginSecret: string | undefined = undefined,
@@ -436,7 +451,7 @@ export function createServer(
     ...(secret === undefined
       ? []
       : [{ method: "POST", segments: seg("/auth/login"),
-           handler: (_p: string[], req: Request, clientAddress: string | undefined) => handleLogin(req, secret, db, clientAddress) } satisfies Route]),
+           handler: (_p: string[], req: Request, clientAddress: string | undefined, db: SQL) => handleLogin(req, secret, db, clientAddress) } satisfies Route]),
     // Resolves no actor and requires no role, the way `POST /auth/login` above
     // does: the login screen renders before a token exists, so its own wording
     // must be fetchable without one. It belongs in this table rather than
@@ -446,129 +461,129 @@ export function createServer(
     // preflight answer is derived from this table too, so a route outside it
     // gets none.
     { method: "GET", segments: seg("/ui-strings"),
-      handler: (_p, _req) => handleGetUiStrings(_req, db) },
+      handler: (_p, _req, _c, db) => handleGetUiStrings(_req, db) },
     { method: "POST", segments: seg("/processes/:processId/instances"),
-      handler: (p, req) => handleCreateInstance(p[0]!, req, resolver, dataSourceRegistry, db, assignmentRegistry) },
+      handler: (p, req, _c, db) => handleCreateInstance(p[0]!, req, resolver, dataSourceRegistry, db, assignmentRegistry) },
     { method: "GET", segments: seg("/instances"),
-      handler: (_p, req) => handleListInstances(req, resolver, db) },
+      handler: (_p, req, _c, db) => handleListInstances(req, resolver, db) },
     { method: "GET", segments: seg("/instances/:instanceId"),
-      handler: (p, req) => handleGetInstanceView(p[0]!, req, resolver, dataSourceRegistry, db) },
+      handler: (p, req, _c, db) => handleGetInstanceView(p[0]!, req, resolver, dataSourceRegistry, db) },
     { method: "POST", segments: seg("/instances/:instanceId/submit"),
-      handler: (p, req) => handleSubmit(p[0]!, req, resolver, dataSourceRegistry, db, assignmentRegistry) },
+      handler: (p, req, _c, db) => handleSubmit(p[0]!, req, resolver, dataSourceRegistry, db, assignmentRegistry) },
     { method: "POST", segments: seg("/instances/:instanceId/claim"),
-      handler: (p, req) => handleClaim(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleClaim(p[0]!, req, resolver, db) },
     { method: "POST", segments: seg("/instances/:instanceId/release"),
-      handler: (p, req) => handleRelease(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleRelease(p[0]!, req, resolver, db) },
     { method: "POST", segments: seg("/instances/:instanceId/delegate"),
-      handler: (p, req) => handleDelegate(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleDelegate(p[0]!, req, resolver, db) },
     { method: "GET", segments: seg("/instances/:instanceId/comments"),
-      handler: (p, req) => handleListComments(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleListComments(p[0]!, req, resolver, db) },
     { method: "POST", segments: seg("/instances/:instanceId/comments"),
-      handler: (p, req) => handlePostComment(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handlePostComment(p[0]!, req, resolver, db) },
     { method: "GET", segments: seg("/instances/:instanceId/attachments"),
-      handler: (p, req) => handleListAttachments(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleListAttachments(p[0]!, req, resolver, db) },
     { method: "POST", segments: seg("/instances/:instanceId/attachments"),
-      handler: (p, req) => handleUploadAttachment(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleUploadAttachment(p[0]!, req, resolver, db) },
     { method: "GET", segments: seg("/instances/:instanceId/attachments/:attachmentId"),
-      handler: (p, req) => handleGetAttachment(p[0]!, p[1]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleGetAttachment(p[0]!, p[1]!, req, resolver, db) },
     { method: "GET", segments: seg("/instances/:instanceId/record"),
-      handler: (p, req) => handleInstanceRecord(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleInstanceRecord(p[0]!, req, resolver, db) },
     { method: "POST", segments: seg("/instances/:instanceId/cancel"),
-      handler: (p, req) => handleCancel(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleCancel(p[0]!, req, resolver, db) },
     { method: "GET", segments: seg("/processes"),
-      handler: (_p, req) => handleListProcesses(req, resolver, db) },
+      handler: (_p, req, _c, db) => handleListProcesses(req, resolver, db) },
     { method: "POST", segments: seg("/processes"),
-      handler: (_p, req) => handlePublish(req, resolver, registry, dataSourceRegistry, db, assignmentRegistry) },
+      handler: (_p, req, _c, db) => handlePublish(req, resolver, registry, dataSourceRegistry, db, assignmentRegistry) },
     { method: "GET", segments: seg("/processes/:processId/versions"),
-      handler: (p, req) => handleListVersions(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleListVersions(p[0]!, req, resolver, db) },
     // Self-scoped: resolves an actor, checks no role, and takes no id. The
     // shell page that calls these sits at /profile, a path this table holds no
     // entry for, so a browser navigation there reaches the bundle rather than
     // an API answer.
     { method: "GET", segments: seg("/account/me"),
-      handler: (_p, req) => handleGetAccount(req, resolver, db) },
+      handler: (_p, req, _c, db) => handleGetAccount(req, resolver, db) },
     { method: "PATCH", segments: seg("/account/me"),
-      handler: (_p, req) => handlePatchAccount(req, resolver, db) },
+      handler: (_p, req, _c, db) => handlePatchAccount(req, resolver, db) },
     { method: "GET", segments: seg("/admin/outbox"),
-      handler: (_p, req) => handleAdminListOutbox(req, resolver, db) },
+      handler: (_p, req, _c, db) => handleAdminListOutbox(req, resolver, db) },
     { method: "POST", segments: seg("/admin/outbox/:idempotencyKey/retry"),
-      handler: (p, req) => handleAdminOutboxRetry(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleAdminOutboxRetry(p[0]!, req, resolver, db) },
     { method: "POST", segments: seg("/admin/outbox/:idempotencyKey/discard"),
-      handler: (p, req) => handleAdminOutboxDiscard(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleAdminOutboxDiscard(p[0]!, req, resolver, db) },
     { method: "GET", segments: seg("/admin/timers"),
-      handler: (_p, req) => handleAdminListTimers(req, resolver, db) },
+      handler: (_p, req, _c, db) => handleAdminListTimers(req, resolver, db) },
     { method: "GET", segments: seg("/admin/users"),
-      handler: (_p, req) => handleAdminListUsers(req, resolver, db) },
+      handler: (_p, req, _c, db) => handleAdminListUsers(req, resolver, db) },
     { method: "POST", segments: seg("/admin/users"),
-      handler: (_p, req) => handleAdminCreateUser(req, resolver, db) },
+      handler: (_p, req, _c, db) => handleAdminCreateUser(req, resolver, db) },
     { method: "POST", segments: seg("/admin/users/:userId/password"),
-      handler: (p, req) => handleAdminSetUserPassword(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleAdminSetUserPassword(p[0]!, req, resolver, db) },
     { method: "POST", segments: seg("/admin/users/:userId/disable"),
-      handler: (p, req) => handleAdminDisableUser(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleAdminDisableUser(p[0]!, req, resolver, db) },
     { method: "POST", segments: seg("/admin/users/:userId/enable"),
-      handler: (p, req) => handleAdminEnableUser(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleAdminEnableUser(p[0]!, req, resolver, db) },
     { method: "PATCH", segments: seg("/admin/users/:userId/roles"),
-      handler: (p, req) => handleAdminSetUserRoles(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleAdminSetUserRoles(p[0]!, req, resolver, db) },
     { method: "PATCH", segments: seg("/admin/users/:userId/manager"),
-      handler: (p, req) => handleAdminSetUserManager(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleAdminSetUserManager(p[0]!, req, resolver, db) },
     { method: "PATCH", segments: seg("/admin/users/:userId/name"),
-      handler: (p, req) => handleAdminSetUserName(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleAdminSetUserName(p[0]!, req, resolver, db) },
     { method: "POST", segments: seg("/admin/migrations/run"),
-      handler: (_p, req) => handleAdminRunMigration(req, resolver, db) },
+      handler: (_p, req, _c, db) => handleAdminRunMigration(req, resolver, db) },
     { method: "POST", segments: seg("/admin/instances/:instanceId/redact"),
-      handler: (p, req) => handleAdminRedactInstance(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleAdminRedactInstance(p[0]!, req, resolver, db) },
     { method: "GET", segments: seg("/admin/data-lists"),
-      handler: (_p, req) => handleAdminListDataLists(req, resolver, db) },
+      handler: (_p, req, _c, db) => handleAdminListDataLists(req, resolver, db) },
     { method: "POST", segments: seg("/admin/data-lists"),
-      handler: (_p, req) => handleAdminCreateDataList(req, resolver, db) },
+      handler: (_p, req, _c, db) => handleAdminCreateDataList(req, resolver, db) },
     { method: "PUT", segments: seg("/admin/data-lists/:listKey/values"),
-      handler: (p, req) => handleAdminPutDataListValues(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleAdminPutDataListValues(p[0]!, req, resolver, db) },
     { method: "GET", segments: seg("/admin/data-lists/:listKey"),
-      handler: (p, req) => handleAdminGetDataList(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleAdminGetDataList(p[0]!, req, resolver, db) },
     { method: "PUT", segments: seg("/admin/data-lists/:listKey"),
-      handler: (p, req) => handleAdminUpdateDataList(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleAdminUpdateDataList(p[0]!, req, resolver, db) },
     { method: "DELETE", segments: seg("/admin/data-lists/:listKey"),
-      handler: (p, req) => handleAdminDeleteDataList(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleAdminDeleteDataList(p[0]!, req, resolver, db) },
     { method: "GET", segments: seg("/admin/ui-strings"),
-      handler: (_p, req) => handleAdminListUiStrings(req, resolver, db) },
+      handler: (_p, req, _c, db) => handleAdminListUiStrings(req, resolver, db) },
     { method: "PUT", segments: seg("/admin/ui-strings"),
-      handler: (_p, req) => handleAdminPutUiString(req, resolver, db) },
+      handler: (_p, req, _c, db) => handleAdminPutUiString(req, resolver, db) },
     { method: "GET", segments: seg("/reporting/processes"),
-      handler: (_p, req) => handleReportingListProcesses(req, resolver, db) },
+      handler: (_p, req, _c, db) => handleReportingListProcesses(req, resolver, db) },
     { method: "GET", segments: seg("/reporting/:processId/cycle-time"),
-      handler: (p, req) => handleReportingCycleTime(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleReportingCycleTime(p[0]!, req, resolver, db) },
     { method: "GET", segments: seg("/reporting/:processId/bottleneck"),
-      handler: (p, req) => handleReportingBottleneck(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleReportingBottleneck(p[0]!, req, resolver, db) },
     { method: "GET", segments: seg("/reporting/:processId/sla"),
-      handler: (p, req) => handleReportingSla(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleReportingSla(p[0]!, req, resolver, db) },
     { method: "GET", segments: seg("/drafts"),
-      handler: (_p, req) => handleListDrafts(req, resolver, db) },
+      handler: (_p, req, _c, db) => handleListDrafts(req, resolver, db) },
     { method: "GET", segments: seg("/drafts/:processId"),
-      handler: (p, req) => handleGetDraft(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleGetDraft(p[0]!, req, resolver, db) },
     { method: "PUT", segments: seg("/drafts/:processId"),
-      handler: (p, req) => handleSaveDraft(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleSaveDraft(p[0]!, req, resolver, db) },
     { method: "DELETE", segments: seg("/drafts/:processId"),
-      handler: (p, req) => handleDeleteDraft(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleDeleteDraft(p[0]!, req, resolver, db) },
     { method: "POST", segments: seg("/drafts/:processId/publish"),
-      handler: (p, req) => handlePublishDraft(p[0]!, req, resolver, registry, dataSourceRegistry, db, assignmentRegistry) },
+      handler: (p, req, _c, db) => handlePublishDraft(p[0]!, req, resolver, registry, dataSourceRegistry, db, assignmentRegistry) },
     { method: "GET", segments: seg("/processes/:processId/versions/:version/orphan-keys"),
-      handler: (p, req) => handleGetOrphanKeys(p[0]!, p[1]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleGetOrphanKeys(p[0]!, p[1]!, req, resolver, db) },
     { method: "GET", segments: seg("/processes/:processId/versions/:version"),
-      handler: (p, req) => handleGetVersionBody(p[0]!, p[1]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleGetVersionBody(p[0]!, p[1]!, req, resolver, db) },
     { method: "GET", segments: seg("/migration-plans/:processId/:fromVersion/:toVersion"),
-      handler: (p, req) => handleGetMigrationPlan(p[0]!, p[1]!, p[2]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleGetMigrationPlan(p[0]!, p[1]!, p[2]!, req, resolver, db) },
     { method: "PUT", segments: seg("/migration-plans/:processId/:fromVersion/:toVersion"),
-      handler: (p, req) => handlePutMigrationPlan(p[0]!, p[1]!, p[2]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handlePutMigrationPlan(p[0]!, p[1]!, p[2]!, req, resolver, db) },
     { method: "GET", segments: seg("/registry"),
       handler: (_p, req) => handleGetRegistry(req, resolver, registry, dataSourceRegistry, assignmentRegistry) },
     { method: "GET", segments: seg("/templates"),
-      handler: (_p, req) => handleListTemplates(req, resolver, db) },
+      handler: (_p, req, _c, db) => handleListTemplates(req, resolver, db) },
     { method: "GET", segments: seg("/templates/:templateKey"),
-      handler: (p, req) => handleGetTemplate(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleGetTemplate(p[0]!, req, resolver, db) },
     { method: "PUT", segments: seg("/templates/:templateKey"),
-      handler: (p, req) => handleSaveTemplate(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleSaveTemplate(p[0]!, req, resolver, db) },
     { method: "DELETE", segments: seg("/templates/:templateKey"),
-      handler: (p, req) => handleDeleteTemplate(p[0]!, req, resolver, db) },
+      handler: (p, req, _c, db) => handleDeleteTemplate(p[0]!, req, resolver, db) },
   ];
 
   // `server` is Bun's second fetch-handler argument, and it is optional because
@@ -601,7 +616,7 @@ export function createServer(
       return toResponse(await handleLivez(), undefined, null);
     }
     if (req.method === "GET" && parts.length === 1 && parts[0] === "readyz") {
-      return toResponse(await handleReadyz(db), undefined, null);
+      return toResponse(await handleReadyz(processDb), undefined, null);
     }
     // GET /metrics: registered only when METRICS_TOKEN holds a value, so a
     // default deployment exposes nothing. Unset follows CORS_ALLOWED_ORIGINS,
@@ -615,7 +630,7 @@ export function createServer(
       if (!bearerTokenMatches(req.headers.get("Authorization"), metricsToken)) {
         return toResponse({ status: 401, body: { error: { type: "actor-resolution", message: "GET /metrics requires a bearer token equal to METRICS_TOKEN" } } }, undefined, null);
       }
-      return toBinaryResponse(await handleMetrics(db), undefined, null);
+      return toBinaryResponse(await handleMetrics(processDb), undefined, null);
     }
 
     // The CORS preflight derives from the table: an OPTIONS request matches
@@ -632,7 +647,7 @@ export function createServer(
       if (route.method !== req.method) continue;
       const params = match(route.segments, parts);
       if (params === null) continue;
-      const result = await route.handler(params, req, clientAddressOf(req, server, trustProxy));
+      const result = await route.handler(params, req, clientAddressOf(req, server, trustProxy), processDb);
       // A successful attachment download is `HttpBinaryResult`, not a JSON
       // envelope. One check at this single exit covers that route and any
       // later one. See errors.ts, the `HttpBinaryResult` doc comment.

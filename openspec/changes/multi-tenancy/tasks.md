@@ -19,13 +19,13 @@
 
 ## 3. Thread the database through the route table
 
-- [ ] 3.1 Add a fourth `db` parameter to `Route.handler` in
+- [x] 3.1 Add a fourth `db` parameter to `Route.handler` in
   `src/http/server.ts`, documented beside the `clientAddress` note.
-- [ ] 3.1a Confirm `createServer`'s own signature does not change, so the
+- [x] 3.1a Confirm `createServer`'s own signature does not change, so the
   fifteen test files calling it stay untouched.
-- [ ] 3.2 Change every handler closure to declare `db` rather than capture it.
-- [ ] 3.3 Supply the resolved handle at the dispatch site.
-- [ ] 3.4 Confirm the suite stays green with SaaS mode off after this task.
+- [x] 3.2 Change every handler closure to declare `db` rather than capture it.
+- [x] 3.3 Supply the resolved handle at the dispatch site.
+- [x] 3.4 Confirm the suite stays green with SaaS mode off after this task.
 
 ## 4. Unbind the plugins
 
