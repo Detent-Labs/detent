@@ -341,7 +341,7 @@ test.skipIf(!DB)("publish rejects an http.request action with method GET and a b
 
 test.skipIf(!DB)("publish rejects a notification.email action with a malformed recipient", async () => {
   const mailReg = createRegistry();
-  register(mailReg, NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef);
+  register(mailReg, NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef());
   const err = await publishRegistryFails(
     bodyWithActionType(NOTIFICATION_EMAIL_ACTION_TYPE, { to: ["not-an-address"], subject: "s", body: "b" }),
     mailReg,

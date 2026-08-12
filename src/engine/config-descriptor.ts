@@ -101,14 +101,33 @@ function describeNumber(schema: z.ZodNumber): LeafDescriptor | undefined {
   return descriptor;
 }
 
+/**
+ * An array over a fixed value set stays `kind: "string-array"` and carries its
+ * values in `enumValues`, the field the scalar `enum` kind already uses. A
+ * separate `enum-array` kind would need a new branch in every consumer of
+ * `ConfigFieldKind`, and the browser's mirror type already declares
+ * `enumValues`. The generated form renders such a property as one checkbox per
+ * value instead of the free-text control an open-ended array gets.
+ *
+ * Without this branch a `z.array(z.enum([...]))` property leaves the supported
+ * subset, which drops the descriptor for its WHOLE type — every sibling
+ * property falls back to the raw JSON textarea with it.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function describeStringArray(schema: z.ZodArray<any>): LeafDescriptor | undefined {
   const element = schema.element as z.ZodTypeAny;
-  if (nodeType(element) !== "string") return undefined;
-  const elementDescriptor = describeString(element as z.ZodString);
-  if (!elementDescriptor) return undefined;
   const descriptor: LeafDescriptor = { kind: "string-array" };
-  if (elementDescriptor.format) descriptor.format = elementDescriptor.format;
+  if (element instanceof z.ZodEnum) {
+    // v4's `.options` may carry numbers; the generated form renders strings.
+    const values = element.options;
+    if (!values.every((v): v is string => typeof v === "string")) return undefined;
+    descriptor.enumValues = [...values];
+  } else {
+    if (nodeType(element) !== "string") return undefined;
+    const elementDescriptor = describeString(element as z.ZodString);
+    if (!elementDescriptor) return undefined;
+    if (elementDescriptor.format) descriptor.format = elementDescriptor.format;
+  }
   // An array's own length bounds sit in `checks`, as `min_length`/`max_length`.
   // v3 carried them on the def as `minLength`/`maxLength` objects instead.
   for (const check of checkDefs(schema)) {

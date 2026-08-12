@@ -27,6 +27,7 @@ import {
   SPAWN_ACTION_TYPE,
   RETURN_ACTION_TYPE,
   createDefaultAssignmentRegistry,
+  outboxActorsOf,
   resolveStepAssignment,
   type AssignmentRegistry,
 } from "./registry.js";
@@ -394,8 +395,12 @@ export async function applyStepEntry(tx: SQL, plan: StepEntryPlan, extraFields?:
     // entryVersion when it enqueues a relocation's onEntry actions, so a row
     // enqueued by that commit is already stamped with the target version rather
     // than needing a separate bump.
-    await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, field_version)
-      VALUES (${row.idempotencyKey}, ${row.instanceId}, ${row.transitionSeq}, ${row.actionId}, ${row.action}, ${entry.version})`;
+    // actors: read off `next`, the instance this commit is writing. All three
+    // trigger positions (onExit, onPath, onEntry) therefore carry the ENTERED
+    // step's candidates, not the left step's — one stamp per commit, stated in
+    // the notification-email spec so an author reads one rule rather than two.
+    await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, field_version, actors)
+      VALUES (${row.idempotencyKey}, ${row.instanceId}, ${row.transitionSeq}, ${row.actionId}, ${row.action}, ${entry.version}, ${outboxActorsOf(next)})`;
   }
   return next;
 }
@@ -876,8 +881,8 @@ export async function fireTimer(
     // Behind the guard, so a redundant fire records no second event.
     await appendInstanceEvent(tx, fired);
     for (const a of timer.onFire.actions ?? []) {
-      await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, event_id, field_version)
-        VALUES (${idempotencyKey(instance.instanceId, instance.transitionSeq, a.id)}, ${instance.instanceId}, ${instance.transitionSeq}, ${a.id}, ${a}, ${fired.id}, ${instance.version})`;
+      await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, event_id, field_version, actors)
+        VALUES (${idempotencyKey(instance.instanceId, instance.transitionSeq, a.id)}, ${instance.instanceId}, ${instance.transitionSeq}, ${a.id}, ${a}, ${fired.id}, ${instance.version}, ${outboxActorsOf(instance)})`;
     }
   });
   return instance;

@@ -440,3 +440,35 @@ words, not as an empty list.
 A `bun:test` assertion covers the scope, the tone mapping and the route
 already. It cannot see a stamp whose tone reads as a defect where a cancelled
 case belongs. It cannot see a nav entry that wraps.
+
+### The notification.email recipient picker
+
+Log in as a developer and open a draft in the studio. Select a step, then add
+an `onEntry` action and pick `notification.email` in the type control.
+
+Pass: the config shows a generated form, not the raw JSON text area. That is
+the whole point of the check. The `toActors` property is an array over three
+fixed words. A property the descriptor cannot express drops the generated form
+for `subject` and `body` along with it.
+
+Pass: `toActors` shows one checkbox per word, for `candidate`, `claimant` and
+`starter`. `to` keeps its free-text control.
+
+Tick two boxes, then switch to the JSON view. Pass: the config reads
+`"toActors": ["candidate", "claimant"]`, in that order whichever box you
+ticked first. Switch back. Pass: the same two boxes still carry a tick.
+
+Type an unknown word into `toActors` through the raw JSON path, then leave the
+field. Pass: the form states which words it allows.
+
+Open a step carrying an action from before this shipped, with `to` alone. Pass:
+it loads with its addresses intact and no box ticked.
+
+Clear `to` and untick every box, then publish. Publishing needs
+`system:publish`, which the developer account does not hold, so switch to the
+superuser account for this step. Pass: publish refuses and names that action by
+its position, as `steps[6].onEntry[1].config.to`.
+
+A `bun:test` assertion covers the descriptor and the schema already. It cannot
+see a checkbox group that renders as a bare fieldset border. Nor can it see a
+generated form that quietly reverted to a text area.

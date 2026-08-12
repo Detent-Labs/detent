@@ -1006,3 +1006,132 @@ test.skipIf(!DB)("a row enqueued by an account disabled before the worker runs s
   const r = await rows(inst.instanceId);
   expect(r.every((x) => x.status === "delivered" && x.delivered_at !== null)).toBe(true);
 });
+
+// --- the frozen actor stamp -------------------------------------------------
+
+// step_a (assigned, onExit x1) --path_ab--> step_b (assigned, onEntry e1,
+// reminder timer). The stamp is read off the instance the commit WRITES, so
+// both actions carry step_b's candidates, not step_a's.
+const assignedBody = (): ProcessBody =>
+  ({
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task",
+          assignment: { strategy: { type: "static", config: { candidates: ["user_first"] } } },
+          onExit: [act("x1")],
+          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task",
+          assignment: { strategy: { type: "static", config: { candidates: ["user_second", "user_third"] } } },
+          onEntry: [act("e1")], timers: [reminder],
+          paths: [{ id: "path_bd", key: "bd", to: "step_done", trigger: "manual" }] },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+// An initial SUBPROCESS step: creation itself enqueues the spawn, so its stamp
+// comes from `createInstance` rather than from any transition. The child is
+// never spawned here — only the outbox row this creation wrote is read.
+const subprocessInitialBody = (): ProcessBody =>
+  ({
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_sub",
+      steps: [
+        { id: "step_sub", key: "sub", label: { en: "Sub" }, type: "subprocess",
+          subprocess: { processId: "proc_child", versionBinding: "pinned", pinnedVersion: 1, inputMapping: {}, outputMapping: {} },
+          paths: [{ id: "path_sd", key: "sd", to: "step_done", trigger: "manual" }] },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+type Stamp = { candidates: string[]; claimant?: string; starter?: string };
+const stamps = async (id: string): Promise<Record<string, Stamp | null>> => {
+  const r = (await sql`SELECT action_id, actors FROM outbox WHERE instance_id = ${id}`) as
+    { action_id: string; actors: unknown }[];
+  return Object.fromEntries(
+    r.map((row) => [row.action_id, (typeof row.actors === "string" ? JSON.parse(row.actors) : row.actors) as Stamp | null]),
+  );
+};
+
+test.skipIf(!DB)("a row enqueued at instance creation carries the actor ids", async () => {
+  // The subprocess-spawn enqueue: an initial subprocess step. Its stamp comes
+  // from the instance creation itself, before any transition exists.
+  const body = subprocessInitialBody();
+  const inst = await createInstance(body, {
+    processId: "proc_1" as Instance["processId"],
+    version: 1,
+    startedBy: "user_starter",
+    assignment: { candidates: ["user_initial"], claimedBy: undefined, claimedAt: undefined },
+  });
+  const s = await stamps(inst.instanceId);
+  const spawn = Object.values(s)[0]!;
+  expect(spawn).toEqual({ candidates: ["user_initial"], starter: "user_starter" });
+});
+
+test.skipIf(!DB)("a row enqueued by a transition carries the entered step's actor ids", async () => {
+  const body = assignedBody();
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+  const s = await stamps(inst.instanceId);
+  // Both the onExit and the onEntry action commit together, so both carry the
+  // one stamp this commit wrote: step_b's resolved candidates.
+  expect(s["action_x1"]).toEqual({ candidates: ["user_second", "user_third"] });
+  expect(s["action_e1"]).toEqual({ candidates: ["user_second", "user_third"] });
+});
+
+test.skipIf(!DB)("a row enqueued by a timer fire carries the actor ids", async () => {
+  const body = assignedBody();
+  const inst = await createFrom(body);
+  const atB = await executeManualTransition(inst, "path_ab", body, actor);
+  await sql`TRUNCATE outbox`; // isolate the fire's own row from the transition's two
+  await fireTimer(atB, "timer_r1", body);
+  const s = await stamps(inst.instanceId);
+  expect(Object.values(s)[0]).toEqual({ candidates: ["user_second", "user_third"] });
+});
+
+test.skipIf(!DB)("a later assignment change leaves an enqueued row alone", async () => {
+  // The property the whole column exists for: delivery must see the actors of
+  // the commit that enqueued the action, not of whatever step the instance has
+  // since reached.
+  const body = assignedBody();
+  const inst = await createFrom(body);
+  const atB = await executeManualTransition(inst, "path_ab", body, actor);
+  await executeManualTransition(atB, "path_bd", body, actor); // step_done declares no assignment
+  const s = await stamps(inst.instanceId);
+  expect(s["action_e1"]).toEqual({ candidates: ["user_second", "user_third"] });
+});
+
+test.skipIf(!DB)("delivery hands the stamped ids to the handler", async () => {
+  const body = assignedBody();
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  const seen: (Stamp | undefined)[] = [];
+  const spyReg = createRegistry();
+  register(spyReg, "x1", { handler: async (ctx) => { seen.push(ctx.actors as Stamp | undefined); return {}; } });
+  register(spyReg, "e1", { handler: async (ctx) => { seen.push(ctx.actors as Stamp | undefined); return {}; } });
+  expect(await drainOutbox(sql, spyReg)).toBe(2);
+  expect(seen).toEqual([
+    { candidates: ["user_second", "user_third"] },
+    { candidates: ["user_second", "user_third"] },
+  ]);
+});
+
+test.skipIf(!DB)("a row predating the stamp still delivers, with no actor ids", async () => {
+  const body = threeActionBody();
+  const inst = await create();
+  await executeManualTransition(inst, "path_ab", body, actor);
+  await sql`UPDATE outbox SET actors = NULL WHERE instance_id = ${inst.instanceId}`;
+
+  let saw: unknown = "unset";
+  const spyReg = createRegistry();
+  for (const t of ["e1", "p1", "x1"]) register(spyReg, t, { handler: async (ctx) => { saw = ctx.actors; return {}; } });
+  expect(await drainOutbox(sql, spyReg)).toBe(3);
+  expect(saw).toBeUndefined();
+});

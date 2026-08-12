@@ -42,8 +42,51 @@ function validateField(descriptor: ConfigFieldDescriptor, value: unknown): strin
     if (descriptor.minItems !== undefined && value.length < descriptor.minItems) return `at least ${descriptor.minItems} item(s)`;
     if (descriptor.maxItems !== undefined && value.length > descriptor.maxItems) return `at most ${descriptor.maxItems} item(s)`;
     if (descriptor.format === "email" && value.some((v) => typeof v === "string" && !EMAIL_RE.test(v))) return "invalid email";
+    // The checkbox group below cannot produce a value outside the set, but the
+    // raw JSON path can, and an author switches between the two freely.
+    if (descriptor.enumValues && value.some((v) => !descriptor.enumValues!.includes(v as string))) {
+      return `allowed: ${descriptor.enumValues.join(", ")}`;
+    }
   }
   return undefined;
+}
+
+/**
+ * An array over a fixed value set (`enumValues`), rendered as a checkbox group.
+ * The open-ended array control below is one textarea of newline-separated
+ * values, so it has no rows to put a picker in — the whole control gives way.
+ *
+ * A `<fieldset>`/`<legend>` wraps it rather than the `<label>` every other kind
+ * uses: one label cannot name several controls.
+ */
+function EnumArrayField({
+  descriptor,
+  value,
+  onChange,
+}: {
+  descriptor: ConfigFieldDescriptor;
+  value: unknown;
+  onChange: (next: unknown) => void;
+}) {
+  const options = descriptor.enumValues ?? [];
+  const selected = Array.isArray(value) ? (value as string[]) : [];
+  const error = validateField(descriptor, value);
+  // Committed order follows `enumValues`, never click order, so two authors
+  // ticking the same boxes produce the same config and the same definitionHash.
+  const toggle = (option: string, on: boolean) =>
+    onChange(options.filter((o) => (o === option ? on : selected.includes(o))));
+  return (
+    <fieldset className="plugin-field">
+      <legend>{descriptor.key}</legend>
+      {options.map((option) => (
+        <label key={option} className="plugin-field-option">
+          <input type="checkbox" checked={selected.includes(option)} onChange={(e) => toggle(option, e.target.checked)} />
+          {option}
+        </label>
+      ))}
+      {error && <span className="error">{error}</span>}
+    </fieldset>
+  );
 }
 
 function GeneratedField({
@@ -55,6 +98,9 @@ function GeneratedField({
   value: unknown;
   onChange: (next: unknown) => void;
 }) {
+  if (descriptor.kind === "string-array" && descriptor.enumValues) {
+    return <EnumArrayField descriptor={descriptor} value={value} onChange={onChange} />;
+  }
   const error = validateField(descriptor, value);
   return (
     <label className="plugin-field">

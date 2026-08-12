@@ -1,18 +1,34 @@
 /**
  * Vendor-neutral `notification.email` action handler: sends one plain-text
- * message over SMTP. `config` is static, publish-validated JSON — no instance
- * `data`, no DB lookup — exactly like `http.request`, whose file layout this
- * mirrors. Recipients are a literal address list, so this reaches a team or
- * manager mailbox, never the actor a step is assigned to.
+ * message over SMTP. Subject and body are static, publish-validated JSON — no
+ * instance `data`, no lookup of the instance — exactly like `http.request`,
+ * whose file layout this mirrors.
+ *
+ * Recipients are the one part this resolves rather than copies. `to` carries
+ * literal addresses. `toActors` names roles — `candidate`, `claimant`,
+ * `starter` — which map onto the actor ids the engine froze onto the outbox row
+ * at enqueue (`HandlerContext.actors`), and which this turns into addresses via
+ * `auth_users`. That reaches the actor holding a step, which a literal list
+ * cannot.
+ *
+ * The db-injectable factory below follows `assignment-strategies.ts`'s
+ * `managerOfStarterStrategyDef`, the shipped precedent for a plugin that reads
+ * the database. No new module is needed for it: that file exists only because
+ * `registry.ts` is a leaf three modules default a parameter to, and this file
+ * is no such leaf.
  *
  * Connection details come from the environment, never from the process body,
  * following the DATABASE_URL / AUTH_JWT_SECRET convention.
  */
 
+import { SQL } from "bun";
 import { z } from "zod";
-import { PermanentError } from "../engine/outbox.js";
+import { emailsForUserIds } from "../auth/users.js";
 import { durationMs } from "../engine/duration.js";
-import type { HandlerContext, HandlerDef } from "../engine/registry.js";
+import { PermanentError } from "../engine/outbox.js";
+import { sql } from "../engine/store.js";
+import type { HandlerContext, HandlerDef, OutboxActors } from "../engine/registry.js";
+import { log } from "../log.js";
 
 export const NOTIFICATION_EMAIL_ACTION_TYPE = "notification.email";
 
@@ -25,11 +41,28 @@ export const NOTIFICATION_EMAIL_ACTION_TYPE = "notification.email";
  */
 export const SMTP_DEFAULT_TIMEOUT_MS = 5_000;
 
-export const notificationEmailConfigSchema = z.object({
-  to: z.array(z.string().email()).min(1),
-  subject: z.string(),
-  body: z.string(),
-});
+/** The three roles `toActors` may name, each mapping onto state the instance already carries. */
+export const NOTIFICATION_ACTOR_TOKENS = ["candidate", "claimant", "starter"] as const;
+
+export type NotificationActorToken = (typeof NOTIFICATION_ACTOR_TOKENS)[number];
+
+/**
+ * `to` no longer carries `.min(1)`: an action may name its recipients by role
+ * alone. The object-level rule below replaces that bound and covers the case
+ * `.min(1)` could not — both lists empty. It runs at publish through
+ * `checkActionRegistry`, like every other config rule here.
+ */
+export const notificationEmailConfigSchema = z
+  .object({
+    to: z.array(z.string().email()).default([]),
+    toActors: z.array(z.enum(NOTIFICATION_ACTOR_TOKENS)).default([]),
+    subject: z.string(),
+    body: z.string(),
+  })
+  .refine((c) => c.to.length + c.toActors.length > 0, {
+    message: "notification.email: name at least one recipient in `to` or `toActors`",
+    path: ["to"],
+  });
 
 /**
  * The `result` namespace an Action.output mapping reads. A stable shape matters
@@ -201,12 +234,13 @@ function encodeBody(body: string): string {
 
 function buildMessage(
   config: z.infer<typeof notificationEmailConfigSchema>,
+  recipients: string[],
   env: SmtpEnv,
   messageId: string,
 ): string {
   const headers = [
     `From: ${env.from}`,
-    `To: ${config.to.join(", ")}`,
+    `To: ${recipients.join(", ")}`,
     `Subject: ${encodeSubject(config.subject)}`,
     `Message-ID: ${messageId}`,
     `Date: ${new Date().toUTCString()}`,
@@ -230,6 +264,7 @@ function buildMessageId(idempotencyKey: string, from: string): string {
 async function runSession(
   wire: SmtpWire,
   config: z.infer<typeof notificationEmailConfigSchema>,
+  recipients: string[],
   env: SmtpEnv,
   idempotencyKey: string,
   phase: { current: string },
@@ -279,7 +314,7 @@ async function runSession(
   // reporting the rest breaks under at-least-once: a 4xx rejection is
   // transient, the outbox retries the row, and every already-accepted address
   // receives the message twice. Aborting here means nothing was sent at all.
-  for (const address of config.to) {
+  for (const address of recipients) {
     phase.current = `RCPT TO ${address}`;
     wire.write(`RCPT TO:<${address}>\r\n`);
     requireOk(await wire.next(), `RCPT TO ${address}`);
@@ -292,10 +327,10 @@ async function runSession(
   const messageId = buildMessageId(idempotencyKey, env.from);
   // Built before the message goes out, so producing the result cannot raise
   // after the server has already accepted it.
-  const result: NotificationEmailResult = { messageId, recipients: [...config.to] };
+  const result: NotificationEmailResult = { messageId, recipients: [...recipients] };
 
   phase.current = "message body";
-  wire.write(`${buildMessage(config, env, messageId)}.\r\n`);
+  wire.write(`${buildMessage(config, recipients, env, messageId)}.\r\n`);
   requireOk(await wire.next(), "message body");
 
   // The 250 above is the point of no return. SMTP carries no idempotency
@@ -311,9 +346,73 @@ function clientName(from: string): string {
   return from.split("@")[1] ?? "localhost";
 }
 
-async function notificationEmailHandler(ctx: HandlerContext): Promise<NotificationEmailResult> {
+/**
+ * The actor ids a token names, in the order the message will list them.
+ * `candidate` yields every candidate: they are all eligible to do the work, so
+ * picking one would need a selection rule this engine does not have.
+ *
+ * ponytail: the candidate list is uncapped, so a strategy resolving hundreds of
+ * actors produces that many `RCPT TO` commands. Candidates come from a
+ * publish-validated strategy rather than from submitted input, and the two
+ * shipped strategies produce a configured list or one manager. Cap it here if a
+ * strategy ever resolves an unbounded directory group.
+ */
+function actorIdsFor(tokens: NotificationActorToken[], actors: OutboxActors | undefined): string[] {
+  const ids: string[] = [];
+  for (const token of tokens) {
+    if (token === "candidate") ids.push(...(actors?.candidates ?? []));
+    else if (token === "claimant" && actors?.claimant) ids.push(actors.claimant);
+    else if (token === "starter" && actors?.starter) ids.push(actors.starter);
+  }
+  return ids;
+}
+
+/**
+ * The addresses this delivery sends to: `to` verbatim first, then the addresses
+ * the tokens resolved, in candidate order. Each address appears once — an
+ * author naming a mailbox literally AND by role must not send it two copies.
+ *
+ * An id matching no account, or one whose account is disabled, contributes
+ * nothing. `emailsForUserIds` drops both, so the Map lookup below misses.
+ */
+async function resolveRecipients(
+  config: z.infer<typeof notificationEmailConfigSchema>,
+  actors: OutboxActors | undefined,
+  db: SQL,
+): Promise<string[]> {
+  const ids = actorIdsFor(config.toActors, actors);
+  const byId = await emailsForUserIds(ids, db);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const address of [...config.to, ...ids.map((id) => byId.get(id))]) {
+    if (address && !seen.has(address)) {
+      seen.add(address);
+      out.push(address);
+    }
+  }
+  return out;
+}
+
+async function notificationEmailHandler(ctx: HandlerContext, db: SQL): Promise<NotificationEmailResult> {
   const config = notificationEmailConfigSchema.parse(ctx.config);
   const env = readSmtpEnv();
+  const recipients = await resolveRecipients(config, ctx.actors, db);
+
+  // No recipient resolved: send nothing and succeed. A step that resolved to no
+  // candidate already records an `assignment.unresolved` event, so dead-lettering
+  // here would report that same fact a second time and park a row an operator
+  // then discards by hand. The warning keeps the condition visible without that
+  // chore. The Message-ID is still built, so `result` keeps its declared shape
+  // for an Action.output mapping.
+  if (recipients.length === 0) {
+    log.warn("notification.email resolved no recipient", {
+      instanceId: ctx.instanceId,
+      actionId: ctx.action.id,
+      idempotencyKey: ctx.idempotencyKey,
+    });
+    return { messageId: buildMessageId(ctx.idempotencyKey, env.from), recipients: [] };
+  }
+
   const wire = new SmtpWire();
 
   const timeoutMs = ctx.action.timeout ? durationMs(ctx.action.timeout) : SMTP_DEFAULT_TIMEOUT_MS;
@@ -330,14 +429,24 @@ async function notificationEmailHandler(ctx: HandlerContext): Promise<Notificati
   });
 
   try {
-    return await Promise.race([runSession(wire, config, env, ctx.idempotencyKey, phase), deadline]);
+    return await Promise.race([runSession(wire, config, recipients, env, ctx.idempotencyKey, phase), deadline]);
   } finally {
     clearTimeout(timeoutHandle);
     wire.close();
   }
 }
 
-export const notificationEmailHandlerDef: HandlerDef = {
-  handler: notificationEmailHandler,
-  configSchema: notificationEmailConfigSchema,
-};
+/**
+ * `db` defaults to the shared pool, the convention `src/auth/users.ts` follows,
+ * so a no-argument call still reaches a real database. A test injects its own.
+ *
+ * The binding happens once, when the registry is built. That is
+ * `managerOfStarterStrategyDef`'s property too, and stage 24 (one database per
+ * tenant) revisits both together — see this change's design doc.
+ */
+export function notificationEmailHandlerDef(db: SQL = sql): HandlerDef {
+  return {
+    handler: (ctx) => notificationEmailHandler(ctx, db),
+    configSchema: notificationEmailConfigSchema,
+  };
+}

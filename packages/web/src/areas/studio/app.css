@@ -1884,3 +1884,23 @@
   background: var(--color-surface);
   color: var(--color-text);
 }
+
+/* A generated plugin-config property over a fixed value set. Every other
+   property renders inside an unstyled <label>, so the <fieldset> a checkbox
+   group needs drops its default border and inset padding to match. */
+.plugin-field {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.plugin-field > legend {
+  padding: 0;
+}
+
+.plugin-field-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}

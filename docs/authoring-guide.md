@@ -207,6 +207,36 @@ An action can write its result back into the payload. The engine verifies the
 value against the target field's declared type first. A value of the wrong
 type never lands.
 
+#### Who a notification reaches
+
+`notification.email` names its recipients two ways, and you may use both at
+once.
+
+`to` holds literal addresses. It reaches a team or a manager mailbox, whoever
+holds the step.
+
+`toActors` holds roles rather than addresses. It takes three words:
+
+- `candidate` names every actor the step's assignment resolved to.
+- `claimant` names the actor holding the claim, if one holds it.
+- `starter` names the actor that started the case.
+
+The engine turns each into the address on that person's account. An account
+that carries no such person, or one an operator disabled, receives nothing.
+Every candidate receives the message: they are all eligible to do the work.
+
+Name at least one recipient across the two lists. An action naming none is a
+publish error.
+
+An action that resolves to no address at all sends nothing and counts as done.
+That happens when a step resolved to no candidate, which the case record
+already reports as an unresolved assignment. Fix the assignment, not the
+notification.
+
+The engine reads the actors as they stood when it queued the action. It does
+not read them as they stand when the message goes out. So a case that has moved
+on since still notifies the people the step named.
+
 The `http.request` type reaches only a host the deployment permits. That list
 lives in the deployment's own environment, not in your process. A target
 outside it never opens a connection, and the action dead-letters with the host

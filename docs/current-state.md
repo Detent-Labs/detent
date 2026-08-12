@@ -664,12 +664,30 @@ Stage-by-stage status is in `ROADMAP.md`.
   next to `httpHandlerDef`. No schema change — the five existing action
   positions already carry it, so "notify on assignment" is a step's `onEntry`
   and "notify on reminder" a timer's `onFire.actions`. Config is static and
-  publish-validated (`to`, one or more valid addresses; `subject`; plain-text
-  `body`), the same discipline `httpConfigSchema` set. **Recipients are literal
-  addresses, never resolved to the step's assignee**: that lookup needs
-  `auth_users.email` by actor id or role, and `HandlerContext` carries no `db`
-  by design (`deliver` runs outside any transaction), so it is a handler-seam
-  change, not a lookup — see roadmap #16 for what stays open.
+  publish-validated (`subject`; plain-text `body`; the two recipient lists
+  below), the same discipline `httpConfigSchema` set.
+
+  Recipients come two ways (roadmap #16b). `to` holds literal addresses.
+  `toActors` holds role tokens: `candidate`, `claimant`, `starter`. The three
+  map onto `assignment.candidates`, `assignment.claimedBy` and
+  `Instance.startedBy`. An object-level refinement demands at least one entry
+  across the two lists. It replaces `to`'s former `.min(1)`.
+
+  Through `emailsForUserIds` (`src/auth/users.ts`) the handler turns a token
+  into an address. That lookup drops an unknown id and a disabled account. The
+  def is therefore a factory, `notificationEmailHandlerDef(db = sql)`, the shape
+  `managerOfStarterStrategyDef` already uses. The pool arrives through
+  `createDefaultRegistry(db = sql)`. Every candidate gets the message, and
+  addresses deduplicate with `to` first. A delivery resolving none opens no
+  socket, returns `recipients: []`, succeeds, and logs one warning.
+
+  The actor ids reach the handler frozen, never read at delivery. The stamp
+  comes from `registry.ts::outboxActorsOf`. All three enqueue sites write it to
+  `outbox.actors`, a jsonb column holding `NULL` on every pre-existing row and
+  never backfilled. It rides on `ClaimedRow`, and `deliver` passes it as the
+  optional `HandlerContext.actors`. Freezing is what makes it correct. The
+  resolution worker cascades automatic steps without waiting for the outbox. A
+  delivery-time read of `instances` would name whoever holds a later step.
 
   Transport is a hand-written SMTP client on `Bun.connect` plus
   `socket.upgradeTLS` (STARTTLS on the submission port), with no new npm
@@ -2646,6 +2664,13 @@ Stage-by-stage status is in `ROADMAP.md`.
   `setManagerByEmail` is the CLI's email-keyed sibling, behind
   `bun run src/auth/cli.ts set-manager <email> <manager-email|->`, where `-`
   clears. `getManagerOf(userId, db)` is what the strategy reads.
+
+  `emailsForUserIds(userIds, db)` answers a set of ids with the address each
+  holds, as a Map. One round trip whatever the size of the set: a caller holds a
+  candidate list whose length it did not choose. An id matching no row is
+  absent, and so is a disabled account. A message nobody may act on looks
+  delivered and is not. The empty set short-circuits without a query.
+  `notification.email`'s `toActors` resolution reads it.
 
   `PATCH /admin/users/:id/manager` is the fifth `/admin/users*` route, body
   `{ managerUserId: string | null }`. It answers 400 for a self-pointer

@@ -262,7 +262,7 @@ long as the row is undelivered.
 
 #### Scenario: A row enqueued at instance creation is stamped
 
-- **WHEN** an instance is created and its initial step enqueues actions
+- **WHEN** a caller creates an instance whose initial step enqueues actions
 - **THEN** each enqueued row's `field_version` equals the instance's version
   at creation
 
@@ -339,3 +339,71 @@ the suite SHALL assert it end to end.
 
 - **WHEN** an `http.request` action targets a host the allowlist permits
 - **THEN** the row does not reach the dead-letter list on that account
+
+<!-- "is stamped" below keeps this header parallel with "Each outbox row is
+     stamped with the field-version it was enqueued under" above. The two
+     requirements describe the same mechanism over two columns, and a reader
+     finds them by that shared shape. -->
+<!-- antislop: allow passive-voice -->
+### Requirement: Each outbox row is stamped with the actor ids in force at enqueue
+
+Every `INSERT INTO outbox` SHALL stamp the new row with the actor ids the
+enqueuing instance holds at that moment. Three parts make up the stamp:
+
+- the assignment candidate list
+- the id holding the claim, when one holds it
+- the id that started the instance
+
+This applies to every enqueue site: instance creation's initial-step spawn, a
+transition's general step-entry enqueue, and a timer firing's enqueue. Each of
+the three already holds the instance it is committing. The stamp therefore
+reads state in hand rather than sending a query.
+
+The stamp SHALL be frozen. An assignment that later resolves differently SHALL
+NOT rewrite a row already on the queue. Delivery therefore sees the actors of the
+commit that enqueued the action. It does not see the actors of whatever step
+the instance has since reached.
+
+Freezing is what makes the value correct. The resolution worker drives
+automatic cascades without waiting for the outbox. An instance can therefore
+sit two steps on by the time a row drains. A delivery-time read would name the
+wrong actors in exactly that case.
+
+A row enqueued before this stamp existed SHALL carry no actor ids. Nothing
+backfills them. No published body could name an actor recipient before this
+stamp existed, so no such row has a consumer.
+
+#### Scenario: A row enqueued at instance creation carries the actor ids
+
+- **WHEN** a caller creates an instance whose initial step enqueues actions
+- **THEN** each enqueued row carries the instance's candidate list, claimant
+  and starter as of that creation
+
+#### Scenario: A row enqueued by a transition carries the actor ids
+
+- **WHEN** a transition commits and enqueues trigger actions
+- **THEN** each enqueued row carries the instance's candidate list, claimant
+  and starter as of that commit
+
+#### Scenario: A row enqueued by a timer fire carries the actor ids
+
+- **WHEN** a timer fires and enqueues its actions
+- **THEN** each enqueued row carries the instance's candidate list, claimant
+  and starter as of that fire
+
+#### Scenario: A later assignment update leaves an enqueued row alone
+
+- **WHEN** a commit enqueues a row for a step whose candidate list holds one
+  actor
+- **AND** the instance then transitions to a step resolving another candidate
+- **THEN** the pending row still carries the first candidate
+
+#### Scenario: Delivery hands the stamped ids to the handler
+
+- **WHEN** a worker claims and delivers a stamped row
+- **THEN** the handler receives the ids the row carries
+
+#### Scenario: A row predating the stamp still delivers
+
+- **WHEN** a worker claims and delivers a row from before the stamp existed
+- **THEN** the delivery proceeds, and the handler receives no actor ids

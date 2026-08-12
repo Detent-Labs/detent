@@ -14,7 +14,7 @@
 
 import type { SQL } from "bun";
 import { sql } from "./store.js";
-import { resolve, type Registry } from "./registry.js";
+import { resolve, type OutboxActors, type Registry } from "./registry.js";
 import { pollForever, logSkippedItem } from "./poll.js";
 import { durationMs } from "./duration.js";
 import { evalOutput } from "../cel/eval.js";
@@ -68,6 +68,12 @@ export type ClaimedRow = {
    * writeback predicate below.
    */
   field_version: number;
+  /**
+   * The actor ids the enqueuing commit held, frozen (see store.ts::initSchema).
+   * Null for a row enqueued before the column existed, and for one whose
+   * instance carried no assignment and no starter.
+   */
+  actors: OutboxActors | null;
 };
 
 /** A permanent (non-retryable) delivery failure — dead-letters without consuming retries. */
@@ -94,11 +100,16 @@ export const deliver: DeliverFn = async (row, registry) => {
     config: row.action.config,
     idempotencyKey: row.idempotency_key,
     instanceId: row.instance_id,
+    ...(row.actors ? { actors: row.actors } : {}),
   });
   return evalOutput(row.action.output, result);
 };
 
 const parseAction = (a: unknown): Action => (typeof a === "string" ? JSON.parse(a) : a) as Action;
+
+/** Same string-or-object treatment `parseAction` applies: a jsonb column reaches the driver either way. */
+const parseActors = (a: unknown): OutboxActors | null =>
+  a === null || a === undefined ? null : ((typeof a === "string" ? JSON.parse(a) : a) as OutboxActors);
 
 /** A promise that rejects after `ms` — raced against a delivery so a hung handler cannot hang the drain pass. */
 function rejectAfter(ms: number): { promise: Promise<never>; clear: () => void } {
@@ -189,7 +200,7 @@ export async function drainOutbox(
       FOR UPDATE SKIP LOCKED
       LIMIT 100
     )
-    RETURNING idempotency_key, instance_id, transition_seq, action, attempts, event_id, field_version`) as ClaimedRow[];
+    RETURNING idempotency_key, instance_id, transition_seq, action, attempts, event_id, field_version, actors`) as ClaimedRow[];
 
   let delivered = 0;
   for (const raw of claimed) {
@@ -200,7 +211,7 @@ export async function drainOutbox(
    // not itself mark the row — lease reclaim is the recovery, and a second write
    // here could race the aborted tx2.
    try {
-    const row: ClaimedRow = { ...raw, action: parseAction(raw.action) };
+    const row: ClaimedRow = { ...raw, action: parseAction(raw.action), actors: parseActors(raw.actors) };
     // The claim UPDATE already incremented this; row.attempts IS the
     // post-claim count, not one less than it.
     const attempts = row.attempts;

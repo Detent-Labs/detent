@@ -379,6 +379,25 @@ export async function updateAccount(
   return row ? toAccount(row) : undefined;
 }
 
+/**
+ * The email address each of `userIds` holds, keyed by `user_id`. One round trip
+ * whatever the size of the set: the caller holds a candidate list it did not
+ * choose the length of, and a per-id lookup would issue one query per candidate.
+ *
+ * A disabled account is left out, as is an id matching no row. A disabled
+ * account is one nobody may act under, so a message to it reaches nobody who can
+ * answer — worse than no address, since it looks delivered and is not.
+ *
+ * The empty set short-circuits without touching the database. Read by the
+ * `notification.email` handler's `toActors` resolution.
+ */
+export async function emailsForUserIds(userIds: string[], db: SQL = sql): Promise<Map<string, string>> {
+  if (userIds.length === 0) return new Map();
+  const rows = (await db`SELECT user_id, email FROM auth_users
+    WHERE user_id = ANY(${db.array(userIds, "TEXT")}) AND disabled = false`) as { user_id: string; email: string }[];
+  return new Map(rows.map((r) => [r.user_id, r.email]));
+}
+
 async function userIdForEmail(email: string, db: SQL): Promise<string | undefined> {
   const rows = (await db`SELECT user_id FROM auth_users WHERE email = ${email}`) as { user_id: string }[];
   return rows[0]?.user_id;

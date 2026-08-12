@@ -20,7 +20,7 @@ import {
 import { definitionHash } from "../schema/hash.js";
 import { armStepTimers, minFireAt } from "./duration.js";
 import { idempotencyKey } from "./idempotency.js";
-import { SPAWN_ACTION_TYPE } from "./registry.js";
+import { SPAWN_ACTION_TYPE, outboxActorsOf } from "./registry.js";
 
 /**
  * Constructs the real client on first use, throwing an error naming
@@ -167,6 +167,16 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // history_entries/instance_events for the ActionOutcome that already carries it.
   // Cleared to NULL on a successful delivery. Idempotent add.
   await db`ALTER TABLE outbox ADD COLUMN IF NOT EXISTS last_error text`;
+  // The actor ids the enqueuing instance held at that moment: assignment
+  // candidates, the claimant, the starter. Frozen, and NOT rewritten when the
+  // instance's assignment later changes — a handler naming a recipient by role
+  // (notification.email's `toActors`) must see the actors of the commit that
+  // enqueued the action. The resolution worker cascades automatic steps without
+  // waiting for this queue, so a delivery-time read of `instances` would name
+  // whoever holds a step the instance reached afterwards. NULL on every row
+  // predating this column, and nothing backfills it: no body published before
+  // it could name an actor recipient. Idempotent add.
+  await db`ALTER TABLE outbox ADD COLUMN IF NOT EXISTS actors jsonb`;
   // Migration locks an instance's undelivered outbox rows before its instance row
   // (matching drainOutbox's own lock order); without this index that scan and lock
   // sequentially scan the whole table.
@@ -598,8 +608,8 @@ export async function createInstance(
     if (inserted.length === 0) return;
     await appendInstanceEvents(tx, events);
     if (spawn && spawnEvent) {
-      await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, event_id, field_version)
-        VALUES (${idempotencyKey(inst.instanceId, inst.transitionSeq, spawn.id)}, ${inst.instanceId}, ${inst.transitionSeq}, ${spawn.id}, ${spawn}, ${spawnEvent.id}, ${inst.version})`;
+      await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, event_id, field_version, actors)
+        VALUES (${idempotencyKey(inst.instanceId, inst.transitionSeq, spawn.id)}, ${inst.instanceId}, ${inst.transitionSeq}, ${spawn.id}, ${spawn}, ${spawnEvent.id}, ${inst.version}, ${outboxActorsOf(inst)})`;
     }
   });
   return inst;

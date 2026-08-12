@@ -21,6 +21,7 @@ import {
   setDisplayNameByEmail,
   getAccountById,
   updateAccount,
+  emailsForUserIds,
   SelfManagerError,
 } from "../src/auth/users.js";
 
@@ -471,4 +472,35 @@ test.skipIf(!DB)("setRolesById, setDisabled, setManagerById and setPasswordById 
   expect((await setDisabled(userId, true))!.displayName).toBe("Rita Alvarez");
   expect((await setManagerById(userId, boss.userId))!.displayName).toBe("Rita Alvarez");
   expect((await setPasswordById(userId, "new-pw"))!.displayName).toBe("Rita Alvarez");
+});
+
+// --- emailsForUserIds -------------------------------------------------------
+
+test.skipIf(!DB)("emailsForUserIds answers two ids with two addresses", async () => {
+  const a = await createUser("m1@example.com", "pw", []);
+  const b = await createUser("m2@example.com", "pw", []);
+  const found = await emailsForUserIds([a.userId, b.userId]);
+  expect(found.get(a.userId)).toBe("m1@example.com");
+  expect(found.get(b.userId)).toBe("m2@example.com");
+  expect(found.size).toBe(2);
+});
+
+test.skipIf(!DB)("emailsForUserIds leaves out an id matching no row", async () => {
+  const a = await createUser("m3@example.com", "pw", []);
+  const found = await emailsForUserIds([a.userId, "user_no_such_row"]);
+  expect([...found.keys()]).toEqual([a.userId]);
+});
+
+test.skipIf(!DB)("emailsForUserIds leaves out a disabled account", async () => {
+  // A disabled account is one nobody may act under, so a message to it reaches
+  // nobody who can answer — worse than no address, since it looks delivered.
+  const a = await createUser("m4@example.com", "pw", []);
+  const b = await createUser("m5@example.com", "pw", []);
+  await setDisabled(b.userId, true);
+  const found = await emailsForUserIds([a.userId, b.userId]);
+  expect([...found.keys()]).toEqual([a.userId]);
+});
+
+test.skipIf(!DB)("emailsForUserIds answers the empty set with nothing", async () => {
+  expect((await emailsForUserIds([])).size).toBe(0);
 });

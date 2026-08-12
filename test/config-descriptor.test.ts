@@ -20,12 +20,28 @@ test("dbListDataSourceConfigSchema produces a descriptor with minLength/maxLengt
   expect(descriptor).toEqual([{ key: "listKey", kind: "string", required: true, minLength: 1, maxLength: 200 }]);
 });
 
-test("notificationEmailConfigSchema produces a descriptor with minItems and format", () => {
+// `to` lost its `.min(1)` when `toActors` arrived: an action may name its
+// recipients by role alone, and the both-empty rule moved to an object-level
+// refinement the generated form does not render. So `to` is no longer
+// `required` and carries no `minItems`.
+test("notificationEmailConfigSchema produces a descriptor with format and a value set", () => {
   const descriptor = describeConfigSchema(notificationEmailConfigSchema, "notification.email");
   expect(descriptor).toEqual([
-    { key: "to", kind: "string-array", required: true, minItems: 1, format: "email" },
+    { key: "to", kind: "string-array", required: false, default: [], format: "email" },
+    { key: "toActors", kind: "string-array", required: false, default: [], enumValues: ["candidate", "claimant", "starter"] },
     { key: "subject", kind: "string", required: true },
     { key: "body", kind: "string", required: true },
+  ]);
+});
+
+// The regression this branch exists to prevent: without it the enum element
+// leaves the supported subset and drops the descriptor for the WHOLE type, so
+// `subject` and `body` fall back to the raw JSON textarea with it.
+test("an array over an enum keeps its own type's descriptor", () => {
+  const schema = z.object({ picks: z.array(z.enum(["a", "b"])), label: z.string() });
+  expect(describeConfigSchema(schema, "test.enumArray")).toEqual([
+    { key: "picks", kind: "string-array", required: true, enumValues: ["a", "b"] },
+    { key: "label", kind: "string", required: true },
   ]);
 });
 

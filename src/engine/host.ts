@@ -39,11 +39,15 @@ import { MAX_KEY_LENGTH } from "../schema/compile.js";
  * close an import cycle. host.ts sits downstream of all three, so building the
  * default registry here is acyclic; registry.ts stays the leaf module it
  * already was.
+ *
+ * `db` defaults to the shared pool, matching `createDefaultDataSourceRegistry`
+ * below: `notification.email` resolves an actor id to an account address, so it
+ * reads `auth_users`. `http.request` takes no database and ignores it.
  */
-export function createDefaultRegistry(): Registry {
+export function createDefaultRegistry(db: SQL = sql): Registry {
   const reg = createRegistry();
   register(reg, HTTP_ACTION_TYPE, httpHandlerDef);
-  register(reg, NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef);
+  register(reg, NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef(db));
   return reg;
 }
 

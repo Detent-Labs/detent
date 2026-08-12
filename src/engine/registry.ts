@@ -7,12 +7,51 @@
 import { z } from "zod";
 import type { Action, AssignmentUnresolvedReason, FieldOption, Instance, Step } from "../schema/definition.js";
 
-/** What a handler is invoked with. It MUST dedupe external effects on `idempotencyKey` (delivery is at-least-once). */
+/**
+ * The actor ids in force at the commit that enqueued an outbox row, frozen onto
+ * that row. Engine-supplied state, not authored config: a handler reading it
+ * still performs no instance lookup of its own.
+ *
+ * `candidates` is the entered step's resolved assignment candidate list.
+ * `claimant` is `assignment.claimedBy`, which a fresh step entry clears.
+ * `starter` is `Instance.startedBy`.
+ */
+export interface OutboxActors {
+  candidates: string[];
+  claimant?: string;
+  starter?: string;
+}
+
+/**
+ * Build the stamp from the instance a commit is writing. One helper so the
+ * three `INSERT INTO outbox` sites (store.ts's subprocess spawn, and
+ * transition.ts's step entry and timer fire) cannot drift apart.
+ *
+ * Homed here rather than beside any one of them: registry.ts is the leaf all
+ * three already import, and this reads nothing but the instance.
+ */
+export function outboxActorsOf(inst: Pick<Instance, "assignment" | "startedBy">): OutboxActors {
+  return {
+    candidates: inst.assignment?.candidates ?? [],
+    ...(inst.assignment?.claimedBy ? { claimant: inst.assignment.claimedBy } : {}),
+    ...(inst.startedBy ? { starter: inst.startedBy } : {}),
+  };
+}
+
+/**
+ * What a handler is invoked with. It MUST dedupe external effects on
+ * `idempotencyKey` (delivery is at-least-once).
+ *
+ * `actors` is optional. A row enqueued before the engine recorded actor ids
+ * carries none, and a handler treats that case exactly like a row whose lists
+ * are all empty. Same shape and same reason as `DataSourceContext.heldValues`.
+ */
 export interface HandlerContext {
   action: Action;
   config: Record<string, unknown>;
   idempotencyKey: string;
   instanceId: string;
+  actors?: OutboxActors;
 }
 
 /** A registered handler plus its plugin config JSON Schema. */

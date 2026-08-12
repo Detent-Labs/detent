@@ -287,6 +287,7 @@ test("an over-size response dead-letters via deliver(), the classification the o
         attempts: 0,
         event_id: null,
         field_version: 1,
+        actors: null,
       };
       const err = await rejects(deliver(row, reg));
       expect(err).toBeInstanceOf(PermanentError); // -> outbox dead-letters, never retries, writes no data
@@ -320,6 +321,7 @@ test("a retried delivery sends the same Idempotency-Key as the original", async 
         attempts: 0,
         event_id: null,
         field_version: 1,
+        actors: null,
       };
       await deliver(row, reg);
       await deliver({ ...row, attempts: row.attempts + 1 }, reg); // simulated retry

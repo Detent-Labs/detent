@@ -323,23 +323,36 @@ Spec: `development-toolchain`.
     Change: `add-observability`. Spec: `observability`. Design:
     `docs/superpowers/specs/2026-07-30-observability-design.md`.
 
-16. **Notifications: DONE.** Stage 9 excluded notifications on purpose; an
+16. **Notifications: DONE (a–b).** Stage 9 excluded notifications on purpose; an
     inbox-only model is a gap for customers used to being pushed to. Delivered as
     one new action handler type on the existing registry, not a new schema
     concept — the five existing action positions already cover "notify on
     assignment" and "notify on reminder". Webhook notification stays a documented
     recipe over `http.request` (stage 5e) rather than new code.
-    **Half of what the stage's own rationale asked for stays open.** Recipients
-    are static configuration, so a message reaches a team or manager mailbox,
-    never the actor a step is assigned to. Resolving an assignee to an account's
-    email address widens the handler seam itself, so it is its own stage (#16b),
-    not a follow-up patch. Stage 17 is unaffected — an escalation notifies a
-    tier, and a tier is a static address.
     One test gap is recorded rather than closed: the authenticated-relay path is
     verified by reading only, because no local harness can complete a TLS
     handshake against the engine's own client socket.
     Change: `add-notifications`. Spec: `notification-email-action-handler`.
     Design: `docs/superpowers/specs/2026-07-30-notifications-design.md`.
+    **16b, recipient resolution: DONE.** 16a shipped with literal recipients
+    only, so a message reached a team or manager mailbox and never the actor
+    holding the step. The config now carries a second list, `toActors`, over
+    three tokens: `candidate`, `claimant`, `starter`. The handler resolves each
+    to an account address and drops an unknown id or a disabled account. Every
+    candidate gets the message; a delivery resolving no address sends nothing,
+    succeeds, and logs one warning.
+    The actor ids reach the handler frozen, on a new `outbox.actors` column all
+    three enqueue sites stamp. A delivery-time read would be wrong, not merely
+    less tidy: the resolution worker cascades automatic steps without waiting
+    for the outbox, so the instance can already sit two steps on. Stage 17 is
+    unaffected — an escalation notifies a tier, and a tier is a static address.
+    The studio needed a matching widening. A `z.array(z.enum(...))` property
+    left `describeConfigSchema`'s supported subset, which drops the descriptor
+    for the WHOLE type, so `notification.email` would have lost its generated
+    form entirely. Such an array now renders as a checkbox group.
+    Change: `notification-recipient-resolution`. Specs:
+    `notification-email-action-handler`, `action-handlers`,
+    `transactional-outbox`, `studio-plugin-config-form`, `local-user-accounts`.
 
 17. **Escalation pattern: DONE.** Timers were already first-class, but there was
     no documented recipe for "SLA breached → notify a manager / reassign", so
