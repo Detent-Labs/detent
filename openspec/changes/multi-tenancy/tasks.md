@@ -59,30 +59,30 @@
 - [x] 5.1 Mint a `tenant` claim in `src/auth/login.ts`, naming the tenant whose
   database authenticated the account.
 - [x] 5.2 Read the claim in `src/auth/jwt.ts`, leaving `LOCAL_ISSUER` alone.
-- [ ] 5.3 Resolve the login's own tenant from the request host.
-- [ ] 5.4 Keep an unknown host indistinguishable from a wrong password, in both
+- [x] 5.3 Resolve the login's own tenant from the request host.
+- [x] 5.4 Keep an unknown host indistinguishable from a wrong password, in both
   answer and cost.
 - [x] 5.5 Change `isActiveAccount` to take `db` per call.
-- [ ] 5.6 Answer 401 for an unknown tenant key, and 503 for a listed tenant
+- [x] 5.6 Answer 401 for an unknown tenant key, and 503 for a listed tenant
   whose database refuses.
 
 ## 6. The worker seam
 
-- [ ] 6.1 Add a `TenantSource` type and take it in `startEngine`.
-- [ ] 6.2 Default it to one entry holding the process database.
-- [ ] 6.3 Walk the list per poll tick in all four workers.
-- [ ] 6.4 Skip an unreachable tenant with one warning, and continue the tick.
-- [ ] 6.5 Move `createDefinitionStore` inside the per-tenant step.
-- [ ] 6.6 Test that one tick serves three tenants, and that one refusing
+- [x] 6.1 Add a `TenantSource` type and take it in `startEngine`.
+- [x] 6.2 Default it to one entry holding the process database.
+- [x] 6.3 Walk the list per poll tick in all four workers.
+- [x] 6.4 Skip an unreachable tenant with one warning, and continue the tick.
+- [x] 6.5 Move `createDefinitionStore` inside the per-tenant step.
+- [x] 6.6 Test that one tick serves three tenants, and that one refusing
   tenant does not stop the other two.
 
 ## 7. The SaaS bootstrap
 
-- [ ] 7.1 Wire the control-plane tenant source when a deployment sets the variable.
-- [ ] 7.2 Read the variable once at bootstrap and fail startup with a message
+- [x] 7.1 Wire the control-plane tenant source when a deployment sets the variable.
+- [x] 7.2 Read the variable once at bootstrap and fail startup with a message
   naming the control plane when it is unreachable. Task 1.2's per-call read
   stays, for the tenant lookups.
-- [ ] 7.3 Test the isolation case end to end: two tenants each holding an
+- [x] 7.3 Test the isolation case end to end: two tenants each holding an
   instance, and neither listing the other's.
 
 ## 8. Documentation

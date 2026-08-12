@@ -14,12 +14,15 @@
 import { SQL, type Server } from "bun";
 import { timingSafeEqual } from "node:crypto";
 import { sql, initSchema } from "../engine/store.js";
-import { startEngine, createDefaultRegistry, createDefaultDataSourceRegistry } from "../engine/host.js";
+import { startEngine, createDefaultRegistry, createDefaultDataSourceRegistry, type TenantSource } from "../engine/host.js";
 import { type Registry, type DataSourceRegistry, type AssignmentRegistry } from "../engine/registry.js";
 // The org-aware set (static + org.manager-of-starter), not the static-only leaf
 // factory of the same name in registry.js. This is the composition root.
 import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies.js";
 import { devHeaderResolver, type ActorResolver } from "../auth/resolve.js";
+import { createTenantConnections, TenantUnreachable, UnknownTenant } from "../tenancy/connections.js";
+import { controlPlane, initControlPlane, saasMode } from "../tenancy/store.js";
+import { tenantKeyOf } from "../auth/jwt.js";
 import { serveWebAsset, resolveWebRoot, isNavigationRequest } from "./static.js";
 import { jwtResolver, type IssuerConfig } from "../auth/jwt.js";
 import { handleLogin } from "../auth/login.js";
@@ -398,6 +401,48 @@ export function resolveAuthResolver(
 }
 
 /**
+ * Open the control plane and build the two seams SaaS mode needs: how one
+ * request finds its database, and which databases the workers walk.
+ *
+ * Startup fails when the control plane is unreachable, rather than serving
+ * requests that would all answer 503. `initControlPlane` is the first statement
+ * that touches it, so an unreachable address surfaces here.
+ *
+ * A request carrying no resolvable tenant raises, and the dispatcher answers
+ * 401 — including the login request, whose tenant comes from its host.
+ */
+async function startTenancy(): Promise<{
+  resolveTenantDb: (req: Request) => Promise<SQL>;
+  tenantOf: (req: Request) => string | undefined;
+  tenants: TenantSource;
+}> {
+  const control = controlPlane();
+  await initControlPlane(control);
+  const connections = createTenantConnections(control, {
+    onSkip: (key, cause) => log.warn("tenant skipped", { tenant: key, error: cause instanceof Error ? cause.message : String(cause) }),
+  });
+  log.info("SaaS mode: tenants resolve per request from the control plane");
+  return {
+    resolveTenantDb: async (req) => {
+      // The login request is the one holding no token, so its tenant comes from
+      // the host it arrived on. Every other request carries the claim.
+      const key = tenantKeyOf(req.headers) ?? hostTenantKey(req);
+      if (!key) throw new UnknownTenant("(none)");
+      return connections.handleFor(key);
+    },
+    tenantOf: (req) => tenantKeyOf(req.headers) ?? hostTenantKey(req),
+    tenants: () => connections.live(),
+  };
+}
+
+/** The tenant a host names: the first label of `acme.detent.example`. */
+function hostTenantKey(req: Request): string | undefined {
+  const host = req.headers.get("Host");
+  const label = host?.split(":")[0]?.split(".")[0];
+  return label && label !== "localhost" ? label : undefined;
+}
+
+/**
  * `resolver` has no default: every caller must pass one explicitly, so no
  * call site can reach `devHeaderResolver` — the non-production dev header
  * resolver — by omission. `startHttpServer`'s own parameter default calls
@@ -434,6 +479,15 @@ export function createServer(
   loginSecret: string | undefined = undefined,
   webRoot: string | undefined = undefined,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  /**
+   * Resolves the database one request runs against. Absent, every request gets
+   * `processDb` — the single-tenant deployment, and the handle these closures
+   * captured before the threading. Present, it raises `UnknownTenant` (401) or
+   * `TenantUnreachable` (503).
+   */
+  resolveTenantDb?: (req: Request) => Promise<SQL>,
+  /** The tenant key a request belongs to, for the token `/auth/login` mints. Absent in a single-tenant deployment. */
+  tenantOf?: (req: Request) => string | undefined,
 ): (req: Request, server?: BunServer) => Promise<Response> {
   // `POST /auth/login` enters the table only when a signing key is
   // configured, so no state makes the login route reachable without one.
@@ -452,7 +506,11 @@ export function createServer(
     ...(secret === undefined
       ? []
       : [{ method: "POST", segments: seg("/auth/login"),
-           handler: (_p: string[], req: Request, clientAddress: string | undefined, db: SQL) => handleLogin(req, secret, db, clientAddress) } satisfies Route]),
+           handler: (_p: string[], req: Request, clientAddress: string | undefined, db: SQL) =>
+             // `db` is already this host's tenant, resolved by the dispatcher, so
+             // the password verifies against that tenant's own directory and the
+             // token it mints names that tenant.
+             handleLogin(req, secret, db, clientAddress, tenantOf?.(req)) } satisfies Route]),
     // Resolves no actor and requires no role, the way `POST /auth/login` above
     // does: the login screen renders before a token exists, so its own wording
     // must be fetchable without one. It belongs in this table rather than
@@ -648,7 +706,22 @@ export function createServer(
       if (route.method !== req.method) continue;
       const params = match(route.segments, parts);
       if (params === null) continue;
-      const result = await route.handler(params, req, clientAddressOf(req, server, trustProxy), processDb);
+      let requestDb = processDb;
+      if (resolveTenantDb) {
+        try {
+          requestDb = await resolveTenantDb(req);
+        } catch (err) {
+          // An unknown tenant answers the way an unverifiable token does, so a
+          // caller cannot learn which tenant keys exist by probing. A listed
+          // tenant whose database refuses is a DEPLOYMENT fault and says so:
+          // an operator reading 401s would hunt the caller instead.
+          if (err instanceof TenantUnreachable) {
+            return toRes({ status: 503, body: { error: { type: "tenant-unreachable", message: "the tenant's database is unavailable" } } });
+          }
+          return toRes({ status: 401, body: { error: { type: "actor-resolution", message: "unknown or missing tenant" } } });
+        }
+      }
+      const result = await route.handler(params, req, clientAddressOf(req, server, trustProxy), requestDb);
       // A successful attachment download is `HttpBinaryResult`, not a JSON
       // envelope. One check at this single exit covers that route and any
       // later one. See errors.ts, the `HttpBinaryResult` doc comment.
@@ -697,13 +770,20 @@ export async function startHttpServer(
     }),
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<{ stop: () => Promise<void> }> {
-  await initSchema(db);
+  // SaaS mode, or not. Unset, everything below is exactly what it was: one
+  // schema built here, no control-plane connection, and the process handle on
+  // every request and every tick.
+  const tenancy = saasMode() ? await startTenancy() : undefined;
+  if (!tenancy) await initSchema(db);
   const allowedOrigins = parseAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS);
   const webRoot = resolveWebRoot(process.env.WEB_ROOT);
-  const fetch = createServer(dataSourceRegistry, registry, db, resolver, allowedOrigins, process.env.AUTH_JWT_SECRET, webRoot, assignmentRegistry);
+  const fetch = createServer(
+    dataSourceRegistry, registry, db, resolver, allowedOrigins, process.env.AUTH_JWT_SECRET, webRoot,
+    assignmentRegistry, tenancy?.resolveTenantDb, tenancy?.tenantOf,
+  );
   const port = Number(process.env.PORT ?? 3000);
   const server = Bun.serve({ fetch, port, maxRequestBodySize: MAX_REQUEST_BODY_SIZE });
-  const engine = startEngine(db, registry, assignmentRegistry);
+  const engine = startEngine(db, registry, assignmentRegistry, tenancy?.tenants);
   log.info("HTTP server listening", { port: server.port, webRoot: webRoot ?? null });
   return {
     // `server.stop()` with no argument is Bun's graceful form: it refuses new

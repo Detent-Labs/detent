@@ -8,10 +8,12 @@
 import { SQL } from "bun";
 import { sql } from "./store.js";
 import { createDefinitionStore } from "./definitions.js";
-import { startOutboxWorker } from "./outbox.js";
-import { startResolutionWorker } from "./resolution.js";
-import { startTimerScheduler } from "./timers.js";
-import { startRetentionSweep } from "./retention.js";
+import { drainOutbox, deliver, CLAIM_LEASE_MS } from "./outbox.js";
+import { drainResolutions } from "./resolution.js";
+import { drainTimers } from "./timers.js";
+import { sweepRetention } from "./retention.js";
+import { pollForever } from "./poll.js";
+import { log } from "../log.js";
 import { registerSubprocessHandlers } from "./subprocess.js";
 import {
   createRegistry,
@@ -142,23 +144,88 @@ export function parseRetentionDays(): number | undefined {
   return days;
 }
 
+/** One tenant's database, and the key naming it. `""` is the single-tenant deployment. */
+export type TenantHandle = { key: string; db: SQL };
+
+/**
+ * Which tenant databases are live right now. Answered per poll tick, so a
+ * tenant provisioned while the process runs is served without a restart, and
+ * one removed stops being visited.
+ */
+export type TenantSource = () => Promise<TenantHandle[]>;
+
+/** The default: this process's own database, one entry, which is today's behaviour exactly. */
+export const singleTenantSource = (db: SQL): TenantSource => async () => [{ key: "", db }];
+
+/**
+ * Everything a worker tick needs for ONE tenant. Built on first sight of that
+ * tenant and cached: `createDefinitionStore` holds a per-database cache, and
+ * rebuilding it each tick would throw that cache away every 500ms.
+ *
+ * The registry is per-tenant too, and only because of the `core.*` subprocess
+ * handlers: those close over a database AND that tenant's definition store, so
+ * unlike the author-facing plugins they cannot read a handle off the context.
+ * They are engine-internal and were never author-facing, so a private copy per
+ * tenant costs nothing an author can observe. The shared entries
+ * (`http.request`, `notification.email`) are copied in by reference and still
+ * read `ctx.db`.
+ */
+function tenantContexts(shared: Registry, assignmentRegistry: AssignmentRegistry) {
+  const cache = new Map<string, { db: SQL; registry: Registry; resolveBody: ReturnType<typeof createDefinitionStore>["resolveBody"] }>();
+  return (t: TenantHandle) => {
+    let ctx = cache.get(t.key);
+    if (!ctx) {
+      const { resolveBody, resolveLatestByContract } = createDefinitionStore(t.db);
+      const registry: Registry = new Map(shared);
+      registerSubprocessHandlers(registry, t.db, resolveBody, resolveLatestByContract, assignmentRegistry);
+      ctx = { db: t.db, registry, resolveBody };
+      cache.set(t.key, ctx);
+    }
+    return ctx;
+  };
+}
+
+/**
+ * `tenants` defaults to this process's own database, so an on-premise
+ * deployment polls exactly what it polls today. In SaaS mode it reads the
+ * control plane, and the worker COUNT stays four whatever the tenant count —
+ * each tick walks the list rather than each tenant getting its own workers.
+ *
+ * `registry` is the shared, author-facing one. It is not mutated here: each
+ * tenant gets a copy carrying its own `core.*` handlers.
+ */
 export function startEngine(
   db: SQL = sql,
   registry: Registry = createDefaultRegistry(),
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  tenants: TenantSource = singleTenantSource(db),
 ): { stop: () => void } {
-  const { resolveBody, resolveLatestByContract } = createDefinitionStore(db);
-  // Register the engine-internal subprocess handlers so the outbox worker can
-  // dispatch core.spawnSubprocess / core.returnSubprocess like any other action.
-  // The spawn handler resolves a child's initial-step candidates, so it needs
-  // the same assignment registry the rest of the engine runs against.
-  registerSubprocessHandlers(registry, db, resolveBody, resolveLatestByContract, assignmentRegistry);
+  const contextFor = tenantContexts(registry, assignmentRegistry);
   const retentionDays = parseRetentionDays();
+
+  /**
+   * Run `fn` for every live tenant. A tenant whose tick throws is logged and
+   * skipped, and the rest still run: in a shared process one tenant's fault
+   * must not stop the others. `pollForever` would otherwise abandon the whole
+   * pass at the first throw.
+   */
+  const eachTenant = (worker: string, fn: (c: ReturnType<typeof contextFor>) => Promise<unknown>) => async () => {
+    for (const t of await tenants()) {
+      try {
+        await fn(contextFor(t));
+      } catch (e) {
+        log.warn("tenant tick skipped", { worker, tenant: t.key, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+  };
+
   const workers = [
-    startOutboxWorker(db, registry, 500, resolveBody),
-    startResolutionWorker(db, resolveBody, 500, undefined, assignmentRegistry),
-    startTimerScheduler(db, resolveBody, 500, assignmentRegistry),
-    ...(retentionDays !== undefined ? [startRetentionSweep(db, retentionDays)] : []),
+    pollForever("outbox", eachTenant("outbox", (c) => drainOutbox(c.db, c.registry, deliver, CLAIM_LEASE_MS, c.resolveBody)), 500),
+    pollForever("resolution", eachTenant("resolution", (c) => drainResolutions(c.db, c.resolveBody, undefined, assignmentRegistry)), 500),
+    pollForever("timers", eachTenant("timers", (c) => drainTimers(c.db, c.resolveBody, assignmentRegistry)), 500),
+    ...(retentionDays !== undefined
+      ? [pollForever("retention", eachTenant("retention", (c) => sweepRetention(c.db, retentionDays)), 500)]
+      : []),
   ];
   return { stop: () => workers.forEach((w) => w.stop()) };
 }
