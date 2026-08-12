@@ -919,6 +919,16 @@ Spec: `development-toolchain`.
     fits the opaque `layout` blob beside the other canvas-only state (node
     positions, and stages 30/33's proposed edge style and waypoints), not
     `src/schema/definition.ts`. No design doc, no OpenSpec change yet.
+    Two changes, ranked apart on 2026-08-13. The multi-select prerequisite
+    ships first and on its own, ahead of stages 30 through 33 rather than
+    behind them. It is the interaction state every other canvas stage edits by
+    hand: stage 37 rounds one node's position on release, and stages 31 and 33
+    attach handles and control points to one selected element. Each assumes a
+    single selected id today, so landing multi-select last rewrites all of
+    them. It also earns its keep alone, since multi-move and multi-delete come
+    with the selection set. Grouping stays the second change and runs after the
+    edge work. The stage keeps one number: this splits the delivery, not the
+    scope.
 
 35. **Starter access to a started instance: DONE.** Raised 2026-08-12 in
     conversation, as the question of whether a process instance records who
@@ -996,6 +1006,43 @@ Spec: `development-toolchain`.
     No design doc, no OpenSpec change yet. A UI change is never trivial here,
     so it writes deltas against the capability specs of the views it moves —
     `studio-app` for the frame, and the specific capability for each view.
+
+37. Canvas nodes snap to the grid: NOT STARTED. Raised 2026-08-13 in
+    conversation. A dragged step lands on the canvas lattice, in steps
+    matching the background the author already sees, instead of at any
+    fractional point the pointer stopped on.
+    The write side is one rounding call. The canvas is hand-drawn SVG, not
+    React Flow, so no `snapToGrid` prop exists to set: `onNodePointerUp` in
+    `canvas/CanvasView.tsx` adds the drag delta to the start position and
+    hands the result to `onMoveStep`, which writes the raw point into
+    `saveState.layout` (`screens/EditScreen.tsx:85`). Position stays in the
+    opaque `layout` blob, so no schema change and no contract question.
+    The hard part is that the grid does not travel with the content.
+    `app.css` paints it on `.canvas-wrap` as a `radial-gradient` at
+    `background-size: 20px 20px`, and the comment there states why: Panzoom
+    transforms the SVG, so a grid painted on the SVG shrinks with the zoom and
+    leaves the rest of the canvas bare. The wrap holds still. A node rounded
+    to a 20-unit lattice in SVG coordinates therefore lines up with the
+    visible dots at zoom 1 and pan 0 alone. The design either declares the
+    dots decorative and the snap invisible, or drives `background-position`
+    and `background-size` from the live Panzoom transform so the two agree at
+    every zoom. That second answer is the one that makes this more than a
+    one-line change.
+    Two constants disagree with a 20-unit step. Auto layout places rows 110
+    apart and columns 240 apart (`canvas/layout.ts`), and the node box is
+    180 by 64 (`canvas/geometry.ts`). The column pitch and the width sit on
+    the lattice; the row pitch and the height do not, so every auto-laid-out
+    step shifts on its first drag. The design picks the step size and
+    reconciles those four numbers, or says the shift is acceptable.
+    Two more write sites want the same rounding. `onPaletteDrop`
+    (`screens/EditScreen.tsx:98`) places a dropped step at the raw pointer
+    point through the same `onMoveStep`, and the in-flight drag preview draws
+    the unrounded position, so a node jumps at release unless the preview
+    snaps too.
+    Overlaps stages 30 through 34 only in the file it touches and in the
+    "presentation, not contract" rule they all follow. No design doc, no
+    OpenSpec change yet. A UI change is never trivial here, so it writes a
+    delta against `studio-canvas`.
 
 ## Changes with no stage
 

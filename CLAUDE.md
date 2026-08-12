@@ -15,15 +15,18 @@ dependency. `packages/web` reaches it only over the HTTP wrapper and the
 exports map. That property is load-bearing: an integration drives a process
 with no browser at all. Do not let a UI concern leak into `src/`.
 
-Direction: no-code and low-code process authoring (`ROADMAP.md` stage 27, NOT
-STARTED). The two words name two things. No-code is the target for what the
+Direction: no-code and low-code process authoring (`ROADMAP.md` stage 27, DONE
+a–f). The two words name two things. No-code is the target for what the
 builders cover: an author types no CEL and no JSON. Low-code is what stays
 underneath permanently: the JSON view, the CEL input and hand-authored bodies
 stay first-class.
 
-The studio already builds a process on a canvas, but CEL guards and action
-config still need a developer today. That direction relaxes none of the
-contract rules. Every authoring surface produces the same JSON definition.
+The builders cover the canvas, the form editor, plugin config, path guards and
+view overrides, migration plans and templates. Three sites keep a raw input on
+purpose: a timer deadline must infer to `string`, an `Action.output` value reads
+`result` alone, and the JSON view is the escape hatch for what no builder
+expresses. That direction relaxes none of the contract rules. Every authoring
+surface produces the same JSON definition.
 
 The paradigm is a state-based finite-state machine: Steps (states) connected by
 explicit Paths (transitions). This is NOT BPMN token flow.
