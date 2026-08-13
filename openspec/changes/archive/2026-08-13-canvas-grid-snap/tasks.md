@@ -7,10 +7,10 @@
 - [x] 1.4 Test: `snapToGrid` rounds to the nearer point on each axis. It
   handles a negative coordinate, and leaves a point already on the lattice
   alone.
-- [x] 1.5 Test: the row pitch, the column pitch, the node width and the node
-  height each divide by `GRID_STEP` with no remainder.
+- [x] 1.5 Test: `GRID_STEP` divides the row pitch, the column pitch, the node
+  width and the node height, each with no remainder.
 - [x] 1.6 Correct `packages/web/test/studio-canvas-fit.test.ts`. `GRAPH.height`
-  goes 174 to 180, the shifted box at line 128 with it, and the comment above
+  goes 174 to 180, and the shifted box at line 128 with it. The comment above
   them re-derives from the new constants. The box is an input to `computeFit`,
   so the suite stays green either way. A stale fixture claiming to describe
   auto layout is the hazard.
@@ -37,7 +37,7 @@
   never by parsing the DOM transform back. Write `--canvas-grid-size` and
   `--canvas-grid-offset` onto `.canvas-wrap`. Drop the listener on unmount.
 - [x] 3.2 Seed both properties from `getScale()` and `getPan()` after the
-  initial fit, so the grid is right before the first pan or zoom.
+  initial fit. The grid is then right before the first gesture.
 - [x] 3.3 Read both properties in `.canvas-wrap`'s `background-size` and
   `background-position` (`areas/studio/app.css`). The gradient and the color
   role stay where they are.

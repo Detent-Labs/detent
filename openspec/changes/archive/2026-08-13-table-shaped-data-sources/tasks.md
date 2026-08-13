@@ -68,8 +68,8 @@
   `columnMapping`, find the picked option. Read each mapped attribute from it.
   Check that value against the target field's declared type. Write a match into
   `data`.
-- [x] 4.3 Let a mapped target take the mapped value over a submitted one, and
-  over the view's readonly and visibility rules.
+- [x] 4.3 Let a mapped target take the mapped value over a submitted one. The
+  view's readonly and visibility rules lose too.
 - [x] 4.4 Walk the `ResolvedViewField[]` from 4.1, which carries the step's
   view order. Never walk the request's own key order.
 - [x] 4.5 Call the write-back from `submitAndTransition`, after validation and
