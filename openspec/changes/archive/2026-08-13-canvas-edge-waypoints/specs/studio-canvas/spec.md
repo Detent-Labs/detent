@@ -396,4 +396,3 @@ tests need not cover the SVG rendering or the pointer-event wiring.
 - **THEN** it returns one polyline through every point in that list
 - **AND** it returns the index at which each leg of that polyline begins
 - **AND** the test needs no DOM or canvas rendering
-
