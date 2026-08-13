@@ -1033,8 +1033,7 @@ Spec: `development-toolchain`.
     and a waypoint has no box to clear. A leg carries no gutter now, and a
     test pins it.
 
-34. Selection grouping (group/ungroup nodes): **MULTI-SELECT DONE, GROUPING
-    NOT STARTED.** Raised 2026-08-10
+34. **Selection grouping (group/ungroup nodes): DONE.** Raised 2026-08-10
     in conversation. An author selects several steps at once and groups them
     into one movable, collapsible unit, the way React Flow's grouping example
     turns a multi-selection into a parent group node, and later ungroups it.
@@ -1071,7 +1070,29 @@ Spec: `development-toolchain`.
     so the marquee takes pointer capture and restores `disablePan` on lost
     capture too — a release outside the SVG would otherwise leave the canvas
     unpannable. The deltas landed in `studio-canvas` and `studio-checks-rail`.
-    Grouping itself stays the second delivery, after the edge work.
+    The second delivery landed 2026-08-14 as `canvas-step-groups`. A group
+    lives at `layout.groups`, the third reserved key in that blob. Its box is
+    its members' bounding box plus a margin, and it has no position of its
+    own: dragging the box moves the members, and the box follows them. A
+    collapsed group draws at the node size, hides its members, and becomes the
+    anchor every path from outside ends on. A path between two hidden members
+    does not draw. Ungrouping leaves every step and every path as it was.
+    The canvas gained no selection state. Clicking a box selects exactly its
+    members, so every rule that reads `selectedStepIds` kept working, and the
+    third column's existing summary carries the group's own controls.
+    `anchorSideToward` and `routeThroughWaypoints` now read a size, defaulting
+    to the node's. `canvas-floating-anchors` predicted that generalization in
+    its own risks: the rule takes two rectangles, and a group's box
+    substitutes for a node's.
+    The review earned its place on that seam. A size on the anchor rule alone
+    would never have arrived, because `routeThroughWaypoints` is the one
+    function the canvas calls per path. It also found two hit tests reading
+    every step regardless of visibility, which would have let a marquee select
+    a hidden member and a connect drag drop a path onto one.
+    The browser found what no test could. `fill: none` leaves only a rect's
+    stroke hit-testable, so a grab inside an expanded box reached the canvas
+    beneath it. The group's name is the handle now, and the interior stays the
+    canvas's, which is what keeps the marquee usable over a group.
 
 35. **Starter access to a started instance: DONE.** Raised 2026-08-12 in
     conversation, as the question of whether a process instance records who

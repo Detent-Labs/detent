@@ -282,6 +282,13 @@ export const en = {
   "canvas.edgeStyleToggle": "Rounded corners",
   "canvas.selectionHeading": "Steps selected",
   "canvas.selectionRemove": "Remove steps",
+  "canvas.groupCreate": "Group these steps",
+  "canvas.groupDefaultName": "Group",
+  "canvas.groupName": "Group name",
+  "canvas.groupCollapse": "Collapse",
+  "canvas.groupExpand": "Expand",
+  "canvas.groupUngroup": "Ungroup",
+  "canvas.groupStepCount": "steps",
 
   "expression.placeholder": "CEL expression",
   "plugin.typePlaceholder": "plugin type identifier",

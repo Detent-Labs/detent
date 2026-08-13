@@ -134,6 +134,18 @@ describe("canvas geometry: a box that is not a node", () => {
     );
   });
 
+  it("keeps a path's waypoints when its end becomes a collapsed box", () => {
+    // A bend placed while the group was expanded still routes once it folds.
+    // The legs run between the waypoints and the box, and the box's own size
+    // decides where the last one lands.
+    const big = { width: 180, height: 60 };
+    const route = routeThroughWaypoints({ x: 0, y: 0 }, { x: 460, y: -20 }, [{ x: 240, y: -160 }], { target: big });
+    expect(route.points.some((p) => p.x === 240 && p.y === -160)).toBe(true);
+    // The box faces the waypoint on the horizontal, so the route enters its
+    // left-middle: x at the box's own edge, y at half its own height.
+    expect(route.points[route.points.length - 1]).toEqual({ x: 460, y: -20 + big.height / 2 });
+  });
+
   it("routes from a sized box rather than from a node-sized one", () => {
     // The collapsed group's own box stands in for a hidden member. Without the
     // size the route would leave a node-sized rectangle at the box's corner.

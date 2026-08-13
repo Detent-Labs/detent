@@ -17,6 +17,7 @@ import { savedBodyReducer, initialSavedBody, isDirty } from "./draftToolbarState
 import { CanvasView } from "../canvas/CanvasView.js";
 import { EditRail } from "../canvas/EditRail.js";
 import { snapToGrid, svgPointFromClient, DEFAULT_EDGE_STYLE, type Point, type EdgeStyle } from "../canvas/geometry.js";
+import { canGroup, groupMatching, type StepGroup } from "../canvas/groups.js";
 import { newStep, type StepKind } from "../draft/createStep.js";
 import { addToDraftArray } from "../draft/draft-array-crud.js";
 import { JsonView } from "../panels/JsonView.js";
@@ -108,6 +109,27 @@ function EditorArea({ processId, formStepId, token, initialRevision, initialLayo
       if (Array.isArray(list) && list.every(isLayoutPoint)) waypoints[pathId] = list;
     }
   }
+
+  // The third reserved key in that blob. An entry that does not parse drops,
+  // and so does a member the draft no longer holds: a step delete is an
+  // ordinary edit, and it must not strand a box or fail the render.
+  const groups: StepGroup[] = [];
+  const storedGroups = saveState.layout.groups;
+  if (Array.isArray(storedGroups)) {
+    for (const entry of storedGroups as unknown[]) {
+      const g = entry as Partial<StepGroup>;
+      if (!g || typeof g.id !== "string" || typeof g.name !== "string" || !Array.isArray(g.stepIds)) continue;
+      const stepIds = g.stepIds.filter((id): id is string => typeof id === "string" && steps.some((s) => s.id === id));
+      groups.push({ id: g.id, name: g.name, stepIds, collapsed: g.collapsed === true });
+    }
+  }
+
+  // One writer for every group edit: create, rename, collapse, expand and
+  // ungroup all rewrite the same list, the way `onWaypointsChange` rewrites
+  // one path's points.
+  const onGroupsChange = (next: StepGroup[]) => {
+    setSaveState((s) => ({ ...s, layout: { ...s.layout, groups: next } }));
+  };
 
   const onWaypointsChange = (pathId: string, points: Point[]) => {
     setSaveState((s) => {
@@ -289,6 +311,7 @@ function EditorArea({ processId, formStepId, token, initialRevision, initialLayo
                 onEdgeStyleChange={onEdgeStyleChange}
                 waypoints={waypoints}
                 onWaypointsChange={onWaypointsChange}
+                groups={groups}
               />
               {/* The third column has three states (studio-canvas). Nothing
                   selected shows the full checks rail. One step or a path
@@ -306,6 +329,63 @@ function EditorArea({ processId, formStepId, token, initialRevision, initialLayo
                   <button type="button" className="btn btn-secondary" onClick={deleteSelection}>
                     {t("canvas.selectionRemove")}
                   </button>
+                  {/* One selection, three states: a set no group holds offers
+                      grouping, a set that IS a group offers that group's own
+                      controls, and a set spanning a group's members and
+                      others offers neither. The canvas keeps no group
+                      selection of its own (design.md). */}
+                  {(() => {
+                    const matched = groupMatching(selectedStepIds, groups);
+                    if (matched) {
+                      return (
+                        <>
+                          <label className="canvas-group-name">
+                            {t("canvas.groupName")}
+                            <input
+                              value={matched.name}
+                              onChange={(e) =>
+                                onGroupsChange(groups.map((g) => (g.id === matched.id ? { ...g, name: e.target.value } : g)))
+                              }
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            aria-pressed={matched.collapsed === true}
+                            onClick={() =>
+                              onGroupsChange(
+                                groups.map((g) => (g.id === matched.id ? { ...g, collapsed: !g.collapsed } : g)),
+                              )
+                            }
+                          >
+                            {matched.collapsed ? t("canvas.groupExpand") : t("canvas.groupCollapse")}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => onGroupsChange(groups.filter((g) => g.id !== matched.id))}
+                          >
+                            {t("canvas.groupUngroup")}
+                          </button>
+                        </>
+                      );
+                    }
+                    if (!canGroup(selectedStepIds, groups)) return null;
+                    return (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() =>
+                          onGroupsChange([
+                            ...groups,
+                            { id: `grp_${crypto.randomUUID()}`, stepIds: [...selectedStepIds], name: t("canvas.groupDefaultName") },
+                          ])
+                        }
+                      >
+                        {t("canvas.groupCreate")}
+                      </button>
+                    );
+                  })()}
                   <ChecksRail validation={validation} collapsed />
                 </aside>
               ) : inspectedStepId !== undefined || selectedPathId !== undefined ? (

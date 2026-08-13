@@ -542,7 +542,7 @@ SHALL remain panel-only.
 
 ### Requirement: Canvas interaction logic is tested as pure functions, independent of rendering
 
-Ten computations SHALL live in pure modules with `bun:test` coverage. Five
+Eleven computations SHALL live in pure modules with `bun:test` coverage. Five
 came first: hit-testing, drag-delta computation, the auto-place traversal, the
 connection-validity predicate and the fit-to-view computation.
 
@@ -556,6 +556,9 @@ faces. It returns that node's anchor and the side it leaves on.
 The tenth is the route through a waypoint list. It takes two node positions
 and the list. It returns one polyline and the index at which each leg of that
 polyline begins.
+
+The eleventh is the group rule set. It gives a group's box, the hidden step
+ids, and the box a path anchors on.
 `packages/web/src/areas/app/screens/inboxLogic.ts` sets that convention. The
 tests need not cover the SVG rendering or the pointer-event wiring.
 
@@ -591,6 +594,14 @@ tests need not cover the SVG rendering or the pointer-event wiring.
 
 - **WHEN** a test gives the anchor rule a node position and a facing point
 - **THEN** it returns that node's anchor and the side it leaves on
+- **AND** the test needs no DOM or canvas rendering
+
+#### Scenario: The group rules hold without rendering
+
+- **WHEN** a test gives the group rules a list of groups and a list of node
+  positions
+- **THEN** it returns each group's box, the hidden step ids, and the box a
+  given step anchors on
 - **AND** the test needs no DOM or canvas rendering
 
 #### Scenario: The waypoint route holds without rendering
@@ -1123,6 +1134,17 @@ reports it.
 The draft SHALL take the first remaining step as its `workflow.initialStep`
 when the deleted set held it. That is the rule a single delete applies today.
 
+The summary SHALL also offer a control that groups the set. Grouping SHALL
+create a group holding exactly the selected steps, with a name the author can
+change. It SHALL leave the selection as it is.
+
+The control SHALL refuse a set that any group already holds. A step SHALL
+belong to at most one group, so nothing has to decide which box draws it.
+
+When the selection exactly matches one group's members, the summary SHALL show
+that group's own controls instead. Those are its name, a collapse
+control and an ungroup control.
+
 The third column SHALL dock the collapsed checks rail at the summary's bottom
 edge. It docks one at the inspector's bottom edge already. The
 `studio-checks-rail` capability carries that summary's own rules.
@@ -1148,16 +1170,23 @@ checks rail again.
 - **WHEN** the set holds the draft's initial step and the developer deletes it
 - **THEN** the draft's `workflow.initialStep` names the first remaining step
 
+<!-- Why: the header must match the base spec character for character. -->
+<!-- antislop: allow passive-voice -->
+
 ### Requirement: A path renders as an orthogonal route, under one canvas-wide style
 
 A path SHALL render as an orthogonal route rather than a straight line. Every
 segment SHALL lie on one axis.
 
-Each anchor SHALL sit at the midpoint of one side of its own node. That side
-is the one the node turns toward the next point on the route. For the source
+Each anchor SHALL sit at the midpoint of one side of its own box. That side
+is the one the box turns toward the next point on the route. For the source
 anchor that point is the first waypoint. Without waypoints it is the target
-node's centre. For the target anchor it is the last waypoint, or the source
-node's centre.
+box's centre. For the target anchor it is the last waypoint, or the source
+box's centre.
+
+A box is a step node at the canvas node size. It is also a collapsed group, at
+the group box's own size. The anchor rule SHALL read that size rather than
+assume a node's. Nothing else about the rule changes.
 
 The larger of the two offsets SHALL pick the axis. A horizontal offset larger
 than the vertical one SHALL put the anchor on a left or a right side.
@@ -1175,6 +1204,10 @@ An anchor SHALL NOT take a free angle on the node's border. A segment leaving
 at an angle has no square turn, and every segment here stays on one axis.
 
 The route SHALL leave each anchor along the axis that anchor sits on.
+
+A path whose source or target sits inside a collapsed group SHALL anchor on
+that group's box. It SHALL NOT anchor on the hidden member. A path between two
+members of one collapsed group SHALL NOT render at all.
 
 A path MAY carry an ordered list of waypoints. The route SHALL run from the
 source anchor to the first waypoint. It SHALL run from each waypoint to the
@@ -1434,6 +1467,16 @@ A path the author deletes MAY leave its list behind in `layout`. A step the
 author deletes already leaves its position behind, and neither one reaches the
 published body.
 
+A draft's groups SHALL persist as `layout.groups`, the third reserved key. It
+holds an ordered list. Each entry carries an id, its member step ids, a name
+and a collapsed flag.
+
+An absent list SHALL read as no groups. So SHALL a value that is not a list of
+groups, rather than failing the render.
+
+A group naming a step the draft no longer holds SHALL drop that member. It
+SHALL draw the rest. A group left with fewer than two members SHALL NOT draw.
+
 The reserved keys SHALL NOT collide with a node position. Every step id carries
 a `step_` prefix, and the position reader admits only a point.
 
@@ -1484,3 +1527,129 @@ a `step_` prefix, and the position reader admits only a point.
 <!-- Why: the header must match the base spec character for character, or the
      delta adds a requirement rather than modifying one. -->
 <!-- antislop: allow passive-voice -->
+
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: this delta copies four requirement blocks from the base spec
+     verbatim, and the base's own established wording uses "render" for what a
+     path does and "show" for what the third column does. Changing either verb
+     here would fork this file's wording from the spec it modifies. -->
+
+### Requirement: A group gathers steps into one movable, collapsible box
+
+The canvas SHALL draw a box around the members of every group the draft holds.
+The box SHALL enclose every member's node, with a margin, and it SHALL carry
+the group's name.
+
+A group is an organizational device on the canvas. It SHALL NOT reach
+`ProcessBody`. It SHALL NOT change which step an instance holds. It SHALL NOT
+introduce parallelism.
+
+The box SHALL draw behind every node, so no member sits under it.
+
+Dragging the box SHALL move every member by the same delta. Each member SHALL
+land on the canvas lattice, the rule a multi-step drag already applies. The
+box follows its members, so it needs no position of its own.
+
+A group SHALL collapse. A collapsed group SHALL draw one box at the canvas
+node size, at its own top-left corner. That box carries the group's name and
+its member count. Its members SHALL NOT draw.
+
+Expanding SHALL restore every member at the position it held. A collapse
+stores no position, since a member keeps its own entry in `layout` throughout.
+
+Ungrouping SHALL drop the group and leave every member where it is. No step
+moves, and no path changes.
+
+Selecting a group's box SHALL select exactly its members. The canvas keeps one
+selection concept, so a group needs no selection state of its own.
+
+A marquee SHALL NOT select a hidden member on its own. It SHALL select every
+member of a collapsed group whose box it overlaps. That is the rule it applies
+to a node it overlaps.
+
+A hidden member SHALL NOT be a connect-drag target. Releasing a connect drag
+over a collapsed group's box SHALL behave as a release over any other node.
+
+A path into a collapsed group SHALL keep its waypoints. Its legs re-route
+between those waypoints and the box. Expanding restores the route the
+waypoints described.
+
+#### Scenario: A group draws a box around its members
+
+- **WHEN** a draft holds a group of three steps
+- **THEN** the canvas draws one box enclosing all three nodes, carrying the
+  group's name
+
+#### Scenario: The box sits behind its members
+
+- **WHEN** a group's box overlaps its member nodes
+- **THEN** every member node draws over the box, and the box hides none of
+  them
+
+#### Scenario: Grouping the selection creates a group
+
+- **WHEN** the developer selects three steps and activates the group control
+- **THEN** the draft's layout holds a group of exactly those three steps
+- **AND** the selection still holds those three steps
+
+#### Scenario: A step belongs to at most one group
+
+- **WHEN** the developer selects a set that any existing group already holds
+- **THEN** the group control refuses, and the draft gains no second group
+
+#### Scenario: Dragging the box moves every member
+
+- **WHEN** the developer drags a group's box
+- **THEN** every member moves by the same delta, and each lands on the lattice
+- **AND** the box encloses them at their new positions
+
+#### Scenario: Collapsing hides the members
+
+- **WHEN** the developer collapses a group
+- **THEN** the canvas draws one box at the node size, with the group's name and
+  its member count
+- **AND** no member node draws
+
+#### Scenario: A path into a collapsed group draws to the box
+
+- **WHEN** a step outside a collapsed group has a path to a member of it
+- **THEN** that path draws to the group's box
+
+#### Scenario: A path inside a collapsed group does not draw
+
+- **WHEN** two members of one collapsed group have a path between them
+- **THEN** that path does not draw
+
+#### Scenario: Expanding restores every member
+
+- **WHEN** the developer expands a collapsed group
+- **THEN** every member draws at the position it held before the collapse
+
+#### Scenario: Ungrouping leaves the steps alone
+
+- **WHEN** the developer ungroups a group
+- **THEN** the box goes, every step keeps its position, and every path still
+  draws
+
+#### Scenario: A group whose member the draft dropped still draws
+
+- **WHEN** a group names a step the draft no longer holds
+- **THEN** the canvas draws the group around its remaining members, and the
+  render does not fail
+
+#### Scenario: Selecting the box selects the members
+
+- **WHEN** the developer clicks a group's box
+- **THEN** the canvas selects exactly that group's member steps
+
+#### Scenario: A marquee over a collapsed group selects its members
+
+- **WHEN** the developer drags a marquee over a collapsed group's box
+- **THEN** the selection holds that group's members
+- **AND** it holds no hidden step of any group the marquee missed
+
+#### Scenario: A bent path into a collapsed group keeps its bend
+
+- **WHEN** a path carrying a waypoint enters a group the developer collapses
+- **THEN** the route still passes through that waypoint and ends at the box
+- **AND** expanding restores the route it drew before

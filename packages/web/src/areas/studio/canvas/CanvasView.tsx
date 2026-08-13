@@ -25,6 +25,7 @@ import {
   type EdgeStyle,
 } from "./geometry";
 import { toggleSelection, normalizeRect, nodesInRect } from "./selection";
+import { drawnBox, hiddenStepIds, anchorBoxFor, type StepGroup } from "./groups";
 import { computeFit, MIN_SCALE, MAX_SCALE, FIT_GUTTER, type Fit } from "./fit";
 import { resolveDropGesture } from "./dropGesture";
 import { inlineRenamePatch } from "./inlineRename";
@@ -59,6 +60,9 @@ interface Props {
    * absent or malformed entry reads as no waypoints (design.md). */
   waypoints: Record<string, Point[]>;
   onWaypointsChange: (pathId: string, points: Point[]) => void;
+  /** Presentation only, in the same `layout` blob (design.md). A group never
+   * reaches `ProcessBody`, so the engine cannot see one. */
+  groups: StepGroup[];
 }
 
 function isPoint(value: unknown): value is Point {
@@ -82,6 +86,7 @@ export function CanvasView({
   onEdgeStyleChange,
   waypoints,
   onWaypointsChange,
+  groups,
 }: Props) {
   const { draft, mutate, contentLocale, loadedChildren } = useDraft();
   const steps = draft.workflow?.steps ?? [];
@@ -246,6 +251,31 @@ export function CanvasView({
     [steps, initialStepId, layout],
   );
 
+  // The group rules read positions by id. `nodePositions` is the same data as
+  // a list, and the boxes need the map.
+  const positionsById = useMemo(() => {
+    const map: Record<string, Point> = {};
+    for (const n of nodePositions) map[n.id] = { x: n.x, y: n.y };
+    return map;
+  }, [nodePositions]);
+
+  const hidden = useMemo(() => hiddenStepIds(groups, positionsById), [groups, positionsById]);
+
+  // Every group that draws, with its own box. A group of fewer than two
+  // present members draws nothing, which is where a step delete leaves one.
+  const groupBoxes = useMemo(
+    () => groups.map((g) => ({ group: g, box: drawnBox(g, positionsById) })).filter((b) => b.box !== undefined),
+    [groups, positionsById],
+  );
+
+  // What the marquee and the connect drag may reach: a visible node, plus one
+  // pseudo-node per collapsed box so a marquee over the fold selects the
+  // members it stands for.
+  const visibleNodePositions = useMemo(
+    () => nodePositions.filter((n) => !hidden.has(n.id)),
+    [nodePositions, hidden],
+  );
+
   // `stepIds` is what the gesture moves; `stepId` is the node under the
   // pointer. The two differ whenever the press lands on a member of a
   // multi-step selection. `startPos` snapshots each mover's position at
@@ -258,6 +288,13 @@ export function CanvasView({
     current: Point;
   } | null>(null);
   const [connectDrag, setConnectDrag] = useState<{ sourceStepId: string; current: Point } | null>(null);
+  // A group box drag moves every member, the way a multi-step node drag does.
+  const [groupDrag, setGroupDrag] = useState<{
+    groupId: string;
+    startPointer: Point;
+    startPos: Record<string, Point>;
+    current: Point;
+  } | null>(null);
   // A waypoint handle drag. `index` names an existing waypoint; `insertAt`
   // names the leg a midpoint-handle drag inserts into. Exactly one is set.
   const [waypointDrag, setWaypointDrag] = useState<{
@@ -346,6 +383,42 @@ export function CanvasView({
    * group's `onPointerUp` selects the path, and a drag that ended in a
    * re-selection would fight the gesture it just finished.
    */
+  /**
+   * A group box drag moves every member by one delta, and each member rounds
+   * its own result — the rule a multi-step node drag already applies. The box
+   * has no position of its own: it follows the members it encloses.
+   */
+  const onGroupPointerDown = (e: React.PointerEvent, group: StepGroup) => {
+    e.stopPropagation();
+    capturePointer(e);
+    const p = toSvgPoint(e);
+    const startPos: Record<string, Point> = {};
+    for (const id of group.stepIds) startPos[id] = positionOf(id);
+    setGroupDrag({ groupId: group.id, startPointer: p, startPos, current: p });
+  };
+
+  const onGroupPointerMove = (e: React.PointerEvent) => {
+    if (!groupDrag) return;
+    setGroupDrag({ ...groupDrag, current: toSvgPoint(e) });
+  };
+
+  const onGroupPointerUp = (e: React.PointerEvent, group: StepGroup) => {
+    e.stopPropagation();
+    if (!groupDrag) return;
+    const delta = dragDelta(groupDrag.startPointer, groupDrag.current);
+    setGroupDrag(null);
+    if (exceedsClickThreshold(delta)) {
+      for (const id of group.stepIds) {
+        const start = groupDrag.startPos[id];
+        if (start) onMoveStep(id, snapToGrid({ x: start.x + delta.x, y: start.y + delta.y }));
+      }
+      return;
+    }
+    // Under the threshold this is a click, and a click on the box selects
+    // exactly its members. The canvas keeps one selection concept.
+    onSelectSteps([...group.stepIds]);
+  };
+
   const onWaypointPointerDown = (e: React.PointerEvent, pathId: string, at: { index?: number; insertAt?: number }) => {
     e.stopPropagation();
     capturePointer(e);
@@ -456,7 +529,17 @@ export function CanvasView({
 
   const onMarqueePointerUp = (e: React.PointerEvent) => {
     if (!marquee) return;
-    onSelectSteps(nodesInRect(normalizeRect(marquee.startSvg, toSvgPoint(e)), nodePositions));
+    const band = normalizeRect(marquee.startSvg, toSvgPoint(e));
+    const picked = nodesInRect(band, visibleNodePositions);
+    // A collapsed group stands in for its members: a marquee over the box
+    // selects them, and a hidden member is never selected on its own.
+    for (const { group, box } of groupBoxes) {
+      if (!group.collapsed || !box) continue;
+      const overlaps =
+        box.x <= band.x + band.width && box.x + box.width >= band.x && box.y <= band.y + band.height && box.y + box.height >= band.y;
+      if (overlaps) for (const id of group.stepIds) if (!picked.includes(id)) picked.push(id);
+    }
+    onSelectSteps(picked);
     setMarquee(null);
     releasePan();
   };
@@ -506,7 +589,10 @@ export function CanvasView({
     if (sourceStep?.id) {
       const existingPaths = sourceStep.paths ?? [];
       const candidateTrigger = existingPaths[0]?.trigger ?? "manual";
-      const result = resolveDropGesture(point, nodePositions, existingPaths, candidateTrigger, sourceStep.terminal === true);
+      // Visible nodes only: a hidden member is not a connect-drag target, or
+      // a release over a collapsed box would create a path to a step nobody
+      // can see.
+      const result = resolveDropGesture(point, visibleNodePositions, existingPaths, candidateTrigger, sourceStep.terminal === true);
 
       if (result.kind === "rejected") {
         showRejection(e, result.reason);
@@ -601,9 +687,38 @@ export function CanvasView({
           </marker>
         </defs>
 
+        {/* Groups draw first, so every node and every route sits over them.
+            A box is a container, not a control: the design language gives it
+            a hairline and no fill, and the grid dots stay visible through it. */}
+        {groupBoxes.map(({ group, box }) => {
+          if (!box) return null;
+          const dragging = groupDrag?.groupId === group.id;
+          const delta = dragging ? dragDelta(groupDrag.startPointer, groupDrag.current) : { x: 0, y: 0 };
+          const moved = dragging ? snapToGrid({ x: box.x + delta.x, y: box.y + delta.y }) : box;
+          const members = group.stepIds.length;
+          return (
+            <g
+              key={group.id}
+              className={`canvas-group panzoom-exclude${group.collapsed ? " canvas-group-collapsed" : ""}`}
+              onPointerDown={(e) => onGroupPointerDown(e, group)}
+              onPointerMove={onGroupPointerMove}
+              onPointerUp={(e) => onGroupPointerUp(e, group)}
+            >
+              <rect x={moved.x} y={moved.y} width={box.width} height={box.height} rx={0} className="canvas-group-box" />
+              <text x={moved.x + 8} y={group.collapsed ? moved.y + 24 : moved.y - 6} className="canvas-group-name">
+                {group.name}
+              </text>
+              {group.collapsed && (
+                <text x={moved.x + 8} y={moved.y + 44} className="canvas-group-count">
+                  {members} {t("canvas.groupStepCount")}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
         {steps.map((step) => {
           if (!step.id) return null;
-          const source = positionOf(step.id);
           const operands = buildOperands({
             fields: draft.fields,
             locale: contentLocale,
@@ -612,13 +727,29 @@ export function CanvasView({
           });
           return (step.paths ?? []).map((path, pathIndex) => {
             if (!path.to) return null;
-            const target = positionOf(path.to);
             // Both anchors depend on the target, so they resolve per path
             // rather than once per step: one step's paths can leave four
             // different sides. With waypoints they face the first and the
             // last of those instead.
             const pathWaypoints = (path.id !== undefined ? waypoints[path.id] : undefined) ?? [];
-            const routed = routeThroughWaypoints(source, target, pathWaypoints);
+            // A collapsed group's box stands in for a hidden member, so the
+            // route ends on the box rather than on a step nobody can see. Two
+            // members of one collapsed group have nothing to draw between.
+            const sourceBox = anchorBoxFor(step.id as string, groups, positionsById);
+            const targetBox = anchorBoxFor(path.to as string, groups, positionsById);
+            if (!sourceBox || !targetBox) return null;
+            if (hidden.has(step.id as string) && hidden.has(path.to) && sourceBox.x === targetBox.x && sourceBox.y === targetBox.y) {
+              return null;
+            }
+            const routed = routeThroughWaypoints(
+              { x: sourceBox.x, y: sourceBox.y },
+              { x: targetBox.x, y: targetBox.y },
+              pathWaypoints,
+              {
+                source: { width: sourceBox.width, height: sourceBox.height },
+                target: { width: targetBox.width, height: targetBox.height },
+              },
+            );
             const route = routed.points;
             const d = routePath(route, edgeStyle);
             // The badge and the guard label follow the route, not a straight
@@ -723,6 +854,7 @@ export function CanvasView({
 
         {steps.map((step) => {
           if (!step.id) return null;
+          if (hidden.has(step.id)) return null;
           const pos = positionOf(step.id);
           const draggedFrom = nodeDrag?.startPos[step.id];
           // The preview rounds exactly as the release does, so the node under

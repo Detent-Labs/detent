@@ -346,6 +346,53 @@
   cursor: grab;
 }
 
+/* A container, not a control: a hairline and no fill, so the grid dots stay
+   visible through it and it never reads as a card. A collapsed group is a
+   surface instead, because it stands in for the steps it hides. */
+.canvas-group {
+  cursor: grab;
+}
+
+/* `fill: none` leaves only the 1px stroke hit-testable, and the browser check
+   earned that: a grab inside an expanded box reached the canvas beneath. The
+   interior stays the canvas's — a marquee and a pan still work over it — and
+   the group's own name is the handle that drags it. */
+.canvas-group-box {
+  fill: none;
+  stroke: var(--color-border);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.canvas-group-name {
+  cursor: grab;
+}
+
+/* A collapsed group is a surface, so its whole box takes the pointer the way
+   a node's does. It stands in for the steps it hides. */
+.canvas-group-collapsed .canvas-group-box {
+  fill: var(--color-surface);
+  stroke-width: 1.5;
+  pointer-events: all;
+}
+
+.canvas-group-name {
+  font-family: var(--font-body);
+  font-size: 12px;
+  fill: var(--color-text-muted);
+}
+
+.canvas-group-collapsed .canvas-group-name {
+  font-size: 13px;
+  fill: var(--color-text);
+}
+
+.canvas-group-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  fill: var(--color-text-muted);
+}
+
 .canvas-node-rect {
   fill: var(--color-surface);
   stroke: var(--color-border);

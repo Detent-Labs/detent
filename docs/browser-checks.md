@@ -781,3 +781,39 @@ Pass: the path draws the straight route it drew at the start.
 Find a guarded automatic path and select it. Pass: the midpoint square sits
 over its guard label and stays grabbable. Deselect. Pass: the label reads
 whole again.
+
+### Canvas step groups (`canvas-step-groups`)
+
+Open Studio and a draft with four or more steps. Most of this entry is a
+visual judgment against the drawn boxes.
+
+Click one step, then shift-click a second. Pass: the third column offers
+"Group these steps". Activate it. Pass: a hairline box encloses both nodes,
+carrying the name "Group", and the grid dots stay visible through it. Watch
+for the defect: a box that hides a node, which means it drew in front.
+
+Drag the box by its NAME. Pass: both members move by the same amount and land
+on grid dots. The box follows them, and no other step moves. The interior is
+not a handle. A drag started inside the box pans the canvas instead, which
+leaves the marquee usable over a group.
+
+Collapse the group. Pass: both members go, one node-sized box remains with an
+opaque fill, and it reads "2 steps". A path from a step outside now ends on
+that box. A path between the two hidden members does not draw at all.
+
+Shift-drag a marquee over the collapsed box. Pass: the selection reports the
+group's own member count, and the summary offers Expand and Ungroup. No
+hidden step of any other group joins it.
+
+Expand. Pass: every member returns to the position it held, and every path
+draws again.
+
+Save the draft and open it again. Pass: the box, its name and its members are
+as you left them.
+
+Ungroup. Pass: the box goes. Every step keeps its position and every path
+still draws.
+
+One case this walk leaves to a test. A path may carry a waypoint into a group
+that then collapses. `studio-canvas-groups.test.ts` asserts two things about
+its route. It passes through the waypoint, and it ends on the box's own side.
