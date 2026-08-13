@@ -1369,6 +1369,47 @@ Stage-by-stage status is in `ROADMAP.md`.
   constants sit on the lattice. An auto-placed step therefore does not shift on
   its first drag. No step size both matched the drawn dots and divided the old
   four.
+- Canvas multi-select (`packages/web/src/areas/studio/canvas/selection.ts`,
+  `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`, `areas/studio/app.css`):
+  the canvas selects a set of steps, not one.
+
+  `EditorArea` holds `selectedStepIds: string[]`. A set of one drives the
+  inspector exactly as the single id did. A set of several drives a summary
+  instead — a count, a Remove steps control, and the same collapsed checks rail
+  the inspector docks — because the inspector edits one step.
+
+  `canvas/selection.ts` exports `toggleSelection`, `normalizeRect` and
+  `nodesInRect`, all pure and covered by
+  `packages/web/test/studio-canvas-selection.test.ts`. The marquee selects on
+  overlap, not containment: at the fit scale a 180-by-60 node fills most of the
+  visible canvas, so containment would be unusable.
+
+  Three Panzoom facts shaped the gesture, and each one is load-bearing.
+
+  Its down-handler binds to `.canvas-wrap` in the bubble phase and its default
+  `handleStartEvent` calls `stopPropagation()`, while React binds at the root,
+  an ancestor. A bubble-phase `onPointerDown` there never runs at all, so the
+  marquee starts on `onPointerDownCapture`.
+
+  Panzoom scales the SVG element, so at any zoom under 1 most of the visible
+  canvas sits outside the SVG's own box. The gesture binds to `.canvas-wrap`
+  for that reason, as `onPaletteDrop` already does, and the band draws as an
+  HTML overlay there rather than as an SVG rect that would clip at the
+  shrunken viewport.
+
+  Panzoom binds `move` and `up` on `document`, so the marquee takes pointer
+  capture and restores `disablePan` from `onLostPointerCapture` as well as
+  `onPointerUp`. A release outside the canvas would otherwise leave it
+  unpannable for the life of the screen.
+
+  Panning dies through `panzoom.setOptions({ disablePan: true })`, not by
+  cancelling the gesture. Panzoom's `constrainXY` reads that option off a fresh
+  spread on every call, so setting it mid-gesture stops a pan that has already
+  started.
+
+  A group move rounds each member's own result rather than the shared delta,
+  which is stage 37's rule applied unchanged. Every selection write stays at
+  pointer-up; pointer-down only decides which steps the gesture moves.
 - Process Studio — lifecycle (`src/http/studio-routes.ts`, `src/engine/drafts.ts`,
   `src/http/errors.ts`, `packages/web/src/areas/studio/panels/DraftToolbar.tsx`,
   `packages/web/src/areas/studio/screens/{VersionsScreen,MigrationPlanScreen}.tsx`,

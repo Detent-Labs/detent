@@ -8,6 +8,7 @@ import { seedLocalizedText, resolveDraftLocalizedText } from "../draft/localized
 import { t } from "../catalog.js";
 import { autoPlaceSteps, type LayoutStep } from "./layout";
 import { dragDelta, exceedsClickThreshold, snapToGrid, svgPointFromClient, GRID_STEP, NODE_WIDTH, NODE_HEIGHT, type Point, type NodePosition } from "./geometry";
+import { toggleSelection, normalizeRect, nodesInRect } from "./selection";
 import { computeFit, MIN_SCALE, MAX_SCALE, FIT_GUTTER, type Fit } from "./fit";
 import { resolveDropGesture } from "./dropGesture";
 import { inlineRenamePatch } from "./inlineRename";
@@ -19,11 +20,17 @@ const REJECT_MESSAGE_MS = 4000;
 interface Props {
   layout: Record<string, unknown>;
   onMoveStep: (stepId: string, point: Point) => void;
-  selectedStepId: string | undefined;
+  /** The selection is a set, not one id (design.md): it is the interaction
+   * state stages 30 to 34 build on, and multi-move and multi-delete come with
+   * it. A set of one behaves exactly as the single selection did. */
+  selectedStepIds: string[];
   /** The second argument carries the clicked path's id (task 3.13),
    * `undefined` for a node click or a deselect — `PathsPanel` uses it to
-   * highlight one row rather than only expanding its section. */
+   * highlight one row rather than only expanding its section. Writes a set of
+   * one, or an empty one. */
   onSelectStep: (stepId: string | undefined, pathId?: string) => void;
+  /** The whole set at once: a shift-click's toggle and a marquee's release. */
+  onSelectSteps: (stepIds: string[]) => void;
   selectedPathId?: string;
 }
 
@@ -37,7 +44,7 @@ function isPoint(value: unknown): value is Point {
  * (not the Draft model); path creation writes through `useDraft()`/
  * `mutate()`, the same surface `PathsPanel`'s "add path" action uses.
  */
-export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, selectedPathId }: Props) {
+export function CanvasView({ layout, onMoveStep, selectedStepIds, onSelectStep, onSelectSteps, selectedPathId }: Props) {
   const { draft, mutate, contentLocale, loadedChildren } = useDraft();
   const steps = draft.workflow?.steps ?? [];
   const initialStepId = draft.workflow?.initialStep;
@@ -201,8 +208,29 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
     [steps, initialStepId, layout],
   );
 
-  const [nodeDrag, setNodeDrag] = useState<{ stepId: string; startPointer: Point; startPos: Point; current: Point } | null>(null);
+  // `stepIds` is what the gesture moves; `stepId` is the node under the
+  // pointer. The two differ whenever the press lands on a member of a
+  // multi-step selection. `startPos` snapshots each mover's position at
+  // pointer-down, so the preview and the release read the same origin.
+  const [nodeDrag, setNodeDrag] = useState<{
+    stepId: string;
+    stepIds: string[];
+    startPointer: Point;
+    startPos: Record<string, Point>;
+    current: Point;
+  } | null>(null);
   const [connectDrag, setConnectDrag] = useState<{ sourceStepId: string; current: Point } | null>(null);
+  // The rubber band. Non-null only while it draws.
+  //
+  // It carries both spaces on purpose. The band itself is an HTML overlay in
+  // `.canvas-wrap`'s own coordinates, the way `.canvas-reject-message` already
+  // is: Panzoom scales the SVG element, so an SVG rect would clip at the
+  // shrunken viewport whenever the band starts outside it — which is most of
+  // the visible canvas at any zoom under 1. `startSvg` is the same press in
+  // user space, which the release needs for the hit test against node
+  // positions. `origin` is `.canvas-wrap`'s top-left at press time; the wrap
+  // never transforms, so one reading holds for the whole gesture.
+  const [marquee, setMarquee] = useState<{ origin: Point; startClient: Point; currentClient: Point; startSvg: Point } | null>(null);
   const [rejectMessage, setRejectMessage] = useState<{ text: string; x: number; y: number } | null>(null);
   // The step node whose label is being renamed inline (task 3.8), and the
   // text field's live value. Neither writes the draft until commit.
@@ -250,7 +278,15 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
     e.stopPropagation();
     capturePointer(e);
     const p = toSvgPoint(e);
-    setNodeDrag({ stepId, startPointer: p, startPos: positionOf(stepId), current: p });
+    // Pointer-down writes no selection (design.md): every selection write
+    // stays at pointer-up, where the shift decides between a toggle and a
+    // replace. Writing here instead would replace the set under a
+    // shift-press, and the second shift-click of a pair would leave one step
+    // selected.
+    const stepIds = selectedStepIds.includes(stepId) && !e.shiftKey ? selectedStepIds : [stepId];
+    const startPos: Record<string, Point> = {};
+    for (const id of stepIds) startPos[id] = positionOf(id);
+    setNodeDrag({ stepId, stepIds, startPointer: p, startPos, current: p });
   };
 
   const onNodePointerMove = (e: React.PointerEvent) => {
@@ -265,12 +301,72 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
     if (exceedsClickThreshold(delta)) {
       // After the click threshold, never before: a movement under it selects
       // rather than moves, and rounding first would write a position for a
-      // click.
-      onMoveStep(nodeDrag.stepId, snapToGrid({ x: nodeDrag.startPos.x + delta.x, y: nodeDrag.startPos.y + delta.y }));
+      // click. Each mover rounds its own result, not the shared delta — every
+      // layout constant is a whole multiple of GRID_STEP, so a group on the
+      // lattice keeps its relative offsets and each member stays on it.
+      for (const id of nodeDrag.stepIds) {
+        const start = nodeDrag.startPos[id];
+        if (start) onMoveStep(id, snapToGrid({ x: start.x + delta.x, y: start.y + delta.y }));
+      }
+      // Dragging a node the set did not hold makes it the whole selection.
+      if (!selectedStepIds.includes(nodeDrag.stepId)) onSelectStep(nodeDrag.stepId);
+    } else if (e.shiftKey) {
+      onSelectSteps(toggleSelection(selectedStepIds, stepId));
     } else {
       onSelectStep(stepId);
     }
     setNodeDrag(null);
+  };
+
+  /**
+   * The marquee binds to `.canvas-wrap`, and in the CAPTURE phase. Both halves
+   * are load-bearing, and each one cost a browser check.
+   *
+   * The wrap, not the SVG: Panzoom scales the SVG element itself, so at any
+   * zoom under 1 most of what an author reads as canvas — grid dots and all —
+   * sits outside the SVG's own box. A handler on the SVG never sees that
+   * press. `onPaletteDrop` resolves through `.canvas-wrap` for the same
+   * reason.
+   *
+   * The capture phase, not the bubble phase: Panzoom's own down-handler binds
+   * to `.canvas-wrap` and its default `handleStartEvent` calls
+   * `stopPropagation()`. React binds at the root, an ancestor of the wrap, so
+   * a bubble-phase handler here would never run at all. React dispatches its
+   * capture handlers while the event still travels down, before the wrap's own
+   * listener fires.
+   *
+   * A node, edge or toolbar press reaches this too, so it needs the same
+   * `.panzoom-exclude` guard the wheel listener uses.
+   */
+  const onCanvasPointerDownCapture = (e: React.PointerEvent) => {
+    if (!e.shiftKey) return;
+    if ((e.target as Element).closest(".panzoom-exclude")) return;
+    capturePointer(e);
+    // Panzoom has not run yet, but it will, and it will set `isPanning`. Its
+    // `constrainXY` reads `disablePan` off a fresh options spread on every
+    // call, so setting it here kills the pan that is about to start.
+    panzoomRef.current?.setOptions({ disablePan: true });
+    const wrap = e.currentTarget.getBoundingClientRect();
+    const client = { x: e.clientX, y: e.clientY };
+    setMarquee({ origin: { x: wrap.left, y: wrap.top }, startClient: client, currentClient: client, startSvg: toSvgPoint(e) });
+  };
+
+  const onMarqueePointerMove = (e: React.PointerEvent) => {
+    if (!marquee) return;
+    setMarquee({ ...marquee, currentClient: { x: e.clientX, y: e.clientY } });
+  };
+
+  // Restoring `disablePan` is not optional and not only a pointer-up concern:
+  // Panzoom binds `up` on `document`, so a release outside the SVG would leave
+  // the canvas unpannable for the life of the screen. Pointer capture (above)
+  // routes the release here, and lost capture is the backstop.
+  const releasePan = () => panzoomRef.current?.setOptions({ disablePan: false });
+
+  const onMarqueePointerUp = (e: React.PointerEvent) => {
+    if (!marquee) return;
+    onSelectSteps(nodesInRect(normalizeRect(marquee.startSvg, toSvgPoint(e)), nodePositions));
+    setMarquee(null);
+    releasePan();
   };
 
   const startRename = (stepId: string, currentLabel: string) => {
@@ -349,6 +445,9 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
   };
 
   const onBackgroundPointerUp = (e: React.PointerEvent) => {
+    // A marquee release is not a deselect. It runs on the wrap, after this
+    // one, and would otherwise empty the set it had just built.
+    if (marquee) return;
     if (e.target === svgRef.current) onSelectStep(undefined);
   };
 
@@ -364,7 +463,16 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
     [];
 
   return (
-    <div className="canvas-wrap">
+    <div
+      className="canvas-wrap"
+      onPointerDownCapture={onCanvasPointerDownCapture}
+      onPointerMove={onMarqueePointerMove}
+      onPointerUp={onMarqueePointerUp}
+      onLostPointerCapture={() => {
+        if (marquee) setMarquee(null);
+        releasePan();
+      }}
+    >
       <div className="canvas-toolbar panzoom-exclude" ref={toolbarRef}>
         <button type="button" className="btn btn-secondary" onClick={fitToView}>
           {t("canvas.fitToView")}
@@ -477,19 +585,20 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
         {steps.map((step) => {
           if (!step.id) return null;
           const pos = positionOf(step.id);
-          const dragged = nodeDrag?.stepId === step.id;
+          const draggedFrom = nodeDrag?.startPos[step.id];
           // The preview rounds exactly as the release does, so the node under
           // the pointer is the node the author gets. Drawing the raw point
-          // here would make it jump at release.
-          const previewed = dragged
+          // here would make it jump at release. Every member of the moving set
+          // previews, not only the node under the pointer.
+          const previewed = draggedFrom
             ? snapToGrid({
-                x: nodeDrag!.startPos.x + dragDelta(nodeDrag!.startPointer, nodeDrag!.current).x,
-                y: nodeDrag!.startPos.y + dragDelta(nodeDrag!.startPointer, nodeDrag!.current).y,
+                x: draggedFrom.x + dragDelta(nodeDrag!.startPointer, nodeDrag!.current).x,
+                y: draggedFrom.y + dragDelta(nodeDrag!.startPointer, nodeDrag!.current).y,
               })
             : pos;
           const x = previewed.x;
           const y = previewed.y;
-          const isSelected = selectedStepId === step.id;
+          const isSelected = selectedStepIds.includes(step.id);
           const isInitial = initialStepId === step.id;
           const isTerminal = step.terminal === true;
           const isRenaming = renaming?.stepId === step.id;
@@ -585,7 +694,20 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
             </div>
           </foreignObject>
         ))}
+
       </svg>
+      {marquee &&
+        (() => {
+          // Wrap-relative, so the band covers every part of the visible canvas
+          // rather than clipping at the transformed SVG's own viewport.
+          const r = normalizeRect(marquee.startClient, marquee.currentClient);
+          return (
+            <div
+              className="canvas-marquee"
+              style={{ left: r.x - marquee.origin.x, top: r.y - marquee.origin.y, width: r.width, height: r.height }}
+            />
+          );
+        })()}
       {rejectMessage && (
         <div className="canvas-reject-message" style={{ left: rejectMessage.x, top: rejectMessage.y }}>
           {rejectMessage.text}

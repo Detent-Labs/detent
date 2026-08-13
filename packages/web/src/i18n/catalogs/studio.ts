@@ -279,6 +279,8 @@ export const en = {
   "canvas.elseMarker": "else",
   "canvas.initialStamp": "start",
   "canvas.inspectorEmpty": "Select a step or a path to edit it.",
+  "canvas.selectionHeading": "Steps selected",
+  "canvas.selectionRemove": "Remove steps",
 
   "expression.placeholder": "CEL expression",
   "plugin.typePlaceholder": "plugin type identifier",

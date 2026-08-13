@@ -587,3 +587,45 @@ zoom you are at.
 Open a draft nobody has dragged yet. Pass: every step already sits on a dot.
 Drag one by a whole number of dots. Pass: it moves by exactly that, with no
 extra nudge on the first drag.
+
+### Canvas multi-select (`canvas-multi-select`)
+
+Open Studio and a draft with four or more steps. The shift key carries the
+whole gesture vocabulary. Hold it to build a selection. Release it to work as
+before.
+
+Click one step, then shift-click a second. Pass: both draw with the accent
+outline, and the third column reports a count of 2. Shift-click the second one
+again. Pass: it drops out, the count is gone, and the first step's inspector is
+back.
+
+Click a fifth step with no shift held. Pass: the canvas draws that step alone
+as selected, whatever the set held before.
+
+Shift-drag a band over two steps, starting on empty canvas. Pass: the band
+draws as you move, the canvas does not travel under it, and both steps end up
+selected. Watch the graph, not the band. A canvas that pans here is the defect
+this check exists for.
+
+Repeat that after panning and zooming in two steps. Pass: the band still lands
+on the steps under it, and the canvas still holds still. Zoom out past the fit
+scale and repeat. Pass: the band's outline is still a hairline, not a fat rule.
+
+Shift-drag a band over nothing. Pass: the selection empties.
+
+Drag one member of a three-step selection. Pass: all three travel together,
+each lands on a dot, and their spacing is what it was. Drag a step the
+selection does not hold. Pass: it moves alone, and it becomes the only
+selected step.
+
+Press a member of a selection and release without moving. Pass: nothing moves.
+
+Select three steps and choose Remove steps. Pass: those three are gone, the
+others stay, and the column shows the full checks rail again. If one of them
+was the initial step, the start marker moved to a remaining step.
+
+Select two steps and read the bottom of the column. Pass: the collapsed checks
+summary still docks there, with the same count the inspector shows.
+
+Now pan the canvas with a plain drag. Pass: it pans, as it always did. The
+marquee took nothing away.

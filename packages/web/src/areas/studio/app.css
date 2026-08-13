@@ -450,6 +450,29 @@
   padding: var(--space-3);
 }
 
+/* The rubber band a shift-drag draws over the canvas. The accent marks a
+   region here, so it stays a stamp: a hairline outline over a wash, never a
+   fill that paints the graph underneath it. Radius 0, like every other surface.
+
+   An HTML overlay in `.canvas-wrap`, not a rect inside the SVG, and a sibling
+   of `.canvas-reject-message` for the same reason that one is. Panzoom scales
+   the SVG element, so an SVG rect clips at the shrunken viewport whenever the
+   band starts outside it — which is most of the visible canvas at any zoom
+   under 1. It also makes the outline one CSS pixel at every zoom, with no
+   `non-scaling-stroke` to arrange.
+
+   `pointer-events: none` is load-bearing, not cosmetic. The band sits over
+   every node; taking the pointer would make it the pointer-up target, and
+   `onBackgroundPointerUp` reads that target to decide whether a press was a
+   deselect. */
+.canvas-marquee {
+  position: absolute;
+  z-index: 1;
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  border: 1px dashed var(--color-accent);
+  pointer-events: none;
+}
+
 .canvas-reject-message {
   position: absolute;
   z-index: 2;
@@ -1739,6 +1762,47 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-3);
+}
+
+/* The third column while several steps are selected. It reuses
+   `.canvas-inspector`'s box, so the column keeps one frame in all three of its
+   states rather than growing a second shape for this one.
+
+   The heading repeats the reading `.studio-checks-rail-summary` already
+   teaches on this same screen: a label flush left, its quantity right-aligned
+   in the mono face. The count is the one machine value here, so it is the one
+   thing that earns mono. The 2px rule under it is the structural weight, the
+   same one `.step-inspector-heading` draws.
+
+   The remove control stays outlined. This screen's one primary action is in
+   the header bar, and a destructive action is outlined here in any case. */
+.canvas-selection {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.canvas-selection-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  padding-bottom: var(--space-2);
+  border-bottom: 2px solid var(--color-divider);
+}
+
+.canvas-selection-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The docked rail sits at the bottom edge, so it takes the column's remaining
+   height rather than floating under the control. */
+.canvas-selection .studio-checks-rail-docked {
+  width: 100%;
+  margin-top: auto;
 }
 
 .steps-panel-empty-copy {

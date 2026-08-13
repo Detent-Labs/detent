@@ -942,7 +942,8 @@ Spec: `development-toolchain`.
     all touch the same path geometry a control point would bend. No design
     doc, no OpenSpec change yet.
 
-34. Selection grouping (group/ungroup nodes): NOT STARTED. Raised 2026-08-10
+34. Selection grouping (group/ungroup nodes): **MULTI-SELECT DONE, GROUPING
+    NOT STARTED.** Raised 2026-08-10
     in conversation. An author selects several steps at once and groups them
     into one movable, collapsible unit, the way React Flow's grouping example
     turns a multi-selection into a parent group node, and later ungroups it.
@@ -967,6 +968,19 @@ Spec: `development-toolchain`.
     with the selection set. Grouping stays the second change and runs after the
     edge work. The stage keeps one number: this splits the delivery, not the
     scope.
+    The first delivery landed 2026-08-13 as `canvas-multi-select`. The canvas
+    now holds `selectedStepIds: string[]`. A shift-click toggles a step, a
+    shift-drag draws a marquee that selects on overlap, a drag on any member
+    moves the whole set, and a set of several swaps the third column to a count
+    and a Remove steps control. Three rules live in `canvas/selection.ts` as
+    pure, tested functions: the toggle, the corner sort, and the overlap test.
+    Two Panzoom facts shaped the gesture. Its down-handler stops propagation at
+    `.canvas-wrap`, so the marquee starts on `onPointerDownCapture` rather than
+    on a bubble-phase handler that never runs. And it binds `up` on `document`,
+    so the marquee takes pointer capture and restores `disablePan` on lost
+    capture too — a release outside the SVG would otherwise leave the canvas
+    unpannable. The deltas landed in `studio-canvas` and `studio-checks-rail`.
+    Grouping itself stays the second delivery, after the edge work.
 
 35. **Starter access to a started instance: DONE.** Raised 2026-08-12 in
     conversation, as the question of whether a process instance records who

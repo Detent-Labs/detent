@@ -229,12 +229,16 @@ without an outcome key.
 
 `StepsPanel` SHALL mount as a fixed-width column in the canvas edit
 screen's third position. It replaces the `studio-checks-rail`
-capability's checks rail there whenever the developer selects a step or
-a path.
+capability's checks rail there whenever the developer selects exactly one
+step, or a path.
 
 When the developer selects no step and no path, the third column SHALL
 show the checks rail. It SHALL NOT show the inspector at all in that
 state.
+
+A selection of more than one step reaches neither of those two. The third
+column SHALL show that selection's own count and delete control instead. The
+selection-set requirements above state both.
 
 Selecting a step node on the canvas SHALL show that one step's sections
 in the inspector. This replaces the checks rail, and any prior step's or
@@ -386,6 +390,7 @@ the first step; see the palette requirement below.
 - **WHEN** an empty draft has no step, and the developer has selected
   nothing
 - **THEN** the palette's Step entry stays visible and usable
+
 ### Requirement: The canvas supports pan and zoom over the process graph
 
 The canvas SHALL support panning by dragging empty canvas space. The canvas
@@ -537,9 +542,11 @@ SHALL remain panel-only.
 
 ### Requirement: Canvas interaction logic is tested as pure functions, independent of rendering
 
-Five computations SHALL live in pure modules with `bun:test` coverage. Those
-are hit-testing, drag-delta computation, the auto-place traversal, the
-connection-validity predicate and the fit-to-view computation.
+Seven computations SHALL live in pure modules with `bun:test` coverage. Five
+carry over unchanged: hit-testing, drag-delta computation, the auto-place
+traversal, the connection-validity predicate and the fit-to-view computation.
+Two are new. One is the rule that toggles a step in the selection set. The
+other is the marquee's overlap test against node rectangles.
 `packages/web/src/areas/app/screens/inboxLogic.ts` sets that convention. The
 tests need not cover the SVG rendering or the pointer-event wiring.
 
@@ -556,6 +563,13 @@ tests need not cover the SVG rendering or the pointer-event wiring.
   a viewport size
 - **THEN** it returns a zoom level and a pan offset, and the test needs no DOM
   or canvas rendering
+
+#### Scenario: The selection toggle and the overlap test hold without rendering
+
+- **WHEN** a test gives the toggle a list of ids and one more id
+- **AND** gives the overlap test a rectangle and a list of node positions
+- **THEN** each returns its own list of ids, and the test needs no DOM or
+  canvas rendering
 
 ### Requirement: Layout computation does not re-run on pointer movement
 
@@ -597,9 +611,10 @@ inspector, never both at once.
 
 The third column SHALL show the checks rail when the developer has
 selected no step and no path. It SHALL show the inspector when the
-developer selects a step or a path. See the `studio-checks-rail`
-capability for the rail's own collapsed presentation in the
-step-selected state.
+developer selects exactly one step, or a path. It SHALL show the
+selection's own count and delete control when the selection holds more
+than one step. See the `studio-checks-rail` capability for the rail's own
+collapsed presentation in the step-selected state.
 
 The three columns SHALL fill the window's height that the screen's own
 header rows leave, above a floor of 36rem. A window taller than that floor
@@ -621,9 +636,16 @@ and the canvas between them takes the rest.
 
 #### Scenario: The third column shows the inspector once the developer selects a step
 
-- **WHEN** the developer selects a step or a path
+- **WHEN** the developer selects one step, or a path
 - **THEN** the third column shows the inspector, not the full checks
   rail
+
+#### Scenario: The third column shows the count with several steps selected
+
+- **WHEN** the developer selects more than one step
+- **THEN** the third column shows the selection count and its delete
+  control
+- **AND** it shows neither the inspector nor the full checks rail
 
 #### Scenario: A tall window grows the columns rather than leaving a band below them
 
@@ -923,3 +945,127 @@ it.
 - **WHEN** the grid step divides the row pitch, the column pitch, the node
   width and the node height
 - **THEN** each division leaves no remainder
+
+### Requirement: The canvas holds a set of selected steps
+
+The canvas selection SHALL be a set of step ids rather than one id. A set of
+one step SHALL behave as a single selection behaves today.
+
+A click on a step node SHALL replace the set with that one step. A shift-click
+SHALL add that step to the set. A shift-click on a step the set already holds
+SHALL drop it. A click on empty canvas SHALL empty the set.
+
+A shift-drag on empty canvas SHALL draw a marquee rectangle. It spans the press
+point and the pointer. On release the set SHALL hold every step whose node
+rectangle the marquee overlaps. It SHALL hold no other step. An overlap of any
+part of a node counts.
+
+The marquee SHALL NOT pan the canvas while it draws. A drag with no shift held
+SHALL pan the canvas as it does today.
+
+A click on a path SHALL leave the set holding that path's source step alone.
+The canvas SHALL hold one selected path at most.
+
+#### Scenario: Shift-clicking a second node selects both
+
+- **WHEN** the developer clicks one step node, then shift-clicks a second one
+- **THEN** the canvas draws both nodes as selected
+
+#### Scenario: Shift-clicking a node already in the set drops it
+
+- **WHEN** the developer has selected two nodes and shift-clicks one of them
+- **THEN** the canvas draws that node as unselected, and keeps the other one
+  selected
+
+#### Scenario: A plain click replaces the whole set
+
+- **WHEN** the developer has selected three nodes and clicks a fourth one with
+  no shift held
+- **THEN** the canvas draws the fourth node alone as selected
+
+#### Scenario: A marquee selects every node it touches
+
+- **WHEN** the developer shift-drags a rectangle over empty canvas
+- **AND** that rectangle overlaps two of five step nodes
+- **THEN** the set holds those two steps and no other
+- **AND** the canvas has not panned
+
+#### Scenario: A plain background drag still pans
+
+- **WHEN** the developer drags on empty canvas with no shift held
+- **THEN** the canvas pans, and no marquee draws
+
+### Requirement: Dragging a node in the set moves every step in it
+
+A drag on a step node the set holds SHALL move every step in the set. Each one
+moves by the same pointer delta.
+
+A drag on a step node the set does not hold SHALL first replace the set with
+that one step. It then moves that step alone.
+
+Each moved step SHALL land on the canvas lattice. That is the rounding a single
+drag applies today. Each moved step's position SHALL persist as draft layout,
+by the route a single drag's position already takes.
+
+The drag preview SHALL draw every moving node at its rounded position. The
+group under the pointer is then the group the developer gets on release.
+
+A movement under the click threshold SHALL still count as a click. It SHALL
+write no position for any step in the set.
+
+#### Scenario: Dragging one node of a set moves them all
+
+- **WHEN** the developer has selected three steps and drags one of the three
+- **THEN** all three move by the same delta, and each lands on the lattice
+
+#### Scenario: Dragging a node outside the set drops the rest
+
+- **WHEN** the developer has selected three steps and drags a fourth one
+- **THEN** the fourth step alone moves, and the set then holds it alone
+
+#### Scenario: A click inside a group writes no position
+
+- **WHEN** the developer has selected three steps
+- **AND** presses and releases on one of them under the click threshold
+- **THEN** no step's layout position changes
+
+### Requirement: A set of several steps offers a count and a delete control
+
+The third column SHALL show the set's count while the set holds more than one
+step. It SHALL show a control that deletes every step in the set.
+
+It SHALL NOT show the inspector in that state. The inspector edits one step,
+and a set of several names no one step for it.
+
+The delete control SHALL take each step in the set out of the draft's
+`workflow.steps`. It SHALL leave a path that points at a deleted step as it is.
+The inspector's own delete leaves such a path today, and the checks rail
+reports it.
+
+The draft SHALL take the first remaining step as its `workflow.initialStep`
+when the deleted set held it. That is the rule a single delete applies today.
+
+The third column SHALL dock the collapsed checks rail at the summary's bottom
+edge. It docks one at the inspector's bottom edge already. The
+`studio-checks-rail` capability carries that summary's own rules.
+
+The set SHALL be empty after the delete. The third column then shows the full
+checks rail again.
+
+#### Scenario: Two selected steps show a count
+
+- **WHEN** the developer selects two steps
+- **THEN** the third column reports a count of two, and shows no step sections
+- **AND** the collapsed checks rail docks at that summary's bottom edge
+
+#### Scenario: The delete control deletes every step in the set
+
+- **WHEN** the developer has selected three of five steps
+- **AND** activates the delete control
+- **THEN** the draft holds the other two steps alone
+- **AND** the third column shows the checks rail
+
+#### Scenario: Deleting the initial step moves the marker
+
+- **WHEN** the set holds the draft's initial step and the developer deletes it
+- **THEN** the draft's `workflow.initialStep` names the first remaining step

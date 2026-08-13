@@ -45,6 +45,13 @@ Selecting a step or a path swaps the third column's content. It SHALL
 show the inspector, not the full checks rail. The inspector SHALL dock a
 one-line checks summary at its bottom edge.
 
+Selecting more than one step swaps that content again. The third column
+SHALL then show the selection's own count and delete control, which the
+`studio-canvas` capability states. That summary SHALL dock the same
+one-line checks summary at its bottom edge. An author therefore reads the
+issue count in every state of the column but one. The full rail's own state
+needs no summary, since its grouped list already carries the count.
+
 The summary SHALL show a single count: the total number of open entries
 across every group in `validation.issues[]`. The summary SHALL carry no
 count when every group is clear.
@@ -86,6 +93,13 @@ rail shows when the developer selects nothing.
 - **WHEN** the developer chooses the collapsed summary
 - **THEN** the inspector's checks area expands to the same grouped list
   the full rail shows
+
+#### Scenario: Selecting several steps keeps the docked summary
+
+- **WHEN** the developer selects more than one step
+- **THEN** the third column shows the selection count and its delete
+  control
+- **AND** the one-line checks summary docks at that summary's bottom edge
 
 ### Requirement: The rail reflects the held-back state of a structurally invalid draft
 

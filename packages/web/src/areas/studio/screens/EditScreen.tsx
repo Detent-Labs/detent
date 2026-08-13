@@ -53,7 +53,10 @@ interface EditorAreaProps {
 function EditorArea({ processId, formStepId, token, initialRevision, initialLayout, navigate, onUnauthorized }: EditorAreaProps) {
   const { draft, mutate, validation, replace, contentLocale } = useDraft();
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
-  const [selectedStepId, setSelectedStepId] = useState<string | undefined>(undefined);
+  // The canvas selection is a set (design.md). A set of one drives the
+  // inspector exactly as the single id did; a set of several drives the group
+  // summary instead, since the inspector edits one step.
+  const [selectedStepIds, setSelectedStepIds] = useState<string[]>([]);
   const [selectedPathId, setSelectedPathId] = useState<string | undefined>(undefined);
   const [surface, setSurface] = useState<"structure" | "json">("structure");
   // `undefined` while the shared modal is closed. Component state, not route
@@ -87,10 +90,38 @@ function EditorArea({ processId, formStepId, token, initialRevision, initialLayo
   };
 
   // The second argument carries a clicked path's id (task 3.13); a node
-  // click or a background deselect passes none, which clears it.
+  // click or a background deselect passes none, which clears it. This writes
+  // a set of one, or an empty one — it is the single-selection path.
   const onSelectStep = (stepId: string | undefined, pathId?: string) => {
-    setSelectedStepId(stepId);
+    setSelectedStepIds(stepId ? [stepId] : []);
     setSelectedPathId(pathId);
+  };
+
+  // The whole set at once: a shift-click's toggle and a marquee's release. A
+  // path belongs to one step, so a set write drops any selected path.
+  const onSelectSteps = (stepIds: string[]) => {
+    setSelectedStepIds(stepIds);
+    setSelectedPathId(undefined);
+  };
+
+  // The inspector takes one step. A set of several names none for it, and the
+  // group summary stands in (studio-canvas: "It SHALL NOT show the inspector
+  // in that state").
+  const inspectedStepId = selectedStepIds.length === 1 ? selectedStepIds[0] : undefined;
+
+  /** Deletes every step in the set, the way `StepsPanel.removeStep` deletes
+   * one. A path pointing at a deleted step stays as it is; the single delete
+   * leaves one the same way, and the checks rail reports it. */
+  const deleteSelection = () => {
+    const doomed = new Set(selectedStepIds);
+    mutate((d) => {
+      if (!d.workflow?.steps) return;
+      d.workflow.steps = d.workflow.steps.filter((s) => !s.id || !doomed.has(s.id));
+      if (d.workflow.initialStep && doomed.has(d.workflow.initialStep)) {
+        d.workflow.initialStep = d.workflow.steps[0]?.id;
+      }
+    });
+    onSelectStep(undefined);
   };
 
   /** The rail's own drag-to-place (task 2.3), through the same `newStep`/
@@ -211,22 +242,35 @@ function EditorArea({ processId, formStepId, token, initialRevision, initialLayo
               <CanvasView
                 layout={saveState.layout}
                 onMoveStep={onMoveStep}
-                selectedStepId={selectedStepId}
+                selectedStepIds={selectedStepIds}
                 onSelectStep={onSelectStep}
+                onSelectSteps={onSelectSteps}
                 selectedPathId={selectedPathId}
               />
-              {/* The third column: the inspector when a step or a path is
-                  selected, the full checks rail otherwise — never both
-                  (studio-canvas: "the canvas edit screen lays out a
-                  palette, the canvas, the inspector, and a checks rail").
-                  `StepsPanel` docks its own collapsed `ChecksRail` at its
-                  bottom edge; this column never mounts a second copy. */}
-              {selectedStepId !== undefined || selectedPathId !== undefined ? (
+              {/* The third column has three states (studio-canvas). Nothing
+                  selected shows the full checks rail. One step or a path
+                  shows the inspector. Several steps show the group summary,
+                  since the inspector edits one step and a set of several
+                  names none for it. The inspector and the summary each dock
+                  their own collapsed `ChecksRail`; this column never mounts a
+                  second copy beside one of them. */}
+              {selectedStepIds.length > 1 ? (
+                <aside className="canvas-inspector canvas-selection">
+                  <div className="canvas-selection-heading">
+                    <span className="canvas-selection-label">{t("canvas.selectionHeading")}</span>
+                    <span className="canvas-selection-count">{selectedStepIds.length}</span>
+                  </div>
+                  <button type="button" className="btn btn-secondary" onClick={deleteSelection}>
+                    {t("canvas.selectionRemove")}
+                  </button>
+                  <ChecksRail validation={validation} collapsed />
+                </aside>
+              ) : inspectedStepId !== undefined || selectedPathId !== undefined ? (
                 <aside className="canvas-inspector">
                   <StepsPanel
                     fields={fields}
                     token={token}
-                    selectedStepId={selectedStepId}
+                    selectedStepId={inspectedStepId}
                     onSelectStep={onSelectStep}
                     selectedPathId={selectedPathId}
                     navigate={(stepId) => navigate({ name: "edit", processId, formStepId: stepId })}
