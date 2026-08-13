@@ -352,6 +352,14 @@
   stroke-width: 1.5;
 }
 
+/* An SVG rect fills black without this. The hairline is the subordinate of the
+   two rule weights, and the outer rule keeps the selection treatment. */
+.canvas-node-subprocess {
+  fill: none;
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+
 .canvas-node-selected {
   stroke: var(--color-accent);
   stroke-width: 2;

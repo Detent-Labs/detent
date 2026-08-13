@@ -928,7 +928,7 @@ Spec: `development-toolchain`.
     held to decide this stage's cost. These anchors are trigonometry between
     two centres, and no router reaches them.
 
-32. Shape per step/path kind on the canvas: NOT STARTED. Raised 2026-08-10 in
+32. **Shape per step/path kind on the canvas: DONE.** Raised 2026-08-10 in
     conversation, alongside stages 30 and 31. The ask spans both node and
     edge, in this repo's own vocabulary (`.claude/rules/ui-glossary.md`):
     Start and End are step properties (`workflow.initialStep`,
@@ -947,6 +947,21 @@ Spec: `development-toolchain`.
     automatic path draws solid against a manual path's dashed stroke. Only the
     subprocess step is indistinguishable from a task step. It gains an inset
     second rule inside its rectangle: radius 0, and no new colour role.
+    Shipped 2026-08-13 as `canvas-subprocess-step-shape`. The rule sits at
+    `x=4, y=4`, `NODE_WIDTH - 8` by `NODE_HEIGHT - 8`, under
+    `.canvas-node-subprocess`: `fill: none`, `--color-border`, and the 1px
+    hairline against the outer rule's 1.5. It reads the doubled border BPMN
+    draws on a call activity, and no new token.
+    Two facts came out of the review and the browser rather than the design.
+    The rule's right edge at x 176 overlaps the connect handle's own circle,
+    which spans 173 to 187. Paint order settles it: the rule draws before the
+    label, the key, the stamps and the handle, so every one of them covers it.
+    And the identity section's three-way "performed by" control cannot express
+    a step that is terminal AND a subprocess. That combination is reachable
+    from the JSON surface alone, which is where the browser check authored it.
+    No pure function decides the marker. `step.type === "subprocess"` is a
+    field read, and `studio-canvas`'s "Eight computations" requirement names
+    its own members. The rendering claim lives in `docs/browser-checks.md`.
 
 33. Editable edges with draggable control points: NOT STARTED. Raised
     2026-08-10 in conversation, alongside stages 30 through 32. An author

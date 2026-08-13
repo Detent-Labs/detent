@@ -675,3 +675,35 @@ step. It is not expected to sit between the two steps.
 
 An edge crosses a step that lies in its path. Pass: it does. Nothing routes
 around an obstacle, by decision, and stage 33's control points are the answer.
+
+### Canvas subprocess marker (`canvas-subprocess-step-shape`)
+
+Open Studio and a draft. Drag the palette's Subprocess entry onto the canvas,
+beside an ordinary step. This entry is a visual judgment. No test in this
+repository reads a rendered node.
+
+Read the two nodes. Pass: the subprocess step carries a second rule inside its
+rectangle, and the task step carries one rule alone. Watch for the defect: a
+filled rectangle over the label and the key. That means the rule lost its
+`fill: none`.
+
+Select the task step and switch its "performed by" control to subprocess. Pass:
+the rule appears on that node, with no reload and no other node touched. Switch
+it back. Pass: the rule leaves.
+
+Select the subprocess step. Pass: the outer rule turns to the accent, and the
+inner rule stays the border colour.
+
+Double-click the subprocess node's label. Pass: the rename field opens over the
+node, and the inner rule stays clear of it on both sides.
+
+Point at the subprocess node's connect handle. Pass: the handle draws whole. It
+overlaps the inner rule's right edge by 3px and covers it there.
+
+Set the subprocess step terminal. Then set another step as the initial step.
+Pass: each node shows its stamp above the rectangle, and the inner rule sits
+inside. Neither hides the other.
+
+Switch to the dark scheme. Pass: both rules stay legible, and neither turns
+black on a dark ground. Zoom away from 1 in both directions. Pass: the inner
+rule scales with the node and stays inside it.

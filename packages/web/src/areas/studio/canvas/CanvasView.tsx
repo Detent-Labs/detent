@@ -672,6 +672,12 @@ export function CanvasView({
                 rx={2}
                 className={isSelected ? "canvas-node-rect canvas-node-selected" : "canvas-node-rect"}
               />
+              {step.type === "subprocess" && (
+                // The doubled rule BPMN draws on a call activity. It sits before
+                // the label, the key, the stamps and the connect handle, so the
+                // handle's own circle covers the 3px it overlaps on the right.
+                <rect x={4} y={4} width={NODE_WIDTH - 8} height={NODE_HEIGHT - 8} rx={0} className="canvas-node-subprocess" />
+              )}
               {isRenaming ? (
                 <foreignObject x={6} y={14} width={NODE_WIDTH - 12} height={22} className="panzoom-exclude">
                   <input
