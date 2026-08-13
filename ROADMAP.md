@@ -987,7 +987,7 @@ Spec: `development-toolchain`.
     field read, and `studio-canvas`'s "Eight computations" requirement names
     its own members. The rendering claim lives in `docs/browser-checks.md`.
 
-33. Editable edges with draggable control points: NOT STARTED. Raised
+33. **Editable edges with draggable control points: DONE.** Raised
     2026-08-10 in conversation, alongside stages 30 through 32. An author
     drags a point on a Path's route to bend it around an obstacle, the way
     React Flow's editable-edges example lets a control point move. Path
@@ -1009,6 +1009,29 @@ Spec: `development-toolchain`.
     decision stands. Waypoints live at `layout.waypoints[pathId]`. Reset
     deletes that list and the edge returns to the direct route, so nothing
     stores what the route was before.
+    Shipped 2026-08-13 as `canvas-edge-waypoints`, and with it the last of
+    stages 30 to 33. A path may carry `layout.waypoints[pathId]`, the second
+    reserved key in that blob. A selected path draws a filled square per
+    waypoint and an outlined one at the route's midpoint. Dragging the
+    outlined square inserts, dragging a filled one moves, and a double-click
+    deletes. The last delete restores the direct route, which is the whole of
+    reset.
+    The anchors face the first and the last waypoint rather than each other,
+    so an edge dragged over a step leaves the top side. A path with no
+    waypoints takes `routeEdge` untouched and draws as it drew before.
+    The review earned its place on the insert index. `midpointOfRoute` returns
+    an index into the drawn polyline's segments, and one leg draws as one or
+    two of them, so that index names nothing in the waypoint list.
+    `routeThroughWaypoints` returns `legStarts` beside its points, and the
+    insert reads the leg off that.
+    The browser earned its place twice, and both findings were invisible to a
+    green suite. A handle without `panzoom-exclude` never sees its own press:
+    Panzoom stops propagation at `.canvas-wrap`, and React listens at the
+    root. The canvas panned instead. And running `routeEdge` per leg, which is
+    the design of record's own sentence made literal, drew a 20-unit spike out
+    of every bend: that function's gutter clears the node an anchor sits on,
+    and a waypoint has no box to clear. A leg carries no gutter now, and a
+    test pins it.
 
 34. Selection grouping (group/ungroup nodes): **MULTI-SELECT DONE, GROUPING
     NOT STARTED.** Raised 2026-08-10

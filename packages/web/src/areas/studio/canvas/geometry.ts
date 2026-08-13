@@ -105,31 +105,136 @@ const leftMid = (n: Point): Point => ({ x: n.x, y: n.y + NODE_HEIGHT / 2 });
 const bottomMid = (n: Point): Point => ({ x: n.x + NODE_WIDTH / 2, y: n.y + NODE_HEIGHT });
 const topMid = (n: Point): Point => ({ x: n.x + NODE_WIDTH / 2, y: n.y });
 
+const SIDE: Record<LeaveDirection, (n: Point) => Point> = {
+  right: rightMid,
+  left: leftMid,
+  down: bottomMid,
+  up: topMid,
+};
+
+const OPPOSITE: Record<LeaveDirection, LeaveDirection> = { right: "left", left: "right", down: "up", up: "down" };
+
+const centreOf = (n: Point): Point => ({ x: n.x + NODE_WIDTH / 2, y: n.y + NODE_HEIGHT / 2 });
+
 /**
- * The two anchors for an edge between two nodes, each at the midpoint of the
- * side its own node turns toward the other. Both read one comparison, so they
- * always sit on opposing sides and every segment stays on one axis.
- *
- * The arguments are node positions, not anchors. Every node is the same size,
- * so the offset between two top-left corners IS the offset between two
- * centres, and the comparison needs no centre arithmetic.
+ * The side of one node facing a point, and that side's own midpoint. The
+ * larger offset from the node's centre picks the axis.
  *
  * The tie takes the horizontal. A zero offset on the chosen axis takes the
  * right side: `|dx| >= |dy|` with `dx` at zero forces `dy` to zero too, so the
- * only state reaching that branch is two steps stacked on one position, and an
+ * only state reaching that branch is a point at the node's own centre, and an
  * edge still has to draw.
  */
+export function anchorSideToward(node: Point, toward: Point): { anchor: Point; leaving: LeaveDirection } {
+  const centre = centreOf(node);
+  const dx = toward.x - centre.x;
+  const dy = toward.y - centre.y;
+  const leaving: LeaveDirection =
+    Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? "right" : "left") : dy >= 0 ? "down" : "up";
+  return { anchor: SIDE[leaving](node), leaving };
+}
+
+/**
+ * The two anchors for an edge between two nodes with no waypoints. The source
+ * faces the target's centre, and the target takes the opposing side.
+ *
+ * Opposing by construction rather than by a second comparison: two nodes
+ * stacked on one position have a zero offset both ways, and facing back would
+ * put both anchors on the same right side and collapse the route to a point.
+ */
 export function anchorsForEdge(source: Point, target: Point): EdgeAnchors {
-  const dx = target.x - source.x;
-  const dy = target.y - source.y;
-  if (Math.abs(dx) >= Math.abs(dy)) {
-    return dx >= 0
-      ? { source: rightMid(source), target: leftMid(target), leaving: "right" }
-      : { source: leftMid(source), target: rightMid(target), leaving: "left" };
+  const from = anchorSideToward(source, centreOf(target));
+  return { source: from.anchor, target: SIDE[OPPOSITE[from.leaving]](target), leaving: from.leaving };
+}
+
+/** Whether a side leaves along the x axis or the y axis. */
+const axisOf = (d: LeaveDirection): "x" | "y" => (d === "right" || d === "left" ? "x" : "y");
+
+/**
+ * One leg of a waypointed route: an L, or a straight line when the two points
+ * already share an axis. `leading` is the axis the leg travels first.
+ *
+ * A leg carries no gutter, and the browser check earned that. `routeEdge`'s
+ * gutter exists to clear the node an anchor sits on. A waypoint has no box to
+ * clear, so a gutter there turns back on itself and draws a 20-unit spike out
+ * of the route's own apex.
+ */
+function routeLeg(from: Point, to: Point, leading: "x" | "y"): Point[] {
+  if (from.x === to.x || from.y === to.y) return [from, to];
+  return leading === "x" ? [from, { x: to.x, y: from.y }, to] : [from, { x: from.x, y: to.y }, to];
+}
+
+export interface WaypointRoute {
+  points: Point[];
+  /** Index into `points` at which each leg begins. One entry per leg. */
+  legStarts: number[];
+}
+
+/**
+ * The route from one node to another through an ordered waypoint list.
+ *
+ * A waypoint feeds the route rather than escaping it, which is the stage 33
+ * design of record. The canvas-wide style still governs every segment, since
+ * `routePath` rounds corner points and never asks where they came from.
+ *
+ * The anchors face the first and the last waypoint rather than each other. An
+ * edge dragged over a step therefore leaves the top side, which is the whole
+ * point of dragging the waypoint up there.
+ *
+ * A path with no waypoints takes `routeEdge` unchanged, so it draws exactly as
+ * it drew before waypoints existed.
+ *
+ * `legStarts` is not decoration. `midpointOfRoute` returns an index into the
+ * drawn polyline's segments, and one leg draws as one or two of them, so that
+ * index names nothing in the waypoint list without this map.
+ */
+export function routeThroughWaypoints(source: Point, target: Point, waypoints: Point[] = []): WaypointRoute {
+  if (waypoints.length === 0) {
+    const a = anchorsForEdge(source, target);
+    return { points: routeEdge(a.source, a.target, a.leaving), legStarts: [0] };
   }
-  return dy >= 0
-    ? { source: bottomMid(source), target: topMid(target), leaving: "down" }
-    : { source: topMid(source), target: bottomMid(target), leaving: "up" };
+
+  const from = anchorSideToward(source, waypoints[0]);
+  const to = anchorSideToward(target, waypoints[waypoints.length - 1]);
+  const chain = [from.anchor, ...waypoints, to.anchor];
+  const last = chain.length - 2;
+
+  const points: Point[] = [];
+  const legStarts: number[] = [];
+  for (let i = 0; i < chain.length - 1; i++) {
+    legStarts.push(points.length === 0 ? 0 : points.length - 1);
+    // The first leg leaves along its anchor's own axis, and the last one has
+    // to ARRIVE along the target anchor's axis, so it leads with the other.
+    // A leg between two waypoints leads along its own larger offset.
+    const a = chain[i];
+    const b = chain[i + 1];
+    const leading: "x" | "y" =
+      i === 0
+        ? axisOf(from.leaving)
+        : i === last
+          ? axisOf(to.leaving) === "x"
+            ? "y"
+            : "x"
+          : Math.abs(b.x - a.x) >= Math.abs(b.y - a.y)
+            ? "x"
+            : "y";
+    for (const p of routeLeg(a, b, leading)) {
+      const tail = points[points.length - 1];
+      if (!tail || tail.x !== p.x || tail.y !== p.y) points.push(p);
+    }
+  }
+  return { points, legStarts };
+}
+
+/**
+ * The leg a route segment belongs to, and so the waypoint index an insert on
+ * that segment takes. Leg 0 runs from the source anchor to the first waypoint,
+ * so an insert there goes at index 0.
+ */
+export function legOfSegment(legStarts: number[], segment: number): number {
+  let leg = 0;
+  for (let i = 0; i < legStarts.length; i++) if (legStarts[i] <= segment) leg = i;
+  return leg;
 }
 
 /**

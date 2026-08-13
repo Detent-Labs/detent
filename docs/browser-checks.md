@@ -744,3 +744,40 @@ Click a vertical route away from its ends. Pass: that path selects.
 Press a step's connect handle. Pass: the handle still sits at the node's
 right-middle, whatever side that node's own paths leave from. The preview is a
 straight line to the pointer.
+
+### Canvas edge waypoints (`canvas-edge-waypoints`)
+
+Open Studio and a draft with three or more steps. Most of this entry is a
+visual judgment against the drawn routes.
+
+Click a path. Pass: one outlined square appears at the middle of its route,
+and no other path shows a square. Click empty canvas. Pass: the square goes.
+
+Drag that square well above both steps and release. Pass: the square fills in,
+the route now climbs to it and back down, and every segment stays square.
+Watch for the defect: a route that jumps to the new point without passing
+through it.
+
+Read where that route leaves its source. Pass: it leaves the top edge, not the
+right edge. The anchor faces the waypoint, not the target.
+
+Choose Rounded corners. Pass: every corner of every leg becomes an arc, and
+the waypoint does not move. Choose it again.
+
+Drag the filled square sideways. Pass: it moves, the route follows, and the
+count of squares does not change. It lands on a grid dot.
+
+Bend the same path a second time, using one of the two new midpoint squares.
+Pass: the second waypoint lands between the right pair of points. The route
+does not fold back on itself, which is what an insert at the wrong index
+looks like.
+
+Save the draft and open it again. Pass: the path draws through the same
+waypoints, and every step kept its position.
+
+Double-click a filled square. Pass: that waypoint goes. Delete the last one.
+Pass: the path draws the straight route it drew at the start.
+
+Find a guarded automatic path and select it. Pass: the midpoint square sits
+over its guard label and stays grabbable. Deselect. Pass: the label reads
+whole again.

@@ -96,6 +96,31 @@ function EditorArea({ processId, formStepId, token, initialRevision, initialLayo
     setSaveState((s) => ({ ...s, layout: { ...s.layout, canvasEdgeStyle: style } }));
   };
 
+  // The second reserved key in that same blob. A malformed entry reads as no
+  // waypoints rather than failing the render, the rule `canvasEdgeStyle`
+  // already follows: a draft saved by a later version must still draw.
+  const isLayoutPoint = (v: unknown): v is Point =>
+    !!v && typeof (v as Point).x === "number" && typeof (v as Point).y === "number";
+  const waypoints: Record<string, Point[]> = {};
+  const storedWaypoints = saveState.layout.waypoints;
+  if (storedWaypoints && typeof storedWaypoints === "object") {
+    for (const [pathId, list] of Object.entries(storedWaypoints as Record<string, unknown>)) {
+      if (Array.isArray(list) && list.every(isLayoutPoint)) waypoints[pathId] = list;
+    }
+  }
+
+  const onWaypointsChange = (pathId: string, points: Point[]) => {
+    setSaveState((s) => {
+      const next = { ...((s.layout.waypoints as Record<string, Point[]> | undefined) ?? {}) };
+      // An empty list leaves no key behind: a path with no waypoints reads
+      // identically whether the key is absent or empty, and the absent form
+      // keeps a reset from growing the blob.
+      if (points.length === 0) delete next[pathId];
+      else next[pathId] = points;
+      return { ...s, layout: { ...s.layout, waypoints: next } };
+    });
+  };
+
   // Position is not body — it lives in `saveState.layout` (round-tripped
   // opaquely by DraftToolbar's save call already), never in the Draft
   // model's `mutate()` (design.md: the two are separate existing surfaces).
@@ -262,6 +287,8 @@ function EditorArea({ processId, formStepId, token, initialRevision, initialLayo
                 selectedPathId={selectedPathId}
                 edgeStyle={edgeStyle}
                 onEdgeStyleChange={onEdgeStyleChange}
+                waypoints={waypoints}
+                onWaypointsChange={onWaypointsChange}
               />
               {/* The third column has three states (studio-canvas). Nothing
                   selected shows the full checks rail. One step or a path

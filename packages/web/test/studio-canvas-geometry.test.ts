@@ -6,6 +6,9 @@ import {
   snapToGrid,
   routeEdge,
   anchorsForEdge,
+  anchorSideToward,
+  routeThroughWaypoints,
+  legOfSegment,
   midpointOfRoute,
   routePath,
   CLICK_THRESHOLD,
@@ -284,6 +287,95 @@ describe("canvas geometry: routing off the horizontal", () => {
       expect(route[route.length - 1]).toEqual(a.target);
       expect(axisAligned(route)).toBe(true);
     }
+  });
+});
+
+describe("canvas geometry: the route through waypoints", () => {
+  const axisAligned = (points: { x: number; y: number }[]) =>
+    points.slice(1).every((p, i) => p.x === points[i].x || p.y === points[i].y);
+  const holds = (points: { x: number; y: number }[], p: { x: number; y: number }) =>
+    points.some((q) => q.x === p.x && q.y === p.y);
+
+  it("routes a path with no waypoints exactly as the pair rule does", () => {
+    const source = { x: 0, y: 0 };
+    const target = { x: 240, y: 0 };
+    const a = anchorsForEdge(source, target);
+    expect(routeThroughWaypoints(source, target, []).points).toEqual(routeEdge(a.source, a.target, a.leaving));
+  });
+
+  it("defaults to no waypoints when the list is omitted", () => {
+    expect(routeThroughWaypoints({ x: 0, y: 0 }, { x: 240, y: 0 }).points).toHaveLength(2);
+  });
+
+  it("passes through its one waypoint", () => {
+    const route = routeThroughWaypoints({ x: 0, y: 0 }, { x: 480, y: 0 }, [{ x: 240, y: -120 }]);
+    expect(holds(route.points, { x: 240, y: -120 })).toBe(true);
+    expect(axisAligned(route.points)).toBe(true);
+  });
+
+  it("passes through every waypoint in order", () => {
+    const ws = [
+      { x: 200, y: -140 },
+      { x: 400, y: -140 },
+    ];
+    const route = routeThroughWaypoints({ x: 0, y: 0 }, { x: 600, y: 0 }, ws);
+    for (const w of ws) expect(holds(route.points, w)).toBe(true);
+    const first = route.points.findIndex((p) => p.x === ws[0].x && p.y === ws[0].y);
+    const second = route.points.findIndex((p) => p.x === ws[1].x && p.y === ws[1].y);
+    expect(first).toBeLessThan(second);
+  });
+
+  it("leaves the side that faces the first waypoint, not the target", () => {
+    // The target sits to the right, so the pair rule would leave rightward.
+    // The waypoint sits above, so this edge leaves the top instead.
+    const source = { x: 0, y: 0 };
+    const route = routeThroughWaypoints(source, { x: 480, y: 0 }, [{ x: 90, y: -200 }]);
+    expect(route.points[0]).toEqual({ x: NODE_WIDTH / 2, y: 0 });
+    expect(anchorSideToward(source, { x: 90, y: -200 }).leaving).toBe("up");
+  });
+
+  it("reports one leg start per leg, each on the route", () => {
+    const route = routeThroughWaypoints({ x: 0, y: 0 }, { x: 480, y: 0 }, [{ x: 240, y: -120 }]);
+    expect(route.legStarts).toHaveLength(2);
+    expect(route.legStarts[0]).toBe(0);
+    expect(route.points[route.legStarts[1]]).toEqual({ x: 240, y: -120 });
+  });
+
+  it("maps a route segment back to the leg it belongs to", () => {
+    const route = routeThroughWaypoints({ x: 0, y: 0 }, { x: 480, y: 0 }, [{ x: 240, y: -120 }]);
+    const boundary = route.legStarts[1];
+    expect(legOfSegment(route.legStarts, 0)).toBe(0);
+    expect(legOfSegment(route.legStarts, boundary - 1)).toBe(0);
+    expect(legOfSegment(route.legStarts, boundary)).toBe(1);
+    // Past the end still names the last leg rather than running off it.
+    expect(legOfSegment(route.legStarts, 99)).toBe(1);
+  });
+
+  it("never doubles back on itself at a waypoint", () => {
+    // The defect the browser found: routing a leg with `routeEdge`'s gutter
+    // put a 20-unit spike out of the apex, because the gutter clears a node
+    // and a waypoint has no box. Two consecutive segments on one axis must
+    // therefore never travel in opposite directions.
+    const route = routeThroughWaypoints({ x: 240, y: 0 }, { x: 480, y: 120 }, [{ x: 360, y: -140 }]);
+    const dirs = route.points.slice(1).map((p, i) => ({
+      dx: Math.sign(p.x - route.points[i].x),
+      dy: Math.sign(p.y - route.points[i].y),
+    }));
+    for (const [i, d] of dirs.slice(1).entries()) {
+      const prev = dirs[i];
+      expect(d.dx === -prev.dx && d.dx !== 0).toBe(false);
+      expect(d.dy === -prev.dy && d.dy !== 0).toBe(false);
+    }
+  });
+
+  it("keeps every segment on one axis with several waypoints", () => {
+    const route = routeThroughWaypoints({ x: 0, y: 0 }, { x: 600, y: 300 }, [
+      { x: 120, y: -160 },
+      { x: 400, y: -160 },
+      { x: 520, y: 40 },
+    ]);
+    expect(axisAligned(route.points)).toBe(true);
+    expect(route.legStarts).toHaveLength(4);
   });
 });
 

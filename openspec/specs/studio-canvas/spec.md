@@ -542,7 +542,7 @@ SHALL remain panel-only.
 
 ### Requirement: Canvas interaction logic is tested as pure functions, independent of rendering
 
-Nine computations SHALL live in pure modules with `bun:test` coverage. Five
+Ten computations SHALL live in pure modules with `bun:test` coverage. Five
 came first: hit-testing, drag-delta computation, the auto-place traversal, the
 connection-validity predicate and the fit-to-view computation.
 
@@ -550,8 +550,12 @@ Two arrived with the selection set. One toggles a step in that set. The other
 is the marquee's overlap test against node rectangles. The eighth is the edge
 route between two anchors.
 
-The ninth is the anchor rule. It takes two node positions. It returns the two
-facing anchors and the axis they leave on.
+The ninth is the anchor rule. It takes a node position and the point that node
+faces. It returns that node's anchor and the side it leaves on.
+
+The tenth is the route through a waypoint list. It takes two node positions
+and the list. It returns one polyline and the index at which each leg of that
+polyline begins.
 `packages/web/src/areas/app/screens/inboxLogic.ts` sets that convention. The
 tests need not cover the SVG rendering or the pointer-event wiring.
 
@@ -585,8 +589,16 @@ tests need not cover the SVG rendering or the pointer-event wiring.
 
 #### Scenario: The anchor rule holds without rendering
 
-- **WHEN** a test gives the anchor rule two node positions
-- **THEN** it returns the two facing anchors and the axis they leave on
+- **WHEN** a test gives the anchor rule a node position and a facing point
+- **THEN** it returns that node's anchor and the side it leaves on
+- **AND** the test needs no DOM or canvas rendering
+
+#### Scenario: The waypoint route holds without rendering
+
+- **WHEN** a test gives the waypoint route two node positions and a list of
+  points
+- **THEN** it returns one polyline through every point in that list
+- **AND** it returns the index at which each leg of that polyline begins
 - **AND** the test needs no DOM or canvas rendering
 
 ### Requirement: Layout computation does not re-run on pointer movement
@@ -1141,14 +1153,21 @@ checks rail again.
 A path SHALL render as an orthogonal route rather than a straight line. Every
 segment SHALL lie on one axis.
 
-Each anchor SHALL sit at the midpoint of the side its own node turns toward
-the other one. The larger of the two node-centre offsets SHALL pick the axis
-for both anchors. A horizontal offset larger than the vertical one SHALL put
-the anchors on a left and a right side. Otherwise they SHALL sit on a top and
-a bottom side. The two anchors SHALL always sit on opposing sides, so both
-leave on the same axis.
+Each anchor SHALL sit at the midpoint of one side of its own node. That side
+is the one the node turns toward the next point on the route. For the source
+anchor that point is the first waypoint. Without waypoints it is the target
+node's centre. For the target anchor it is the last waypoint, or the source
+node's centre.
 
-A zero offset on the chosen axis SHALL put the source anchor on the right
+The larger of the two offsets SHALL pick the axis. A horizontal offset larger
+than the vertical one SHALL put the anchor on a left or a right side.
+Otherwise it SHALL sit on a top or a bottom side.
+
+A path with no waypoints SHALL therefore draw exactly as it drew before
+waypoints existed. Its two anchors read offsets that negate each other
+exactly. They land on opposing sides, and both leave on one axis.
+
+A zero offset on the chosen axis SHALL put the anchor on the right
 side. Two steps stacked on one position reach that case, and every path SHALL
 draw.
 
@@ -1157,7 +1176,29 @@ at an angle has no square turn, and every segment here stays on one axis.
 
 The route SHALL leave each anchor along the axis that anchor sits on.
 
-The segment count SHALL follow from the two anchors, on both axes.
+A path MAY carry an ordered list of waypoints. The route SHALL run from the
+source anchor to the first waypoint. It SHALL run from each waypoint to the
+next, and from the last waypoint to the target anchor. Every waypoint SHALL
+lie on the drawn route.
+
+A leg between two points SHALL draw as one straight segment, or as two when
+the points share no axis. It SHALL carry no gutter. The gutter clears the node
+an anchor sits on, and a waypoint has no box to clear.
+
+The route SHALL NOT double back on itself at any point. Two consecutive
+segments on one axis SHALL NOT travel in opposite directions.
+
+The first leg SHALL travel first along its anchor's own axis. The last leg
+SHALL arrive along the target anchor's axis. A leg between two waypoints SHALL
+travel first along the larger offset between them.
+
+The canvas-wide style SHALL govern every segment of a waypointed route. A path
+SHALL NOT carry a style of its own. Switching the toolbar control SHALL
+re-route the path between the same waypoints.
+
+The segment count SHALL follow from the two anchors, on both axes. It governs
+a path with no waypoints. A waypointed route takes its count from its legs
+instead.
 
 A target is ahead when its entry anchor sits beyond the source's exit anchor.
 That reading runs along the leaving axis, in the leaving direction. An anchor
@@ -1193,6 +1234,34 @@ presses. A handle that moved under the pointer would be harder to press.
 The drag-to-connect preview SHALL stay a straight line from that handle. It
 follows the pointer and reaches no target. It has neither a route to draw nor
 a side to face.
+
+A selected path SHALL draw one handle at each of its waypoints, and one at the
+route's midpoint. An unselected path SHALL draw none. The canvas holds at most
+one selected path, so at most one path shows handles.
+
+A handle SHALL draw after the guard label and the priority badge, which read
+the same midpoint. A handle stays grabbable that way. It may cover part of a
+label, and an author reading a guard deselects the path to clear the handles.
+
+A waypoint handle SHALL draw after the midpoint handle and take the pointer
+where the two coincide. A symmetric bend puts the route midpoint on the
+waypoint itself, and only the waypoint handle answers a double-click.
+
+Dragging the midpoint handle SHALL add a waypoint at the release point.
+Dragging a waypoint handle SHALL move that waypoint. Each SHALL land on the
+canvas lattice, the way a dragged step already does.
+
+A new waypoint SHALL take the position in the list that keeps the route's
+order. The midpoint handle sits on one leg of the route, and the new waypoint
+goes at that leg's own index.
+
+A route segment's index SHALL NOT stand in for a waypoint's index. One leg
+draws as one or two segments, so the route carries more segments than the list
+carries points.
+
+Double-clicking a waypoint handle SHALL delete that waypoint. A path whose
+last waypoint goes SHALL draw the direct route again. That is the whole of
+reset, and nothing stores what the route was before.
 
 #### Scenario: A path along one row draws straight
 
@@ -1279,6 +1348,65 @@ a side to face.
   below it
 - **THEN** the path's anchors move to the facing sides, with no reload
 
+#### Scenario: A waypointed route passes through its waypoint
+
+- **WHEN** a path carries one waypoint
+- **THEN** the drawn route passes through that point
+- **AND** every segment lies on one axis
+
+#### Scenario: A waypointed route never doubles back
+
+- **WHEN** a path carries a waypoint the route reaches head-on
+- **THEN** no segment of the route travels back along the one before it
+- **AND** no spike stands out of the route at that waypoint
+
+#### Scenario: A waypoint above the two steps turns the route above them
+
+- **WHEN** a path between two steps on one row carries a waypoint above both
+- **THEN** the route leaves the source, rises to that waypoint, and comes back
+  down into the target
+
+#### Scenario: The source anchor faces the first waypoint
+
+- **WHEN** a path to a step on its right carries a first waypoint above the
+  source
+- **THEN** the route leaves the source's top side rather than its right side
+
+#### Scenario: The style still governs a waypointed route
+
+- **WHEN** a path carrying waypoints renders under `smoothstep`
+- **THEN** every corner of every leg draws as an arc
+- **AND** the waypoints do not move
+
+#### Scenario: Only a selected path shows handles
+
+- **WHEN** the developer selects a path
+- **THEN** that path draws a handle at each waypoint and one at its midpoint
+- **AND** no other path draws a handle
+
+#### Scenario: Dragging the midpoint handle adds a waypoint
+
+- **WHEN** the developer drags a selected path's midpoint handle and releases
+- **THEN** the path carries one more waypoint, at the released point rounded
+  to the lattice
+- **AND** the route passes through it
+
+#### Scenario: Dragging a waypoint handle moves that waypoint
+
+- **WHEN** the developer drags an existing waypoint handle and releases
+- **THEN** that waypoint sits at the released point rounded to the lattice
+- **AND** the list holds the same number of waypoints as before
+
+#### Scenario: Double-clicking a waypoint handle deletes it
+
+- **WHEN** the developer double-clicks a waypoint handle
+- **THEN** the path carries one fewer waypoint
+
+#### Scenario: Deleting the last waypoint restores the direct route
+
+- **WHEN** the developer deletes a path's only waypoint
+- **THEN** the path draws the route it drew before any waypoint existed
+
 <!-- Why: the header must match the base spec character for character, or the
      delta adds a requirement rather than modifying one. -->
 <!-- antislop: allow passive-voice -->
@@ -1295,7 +1423,18 @@ be no schema change and no API change.
 An absent value SHALL read as `step`. A value this version does not know SHALL
 also read as `step`, rather than failing the render.
 
-The reserved key SHALL NOT collide with a node position. Every step id carries
+A path's waypoints SHALL persist as `layout.waypoints[pathId]`, an ordered
+list of points. That key sits in the same blob, and it is the second reserved
+one.
+
+An absent list SHALL read as no waypoints. So SHALL a value that is not a list
+of points, rather than failing the render.
+
+A path the author deletes MAY leave its list behind in `layout`. A step the
+author deletes already leaves its position behind, and neither one reaches the
+published body.
+
+The reserved keys SHALL NOT collide with a node position. Every step id carries
 a `step_` prefix, and the position reader admits only a point.
 
 #### Scenario: The style survives a save and a reload
@@ -1320,3 +1459,28 @@ a `step_` prefix, and the position reader admits only a point.
 - **WHEN** the developer switches the style and saves
 - **THEN** every step keeps the position it had, and the layout still carries
   one entry per placed step
+
+#### Scenario: Waypoints survive a save and a reload
+
+- **WHEN** the developer bends a path and saves the draft
+- **AND** opens that draft's canvas again
+- **THEN** the path draws through the same waypoints
+
+#### Scenario: A draft saved before waypoints renders without them
+
+- **WHEN** a draft whose layout carries no `waypoints` opens
+- **THEN** every path draws its direct route, and the render does not fail
+
+#### Scenario: A malformed waypoint list falls back rather than failing
+
+- **WHEN** a draft's `layout.waypoints` entry is not a list of points
+- **THEN** that path draws its direct route
+
+#### Scenario: Waypoints leave node positions and the style alone
+
+- **WHEN** the developer bends a path and saves
+- **THEN** every step keeps its position and the canvas keeps its style
+
+<!-- Why: the header must match the base spec character for character, or the
+     delta adds a requirement rather than modifying one. -->
+<!-- antislop: allow passive-voice -->

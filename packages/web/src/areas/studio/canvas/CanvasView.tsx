@@ -12,8 +12,8 @@ import {
   exceedsClickThreshold,
   snapToGrid,
   svgPointFromClient,
-  anchorsForEdge,
-  routeEdge,
+  routeThroughWaypoints,
+  legOfSegment,
   routePath,
   midpointOfRoute,
   segmentLength,
@@ -31,6 +31,9 @@ import { inlineRenamePatch } from "./inlineRename";
 import { buildOperands, guardEdgeLabel } from "../panels/shared/conditionLogic";
 
 const HANDLE_RADIUS = 7;
+/** The waypoint handle's side. A square, not a circle: the canvas already has
+ * one control shape, and the connect handle owns it (design.md). */
+const WAYPOINT_HANDLE = 10;
 const REJECT_MESSAGE_MS = 4000;
 
 interface Props {
@@ -52,6 +55,10 @@ interface Props {
   edgeStyle: EdgeStyle;
   onEdgeStyleChange: (style: EdgeStyle) => void;
   selectedPathId?: string;
+  /** Per path id, in the same opaque `layout` blob as node positions. An
+   * absent or malformed entry reads as no waypoints (design.md). */
+  waypoints: Record<string, Point[]>;
+  onWaypointsChange: (pathId: string, points: Point[]) => void;
 }
 
 function isPoint(value: unknown): value is Point {
@@ -73,6 +80,8 @@ export function CanvasView({
   selectedPathId,
   edgeStyle,
   onEdgeStyleChange,
+  waypoints,
+  onWaypointsChange,
 }: Props) {
   const { draft, mutate, contentLocale, loadedChildren } = useDraft();
   const steps = draft.workflow?.steps ?? [];
@@ -249,6 +258,15 @@ export function CanvasView({
     current: Point;
   } | null>(null);
   const [connectDrag, setConnectDrag] = useState<{ sourceStepId: string; current: Point } | null>(null);
+  // A waypoint handle drag. `index` names an existing waypoint; `insertAt`
+  // names the leg a midpoint-handle drag inserts into. Exactly one is set.
+  const [waypointDrag, setWaypointDrag] = useState<{
+    pathId: string;
+    index?: number;
+    insertAt?: number;
+    start: Point;
+    current: Point;
+  } | null>(null);
   // The rubber band. Non-null only while it draws.
   //
   // It carries both spaces on purpose. The band itself is an HTML overlay in
@@ -321,6 +339,51 @@ export function CanvasView({
   const onNodePointerMove = (e: React.PointerEvent) => {
     if (!nodeDrag) return;
     setNodeDrag({ ...nodeDrag, current: toSvgPoint(e) });
+  };
+
+  /**
+   * A waypoint handle's own gesture. Every handler stops propagation: the edge
+   * group's `onPointerUp` selects the path, and a drag that ended in a
+   * re-selection would fight the gesture it just finished.
+   */
+  const onWaypointPointerDown = (e: React.PointerEvent, pathId: string, at: { index?: number; insertAt?: number }) => {
+    e.stopPropagation();
+    capturePointer(e);
+    const p = toSvgPoint(e);
+    setWaypointDrag({ pathId, ...at, start: p, current: p });
+  };
+
+  const onWaypointPointerMove = (e: React.PointerEvent) => {
+    if (!waypointDrag) return;
+    setWaypointDrag({ ...waypointDrag, current: toSvgPoint(e) });
+  };
+
+  const onWaypointPointerUp = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    if (!waypointDrag) return;
+    const { pathId, index, insertAt, start, current } = waypointDrag;
+    setWaypointDrag(null);
+    // Under the threshold this was a click, not a drag: it writes nothing.
+    // That is the rule a node drag already applies, so a stray press on a
+    // handle cannot bend an edge.
+    if (!exceedsClickThreshold(dragDelta(start, current))) return;
+    const landed = snapToGrid(current);
+    const existing = waypoints[pathId] ?? [];
+    if (index !== undefined) {
+      onWaypointsChange(
+        pathId,
+        existing.map((w, i) => (i === index ? landed : w)),
+      );
+    } else if (insertAt !== undefined) {
+      const next = [...existing];
+      next.splice(insertAt, 0, landed);
+      onWaypointsChange(pathId, next);
+    }
+  };
+
+  const onWaypointDoubleClick = (e: React.MouseEvent, pathId: string, index: number) => {
+    e.stopPropagation();
+    onWaypointsChange(pathId, (waypoints[pathId] ?? []).filter((_, i) => i !== index));
   };
 
   const onNodePointerUp = (e: React.PointerEvent, stepId: string) => {
@@ -491,6 +554,12 @@ export function CanvasView({
   const guardLabels: Array<{ key: string; x: number; y: number; maxWidth: number; text: string; stepId: string; pathId: string | undefined }> =
     [];
 
+  // Waypoint handles ride that same late pass, and for the same reason: a
+  // handle inside the edge group sits behind a nearby node's opaque fill.
+  // Drawing after the guard labels also keeps a handle grabbable where the
+  // two share the route's midpoint.
+  const waypointHandles: Array<{ key: string; x: number; y: number; pathId: string; index?: number; insertAt?: number }> = [];
+
   return (
     <div
       className="canvas-wrap"
@@ -546,9 +615,11 @@ export function CanvasView({
             const target = positionOf(path.to);
             // Both anchors depend on the target, so they resolve per path
             // rather than once per step: one step's paths can leave four
-            // different sides.
-            const anchors = anchorsForEdge(source, target);
-            const route = routeEdge(anchors.source, anchors.target, anchors.leaving);
+            // different sides. With waypoints they face the first and the
+            // last of those instead.
+            const pathWaypoints = (path.id !== undefined ? waypoints[path.id] : undefined) ?? [];
+            const routed = routeThroughWaypoints(source, target, pathWaypoints);
+            const route = routed.points;
             const d = routePath(route, edgeStyle);
             // The badge and the guard label follow the route, not a straight
             // line between the anchors. On a five-segment route those two
@@ -581,6 +652,23 @@ export function CanvasView({
                 text: guardLabel,
                 stepId: step.id as string,
                 pathId: path.id,
+              });
+            }
+            // Only the selected path shows handles. Every path showing them
+            // would put a control every twenty pixels on a busy graph.
+            if (isSelected && path.id !== undefined) {
+              const pathId = path.id;
+              for (const [index, w] of pathWaypoints.entries()) {
+                waypointHandles.push({ key: `${pathId}-w${index}`, x: w.x, y: w.y, pathId, index });
+              }
+              // The midpoint's own segment names a leg, never a list index:
+              // one leg draws as two to six segments.
+              waypointHandles.push({
+                key: `${pathId}-mid`,
+                x: midX,
+                y: midY,
+                pathId,
+                insertAt: legOfSegment(routed.legStarts, mid.segment),
               });
             }
             return (
@@ -751,6 +839,36 @@ export function CanvasView({
             </div>
           </foreignObject>
         ))}
+
+        {waypointHandles.map((h) => {
+          // The drag previews where the handle will land, snapped, so the
+          // square under the pointer is the square the author gets.
+          const dragging =
+            waypointDrag?.pathId === h.pathId &&
+            waypointDrag.index === h.index &&
+            waypointDrag.insertAt === h.insertAt;
+          const at = dragging ? snapToGrid(waypointDrag.current) : { x: h.x, y: h.y };
+          return (
+            <rect
+              key={h.key}
+              x={at.x - WAYPOINT_HANDLE / 2}
+              y={at.y - WAYPOINT_HANDLE / 2}
+              width={WAYPOINT_HANDLE}
+              height={WAYPOINT_HANDLE}
+              rx={0}
+              // `panzoom-exclude` is load-bearing, and the browser check
+              // earned it: Panzoom's down-handler calls `stopPropagation` at
+              // `.canvas-wrap`, and React listens at the root, an ancestor.
+              // Without the class the press never reaches this rect and pans
+              // the canvas instead. Every node and edge group carries it.
+              className={`canvas-waypoint-handle panzoom-exclude${h.index === undefined ? " canvas-waypoint-handle-new" : ""}`}
+              onPointerDown={(e) => onWaypointPointerDown(e, h.pathId, { index: h.index, insertAt: h.insertAt })}
+              onPointerMove={onWaypointPointerMove}
+              onPointerUp={onWaypointPointerUp}
+              onDoubleClick={h.index === undefined ? undefined : (e) => onWaypointDoubleClick(e, h.pathId, h.index as number)}
+            />
+          );
+        })}
 
       </svg>
       {marquee &&
