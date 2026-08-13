@@ -100,21 +100,25 @@ export interface EdgeAnchors {
   leaving: LeaveDirection;
 }
 
-const rightMid = (n: Point): Point => ({ x: n.x + NODE_WIDTH, y: n.y + NODE_HEIGHT / 2 });
-const leftMid = (n: Point): Point => ({ x: n.x, y: n.y + NODE_HEIGHT / 2 });
-const bottomMid = (n: Point): Point => ({ x: n.x + NODE_WIDTH / 2, y: n.y + NODE_HEIGHT });
-const topMid = (n: Point): Point => ({ x: n.x + NODE_WIDTH / 2, y: n.y });
+/** A box's own extent. A step node takes `NODE_SIZE`; a collapsed group takes
+ * its own, which is why the anchor rule reads a size rather than assuming. */
+export interface Size {
+  width: number;
+  height: number;
+}
 
-const SIDE: Record<LeaveDirection, (n: Point) => Point> = {
-  right: rightMid,
-  left: leftMid,
-  down: bottomMid,
-  up: topMid,
+export const NODE_SIZE: Size = { width: NODE_WIDTH, height: NODE_HEIGHT };
+
+const SIDE: Record<LeaveDirection, (n: Point, z: Size) => Point> = {
+  right: (n, z) => ({ x: n.x + z.width, y: n.y + z.height / 2 }),
+  left: (n, z) => ({ x: n.x, y: n.y + z.height / 2 }),
+  down: (n, z) => ({ x: n.x + z.width / 2, y: n.y + z.height }),
+  up: (n, z) => ({ x: n.x + z.width / 2, y: n.y }),
 };
 
 const OPPOSITE: Record<LeaveDirection, LeaveDirection> = { right: "left", left: "right", down: "up", up: "down" };
 
-const centreOf = (n: Point): Point => ({ x: n.x + NODE_WIDTH / 2, y: n.y + NODE_HEIGHT / 2 });
+const centreOf = (n: Point, z: Size = NODE_SIZE): Point => ({ x: n.x + z.width / 2, y: n.y + z.height / 2 });
 
 /**
  * The side of one node facing a point, and that side's own midpoint. The
@@ -125,13 +129,13 @@ const centreOf = (n: Point): Point => ({ x: n.x + NODE_WIDTH / 2, y: n.y + NODE_
  * only state reaching that branch is a point at the node's own centre, and an
  * edge still has to draw.
  */
-export function anchorSideToward(node: Point, toward: Point): { anchor: Point; leaving: LeaveDirection } {
-  const centre = centreOf(node);
+export function anchorSideToward(node: Point, toward: Point, size: Size = NODE_SIZE): { anchor: Point; leaving: LeaveDirection } {
+  const centre = centreOf(node, size);
   const dx = toward.x - centre.x;
   const dy = toward.y - centre.y;
   const leaving: LeaveDirection =
     Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? "right" : "left") : dy >= 0 ? "down" : "up";
-  return { anchor: SIDE[leaving](node), leaving };
+  return { anchor: SIDE[leaving](node, size), leaving };
 }
 
 /**
@@ -142,9 +146,11 @@ export function anchorSideToward(node: Point, toward: Point): { anchor: Point; l
  * stacked on one position have a zero offset both ways, and facing back would
  * put both anchors on the same right side and collapse the route to a point.
  */
-export function anchorsForEdge(source: Point, target: Point): EdgeAnchors {
-  const from = anchorSideToward(source, centreOf(target));
-  return { source: from.anchor, target: SIDE[OPPOSITE[from.leaving]](target), leaving: from.leaving };
+export function anchorsForEdge(source: Point, target: Point, sizes: { source?: Size; target?: Size } = {}): EdgeAnchors {
+  const sz = sizes.source ?? NODE_SIZE;
+  const tz = sizes.target ?? NODE_SIZE;
+  const from = anchorSideToward(source, centreOf(target, tz), sz);
+  return { source: from.anchor, target: SIDE[OPPOSITE[from.leaving]](target, tz), leaving: from.leaving };
 }
 
 /** Whether a side leaves along the x axis or the y axis. */
@@ -188,14 +194,24 @@ export interface WaypointRoute {
  * drawn polyline's segments, and one leg draws as one or two of them, so that
  * index names nothing in the waypoint list without this map.
  */
-export function routeThroughWaypoints(source: Point, target: Point, waypoints: Point[] = []): WaypointRoute {
+export function routeThroughWaypoints(
+  source: Point,
+  target: Point,
+  waypoints: Point[] = [],
+  // A collapsed group's box stands in for a hidden member, and it is not the
+  // node size. This is the one function the canvas calls per path, so a size
+  // on the anchor rule alone would never reach it.
+  sizes: { source?: Size; target?: Size } = {},
+): WaypointRoute {
+  const sz = sizes.source ?? NODE_SIZE;
+  const tz = sizes.target ?? NODE_SIZE;
   if (waypoints.length === 0) {
-    const a = anchorsForEdge(source, target);
+    const a = anchorsForEdge(source, target, sizes);
     return { points: routeEdge(a.source, a.target, a.leaving), legStarts: [0] };
   }
 
-  const from = anchorSideToward(source, waypoints[0]);
-  const to = anchorSideToward(target, waypoints[waypoints.length - 1]);
+  const from = anchorSideToward(source, waypoints[0], sz);
+  const to = anchorSideToward(target, waypoints[waypoints.length - 1], tz);
   const chain = [from.anchor, ...waypoints, to.anchor];
   const last = chain.length - 2;
 
