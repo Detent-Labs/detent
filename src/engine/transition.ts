@@ -493,6 +493,7 @@ export async function commitManualTransition(
   db: SQL = sql,
   dataPatch?: Instance["data"],
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  events?: InstanceEvent[],
 ): Promise<Instance> {
   // Deliberately a no-op, not a throw: internal idempotent re-entry (e.g. a
   // timer firing against an instance a cascade already completed) must not
@@ -525,7 +526,10 @@ export async function commitManualTransition(
     "user",
     actor.id,
     db,
-    undefined,
+    // `events` rides the same overrides slot `assignment.unresolved` already
+    // uses, so a caller-supplied event lands in the commit's own transaction
+    // and cannot outlive a rolled-back one.
+    events && events.length > 0 ? { events } : undefined,
     dataPatch ? { data: mergedData } : undefined,
     assignmentRegistry,
   );
@@ -535,7 +539,8 @@ export async function commitManualTransition(
  * Execute a single manual transition, then run the instance to rest —
  * `commitManualTransition` followed by `resolveAutomatic`. Unchanged
  * signature and behavior for every caller that supplies no `dataPatch`; both
- * functions now accept the same optional `dataPatch`.
+ * functions accept the same optional `dataPatch` and the same optional
+ * `events`.
  */
 export async function executeManualTransition(
   instance: Instance,
@@ -545,9 +550,10 @@ export async function executeManualTransition(
   db: SQL = sql,
   dataPatch?: Instance["data"],
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  events?: InstanceEvent[],
 ): Promise<Instance> {
   if (instance.status !== "running") return instance;
-  const committed = await commitManualTransition(instance, pathId, body, actor, db, dataPatch, assignmentRegistry);
+  const committed = await commitManualTransition(instance, pathId, body, actor, db, dataPatch, assignmentRegistry, events);
   return resolveAutomatic(committed, body, actor, db, assignmentRegistry);
 }
 

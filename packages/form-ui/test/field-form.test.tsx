@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { FieldForm, effectiveSpan } from "../src/FieldForm.js";
+import { FieldForm, effectiveSpan, optionText } from "../src/FieldForm.js";
 import type { ResolvedViewField, SubmissionIssue } from "../src/types.js";
 
 /** `react-dom/server`'s `renderToStaticMarkup`, no jsdom/testing-library —
@@ -396,5 +396,34 @@ describe("effectiveSpan clamps a span to the grid it sits in", () => {
 
   it("clamps a span wider than the grid", () => {
     expect(effectiveSpan(2, 1)).toBe(1);
+  });
+});
+
+// table-shaped-data-sources: an option's row attributes fold into its text,
+// because a native <option> carries one text run and that text is its
+// accessible name.
+describe("optionText", () => {
+  it("appends attribute values in map order, which is the operator's declared order", () => {
+    expect(optionText("Widget", { sku: "A-1140", price: 12.5 }, "en")).toBe("Widget · A-1140 · 12.5");
+  });
+
+  it("leaves an option with no attributes exactly as it reads today", () => {
+    expect(optionText("Widget", undefined, "en")).toBe("Widget");
+  });
+
+  it("leaves no empty segment for a column the row does not fill", () => {
+    // The engine omits an unfilled column rather than sending an empty string,
+    // so the renderer never has to trim one.
+    expect(optionText("Widget", { sku: "A-1140" }, "en")).toBe("Widget · A-1140");
+    expect(optionText("Widget", {}, "en")).toBe("Widget");
+  });
+
+  it("prints a number through the locale's own formatter", () => {
+    expect(optionText("Widget", { price: 1234.5 }, "de")).toBe("Widget · 1.234,5");
+    expect(optionText("Widget", { price: 1234.5 }, "en")).toBe("Widget · 1,234.5");
+  });
+
+  it("prints a boolean as its literal value, in every locale", () => {
+    expect(optionText("Widget", { bulk: true }, "de")).toBe("Widget · true");
   });
 });

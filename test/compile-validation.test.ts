@@ -353,3 +353,99 @@ describe("compile: a body violating a new check still reads (no new Zod refineme
     expect(processBody.safeParse(b).success).toBe(true);
   });
 });
+
+// table-shaped-data-sources: the seventh structural check. `columnMapping`
+// bounds live here, not as a Zod refinement — `definition.ts` also
+// deserializes stored immutable bodies, and a refinement there would make an
+// already-published body throw on READ.
+describe("compile: columnMapping bounds", () => {
+  /** A body whose one select field binds a data source and maps `price` onto a number field. */
+  const mappingBody = (over: Record<string, unknown> = {}): any => {
+    const b = baseBody();
+    b.dataSources = [{ id: "ds_products", key: "products", type: "db.list", config: { listKey: "products" } }];
+    b.fields = [
+      { id: "field_product", key: "product", label: { en: "Product" }, type: "select", dataSource: "ds_products", columnMapping: { price: "field_amount" }, ...over },
+      { id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+    ];
+    return b;
+  };
+
+  it("accepts a select field mapping a column onto another catalog field", () => {
+    expect(() => compileProcessBody(mappingBody() as ProcessBody)).not.toThrow();
+  });
+
+  it("rejects a mapping with no dataSource: inline options declare no columns", () => {
+    const b = mappingBody({ dataSource: undefined, options: [{ value: "a", label: { en: "A" } }] });
+    delete b.fields[0].dataSource;
+    expect(rejects(b).issues.some((i) => i.message.includes("needs a dataSource"))).toBe(true);
+  });
+
+  it("rejects a mapping on a multiselect: several rows cannot fill one target", () => {
+    expect(rejects(mappingBody({ type: "multiselect" })).issues.some((i) => i.message.includes("needs a select field"))).toBe(true);
+  });
+
+  it("rejects a key outside the slug grammar", () => {
+    const b = mappingBody();
+    b.fields[0].columnMapping = { "Unit Price": "field_amount" };
+    expect(rejects(b).issues.some((i) => i.message.includes("columnMapping key must match"))).toBe(true);
+  });
+
+  it("rejects a target that resolves to no field in the body", () => {
+    const b = mappingBody();
+    b.fields[0].columnMapping = { price: "field_missing" };
+    expect(rejects(b).issues.some((i) => i.message.includes("does not resolve to a field"))).toBe(true);
+  });
+
+  it("rejects a target that is the mapping field itself", () => {
+    const b = mappingBody();
+    b.fields[0].columnMapping = { price: "field_product" };
+    expect(rejects(b).issues.some((i) => i.message.includes("the mapping field itself"))).toBe(true);
+  });
+
+  it("rejects a group target, which takes no value", () => {
+    const b = mappingBody();
+    b.fields[1] = { id: "field_amount", key: "amount", label: { en: "Amount" }, type: "group", fields: [] };
+    expect(rejects(b).issues.some((i) => i.message.includes("is a group field"))).toBe(true);
+  });
+
+  it("rejects two keys naming one target, which would leave the write no order", () => {
+    const b = mappingBody();
+    b.fields[0].columnMapping = { price: "field_amount", cost: "field_amount" };
+    expect(rejects(b).issues.some((i) => i.message.includes("targets one field twice"))).toBe(true);
+  });
+
+  it("publishes a key naming no declared column: publishing reads no data list", () => {
+    const b = mappingBody();
+    b.fields[0].columnMapping = { nothing_declares_this: "field_amount" };
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("accepts attributes on an inline option and on a static data source config", () => {
+    const b = baseBody();
+    b.dataSources = [
+      { id: "ds_s", key: "s", type: "static", config: { options: [{ value: "a", label: { en: "A" }, attributes: { sku: "A-1" } }] } },
+    ];
+    b.fields = [
+      { id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      { id: "field_pick", key: "pick", label: { en: "Pick" }, type: "select", options: [{ value: "a", label: { en: "A" }, attributes: { n: 1 } }] },
+    ];
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("rejects a non-scalar attribute value", () => {
+    const b = baseBody();
+    b.fields[0] = { id: "field_pick", key: "pick", label: { en: "Pick" }, type: "select", options: [{ value: "a", label: { en: "A" }, attributes: { bad: { nested: 1 } } }] };
+    expect(() => compileProcessBody(b as ProcessBody)).toThrow();
+  });
+
+  it("adds neither key to a body that declares neither, so its definitionHash cannot move", () => {
+    // The hash is JCS over the compiled body. A key the compile pass or the
+    // read path introduced would change it, and every stored pin with it. The
+    // two keys are optional, so a body written before they existed has to come
+    // out of compile carrying neither.
+    const compiled = compileProcessBody(baseBody() as ProcessBody);
+    const serialized = JSON.stringify(compiled);
+    expect(serialized).not.toContain("attributes");
+    expect(serialized).not.toContain("columnMapping");
+  });
+});

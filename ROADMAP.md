@@ -823,15 +823,53 @@ Spec: `development-toolchain`.
     `studio-plugin-config-form` (both modified). Design:
     `docs/superpowers/specs/2026-08-10-zod-v4-migration-design.md`.
 
-29. Table-shaped data sources: NOT STARTED. Raised 2026-08-10 in conversation.
-    Stage 26's `"db.list"` type gives every row exactly `value` + `label`; a
-    data source whose rows carry more attributes than that has no fit today,
-    since `db.list`'s config schema is fixed, not composable. Needs a design
-    pass before a change: whether the extra columns are a fixed additional set
-    or free-form (jsonb), how the studio's data-source picker and a consuming
-    field surface more than one column, and whether it is a new sibling type
-    beside `db.list` or a generalization of it. No design doc, no OpenSpec
-    change yet.
+29. Table-shaped data sources: DONE. Change: `table-shaped-data-sources`.
+    A data list declares extra columns on itself, not in a process body, so an
+    operator makes a list table-shaped with no publish and no migration. Each
+    column carries a `key`, an operator-facing `label` and a scalar `type`
+    (`string`/`number`/`boolean`); `MAX_DATA_LIST_COLUMNS` is 10. A value fills
+    one attribute per declared column, and `"db.list"` carries them onto each
+    resolved `FieldOption` as an optional `attributes` map, built by walking
+    the DECLARATION rather than the stored jsonb (Postgres normalizes a jsonb
+    object's key order, so the stored order is not the operator's).
+    `db.list`'s `configSchema` stays `{ listKey }` alone.
+    The four open questions the stage raised are answered. The columns are
+    free-form per list rather than a fixed set; the picker folds each attribute
+    into the `<option>`'s own text, because a native `<option>` carries one
+    text run and that text is its accessible name; it is a generalization of
+    `db.list`, not a sibling type. The fourth, which the queue file added and
+    which decided the size: a consuming field reads the WHOLE row, and
+    `FieldDef.columnMapping` (column key -> target `FieldId`) writes mapped
+    attributes into ordinary catalog fields at submission and at creation,
+    before the transition commits, so a guard on the same hop reads
+    `data.<key>`. That reaches no CEL namespace: the data-source deferral in
+    `docs/decisions.md` stands, and a mapped value is an ordinary field value
+    by the time a guard sees it. Seven publish-time invariants bound a mapping
+    (`compile.ts::checkColumnMapping`, the seventh structural check). A mapped
+    target takes the mapped value over a submitted one and over the view's
+    readonly/visibility rules — the list owns a mapped field. An attribute
+    whose type does not match its target is dropped, not written, and recorded
+    as the twelfth `InstanceEvent` kind, `datasource.attribute-dropped`; the
+    submission still succeeds, the rule `Action.output` already takes.
+    `commitManualTransition`/`executeManualTransition` gained one optional
+    trailing `events` argument so that drop lands in the commit's own
+    transaction. No studio work: `draft/validation.ts` calls the engine's own
+    `compileProcessBody`, so the new invariants reach the checks rail with no
+    browser-side code, and the no-code `columnMapping` editor waits behind
+    stage 36's hold on `panels/EditPanelsModal.tsx`. Specs: `db-data-source-type`,
+    `persistence`, `data-list-administration`, `definition-contract`,
+    `data-source-resolution`, `runtime-api`, `runtime-events`, `form-ui`,
+    `admin-app` (all modified).
+    The browser check earned its place twice, and both findings were invisible
+    to a green suite. The problem list under the value editor was keyed by the
+    message string, and two blank columns emit the same sentence twice: the
+    duplicate React key broke reconciliation, so stale entries stayed on screen
+    while Save re-enabled from the same render. A production build strips
+    React's duplicate-key warning, so the console said nothing. It is keyed by
+    position now. And the values table grows one column per declared column,
+    which took the page to 1861px of horizontal scroll at the bound on a
+    1100px window; `.admin-table-scroll` contains it, and the page is back to
+    the 152px baseline every admin screen shows in German at that width.
 
 30. Canvas edge routing styles (step/smoothstep): NOT STARTED. Raised
     2026-08-10 in conversation. The canvas draws every Path as a straight SVG

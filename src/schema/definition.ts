@@ -229,7 +229,26 @@ export const RESERVED_ACTION_PREFIX = "core.";
 // Fields: central catalog, referenced by steps.
 // ============================================================
 
-export const fieldOption = z.object({ value: z.string(), label: localizedText });
+/**
+ * A column value an option's row carries beyond `value` and `label`. A JSON
+ * scalar, never a nested object: a nested value has no target field type to
+ * check against, and `FieldDef.columnMapping` writes one of these into an
+ * ordinary field.
+ */
+export const optionAttribute = z.union([z.string(), z.number(), z.boolean()]);
+export type OptionAttribute = z.infer<typeof optionAttribute>;
+
+export const fieldOption = z.object({
+  value: z.string(),
+  label: localizedText,
+  /**
+   * The extra columns the option's row carries. Absent for an option with
+   * none, never an empty map — a renderer branches on the key's presence.
+   * Optional, and no body written before this key existed declares it, so
+   * `definitionHash` is unmoved and the read path is unchanged.
+   */
+  attributes: z.record(z.string(), optionAttribute).optional(),
+});
 export type FieldOption = z.infer<typeof fieldOption>;
 
 /** Catalog-level validation. Requiredness is per-step and lives in the view. */
@@ -252,6 +271,14 @@ export type FieldDef = {
   type: BaseFieldType | Plugin;
   options?: FieldOption[];
   dataSource?: DataSourceId;
+  /**
+   * Column key -> the catalog field the engine writes that column into when a
+   * participant picks a row. The engine resolves the picked option, checks the
+   * attribute against the target's declared type, and writes a match. The
+   * bounds live in `compile.ts::checkColumnMapping`, not here: a refinement on
+   * this read schema would make an already-published body throw on READ.
+   */
+  columnMapping?: Record<string, FieldId>;
   validation?: FieldValidation;
   default?: Literal | Expression;
   fields?: FieldDef[];
@@ -266,6 +293,7 @@ export const fieldDef: z.ZodType<FieldDef, unknown> = z.lazy(() =>
       type: z.union([baseFieldType, plugin]),
       options: z.array(fieldOption).optional(),
       dataSource: dataSourceId.optional(),
+      columnMapping: z.record(z.string(), fieldId).optional(),
       validation: fieldValidation.optional(),
       default: z.union([expression, literal]).optional(),
       fields: z.array(fieldDef).optional(),
@@ -1053,6 +1081,18 @@ export const instanceEvent = z.discriminatedUnion("kind", [
     ...instanceEventEnvelope,
     kind: z.literal("assignment.unresolved"),
     payload: z.object({ stepId, reason: assignmentUnresolvedReason }).strict(),
+  }),
+  // A field's `columnMapping` named an attribute whose value does not match its
+  // target field's declared type, so the engine dropped it rather than writing
+  // it. The submission still succeeds: the mismatch comes from operator data,
+  // and the participant can do nothing about it — the rule `Action.output`
+  // already takes in the outbox. No transition of its own and no actions
+  // enqueued; recorded in the same transaction as the submission's or the
+  // creation's own commit, at the seq in force.
+  z.object({
+    ...instanceEventEnvelope,
+    kind: z.literal("datasource.attribute-dropped"),
+    payload: z.object({ fieldId, column: z.string(), targetFieldId: fieldId, reason: z.literal("type-mismatch") }).strict(),
   }),
 ]);
 export type InstanceEvent = z.infer<typeof instanceEvent>;

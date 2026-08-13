@@ -72,11 +72,13 @@ test.skipIf(!DB)("the overview lists every data list, the detail route reports i
   expect(overview.items[0]).toMatchObject({ listKey: "cost_centres", activeValueCount: 1 });
 
   const detail = (await (await fetch(req(`${BASE}/cost_centres`, "GET", maintainer))).json()) as {
-    values: { value: string; active: boolean }[];
+    values: { value: string; active: boolean; attributes: Record<string, unknown> }[];
   };
+  // `attributes` is empty on a list that declares no columns, and the route
+  // returns the key rather than omitting it — one shape for every list.
   expect(detail.values).toEqual([
-    { value: "cc1", label: { en: "One" }, active: true, sortOrder: 0 },
-    { value: "cc2", label: { en: "Two" }, active: false, sortOrder: 1 },
+    { value: "cc1", label: { en: "One" }, attributes: {}, active: true, sortOrder: 0 },
+    { value: "cc2", label: { en: "Two" }, attributes: {}, active: false, sortOrder: 1 },
   ] as unknown as typeof detail.values);
 });
 
@@ -215,4 +217,105 @@ test.skipIf(!DB)("an admin cannot write a data list", async () => {
   expect((await createList("from_admin", admin)).status).toBe(403);
   expect((await putValues("cost_centres", [v("cc1")], admin)).status).toBe(403);
   expect((await fetch(req(`${BASE}/cost_centres`, "DELETE", admin))).status).toBe(403);
+});
+
+// ---- table-shaped-data-sources: the column declaration and per-value attributes ----
+
+const COLS = [
+  { key: "sku", label: "SKU", type: "string" },
+  { key: "price", label: "Price", type: "number" },
+];
+
+const createWithColumns = (key: string, columns: unknown[], actor: Actor = maintainer) =>
+  fetch(req(BASE, "POST", actor, { listKey: key, label: key, columns }));
+const updateList = (key: string, patch: Record<string, unknown>, actor: Actor = maintainer) =>
+  fetch(req(`${BASE}/${key}`, "PUT", actor, { label: key, ...patch }));
+const getList = (key: string, actor: Actor = maintainer) => fetch(req(`${BASE}/${key}`, "GET", actor));
+
+test.skipIf(!DB)("a create declares columns, and both read routes return them", async () => {
+  expect((await createWithColumns("products", COLS)).status).toBe(201);
+  const detail = (await (await getList("products")).json()) as { columns: unknown[] };
+  expect(detail.columns).toEqual(COLS);
+  const page = (await (await fetch(req(BASE, "GET", maintainer))).json()) as { items: { listKey: string; columns: unknown[] }[] };
+  expect(page.items.find((i) => i.listKey === "products")!.columns).toEqual(COLS);
+});
+
+test.skipIf(!DB)("an update that omits columns leaves the declaration alone", async () => {
+  await createWithColumns("products", COLS);
+  expect((await updateList("products", {})).status).toBe(200);
+  const detail = (await (await getList("products")).json()) as { columns: unknown[] };
+  expect(detail.columns).toEqual(COLS);
+});
+
+test.skipIf(!DB)("an empty array clears the declaration and every attribute with it", async () => {
+  await createWithColumns("products", COLS);
+  await putValues("products", [{ ...v("widget"), attributes: { sku: "A-1140", price: 12.5 } }]);
+  expect((await updateList("products", { columns: [] })).status).toBe(200);
+  const detail = (await (await getList("products")).json()) as { columns: unknown[]; values: { attributes: unknown }[] };
+  expect(detail.columns).toEqual([]);
+  expect(detail.values[0]!.attributes).toEqual({});
+});
+
+test.skipIf(!DB)("dropping one column drops that attribute and keeps the others", async () => {
+  await createWithColumns("products", COLS);
+  await putValues("products", [{ ...v("widget"), attributes: { sku: "A-1140", price: 12.5 } }]);
+  await updateList("products", { columns: [COLS[0]] });
+  const detail = (await (await getList("products")).json()) as { values: { attributes: Record<string, unknown> }[] };
+  expect(detail.values[0]!.attributes).toEqual({ sku: "A-1140" });
+});
+
+test.skipIf(!DB)("the route refuses a malformed column and writes nothing", async () => {
+  await createList("products");
+  const res = await updateList("products", { columns: [{ key: "Unit Price", label: "x", type: "string" }] });
+  expect(res.status).toBe(400);
+  const detail = (await (await getList("products")).json()) as { columns: unknown[] };
+  expect(detail.columns).toEqual([]);
+});
+
+test.skipIf(!DB)("the route refuses a duplicate column key and a count over the bound", async () => {
+  await createList("products");
+  expect((await updateList("products", { columns: [COLS[0], COLS[0]] })).status).toBe(400);
+  const over = Array.from({ length: 11 }, (_, i) => ({ key: `c${i}`, label: `C${i}`, type: "string" }));
+  expect((await updateList("products", { columns: over })).status).toBe(400);
+});
+
+test.skipIf(!DB)("a value carries typed attributes, and the detail route returns them", async () => {
+  await createWithColumns("products", COLS);
+  expect((await putValues("products", [{ ...v("widget"), attributes: { sku: "A-1140", price: 12.5 } }])).status).toBe(200);
+  const detail = (await (await getList("products")).json()) as { values: { attributes: unknown }[] };
+  expect(detail.values[0]!.attributes).toEqual({ sku: "A-1140", price: 12.5 });
+});
+
+test.skipIf(!DB)("the values route refuses an undeclared attribute key and writes nothing", async () => {
+  await createWithColumns("products", COLS);
+  await putValues("products", [{ ...v("widget"), attributes: { sku: "A-1140" } }]);
+  const res = await putValues("products", [{ ...v("widget"), attributes: { nope: "x" } }]);
+  expect(res.status).toBe(400);
+  const detail = (await (await getList("products")).json()) as { values: { attributes: unknown }[] };
+  expect(detail.values[0]!.attributes).toEqual({ sku: "A-1140" });
+});
+
+test.skipIf(!DB)("the values route refuses a mistyped attribute", async () => {
+  await createWithColumns("products", COLS);
+  expect((await putValues("products", [{ ...v("widget"), attributes: { price: "cheap" } }])).status).toBe(400);
+});
+
+test.skipIf(!DB)("a value entry that omits attributes clears the map", async () => {
+  await createWithColumns("products", COLS);
+  await putValues("products", [{ ...v("widget"), attributes: { sku: "A-1140" } }]);
+  await putValues("products", [v("widget")]);
+  const detail = (await (await getList("products")).json()) as { values: { attributes: unknown }[] };
+  expect(detail.values[0]!.attributes).toEqual({});
+});
+
+test.skipIf(!DB)("a retired value keeps the attributes it held", async () => {
+  await createWithColumns("products", COLS);
+  await putValues("products", [{ ...v("widget"), attributes: { sku: "A-1140" } }, v("other")]);
+  // Omitting `widget` retires it. It still resolves for an instance holding
+  // it, so its attributes have to survive with it.
+  await putValues("products", [v("other")]);
+  const detail = (await (await getList("products")).json()) as { values: { value: string; active: boolean; attributes: unknown }[] };
+  const widget = detail.values.find((x) => x.value === "widget")!;
+  expect(widget.active).toBe(false);
+  expect(widget.attributes).toEqual({ sku: "A-1140" });
 });

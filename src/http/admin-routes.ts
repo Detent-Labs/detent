@@ -28,7 +28,14 @@ import { migrateInstances } from "../engine/migration.js";
 import { redactInstance } from "../engine/retention.js";
 import { localizedText, type ProcessId, type InstanceId, type LocalizedText } from "../schema/definition.js";
 import { MAX_KEY_LENGTH } from "../schema/compile.js";
-import { DB_LIST_DATA_SOURCE_TYPE, MAX_DATA_LIST_VALUES } from "../engine/host.js";
+import {
+  DB_LIST_DATA_SOURCE_TYPE,
+  MAX_DATA_LIST_VALUES,
+  attributeMatchesColumn,
+  dataListColumns,
+  parseJsonb,
+  type DataListColumn,
+} from "../engine/host.js";
 import { listUiStringOverrides, setUiStringOverride, countUiStringOverrides, uiStringOverrideExists } from "../engine/ui-strings.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
@@ -428,22 +435,55 @@ function requireString(raw: unknown, label: string): string {
 interface DataListValueInput {
   value: string;
   label: LocalizedText;
+  attributes: Record<string, string | number | boolean>;
   sortOrder: number;
+}
+
+/**
+ * The column declaration, or `undefined` when the request carries none. An
+ * omitted `columns` leaves the declaration as it stands; an empty array clears
+ * it. `dataListColumns` carries the grammar, the type set, the uniqueness rule
+ * and the count bound, so this route and the engine cannot disagree on any of
+ * them.
+ */
+function parseColumns(raw: unknown): DataListColumn[] | undefined {
+  if (raw === undefined) return undefined;
+  const parsed = dataListColumns.safeParse(raw);
+  if (!parsed.success) throw new RequestShapeError(`columns is invalid: ${parsed.error.issues.map((i) => i.message).join("; ")}`);
+  return parsed.data;
+}
+
+/** One value's attributes: every key names a declared column, every value matches that column's type. */
+function parseAttributes(raw: unknown, columnsByKey: Map<string, DataListColumn>, i: number): Record<string, string | number | boolean> {
+  if (raw === undefined || raw === null) return {};
+  if (typeof raw !== "object" || Array.isArray(raw)) throw new RequestShapeError(`values[${i}].attributes must be an object`);
+  const out: Record<string, string | number | boolean> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    const column = columnsByKey.get(key);
+    if (!column) throw new RequestShapeError(`values[${i}].attributes names no declared column: '${key}'`);
+    if (!attributeMatchesColumn(column, value)) {
+      throw new RequestShapeError(`values[${i}].attributes.${key} must be a ${column.type}`);
+    }
+    out[key] = value as string | number | boolean;
+  }
+  return out;
 }
 
 /**
  * Parse and check a whole value set before any write. The size bound and the
  * duplicate rule are checked here rather than per row, so a rejected request
- * writes nothing at all.
+ * writes nothing at all. `columns` is the declaration the list holds, so an
+ * attribute is checked against the column it names.
  */
-function parseValues(raw: unknown): DataListValueInput[] {
+function parseValues(raw: unknown, columns: DataListColumn[]): DataListValueInput[] {
   if (!Array.isArray(raw)) throw new RequestShapeError("values must be an array");
   if (raw.length > MAX_DATA_LIST_VALUES) {
     throw new RequestShapeError(`a data list holds at most ${MAX_DATA_LIST_VALUES} values, got ${raw.length}`);
   }
+  const columnsByKey = new Map(columns.map((c) => [c.key, c]));
   const seen = new Set<string>();
   return raw.map((entry, i) => {
-    const row = entry as { value?: unknown; label?: unknown; sortOrder?: unknown };
+    const row = entry as { value?: unknown; label?: unknown; attributes?: unknown; sortOrder?: unknown };
     const value = requireString(row.value, `values[${i}].value`);
     if (seen.has(value)) throw new RequestShapeError(`values names '${value}' twice`);
     seen.add(value);
@@ -451,7 +491,7 @@ function parseValues(raw: unknown): DataListValueInput[] {
     if (!parsed.success) throw new RequestShapeError(`values[${i}].label must be a localized text object`);
     const sortOrder = row.sortOrder === undefined ? i : Number(row.sortOrder);
     if (!Number.isInteger(sortOrder)) throw new RequestShapeError(`values[${i}].sortOrder must be an integer`);
-    return { value, label: parsed.data, sortOrder };
+    return { value, label: parsed.data, attributes: parseAttributes(row.attributes, columnsByKey, i), sortOrder };
   });
 }
 
@@ -474,13 +514,27 @@ async function referencingProcesses(listKey: string, db: SQL): Promise<{ process
   `) as { processId: string; version: number }[];
 }
 
-async function readList(listKey: string, db: SQL): Promise<{ listKey: string; label: string; description: string | null } | undefined> {
-  const rows = (await db`SELECT list_key AS "listKey", label, description FROM data_lists WHERE list_key = ${listKey}`) as {
+interface StoredList {
+  listKey: string;
+  label: string;
+  description: string | null;
+  columns: DataListColumn[];
+}
+
+async function readList(listKey: string, db: SQL): Promise<StoredList | undefined> {
+  const rows = (await db`SELECT list_key AS "listKey", label, description, columns FROM data_lists WHERE list_key = ${listKey}`) as {
     listKey: string;
     label: string;
     description: string | null;
+    columns: unknown;
   }[];
-  return rows[0];
+  const row = rows[0];
+  if (!row) return undefined;
+  // A stored declaration only reaches the table through parseColumns, so this
+  // parse succeeds. It falls back to "no columns" rather than failing the whole
+  // screen if somebody edits the row by hand.
+  const parsed = dataListColumns.safeParse(parseJsonb(row.columns) ?? []);
+  return { ...row, columns: parsed.success ? parsed.data : [] };
 }
 
 const notFoundList = (listKey: string): HttpResult => ({
@@ -492,14 +546,17 @@ export async function handleAdminListDataLists(req: Request, resolver: ActorReso
   return guarded(req, async () => {
     requireDataListRead(await resolveActor(req, resolver, db));
     const items = (await db`
-      SELECT l.list_key AS "listKey", l.label, l.description, l.updated_at AS "updatedAt", l.updated_by AS "updatedBy",
+      SELECT l.list_key AS "listKey", l.label, l.description, l.columns, l.updated_at AS "updatedAt", l.updated_by AS "updatedBy",
              count(v.value) FILTER (WHERE v.active)::int AS "activeValueCount"
       FROM data_lists l
       LEFT JOIN data_list_values v ON v.list_key = l.list_key
       GROUP BY l.list_key
       ORDER BY l.list_key
-    `) as unknown[];
-    return { status: 200, body: { items } };
+    `) as { columns: unknown }[];
+    // `columns` and a value's `attributes` are jsonb, which the driver hands
+    // back parsed or as text depending on how the row was written. Every read
+    // normalizes, so a caller never has to guess which it got.
+    return { status: 200, body: { items: items.map((i) => ({ ...i, columns: parseJsonb(i.columns) ?? [] })) } };
   });
 }
 
@@ -515,16 +572,17 @@ export async function handleAdminCreateDataList(req: Request, resolver: ActorRes
     // read-then-insert pair lets two simultaneous creates of one key past the
     // check, and the loser then surfaces a primary key violation as a 500
     // rather than the 409 this route already has an answer for.
+    const columns = parseColumns(body.columns) ?? [];
     const inserted = (await db`
-      INSERT INTO data_lists (list_key, label, description, updated_by)
-      VALUES (${listKey}, ${label}, ${description}, ${actor.id})
+      INSERT INTO data_lists (list_key, label, description, columns, updated_by)
+      VALUES (${listKey}, ${label}, ${description}, ${columns}, ${actor.id})
       ON CONFLICT (list_key) DO NOTHING
       RETURNING list_key
     `) as unknown[];
     if (inserted.length === 0) {
       return { status: 409, body: { error: { type: "conflict", message: `data list '${listKey}' already exists` } } };
     }
-    return { status: 201, body: { listKey, label, description } };
+    return { status: 201, body: { listKey, label, description, columns } };
   });
 }
 
@@ -536,11 +594,12 @@ export async function handleAdminGetDataList(listKey: string, req: Request, reso
     // Inactive values are reported, not hidden: an operator needs to see what a
     // running instance can still hold.
     const values = (await db`
-      SELECT value, label, active, sort_order AS "sortOrder"
+      SELECT value, label, attributes, active, sort_order AS "sortOrder"
       FROM data_list_values WHERE list_key = ${listKey}
       ORDER BY sort_order, value
-    `) as unknown[];
-    return { status: 200, body: { ...list, values, usedBy: await referencingProcesses(listKey, db) } };
+    `) as { label: unknown; attributes: unknown }[];
+    const normalized = values.map((v) => ({ ...v, label: parseJsonb(v.label) ?? {}, attributes: parseJsonb(v.attributes) ?? {} }));
+    return { status: 200, body: { ...list, values: normalized, usedBy: await referencingProcesses(listKey, db) } };
   });
 }
 
@@ -551,13 +610,31 @@ export async function handleAdminUpdateDataList(listKey: string, req: Request, r
     const body = await readJson(req);
     const label = requireString(body.label, "label");
     const description = body.description === undefined || body.description === null ? null : String(body.description);
-    const rows = (await db`
-      UPDATE data_lists SET label = ${label}, description = ${description}, updated_by = ${actor.id}, updated_at = now()
-      WHERE list_key = ${listKey}
-      RETURNING list_key AS "listKey", label, description
-    `) as unknown[];
+    const columns = parseColumns(body.columns);
+    const existing = await readList(listKey, db);
+    if (!existing) return notFoundList(listKey);
+    // An omitted `columns` leaves the declaration alone; an array replaces it.
+    const next = columns ?? existing.columns;
+    // A column the request drops takes its attribute with it, in this same
+    // transaction. Nothing keeps an attribute whose column no longer exists,
+    // and leaving one behind would resurrect it on a later re-declaration.
+    const dropped = existing.columns.map((c) => c.key).filter((key) => !next.some((c) => c.key === key));
+    const rows = await withTransaction(db, async (tx) => {
+      const updated = (await tx`
+        UPDATE data_lists
+        SET label = ${label}, description = ${description}, columns = ${next},
+            updated_by = ${actor.id}, updated_at = now()
+        WHERE list_key = ${listKey}
+        RETURNING list_key AS "listKey", label, description, columns
+      `) as { columns: unknown }[];
+      if (dropped.length > 0) {
+        await tx`UPDATE data_list_values SET attributes = attributes - ${tx.array(dropped, "TEXT")}
+          WHERE list_key = ${listKey}`;
+      }
+      return updated;
+    });
     if (rows.length === 0) return notFoundList(listKey);
-    return { status: 200, body: rows[0] };
+    return { status: 200, body: { ...rows[0], columns: parseJsonb(rows[0]!.columns) ?? [] } };
   });
 }
 
@@ -572,16 +649,22 @@ export async function handleAdminPutDataListValues(listKey: string, req: Request
     const actor = await resolveActor(req, resolver, db);
     requireRole(actor, DATALISTS_ROLE);
     const body = await readJson(req);
-    const values = parseValues(body.values);
-    if (!(await readList(listKey, db))) return notFoundList(listKey);
+    // The list is read first: an attribute is checked against the column the
+    // list declares, so the declaration has to be in hand before the parse.
+    const list = await readList(listKey, db);
+    if (!list) return notFoundList(listKey);
+    const values = parseValues(body.values, list.columns);
     await withTransaction(db, async (tx) => {
       await tx`UPDATE data_list_values SET active = false, updated_by = ${actor.id}, updated_at = now()
         WHERE list_key = ${listKey} AND active`;
       for (const v of values) {
-        await tx`INSERT INTO data_list_values (list_key, value, label, active, sort_order, updated_by)
-          VALUES (${listKey}, ${v.value}, ${v.label}, true, ${v.sortOrder}, ${actor.id})
+        // A retired value keeps the attributes it holds, because this route
+        // only ever touches a row the request names. That matters: an inactive
+        // value still resolves for an instance holding it.
+        await tx`INSERT INTO data_list_values (list_key, value, label, attributes, active, sort_order, updated_by)
+          VALUES (${listKey}, ${v.value}, ${v.label}, ${v.attributes}, true, ${v.sortOrder}, ${actor.id})
           ON CONFLICT (list_key, value) DO UPDATE
-          SET label = excluded.label, active = true, sort_order = excluded.sort_order,
+          SET label = excluded.label, attributes = excluded.attributes, active = true, sort_order = excluded.sort_order,
               updated_by = excluded.updated_by, updated_at = now()`;
       }
     });

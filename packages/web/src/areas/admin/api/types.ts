@@ -142,11 +142,23 @@ export interface MigrationResult {
   failed: string[];
 }
 
+/**
+ * One extra column a list's values carry beyond `value` and `label`. `label` is
+ * plain operator text in one language, exactly as the list's own label is:
+ * this is operator configuration, not authored content.
+ */
+export interface DataListColumn {
+  key: string;
+  label: string;
+  type: "string" | "number" | "boolean";
+}
+
 /** Mirrors the `data_lists` row the overview route returns. */
 export interface DataListSummary {
   listKey: string;
   label: string;
   description: string | null;
+  columns: DataListColumn[];
   updatedAt: string;
   updatedBy: string;
   activeValueCount: number;
@@ -164,6 +176,8 @@ export interface DataListPage {
 export interface DataListValue {
   value: string;
   label: Record<string, string>;
+  /** One entry per declared column the value fills, typed by that column. */
+  attributes: Record<string, string | number | boolean>;
   active: boolean;
   sortOrder: number;
 }
@@ -178,6 +192,7 @@ export interface DataListDetail {
   listKey: string;
   label: string;
   description: string | null;
+  columns: DataListColumn[];
   values: DataListValue[];
   usedBy: DataListUsage[];
 }

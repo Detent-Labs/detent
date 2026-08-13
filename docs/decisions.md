@@ -18,6 +18,15 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   a separate, more consequential decision (an unresolvable reference there could
   only park a wait-state forever or throw mid-delivery); it stays deliberately
   out of scope until a concrete need for CEL-visible data-source values exists.
+
+  Stage 29 tested that deferral and left it standing. `FieldDef.columnMapping`
+  now writes a picked option's column attributes into ordinary catalog fields,
+  before the transition commits, so a guard reads `data.<key>` as it always
+  has. That is not a data source in the CEL context. The engine resolves the
+  value, checks it against the target field's declared type, and writes it; CEL
+  then reads a field, exactly as it does for a participant's own input. The
+  unresolvable-reference hazard this row names never arises, because nothing
+  CEL evaluates names a data source.
 - **A data-source type whose resolution leaves the database.** Two types now
   ship: `"static"` and `"db.list"` (the latter reads two engine-owned tables,
   see `docs/current-state.md`). Neither leaves the engine's own Postgres, so

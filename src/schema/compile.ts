@@ -1,7 +1,7 @@
 /**
  * Publish-time compile pass.
  *
- * Validates every duration-typed value (see `validateDurations`) and the six
+ * Validates every duration-typed value (see `validateDurations`) and the seven
  * structural write-path checks below (see `structuralIssues`), then injects
  * the engine-owned cancel-sink — and, for a contracted process, the
  * reserved "cancelled" outcome bound to it — into a ProcessBody. This runs
@@ -19,7 +19,7 @@
  * cover keys that no read reproduces, and the resulting pin would never
  * rehydrate.
  *
- * Every check in this module — durations and the six structural checks alike —
+ * Every check in this module — durations and the seven structural checks alike —
  * runs on BOTH compile branches, ahead of the `publishedProcessBody`-valid
  * early return: that placement is what makes a check unbypassable by a
  * hand-written body that merely satisfies `publishedProcessBody` (which
@@ -127,7 +127,7 @@ export function validateDurations(body: ProcessBody): DurationIssue[] {
 }
 
 // ============================================================
-// Structural write-path checks (harden-publish-validation). Six checks, one
+// Structural write-path checks (harden-publish-validation). Seven checks, one
 // placement: called from compileProcessBody immediately after
 // validateDurations, so every one of them runs on a body BEFORE it takes
 // either compile branch. Modelled on DurationIssue/DurationValidationError —
@@ -138,15 +138,15 @@ export function validateDurations(body: ProcessBody): DurationIssue[] {
 // ============================================================
 
 /** A structural authoring-time defect located in the body (unknown key, reserved
- * prefix, uncompilable pattern, unresolved id, malformed field key, or an
- * over-long authored string). */
+ * prefix, uncompilable pattern, unresolved id, an out-of-bounds columnMapping,
+ * malformed field key, or an over-long authored string). */
 export interface CompileIssue {
   loc: string;
   value: string;
   message: string;
 }
 
-/** A body about to be published violates one of the six structural write-path checks. */
+/** A body about to be published violates one of the seven structural write-path checks. */
 export class CompileValidationError extends Error {
   constructor(readonly issues: CompileIssue[]) {
     super(issues.map((i) => `${i.loc}: ${i.message} (${JSON.stringify(i.value)})`).join("; "));
@@ -498,6 +498,67 @@ function checkIdResolution(body: ProcessBody): CompileIssue[] {
   return issues;
 }
 
+/**
+ * `FieldDef.columnMapping` bounds. Seven rules, all write-path: a refinement
+ * on `fieldDef` would make an already-published body throw on READ, and this
+ * check may tighten later.
+ *
+ * It does NOT check a key against any data list. `db-data-source-type` keeps
+ * publishing independent of the state of the data, so a key naming no declared
+ * column publishes and writes nothing at runtime.
+ *
+ * Safe to run on an already-published body, which `structuralIssues` does: no
+ * body written before this key existed carries a `columnMapping`, so an
+ * identical re-publish cannot newly fail.
+ */
+function checkColumnMapping(body: ProcessBody): CompileIssue[] {
+  const issues: CompileIssue[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allFields = collectFieldsDeep((body.fields ?? []) as any);
+  const fieldsById = new Map(allFields.map((f) => [f.id as string, f]));
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  walkFieldsIndexed(body.fields as any, "fields", (f, floc) => {
+    const mapping = f?.columnMapping;
+    if (!isPlainObject(mapping)) return;
+    const loc = `${floc}.columnMapping`;
+
+    if (f.dataSource === undefined) {
+      issues.push({ loc, value: String(f.id), message: "columnMapping needs a dataSource: an inline options array declares no columns" });
+    }
+    if (f.type !== "select") {
+      issues.push({ loc, value: String(f.type), message: "columnMapping needs a select field: a multiselect picks several rows for one target" });
+    }
+
+    const seenTargets = new Map<string, string>();
+    for (const [column, target] of Object.entries(mapping)) {
+      if (!FIELD_KEY_FORMAT.test(column)) {
+        issues.push({ loc: `${loc}.${column}`, value: column, message: "columnMapping key must match /^[a-z_][a-z0-9_]*$/" });
+      }
+      if (column.length > MAX_KEY_LENGTH) {
+        issues.push({ loc: `${loc}.${column}`, value: column, message: `columnMapping key exceeds the ${MAX_KEY_LENGTH}-character bound` });
+      }
+      const tid = String(target);
+      const targetField = fieldsById.get(tid);
+      if (!targetField) {
+        issues.push({ loc: `${loc}.${column}`, value: tid, message: `columnMapping target does not resolve to a field in this process: ${tid}` });
+      } else if (targetField.type === "group") {
+        issues.push({ loc: `${loc}.${column}`, value: tid, message: "columnMapping target is a group field, which takes no value" });
+      }
+      if (tid === String(f.id)) {
+        issues.push({ loc: `${loc}.${column}`, value: tid, message: "columnMapping target is the mapping field itself" });
+      }
+      const prior = seenTargets.get(tid);
+      if (prior !== undefined) {
+        issues.push({ loc: `${loc}.${column}`, value: tid, message: `columnMapping targets one field twice: '${prior}' and '${column}' both write ${tid}` });
+      } else {
+        seenTargets.set(tid, column);
+      }
+    }
+  });
+  return issues;
+}
+
 // ============================================================
 // 6. Field key format (task 6.1) and length bounds (tasks 6.2-6.4).
 // ============================================================
@@ -675,8 +736,8 @@ function checkLengthBounds(body: ProcessBody): CompileIssue[] {
 }
 
 /**
- * Every structural write-path check this change adds, run together and
- * reported as one batch of located issues (task 1.1/1.2). Called from
+ * Every structural write-path check, run together and reported as one batch
+ * of located issues (task 1.1/1.2). Called from
  * `compileProcessBody` on the raw body, before either compile branch, so
  * neither the authored-input branch nor the already-compiled early return can
  * skip it. `checkReservedActionPrefix` and `checkUnknownKeys` operate on the
@@ -692,6 +753,7 @@ function structuralIssues(body: ProcessBody): CompileIssue[] {
     ...checkUnknownKeys(body),
     ...checkPatterns(body),
     ...checkIdResolution(body),
+    ...checkColumnMapping(body),
     ...checkFieldKeyFormat(body),
     ...checkLengthBounds(body),
   ];
@@ -703,7 +765,7 @@ export function compileProcessBody(body: ProcessBody): ProcessBody {
   const durations = validateDurations(body);
   if (durations.length > 0) throw new DurationValidationError(durations);
 
-  // The six structural checks (harden-publish-validation), same placement as
+  // The seven structural checks (harden-publish-validation), same placement as
   // validateDurations and for the same reason: ahead of the
   // publishedProcessBody-valid early return below, so a hand-written body
   // that merely satisfies that schema (which checks only the cancel-sink

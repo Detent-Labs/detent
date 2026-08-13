@@ -502,3 +502,60 @@ defect where the data would sit, and the other tenant's session keeps working.
 
 Unset `TENANT_CONTROL_PLANE_URL` and restart. Pass: the app behaves as it did
 before any of this. One database, and no host requirement.
+
+### Table-shaped data sources (`table-shaped-data-sources`)
+
+Log in as the superuser. The publish step needs `system:publish`, which the
+developer account does not hold.
+
+Open Operations, then Data lists. Add a list `products`. Declare two
+columns: `sku` as text, and `unit_price` as a number. Save. Pass: both columns
+appear as headings on the values table, and each value row carries one input
+per column.
+
+Add two values, and fill both columns on each. Pass: the number input
+right-aligns in the mono face, and the text input does not.
+
+Take the `unit_price` column out and save. Pass: the screen states, before the
+save, that the change drops that entry from every value. Dismiss that
+confirmation. Pass: nothing changes. Then declare the column again and refill
+it.
+
+Declare eleven columns. Pass: the screen refuses the save and names the bound
+where the data would sit. This is the case the bound exists for.
+
+Take one column back out, so ten stand. Read the values table at a 1100px
+window. Pass: that table scrolls sideways inside its own box, and the page
+does not. The page still scrolls about 152px in German at that width. Every
+admin screen does, and stage 13c measured it.
+
+Retire the value you filled, then read its row. Pass: its attribute inputs
+stay on screen and refuse to take a keystroke. The values route retires such a
+row rather than rewriting it. An editable input would promise a write that
+never lands.
+
+Fill and clear a column key while the refusal list holds several lines. Pass:
+every line the state calls for appears, and the whole list clears the moment
+the last defect does. Two blank columns give the same sentence twice, and both
+lines have to appear.
+
+Switch the locale to German. Pass: every heading, every refusal line and the
+warning above read in German, with no reload. Read the values table at
+1100px. A German heading is longer, and this is where it shows.
+
+Open Studio. Assemble a process with a `select` field bound to a `db.list` source
+naming `products`. On the raw definition view, give that field a
+`columnMapping` sending `sku` to a text field and `unit_price` to a number
+field. Mark both targets readonly on the step's view. Publish.
+
+Start the process from Tasks. Open the step. Pass: each option reads as its
+label, then its SKU, then its price, separated by a middot. A screen reader
+reads that as one line, because a native option carries one text run.
+
+Pick a row and submit. Pass: the two readonly fields hold the row's values on
+the next screen, and the participant typed neither.
+
+Back in Operations, retype `unit_price` from number to text and save. Start a
+second case, pick the same row, and submit. Pass: the submission succeeds, the
+number field stays empty, and the instance record carries a
+`datasource.attribute-dropped` entry naming the column.

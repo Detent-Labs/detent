@@ -318,27 +318,41 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // per-value label is a LocalizedText and therefore jsonb. Both relations sit
   // outside the audit backbone — they are configuration, not a record of what an
   // instance did, so no append-only rule applies.
+  // `columns` declares the extra columns a value of this list carries beyond
+  // `value` and `label`: an array of `{ key, label, type }`. It sits on the
+  // list rather than in a process body so an operator makes a list
+  // table-shaped with no publish, the same property the values themselves
+  // already have.
   await db`CREATE TABLE IF NOT EXISTS data_lists (
     list_key    text PRIMARY KEY,
     label       text NOT NULL,
     description text,
+    columns     jsonb NOT NULL DEFAULT '[]',
     updated_by  text NOT NULL,
     updated_at  timestamptz NOT NULL DEFAULT now()
   )`;
+  await db`ALTER TABLE data_lists ADD COLUMN IF NOT EXISTS columns jsonb NOT NULL DEFAULT '[]'`;
   // A value is deactivated, never deleted: an instance that already holds one
   // must keep resolving its label (see the `heldValues` rule in host.ts). The
   // cascade therefore only fires when the whole list goes, which the delete
   // guard blocks while any published body references it.
+  // `attributes` holds this value's entry per declared column, as a JSON scalar
+  // each. Postgres normalizes a jsonb object's key order, so the read side
+  // walks the list's `columns` declaration and looks each key up here — never
+  // the reverse. Both new columns default to the empty case, so a deployment
+  // that predates them needs no backfill.
   await db`CREATE TABLE IF NOT EXISTS data_list_values (
     list_key   text NOT NULL REFERENCES data_lists (list_key) ON DELETE CASCADE,
     value      text NOT NULL,
     label      jsonb NOT NULL,
+    attributes jsonb NOT NULL DEFAULT '{}',
     active     boolean NOT NULL DEFAULT true,
     sort_order integer NOT NULL DEFAULT 0,
     updated_by text NOT NULL,
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (list_key, value)
   )`;
+  await db`ALTER TABLE data_list_values ADD COLUMN IF NOT EXISTS attributes jsonb NOT NULL DEFAULT '{}'`;
   // Process templates: a reusable authored body a new process seeds from. Its
   // own table for the reason `drafts` has one — a template body in `definitions`
   // would make every read site of that table responsible for excluding it, and

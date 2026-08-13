@@ -69,6 +69,63 @@ export const MAX_DATA_LIST_VALUES = 500;
 export const dbListDataSourceConfigSchema = z.object({ listKey: z.string().min(1).max(MAX_KEY_LENGTH) });
 
 /**
+ * The most columns one data list may declare beyond `value` and `label`. The
+ * bound guards the payload, not the rendered option text: ten columns of long
+ * values still make an unreadable `<option>`, which the browser check covers.
+ */
+export const MAX_DATA_LIST_COLUMNS = 10;
+
+/** A column key names a `FieldDef.columnMapping` entry, so it takes the same slug grammar. */
+const DATA_LIST_COLUMN_KEY_FORMAT = /^[a-z_][a-z0-9_]*$/;
+
+/**
+ * One declared column of a data list. `label` is plain operator-facing text in
+ * one language, exactly as `data_lists.label` already is — this is operator
+ * configuration, not authored content, so no `LocalizedText` rule reaches it.
+ *
+ * `type` earns its place: the write-back checks an attribute against its
+ * target field's declared type rather than coercing it, and a text-only store
+ * would make `data.price > 10` compare a string against a number.
+ */
+export const dataListColumn = z.object({
+  key: z.string().regex(DATA_LIST_COLUMN_KEY_FORMAT).max(MAX_KEY_LENGTH),
+  label: z.string().min(1),
+  type: z.enum(["string", "number", "boolean"]),
+});
+export type DataListColumn = z.infer<typeof dataListColumn>;
+
+/** The declaration as a whole: bounded, and unique on `key`. */
+export const dataListColumns = z
+  .array(dataListColumn)
+  .max(MAX_DATA_LIST_COLUMNS)
+  .refine((cols) => new Set(cols.map((c) => c.key)).size === cols.length, {
+    message: "column keys must be unique within a list",
+  });
+
+/**
+ * A `jsonb` column as the driver hands it back. `Bun.sql` returns a parsed
+ * value for a column written through an object parameter, and the raw text for
+ * one written through an explicit `::jsonb` cast. Both reach these two
+ * relations, so every read goes through here — the same shape `store.ts` uses
+ * for an instance body.
+ */
+export function parseJsonb(raw: unknown): unknown {
+  if (typeof raw !== "string") return raw;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Whether a stored attribute matches the type its column declares. */
+export function attributeMatchesColumn(column: DataListColumn, value: unknown): boolean {
+  if (column.type === "number") return typeof value === "number";
+  if (column.type === "boolean") return typeof value === "boolean";
+  return typeof value === "string";
+}
+
+/**
  * A registry pre-populated with the built-in `"static"` and `"db.list"` data
  * source handlers. `"static"` echoes its configured `options` unchanged;
  * `"db.list"` reads them from `data_lists`/`data_list_values`, so an operator
@@ -104,21 +161,50 @@ export function createDefaultDataSourceRegistry(): DataSourceRegistry {
       // retirement rule protects: 500 active values plus one retired value a
       // holder names is 501 rows and 500 offered values.
       const rows = (await db`
-        SELECT v.value, v.label, v.active
+        SELECT l.columns, v.value, v.label, v.attributes, v.active
         FROM data_lists l
         LEFT JOIN data_list_values v
           ON v.list_key = l.list_key AND (v.active OR v.value = ANY(${db.array(held, "TEXT")}))
         WHERE l.list_key = ${listKey}
         ORDER BY v.sort_order, v.value
         LIMIT ${MAX_DATA_LIST_VALUES + 1 + held.length}
-      `) as { value: string | null; label: FieldOption["label"] | null; active: boolean | null }[];
+      `) as {
+        columns: unknown;
+        value: string | null;
+        label: FieldOption["label"] | null;
+        attributes: Record<string, unknown> | null;
+        active: boolean | null;
+      }[];
       if (rows.length === 0) throw new Error(`data list '${listKey}' does not exist`);
       // At most `held.length` of the rows read are inactive, so the limit above
       // always leaves enough room to see a 501st active value when one exists.
       if (rows.filter((r) => r.active).length > MAX_DATA_LIST_VALUES) {
         throw new Error(`data list '${listKey}' holds more than the ${MAX_DATA_LIST_VALUES}-value bound`);
       }
-      return rows.filter((r) => r.value !== null).map((r) => ({ value: r.value as string, label: r.label as FieldOption["label"] }));
+      // Every row of the join carries the same list, so one parse of the
+      // declaration serves them all. A declaration the admin routes rejected
+      // cannot be here; a hand-edited one that fails to parse reads as "no
+      // columns" rather than bricking every step bound to the list.
+      const declared = dataListColumns.safeParse(parseJsonb(rows[0]?.columns) ?? []);
+      const columns = declared.success ? declared.data : [];
+      return rows
+        .filter((r) => r.value !== null)
+        .map((r) => {
+          const option: FieldOption = { value: r.value as string, label: parseJsonb(r.label) as FieldOption["label"] };
+          if (columns.length === 0) return option;
+          const stored = parseJsonb(r.attributes) as Record<string, unknown> | undefined;
+          // Walk the DECLARATION, never the stored object: Postgres normalizes
+          // a jsonb object's key order, so the stored order is not the
+          // operator's. The renderer reads this map in order.
+          const attributes: Record<string, string | number | boolean> = {};
+          for (const column of columns) {
+            const raw = stored?.[column.key];
+            if (raw === undefined || raw === null) continue;
+            if (attributeMatchesColumn(column, raw)) attributes[column.key] = raw as string | number | boolean;
+          }
+          // Absent, not empty: a renderer branches on the key's presence.
+          return Object.keys(attributes).length > 0 ? { ...option, attributes } : option;
+        });
     },
   });
   return reg;

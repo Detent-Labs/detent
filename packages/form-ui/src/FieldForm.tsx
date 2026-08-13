@@ -23,6 +23,36 @@ export function effectiveSpan(span: 1 | 2 | undefined, columns: 1 | 2): 1 | 2 {
   return Math.min(span ?? 1, columns) as 1 | 2;
 }
 
+/** Separates an option's label from its attributes, and each attribute from the next. */
+export const OPTION_ATTRIBUTE_SEPARATOR = " · ";
+
+/**
+ * An option's visible text: its label, then the attribute values its data-list
+ * row carries, in the order the operator declared. The engine builds
+ * `attributes` by walking that declaration, so map order is declaration order.
+ *
+ * Folded into the text rather than drawn as columns because a native
+ * `<option>` carries one text run. That text is the accessible name, so the
+ * keyboard behavior, the type-ahead and the screen-reader reading all come
+ * from the platform. A custom listbox would draw aligned columns and own every
+ * one of those itself.
+ *
+ * A number prints through the locale's own formatter. A boolean prints as its
+ * literal value: it is a machine value with no wording of its own, and one
+ * text run admits no catalog lookup and no face change.
+ */
+export function optionText(
+  label: string,
+  attributes: Record<string, string | number | boolean> | undefined,
+  locale: LocaleCode,
+): string {
+  if (!attributes) return label;
+  const parts = Object.values(attributes).map((v) =>
+    typeof v === "number" ? new Intl.NumberFormat(locale).format(v) : String(v),
+  );
+  return parts.length === 0 ? label : [label, ...parts].join(OPTION_ATTRIBUTE_SEPARATOR);
+}
+
 /** Renders every root-level (non-nested) field from an `InstanceView` in a
  * `columns`-wide grid; a `group` field recurses into the fields that carry its
  * key as their `ResolvedViewField.group`, at that same width.
@@ -127,7 +157,7 @@ export function FieldInput({ field, allFields, values, onChange, locale, baseLoc
   // independently-maintained copies of the same map.
   const options = (field.options ?? []).map((o) => (
     <option key={o.value} value={o.value}>
-      {resolveText(o.label, locale, baseLocale) || o.value}
+      {optionText(resolveText(o.label, locale, baseLocale) || o.value, o.attributes, locale)}
     </option>
   ));
 

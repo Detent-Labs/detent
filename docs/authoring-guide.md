@@ -122,6 +122,55 @@ resolving a short list. A truncated list would reject a value a participant
 legitimately holds. A retired value a running instance holds sits on top of
 that count. A full list therefore keeps working for its holders.
 
+### Columns on a data list
+
+A `db.list` row can carry more than a value and a label. An operator declares
+columns on the Data lists screen. Each column has a key, a heading and a type:
+text, number, or yes-or-no. Each value then fills one entry per column.
+
+The picker shows those entries beside the option's label, in the order the
+operator declared them. That part needs nothing from you.
+
+The other part does. A field that binds the list maps a column onto another
+field of your catalog:
+
+```json
+{ "id": "field_product", "key": "product", "type": "select",
+  "dataSource": "ds_products",
+  "columnMapping": { "unit_price": "field_price" } }
+```
+
+Picking a row writes the mapped fields before the transition commits. A guard
+on the path out of that step therefore reads `data.price` as it reads any other
+field. Nothing about CEL changes: the value is an ordinary field value by the
+time a guard sees it.
+
+Six rules bound a mapping.
+
+The field must name a `dataSource`, and its type must be `select`. A
+`multiselect` picks several rows, and one target field takes one value.
+
+A target must be another field of this process. It cannot be the mapping field
+itself, and it cannot be a group.
+
+Two columns cannot write one field. That would leave the write no order.
+
+Publishing does not read the tables here either. A key naming a column the list
+does not declare publishes, and writes nothing.
+
+The mapped value wins. One submission may carry both the picker and a value for
+a mapped target. The list's value is the one that lands.
+
+The natural shape marks the target readonly in the view. A participant then
+reads what the pick produced, rather than typing over it.
+
+The engine drops an entry whose type does not match its target field, and the
+submission still succeeds. The instance record names the drop. That mismatch
+comes from operator data, and the participant can do nothing about it.
+
+The studio has no builder for a mapping yet. Write the mapping as JSON, in the
+studio's raw definition view.
+
 ### Step
 
 One state. Exactly one step is active per running process.

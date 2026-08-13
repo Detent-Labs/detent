@@ -1,4 +1,5 @@
 import type {
+  DataListColumn,
   DataListDetail,
   DataListPage,
   InstancePage,
@@ -185,11 +186,17 @@ export async function listDataLists(token: string): Promise<DataListPage> {
   return (await res.json()) as DataListPage;
 }
 
-export async function createDataList(listKey: string, label: string, description: string | null, token: string): Promise<void> {
+export async function createDataList(
+  listKey: string,
+  label: string,
+  description: string | null,
+  token: string,
+  columns: DataListColumn[] = [],
+): Promise<void> {
   await request("/admin/data-lists", token, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ listKey, label, description }),
+    body: JSON.stringify({ listKey, label, description, columns }),
   });
 }
 
@@ -198,18 +205,25 @@ export async function getDataList(listKey: string, token: string): Promise<DataL
   return (await res.json()) as DataListDetail;
 }
 
-export async function updateDataList(listKey: string, label: string, description: string | null, token: string): Promise<void> {
+/** `columns` omitted leaves the declaration as it stands; an array replaces it, and `[]` clears it. */
+export async function updateDataList(
+  listKey: string,
+  label: string,
+  description: string | null,
+  token: string,
+  columns?: DataListColumn[],
+): Promise<void> {
   await request(`/admin/data-lists/${encodeURIComponent(listKey)}`, token, {
     method: "PUT",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ label, description }),
+    body: JSON.stringify(columns === undefined ? { label, description } : { label, description, columns }),
   });
 }
 
 /** Sends the whole set: the route replaces it, deactivating what this omits. */
 export async function putDataListValues(
   listKey: string,
-  values: { value: string; label: Record<string, string>; sortOrder: number }[],
+  values: { value: string; label: Record<string, string>; attributes: Record<string, string | number | boolean>; sortOrder: number }[],
   token: string,
 ): Promise<void> {
   await request(`/admin/data-lists/${encodeURIComponent(listKey)}/values`, token, {

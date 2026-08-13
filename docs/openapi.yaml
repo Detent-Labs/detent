@@ -1192,6 +1192,24 @@ components:
           type: array
           items:
             type: object
+            properties:
+              value:
+                type: string
+              label:
+                type: object
+                additionalProperties:
+                  type: string
+              attributes:
+                type: object
+                description: >-
+                  The extra columns this option's data-list row carries, in the
+                  order the operator declared them. Absent when the row carries
+                  none. A value is a string, a number or a boolean.
+                additionalProperties:
+                  oneOf:
+                    - type: string
+                    - type: number
+                    - type: boolean
       required: [field, required, readonly]
 
     AvailablePath:

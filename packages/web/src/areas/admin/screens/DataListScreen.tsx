@@ -3,7 +3,17 @@ import { getDataList, updateDataList, putDataListValues, deleteDataList, AdminCl
 import type { DataListDetail } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
-import { readLabel, toPayload, validateValues, type ValueRow } from "./dataListsLogic.js";
+import {
+  attributesToInputs,
+  badNumberAttributes,
+  droppedColumns,
+  readLabel,
+  toPayload,
+  validateColumns,
+  validateValues,
+  type ColumnRow,
+  type ValueRow,
+} from "./dataListsLogic.js";
 import type { Route } from "../routing.js";
 import { t, tFill } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
@@ -18,18 +28,22 @@ interface DataListScreenProps {
 }
 
 /**
- * One list: its name, its values, and the published versions that read it.
+ * One list: its columns, its values, and the published versions that read it.
  *
  * A retired value keeps its row, marked, rather than vanishing — a running
  * instance can still hold it, and the operator needs to see that. Retiring is
  * the only removal this screen offers, because it is the only one the route
  * performs: saving sends the values that are not retired, and the server
  * deactivates the rest.
+ *
+ * Columns sit above values because a value's attribute inputs come from the
+ * declaration. The order on screen is the order the two depend on.
  */
 export function DataListScreen({ listKey, token, locale, navigate, onUnauthorized }: DataListScreenProps) {
   const [detail, setDetail] = useState<DataListDetail | undefined>(undefined);
   const [label, setLabel] = useState("");
   const [description, setDescription] = useState("");
+  const [columns, setColumns] = useState<ColumnRow[]>([]);
   const [rows, setRows] = useState<ValueRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -45,7 +59,15 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
       setDetail(next);
       setLabel(next.label);
       setDescription(next.description ?? "");
-      setRows(next.values.map((v) => ({ value: v.value, label: readLabel(v.label, locale), retired: !v.active })));
+      setColumns(next.columns.map((c) => ({ ...c })));
+      setRows(
+        next.values.map((v) => ({
+          value: v.value,
+          label: readLabel(v.label, locale),
+          attributes: attributesToInputs(v.attributes, next.columns),
+          retired: !v.active,
+        })),
+      );
     } catch (err) {
       if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
       else setError(describeCaughtError(err, locale));
@@ -58,21 +80,37 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
     void load();
   }, [load, reloadToken]);
 
-  const problems = validateValues(rows, locale);
+  const problems = [...validateColumns(columns, locale), ...validateValues(rows, locale), ...badNumberAttributes(rows, columns, locale)];
 
   const patch = (index: number, change: Partial<ValueRow>) => {
     setSaved(false);
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...change } : row)));
   };
 
+  const patchAttribute = (index: number, key: string, value: string) => {
+    setSaved(false);
+    setRows((prev) => prev.map((row, i) => (i === index ? { ...row, attributes: { ...row.attributes, [key]: value } } : row)));
+  };
+
+  const patchColumn = (index: number, change: Partial<ColumnRow>) => {
+    setSaved(false);
+    setColumns((prev) => prev.map((column, i) => (i === index ? { ...column, ...change } : column)));
+  };
+
   const save = async () => {
     if (!detail) return;
+    // The warning fires before the write, not after: dropping a column drops
+    // its entry from every value, and no screen here undoes that.
+    const dropping = droppedColumns(detail.columns, columns);
+    if (dropping.length > 0 && !window.confirm(tFill(locale, "dataList.dropColumnConfirm", { columns: dropping.join(", ") }))) return;
     setSaving(true);
     setError(undefined);
     try {
       const existingLabels = Object.fromEntries(detail.values.map((v) => [v.value, v.label]));
-      await updateDataList(listKey, label.trim(), description.trim() === "" ? null : description.trim(), token);
-      await putDataListValues(listKey, toPayload(rows, locale, existingLabels), token);
+      // The declaration goes first: the values route checks every attribute
+      // against the columns the list holds, so it has to hold them by then.
+      await updateDataList(listKey, label.trim(), description.trim() === "" ? null : description.trim(), token, columns);
+      await putDataListValues(listKey, toPayload(rows, locale, existingLabels, columns), token);
       setSaved(true);
       refresh();
     } catch (err) {
@@ -140,12 +178,99 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
             </label>
           </div>
 
+          <h2>{t(locale, "dataList.columnsTitle")}</h2>
+          <p className="admin-note">{t(locale, "dataList.columnsNote")}</p>
+          {columns.length === 0 ? (
+            <p className="admin-empty">{t(locale, "dataList.columnsEmpty")}</p>
+          ) : (
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>{t(locale, "dataList.colColumnKey")}</th>
+                  <th>{t(locale, "dataList.colColumnLabel")}</th>
+                  <th>{t(locale, "dataList.colColumnType")}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {/* Keyed by position, for the reason the value rows are: the
+                    key is what the input edits, so keying on it would remount
+                    the field and drop focus on every keystroke. */}
+                {columns.map((column, i) => (
+                  <tr key={i}>
+                    <td>
+                      <input
+                        className="admin-mono"
+                        value={column.key}
+                        onChange={(e) => patchColumn(i, { key: e.target.value })}
+                        aria-label={tFill(locale, "dataList.columnKeyAria", { n: i + 1 })}
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="unit_price…"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        value={column.label}
+                        onChange={(e) => patchColumn(i, { label: e.target.value })}
+                        aria-label={tFill(locale, "dataList.columnLabelAria", { n: i + 1 })}
+                      />
+                    </td>
+                    <td>
+                      <select
+                        value={column.type}
+                        onChange={(e) => patchColumn(i, { type: e.target.value as ColumnRow["type"] })}
+                        aria-label={tFill(locale, "dataList.columnTypeAria", { n: i + 1 })}
+                      >
+                        <option value="string">{t(locale, "dataList.typeString")}</option>
+                        <option value="number">{t(locale, "dataList.typeNumber")}</option>
+                        <option value="boolean">{t(locale, "dataList.typeBoolean")}</option>
+                      </select>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          setSaved(false);
+                          setColumns((prev) => prev.filter((_, j) => j !== i));
+                        }}
+                      >
+                        {t(locale, "dataList.removeColumn")}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          <div className="admin-controls">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setSaved(false);
+                setColumns((prev) => [...prev, { key: "", label: "", type: "string" }]);
+              }}
+            >
+              {t(locale, "dataList.addColumn")}
+            </button>
+          </div>
+
           <h2>{t(locale, "dataList.valuesTitle")}</h2>
+          {/* The one admin table whose width an operator decides: it grows a
+              column per declared column. It scrolls inside this container, so
+              the page never scrolls sideways. */}
+          <div className="admin-table-scroll">
           <table className="admin-table">
             <thead>
               <tr>
                 <th>{t(locale, "dataList.colValue")}</th>
                 <th>{tFill(locale, "dataList.colLabel", { locale })}</th>
+                {columns.map((column, i) => (
+                  <th key={i}>{column.label || column.key}</th>
+                ))}
                 <th>{t(locale, "dataList.colState")}</th>
                 <th />
               </tr>
@@ -170,6 +295,37 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
                   <td>
                     <input value={row.label} onChange={(e) => patch(i, { label: e.target.value })} aria-label={tFill(locale, "dataList.valueLabelAria", { n: i + 1 })} />
                   </td>
+                  {/* A retired value's attributes are readonly: the values
+                      route retires such a row rather than rewriting it, so an
+                      editable input would promise a write that never happens. */}
+                  {columns.map((column, ci) => {
+                    const aria = tFill(locale, "dataList.attributeAria", { column: column.label || column.key, n: i + 1 });
+                    if (column.type === "boolean") {
+                      return (
+                        <td key={ci}>
+                          <input
+                            type="checkbox"
+                            checked={row.attributes[column.key] === "true"}
+                            disabled={row.retired}
+                            onChange={(e) => patchAttribute(i, column.key, e.target.checked ? "true" : "false")}
+                            aria-label={aria}
+                          />
+                        </td>
+                      );
+                    }
+                    return (
+                      <td key={ci}>
+                        <input
+                          type={column.type === "number" ? "number" : "text"}
+                          className={column.type === "number" ? "admin-mono" : undefined}
+                          value={row.attributes[column.key] ?? ""}
+                          readOnly={row.retired}
+                          onChange={(e) => patchAttribute(i, column.key, e.target.value)}
+                          aria-label={aria}
+                        />
+                      </td>
+                    );
+                  })}
                   <td>
                     <span className={`admin-badge admin-badge-${row.retired ? "disabled" : "enabled"}`}>
                       {t(locale, row.retired ? "dataList.stateRetired" : "dataList.stateOffered")}
@@ -184,12 +340,20 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
               ))}
             </tbody>
           </table>
+          </div>
 
           {/* Above the controls, so the reason a disabled Save is disabled is
               visible without scrolling past it. */}
+          {/* Keyed by position, not by the message. Two blank columns produce
+              the SAME sentence twice, and a duplicate React key breaks
+              reconciliation: the list keeps stale entries after the problems
+              clear, while Save re-enables from the same render. A production
+              build strips React's duplicate-key warning, so nothing says so.
+              The list is fully re-derived every render and never reordered, so
+              the index is the honest key. */}
           <ul className="admin-error" aria-live="polite">
-            {problems.map((problem) => (
-              <li key={problem}>{problem}</li>
+            {problems.map((problem, i) => (
+              <li key={i}>{problem}</li>
             ))}
           </ul>
 
@@ -199,7 +363,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
               className="btn btn-secondary"
               onClick={() => {
                 setSaved(false);
-                setRows((prev) => [...prev, { value: "", label: "", retired: false }]);
+                setRows((prev) => [...prev, { value: "", label: "", attributes: {}, retired: false }]);
               }}
             >
               {t(locale, "dataList.addValue")}

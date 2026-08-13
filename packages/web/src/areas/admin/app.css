@@ -64,6 +64,22 @@
   font-size: 0.9rem;
 }
 
+/* A data list's values table grows one column per declared column, so an
+   operator decides its width. Contained here rather than on `.admin-table`:
+   every other admin table has a fixed column set, and this is the one whose
+   width leaves the layout's hands. Without it the page itself scrolls
+   sideways, measured at 152px on a 1100px window with two columns in German.
+   `min-width: 100%` keeps a narrow table filling the row, so a list with no
+   columns looks exactly as it did. */
+.admin-table-scroll {
+  overflow-x: auto;
+}
+
+.admin-table-scroll > .admin-table {
+  width: auto;
+  min-width: 100%;
+}
+
 .admin-table th {
   text-align: left;
   font-family: var(--font-body);
@@ -182,6 +198,19 @@
 .admin-role-input {
   font-family: var(--font-mono);
   font-size: 0.8rem;
+}
+
+/* A data list column key is an identifier the engine matches literally, and a
+   number attribute is a quantity that has to align down its column. Both take
+   the mono face, for the reason `.admin-role-input` above does. A number input
+   right-aligns, the way a ledger's amount column does. */
+.admin-mono {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+input.admin-mono[type="number"] {
+  text-align: right;
 }
 
 .admin-role-editor {

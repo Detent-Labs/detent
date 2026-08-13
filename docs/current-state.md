@@ -2299,9 +2299,85 @@ Stage-by-stage status is in `ROADMAP.md`.
   did, so no append-only rule applies.
 
   The declaration stays in the body. A `"db.list"` data source still carries
-  `config: { listKey }`, and only the values move out. `definition.ts` does
-  not change. `definitionHash` therefore stays the same, and every published
-  body stays valid.
+  `config: { listKey }`, and only the values move out. `definitionHash`
+  therefore stays the same, and every published body stays valid. The
+  table-shaped entry below added two optional keys to `definition.ts`. Neither
+  moves a stored hash, because no body written before them declares one.
+
+- Table-shaped data lists (`src/engine/host.ts`, `src/engine/store.ts`,
+  `src/schema/definition.ts`, `src/schema/compile.ts`, `src/runtime/api.ts`,
+  `src/engine/transition.ts`, `src/http/admin-routes.ts`,
+  `packages/form-ui/src/FieldForm.tsx`, the admin area of `packages/web`):
+  a data list row carries more than `value` and `label`.
+
+  `data_lists` gains `columns jsonb NOT NULL DEFAULT '[]'`.
+  `data_list_values` gains `attributes jsonb NOT NULL DEFAULT '{}'`. Both
+  arrive through `ADD COLUMN IF NOT EXISTS` beside the create. An existing row
+  therefore takes the empty case with no backfill.
+
+  A column declares three things. `key` takes the field-key slug grammar.
+  `label` is operator-facing text in one language. `type` is `string`, `number`
+  or `boolean`. `MAX_DATA_LIST_COLUMNS` is 10.
+
+  The declaration lives on the list, so making a list table-shaped needs no
+  publish. `db.list`'s `configSchema` stays `{ listKey }` alone.
+
+  `FieldOption` gains an optional `attributes` map of JSON scalars. A
+  `"static"` source and an inline `options` array therefore carry them too.
+
+  `db.list` builds that map by walking the list's `columns` declaration. It
+  looks each key up in the stored object, never the reverse. Postgres
+  normalizes a jsonb object's key order, so the stored order is not the
+  operator's. An option of a list with no columns carries no `attributes` key
+  at all.
+
+  `parseJsonb` in `host.ts` normalizes what `Bun.sql` returns for a jsonb
+  column. That is a parsed value for one written through an object parameter.
+  It is raw text for one written through an explicit cast.
+
+  `FieldDef` gains an optional `columnMapping`, column key to target `FieldId`.
+  `compile.ts::checkColumnMapping` is the seventh structural write-path check.
+  It requires a `dataSource` and a `select` type. It holds each key to the slug
+  grammar and the length bound. It resolves every target in the recursive field
+  set. It refuses a self-target, a group target, and two keys naming one
+  target.
+
+  It reads no data list. A key naming no declared column publishes, and writes
+  nothing.
+
+  `validateSubmissionData` now returns the `ResolvedViewField[]` it already
+  built. `applyColumnMapping` walks that list. It carries the step's view
+  order, not the request's own key order. The walk finds the picked option, and
+  checks each mapped attribute against its target field's declared type.
+
+  `submitAndTransition` and `createProcessInstance` call it after validation
+  and before the commit. A guard on the outgoing path therefore reads a mapped
+  value. At creation it runs before `resolveStepAssignment`, so a strategy on
+  the initial step reads the final seed data.
+
+  A mapped target takes the mapped value over a submitted one, and over the
+  view's readonly and visibility rules. The list owns a mapped field.
+
+  The engine drops a mismatching attribute rather than writing it, and the
+  submission still succeeds. That is the rule `Action.output` already takes in
+  the outbox.
+
+  The drop records a `datasource.attribute-dropped` event, the twelfth
+  `InstanceEvent` kind. Its payload is `{ fieldId, column, targetFieldId,
+  reason }`. `commitManualTransition` and `executeManualTransition` gained one
+  optional trailing `events` argument. It rides the `overrides.events` slot
+  `assignment.unresolved` already uses, so the drop lands in the commit's own
+  transaction.
+
+  `FieldForm` folds an option's attribute values into its text, separated by
+  `·`. It formats a number through the locale's own formatter, and a boolean
+  as its literal value. A native `<option>` carries one text run, so that text
+  is the accessible name. The keyboard behavior comes from the platform.
+
+  The admin data list screen declares the columns and fills the attributes. It
+  warns before a save that drops one. The studio gains no builder: stage 36's
+  hold covers `panels/EditPanelsModal.tsx`, so an author writes a mapping as
+  JSON.
 
   `DataSourceContext` gains an optional `heldValues: string[]`.
   `resolveFields` supplies the values the instance holds for the field under

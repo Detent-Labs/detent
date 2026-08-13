@@ -482,6 +482,79 @@ function findStep(body: ProcessBody, stepId: string): Step {
 // Submission validation
 // ============================================================
 
+/** One mapped attribute the engine refused to write, and why. */
+export interface DroppedAttribute {
+  fieldId: FieldId;
+  column: string;
+  targetFieldId: FieldId;
+  reason: "type-mismatch";
+}
+
+/**
+ * Apply every written field's `columnMapping` over the options already
+ * resolved for submission validation.
+ *
+ * Walks `resolved`, which carries the step's VIEW order, not the request's own
+ * key order: the client controls the latter, and two pickers writing in a
+ * client-decided order is not a behavior anyone can reason about.
+ *
+ * A mapped target takes the mapped value even when the request also carries
+ * one for it, and even when the view marks it readonly or never shows it. The
+ * list owns a mapped field. The view bounds what a participant may change, not
+ * what the engine may write.
+ *
+ * A mismatching attribute is dropped rather than failing the submission. The
+ * mismatch comes from operator data, and the participant can do nothing about
+ * it — the same rule `Action.output` already takes in the outbox.
+ */
+function applyColumnMapping(
+  resolved: ResolvedViewField[],
+  submitted: Record<string, Literal>,
+  fieldsById: Map<string, FieldDef>,
+): { writes: Record<string, Literal>; dropped: DroppedAttribute[] } {
+  const writes: Record<string, Literal> = {};
+  const dropped: DroppedAttribute[] = [];
+  for (const rf of resolved) {
+    const mapping = rf.field.columnMapping;
+    if (!mapping) continue;
+    const picked = submitted[rf.field.id as string];
+    if (picked === undefined) continue; // the request did not write this field
+    const option = rf.options?.find((o) => o.value === picked);
+    if (!option?.attributes) continue; // no such option, or a row with nothing to carry
+    for (const [column, targetId] of Object.entries(mapping)) {
+      const attribute = option.attributes[column];
+      if (attribute === undefined) continue; // an unfilled or undeclared column writes nothing
+      const target = fieldsById.get(targetId as string);
+      if (!target) continue; // publish-time invariant guarantees resolution; defensive only
+      if (!typeMatches(target.type, attribute)) {
+        dropped.push({ fieldId: rf.field.id, column, targetFieldId: targetId, reason: "type-mismatch" });
+        continue;
+      }
+      writes[targetId as string] = attribute;
+    }
+  }
+  return { writes, dropped };
+}
+
+/** The `datasource.attribute-dropped` records for one write-back's drops. */
+function droppedAttributeEvents(
+  dropped: DroppedAttribute[],
+  instanceId: Instance["instanceId"],
+  version: number,
+  transitionSeq: number,
+): InstanceEvent[] {
+  const at = new Date().toISOString();
+  return dropped.map((d) => ({
+    id: newInstanceEventId(),
+    instanceId,
+    transitionSeq,
+    version,
+    kind: "datasource.attribute-dropped" as const,
+    payload: { fieldId: d.fieldId, column: d.column, targetFieldId: d.targetFieldId, reason: d.reason },
+    at,
+  }));
+}
+
 function optionValuesValid(options: FieldOption[] | undefined, value: Literal): boolean {
   if (!options || options.length === 0) return true;
   const allowed = new Set(options.map((o) => o.value));
@@ -566,7 +639,7 @@ async function validateSubmissionData(
   registry: DataSourceRegistry,
   db: SQL,
   opts: { checkRequired: boolean } = { checkRequired: true },
-): Promise<void> {
+): Promise<ResolvedViewField[]> {
   const resolved = await resolveFields(body, step, instance, actor, registry, db);
   const fieldsById = new Map(resolved.map((r) => [r.field.id as string, r]));
   const editable = editableFieldIds(resolved);
@@ -612,6 +685,9 @@ async function validateSubmissionData(
   }
 
   if (issues.length > 0) throw new SubmissionValidationError(issues);
+  // Returned so the caller's column-mapping write-back reads the options this
+  // call already resolved, instead of resolving the step a second time.
+  return resolved;
 }
 
 // ============================================================
@@ -679,7 +755,14 @@ export async function createProcessInstance(
     startedAt: new Date().toISOString(),
   };
 
-  await validateSubmissionData(body, initial, stub, actor, submitted, registry, db, { checkRequired: false });
+  const resolvedInitial = await validateSubmissionData(body, initial, stub, actor, submitted, registry, db, { checkRequired: false });
+
+  // The write-back lands before the assignment resolves, so a strategy on the
+  // initial step reads the final seed data, mapped values included. `submitted`
+  // is the object `stub.data` aliases and `createInstance` writes, so mutating
+  // it here is what carries the values onto the created instance.
+  const mapped = applyColumnMapping(resolvedInitial, submitted, new Map(collectFieldsDeep(body.fields).map((f) => [f.id as string, f])));
+  Object.assign(submitted, mapped.writes);
 
   // Creation is a step entry, so the initial step's candidates resolve here —
   // before `createInstance`, which calls no resolver — over the same minted id
@@ -703,6 +786,7 @@ export async function createProcessInstance(
         at: new Date().toISOString(),
       }]
     : [];
+  events.push(...droppedAttributeEvents(mapped.dropped, mintedId as Instance["instanceId"], version, 0));
 
   const created = await createInstance(
     body,
@@ -835,9 +919,19 @@ export async function submitAndTransition(
       throw new AuthorizationError(`actor '${actor.id}' may not submit instance '${instanceId}'`);
     }
 
-    await validateSubmissionData(body, step, instance, actor, submitted, registry, tx);
+    const resolved = await validateSubmissionData(body, step, instance, actor, submitted, registry, tx);
 
-    return commitManualTransition(instance, pathId, body, actor, tx, data, assignmentRegistry);
+    // After validation, never inside it: a `SubmissionValidationError` blames a
+    // field on the participant's form, and a mismatching attribute is the
+    // operator's data, not theirs. Before the commit, so a guard on the
+    // outgoing path reads the mapped value.
+    const mapped = applyColumnMapping(resolved, submitted, new Map(collectFieldsDeep(body.fields).map((f) => [f.id as string, f])));
+    const patch = Object.keys(mapped.writes).length > 0 ? { ...(data ?? {}), ...mapped.writes } : data;
+    // The drops share the seq the entry lands on, the way
+    // `assignment.unresolved` already does for an event accompanying a hop.
+    const events = droppedAttributeEvents(mapped.dropped, instance.instanceId, instance.version, instance.transitionSeq + 1);
+
+    return commitManualTransition(instance, pathId, body, actor, tx, patch, assignmentRegistry, events);
   });
 
   const body = await store.resolveBody(committed.processId, committed.version);

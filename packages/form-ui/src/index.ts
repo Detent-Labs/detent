@@ -1,4 +1,4 @@
-export { FieldForm, FieldInput, effectiveSpan } from "./FieldForm.js";
+export { FieldForm, FieldInput, effectiveSpan, optionText, OPTION_ATTRIBUTE_SEPARATOR } from "./FieldForm.js";
 export { PathButtons } from "./PathButtons.js";
 export { editableFieldIds, filterToEditable } from "./submit.js";
 export { resolveText } from "./locale.js";
