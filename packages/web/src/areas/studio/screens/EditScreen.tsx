@@ -16,7 +16,7 @@ import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
 import { savedBodyReducer, initialSavedBody, isDirty } from "./draftToolbarState.js";
 import { CanvasView } from "../canvas/CanvasView.js";
 import { EditRail } from "../canvas/EditRail.js";
-import { svgPointFromClient, type Point } from "../canvas/geometry.js";
+import { snapToGrid, svgPointFromClient, type Point } from "../canvas/geometry.js";
 import { newStep, type StepKind } from "../draft/createStep.js";
 import { addToDraftArray } from "../draft/draft-array-crud.js";
 import { JsonView } from "../panels/JsonView.js";
@@ -113,7 +113,9 @@ function EditorArea({ processId, formStepId, token, initialRevision, initialLayo
       target?.closest(".canvas-wrap")?.querySelector<SVGSVGElement>("svg.canvas-svg") ??
       target?.closest<SVGSVGElement>("svg.canvas-svg");
     if (!svg) return; // dropped outside the canvas — no placement
-    const point = svgPointFromClient(svg, clientX, clientY);
+    // Rounded here, the same way a drag's release is: a dropped step lands on
+    // the lattice the author can see.
+    const point = snapToGrid(svgPointFromClient(svg, clientX, clientY));
     const created = newStep(kind, seedLocalizedText(contentLocale));
     addToDraftArray(
       mutate,

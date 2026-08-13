@@ -7,8 +7,11 @@ export interface LayoutStep {
   paths?: Array<{ to?: string }>;
 }
 
-const COLUMN_WIDTH = 240;
-const ROW_HEIGHT = 110;
+// Both are whole multiples of `GRID_STEP`, so an auto-placed step already sits
+// on the canvas lattice and does not shift the first time an author drags it.
+// The row pitch was 110 until that rule arrived.
+export const COLUMN_WIDTH = 240;
+export const ROW_HEIGHT = 120;
 
 /**
  * Computes a position for every step id absent from `existingLayout`, via a

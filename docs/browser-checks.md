@@ -559,3 +559,31 @@ Back in Operations, retype `unit_price` from number to text and save. Start a
 second case, pick the same row, and submit. Pass: the submission succeeds, the
 number field stays empty, and the instance record carries a
 `datasource.attribute-dropped` entry naming the column.
+
+### Canvas grid snapping (`canvas-grid-snap`)
+
+Open Studio and a draft with several steps. This whole entry is a visual
+judgment against the dots the canvas paints. That is why none of it is an
+assertion.
+
+Drag a step a short way and release. Pass: it settles on a dot, rather than
+where the pointer stopped. It does not jump at the moment you let go. The node
+you hold is the node you get.
+
+Press a step and release without moving. Pass: it selects, and it stays where
+it was. A click is not a tiny drag.
+
+Zoom in two steps and drag a step again. Pass: the dots sit further apart, and
+the step still lands on one. Zoom out past the fit scale and repeat. Pass: the
+dots sit closer together, and the step still lands on one.
+
+Pan the canvas, then drag a step. Pass: the dots travelled with the graph, and
+the step lands on one of them. The dots and the steps move together, never
+against each other.
+
+Drop a step from the creation palette. Pass: it lands on a dot, at whatever
+zoom you are at.
+
+Open a draft nobody has dragged yet. Pass: every step already sits on a dot.
+Drag one by a whole number of dots. Pass: it moves by exactly that, with no
+extra nudge on the first drag.

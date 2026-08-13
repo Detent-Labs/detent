@@ -34,24 +34,26 @@ const TOOLBAR_CLEARANCE = 38 + 8 + FIT_GUTTER;
 const INSETS: Insets = { top: TOOLBAR_CLEARANCE, right: FIT_GUTTER, bottom: FIT_GUTTER, left: FIT_GUTTER };
 
 // The graph from issue #3: request -> decision -> approved/rejected, as
-// `autoPlaceSteps` positions it (three columns of 240, two rows of 110, nodes
-// 180x64).
-const GRAPH: Box = { x: 0, y: 0, width: 660, height: 174 };
+// `autoPlaceSteps` positions it (three columns of 240, two rows of 120, nodes
+// 180x60). The box is an input to computeFit, so this file stays green
+// whatever those constants say — which is exactly why it has to be re-derived
+// by hand when they move, rather than left to a failing assertion.
+const GRAPH: Box = { x: 0, y: 0, width: 660, height: 180 };
 
 describe("canvas fit: a canvas wider than the graph", () => {
   const element = { width: 1200, height: 800 };
 
   it("keeps the scale at 1 and centres the graph in the inset area", () => {
     // Worked by hand, so a reader can check it without running anything.
-    // Usable area 1168x722. Scale min(1168/660, 722/174, 1) = 1.
+    // Usable area 1168x722. Scale min(1168/660, 722/180, 1) = 1.
     // Target centre (16 + 584, 62 + 361) = (600, 423); element centre
-    // (600, 400); content centre (330, 87).
+    // (600, 400); content centre (330, 90).
     // x = (600 - 600)/1 + 600 - 330 = 270
-    // y = (423 - 400)/1 + 400 -  87 = 336
+    // y = (423 - 400)/1 + 400 -  90 = 333
     const fit = computeFit(GRAPH, element, INSETS);
     expect(fit.scale).toBe(1);
     expect(fit.x).toBeCloseTo(270, 6);
-    expect(fit.y).toBeCloseTo(336, 6);
+    expect(fit.y).toBeCloseTo(333, 6);
   });
 
   it("lands the graph inside the inset area", () => {
@@ -125,7 +127,7 @@ describe("canvas fit: the toolbar overlay", () => {
 describe("canvas fit: a content box offset from the origin", () => {
   it("frames a graph whose steps all sit at negative coordinates", () => {
     const element = { width: 500, height: 576 };
-    const shifted: Box = { x: -900, y: -400, width: 660, height: 174 };
+    const shifted: Box = { x: -900, y: -400, width: 660, height: 180 };
     const fit = computeFit(shifted, element, INSETS);
     const box = project(fit, shifted, element);
     const area = target(element, INSETS);
@@ -195,6 +197,15 @@ describe("canvas fit: the clipping surface", () => {
   it("paints the grid on the wrap, which the zoom does not move", () => {
     expect(rule(".canvas-wrap")).toContain("background-image");
     expect(rule(".canvas-svg")).not.toContain("background-image");
+  });
+
+  it("drives the grid's size and offset from the transform, not from fixed pixels", () => {
+    // The wrap holds still, but its grid does not: CanvasView writes these
+    // three properties on every `panzoomchange`. A fixed `20px` here would put
+    // the dots back out of step with the lattice at any scale but 1.
+    const wrap = rule(".canvas-wrap");
+    expect(wrap).toContain("background-size: var(--canvas-grid-size) var(--canvas-grid-size)");
+    expect(wrap).toContain("background-position: var(--canvas-grid-offset-x) var(--canvas-grid-offset-y)");
   });
 });
 

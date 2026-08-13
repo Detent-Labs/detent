@@ -294,10 +294,21 @@
   overflow: hidden;
   /* The grid sits on the wrap, not on the SVG. Panzoom transforms the SVG, so
      a grid painted there shrinks with the zoom and leaves the rest of the
-     canvas bare. The wrap holds still. */
+     canvas bare. The wrap holds still.
+
+     Holding still is not the same as ignoring the transform. CanvasView
+     subscribes to `panzoomchange` and writes the three properties below, so
+     the dots track the scale and the pan. A step snapped to the lattice
+     therefore meets the dots the author is looking at, at every zoom. The
+     fallbacks are the scale-1, pan-0 values, so a canvas that has not yet
+     reported a transform still paints the grid it always did. */
+  --canvas-grid-size: 20px;
+  --canvas-grid-offset-x: 0px;
+  --canvas-grid-offset-y: 0px;
   background-color: var(--color-surface-muted);
   background-image: radial-gradient(var(--color-border) 1px, transparent 1px);
-  background-size: 20px 20px;
+  background-size: var(--canvas-grid-size) var(--canvas-grid-size);
+  background-position: var(--canvas-grid-offset-x) var(--canvas-grid-offset-y);
 }
 
 .canvas-toolbar {

@@ -1,5 +1,25 @@
 export const NODE_WIDTH = 180;
-export const NODE_HEIGHT = 64;
+export const NODE_HEIGHT = 60;
+
+/**
+ * The canvas lattice, in SVG user units, matching the dot pitch `.canvas-wrap`
+ * paints. Every layout constant is a whole multiple of it, so an auto-placed
+ * step already sits on the lattice and does not shift on its first drag.
+ *
+ * It lives here rather than in `CanvasView.tsx` so a later waypoint or control
+ * point (stages 30 to 33) rounds the same way rather than its own way.
+ */
+export const GRID_STEP = 20;
+
+/**
+ * The nearest lattice point. Called at all three sites that write a position —
+ * a drag's release, the drag preview, and a palette drop — so the node under
+ * the pointer is the node the author gets. Rounding at the write path alone
+ * would leave the preview unrounded and make it jump on release.
+ */
+export function snapToGrid(point: Point): Point {
+  return { x: Math.round(point.x / GRID_STEP) * GRID_STEP, y: Math.round(point.y / GRID_STEP) * GRID_STEP };
+}
 
 export interface Point {
   x: number;
@@ -28,6 +48,22 @@ export function hitTestNode(point: Point, nodes: NodePosition[]): string | undef
 /** Delta between a drag's start and current pointer position. */
 export function dragDelta(start: Point, current: Point): Point {
   return { x: current.x - start.x, y: current.y - start.y };
+}
+
+/**
+ * How far a pointer travels before a press counts as a drag rather than a
+ * click, in SVG user units.
+ */
+export const CLICK_THRESHOLD = 4;
+
+/**
+ * Whether a pointer movement was a drag. Sits beside `dragDelta` rather than
+ * inside the event handler because it decides whether a position is written at
+ * all: the snap runs only past this line, so a click can never round its own
+ * step onto the lattice.
+ */
+export function exceedsClickThreshold(delta: Point): boolean {
+  return Math.abs(delta.x) > CLICK_THRESHOLD || Math.abs(delta.y) > CLICK_THRESHOLD;
 }
 
 /**

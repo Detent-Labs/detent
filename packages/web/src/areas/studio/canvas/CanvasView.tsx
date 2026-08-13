@@ -7,14 +7,13 @@ import { newPath } from "../draft/createPath";
 import { seedLocalizedText, resolveDraftLocalizedText } from "../draft/localized-text";
 import { t } from "../catalog.js";
 import { autoPlaceSteps, type LayoutStep } from "./layout";
-import { dragDelta, svgPointFromClient, NODE_WIDTH, NODE_HEIGHT, type Point, type NodePosition } from "./geometry";
+import { dragDelta, exceedsClickThreshold, snapToGrid, svgPointFromClient, GRID_STEP, NODE_WIDTH, NODE_HEIGHT, type Point, type NodePosition } from "./geometry";
 import { computeFit, MIN_SCALE, MAX_SCALE, FIT_GUTTER, type Fit } from "./fit";
 import { resolveDropGesture } from "./dropGesture";
 import { inlineRenamePatch } from "./inlineRename";
 import { buildOperands, guardEdgeLabel } from "../panels/shared/conditionLogic";
 
 const HANDLE_RADIUS = 7;
-const CLICK_THRESHOLD = 4;
 const REJECT_MESSAGE_MS = 4000;
 
 interface Props {
@@ -151,8 +150,34 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
       panzoom.zoomWithWheel(e);
     };
     wrap?.addEventListener("wheel", onWheel);
+
+    // The painted grid lives on `.canvas-wrap`, which Panzoom never
+    // transforms, so it has to be told what the transform is. Without this a
+    // node rounded to the lattice meets the drawn dots at scale 1 and pan 0
+    // alone, and an author works at the fit scale, which is rarely 1.
+    //
+    // Two custom properties, read by the stylesheet: the gradient and its
+    // colour role stay in CSS, and this hands over two numbers. Reading the
+    // event's own `detail` rather than parsing the element's transform back
+    // keeps this off the layout path.
+    const paintGrid = (scale: number, x: number, y: number) => {
+      if (!wrap) return;
+      wrap.style.setProperty("--canvas-grid-size", `${GRID_STEP * scale}px`);
+      wrap.style.setProperty("--canvas-grid-offset-x", `${x * scale}px`);
+      wrap.style.setProperty("--canvas-grid-offset-y", `${y * scale}px`);
+    };
+    const onPanzoomChange = (e: Event) => {
+      const d = (e as CustomEvent<{ scale: number; x: number; y: number }>).detail;
+      paintGrid(d.scale, d.x, d.y);
+    };
+    el.addEventListener("panzoomchange", onPanzoomChange);
+    // Seeded from the fit above, so the grid is right before the first gesture
+    // rather than one event later.
+    paintGrid(initialFit.scale, initialFit.x, initialFit.y);
+
     return () => {
       wrap?.removeEventListener("wheel", onWheel);
+      el.removeEventListener("panzoomchange", onPanzoomChange);
       panzoom.destroy();
       panzoomRef.current = null;
     };
@@ -237,8 +262,11 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
     e.stopPropagation();
     if (!nodeDrag) return;
     const delta = dragDelta(nodeDrag.startPointer, nodeDrag.current);
-    if (Math.abs(delta.x) > CLICK_THRESHOLD || Math.abs(delta.y) > CLICK_THRESHOLD) {
-      onMoveStep(nodeDrag.stepId, { x: nodeDrag.startPos.x + delta.x, y: nodeDrag.startPos.y + delta.y });
+    if (exceedsClickThreshold(delta)) {
+      // After the click threshold, never before: a movement under it selects
+      // rather than moves, and rounding first would write a position for a
+      // click.
+      onMoveStep(nodeDrag.stepId, snapToGrid({ x: nodeDrag.startPos.x + delta.x, y: nodeDrag.startPos.y + delta.y }));
     } else {
       onSelectStep(stepId);
     }
@@ -450,8 +478,17 @@ export function CanvasView({ layout, onMoveStep, selectedStepId, onSelectStep, s
           if (!step.id) return null;
           const pos = positionOf(step.id);
           const dragged = nodeDrag?.stepId === step.id;
-          const x = dragged ? nodeDrag!.startPos.x + dragDelta(nodeDrag!.startPointer, nodeDrag!.current).x : pos.x;
-          const y = dragged ? nodeDrag!.startPos.y + dragDelta(nodeDrag!.startPointer, nodeDrag!.current).y : pos.y;
+          // The preview rounds exactly as the release does, so the node under
+          // the pointer is the node the author gets. Drawing the raw point
+          // here would make it jump at release.
+          const previewed = dragged
+            ? snapToGrid({
+                x: nodeDrag!.startPos.x + dragDelta(nodeDrag!.startPointer, nodeDrag!.current).x,
+                y: nodeDrag!.startPos.y + dragDelta(nodeDrag!.startPointer, nodeDrag!.current).y,
+              })
+            : pos;
+          const x = previewed.x;
+          const y = previewed.y;
           const isSelected = selectedStepId === step.id;
           const isInitial = initialStepId === step.id;
           const isTerminal = step.terminal === true;

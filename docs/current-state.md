@@ -1341,6 +1341,34 @@ Stage-by-stage status is in `ROADMAP.md`.
   existing convention (`packages/web/src/areas/app/screens/inboxLogic.ts`). The canvas
   introduces no operation the panels can't already do — deletion and every
   field edit remain panel-only.
+- Canvas grid snapping (`packages/web/src/areas/studio/canvas/geometry.ts`,
+  `canvas/layout.ts`, `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`,
+  `areas/studio/app.css`): a step lands on the lattice the author can see.
+
+  `GRID_STEP` is 20 and `snapToGrid` rounds to the nearest point. Three sites
+  call it: a drag's release, the drag preview, and the palette drop. All three,
+  because the preview never calls `onMoveStep`. Rounding at the write path
+  alone would leave the preview unrounded, and the node would jump on release.
+
+  `CLICK_THRESHOLD` and its comparison moved into `geometry.ts` as
+  `exceedsClickThreshold`. The snap runs only past that line, so a click never
+  rounds its own step onto the lattice.
+
+  The grid tracks the transform. `CanvasView` subscribes to `panzoomchange`
+  and writes `--canvas-grid-size`, `--canvas-grid-offset-x` and
+  `--canvas-grid-offset-y` onto `.canvas-wrap`, reading the scale and pan from
+  the event's own `detail`. The stylesheet reads all three, so the gradient and
+  its colour role stay in CSS.
+
+  The grid still sits on the wrap rather than the SVG, for the reason it always
+  did: Panzoom transforms the SVG, so a grid drawn there shrinks with the zoom.
+  The wrap holds still. What changed is that the still surface is now told what
+  the moving one is doing.
+
+  `ROW_HEIGHT` went 110 to 120 and `NODE_HEIGHT` 64 to 60, so all four layout
+  constants sit on the lattice. An auto-placed step therefore does not shift on
+  its first drag. No step size both matched the drawn dots and divided the old
+  four.
 - Process Studio — lifecycle (`src/http/studio-routes.ts`, `src/engine/drafts.ts`,
   `src/http/errors.ts`, `packages/web/src/areas/studio/panels/DraftToolbar.tsx`,
   `packages/web/src/areas/studio/screens/{VersionsScreen,MigrationPlanScreen}.tsx`,

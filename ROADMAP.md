@@ -1045,42 +1045,37 @@ Spec: `development-toolchain`.
     so it writes deltas against the capability specs of the views it moves —
     `studio-app` for the frame, and the specific capability for each view.
 
-37. Canvas nodes snap to the grid: NOT STARTED. Raised 2026-08-13 in
-    conversation. A dragged step lands on the canvas lattice, in steps
-    matching the background the author already sees, instead of at any
-    fractional point the pointer stopped on.
-    The write side is one rounding call. The canvas is hand-drawn SVG, not
-    React Flow, so no `snapToGrid` prop exists to set: `onNodePointerUp` in
-    `canvas/CanvasView.tsx` adds the drag delta to the start position and
-    hands the result to `onMoveStep`, which writes the raw point into
-    `saveState.layout` (`screens/EditScreen.tsx:85`). Position stays in the
-    opaque `layout` blob, so no schema change and no contract question.
-    The hard part is that the grid does not travel with the content.
-    `app.css` paints it on `.canvas-wrap` as a `radial-gradient` at
-    `background-size: 20px 20px`, and the comment there states why: Panzoom
-    transforms the SVG, so a grid painted on the SVG shrinks with the zoom and
-    leaves the rest of the canvas bare. The wrap holds still. A node rounded
-    to a 20-unit lattice in SVG coordinates therefore lines up with the
-    visible dots at zoom 1 and pan 0 alone. The design either declares the
-    dots decorative and the snap invisible, or drives `background-position`
-    and `background-size` from the live Panzoom transform so the two agree at
-    every zoom. That second answer is the one that makes this more than a
-    one-line change.
-    Two constants disagree with a 20-unit step. Auto layout places rows 110
-    apart and columns 240 apart (`canvas/layout.ts`), and the node box is
-    180 by 64 (`canvas/geometry.ts`). The column pitch and the width sit on
-    the lattice; the row pitch and the height do not, so every auto-laid-out
-    step shifts on its first drag. The design picks the step size and
-    reconciles those four numbers, or says the shift is acceptable.
-    Two more write sites want the same rounding. `onPaletteDrop`
-    (`screens/EditScreen.tsx:98`) places a dropped step at the raw pointer
-    point through the same `onMoveStep`, and the in-flight drag preview draws
-    the unrounded position, so a node jumps at release unless the preview
-    snaps too.
-    Overlaps stages 30 through 34 only in the file it touches and in the
-    "presentation, not contract" rule they all follow. No design doc, no
-    OpenSpec change yet. A UI change is never trivial here, so it writes a
-    delta against `studio-canvas`.
+37. Canvas nodes snap to the grid: DONE. Change: `canvas-grid-snap`.
+    A dragged step, a dropped step and the in-flight drag preview all round to
+    a 20-unit lattice through one `snapToGrid` in `canvas/geometry.ts`. All
+    three round, so the node under the pointer is the node the author gets: the
+    preview never calls `onMoveStep`, so rounding at the write path alone would
+    have left it unrounded and jumping on release.
+    The grid question got the harder of its two answers. `.canvas-wrap` now
+    takes its `background-size` and `background-position` from three custom
+    properties, which `CanvasView` writes on every `panzoomchange` from the
+    event's own `detail`. The dots therefore track the scale and the pan, and a
+    node released on a dot lands on that dot at any zoom. The grid stays
+    painted on the wrap for the reason it always was, and the wrap still holds
+    still; what changed is that it is now told what the transform is. An author
+    works at the fit scale, rarely 1, so a snap measured against a fixed 20px
+    grid would have lined up with nothing they could see.
+    The four constants are reconciled rather than left disagreeing.
+    `ROW_HEIGHT` went 110 to 120 and `NODE_HEIGHT` 64 to 60, so all four sit on
+    the lattice and no auto-placed step shifts on its first drag. No step size
+    both matched the drawn 20px dots and divided the old four: 10 divides 240,
+    180 and 110 but not 64.
+    The review pass earned its place on one finding. `studio-canvas-fit.test.ts`
+    fixes its graph box by hand, with a comment deriving the height from the two
+    constants. That box is an input to `computeFit`, so the suite would have
+    stayed green while the fixture quietly stopped describing the layout it
+    names. Corrected, along with the one hand-worked expectation the height
+    feeds. `CLICK_THRESHOLD` and its comparison moved to `geometry.ts` as
+    `exceedsClickThreshold`, so the ordering the snap depends on — threshold
+    first, rounding second — has a test rather than only a comment.
+    Presentation throughout. Position stays in the opaque `layout` blob, so no
+    schema, no hash and no published body moves. Specs: `studio-canvas`
+    (modified).
 
 ## Changes with no stage
 
