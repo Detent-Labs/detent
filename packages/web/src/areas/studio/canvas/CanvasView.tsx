@@ -7,7 +7,22 @@ import { newPath } from "../draft/createPath";
 import { seedLocalizedText, resolveDraftLocalizedText } from "../draft/localized-text";
 import { t } from "../catalog.js";
 import { autoPlaceSteps, type LayoutStep } from "./layout";
-import { dragDelta, exceedsClickThreshold, snapToGrid, svgPointFromClient, GRID_STEP, NODE_WIDTH, NODE_HEIGHT, type Point, type NodePosition } from "./geometry";
+import {
+  dragDelta,
+  exceedsClickThreshold,
+  snapToGrid,
+  svgPointFromClient,
+  routeEdge,
+  routePath,
+  midpointOfRoute,
+  segmentLength,
+  GRID_STEP,
+  NODE_WIDTH,
+  NODE_HEIGHT,
+  type Point,
+  type NodePosition,
+  type EdgeStyle,
+} from "./geometry";
 import { toggleSelection, normalizeRect, nodesInRect } from "./selection";
 import { computeFit, MIN_SCALE, MAX_SCALE, FIT_GUTTER, type Fit } from "./fit";
 import { resolveDropGesture } from "./dropGesture";
@@ -31,6 +46,10 @@ interface Props {
   onSelectStep: (stepId: string | undefined, pathId?: string) => void;
   /** The whole set at once: a shift-click's toggle and a marquee's release. */
   onSelectSteps: (stepIds: string[]) => void;
+  /** Canvas-wide, never per path (design.md). `EditScreen` resolves an absent
+   * or unknown stored value to the default before it reaches here. */
+  edgeStyle: EdgeStyle;
+  onEdgeStyleChange: (style: EdgeStyle) => void;
   selectedPathId?: string;
 }
 
@@ -44,7 +63,16 @@ function isPoint(value: unknown): value is Point {
  * (not the Draft model); path creation writes through `useDraft()`/
  * `mutate()`, the same surface `PathsPanel`'s "add path" action uses.
  */
-export function CanvasView({ layout, onMoveStep, selectedStepIds, onSelectStep, onSelectSteps, selectedPathId }: Props) {
+export function CanvasView({
+  layout,
+  onMoveStep,
+  selectedStepIds,
+  onSelectStep,
+  onSelectSteps,
+  selectedPathId,
+  edgeStyle,
+  onEdgeStyleChange,
+}: Props) {
   const { draft, mutate, contentLocale, loadedChildren } = useDraft();
   const steps = draft.workflow?.steps ?? [];
   const initialStepId = draft.workflow?.initialStep;
@@ -477,6 +505,14 @@ export function CanvasView({ layout, onMoveStep, selectedStepIds, onSelectStep, 
         <button type="button" className="btn btn-secondary" onClick={fitToView}>
           {t("canvas.fitToView")}
         </button>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          aria-pressed={edgeStyle === "smoothstep"}
+          onClick={() => onEdgeStyleChange(edgeStyle === "smoothstep" ? "step" : "smoothstep")}
+        >
+          {t("canvas.edgeStyleToggle")}
+        </button>
       </div>
       <svg
         ref={svgRef}
@@ -509,20 +545,30 @@ export function CanvasView({ layout, onMoveStep, selectedStepIds, onSelectStep, 
             if (!path.to) return null;
             const target = positionOf(path.to);
             const targetAnchor = { x: target.x, y: target.y + NODE_HEIGHT / 2 };
-            const midX = (sourceAnchor.x + targetAnchor.x) / 2;
-            const midY = (sourceAnchor.y + targetAnchor.y) / 2;
+            const route = routeEdge(sourceAnchor, targetAnchor);
+            const d = routePath(route, edgeStyle);
+            // The badge and the guard label follow the route, not a straight
+            // line between the anchors. On a five-segment route those two
+            // points are nowhere near each other.
+            const mid = midpointOfRoute(route);
+            const midX = mid.point.x;
+            const midY = mid.point.y;
             const automaticGuarded = path.trigger === "automatic" && path.guard !== undefined;
             const automaticDefault = path.trigger === "automatic" && path.guard === undefined;
             const isSelected = path.id !== undefined && path.id === selectedPathId;
             const guardSrc = path.guard?.src;
             const guardLabel = automaticGuarded && guardSrc ? guardEdgeLabel(guardSrc, operands) : undefined;
             if (guardLabel) {
-              // Cap the label to the free space between the two node
-              // anchors it sits between, so it never needs to spill onto a
+              // Cap the label to the free space on the segment its midpoint
+              // actually falls on, so it never needs to spill onto a
               // neighboring node in the first place; the post-node paint
               // order (below) is the fallback for when that gap is too
               // narrow for even the ellipsis to clear it.
-              const gap = Math.abs(targetAnchor.x - sourceAnchor.x);
+              //
+              // The segment, not the anchor gap: a five-segment route puts
+              // its midpoint on a vertical run, where the distance between
+              // the two anchors says nothing about the room available.
+              const gap = segmentLength(route, mid.segment);
               const maxWidth = Math.min(220, Math.max(60, gap - 24));
               guardLabels.push({
                 key: path.id ?? `${step.id}-${pathIndex}-guard`,
@@ -543,15 +589,17 @@ export function CanvasView({ layout, onMoveStep, selectedStepIds, onSelectStep, 
                   onSelectStep(step.id, path.id);
                 }}
               >
-                <line
-                  x1={sourceAnchor.x}
-                  y1={sourceAnchor.y}
-                  x2={targetAnchor.x}
-                  y2={targetAnchor.y}
+                <path
+                  d={d}
                   className={path.trigger === "manual" ? "canvas-edge canvas-edge-manual" : "canvas-edge canvas-edge-automatic"}
                   markerEnd="url(#canvas-arrow)"
                 />
-                <line x1={sourceAnchor.x} y1={sourceAnchor.y} x2={targetAnchor.x} y2={targetAnchor.y} className="canvas-edge-hitarea" />
+                {/* The same `d`, so the pointer target follows the route
+                    rather than a straight line the canvas no longer draws.
+                    `.canvas-edge-hitarea` needs `fill: none` for that: a
+                    `<line>` cannot fill, a `<path>` can, and a five-segment
+                    route encloses area SVG would otherwise paint black. */}
+                <path d={d} className="canvas-edge-hitarea" />
                 {automaticGuarded && (
                   <text x={midX} y={midY - 6} className="canvas-edge-badge">
                     {path.priority ?? "?"}

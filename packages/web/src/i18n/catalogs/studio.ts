@@ -279,6 +279,7 @@ export const en = {
   "canvas.elseMarker": "else",
   "canvas.initialStamp": "start",
   "canvas.inspectorEmpty": "Select a step or a path to edit it.",
+  "canvas.edgeStyleToggle": "Rounded corners",
   "canvas.selectionHeading": "Steps selected",
   "canvas.selectionRemove": "Remove steps",
 

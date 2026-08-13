@@ -16,7 +16,7 @@ import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
 import { savedBodyReducer, initialSavedBody, isDirty } from "./draftToolbarState.js";
 import { CanvasView } from "../canvas/CanvasView.js";
 import { EditRail } from "../canvas/EditRail.js";
-import { snapToGrid, svgPointFromClient, type Point } from "../canvas/geometry.js";
+import { snapToGrid, svgPointFromClient, DEFAULT_EDGE_STYLE, type Point, type EdgeStyle } from "../canvas/geometry.js";
 import { newStep, type StepKind } from "../draft/createStep.js";
 import { addToDraftArray } from "../draft/draft-array-crud.js";
 import { JsonView } from "../panels/JsonView.js";
@@ -81,6 +81,20 @@ function EditorArea({ processId, formStepId, token, initialRevision, initialLayo
   // Client-only, set on every successful save (never on a reload) — new
   // state DraftToolbar tracks nowhere today.
   const [lastSavedAt, setLastSavedAt] = useState<Date | undefined>(undefined);
+
+  // The canvas-wide edge style shares the `layout` blob with node positions.
+  // No collision is possible: every step id carries a `step_` prefix, and
+  // `positionOf` admits only a point. An absent value reads as the default,
+  // and so does a value this version does not know — a draft saved by a later
+  // one must render, not throw.
+  const edgeStyle: EdgeStyle =
+    saveState.layout.canvasEdgeStyle === "smoothstep" || saveState.layout.canvasEdgeStyle === "step"
+      ? saveState.layout.canvasEdgeStyle
+      : DEFAULT_EDGE_STYLE;
+
+  const onEdgeStyleChange = (style: EdgeStyle) => {
+    setSaveState((s) => ({ ...s, layout: { ...s.layout, canvasEdgeStyle: style } }));
+  };
 
   // Position is not body — it lives in `saveState.layout` (round-tripped
   // opaquely by DraftToolbar's save call already), never in the Draft
@@ -246,6 +260,8 @@ function EditorArea({ processId, formStepId, token, initialRevision, initialLayo
                 onSelectStep={onSelectStep}
                 onSelectSteps={onSelectSteps}
                 selectedPathId={selectedPathId}
+                edgeStyle={edgeStyle}
+                onEdgeStyleChange={onEdgeStyleChange}
               />
               {/* The third column has three states (studio-canvas). Nothing
                   selected shows the full checks rail. One step or a path

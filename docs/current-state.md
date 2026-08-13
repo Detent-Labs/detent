@@ -1410,6 +1410,47 @@ Stage-by-stage status is in `ROADMAP.md`.
   A group move rounds each member's own result rather than the shared delta,
   which is stage 37's rule applied unchanged. Every selection write stays at
   pointer-up; pointer-down only decides which steps the gesture moves.
+- Canvas edge routing (`packages/web/src/areas/studio/canvas/geometry.ts`,
+  `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`, `areas/studio/app.css`): a
+  path draws as an orthogonal route, under one canvas-wide style.
+
+  `routeEdge` returns the route's corner points, and the count reads off both
+  axes. A target ahead on the same row takes one segment, which is the common
+  case: `autoPlaceSteps` puts a linear chain of steps on one row. A target
+  ahead on another row takes three. A target that is not ahead takes five, and
+  it dips below when both anchors share a row, since a shared row leaves no row
+  between them to cross on.
+
+  The gutter is `GRID_STEP`, not a constant of its own, so a turn sits a whole
+  grid step clear of the node it leaves. That holds on the axis the anchor
+  leaves on. An anchor sits at the node's vertical middle, so a turn's y
+  follows it off the lattice.
+
+  `routePath` renders the points. `step` joins them directly. `smoothstep`
+  replaces each corner with a quarter-arc, whose radius clamps to half the
+  shorter of the two segments it joins. A route with no corner carries no arc
+  under either style.
+
+  `midpointOfRoute` returns the half-way point AND the segment it falls on. The
+  segment is not decoration: a guard label bounds its own width by the run it
+  sits on, and a five-segment route puts that midpoint on a vertical run where
+  the distance between the two anchors says nothing about the room available.
+
+  The style is canvas-wide and persists at `layout.canvasEdgeStyle`. It shares
+  the `layout` blob with node positions, and cannot collide with one: every
+  step id carries a `step_` prefix, and `positionOf` admits only a point. An
+  absent value renders as `step`, and so does a value this version does not
+  know.
+
+  The edge is a `<path>` now, not a `<line>`, and `.canvas-edge-hitarea` needed
+  `fill: none` for that. A line cannot fill. A five-segment route encloses
+  area, and SVG fills a path black by default, which would have painted a blob
+  over the canvas and swallowed every pointer event inside it.
+
+  No router ships, and an edge crosses a node in its way. `libavoid-js` was the
+  candidate and the user declined it: a 813 KB beta WASM module against a
+  712 KB bundle, buying obstacle avoidance alone. Stage 33's control points are
+  the intended answer to a crossing edge.
 - Process Studio — lifecycle (`src/http/studio-routes.ts`, `src/engine/drafts.ts`,
   `src/http/errors.ts`, `packages/web/src/areas/studio/panels/DraftToolbar.tsx`,
   `packages/web/src/areas/studio/screens/{VersionsScreen,MigrationPlanScreen}.tsx`,

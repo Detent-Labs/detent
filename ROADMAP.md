@@ -871,7 +871,7 @@ Spec: `development-toolchain`.
     1100px window; `.admin-table-scroll` contains it, and the page is back to
     the 152px baseline every admin screen shows in German at that width.
 
-30. Canvas edge routing styles (step/smoothstep): NOT STARTED. Raised
+30. **Canvas edge routing styles (step/smoothstep): DONE.** Raised
     2026-08-10 in conversation. The canvas draws every Path as a straight SVG
     `<line>` between two fixed anchors (`canvas/CanvasView.tsx`); an author
     asked for the orthogonal routing React Flow's edge-types example calls
@@ -888,8 +888,22 @@ Spec: `development-toolchain`.
     (https://github.com/Aksem/libavoid-js), a WASM port of libavoid's
     orthogonal connector routing with obstacle avoidance, is one candidate;
     nothing here commits to it. Pure `canvas/` presentation, per the UI
-    glossary rule that "edge" never means anything outside that layer. No
-    design doc, no OpenSpec change yet.
+    glossary rule that "edge" never means anything outside that layer.
+    Shipped 2026-08-13 as `canvas-edge-routing-styles`. The geometry question
+    resolved to hand-rolled, and the user made that call. `libavoid-js` is a
+    beta at `0.5.0-beta.5`. It unpacks to 813 KB of WASM against a 712 KB
+    bundle, and it buys obstacle avoidance alone. Its LGPL-2.1-or-later licence
+    suits this repository's AGPL-3.0, so the licence was not the objection.
+    `routeEdge` in `canvas/geometry.ts` runs to about forty lines.
+    The segment count reads off BOTH axes, which the review caught. A target
+    ahead on the same row takes one segment, and that is the common case:
+    `autoPlaceSteps` puts a linear chain on one row. A target ahead on another
+    row takes three. A target that is not ahead takes five, and it dips below
+    when both anchors share a row. `smoothstep` returns the same points and
+    rounds each corner, clamped to half the shorter segment. The style persists
+    at `layout.canvasEdgeStyle`. An absent or unknown value renders as `step`.
+    The change's own `design.md` is the design of record for stages 30 to 33.
+    Git ignores `docs/superpowers/`, and stage 24 already lost a design there.
 
 31. Custom and floating canvas edges: NOT STARTED. Raised 2026-08-10 in
     conversation, alongside stage 30. Today's anchors are fixed: every Path
@@ -901,9 +915,18 @@ Spec: `development-toolchain`.
     other node. React Flow's "custom edges" example renders arbitrary content
     along an edge, not only a stroke; here that could mean a delete or insert
     affordance on the edge itself, beyond today's guard-label and priority
-    badges. Overlaps stage 30 and is better evaluated together: a
-    routing-library choice there also decides how much of this comes for
-    free. No design doc, no OpenSpec change yet.
+    badges. Designed 2026-08-13, in `canvas-edge-routing-styles`'s
+    `design.md`, and not yet built. The anchor snaps to the midpoint of the
+    side facing the target. The larger of the two centre offsets picks that
+    side. A free-angle border point suits a straight edge and fights an
+    orthogonal one, because a segment leaving at 37 degrees has no clean turn.
+    `routeEdge` gains the axis each anchor leaves on, and the routing itself
+    does not change. This design defers the stage's second half, the
+    affordances drawn on the edge. The inspector deletes a path already, and a
+    control on the edge is a second way to do one thing.
+    One premise did not survive the design pass. Stage 30's library choice was
+    held to decide this stage's cost. These anchors are trigonometry between
+    two centres, and no router reaches them.
 
 32. Shape per step/path kind on the canvas: NOT STARTED. Raised 2026-08-10 in
     conversation, alongside stages 30 and 31. The ask spans both node and
@@ -918,10 +941,12 @@ Spec: `development-toolchain`.
     all, identical to a task step. An automatic path already renders as a
     solid stroke against a manual path's dashed one
     (`canvas-edge-automatic`/`canvas-edge-manual`), so that half of the ask
-    already has a baseline, just not a distinct shape. Overlaps stages 30 and
-    31: floating anchors and a routing-library choice change the SVG
-    structure a node/edge shape would attach to, so the three want one
-    evaluation, not three. No design doc, no OpenSpec change yet.
+    already has a baseline, just not a distinct shape. Designed 2026-08-13, in `canvas-edge-routing-styles`'s
+    `design.md`, and not yet built. The stage reads as four asks and reduces to
+    one gap. An initial step and a terminal step carry stamps already. An
+    automatic path draws solid against a manual path's dashed stroke. Only the
+    subprocess step is indistinguishable from a task step. It gains an inset
+    second rule inside its rectangle: radius 0, and no new colour role.
 
 33. Editable edges with draggable control points: NOT STARTED. Raised
     2026-08-10 in conversation, alongside stages 30 through 32. An author
@@ -937,10 +962,14 @@ Spec: `development-toolchain`.
     avoid per-edge state. A dragged control point is per-edge by nature, so
     the design must say whether dragging one edge silently opts it out of the
     canvas-wide style, and what a reset back to that style looks like.
-    Overlaps stages 30 through 32 for the same reason they overlap each
-    other: floating anchors, a routing-library choice and a per-kind shape
-    all touch the same path geometry a control point would bend. No design
-    doc, no OpenSpec change yet.
+    Designed 2026-08-13, in `canvas-edge-routing-styles`'s
+    `design.md`, and not yet built. The tension resolves when a waypoint feeds
+    the route rather than escaping it. `routeEdge` runs once per consecutive
+    pair, and the canvas-wide style governs every one of those segments. A bent
+    edge is still a `step` edge. No path carries a style, so stage 30's
+    decision stands. Waypoints live at `layout.waypoints[pathId]`. Reset
+    deletes that list and the edge returns to the direct route, so nothing
+    stores what the route was before.
 
 34. Selection grouping (group/ungroup nodes): **MULTI-SELECT DONE, GROUPING
     NOT STARTED.** Raised 2026-08-10

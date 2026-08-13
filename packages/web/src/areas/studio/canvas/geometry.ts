@@ -82,3 +82,135 @@ export function svgPointFromClient(svg: SVGSVGElement, clientX: number, clientY:
   const transformed = pt.matrixTransform(ctm.inverse());
   return { x: transformed.x, y: transformed.y };
 }
+
+/** The two edge styles the canvas offers. There is no straight style. */
+export type EdgeStyle = "step" | "smoothstep";
+
+export const DEFAULT_EDGE_STYLE: EdgeStyle = "step";
+
+/** The corner radius `smoothstep` draws, before the per-corner clamp below. */
+export const EDGE_CORNER_RADIUS = 8;
+
+/**
+ * The orthogonal route between two anchors, as its corner points. The gutter is
+ * `GRID_STEP` rather than a constant of its own, so a route's corners land on
+ * the same lattice the nodes do.
+ *
+ * Three cases, and the count reads off BOTH axes. Reading only the x axis was
+ * the review's first finding: it makes every route three segments, and the
+ * common edge on this canvas is one. `autoPlaceSteps` writes
+ * `y: row * ROW_HEIGHT` with `rowByDepth` starting at 0 per depth, so a linear
+ * chain of steps sits on one row and every edge in it is straight.
+ */
+export function routeEdge(source: Point, target: Point): Point[] {
+  const ahead = target.x > source.x;
+
+  if (ahead && source.y === target.y) return [source, target];
+
+  // The turn sits one gutter out from the source anchor, never at the midpoint
+  // between the two. A midpoint lands off the lattice for the ordinary column
+  // pitch: COLUMN_WIDTH 240 against NODE_WIDTH 180 puts it 30 out, and 30 is
+  // not a whole grid step.
+  const outX = source.x + GRID_STEP;
+
+  if (ahead) {
+    return dedupe([source, { x: outX, y: source.y }, { x: outX, y: target.y }, target]);
+  }
+
+  // Not ahead: the route has to reach the target's entry edge from outside it.
+  // It leaves by the gutter, crosses on a row between the two, comes back past
+  // the entry edge by the gutter, and turns in.
+  const backX = target.x - GRID_STEP;
+  // Two anchors on one row leave no row between them, and the midpoint would
+  // collapse the route to duplicate points. It dips below instead, clear of
+  // both nodes: the anchor sits at the node's middle, so half its height plus
+  // a gutter would land off the lattice, and three grid steps clears it and
+  // stays on.
+  const midY = source.y === target.y ? source.y + GRID_STEP * 3 : snapToGrid({ x: 0, y: (source.y + target.y) / 2 }).y;
+  return dedupe([
+    source,
+    { x: outX, y: source.y },
+    { x: outX, y: midY },
+    { x: backX, y: midY },
+    { x: backX, y: target.y },
+    target,
+  ]);
+}
+
+/**
+ * Drops a point identical to the one before it. A zero-length segment carries
+ * no direction, so `routePath`'s corner arithmetic would read `Math.sign(0)`
+ * and place an arc on an axis the route never travels.
+ */
+function dedupe(points: Point[]): Point[] {
+  return points.filter((p, i) => i === 0 || p.x !== points[i - 1].x || p.y !== points[i - 1].y);
+}
+
+/**
+ * The point half way along the route by travelled length, and the index of the
+ * segment it falls on. The index is not decoration: a guard label bounds its
+ * own width by the segment it sits on, and on a five-segment route that
+ * segment is not the one between the two anchors.
+ */
+export function midpointOfRoute(points: Point[]): { point: Point; segment: number } {
+  const lengths: number[] = [];
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    const d = Math.abs(points[i].x - points[i - 1].x) + Math.abs(points[i].y - points[i - 1].y);
+    lengths.push(d);
+    total += d;
+  }
+  if (total === 0) return { point: points[0], segment: 0 };
+
+  let travelled = 0;
+  for (let i = 0; i < lengths.length; i++) {
+    if (travelled + lengths[i] >= total / 2) {
+      const into = total / 2 - travelled;
+      const a = points[i];
+      const b = points[i + 1];
+      const ratio = lengths[i] === 0 ? 0 : into / lengths[i];
+      return { point: { x: a.x + (b.x - a.x) * ratio, y: a.y + (b.y - a.y) * ratio }, segment: i };
+    }
+    travelled += lengths[i];
+  }
+  return { point: points[points.length - 1], segment: lengths.length - 1 };
+}
+
+/** The length of one segment of a route, in user units. */
+export function segmentLength(points: Point[], index: number): number {
+  const a = points[index];
+  const b = points[index + 1];
+  if (!a || !b) return 0;
+  return Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
+}
+
+/**
+ * The route as an SVG `d` attribute. `step` joins the corner points directly.
+ * `smoothstep` replaces each corner with a quarter-arc, whose radius clamps to
+ * half the shorter of the two segments it joins — otherwise a short segment
+ * carries an arc that overshoots its own corner. A route with no corner (the
+ * common same-row case) carries no arc under either style.
+ */
+export function routePath(points: Point[], style: EdgeStyle, radius = EDGE_CORNER_RADIUS): string {
+  if (points.length < 2) return "";
+  if (style === "step" || points.length === 2) {
+    return points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
+  }
+
+  let d = `M${points[0].x},${points[0].y}`;
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1];
+    const corner = points[i];
+    const next = points[i + 1];
+    const r = Math.min(radius, segmentLength(points, i - 1) / 2, segmentLength(points, i) / 2);
+    if (r === 0) {
+      d += ` L${corner.x},${corner.y}`;
+      continue;
+    }
+    const into = { x: corner.x + Math.sign(prev.x - corner.x) * r, y: corner.y + Math.sign(prev.y - corner.y) * r };
+    const out = { x: corner.x + Math.sign(next.x - corner.x) * r, y: corner.y + Math.sign(next.y - corner.y) * r };
+    d += ` L${into.x},${into.y} Q${corner.x},${corner.y} ${out.x},${out.y}`;
+  }
+  const last = points[points.length - 1];
+  return `${d} L${last.x},${last.y}`;
+}

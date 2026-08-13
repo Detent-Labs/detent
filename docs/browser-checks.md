@@ -629,3 +629,49 @@ summary still docks there, with the same count the inspector shows.
 
 Now pan the canvas with a plain drag. Pass: it pans, as it always did. The
 marquee took nothing away.
+
+### Canvas edge routing (`canvas-edge-routing-styles`)
+
+Open Studio and a draft with four or more steps. Most of this entry is a visual
+judgment against the drawn routes. Little of it is an assertion.
+
+Read the edges of a draft nobody has rearranged. Pass: a step and its successor
+on the same row join by one straight line, with no corner. That is the common
+case. Watch for the defect: a route that turns two corners to cross a straight
+gap.
+
+Find a path whose target sits on another row. Pass: the line leaves the source's
+right edge and turns once. It runs vertically, turns again, and enters the
+target's left edge horizontally. The arrowhead points into that edge.
+
+Drag a step so one of its paths points backwards, to a step on its left. Pass:
+the route leaves rightwards and drops to a row between the two. It runs back
+past the target and turns in from the left. It does not cut diagonally across
+the graph.
+
+Drag a step so a backward path's two ends sit on one row. Pass: the route dips
+below both steps rather than folding onto itself.
+
+Choose Rounded corners. Pass: every corner becomes an arc, and the straight
+same-row lines stay straight. No arc appears where there is no corner. Choose it
+again. Pass: the corners go square.
+
+Zoom in and read a corner. Pass: the arc is a quarter circle, and it does not
+overshoot the corner it rounds.
+
+Click a route where it turns, well away from a straight line between the two
+steps. Pass: that path selects. Its row highlights in the inspector, so the
+pointer follows the drawn route.
+
+Look at the area a five-segment route encloses. Pass: it is empty canvas. A
+filled shape there means the hit area lost its `fill: none`.
+
+Save the draft and open it again. Pass: the style you chose is the style you
+get, and every step kept its position.
+
+A guard label on a routed path sits at the middle of the route. On a route that
+turns, that puts it on a vertical run. Pass: it is legible and clear of every
+step. It is not expected to sit between the two steps.
+
+An edge crosses a step that lies in its path. Pass: it does. Nothing routes
+around an obstacle, by decision, and stage 33's control points are the answer.
