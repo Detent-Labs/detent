@@ -5,6 +5,7 @@ import {
   exceedsClickThreshold,
   snapToGrid,
   routeEdge,
+  anchorsForEdge,
   midpointOfRoute,
   routePath,
   CLICK_THRESHOLD,
@@ -162,6 +163,127 @@ describe("canvas geometry: edge routing", () => {
   it("clears the source node by a whole grid step on every turning route", () => {
     const route = routeEdge({ x: 180, y: 30 }, { x: 240, y: 150 });
     expect(route[1].x - route[0].x).toBe(GRID_STEP);
+  });
+});
+
+describe("canvas geometry: the anchor rule", () => {
+  // Node positions, not anchors: every node is NODE_WIDTHxNODE_HEIGHT, so the
+  // offset between two top-left corners is the offset between two centres.
+  const at = (x: number, y: number) => ({ x, y });
+
+  it("faces right when the horizontal gap is the larger one", () => {
+    const a = anchorsForEdge(at(0, 0), at(400, 60));
+    expect(a.leaving).toBe("right");
+    expect(a.source).toEqual({ x: NODE_WIDTH, y: NODE_HEIGHT / 2 });
+    expect(a.target).toEqual({ x: 400, y: 60 + NODE_HEIGHT / 2 });
+  });
+
+  it("faces left for a target behind it", () => {
+    const a = anchorsForEdge(at(400, 0), at(0, 60));
+    expect(a.leaving).toBe("left");
+    expect(a.source).toEqual({ x: 400, y: NODE_HEIGHT / 2 });
+    expect(a.target).toEqual({ x: 0 + NODE_WIDTH, y: 60 + NODE_HEIGHT / 2 });
+  });
+
+  it("faces down when the vertical gap is the larger one", () => {
+    const a = anchorsForEdge(at(0, 0), at(60, 400));
+    expect(a.leaving).toBe("down");
+    expect(a.source).toEqual({ x: NODE_WIDTH / 2, y: NODE_HEIGHT });
+    expect(a.target).toEqual({ x: 60 + NODE_WIDTH / 2, y: 400 });
+  });
+
+  it("faces up for a target above it", () => {
+    const a = anchorsForEdge(at(0, 400), at(60, 0));
+    expect(a.leaving).toBe("up");
+    expect(a.source).toEqual({ x: NODE_WIDTH / 2, y: 400 });
+    expect(a.target).toEqual({ x: 60 + NODE_WIDTH / 2, y: 0 + NODE_HEIGHT });
+  });
+
+  it("takes the horizontal on an equal-offset diagonal", () => {
+    expect(anchorsForEdge(at(0, 0), at(200, 200)).leaving).toBe("right");
+    expect(anchorsForEdge(at(0, 0), at(-200, -200)).leaving).toBe("left");
+  });
+
+  it("takes the right side for two steps stacked on one position", () => {
+    const a = anchorsForEdge(at(100, 100), at(100, 100));
+    expect(a.leaving).toBe("right");
+    expect(a.source).toEqual({ x: 100 + NODE_WIDTH, y: 100 + NODE_HEIGHT / 2 });
+  });
+});
+
+describe("canvas geometry: routing off the horizontal", () => {
+  const axisAligned = (points: ReturnType<typeof routeEdge>) =>
+    points.slice(1).every((p, i) => p.x === points[i].x || p.y === points[i].y);
+
+  const routeBetween = (source: { x: number; y: number }, target: { x: number; y: number }) => {
+    const a = anchorsForEdge(source, target);
+    return routeEdge(a.source, a.target, a.leaving);
+  };
+
+  it("draws one segment down a shared column", () => {
+    const route = routeBetween({ x: 0, y: 0 }, { x: 0, y: 400 });
+    expect(route).toEqual([
+      { x: NODE_WIDTH / 2, y: NODE_HEIGHT },
+      { x: NODE_WIDTH / 2, y: 400 },
+    ]);
+  });
+
+  it("turns two corners for a target below and across", () => {
+    const route = routeBetween({ x: 0, y: 0 }, { x: 240, y: 400 });
+    expect(route).toHaveLength(4);
+    expect(axisAligned(route)).toBe(true);
+    // Leaves vertically, one grid step clear of the side it leaves.
+    expect(route[1].x).toBe(route[0].x);
+    expect(route[1].y - route[0].y).toBe(GRID_STEP);
+  });
+
+  it("draws one segment back along a shared row", () => {
+    // The win floating anchors buy: a backward path is short, not a detour
+    // around the outside of both nodes.
+    const route = routeBetween({ x: 400, y: 0 }, { x: 0, y: 0 });
+    expect(route).toEqual([
+      { x: 400, y: NODE_HEIGHT / 2 },
+      { x: NODE_WIDTH, y: NODE_HEIGHT / 2 },
+    ]);
+  });
+
+  it("takes five segments for a backward target that overlaps on the horizontal", () => {
+    // dx is -100 against dy 60, so the pair is horizontal. The target's right
+    // edge lands at 180, right of the source's left edge at 100, so the entry
+    // anchor is not ahead of the exit anchor and the route reaches it from
+    // outside.
+    const route = routeBetween({ x: 100, y: 0 }, { x: 0, y: 60 });
+    expect(route).toHaveLength(6);
+    expect(axisAligned(route)).toBe(true);
+  });
+
+  it("returns a route that leaves up above the node it leaves", () => {
+    // The regression the transform table exists to prevent: a self-inverse
+    // transform maps back to the source's own side, and a rotation would put
+    // the whole route on the far side of the origin.
+    const route = routeBetween({ x: 0, y: 400 }, { x: 60, y: 0 });
+    expect(route[0]).toEqual({ x: NODE_WIDTH / 2, y: 400 });
+    expect(route[route.length - 1]).toEqual({ x: 60 + NODE_WIDTH / 2, y: NODE_HEIGHT });
+    expect(route[1].y).toBeLessThan(route[0].y);
+    expect(axisAligned(route)).toBe(true);
+  });
+
+  it("keeps every leaving direction axis-aligned and anchored at both ends", () => {
+    const targets = [
+      { x: 400, y: 0 },
+      { x: -400, y: 0 },
+      { x: 0, y: 400 },
+      { x: 0, y: -400 },
+      { x: 300, y: 260 },
+      { x: -300, y: -260 },
+    ];
+    for (const target of targets) {
+      const a = anchorsForEdge({ x: 0, y: 0 }, target);
+      const route = routeEdge(a.source, a.target, a.leaving);
+      expect(route[0]).toEqual(a.source);
+      expect(route[route.length - 1]).toEqual(a.target);
+      expect(axisAligned(route)).toBe(true);
+    }
   });
 });
 

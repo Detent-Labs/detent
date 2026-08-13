@@ -905,7 +905,8 @@ Spec: `development-toolchain`.
     The change's own `design.md` is the design of record for stages 30 to 33.
     Git ignores `docs/superpowers/`, and stage 24 already lost a design there.
 
-31. Custom and floating canvas edges: NOT STARTED. Raised 2026-08-10 in
+31. **Custom and floating canvas edges: ANCHORS DONE, EDGE AFFORDANCES NOT
+    STARTED.** Raised 2026-08-10 in
     conversation, alongside stage 30. Today's anchors are fixed: every Path
     leaves a step's right-middle and enters the target's left-middle
     (`sourceAnchor`/`targetAnchor` in `canvas/CanvasView.tsx`), even when the
@@ -927,6 +928,29 @@ Spec: `development-toolchain`.
     One premise did not survive the design pass. Stage 30's library choice was
     held to decide this stage's cost. These anchors are trigonometry between
     two centres, and no router reaches them.
+    The anchors shipped 2026-08-13 as `canvas-floating-anchors`.
+    `anchorsForEdge` in `canvas/geometry.ts` reads `|dx| >= |dy|` between two
+    node positions, and both anchors take that one comparison, so they always
+    sit on opposing sides and every segment stays on one axis. A tie takes the
+    horizontal. A zero offset takes the right side, which two steps stacked on
+    one position reach.
+    The vertical and backward cases run through a transform rather than a
+    second copy of the routing arithmetic. `routeEdge` gains a leaving
+    direction, maps both anchors into the canonical "leaves rightward" space,
+    runs unchanged, and maps every returned point back. The four transforms are
+    identity, negate x, swap, and swap-then-negate-both. Each composes with
+    itself to the identity, which is what lets one table serve both ways.
+    The review earned its place on that table. The design named the up case as
+    swap-then-negate-x. That reaches the canonical space and composes to a
+    180-degree rotation, so every upward edge would have returned drawn on the
+    far side of the canvas.
+    A backward path is now short rather than a detour. A target to the left
+    that does not overlap its source is ahead along the leaving axis, so it
+    takes one segment or three. The five-segment route survives only for nodes
+    that overlap along that axis.
+    The connect handle stays at the right-middle and the drag preview stays a
+    straight line from it. A control that moved under the pointer is harder to
+    press, and a drag in flight has no target to face.
 
 32. **Shape per step/path kind on the canvas: DONE.** Raised 2026-08-10 in
     conversation, alongside stages 30 and 31. The ask spans both node and

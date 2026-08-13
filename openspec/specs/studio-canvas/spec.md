@@ -542,13 +542,16 @@ SHALL remain panel-only.
 
 ### Requirement: Canvas interaction logic is tested as pure functions, independent of rendering
 
-Eight computations SHALL live in pure modules with `bun:test` coverage. Five
+Nine computations SHALL live in pure modules with `bun:test` coverage. Five
 came first: hit-testing, drag-delta computation, the auto-place traversal, the
 connection-validity predicate and the fit-to-view computation.
 
 Two arrived with the selection set. One toggles a step in that set. The other
 is the marquee's overlap test against node rectangles. The eighth is the edge
 route between two anchors.
+
+The ninth is the anchor rule. It takes two node positions. It returns the two
+facing anchors and the axis they leave on.
 `packages/web/src/areas/app/screens/inboxLogic.ts` sets that convention. The
 tests need not cover the SVG rendering or the pointer-event wiring.
 
@@ -579,6 +582,12 @@ tests need not cover the SVG rendering or the pointer-event wiring.
   anchor and a style
 - **THEN** it returns the route's corner points, and the test needs no DOM or
   canvas rendering
+
+#### Scenario: The anchor rule holds without rendering
+
+- **WHEN** a test gives the anchor rule two node positions
+- **THEN** it returns the two facing anchors and the axis they leave on
+- **AND** the test needs no DOM or canvas rendering
 
 ### Requirement: Layout computation does not re-run on pointer movement
 
@@ -1129,17 +1138,32 @@ checks rail again.
 
 ### Requirement: A path renders as an orthogonal route, under one canvas-wide style
 
-A path SHALL render as an orthogonal route rather than a straight line. The
-route SHALL leave the source anchor horizontally and enter the target anchor
-horizontally. Every segment SHALL lie on one axis.
+A path SHALL render as an orthogonal route rather than a straight line. Every
+segment SHALL lie on one axis.
+
+Each anchor SHALL sit at the midpoint of the side its own node turns toward
+the other one. The larger of the two node-centre offsets SHALL pick the axis
+for both anchors. A horizontal offset larger than the vertical one SHALL put
+the anchors on a left and a right side. Otherwise they SHALL sit on a top and
+a bottom side. The two anchors SHALL always sit on opposing sides, so both
+leave on the same axis.
+
+A zero offset on the chosen axis SHALL put the source anchor on the right
+side. Two steps stacked on one position reach that case, and every path SHALL
+draw.
+
+An anchor SHALL NOT take a free angle on the node's border. A segment leaving
+at an angle has no square turn, and every segment here stays on one axis.
+
+The route SHALL leave each anchor along the axis that anchor sits on.
 
 The segment count SHALL follow from the two anchors, on both axes.
 
-A target whose entry anchor sits strictly right of the source's exit anchor is
-ahead. An anchor pair that is ahead and on the same row SHALL take one segment.
-That is the common case: the auto-layout places a linear chain of steps on one
-row. An anchor pair that is ahead and on different rows SHALL take three
-segments.
+A target is ahead when its entry anchor sits beyond the source's exit anchor.
+That reading runs along the leaving axis, in the leaving direction. An anchor
+pair that is ahead and level on the other axis SHALL take one segment. That is
+the common case: the auto-layout places a linear chain of steps on one row. An
+anchor pair that is ahead and not level SHALL take three segments.
 
 An anchor pair that is not ahead SHALL take five segments. The route has to
 reach the target's entry edge from outside it.
@@ -1162,8 +1186,13 @@ anchors.
 
 A guard label and a priority badge SHALL sit at the route's own midpoint.
 
-The drag-to-connect preview SHALL stay a straight line. It follows the pointer
-and reaches no target, so it has no route to draw.
+The connect handle SHALL stay at the source node's right-middle, whatever
+anchor a path leaving that node takes. The handle is a control an author
+presses. A handle that moved under the pointer would be harder to press.
+
+The drag-to-connect preview SHALL stay a straight line from that handle. It
+follows the pointer and reaches no target. It has neither a route to draw nor
+a side to face.
 
 #### Scenario: A path along one row draws straight
 
@@ -1173,14 +1202,39 @@ and reaches no target, so it has no route to draw.
 #### Scenario: A path to a step ahead of it on another row turns two corners
 
 - **WHEN** a step has a path to a step placed to its right and one row down
+- **AND** the horizontal gap is the larger of the two
 - **THEN** the path renders as three axis-aligned segments, leaving the source
   horizontally and entering the target horizontally
 
+#### Scenario: A path to a step below it leaves the bottom side
+
+- **WHEN** a step has a path to a step placed below it
+- **AND** the vertical gap is the larger of the two
+- **THEN** the path leaves the source's bottom-middle and enters the target's
+  top-middle
+- **AND** every segment lies on one axis
+
+#### Scenario: A path to a step above it leaves the top side
+
+- **WHEN** a step has a path to a step placed above it
+- **AND** the vertical gap is the larger of the two
+- **THEN** the path leaves the source's top-middle and enters the target's
+  bottom-middle
+
+#### Scenario: A path to a step behind it on the same row draws straight
+
+- **WHEN** a step has a path to a step placed to its left on the same row
+- **AND** the two nodes do not overlap on the horizontal
+- **THEN** the path leaves the source's left-middle and enters the target's
+  right-middle
+- **AND** it renders as one horizontal segment, and it turns no corner
+
 #### Scenario: A path to a step behind it reaches the entry edge from outside
 
-- **WHEN** a step has a path to a step placed to its left
-- **THEN** the path renders as five axis-aligned segments, and it enters the
-  target from outside the target's entry edge
+- **WHEN** a step has a path to a step placed to its left and one row down
+- **AND** the two nodes overlap on the horizontal
+- **THEN** the path renders as five axis-aligned segments
+- **AND** it enters the target from outside the target's entry edge
 
 #### Scenario: A straight route carries no arc under either style
 
@@ -1211,6 +1265,23 @@ and reaches no target, so it has no route to draw.
 - **WHEN** the developer clicks a route where it turns a corner, away from the
   straight line between its anchors
 - **THEN** the canvas draws that path as selected
+
+#### Scenario: The connect handle stays put while the anchor moves
+
+- **WHEN** a step's only path leaves its bottom side
+- **THEN** that step's connect handle still sits at its right-middle
+- **AND** a drag from that handle still previews as a straight line to the
+  pointer
+
+#### Scenario: Dragging a step moves its anchors
+
+- **WHEN** the developer drags a target step from the right of its source to
+  below it
+- **THEN** the path's anchors move to the facing sides, with no reload
+
+<!-- Why: the header must match the base spec character for character, or the
+     delta adds a requirement rather than modifying one. -->
+<!-- antislop: allow passive-voice -->
 
 ### Requirement: The canvas edge style persists in the draft layout
 

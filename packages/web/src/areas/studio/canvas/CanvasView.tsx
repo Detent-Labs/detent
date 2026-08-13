@@ -12,6 +12,7 @@ import {
   exceedsClickThreshold,
   snapToGrid,
   svgPointFromClient,
+  anchorsForEdge,
   routeEdge,
   routePath,
   midpointOfRoute,
@@ -534,7 +535,6 @@ export function CanvasView({
         {steps.map((step) => {
           if (!step.id) return null;
           const source = positionOf(step.id);
-          const sourceAnchor = { x: source.x + NODE_WIDTH, y: source.y + NODE_HEIGHT / 2 };
           const operands = buildOperands({
             fields: draft.fields,
             locale: contentLocale,
@@ -544,8 +544,11 @@ export function CanvasView({
           return (step.paths ?? []).map((path, pathIndex) => {
             if (!path.to) return null;
             const target = positionOf(path.to);
-            const targetAnchor = { x: target.x, y: target.y + NODE_HEIGHT / 2 };
-            const route = routeEdge(sourceAnchor, targetAnchor);
+            // Both anchors depend on the target, so they resolve per path
+            // rather than once per step: one step's paths can leave four
+            // different sides.
+            const anchors = anchorsForEdge(source, target);
+            const route = routeEdge(anchors.source, anchors.target, anchors.leaving);
             const d = routePath(route, edgeStyle);
             // The badge and the guard label follow the route, not a straight
             // line between the anchors. On a five-segment route those two

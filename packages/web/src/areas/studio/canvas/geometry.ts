@@ -91,10 +91,81 @@ export const DEFAULT_EDGE_STYLE: EdgeStyle = "step";
 /** The corner radius `smoothstep` draws, before the per-corner clamp below. */
 export const EDGE_CORNER_RADIUS = 8;
 
+/** Which side of a node an edge leaves, and so the axis it travels. */
+export type LeaveDirection = "right" | "left" | "down" | "up";
+
+export interface EdgeAnchors {
+  source: Point;
+  target: Point;
+  leaving: LeaveDirection;
+}
+
+const rightMid = (n: Point): Point => ({ x: n.x + NODE_WIDTH, y: n.y + NODE_HEIGHT / 2 });
+const leftMid = (n: Point): Point => ({ x: n.x, y: n.y + NODE_HEIGHT / 2 });
+const bottomMid = (n: Point): Point => ({ x: n.x + NODE_WIDTH / 2, y: n.y + NODE_HEIGHT });
+const topMid = (n: Point): Point => ({ x: n.x + NODE_WIDTH / 2, y: n.y });
+
 /**
- * The orthogonal route between two anchors, as its corner points. The gutter is
- * `GRID_STEP` rather than a constant of its own, so a route's corners land on
- * the same lattice the nodes do.
+ * The two anchors for an edge between two nodes, each at the midpoint of the
+ * side its own node turns toward the other. Both read one comparison, so they
+ * always sit on opposing sides and every segment stays on one axis.
+ *
+ * The arguments are node positions, not anchors. Every node is the same size,
+ * so the offset between two top-left corners IS the offset between two
+ * centres, and the comparison needs no centre arithmetic.
+ *
+ * The tie takes the horizontal. A zero offset on the chosen axis takes the
+ * right side: `|dx| >= |dy|` with `dx` at zero forces `dy` to zero too, so the
+ * only state reaching that branch is two steps stacked on one position, and an
+ * edge still has to draw.
+ */
+export function anchorsForEdge(source: Point, target: Point): EdgeAnchors {
+  const dx = target.x - source.x;
+  const dy = target.y - source.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0
+      ? { source: rightMid(source), target: leftMid(target), leaving: "right" }
+      : { source: leftMid(source), target: rightMid(target), leaving: "left" };
+  }
+  return dy >= 0
+    ? { source: bottomMid(source), target: topMid(target), leaving: "down" }
+    : { source: topMid(source), target: bottomMid(target), leaving: "up" };
+}
+
+/**
+ * Maps a point into the canonical space `routeRightward` works in, where the
+ * source leaves rightward and the target is entered from its left.
+ *
+ * Every one of the four composes with itself to the identity, which is what
+ * lets the same function map a returned point back. That is worth checking
+ * rather than assuming: swap followed by a negated x reaches the canonical
+ * space too, and composes to a 180-degree rotation, so every upward edge would
+ * return drawn on the far side of the canvas.
+ */
+const CANONICAL: Record<LeaveDirection, (p: Point) => Point> = {
+  right: (p) => p,
+  left: (p) => ({ x: -p.x, y: p.y }),
+  down: (p) => ({ x: p.y, y: p.x }),
+  up: (p) => ({ x: -p.y, y: -p.x }),
+};
+
+/**
+ * The orthogonal route between two anchors, as its corner points.
+ *
+ * `leaving` defaults to `right`, the fixed pair every anchor took before
+ * floating anchors landed. The transform lives here rather than in
+ * `CanvasView`: routing arithmetic in a component would sit outside the pure
+ * modules `studio-canvas` requires it to live in.
+ */
+export function routeEdge(source: Point, target: Point, leaving: LeaveDirection = "right"): Point[] {
+  const toCanonical = CANONICAL[leaving];
+  return routeRightward(toCanonical(source), toCanonical(target)).map(toCanonical);
+}
+
+/**
+ * The route in canonical space. The gutter is `GRID_STEP` rather than a
+ * constant of its own, so a route's corners land on the same lattice the nodes
+ * do.
  *
  * Three cases, and the count reads off BOTH axes. Reading only the x axis was
  * the review's first finding: it makes every route three segments, and the
@@ -102,7 +173,7 @@ export const EDGE_CORNER_RADIUS = 8;
  * `y: row * ROW_HEIGHT` with `rowByDepth` starting at 0 per depth, so a linear
  * chain of steps sits on one row and every edge in it is straight.
  */
-export function routeEdge(source: Point, target: Point): Point[] {
+function routeRightward(source: Point, target: Point): Point[] {
   const ahead = target.x > source.x;
 
   if (ahead && source.y === target.y) return [source, target];

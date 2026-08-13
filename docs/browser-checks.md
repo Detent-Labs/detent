@@ -707,3 +707,40 @@ inside. Neither hides the other.
 Switch to the dark scheme. Pass: both rules stay legible, and neither turns
 black on a dark ground. Zoom away from 1 in both directions. Pass: the inner
 rule scales with the node and stays inside it.
+
+### Canvas floating anchors (`canvas-floating-anchors`)
+
+Open Studio and a draft with three or more steps. Most of this entry is a
+visual judgment against the drawn routes.
+
+Drag a target step directly below its source, further down than across. Pass:
+the path leaves the source's bottom edge at its middle. It enters the target's
+top edge at its middle. Every segment stays square.
+
+Drag that same target above the source instead. Pass: the path leaves the top
+edge and enters the bottom edge. Watch for the defect: a route drawn on the
+far side of the canvas. That means the upward transform did not map back.
+
+Drag the target slowly around the source, through all four quadrants. Pass:
+each anchor pair jumps to the facing sides as you cross the diagonal. No route
+ever leaves at an angle.
+
+Drag a target to the left of its source, on the same row, clear of it. Pass:
+the path is one short straight line from the source's left edge to the
+target's right edge. It does not loop around the outside of either node.
+
+Now drag that target until the two nodes overlap horizontally. Pass: the route
+takes five segments and comes in from outside the target's right edge.
+
+Read the arrowhead in each of the four cases. Pass: it points into the side
+the route enters, and it is never sideways to that edge.
+
+Find a guarded automatic path whose route runs vertically. Pass: its guard
+label and its priority badge sit on the route and stay legible. They do not
+overlap a node.
+
+Click a vertical route away from its ends. Pass: that path selects.
+
+Press a step's connect handle. Pass: the handle still sits at the node's
+right-middle, whatever side that node's own paths leave from. The preview is a
+straight line to the pointer.
