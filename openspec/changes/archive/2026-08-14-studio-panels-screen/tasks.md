@@ -94,6 +94,6 @@
 - [x] 8.5 A real browser. Deep-link a view, reload it, press Back, and switch
   views with text half-typed.
 - [x] 8.6 In the browser, confirm the checks rail lists in full beside the
-  views, and that a fix clears its entry.
+  views. A fix clears its entry.
 - [x] 8.7 In the browser, read the screen on a tall window and on a short one.
   The columns fill the first and hold the floor on the second.
