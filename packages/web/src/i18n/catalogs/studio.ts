@@ -217,6 +217,14 @@ export const en = {
   "edit.structureTab": "Structure",
   "edit.jsonTab": "JSON",
 
+  "columnMapping.heading": "Column mapping",
+  "columnMapping.noColumns": "This list declares no column, so there is nothing to map.",
+  "columnMapping.columnAria": "Column",
+  "columnMapping.targetAria": "Target field",
+  "columnMapping.addRow": "Map a column",
+  "columnMapping.removeRow": "Remove",
+  "columnMapping.staleColumn": "The list no longer declares this column. The mapping writes nothing until an operator declares it again, or you remove the row.",
+
   "panelsScreen.linksLabel": "Process-wide editors",
   "panelsScreen.linkFields": "Fields",
   "panelsScreen.linkDataSources": "Data sources",

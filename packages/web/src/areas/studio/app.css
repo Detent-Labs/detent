@@ -648,6 +648,44 @@
   color: var(--color-text-muted);
 }
 
+/* The column-mapping editor, under the data source that feeds it. Register
+   rows: a hairline between them, flush-left content, no radius. The column key
+   and the target are both values the engine matches exactly, so both controls
+   carry the mono face. */
+.studio-column-mapping {
+  margin-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-2);
+}
+
+.studio-column-mapping-heading {
+  margin: 0 0 var(--space-2);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.studio-column-mapping-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-2) 0;
+}
+
+.studio-column-mapping-row select {
+  font-family: var(--font-mono);
+}
+
+/* The warning takes the whole line under its row, rather than squeezing into
+   the flex line beside three controls. */
+.studio-column-mapping-row .studio-warning {
+  flex-basis: 100%;
+  margin: 0;
+}
+
 .studio-note {
   color: var(--color-text-muted);
   min-height: 1.25rem;

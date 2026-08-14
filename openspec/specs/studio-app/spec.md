@@ -701,6 +701,10 @@ For a data source of type `"db.list"`, `DataSourcesPanel` SHALL offer the
 studio reads them through the data list read route, which its
 `system:developer` role already grants.
 
+That read SHALL carry each list's declared columns beside its key. The route
+returns them today. The field catalog needs them to offer real column keys.
+A second read over the same rows would let the two disagree.
+
 A draft whose `"db.list"` data source names a `listKey` the server does not
 report SHALL draw a warning, never a validation error. Publishing does not
 read the tables, so a missing list cannot be an invariant here. The warning
@@ -710,6 +714,10 @@ matches the one for a step with no `assignment`.
 - **WHEN** an author edits a `"db.list"` data source and the server reports
   two lists
 - **THEN** the panel offers both keys as a choice
+
+#### Scenario: The read carries each list's columns
+- **WHEN** the server reports a list declaring two columns
+- **THEN** the studio holds both column keys against that list
 
 #### Scenario: A key the server does not report draws a warning
 - **WHEN** a draft names a `listKey` the server does not report
@@ -884,4 +892,3 @@ grow with the code. This rule does.
 
 - **WHEN** a site legitimately needs no warning
 - **THEN** an inline comment states the reason, and the rule skips it
-

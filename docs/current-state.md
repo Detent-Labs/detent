@@ -3530,3 +3530,35 @@ meets `scope=started` should infer no new permission tier from it.
   writes into the in-browser draft, and the edit screen's toolbar persists it.
   A note beside the back control states that, so leaving never reads as a
   cancel.
+
+- Process Studio, the column-mapping editor
+  (`packages/web/src/areas/studio/panels/columnMappingLogic.ts`,
+  `FieldCatalogPanel.tsx`, `panels/shared/useDataLists.ts`,
+  `studio-column-mapping-form`): stage 29's deferred builder. An author edited
+  `FieldDef.columnMapping` as JSON until now.
+
+  The editor shows one row per mapped column, under the `dataSource` picker
+  that feeds it. The first control picks a key the bound list declares. The
+  second picks a catalog field.
+
+  It appears for a `select` field bound to a `"db.list"` source, and nowhere
+  else. `checkColumnMapping` supplies two of those conditions. It refuses a
+  mapping on a field carrying no `dataSource`, and on a field that is not a
+  `select`. The `db.list` narrowing is the editor's own, because no other
+  source type declares columns. Hiding the editor never deletes what the field
+  carries, so switching a type back restores the rows.
+
+  It validates nothing else. `draft/validation.ts` runs `compileProcessBody`,
+  so all seven rules already reach the checks rail. A duplicate target reaches
+  the rail rather than a disabled control, since an author passes through that
+  state mid-edit. The target picker omits a group field and the mapping field
+  itself, which is shape rather than validation.
+
+  A key the list no longer declares keeps its row and takes a mark. The detail
+  route reports the same key, so the two surfaces agree. Neither marks anything
+  while the fetch has not resolved.
+
+  `useDataLists` is the one read behind both pickers, the `"db.list"` key one
+  and the column one. It takes the shape `useRegistry` beside it already had.
+  `listDataLists` replaced `listDataListKeys`, which discarded the columns the
+  route already returned.

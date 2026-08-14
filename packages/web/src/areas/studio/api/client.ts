@@ -11,6 +11,7 @@ import type {
   InstanceRecordPage,
   TemplateSummary,
   TemplateRecord,
+  StudioDataList,
 } from "./types.js";
 import { AppClientError, request } from "../../../api/client.js";
 
@@ -183,13 +184,17 @@ export async function getInstanceRecord(instanceId: string, token: string, opts:
 }
 
 /**
- * The data list keys the server holds, for the `"db.list"` picker. Reads the
- * admin data list route, which accepts `system:developer` for exactly this.
+ * The data lists the server holds, for the `"db.list"` picker and for the
+ * field catalog's column-mapping editor. Reads the admin data list route,
+ * which accepts `system:developer` for exactly this.
+ *
+ * Carries each list's declared columns beside its key. The route returns them,
+ * and the mapping editor offers those keys rather than free text.
  */
-export async function listDataListKeys(token: string): Promise<string[]> {
+export async function listDataLists(token: string): Promise<StudioDataList[]> {
   const res = await request("/admin/data-lists", token);
-  const page = (await res.json()) as { items: { listKey: string }[] };
-  return page.items.map((item) => item.listKey);
+  const page = (await res.json()) as { items: StudioDataList[] };
+  return page.items.map((item) => ({ listKey: item.listKey, columns: item.columns ?? [] }));
 }
 
 /**

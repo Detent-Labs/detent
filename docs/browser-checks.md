@@ -607,6 +607,37 @@ one process once, not twice.
 Switch the locale to German and repeat the removal. Pass: both sentences read
 in German, and the column keys stay untranslated in the mono face.
 
+### The column-mapping editor (`column-mapping-editor`)
+
+Source: stage 29's deferred builder. This walk needs a `products` data list
+declaring `sku` and `price`, and a draft to edit.
+
+Open Studio, then a draft, then Fields. Add a `db.list` data source naming
+`products`. Pass: the key picker offers it, which is the widened read working.
+
+Set a field's type to `select` and bind it to that source. Pass: the column
+mapping editor appears under the `dataSource` picker. Set the type to
+`multiselect`. Pass: it goes. Set it back to `select`. Pass: it returns.
+
+Choose "Map a column". Pass: the first picker offers `sku` and `price`, and no
+other key. The second offers the catalog's fields, without the mapping field
+itself and without any group field.
+
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: `.claude/rules/ui-glossary.md` fixes "JSON surface" as the one name
+     for the raw definition view. The rule reads its "surface" as a synonym for
+     the "render" this file uses of a browser painting a page. -->
+Pick `sku` against a text field. Open the JSON surface. Pass: the body carries
+`columnMapping` with that pair, and nothing else changed.
+
+Map `price` onto the same field. Pass: the editor keeps both rows, and the
+checks rail names the duplicate. The panel refuses no keystroke, and the rail
+is where a publish rule reports.
+
+In Operations, drop `sku` from the list. Save the draft, then reload the
+editor. Pass: the `sku` row stays, keeps its target, and carries a warning. It
+does not vanish. The data list screen reports the same key under "Used by".
+
 ### Canvas grid snapping (`canvas-grid-snap`)
 
 Open Studio and a draft with several steps. This whole entry is a visual

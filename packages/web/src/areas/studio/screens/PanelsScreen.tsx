@@ -142,7 +142,7 @@ export function PanelsScreen({ openView, onBack, onOpenView, token }: Props) {
         <main className="studio-panels-screen-view">
           {/* All three mount; `hidden` shows one. See the component note. */}
           <div hidden={openView !== "fields"}>
-            <FieldCatalogPanel />
+            <FieldCatalogPanel token={token} />
           </div>
           <div hidden={openView !== "dataSources"}>
             <DataSourcesPanel token={token} />

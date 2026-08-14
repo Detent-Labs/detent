@@ -155,3 +155,15 @@ export interface TemplateRecord {
   createdBy: string;
   updatedAt: string;
 }
+
+/**
+ * One data list as the studio reads it: its key, and the columns it declares.
+ *
+ * The `"db.list"` picker uses the key alone. The field catalog's column-mapping
+ * editor uses the columns, so an author picks a declared key rather than typing
+ * one (`studio-column-mapping-form`).
+ */
+export interface StudioDataList {
+  listKey: string;
+  columns: { key: string; label: string; type: "string" | "number" | "boolean" }[];
+}

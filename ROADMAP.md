@@ -870,6 +870,21 @@ Spec: `development-toolchain`.
     which took the page to 1861px of horizontal scroll at the bound on a
     1100px window; `.admin-table-scroll` contains it, and the page is back to
     the 152px baseline every admin screen shows in German at that width.
+    The stage's deferred builder shipped on 2026-08-14 as
+    `column-mapping-editor`. The field catalog now edits `columnMapping`
+    without the JSON view: one row per mapped column, a picker over the bound
+    list's declared keys, and a picker over the catalog. The editor appears
+    only for a `select` field bound to a `"db.list"` source. Two of those
+    conditions are `checkColumnMapping`'s own; the `db.list` narrowing is the
+    editor's, since no other source type declares columns to pick from.
+    It validates nothing. `draft/validation.ts` runs `compileProcessBody`, so
+    all seven rules already reach the checks rail, and a duplicate target
+    reaches it rather than a disabled control. A key the list no longer
+    declares keeps its row and takes a mark, the same state the detail route
+    reports. `useDataLists` in `panels/shared/` is the one read behind both the
+    key picker and the column picker, in the shape `useRegistry` beside it
+    already took. Specs: `studio-column-mapping-form` (new), `studio-app`
+    (modified).
     The stage's first open question is answered, by `report-column-usage` on
     2026-08-14. The detail route's usage report now names the column keys each
     process maps, and the screen shows them beside the process. The removal

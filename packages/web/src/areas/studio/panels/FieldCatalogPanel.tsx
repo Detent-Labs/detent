@@ -8,6 +8,9 @@ import { mintCatalogField } from "../draft/mintField";
 import { removeAt, updateAt } from "../draft/list-ops";
 import { addToDraftArray, updateInDraftArray } from "../draft/draft-array-crud";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
+import { useDataLists } from "./shared/useDataLists.js";
+import { columnMappingRows, declaredColumns, mappableTargets, showsColumnMapping } from "./columnMappingLogic.js";
+import type { StudioDataList } from "../api/types.js";
 import { IssueList } from "./shared/IssueList";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { FieldValidationEditor } from "./shared/FieldValidationEditor";
@@ -29,12 +32,14 @@ function isCustomType(type: DraftField["type"]): type is DraftOf<FieldDef>["type
 interface FieldRowProps {
   field: DraftField;
   dataSources: DraftDataSource[];
+  /** `undefined` until the fetch resolves, and after a failed one. */
+  lists: StudioDataList[] | undefined;
   onChange: (patch: Partial<DraftField>) => void;
   onRemove: () => void;
 }
 
 /** Fields are recursive (a `group` field carries its own sub-fields), so this renders itself for `field.fields`. */
-function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
+function FieldRow({ field, dataSources, lists, onChange, onRemove }: FieldRowProps) {
   const { draft, contentLocale } = useDraft();
   const custom = isCustomType(field.type);
   const typeSelectValue = typeof field.type === "object" && field.type !== null ? "__custom__" : (field.type ?? "string");
@@ -42,6 +47,42 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
   const hasDataSource = field.dataSource !== undefined;
 
   const setOptions = (options: DraftOption[]) => onChange({ options, dataSource: options.length > 0 ? undefined : field.dataSource });
+
+  const mappingRows = columnMappingRows(field, dataSources, lists);
+  const columns = declaredColumns(field, dataSources, lists);
+  const targets = mappableTargets(field, draft.fields ?? []);
+  /** The first declared column no row holds yet, or `undefined` when every one is mapped. */
+  const unmapped = columns.find((c) => !mappingRows.some((r) => r.column === c));
+
+  /**
+   * Writes the mapping back, or drops the key entirely when the result is
+   * empty. An empty object is not the same as no mapping: the schema reads
+   * `columnMapping` as optional, and a body carrying `{}` says an author meant
+   * something they did not.
+   */
+  const writeMapping = (next: Record<string, string>) =>
+    onChange({ columnMapping: (Object.keys(next).length === 0 ? undefined : next) as DraftField["columnMapping"] });
+
+  const setMapping = (column: string, target: string) => {
+    const next = { ...((field.columnMapping ?? {}) as Record<string, string>) };
+    next[column] = target;
+    writeMapping(next);
+  };
+
+  // Rebuilt rather than patched in place, so the row keeps its position: a
+  // delete-then-add would send the renamed key to the end of the list.
+  const renameMapping = (from: string, to: string) => {
+    const current = (field.columnMapping ?? {}) as Record<string, string>;
+    writeMapping(Object.fromEntries(Object.entries(current).map(([k, v]) => (k === from ? [to, v] : [k, v]))));
+  };
+
+  const removeMapping = (column: string) => {
+    const next = { ...((field.columnMapping ?? {}) as Record<string, string>) };
+    delete next[column];
+    writeMapping(next);
+  };
+
+  const addMapping = () => unmapped !== undefined && setMapping(unmapped, "");
 
   const addOption = () => setOptions([...(field.options ?? []), { value: "", label: seedLocalizedText(contentLocale) }]);
   const updateOption = (i: number, patch: Partial<DraftOption>) => setOptions(updateAt(field.options ?? [], i, patch));
@@ -159,6 +200,60 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
             {t("fieldCatalog.addOption")}
           </button>
         </div>
+
+        {/* The mapping sits under the source that feeds it: the fieldset above
+            groups where a field's choices come from, and this answers what a
+            chosen row then writes. Hidden where a mapping cannot publish, and
+            hiding it never deletes what the field already carries. */}
+        {showsColumnMapping(field, dataSources) && (
+          <div className="studio-column-mapping">
+            <p className="studio-column-mapping-heading">{t("columnMapping.heading")}</p>
+            {columns.length === 0 ? (
+              <p className="studio-note">{t("columnMapping.noColumns")}</p>
+            ) : (
+              <>
+                {mappingRows.map((row) => (
+                  <div className="studio-column-mapping-row" key={row.column}>
+                    <select
+                      aria-label={t("columnMapping.columnAria")}
+                      value={row.column}
+                      onChange={(e) => renameMapping(row.column, e.target.value)}
+                    >
+                      {/* A stale key is not among the declared ones, so it needs
+                          its own entry to stay selected and visible. */}
+                      {row.stale && <option value={row.column}>{row.column}</option>}
+                      {columns.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                    <span aria-hidden="true">-&gt;</span>
+                    <select
+                      aria-label={t("columnMapping.targetAria")}
+                      value={row.target}
+                      onChange={(e) => setMapping(row.column, e.target.value)}
+                    >
+                      <option value="">{t("fieldCatalog.noneOption")}</option>
+                      {targets.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.key === "" || f.key === undefined ? f.id : f.key}
+                        </option>
+                      ))}
+                    </select>
+                    <button type="button" className="btn btn-secondary" onClick={() => removeMapping(row.column)}>
+                      {t("columnMapping.removeRow")}
+                    </button>
+                    {row.stale && <p className="studio-warning">{t("columnMapping.staleColumn")}</p>}
+                  </div>
+                ))}
+                <button type="button" className="btn btn-secondary" onClick={addMapping} disabled={unmapped === undefined}>
+                  {t("columnMapping.addRow")}
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </fieldset>
 
       <FieldValidationEditor field={field} validation={field.validation} onChange={(validation) => onChange({ validation })} />
@@ -171,6 +266,7 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
               key={sub.id ?? i}
               field={sub}
               dataSources={dataSources}
+              lists={lists}
               onChange={(patch) => updateSubField(i, patch)}
               onRemove={() => removeSubField(i)}
             />
@@ -190,10 +286,13 @@ function FieldRow({ field, dataSources, onChange, onRemove }: FieldRowProps) {
   );
 }
 
-export function FieldCatalogPanel() {
+export function FieldCatalogPanel({ token }: { token: string }) {
   const { draft, mutate, contentLocale } = useDraft();
   const fields = draft.fields ?? [];
   const dataSources = draft.dataSources ?? [];
+  // The same hook `DataSourcesPanel` reads, so the key picker beside this one
+  // and the column picker here cannot offer different lists.
+  const lists = useDataLists(token);
 
   const addField = () => {
     addToDraftArray(mutate, (d) => (d.fields ??= []), mintCatalogField("text", seedLocalizedText(contentLocale)));
@@ -218,6 +317,7 @@ export function FieldCatalogPanel() {
           key={field.id ?? index}
           field={field}
           dataSources={dataSources}
+          lists={lists}
           onChange={(patch) => updateField(index, patch)}
           onRemove={() => removeField(index)}
         />

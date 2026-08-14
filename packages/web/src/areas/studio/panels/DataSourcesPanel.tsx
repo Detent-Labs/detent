@@ -1,13 +1,12 @@
-import { useEffect, useState } from "react";
 import type { DataSourceDef } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import { useDraft } from "../draft/store";
 import { t } from "../catalog.js";
 import { mintId } from "../draft/ids";
 import { addToDraftArray, updateInDraftArray } from "../draft/draft-array-crud";
-import { listDataListKeys } from "../api/client.js";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { useRegistry } from "./shared/useRegistry.js";
+import { useDataLists } from "./shared/useDataLists.js";
 import { IssueList } from "./shared/IssueList";
 import { DB_LIST_TYPE, keyOptions, listKeyOf, unknownListKeyWarning } from "./dataListKeysLogic.js";
 
@@ -17,20 +16,11 @@ type DraftDataSource = DraftOf<DataSourceDef>;
 export function DataSourcesPanel({ token }: { token: string }) {
   const { draft, mutate } = useDraft();
   const dataSources = draft.dataSources ?? [];
-  // `undefined` until the keys arrive, and after a failed fetch — the picker
+  // `undefined` until the lists arrive, and after a failed fetch — the picker
   // then falls back to free text and warns about nothing.
-  const [listKeys, setListKeys] = useState<string[] | undefined>(undefined);
+  const lists = useDataLists(token);
+  const listKeys = lists?.map((l) => l.listKey);
   const registry = useRegistry(token);
-
-  useEffect(() => {
-    let live = true;
-    listDataListKeys(token)
-      .then((keys) => live && setListKeys(keys))
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, [token]);
 
   const addDataSource = () => {
     addToDraftArray(mutate, (d) => (d.dataSources ??= []), { id: mintId("dataSource"), key: "", type: "", config: {} });
