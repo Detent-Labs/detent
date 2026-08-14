@@ -275,6 +275,21 @@ after a substantial change lands.
   - Running commands inside the devcontainer without the `devcontainer` CLI
     (docker compose invocation, Windows Git Bash path fix, exposing a dev
     server port): see the `devcontainer-exec` skill.
+- **No `cd` prefix and no whitespace-only argument, in any Bash command.** The
+  Bash tool already starts in the repository root. On this Windows host the
+  permission analyzer reads every operand as a possible path, and two habits of
+  ours stop it before it reaches the auto-approval classifier.
+  - `cd "C:/.../detent" && ... "$HOME/AI/AntiSlop/antislop.py" ... "$f"` loses
+    the working directory. One `$VAR` anywhere in a `cd` chain makes the final
+    directory unknowable, reported as `Contains simple_expansion`. The analyzer
+    then cannot resolve the relative paths that follow, so it asks for manual
+    approval. Drop the `cd`. Pass an absolute path for anything outside the
+    repository, and a relative one for anything inside it.
+  - `tr '\n' ' '` passes a lone space as an argument. The analyzer resolves it
+    against the working directory, gets a last path component that ends in a
+    space, and denies it as a Cygwin-emulated symlink. `paste -sd' '` breaks
+    the same way. Join lines with `xargs echo`, or leave them unjoined.
+  Neither command was unsafe, and neither message named the operand at fault.
 - PostgreSQL is the datastore. The engine reaches it via Bun's native `Bun.sql`
   (no client dependency); `DATABASE_URL` is the connection convention, set by the
   devcontainer compose.
