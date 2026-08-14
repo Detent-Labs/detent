@@ -4,14 +4,14 @@ import { draftFields } from "../draft/fields.js";
 import type { Draft } from "../draft/types.js";
 import { t } from "../catalog.js";
 import { StepsPanel } from "../panels/StepsPanel.js";
-import { EditPanelsModal, type PanelView } from "../panels/EditPanelsModal.js";
+import { PanelsScreen } from "./PanelsScreen.js";
 import { useDraftToolbarActions } from "../panels/DraftToolbar.js";
 import { ProcessHeaderBar } from "../panels/ProcessHeaderBar.js";
 import { ChecksRail } from "../panels/ChecksRail.js";
 import { seedLocalizedText } from "../draft/localized-text";
 import { getDraft, StudioClientError } from "../api/client.js";
 import type { DraftRecord, PublishResult } from "../api/types.js";
-import type { Route } from "../routing.js";
+import type { Route, PanelView } from "../routing.js";
 import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
 import { savedBodyReducer, initialSavedBody, isDirty } from "./draftToolbarState.js";
 import { CanvasView } from "../canvas/CanvasView.js";
@@ -26,10 +26,12 @@ import { FormEditorScreen } from "./FormEditorScreen.js";
 
 interface EditScreenProps {
   processId: string;
-  /** The `edit` route's optional sub-state (design.md's routing decision):
-   * set, the form editor's routed page renders in place of the canvas and
-   * inspector, for this step. */
+  /** The `edit` route's two optional sub-states. Either one renders in place
+   * of the canvas and inspector: `formStepId` the form editor for that step,
+   * `panel` the panels screen at that view. The form editor wins when both
+   * arrive, which `routePath` already encodes. */
   formStepId?: string;
+  panel?: PanelView;
   token: string;
   navigate: (route: Route) => void;
   onUnauthorized: () => void;
@@ -38,6 +40,7 @@ interface EditScreenProps {
 interface EditorAreaProps {
   processId: string;
   formStepId?: string;
+  panel?: PanelView;
   token: string;
   initialRevision: number;
   initialLayout: Record<string, unknown>;
@@ -51,7 +54,7 @@ interface EditorAreaProps {
  * remaining direct consumer of `DraftToolbarProps`; `DraftToolbar` itself no
  * longer mounts here (design.md: "DraftToolbar keeps its logic.
  * ProcessHeaderBar renders the buttons."). */
-function EditorArea({ processId, formStepId, token, initialRevision, initialLayout, navigate, onUnauthorized }: EditorAreaProps) {
+function EditorArea({ processId, formStepId, panel, token, initialRevision, initialLayout, navigate, onUnauthorized }: EditorAreaProps) {
   const { draft, mutate, validation, replace, contentLocale } = useDraft();
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
   // The canvas selection is a set (design.md). A set of one drives the
@@ -60,14 +63,6 @@ function EditorArea({ processId, formStepId, token, initialRevision, initialLayo
   const [selectedStepIds, setSelectedStepIds] = useState<string[]>([]);
   const [selectedPathId, setSelectedPathId] = useState<string | undefined>(undefined);
   const [surface, setSurface] = useState<"structure" | "json">("structure");
-  // `undefined` while the shared modal is closed. Component state, not route
-  // state: a modal that always opens fresh from its own link needs no
-  // shareable link. The form editor's `formStepId` is this route's one
-  // exception (design.md's routing decision): it is route state, because a
-  // navigation away and back must show the same draft state a re-opened
-  // modal would have, and that survives only under the one `DraftProvider`
-  // this screen mounts for its own life.
-  const [openPanel, setOpenPanel] = useState<PanelView | undefined>(undefined);
   const fields = draftFields(draft);
 
   const steps = draft.workflow?.steps ?? [];
@@ -286,7 +281,14 @@ function EditorArea({ processId, formStepId, token, initialRevision, initialLayo
       />
       {surface === "structure" ? (
         <>
-          {formStepId !== undefined ? (
+          {panel !== undefined ? (
+            <PanelsScreen
+              openView={panel}
+              onBack={() => navigate({ name: "edit", processId })}
+              onOpenView={(view) => navigate({ name: "edit", processId, panel: view })}
+              token={token}
+            />
+          ) : formStepId !== undefined ? (
             formStep ? (
               <FormEditorScreen
                 step={formStep}
@@ -299,7 +301,7 @@ function EditorArea({ processId, formStepId, token, initialRevision, initialLayo
             )
           ) : (
             <div className="studio-canvas-layout">
-              <EditRail onDrop={onPaletteDrop} onOpenPanel={setOpenPanel} fields={fields} />
+              <EditRail onDrop={onPaletteDrop} onOpenPanel={(view) => navigate({ name: "edit", processId, panel: view })} />
               <CanvasView
                 layout={saveState.layout}
                 onMoveStep={onMoveStep}
@@ -404,12 +406,6 @@ function EditorArea({ processId, formStepId, token, initialRevision, initialLayo
               )}
             </div>
           )}
-          <EditPanelsModal
-            openView={openPanel}
-            onClose={() => setOpenPanel(undefined)}
-            onOpenView={setOpenPanel}
-            token={token}
-          />
         </>
       ) : (
         <JsonView draft={draft} onApply={replace} />
@@ -429,7 +425,7 @@ type EditLoadState =
   | { kind: "error"; message: string }
   | { kind: "loaded"; record: DraftRecord };
 
-export function EditScreen({ processId, formStepId, token, navigate, onUnauthorized }: EditScreenProps) {
+export function EditScreen({ processId, formStepId, panel, token, navigate, onUnauthorized }: EditScreenProps) {
   const [state, setState] = useState<EditLoadState>({ kind: "loading" });
 
   const load = useCallback(() => {
@@ -490,6 +486,7 @@ export function EditScreen({ processId, formStepId, token, navigate, onUnauthori
       <EditorArea
         processId={processId}
         formStepId={formStepId}
+        panel={panel}
         token={token}
         initialRevision={state.record.revision}
         initialLayout={state.record.layout}

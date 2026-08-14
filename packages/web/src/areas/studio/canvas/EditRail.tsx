@@ -3,8 +3,8 @@ import { SquarePlus, Share2, Flag, ChevronRight } from "lucide-react";
 import { t, type TranslationKey } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
 import type { StepKind } from "../draft/createStep.js";
-import type { DraftField } from "../draft/fields.js";
-import { PANEL_VIEWS, type PanelView } from "../panels/EditPanelsModal.js";
+import { PANEL_VIEWS, type PanelView } from "../routing.js";
+import { panelEntityCounts } from "../draft/panel-rail.js";
 
 interface Props {
   /** Fires on release, screen (client) coordinates — same shape as the
@@ -13,13 +13,9 @@ interface Props {
    * resolving a client point to a canvas point is the caller's job
    * (`EditorArea`). */
   onDrop: (kind: StepKind, clientX: number, clientY: number) => void;
-  /** Opens `EditPanelsModal` to the given view — the same call the
-   * now-removed `studio-panel-links` nav used to make (`setOpenPanel`). */
+  /** Navigates to the panels screen at the given view. It set component
+   * state before the screen was routed (`setOpenPanel`). */
   onOpenPanel: (view: PanelView) => void;
-  /** `draftFields(draft)`, already flattened by the caller (`EditorArea`
-   * computes it once and also hands it to `StepsPanel`): reused here for
-   * the Fields row's count rather than flattened a second time. */
-  fields: DraftField[];
 }
 
 const ADD_ENTRIES: { kind: StepKind; label: TranslationKey; Icon: typeof SquarePlus }[] = [
@@ -31,23 +27,27 @@ const ADD_ENTRIES: { kind: StepKind; label: TranslationKey; Icon: typeof SquareP
 const PROCESS_ROWS: { view: PanelView; label: TranslationKey }[] = PANEL_VIEWS.map((view) => ({
   view,
   label:
-    view === "fields" ? "editPanels.linkFields" : view === "dataSources" ? "editPanels.linkDataSources" : "editPanels.linkContract",
+    view === "fields"
+      ? "panelsScreen.linkFields"
+      : view === "dataSources"
+        ? "panelsScreen.linkDataSources"
+        : "panelsScreen.linkContract",
 }));
 
 /**
  * The canvas edit screen's one rail (design.md: "One rail component, not
  * two side-by-side ones"). Two labeled sections share this single column:
  * "Add to canvas" — the place-on-canvas palette, ported unchanged from the
- * now-deleted `StepPalette` — and "Process" — the three `EditPanelsModal`
- * entry points the now-removed `studio-panel-links` nav used to render.
+ * now-deleted `StepPalette` — and "Process" — the three entry points into the
+ * panels screen that the now-removed `studio-panel-links` nav used to render.
  * Both groups are register rows, ruled the same way, with a structural
  * divider between the two sections.
  *
- * The Process rows stay modal-openers (design.md: "The rail's Process rows
- * stay modal-openers"): no inline editing moves in here, only a count and a
- * chevron per row.
+ * The Process rows only navigate: no inline editing moves in here, only a
+ * count and a chevron per row. They opened a modal before stage 36 routed the
+ * panels screen.
  */
-export function EditRail({ onDrop, onOpenPanel, fields }: Props) {
+export function EditRail({ onDrop, onOpenPanel }: Props) {
   const { draft } = useDraft();
   const [dragging, setDragging] = useState<{ kind: StepKind; x: number; y: number } | null>(null);
 
@@ -71,13 +71,9 @@ export function EditRail({ onDrop, onOpenPanel, fields }: Props) {
     setDragging(null);
   };
 
-  // Same three expressions `EditPanelsModal`'s own rail reads its counts
-  // from — reused here rather than recomputed a second way.
-  const entityCount: Record<PanelView, number> = {
-    fields: fields.length,
-    dataSources: (draft.dataSources ?? []).length,
-    contract: (draft.contract?.outcomes ?? []).length,
-  };
+  // One helper, so this rail and the panels screen's index rail cannot report
+  // different numbers for one view. Each carried its own copy before.
+  const entityCount = panelEntityCounts(draft);
 
   return (
     <div className="studio-rail">

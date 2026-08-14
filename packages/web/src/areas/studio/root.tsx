@@ -118,6 +118,7 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
             <EditScreen
               processId={route.processId}
               formStepId={route.formStepId}
+              panel={route.panel}
               token={session.token}
               navigate={navigate}
               onUnauthorized={onUnauthorized}

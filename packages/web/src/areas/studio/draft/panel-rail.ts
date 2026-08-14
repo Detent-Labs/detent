@@ -2,10 +2,32 @@ import type { Step } from "workflow-engine/schema";
 import type { DraftOf } from "./types";
 import type { DraftField } from "./fields";
 import type { EditorIssue, EntityType } from "./issues";
+import type { PanelView } from "../routing";
 
 type DraftStep = DraftOf<Step>;
 
-/** One row of the shared modal's left rail under the Fields view. `depth` is
+/**
+ * How many entities each process-wide view holds, for the count beside its
+ * name. Two rails read it — the panels screen's index rail and the canvas edit
+ * rail's Process section — and both showed the same number from their own copy
+ * of these three expressions before this lived here.
+ *
+ * `fields` counts rail rows, not catalog entries: a group field contributes
+ * itself and its children, which is what either rail lists.
+ */
+export function panelEntityCounts(draft: {
+  fields?: DraftField[];
+  dataSources?: unknown[];
+  contract?: { outcomes?: unknown[] };
+}): Record<PanelView, number> {
+  return {
+    fields: flattenRailFields(draft.fields).length,
+    dataSources: (draft.dataSources ?? []).length,
+    contract: (draft.contract?.outcomes ?? []).length,
+  };
+}
+
+/** One row of the panels screen's index rail under the Fields view. `depth` is
  * capped at 1: a group field's children indent once, and anything deeper takes
  * a top-level row instead. The cap is a rail-rendering rule, not a schema one —
  * `FieldDef`'s `group` nesting carries no depth limit and this adds none. */

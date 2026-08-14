@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { matchRoute, routePath, ROUTE_ROLE, type Route } from "../src/areas/studio/routing.js";
+import { matchRoute, routePath, ROUTE_ROLE, PANEL_VIEWS, type Route } from "../src/areas/studio/routing.js";
 import { mayEnter } from "../src/shell/areas.js";
 
 const DEVELOPER_ROLE = "system:developer";
@@ -17,6 +17,7 @@ const EVERY_ROUTE: Route[] = [
   { name: "processes" },
   { name: "edit", processId: "proc_1" },
   { name: "edit", processId: "proc_1", formStepId: "step_1" },
+  { name: "edit", processId: "proc_1", panel: "fields" },
   { name: "versions", processId: "proc_1" },
   { name: "migrate", processId: "proc_1", from: "1", to: "2" },
   { name: "tools" },
@@ -57,6 +58,37 @@ describe("the form editor's formStepId sub-state of the edit route", () => {
     expect(plain).toEqual({ name: "edit", processId: "proc_1" });
     expect(withForm).toEqual({ name: "edit", processId: "proc_1", formStepId: "step_1" });
     expect(withForm).not.toEqual(plain);
+  });
+});
+
+describe("the panels screen's panel sub-state of the edit route", () => {
+  it("round-trips /processes/:id/edit/panels/:view, per view", () => {
+    for (const panel of PANEL_VIEWS) {
+      const route: Route = { name: "edit", processId: "proc_1", panel };
+      expect(routePath(route)).toBe(`/processes/proc_1/edit/panels/${panel}`);
+      expect(matchRoute(routePath(route))).toEqual(route);
+    }
+  });
+
+  it("falls back to the plain edit route on an unrecognized view", () => {
+    // A typo lands on the canvas, not on a dead end. The top-level table
+    // answers an unrecognized path with the process list; this is that rule
+    // one level down.
+    expect(matchRoute("/processes/proc_1/edit/panels/nonsense")).toEqual({ name: "edit", processId: "proc_1" });
+  });
+
+  it("stays distinct from the plain edit path and from a form path", () => {
+    const plain = matchRoute("/processes/proc_1/edit");
+    const withPanel = matchRoute("/processes/proc_1/edit/panels/fields");
+    const withForm = matchRoute("/processes/proc_1/edit/form/step_1");
+    expect(withPanel).toEqual({ name: "edit", processId: "proc_1", panel: "fields" });
+    expect(withPanel).not.toEqual(plain);
+    expect(withPanel).not.toEqual(withForm);
+  });
+
+  it("prefers the form path when both fields are set, so one path is emitted", () => {
+    const route: Route = { name: "edit", processId: "proc_1", formStepId: "step_1", panel: "fields" };
+    expect(routePath(route)).toBe("/processes/proc_1/edit/form/step_1");
   });
 });
 

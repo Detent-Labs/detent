@@ -23,7 +23,7 @@ pairs that go wrong span both sections, so both live in one file.
 | inspector panel | one section inside the inspector | `panels/StepsPanel.tsx` and what it nests |
 | edit rail | the creation palette: add a step, a path, an outcome | `canvas/EditRail.tsx` |
 | checks rail | the validation issue list | `panels/ChecksRail.tsx` |
-| edit panels modal | the overlay holding the three process-wide views | `panels/EditPanelsModal.tsx` |
+| panels screen | the routed screen holding the three process-wide views | `screens/PanelsScreen.tsx` |
 | player | the step-form preview an author drives | `screens/PlayerScreen.tsx` |
 | JSON surface | the raw definition view | `panels/JsonView.tsx` |
 
@@ -31,13 +31,14 @@ pairs that go wrong span both sections, so both live in one file.
 the canvas. Say *edit rail* or *checks rail*, every time.
 
 **panel** alone names nothing either. The inspector holds inspector panels.
-`EditPanelsModal` holds three views: the field catalog, data sources, and the
+`PanelsScreen` holds three views: the field catalog, data sources, and the
 contract. The component name carries the word `Panels`. The views are not
 inspector panels.
 
-The checks rail renders in two places. It sits beside the canvas in full until
-an author selects a step. The inspector then docks a second instance,
-collapsed, at its bottom edge. Both are the checks rail.
+The checks rail renders in three places. It sits beside the canvas in full
+until an author selects a step. The inspector then docks a second instance,
+collapsed, at its bottom edge. The panels screen carries a third, in full. All
+three are the checks rail.
 
 ## 2. Domain terms as the UI shows them
 

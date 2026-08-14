@@ -1,6 +1,15 @@
+/** The three process-wide views, in rail order. The panels screen re-exports
+ * this as its own; routing owns it so the route type needs no import from a
+ * component. */
+export type PanelView = "fields" | "dataSources" | "contract";
+
+export const PANEL_VIEWS: PanelView[] = ["fields", "dataSources", "contract"];
+
+const isPanelView = (v: string): v is PanelView => (PANEL_VIEWS as string[]).includes(v);
+
 export type Route =
   | { name: "processes" }
-  | { name: "edit"; processId: string; formStepId?: string }
+  | { name: "edit"; processId: string; formStepId?: string; panel?: PanelView }
   | { name: "versions"; processId: string }
   | { name: "migrate"; processId: string; from: string; to: string }
   | { name: "tools" }
@@ -28,6 +37,18 @@ export function matchRoute(path: string): Route {
       formStepId: decodeURIComponent(editFormMatch[2]!),
     };
   }
+  // The panels screen is the second sub-state of `edit`, on the same footing as
+  // the form editor above. An unrecognized view falls through to the plain edit
+  // route below, so a typo lands on the canvas rather than a dead end.
+  const editPanelMatch = /^\/processes\/([^/]+)\/edit\/panels\/([^/]+)$/.exec(path);
+  if (editPanelMatch && isPanelView(editPanelMatch[2]!)) {
+    return {
+      name: "edit",
+      processId: decodeURIComponent(editPanelMatch[1]!),
+      panel: editPanelMatch[2],
+    };
+  }
+  if (editPanelMatch) return { name: "edit", processId: decodeURIComponent(editPanelMatch[1]!) };
   const editMatch = /^\/processes\/([^/]+)\/edit$/.exec(path);
   if (editMatch) return { name: "edit", processId: decodeURIComponent(editMatch[1]!) };
   const versionsMatch = /^\/processes\/([^/]+)\/versions$/.exec(path);
@@ -45,9 +66,11 @@ export function routePath(route: Route): string {
     case "processes":
       return "/";
     case "edit":
-      return route.formStepId
-        ? `/processes/${encodeURIComponent(route.processId)}/edit/form/${encodeURIComponent(route.formStepId)}`
-        : `/processes/${encodeURIComponent(route.processId)}/edit`;
+      if (route.formStepId)
+        return `/processes/${encodeURIComponent(route.processId)}/edit/form/${encodeURIComponent(route.formStepId)}`;
+      // `panel` needs no encoding: it is one of three literals, not user input.
+      if (route.panel) return `/processes/${encodeURIComponent(route.processId)}/edit/panels/${route.panel}`;
+      return `/processes/${encodeURIComponent(route.processId)}/edit`;
     case "versions":
       return `/processes/${encodeURIComponent(route.processId)}/versions`;
     case "migrate":

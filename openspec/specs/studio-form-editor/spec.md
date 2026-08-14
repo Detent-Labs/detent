@@ -82,8 +82,9 @@ return it to that list, if the field stays in the catalog.
 
 - **WHEN** the developer mints a field through the form editor's
   palette
-- **THEN** that field appears in the process's field catalog, the same
-  as a field minted through `EditPanelsModal`'s Fields tab
+- **THEN** that field appears in the process's field catalog
+- **AND** it appears there the same way a field minted on the panels
+  screen's Fields view does
 
 ### Requirement: The canvas places fields at the view's column count, in array order
 

@@ -1155,35 +1155,48 @@ Spec: `development-toolchain`.
     already carry.
     Change: `starter-instance-list`. Specs: `http-wrapper`, `end-user-app`.
 
-36. Edit panels modal rework: NOT STARTED. Raised 2026-08-12 in conversation.
-    The three process-wide views — field catalog, data sources, contract — sit
-    behind one overlay, `panels/EditPanelsModal.tsx`, and the ask is to reshape
-    it. The direction stays open on purpose. A design session with Claude
-    Design sets it, and `.claude/rules/design-language.md` plus the
-    `/frontend-design:frontend-design` skill govern that session, per the
-    conventions in `CLAUDE.md`.
-    What stands today, so the session starts from the code rather than from
-    memory. Stage 11b's `studio-edit-shared-modal` put all three views in one
-    native `<dialog>`, and the glossary fixes the name: *edit panels modal*.
-    The dialog measures `min(72rem, 92vw)` wide and `88vh` tall. A 16rem rail
-    on the left lists the three views, each with an entity count and an issue
-    count, and nests a flat list of every catalog field under the first one,
-    indented by `data-depth`. The view fills the rest. The three panels behind
-    it are small: `FieldCatalogPanel` 230 lines, `DataSourcesPanel` 103,
-    `ContractPanel` 111.
-    Two properties any rework has to keep. The element stays mounted for the
-    life of the screen, so a half-typed outcome name in `ContractPanel` and
-    `DataSourcesPanel`'s fetched list keys survive a view switch. And the
-    overlay carries no Save: every panel writes into the in-browser draft
-    through `useDraft()`, and the screen's own toolbar stays the only thing
-    that persists. The footer states that promise to the author.
-    One precedent belongs in the session. Stage 27e faced the same question for
-    the form editor and answered it by leaving the overlay: `FormEditorScreen`
-    is a routed sub-state of the edit screen, not a toggled dialog. Whether the
-    three views follow it is exactly what the design has to decide.
-    No design doc, no OpenSpec change yet. A UI change is never trivial here,
-    so it writes deltas against the capability specs of the views it moves —
-    `studio-app` for the frame, and the specific capability for each view.
+36. **Panels screen: DONE.** Change: `studio-panels-screen`. Raised
+    2026-08-12 in conversation, and held until somebody took its visual
+    decision. That session ran on 2026-08-14 through
+    `/frontend-design:frontend-design`. It put three directions to the user: a
+    rail-only rework, a canvas drawer, and the routed screen. The user took the
+    routed screen.
+    One finding decided it. The overlay hid the checks rail while an author
+    edited field keys and data source keys, and those two produce most of what
+    that rail reports. The rail entry showed a count per view, and that number
+    stood in for the list behind the backdrop. A screen frees a column for the
+    rail.
+    Two smaller facts agreed. `openPanel` was `useState` in `EditScreen.tsx`,
+    so no link reached a view, Back did not close it, and a reload landed on
+    the canvas. And the dialog measured `min(72rem, 92vw)` by `88vh`, paying
+    for a backdrop over what nobody could see. Stage 27e had already answered
+    the same question for the form editor by routing it.
+    The three views now sit at `/processes/:id/edit/panels/:view`. `panel`
+    rides the `edit` route as an optional field beside `formStepId`, the shape
+    `routing.ts` already called a sub-state rather than a sibling route. An
+    unrecognized view falls through to the plain edit match, so a typo lands on
+    the canvas.
+    Both properties the stage fixed survive. All three views stay mounted and
+    `hidden` shows one, so `ContractPanel`'s half-typed outcome name and
+    `DataSourcesPanel`'s fetched list keys outlive a switch. And the screen
+    carries no Save: every panel writes into the in-browser draft, and the edit
+    screen's toolbar persists it.
+    The review earned its place twice. `canvas/EditRail.tsx` imported
+    `PANEL_VIEWS` from the module this change moved, and no task named that
+    file. And nothing gave the new screen a height rule: the dialog's `88vh`
+    does not survive, and item 1 had already archived a whole pass because this
+    screen did not grow into its height.
+    The apply found what the review could not. `EditRail`'s `fields` prop
+    existed only to feed its own count, and `panelEntityCounts` in
+    `draft/panel-rail.ts` now serves both rails. The two had disagreed: the
+    canvas rail counted `draftFields`, which keeps a field carrying no id,
+    while the screen counted rail rows, which drop one.
+    The three panels keep their internals. `FieldCatalogPanel` is 230 lines,
+    `DataSourcesPanel` 103, `ContractPanel` 111, and none of them moved. That
+    is the larger option `tmp/open-work-priority.md` sizes on its own.
+    Specs: `studio-app`, `studio-checks-rail`, `studio-form-editor` (all
+    modified). `.claude/rules/ui-glossary.md` carries the renamed term: the
+    edit panels modal is the panels screen.
 
 37. Canvas nodes snap to the grid: DONE. Change: `canvas-grid-snap`.
     A dragged step, a dropped step and the in-flight drag preview all round to

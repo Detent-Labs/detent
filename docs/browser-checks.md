@@ -87,20 +87,40 @@ is the precedent (`docs/current-state.md:1270`). Without it, Panzoom's
 native down-handler wins the race against React's synthetic dispatch. It
 turns a node drag into a canvas pan.
 
-### Studio modal: stacking, focus, backdrop, Close
+### The panels screen (`studio-panels-screen`)
 
-Source: `2026-08-06-studio-edit-shared-modal` tasks 6.3 and 6.4.
+Source: stage 36. It replaced the shared modal's own four points. The routed
+screen makes all four moot: no backdrop, no focus trap, no Close.
 
-Open the shared editing modal from the studio canvas. Confirm it stacks
-above everything else on the page.
+Open a draft in Studio. Choose Fields in the canvas rail's Process section.
+Pass: the panels screen opens, the canvas is gone, and the address bar reads
+`/studio/processes/<id>/edit/panels/fields`.
 
-Tab away from the modal and back. Confirm focus returns to the control
-that opened it. Click the backdrop while a change sits unsaved. Confirm the
-modal stays open. Click Close. Confirm it discards nothing that was already
-saved.
+Read the third column. Pass: it lists every open check, grouped, in full. It
+is not the one-line summary the inspector docks.
 
-Pass: all four hold. Each one is a visual or interaction judgment, not a
-property a `bun:test` assertion can observe.
+Type a name into the Contract view's outcome input without adding it. Switch
+to Fields, then back. Pass: the typed text is still there. A remount would
+have dropped it.
+
+Reload the browser on that view. Pass: the same view reopens, not the canvas.
+Press Back. Pass: the canvas returns and the draft keeps every change.
+
+Load `/studio/processes/<id>/edit/panels/nonsense` directly. Pass: the canvas
+renders and the screen reports no defect.
+
+Break a field key so the checks rail names it, then fix it on the screen.
+Pass: the entry leaves the rail with no reload.
+
+Read the screen on a tall window, then on one under 36rem of content height.
+Pass: the three columns fill the first, and hold the floor on the second with
+the page scrolling. Measure it rather than judging it.
+
+At 1440x1000 the grid reads 731px, with a 24px gap below and no page scroll.
+The middle column scrolls its own overflow. At 1440x640 it holds the 576px
+floor and the page scrolls. Item 1 archived a whole pass over this same
+height, and this screen needed `flex: 1 1 0` where the canvas layout takes
+`1 1 auto`.
 
 ### Studio canvas-first components under dark scheme
 

@@ -902,45 +902,74 @@
   margin-bottom: var(--space-3);
 }
 
-/* --- The shared editing modal and the step section index ----------------- */
+/* --- The panels screen and the step section index ------------------------ */
 
-/* Wider than .studio-dialog's 34rem reading measure: this one carries a rail
-   beside a full structural editor, which is a tool surface, not a reading
-   column. `display` is gated on `[open]`: an unqualified `display: flex`
-   here is an author-stylesheet rule, which unconditionally overrides the
-   UA stylesheet's `dialog:not([open]) { display: none; }` regardless of
-   selector specificity (author beats UA in the cascade at any specificity),
-   so `EditPanelsModal` rendered visible, full width, no backdrop, even
-   while closed and `showModal()` never called. `.studio-dialog`, the
-   base class every studio dialog carries, sets no `display` of its own,
-   which is why none of the others had this bug. */
-.studio-panels-modal[open] {
-  max-width: min(72rem, 92vw);
-  width: min(72rem, 92vw);
-  max-height: 88vh;
-  padding: 0;
+/* The panels screen. It replaced a native `<dialog>` that measured
+   `min(72rem, 92vw)` by `88vh`, so nothing here carries a viewport unit. The
+   screen takes the height `.shell` leaves, through `.studio-edit-screen`'s
+   flex chain. `PanelsScreen` renders a fragment, so the header and the layout
+   below are that chain's own children, as `.studio-canvas-layout` is. */
+
+/* One chrome row, not the modal's two: Back on the left, and the note saying
+   the screen keeps every change on the right. The 2px rule is the structural
+   one the design language reserves for a major section boundary. */
+.studio-panels-screen-header {
   display: flex;
-  flex-direction: column;
-}
-
-/* Two chrome bars and no more: what is open, and one Close. The 2px rule is
-   the structural one the design language reserves for a major section
-   boundary. */
-.studio-panels-modal-header {
-  padding: var(--space-3) var(--space-4);
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
   border-bottom: 2px solid var(--color-divider);
 }
 
-.studio-panels-modal-header h2 {
+.studio-panels-screen-note {
   margin: 0;
+  color: var(--color-text-muted);
 }
 
-.studio-panels-modal-body {
+/* Three columns, in the order the requirement states: index rail, open view,
+   checks rail. The rail widths match `.studio-canvas-layout`'s outer two, so
+   the two screens do not shift their side columns as an author moves between
+   them. The 36rem floor is that layout's own. */
+/* `flex: 1 1 0`, where `.studio-canvas-layout` beside it takes `1 1 auto`.
+   The difference is load-bearing here and the browser check found it. `.shell`
+   sets a 100vh FLOOR, not a ceiling, so a flex child sized `auto` starts at its
+   content height and nothing pushes back: all three columns hold a scrolling
+   list, and the tallest one took the grid to 961px in a 1000px window, scrolling
+   the page by 230px instead of a column. A zero basis makes the grid grow into
+   the space its siblings leave and no further, so each column scrolls its own
+   overflow. `.studio-canvas-layout` never needed it, because the canvas between
+   its side columns carries no intrinsic height to start from.
+   `overflow: hidden` keeps a column from painting outside the box it just
+   won. */
+.studio-panels-screen-layout {
   display: grid;
-  grid-template-columns: 16rem minmax(0, 1fr);
-  min-height: 0;
-  flex: 1;
+  flex: 1 1 0;
+  grid-template-columns: 16rem minmax(0, 1fr) 22rem;
+  gap: var(--space-3);
+  align-items: stretch;
+  min-height: 36rem;
   overflow: hidden;
+}
+
+/* A grid item defaults to `min-height: auto`. Each column scrolls its own
+   overflow, so none of them may impose a floor on the row. */
+.studio-panels-screen-layout > * {
+  min-height: 0;
+}
+
+.studio-panels-screen-view {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-width: 0;
+}
+
+/* In the chrome row beside Back, at the size the row's other two items take:
+   the open panel renders its own heading, and this names the screen. */
+.studio-panels-screen-heading {
+  flex: 1;
+  margin: 0;
+  font-size: 1rem;
 }
 
 .studio-panels-rail {
@@ -1012,26 +1041,6 @@
    `flattenRailFields` caps it there, so no third step exists. */
 .studio-panels-rail-field[data-depth="1"] {
   padding-left: var(--space-6);
-}
-
-.studio-panels-modal-view {
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: var(--space-3) var(--space-4);
-  min-width: 0;
-}
-
-.studio-panels-modal-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-top: 2px solid var(--color-divider);
-}
-
-.studio-panels-modal-footer .studio-dialog-note {
-  margin: 0;
 }
 
 /* The section index: the same register form as the rail, one scale down. */

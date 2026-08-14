@@ -2485,9 +2485,10 @@ Stage-by-stage status is in `ROADMAP.md`.
   is the accessible name. The keyboard behavior comes from the platform.
 
   The admin data list screen declares the columns and fills the attributes. It
-  warns before a save that drops one. The studio gains no builder: stage 36's
-  hold covers `panels/EditPanelsModal.tsx`, so an author writes a mapping as
-  JSON.
+  warns before a save that drops one, and names the published processes that
+  map it. The studio gained no builder while stage 36 held the field catalog
+  panel, so an author wrote a mapping as JSON. Stage 36 shipped, and item 12
+  in the queue is that builder.
 
   `DataSourceContext` gains an optional `heldValues: string[]`.
   `resolveFields` supplies the values the instance holds for the field under
@@ -3241,7 +3242,7 @@ lacked.
 `docs/browser-checks.md` holds the four checks that stay manual. One is
 `iframe` framing from a second origin. Another is the attachment
 download's Save-not-render behavior. A third is the form editor's pointer
-work. The fourth is the shared modal's four remaining points.
+work. The fourth is the panels screen's own walk.
 
 Each entry names the address rule, the frontend build step, and the
 change that first asked for it. The address rule is `127.0.0.1`, not
@@ -3495,3 +3496,37 @@ meets `scope=started` should infer no new permission tier from it.
   `tenantKeyOf` reads that claim before verification. That is safe: the claim
   sits inside the signed payload. `/auth/login` holds no token yet. It takes
   its tenant from the request host.
+
+- Process Studio, the panels screen (`packages/web/src/areas/studio/screens/
+  PanelsScreen.tsx`, `routing.ts`, `canvas/EditRail.tsx`, `studio-app`,
+  `studio-checks-rail`): stage 36. The field catalog, the data sources and the
+  contract sat behind one native `<dialog>`. It measured `min(72rem, 92vw)` by
+  `88vh`. They sit on a routed screen now, at
+  `/processes/:id/edit/panels/:view`.
+
+  The overlay hid the checks rail. An author inside it edited field keys and
+  data source keys. Those two produce most of what the rail reports. The rail
+  entry showed a count per view, and that number stood in for a list behind
+  the backdrop. The screen gives the rail its own column.
+
+  `panel` rides the `edit` route as an optional field, beside `formStepId`.
+  `matchRoute` tries the panels pattern before the plain edit pattern. An
+  unrecognized view falls through to the plain match. A typo therefore lands
+  on the canvas. `routePath` emits the form path when both fields arrive. One
+  route object never yields two paths.
+
+  All three views stay MOUNTED, and `hidden` shows one. Rendering the open view
+  alone would drop `ContractPanel`'s half-typed outcome name. It would also
+  refetch `DataSourcesPanel`'s list keys on every switch. The attribute keeps
+  the subtree and takes it out of the accessibility tree, with no CSS.
+
+  `panelEntityCounts` in `draft/panel-rail.ts` is the one source of the count
+  beside each view's name. The canvas edit rail and the screen's index rail
+  both read it. Each carried its own copy of the three expressions before, and
+  the two did not agree. The canvas rail counted `draftFields`, which keeps a
+  field carrying no id. The screen counted rail rows, which drop one.
+
+  The screen carries no Save, the rule the overlay already had. Every panel
+  writes into the in-browser draft, and the edit screen's toolbar persists it.
+  A note beside the back control states that, so leaving never reads as a
+  cancel.
