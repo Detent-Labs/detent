@@ -6,6 +6,7 @@ import {
   badNumberAttributes,
   droppedColumns,
   duplicateValues,
+  mappingProcesses,
   readLabel,
   toPayload,
   validateColumns,
@@ -132,6 +133,27 @@ describe("droppedColumns", () => {
   it("names what a save would remove, so the screen can warn first", () => {
     expect(droppedColumns([column("sku"), column("price")], [column("sku")])).toEqual(["price"]);
     expect(droppedColumns([column("sku")], [column("sku"), column("price")])).toEqual([]);
+  });
+});
+
+describe("mappingProcesses", () => {
+  const use = (processId: string, version: number, columns: string[]) => ({ processId, version, columns });
+
+  it("names a process that maps a dropped column", () => {
+    expect(mappingProcesses([use("proc_a", 1, ["price"]), use("proc_b", 1, ["sku"])], ["price"])).toEqual(["proc_a"]);
+  });
+
+  it("names a process mapping two dropped columns once", () => {
+    expect(mappingProcesses([use("proc_a", 1, ["price", "sku"])], ["price", "sku"])).toEqual(["proc_a"]);
+  });
+
+  it("names a process holding two versions once", () => {
+    expect(mappingProcesses([use("proc_a", 1, ["price"]), use("proc_a", 2, ["price"])], ["price"])).toEqual(["proc_a"]);
+  });
+
+  it("names nobody when no process maps the dropped column", () => {
+    expect(mappingProcesses([use("proc_a", 1, ["sku"])], ["price"])).toEqual([]);
+    expect(mappingProcesses([use("proc_a", 1, [])], ["price"])).toEqual([]);
   });
 });
 

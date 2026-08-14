@@ -178,6 +178,8 @@ export const en = {
     "A retired value stays in this table. Instances that already hold it keep seeing its label, and it is no longer offered to anyone else.",
   "dataList.usedByTitle": "Used by",
   "dataList.usedByEmpty": "No published version reads this list. It can be deleted.",
+  "dataList.usedByColumns": "maps",
+  "dataList.usedByNoColumns": "maps no column of this list",
   "dataList.delete": "Delete list",
   "dataList.deleteConfirm": "Deleting removes the list and every value in it. A list a published process references cannot be deleted. Continue?",
   "dataList.problemTooMany": "A list holds at most {max} values. This one has {n}.",
@@ -202,6 +204,8 @@ export const en = {
   "dataList.attributeAria": "{column} of value {n}",
   "dataList.dropColumnConfirm":
     "Saving removes {columns} from every value in this list. Those entries are gone once you save. Continue?",
+  "dataList.dropColumnMapped":
+    "These published processes map one of those columns and stop receiving it: {processes}.",
   "dataList.problemTooManyColumns": "A list declares at most {max} columns. This one has {n}.",
   "dataList.problemColumnKey": "'{key}' is not a valid column key. Use lowercase letters, digits and underscores, starting with a letter.",
   "dataList.problemColumnLabel": "Column '{key}' needs a heading.",
@@ -396,6 +400,8 @@ export const de: Record<keyof typeof en, string> = {
     "Ein stillgelegter Wert bleibt in dieser Tabelle. Instanzen, die ihn schon halten, sehen weiterhin seine Beschriftung, und niemand sonst bekommt ihn noch angeboten.",
   "dataList.usedByTitle": "Verwendet von",
   "dataList.usedByEmpty": "Keine veröffentlichte Version liest diese Liste. Sie lässt sich löschen.",
+  "dataList.usedByColumns": "übernimmt",
+  "dataList.usedByNoColumns": "übernimmt keine Spalte dieser Liste",
   "dataList.delete": "Liste löschen",
   "dataList.deleteConfirm":
     "Das Löschen entfernt die Liste und jeden Wert darin. Eine Liste, auf die ein veröffentlichter Prozess verweist, lässt sich nicht löschen. Fortfahren?",
@@ -421,6 +427,8 @@ export const de: Record<keyof typeof en, string> = {
   "dataList.attributeAria": "{column} von Wert {n}",
   "dataList.dropColumnConfirm":
     "Beim Speichern verschwindet {columns} aus jedem Wert dieser Liste. Diese Einträge sind danach weg. Fortfahren?",
+  "dataList.dropColumnMapped":
+    "Diese veröffentlichten Prozesse übernehmen eine dieser Spalten und bekommen sie nicht mehr: {processes}.",
   "dataList.problemTooManyColumns": "Eine Liste führt höchstens {max} Spalten. Diese hat {n}.",
   "dataList.problemColumnKey": "'{key}' ist kein gültiger Spaltenschlüssel. Erlaubt sind Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.",
   "dataList.problemColumnLabel": "Spalte '{key}' braucht eine Überschrift.",

@@ -2531,6 +2531,14 @@ Stage-by-stage status is in `ROADMAP.md`.
   its usage report, so the guard and the report cannot disagree. Both read
   every published body with no supporting index. Both are admin routes on no
   instance path.
+  Each entry of that report names the column keys its own process maps
+  (`mappedColumns`). They sort, because `columnMapping` sits inside the jsonb
+  body and Postgres normalizes a jsonb object's key order. A key the list no
+  longer declares reports too. `checkColumnMapping` never checks a key against
+  a declaration. So a mapping outliving its column is what an operator reads
+  the report to find. The guard pays one body read per referencing row and
+  discards it. That buys the single `EXISTS` clause deciding what a reference
+  is.
 
 - Process templates (`src/engine/templates.ts`,
   `packages/web/src/areas/studio/screens/TemplatesScreen.tsx`): a `templates`

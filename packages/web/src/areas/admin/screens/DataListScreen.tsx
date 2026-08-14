@@ -7,6 +7,7 @@ import {
   attributesToInputs,
   badNumberAttributes,
   droppedColumns,
+  mappingProcesses,
   readLabel,
   toPayload,
   validateColumns,
@@ -102,7 +103,16 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
     // The warning fires before the write, not after: dropping a column drops
     // its entry from every value, and no screen here undoes that.
     const dropping = droppedColumns(detail.columns, columns);
-    if (dropping.length > 0 && !window.confirm(tFill(locale, "dataList.dropColumnConfirm", { columns: dropping.join(", ") }))) return;
+    if (dropping.length > 0) {
+      // The processes come after the columns sentence, each key its own whole
+      // sentence: a translator never sees half of one.
+      const breaking = mappingProcesses(detail.usedBy, dropping);
+      const warning = [
+        tFill(locale, "dataList.dropColumnConfirm", { columns: dropping.join(", ") }),
+        ...(breaking.length === 0 ? [] : [tFill(locale, "dataList.dropColumnMapped", { processes: breaking.join(", ") })]),
+      ].join(" ");
+      if (!window.confirm(warning)) return;
+    }
     setSaving(true);
     setError(undefined);
     try {
@@ -385,7 +395,15 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
             <ul className="admin-timeline">
               {detail.usedBy.map((use) => (
                 <li key={`${use.processId}-${use.version}`}>
-                  {use.processId} <span className="admin-timeline-meta">v{use.version}</span>
+                  {use.processId} <span className="admin-timeline-meta">v{use.version}</span>{" "}
+                  {use.columns.length === 0 ? (
+                    <span className="admin-timeline-meta">{t(locale, "dataList.usedByNoColumns")}</span>
+                  ) : (
+                    <span className="admin-timeline-meta">
+                      {t(locale, "dataList.usedByColumns")}{" "}
+                      <code className="admin-timeline-key">{use.columns.join(", ")}</code>
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>

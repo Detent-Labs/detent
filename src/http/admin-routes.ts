@@ -26,7 +26,7 @@ import {
 } from "../auth/users.js";
 import { migrateInstances } from "../engine/migration.js";
 import { redactInstance } from "../engine/retention.js";
-import { localizedText, type ProcessId, type InstanceId, type LocalizedText } from "../schema/definition.js";
+import { collectFieldsDeep, localizedText, type FieldDef, type ProcessId, type InstanceId, type LocalizedText } from "../schema/definition.js";
 import { MAX_KEY_LENGTH } from "../schema/compile.js";
 import {
   DB_LIST_DATA_SOURCE_TYPE,
@@ -495,15 +495,60 @@ function parseValues(raw: unknown, columns: DataListColumn[]): DataListValueInpu
   });
 }
 
+interface ListUsage {
+  processId: string;
+  version: number;
+  /** The keys of `listKey`'s columns this body maps into catalog fields. */
+  columns: string[];
+}
+
+/**
+ * The column keys of `listKey` a stored body maps, sorted.
+ *
+ * Sorted because `columnMapping` lives inside the jsonb body, and Postgres
+ * normalizes a jsonb object's key order. `Object.keys` therefore reports the
+ * storage's order, not the author's — the defect stage 29 hit and answered by
+ * walking the declaration. No declaration reaches here: the delete guard
+ * shares this scan and holds none.
+ *
+ * A key the list no longer declares still reports. `checkColumnMapping` never
+ * checks a key against a declaration, so a mapping outliving its column is
+ * exactly what an operator reads this report to find.
+ *
+ * A body whose `fields` is no array reports nothing rather than throwing. The
+ * row still counts as a reference: the query's own EXISTS clause matched it.
+ */
+function mappedColumns(rawBody: unknown, listKey: string): string[] {
+  const body = parseJsonb(rawBody) as { fields?: unknown; dataSources?: unknown } | null | undefined;
+  if (!body || !Array.isArray(body.fields)) return [];
+  const declared = Array.isArray(body.dataSources)
+    ? (body.dataSources as { id?: string; type?: string; config?: { listKey?: string } }[])
+    : [];
+  const sourceIds = new Set(
+    declared.filter((d) => d?.type === DB_LIST_DATA_SOURCE_TYPE && d?.config?.listKey === listKey).map((d) => d?.id),
+  );
+  const keys = new Set<string>();
+  for (const f of collectFieldsDeep(body.fields as FieldDef[])) {
+    if (!f.dataSource || !sourceIds.has(f.dataSource)) continue;
+    for (const key of Object.keys(f.columnMapping ?? {})) keys.add(key);
+  }
+  return [...keys].sort();
+}
+
 /**
  * The published processes whose body declares a `"db.list"` data source naming
- * `listKey`. Serves both the usage report and the delete guard, so the two
- * cannot disagree. A full scan of `definitions` with no supporting index; both
- * callers are admin routes on no instance path (see the design's risk note).
+ * `listKey`, each with the column keys it maps. Serves both the usage report
+ * and the delete guard, so the two cannot disagree. A full scan of
+ * `definitions` with no supporting index; both callers are admin routes on no
+ * instance path (see the design's risk note).
+ *
+ * The guard never reads `columns`, and so pays one body read per referencing
+ * row for nothing. That buys the one EXISTS clause deciding what a reference
+ * is. A second function for the report alone would carry a second copy of it.
  */
-async function referencingProcesses(listKey: string, db: SQL): Promise<{ processId: string; version: number }[]> {
-  return (await db`
-    SELECT process_id AS "processId", version
+async function referencingProcesses(listKey: string, db: SQL): Promise<ListUsage[]> {
+  const rows = (await db`
+    SELECT process_id AS "processId", version, body
     FROM definitions
     WHERE status = 'published'
       AND EXISTS (
@@ -511,7 +556,8 @@ async function referencingProcesses(listKey: string, db: SQL): Promise<{ process
         WHERE ds->>'type' = ${DB_LIST_DATA_SOURCE_TYPE} AND ds->'config'->>'listKey' = ${listKey}
       )
     ORDER BY process_id, version
-  `) as { processId: string; version: number }[];
+  `) as { processId: string; version: number; body: unknown }[];
+  return rows.map((r) => ({ processId: r.processId, version: r.version, columns: mappedColumns(r.body, listKey) }));
 }
 
 interface StoredList {

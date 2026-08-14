@@ -186,6 +186,12 @@ export interface DataListValue {
 export interface DataListUsage {
   processId: string;
   version: number;
+  /**
+   * The list's column keys this version maps into catalog fields, sorted. A key
+   * the list no longer declares appears too: a mapping outliving its column is
+   * what an operator reads this report to find.
+   */
+  columns: string[];
 }
 
 export interface DataListDetail {

@@ -870,6 +870,20 @@ Spec: `development-toolchain`.
     which took the page to 1861px of horizontal scroll at the bound on a
     1100px window; `.admin-table-scroll` contains it, and the page is back to
     the 152px baseline every admin screen shows in German at that width.
+    The stage's first open question is answered, by `report-column-usage` on
+    2026-08-14. The detail route's usage report now names the column keys each
+    process maps, and the screen shows them beside the process. The removal
+    warning names the published processes that map a dropped column, which is
+    the moment the report changes a decision. Two properties decided the shape.
+    The keys sort, because `columnMapping` lives inside the jsonb body and
+    Postgres normalizes a jsonb object's key order — stage 29's own defect,
+    which it answered by walking the declaration. And a key the list no longer
+    declares reports: `checkColumnMapping` runs seven rules and none checks a
+    key against a declaration, so a mapping outliving its column is exactly
+    what the report exists to surface. `referencingProcesses` keeps both
+    callers, so the guard reads bodies it discards rather than a second copy of
+    the `EXISTS` clause deciding what a reference is. Specs:
+    `data-list-administration`, `admin-app` (both modified).
 
 30. **Canvas edge routing styles (step/smoothstep): DONE.** Raised
     2026-08-10 in conversation. The canvas draws every Path as a straight SVG

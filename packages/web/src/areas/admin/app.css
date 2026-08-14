@@ -341,6 +341,12 @@ input.admin-mono[type="number"] {
   font-family: var(--font-body);
 }
 
+/* A data list column key is a value the engine matches exactly, so it takes
+   the mono face — the meta span it sits in sets the body face for its prose. */
+.admin-timeline .admin-timeline-key {
+  font-family: var(--font-mono);
+}
+
 .admin-detail-header {
   border: 2px solid var(--color-divider);
   padding: var(--space-3);

@@ -4,6 +4,7 @@
  * an inline message before the operator loses their edits.
  */
 import type { UiLocale } from "../../../i18n/locale.js";
+import type { DataListUsage } from "../api/types.js";
 import { t, tFill } from "../catalog.js";
 
 /**
@@ -132,6 +133,21 @@ export function validateColumns(columns: readonly ColumnRow[], locale: UiLocale)
 export function droppedColumns(before: readonly ColumnRow[], after: readonly ColumnRow[]): string[] {
   const kept = new Set(after.map((c) => c.key));
   return before.map((c) => c.key).filter((key) => !kept.has(key));
+}
+
+/**
+ * The published processes a column removal breaks, distinct and in the usage
+ * report's own order. One process mapping two dropped columns appears once:
+ * the operator asks which processes break, not how many times each one does.
+ */
+export function mappingProcesses(usedBy: readonly DataListUsage[], dropped: readonly string[]): string[] {
+  const gone = new Set(dropped);
+  const out: string[] = [];
+  for (const use of usedBy) {
+    if (out.includes(use.processId)) continue;
+    if (use.columns.some((key) => gone.has(key))) out.push(use.processId);
+  }
+  return out;
 }
 
 /**

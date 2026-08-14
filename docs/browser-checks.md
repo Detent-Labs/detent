@@ -560,6 +560,33 @@ second case, pick the same row, and submit. Pass: the submission succeeds, the
 number field stays empty, and the instance record carries a
 `datasource.attribute-dropped` entry naming the column.
 
+### Which processes map a column (`report-column-usage`)
+
+This walk continues the one above. It needs the `products` list, and the
+published process that maps `sku` and `unit_price`.
+
+Open Operations, then Data lists, then `products`. Read the "Used by" section.
+Pass: the published process appears, and the line names `sku` and
+`unit_price`, alphabetically, in the mono face.
+
+Publish a second process that reads `products` and maps nothing. Reload the
+list. Pass: the second process appears and its line says in words that it maps
+no column. No blank space stands in for that sentence.
+
+Take the `unit_price` column out and press Save. Pass: the warning carries two
+sentences. The first names the column. The second names the process that maps
+it, once. Dismiss it, and nothing changes.
+
+Save the removal for real, then reload the list. Pass: the "Used by" line
+still names `unit_price`. The mapping outlived the column. That is what this
+section is for.
+
+Take `sku` out as well and press Save. Pass: the second sentence names that
+one process once, not twice.
+
+Switch the locale to German and repeat the removal. Pass: both sentences read
+in German, and the column keys stay untranslated in the mono face.
+
 ### Canvas grid snapping (`canvas-grid-snap`)
 
 Open Studio and a draft with several steps. This whole entry is a visual
