@@ -3562,3 +3562,41 @@ meets `scope=started` should infer no new permission tier from it.
   and the column one. It takes the shape `useRegistry` beside it already had.
   `listDataLists` replaced `listDataListKeys`, which discarded the columns the
   route already returned.
+
+- The shutdown suite's ports (`test/http-shutdown.test.ts`,
+  `src/http/server.ts`, `development-toolchain`): the file spawned the real
+  entrypoint on four hardcoded ports. A run that died abnormally left its child
+  holding the bind. The next run then failed with `Is port 48232 in use?`, not
+  with whatever orphaned the child.
+
+  It reddened CI run 31835376765 on 2026-08-14, and reproduced locally three
+  times running. One flake became two red runs. A Bun segfault in another suite
+  orphaned a child, and the next run then failed on the port.
+
+  Every server here now takes an OS-assigned port. `spawnServer` passes
+  `PORT=0` and reads the number the child logs. No constant names a port.
+  `startHttpServer` returns the port it bound, which it did not before. A
+  caller passing `PORT=0` had no other way to learn the assignment.
+
+  The startup log line replaced the `/livez` poll. `Bun.serve` has returned by
+  the time the child writes that line. A child that logged it is listening, so
+  the poll proved the same thing one round trip later.
+
+  `spawnServer` pumps the child's stdout from the spawn. Finding the port means
+  reading while the child lives, and a stream reads once. Its reader awaits the
+  pump's end, because each test asserts on a line the child writes as it exits.
+
+  Each test kills its child in a `finally`. A mutation run proved it. Three
+  tests failed, and no child stayed alive. That covers a failed assertion, not
+  a runner that dies abnormally, which runs no `finally`. The ephemeral port is
+  what makes the second case survivable.
+
+  `test/schema-bootstrap.test.ts` took the same treatment. It bound 48213 and
+  48214 through `startHttpServer`, and carried the same comment about a
+  distinct number not colliding. No test now names a port for a listener it
+  starts.
+
+  Finding that second file took a wider sweep than the first one. A search for
+  `Bun.serve` misses a test that binds through `startHttpServer`. The sweep
+  that finds both reads every file naming `process.env.PORT`, `startHttpServer`
+  or `Bun.serve`.

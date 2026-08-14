@@ -769,7 +769,7 @@ export async function startHttpServer(
       ALLOW_INSECURE_DEV_AUTH: process.env.ALLOW_INSECURE_DEV_AUTH,
     }),
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
-): Promise<{ stop: () => Promise<void> }> {
+): Promise<{ port: number; stop: () => Promise<void> }> {
   // SaaS mode, or not. Unset, everything below is exactly what it was: one
   // schema built here, no control-plane connection, and the process handle on
   // every request and every tick.
@@ -786,6 +786,12 @@ export async function startHttpServer(
   const engine = startEngine(db, registry, assignmentRegistry, tenancy?.tenants);
   log.info("HTTP server listening", { port: server.port, webRoot: webRoot ?? null });
   return {
+    // The port the OS assigned, which is the only way a caller passing PORT=0
+    // learns what it got. `port` above is the request; this is the answer.
+    //
+    // Bun types `server.port` optional because a unix-socket server has none.
+    // This one always takes a numeric `port`, so it always listens on TCP.
+    port: server.port!,
     // `server.stop()` with no argument is Bun's graceful form: it refuses new
     // connections at once and resolves once in-flight requests finish. The
     // pollers stop after that, so a request still being served can still

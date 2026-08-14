@@ -33,7 +33,7 @@ let stopServer: (() => Promise<void>) | undefined;
 
 afterEach(async () => {
   // Awaited: `stop` drains in-flight requests before it resolves, and the
-  // next test binds its own port straight after.
+  // next test asks the OS for a port straight after.
   await stopServer?.();
   stopServer = undefined;
   // However a test above finished, leave a full schema behind for every
@@ -48,14 +48,16 @@ test.skipIf(!DB)(
     // Every table initSchema creates today — a genuinely fresh database.
     await sql`DROP TABLE IF EXISTS outbox, instances, history_entries, instance_events, definitions, migration_plans, auth_users, drafts, data_list_values, data_lists CASCADE`;
 
-    const port = 48213;
     const prevPort = process.env.PORT;
-    process.env.PORT = String(port);
+    // The OS picks (`development-toolchain`: "A test that spawns a server takes
+    // an ephemeral port and reaps its child"). A fixed number here outlived a
+    // run that died and blocked the next one.
+    process.env.PORT = "0";
     try {
       const server = await startHttpServer(createRegistry(), createDataSourceRegistry(), sql, devHeaderResolver);
       stopServer = server.stop;
 
-      const res = await fetch(`http://127.0.0.1:${port}/processes`, { headers: { "X-Actor-Id": "schema-bootstrap-test" } });
+      const res = await fetch(`http://127.0.0.1:${server.port}/processes`, { headers: { "X-Actor-Id": "schema-bootstrap-test" } });
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual([]);
     } finally {
@@ -74,14 +76,13 @@ test.skipIf(!DB)(
     const processId = `proc_schema_bootstrap_${crypto.randomUUID()}` as ProcessId;
     const published = await publishBody(processId, minimalBody(), reg, dsReg, sql);
 
-    const port = 48214; // distinct from the other tests' port, so a lingering bind can't collide
     const prevPort = process.env.PORT;
-    process.env.PORT = String(port);
+    process.env.PORT = "0";
     try {
       const server = await startHttpServer(reg, dsReg, sql, devHeaderResolver);
       stopServer = server.stop;
 
-      const res = await fetch(`http://127.0.0.1:${port}/processes`, { headers: { "X-Actor-Id": "schema-bootstrap-test" } });
+      const res = await fetch(`http://127.0.0.1:${server.port}/processes`, { headers: { "X-Actor-Id": "schema-bootstrap-test" } });
       expect(res.status).toBe(200);
       const body = (await res.json()) as { processId: string; version: number; definitionHash: string; status: string }[];
       expect(body).toHaveLength(1);
