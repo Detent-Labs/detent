@@ -21,9 +21,13 @@ watch the result in the other three.
 | Area | Role you need | Who works here | What happens here |
 |---|---|---|---|
 | Tasks | none, a login is enough | participant | complete tasks, start a process |
-| Studio | `system:author` or `system:developer` | **author** | build, test and publish processes |
-| Operations | `system:admin` | operator | instances, outbox, timers, users, migrations |
+| Studio | `system:author`, `system:developer` or `system:templates` | **author** | build, test and publish processes |
+| Operations | `system:admin` or `system:datalists` | operator | instances, outbox, timers, users, migrations, data lists |
 | Reports | `system:reports` | process owner | cycle time, bottlenecks, SLA |
+
+Entry to an area is the weaker gate. Any one role in the cell opens the door.
+Each screen inside keeps its own check. The Templates screen wants
+`system:templates`, and the data list screens want `system:datalists`.
 
 After you log in, Detent sends you to the first role-gated area you may
 enter. An actor with no reserved role lands in Tasks.
@@ -36,7 +40,7 @@ becomes a number in Reports.
 
 ## Vocabulary
 
-Twelve terms, in an order that lets you read them top to bottom. No term needs
+Thirteen terms, in an order that lets you read them top to bottom. No term needs
 a term below it.
 
 ### Process
@@ -145,7 +149,11 @@ on the path out of that step therefore reads `data.price` as it reads any other
 field. Nothing about CEL changes: the value is an ordinary field value by the
 time a guard sees it.
 
-Six rules bound a mapping.
+Seven rules bound a mapping.
+
+A column key matches `/^[a-z_][a-z0-9_]*$/`, the same grammar a field key
+takes, and stays under the same length bound. Publishing rejects a key that
+does not.
 
 The field must name a `dataSource`, and its type must be `select`. A
 `multiselect` picks several rows, and one target field takes one value.
@@ -168,8 +176,14 @@ The engine drops an entry whose type does not match its target field, and the
 submission still succeeds. The instance record names the drop. That mismatch
 comes from operator data, and the participant can do nothing about it.
 
-The studio has no builder for a mapping yet. Write the mapping as JSON, in the
-studio's raw definition view.
+The Field catalog panel builds a mapping. Under the data source picker it
+shows one row per mapped column. The first control picks a column key the
+bound list declares. The second picks the catalog field it writes. The panel
+marks a row whose key the list no longer declares.
+
+The editor appears for a `select` field bound to a `db.list` source. For any
+other source type, write the mapping as JSON in the studio's raw definition
+view.
 
 ### Step
 
@@ -308,8 +322,9 @@ A timer that names a target path forces that transition when it fires. It
 ignores the guard on that path. A timer without a target path is a reminder.
 It runs its actions and the process stays where it is.
 
-The example puts two reminders on `review`, at `P7D` and `P14D`, and one on
-`book` at `P1D`.
+The example puts one reminder on `review`, at `P7D`. Beside it at `P14D` sits
+a forcing timer that takes the `escalate` path, and `book` carries one at `P1D`
+that takes `booking-failed`.
 
 A duration uses weeks, days, hours, minutes and seconds. Months and years are
 not allowed, because their length depends on the calendar.

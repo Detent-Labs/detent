@@ -83,7 +83,7 @@ per row. The keyboard-only reorder moves the focused field.
 
 This stays manual because pointer event ordering runs on a real event loop.
 `bun:test` cannot observe it. `@panzoom/panzoom`'s `panzoom-exclude` class
-is the precedent (`docs/current-state.md:1270`). Without it, Panzoom's
+is the precedent (`docs/current-state.md`). Without it, Panzoom's
 native down-handler wins the race against React's synthetic dispatch. It
 turns a node drag into a canvas pan.
 

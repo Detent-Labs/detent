@@ -50,6 +50,7 @@ Declared directly in a `package.json` (root or a `packages/*` workspace).
 
 | Package | Version | License |
 |---|---|---|
+| `@dagrejs/dagre` | 3.1.1 | MIT |
 | `@marcbachmann/cel-js` | 8.0.0 | MIT |
 | `@panzoom/panzoom` | 4.6.2 | MIT |
 | `@types/bun` | 1.3.14 | MIT |
@@ -77,7 +78,8 @@ license.
 
 ### MIT
 
-`@oxc-project/types` 0.143.0, `@rolldown/binding-android-arm64` 1.2.3,
+`@dagrejs/graphlib` 4.0.5, `@oxc-project/types` 0.143.0,
+`@rolldown/binding-android-arm64` 1.2.3,
 `@rolldown/binding-darwin-arm64` 1.2.3, `@rolldown/binding-darwin-x64` 1.2.3,
 `@rolldown/binding-freebsd-x64` 1.2.3,
 `@rolldown/binding-linux-arm-gnueabihf` 1.2.3,
@@ -133,5 +135,6 @@ installed on this platform), `js-tokens` 4.0.0, `loose-envify` 1.4.0, `nanoid`
   "Transitive dependencies" are build-time tooling. Bun installs them, but
   the build does not bundle them into the shipped application code.
 - Runtime/bundled libraries are `@marcbachmann/cel-js`, `jose`, `zod`,
-  `react`, `react-dom`, `immer`, `@panzoom/panzoom`, `lucide-react` (plus
-  their small runtime helpers `scheduler`, `loose-envify`, `js-tokens`).
+  `react`, `react-dom`, `immer`, `@panzoom/panzoom`, `lucide-react`,
+  `@dagrejs/dagre` (plus their small runtime helpers `@dagrejs/graphlib`,
+  `scheduler`, `loose-envify`, `js-tokens`).

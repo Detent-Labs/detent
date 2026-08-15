@@ -1,6 +1,6 @@
 # GitHub-hosted CI. Free for a public repository. Reverses the "no hosted
 # service" decision commit 4ff4382 recorded; see
-# openspec/changes/add-ci-workflow/proposal.md - Why for why, and
+# openspec/changes/archive/2026-08-09-add-ci-workflow/proposal.md - Why for why, and
 # README.md / ROADMAP.md / docs/current-state.md for the rewritten record.
 #
 # pull_request is safe here specifically because the runner is

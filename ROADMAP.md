@@ -33,16 +33,15 @@ preconditions is missing, instead of the push failing on a symptom.
 
 Change: `add-ci-and-dependency-hygiene`, `specify-the-real-push-gate`,
 `add-devcontainer-preflight`, `add-ci-workflow`.
-Spec: `development-toolchain`.
+Specs: `development-toolchain`, `devcontainer-preflight`.
 
 ## Open stages
 
 31. **Custom and floating canvas edges: ANCHORS DONE, EDGE AFFORDANCES NOT
     STARTED.** Raised 2026-08-10 in
-    conversation, alongside stage 30. Today's anchors are fixed: every Path
-    leaves a step's right-middle and enters the target's left-middle
-    (`sourceAnchor`/`targetAnchor` in `canvas/CanvasView.tsx`), even when the
-    target sits above, below, or left of the source. React Flow's
+    conversation, alongside stage 30. The anchors were fixed then: every Path
+    left a step's right-middle and entered the target's left-middle, even when
+    the target sat above, below, or left of the source. React Flow's
     "floating edges" example computes the anchor from the angle between the
     two node centers instead, so each node's border point actually faces the
     other node. React Flow's "custom edges" example renders arbitrary content
@@ -86,10 +85,11 @@ Spec: `development-toolchain`.
 
 40. **Permission model rework: SEAM DONE, STORAGE NOT BUILT.** Raised
     2026-08-15 in conversation. A design pass ran the same day and took the
-    decisions below. Nobody is blocked by the current model, so the storage
-    half records a direction rather than queued work.
-    `tmp/open-work-priority.md` carries it as a deferral and names the trigger
-    that moves it.
+    decisions below. Nobody is blocked by the current model. The storage half
+    is now proposed as the OpenSpec change `process-scoped-permission-grants`,
+    which stores one row per grant in a `permission_grants` table, and no task
+    of it is applied. `tmp/open-work-priority.md` carries it as a deferral and
+    names the trigger that moves it.
 
     The seam shipped 2026-08-15 as `process-scoped-permission-seam`, ahead of
     that trigger, because it was the one piece carrying no storage question.
@@ -206,6 +206,76 @@ Spec: `development-toolchain`.
     change to the shape reaches all three plus their i18n catalogs.
 
     Specs: `authorization`, `admin-user-management`, `instance-query`.
+
+42. **Field catalog and data sources as list and detail: NOT STARTED.** Raised
+    2026-08-15 in conversation. A design pass ran the same day and took the
+    decisions below. Two problems drive the stage. Neither one concerns what
+    the two panels hold.
+
+    `panels/FieldCatalogPanel.tsx` renders every field expanded, always. One
+    field carries a key, a label, a description, a type, an options fieldset
+    with its data source and column mapping, a validation editor and an issue
+    list. A group field repeats all of that for each child.
+    `examples/purchase-requisition.json` declares 22 fields, so the view stacks
+    22 of those blocks under one scrollbar. `panels/DataSourcesPanel.tsx`
+    stacks its own rows the same way.
+
+    Neither panel carries CSS. `.field-catalog-panel`, `.field-row`,
+    `.option-row` and `.data-source-row` appear in no stylesheet. Neither
+    `app.css` nor `shell.css` declares a bare `label`, `input` or `fieldset`
+    rule. One rule of that kind exists, `.steps-panel label` in `app.css`,
+    and it sets label above control at `--space-1`. The design language's field
+    rule already ships in the area. These two panels never got it.
+
+    **The panels rail becomes the master.** `screens/PanelsScreen.tsx` already
+    lists every field key under the Fields entry, indents a group's children
+    and carries an Add entry. Choosing an entry scrolls that field into view
+    today. It selects the field instead, and the view renders that one field's
+    editor. The scroll shrinks from 22 fields to one. The screen keeps its
+    three columns.
+
+    **Selection is component state and resets on a reload.** Mount selects the
+    first field. Add selects the new field, so an author types into it at once.
+    Remove selects the neighbour. A switch to another view and back keeps the
+    selection. The editor dock takes the same position, for the same reason. No
+    area holds a per-author preference store, and a lost selection lands an
+    author on the view they already had open. A field takes no address of its
+    own either. `/edit/panels/fields/<fieldId>` would carry an opaque id that
+    one draft alone resolves, and the rail reaches any field in one click.
+
+    **A group keeps its recursive editor.** Choosing a child selects the parent
+    group and scrolls to the child inside it. `field-row-<id>` in
+    `FieldCatalogPanel.tsx` and `scrollToField` in `PanelsScreen.tsx` both
+    survive. They then cover one group rather than the whole catalog.
+
+    **Each rail entry marks its own issues.** The checks rail expands and
+    collapses, and nothing in it navigates to an entity. One field at a time
+    would hide a broken field behind the entry an author has open. The rail
+    counts issues per view already, through `issueCountForEntityType`. A
+    per-id sibling gives each field entry the same mark. That part is not
+    optional. Without it the stage trades a scroll for a hunt.
+
+    **Two of the four views take the pattern.** Fields and data sources both
+    stack rows, so both become list and detail. Contract holds one editor, and
+    the spec grants it no sublist already. The field matrix is a table. One
+    further fix falls out of the pair. A sublist renders only under the open
+    view, since two sublists at once fill the 16rem column.
+
+    The CSS half copies what the area states already. A `key` and a `type`
+    print in mono, because the engine matches both exactly. A hairline divides
+    rail rows and a 2px rule sits under the heading. A label sits above its
+    control at 4px. The border is the field. No corner takes a radius.
+
+    Three things stay out. The rail gets no filter, since 22 fields do not earn
+    one and 100 do. The screen gets no overview table, since the field matrix
+    maps a field against a step already. Neither panel gains a duplicate or a
+    reorder control, since neither problem drove the stage.
+
+    The stage lands after the editor dock. Both of them change `app.css` and
+    `src/i18n/catalogs/studio.ts`, and both append to those two files.
+
+    Spec: `studio-app`. The rail's scroll-into-view requirement becomes a
+    selection, and the per-field issue mark joins it.
 
 ## Done
 

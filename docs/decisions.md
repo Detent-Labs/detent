@@ -41,12 +41,21 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   an issuer's claim through verbatim, and `auth_users.roles` is a `TEXT[]` the
   admin area edits. None of the three moves.
 
-  Nobody is blocked by the current model, so nothing is queued.
-  `tmp/open-work-priority.md` carries the trigger. The one piece worth landing
-  ahead of a need is the seam: `can(actor, permission, processId)` at the call
-  sites that hold a process, with today's global-role check as its whole body.
-  Behind that function, the storage question stops being one a later change can
-  get wrong.
+  Nobody is blocked by the current model. `tmp/open-work-priority.md` carries
+  the trigger.
+
+  The seam shipped 2026-08-15 as `process-scoped-permission-seam`.
+  `can(actor, permission, processId)` and `requirePermission` sit in
+  `src/auth/authorize.ts` over three permissions, and a private
+  `PERMISSION_ROLE` map answers each one with the global role that gates it
+  today, so `processId` reaches no branch. Six call sites ask through them.
+  Behind that function, the storage question stopped being one a later change
+  can get wrong.
+
+  What stays unbuilt is the storage half: where a scoped grant lives and how it
+  is written. It is drafted as the OpenSpec change
+  `process-scoped-permission-grants`, which proposes a `permission_grants`
+  table holding one row per grant. No task of it is applied.
 - **CEL-readable data-source results.** Runtime option-list resolution for
   `field.dataSource` is DONE (see `docs/current-state.md`) — but `src/cel/check.ts`
   still registers a data source at no site (guards/output/transforms), so a CEL
@@ -159,6 +168,32 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   `panels/PathsPanel.tsx`, which is the per-step inspector panel. A real
   browser check covers the collapse, the tab switch, and the canvas floor.
 
-  Shipped 2026-08-15 as `studio-editor-dock`. The strip lives in
-  `dock/EditorDock.tsx` over the pure `dock/pathRows.ts`, and the glossary
-  carries the noun.
+  Built 2026-08-15 under the OpenSpec change `studio-editor-dock`, which is
+  neither applied nor archived yet. The strip lives in `dock/EditorDock.tsx`
+  over the pure `dock/pathRows.ts`, and the glossary carries the noun. This
+  entry leaves the section when that change archives; the decisions that
+  outlive it are the Player rejection, the two deferred tabs and the
+  no-persistence rule.
+- **List and detail for the panel views.** `panels/FieldCatalogPanel.tsx`
+  renders every field expanded at once, and `panels/DataSourcesPanel.tsx`
+  stacks its rows the same way. Neither carries any CSS: `.field-row`,
+  `.option-row` and `.data-source-row` appear in no stylesheet, and the area's
+  one label rule is `.steps-panel label` (in `app.css`). A design pass on
+  2026-08-15 settled the shape; `ROADMAP.md` stage 42 carries it in full.
+  Three decisions outlive that stage.
+
+  The panels rail is the master, not a second list beside one. It lists every
+  field key already, so a register inside the view would put the same list on
+  screen twice. Choosing an entry selects instead of scrolling, and the view
+  renders one entity's editor. That shape is what a later panel view adopts,
+  and it is why neither view gains a table of its own.
+
+  A selection is component state and takes no address. This matches the editor
+  dock above for the same reason: no area holds a per-author preference store,
+  and an opaque `field_` id resolves inside one draft only. A linkable field is
+  a separate ask, and it needs a reason the rail cannot already serve.
+
+  A rail entry carries its own issue mark. The checks rail navigates to
+  nothing, so one entity at a time would otherwise hide a broken field behind
+  whichever entry an author has open. Any view that adopts this shape owes the
+  same mark, or it trades a scroll for a hunt.

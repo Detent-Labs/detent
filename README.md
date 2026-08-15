@@ -61,7 +61,7 @@ carries the four areas above.
 | `src/runtime/api.ts` | Runtime API Layer: instance creation, view resolution, submit-and-transition, claim/release, cancel, and the read/query surface (`listInstances` / `getInstanceRecord`) — the boundary a UI calls without touching engine internals. Every function takes an explicit `Actor`. |
 | `src/http/` | Thin REST/JSON wrapper over `Bun.serve` around the Runtime API Layer. One route file per surface: admin, studio, reporting, account and UI strings. Health, readiness and metrics endpoints sit beside them, and `static.ts` serves the frontend from `WEB_ROOT`. Typed-error-to-HTTP-status mapping, configurable CORS. |
 | `src/auth/` | `ActorResolver` seam with two implementations (a non-production dev-header resolver and a production-capable JWT resolver accepting local `auth_users` accounts and JWKS-backed external issuers), login + rate limiting, a user-admin CLI, and the eight reserved roles (`system:publish`, `system:cancel-any`, `system:admin`, `system:developer`, `system:author`, `system:reports`, `system:datalists`, `system:templates`). The server checks each role directly. None implies another. An operator creates an account and resets a password over HTTP. The CLI stays the recovery path when no account holds `system:admin`. |
-| `src/handlers/` | Two action handlers ship. `http.request` is a vendor-neutral REST call with engine-set idempotency and outbox-aligned retry semantics. `notification.email` speaks SMTP directly and reads its connection details from the environment. |
+| `src/handlers/` | Three action handlers ship. `http.request` is a vendor-neutral REST call with engine-set idempotency and outbox-aligned retry semantics. `notification.email` speaks SMTP directly and reads its connection details from the environment. `process.start` starts an independent instance of another process and returns nothing to its caller. |
 | `packages/web/` | The one browser package. `src/shell/` holds prefix routing, the one session and login, the account menu and the area switcher; `src/api/` and `src/i18n/` hold what every area shares; `src/areas/{app,admin,studio,reporting}/` hold the four audiences' screens, one URL prefix and one lazy chunk each. The admin and studio areas gate each screen separately through a `ROUTE_ROLE` map. An area never imports from another area. |
 | `packages/form-ui/` | Source-only shared step-form renderer, so what an author previews is what a participant gets. |
 | `examples/expense-approval.json` | Complete Capture → Review → Book example. Runs end-to-end in the devcontainer against its `webhook-sink` service. |
@@ -137,10 +137,10 @@ statement is `CREATE ... IF NOT EXISTS`, so this is a no-op against a
 database that already has the schema. Set `DATABASE_URL` before starting the
 process; without it, the process fails immediately and names the variable.
 
-On a deployment with meaningful existing data volume, create the two indexes
+On a deployment with meaningful existing data volume, create the indexes
 `initSchema` adds ahead of the deploy, using `CREATE INDEX CONCURRENTLY`.
 Match the definitions in `src/engine/store.ts::initSchema` exactly. That way
-the startup call finds both indexes already there and skips them —
+the startup call finds them already there and skips them —
 `CREATE INDEX` inside `initSchema` blocks startup on a large table.
 
 ### Authentication configuration

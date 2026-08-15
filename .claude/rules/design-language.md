@@ -127,8 +127,10 @@ An area never styles another area's prefix. Shared motifs move to `shell/`,
 or engineers duplicate them on purpose. No component reads a primitive.
 Components read roles only.
 
-**Labels and locales.** Every string a person reads comes from a catalog
-through `t(locale, key)`. EN and DE ship today. German text can be up to 40%
+**Labels and locales.** Every string a person reads comes from a catalog.
+EN and DE ship in the shell, app, admin and reporting catalogs, each reached
+through `t(locale, key)`. The studio catalog carries English only, and its
+`t(key)` takes no locale. German text can be up to 40%
 longer than English, and that constrains layout more than it constrains
 copy.
 

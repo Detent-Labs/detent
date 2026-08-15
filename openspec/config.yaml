@@ -52,8 +52,10 @@ context: |
   imports from another area — only upward into `shell/`, `api/`, `i18n/`.
   The studio area is Process Studio, the developer's product: server-persisted
   drafts (the `drafts` table, optimistic concurrency on a `revision` column),
-  a canvas-primary edit screen (drag-to-move, drag-to-connect) with the
-  structural panels as inspector and a replacing JSON surface, publish,
+  a canvas-primary edit screen (drag-to-move, drag-to-connect) with a
+  selection-driven inspector beside a routed panels screen holding the four
+  process-wide views (field catalog, data sources, contract, field matrix),
+  a routed form editor, a replacing JSON surface, publish,
   published versions with a JSON diff, migration-plan authoring, a
   registry/CEL-scratchpad Tools screen, a Player beside the merged
   instance record, and a Templates screen holding the reusable bodies a new
@@ -62,7 +64,8 @@ context: |
   alone and the Templates screen behind `system:templates`. The admin area is the
   operator's product — all-instances list, merged transition/event record
   with cancel, outbox with dead-letter retry/discard, pending timers, user
-  administration, data list maintenance; gated by `system:admin` or, for the
+  administration, data list maintenance, the UI-strings override screen;
+  gated by `system:admin` or, for the
   data list screens alone, `system:datalists`. The app area is participant-facing
   (My-tasks inbox / Task / Start-a-process over `scope=mine`-derived inbox
   filtering and JWT auth). The reporting area is the process owner's — cycle
@@ -79,8 +82,9 @@ context: |
   `getInstanceView`, `submitAndTransition`, `claimStep`/`releaseClaim`,
   `listInstances`/`getInstanceRecord` — validating and writing
   user-submitted data (nothing else in the engine does). `src/http/` wraps
-  it as `http-wrapper`, alongside `src/http/admin-routes.ts` and
-  `src/http/studio-routes.ts`; JWT/local-account auth (`jwt-authentication`,
+  it as `http-wrapper`, with one route module per surface beside
+  `routes.ts` — admin, studio, reporting, account and UI strings;
+  JWT/local-account auth (`jwt-authentication`,
   `local-user-accounts`) and role-gated operations (`authorization`:
   `system:publish`, `system:cancel-any`, `system:admin`, `system:developer`,
   `system:author`, `system:reports`, `system:datalists`, `system:templates` —

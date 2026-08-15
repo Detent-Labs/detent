@@ -1,8 +1,13 @@
 # Backup and Restore
 
-One Postgres database backs an entire environment (see CLAUDE.md's
-environment-separation convention). A whole-database dump is the backup unit
-for this schema, not a per-table one.
+One Postgres database backs an entire environment. A whole-database dump is
+the backup unit for this schema, not a per-table one.
+
+A SaaS deployment holds more than one. With `TENANT_CONTROL_PLANE_URL` set,
+each tenant gets a database of its own. The control plane holds nothing but
+the list of them. A dump of `DATABASE_URL` therefore covers the control plane
+alone. Dump every tenant database beside it, and restore each one with its
+own `pg_restore`.
 
 `docs/runbooks/deployment.md` covers what a deployment configures, including
 the `DATABASE_URL` this runbook reads.

@@ -749,6 +749,33 @@ Stage-by-stage status is in `ROADMAP.md`.
   port publishing belongs in the gitignored `docker-compose.override.yml`; the
   end-to-end test reads messages back over Mailpit's HTTP API inside the
   compose network, so it never depends on a host binding.
+- Process chaining (`src/handlers/process-start.ts`, `process-chaining`,
+  roadmap #39): a third built-in handler, `process.start`, registered by
+  `createDefaultRegistry` beside `httpHandlerDef` and
+  `notificationEmailHandlerDef`. Its config carries a `processId` and an
+  `inputMapping`. It starts an independent instance of that process, seeded
+  from the acting instance's data.
+
+  A chain is fire-and-forget, not call-and-return. Unlike a `subprocess` step,
+  the started instance records no `parent` link and no return path. The acting
+  instance never parks to wait for it. It records `chainedFrom` instead, a
+  reporting-only backlink nothing else reads. That is why the type carries no
+  `core.` prefix. It is an ordinary author-visible action, allowed at every
+  position an authored body offers.
+
+  The started id is `inst_${ctx.idempotencyKey}`. One instance therefore
+  starts, and a redelivery finds it there. The target resolves to the newest
+  published version at start time.
+
+  `inputMapping` is total per entry, the same rule a subprocess mapping takes.
+  A raising entry leaves its target unwritten. It records
+  `mapping.entry-dropped` on the ACTING instance, since that is whose context
+  the mapping evaluated. After creation the engine drives the started instance
+  to rest. A failed start dead-letters through the ordinary outbox path.
+
+  `src/engine/definitions.ts` checks it at publish, over every action position
+  `collect` visits. The referenced process must carry a published version, and
+  every `inputMapping` key must name a field that process declares.
 - Reconcile in-flight action writebacks across a migration (`src/engine/migration.ts`,
   `src/engine/outbox.ts`): closes what was previously a "Decided, not yet built" gap.
   `migrateOne`'s in-flight-actions check now blocks only a `claimed` outbox row with
@@ -868,7 +895,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   same `ActorResolver` seam every other route uses, which in the shipped
   configuration is `devHeaderResolver` — under it, any caller may publish a
   process definition or cancel any instance. This is recorded as an explicit,
-  known gap (see `openspec/changes/add-read-query-api`), not silently
+  known gap (see `openspec/changes/archive/2026-07-25-add-read-query-api`), not silently
   accepted; a real identity provider is a separate change.
 - Authentication (`src/auth/{jwt,users,login,cli}.ts`, `add-authentication`):
   closes the gap the previous entry recorded. `jwtResolver` (`src/auth/jwt.ts`)
@@ -980,6 +1007,19 @@ Stage-by-stage status is in `ROADMAP.md`.
   `cli.ts set-roles <email> system:publish,system:cancel-any` covers it.
   **BREAKING**: any account that published or cancelled instances before this
   change needs the relevant role granted, or it now gets `403`.
+
+  A process-scoped seam sits on top of that check since
+  `process-scoped-permission-seam` (roadmap #40). `src/auth/authorize.ts`
+  exports `can(actor, permission, processId)` and `requirePermission`. Three
+  permissions reach them: `"publish"`, `"cancel"` and `"migrate"`. A private
+  `PERMISSION_ROLE` map answers each one with the global role that gates it
+  today. The `migrate` entry names `DEVELOPER_ROLE`, a role the paragraph
+  above does not. The body voids `processId`, so nobody gained or lost access.
+
+  Six call sites ask through it: the publish route, the four studio migration
+  routes, and `cancelInstance`. What the seam buys is the storage question.
+  A later change to where a grant lives moves one file, not six sites.
+  `docs/decisions.md` carries the half that stays unbuilt.
 - Login rate limiting (`src/auth/login.ts`, `add-login-rate-limit`): closes
   the gap the `add-authentication` entry recorded. `handleLogin` tracks
   attempts per normalized email (`trim().toLowerCase()`) in an in-memory
@@ -1469,6 +1509,71 @@ Stage-by-stage status is in `ROADMAP.md`.
   candidate and the user declined it: a 813 KB beta WASM module against a
   712 KB bundle, buying obstacle avoidance alone. Stage 33's control points are
   the intended answer to a crossing edge.
+- Subprocess step shape (`packages/web/src/areas/studio/canvas/CanvasView.tsx`,
+  `canvas-subprocess-step-shape`, roadmap #32): a subprocess step's node draws
+  a second rule inside its rectangle, inset from the outer one. A task step
+  keeps the single rectangle. The inset rule takes radius 0 and the border
+  colour role the node already reads, so no new colour role appears. The
+  marker follows the step's `type` field, and it appears and disappears as the
+  author switches the identity section's type control. No schema change: the
+  type it reads is already in the draft. The stage's three other asks shipped
+  earlier — the initial stamp, the terminal outcome stamp, and the solid
+  automatic path against the manual path's dashed stroke.
+- Canvas floating anchors (`packages/web/src/areas/studio/canvas/geometry.ts`,
+  `canvas/CanvasView.tsx`, `canvas-floating-anchors`, roadmap #31): a path's
+  two anchors follow the two node centres instead of always leaving right and
+  entering left. `anchorsForEdge` reads `|dx| >= |dy|` between the two
+  positions, so both anchors take one comparison, always sit on opposing
+  sides, and every segment stays on one axis. A tie takes the horizontal, and
+  a zero offset takes the right side, which two steps stacked on one position
+  reach.
+
+  The vertical and backward cases run through a transform rather than a second
+  copy of the routing arithmetic. `routeEdge` takes a leaving direction, maps
+  both anchors into the canonical "leaves rightward" space, runs unchanged,
+  and maps every returned point back. The four transforms are identity,
+  negate x, swap, and swap-then-negate-both, and each composes with itself to
+  the identity, which is what lets one table serve both ways.
+
+  A backward path is short rather than a detour now. A target to the left that
+  does not overlap its source is ahead along the leaving axis, so it takes one
+  segment or three. The five-segment route survives only for nodes that
+  overlap along that axis. The connect handle stays at the right-middle and
+  the drag preview stays a straight line from it: a control that moved under
+  the pointer is harder to press, and a drag in flight has no target to face.
+- Canvas edge waypoints (`packages/web/src/areas/studio/canvas/`,
+  `canvas-edge-waypoints`, roadmap #33): a path may carry a list of
+  waypoints, and its route runs from the source anchor through each one in
+  turn to the target anchor. The canvas-wide style still governs every
+  segment, so a bent edge is still a `step` edge and the toolbar control
+  re-routes it between the same waypoints.
+
+  A selected path draws a handle at each waypoint and one at the route's
+  midpoint. Dragging the midpoint handle adds a waypoint, dragging a waypoint
+  handle moves it, and each lands on the canvas lattice. A double-click on a
+  handle deletes that waypoint, and an edge whose last waypoint goes is back
+  to the direct route — that is the whole of reset. The list persists at
+  `layout.waypoints[pathId]`, inside the same opaque `layout` blob that
+  already round-trips node positions and `layout.canvasEdgeStyle`. The anchor
+  rule generalizes with it: it read the side facing the other node, and it now
+  reads the side facing the next point on the route.
+- Canvas step groups (`packages/web/src/areas/studio/canvas/groups.ts`,
+  `canvas/CanvasView.tsx`, `canvas-step-groups`, roadmap #34): an author
+  groups the selected steps, the second delivery on the selection set
+  `canvas-multi-select` shipped. A group takes a name and draws as a labelled
+  box around its members. Dragging the box moves every member, each landing on
+  the lattice. A group collapses to one box the size of a step node: its
+  members stop drawing, and so does any path between two of them. A path from
+  outside a collapsed group to a member draws to the box instead, so it still
+  reads as an entry into the group. Expanding restores every member at the
+  position it held, and ungrouping drops the group and leaves them where they
+  are. `groups.ts` exports `StepGroup`, `Box`, `GROUP_MARGIN`, `groupBox`,
+  `drawnBox`, `hiddenStepIds`, `anchorBoxFor`, `groupOf`, `canGroup` and
+  `groupMatching`.
+
+  A group is an organizational device on the canvas, not a runtime concept. It
+  never reaches `ProcessBody`, and no v1 boundary moves. The list persists at
+  `layout.groups`, the third reserved key in the same opaque blob.
 - Automatic canvas layout (`packages/web/src/areas/studio/canvas/arrange.ts`,
   `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`,
   `i18n/catalogs/studio.ts`, `studio-canvas`): the canvas toolbar's third
@@ -1600,10 +1705,9 @@ Stage-by-stage status is in `ROADMAP.md`.
 
   On a subprocess step whose child resolved, the picker adds `child.outcome`
   (the contract's `outcomes`) and `child.data.<key>` over `contract.outputFields`
-  **alone**, matching what `contractFieldSchema` types at `check.ts:316`. Both
+  **alone**, matching what `check.ts::contractFieldSchema` types. Both
   condition sites get them, since `validateProcessBody` pushes guards and view
-  overrides with the same `child = s.type === "subprocess"` flag
-  (`check.ts:198`, `:222-224`).
+  overrides with the same `child = s.type === "subprocess"` flag.
 
   Browser testing found two state rules the plan missed. First, builder state
   re-seeds when the **operand signature** changes, not only when `src` does
@@ -1628,7 +1732,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   `pattern` and `rule`. Previously only reachable through the JSON view.
 
   `offeredKeys` is a literal table over the field's declared type. It mirrors
-  `checkConstraints` (`src/runtime/api.ts:503`). That function branches on the
+  `checkConstraints` (`src/runtime/api.ts::checkConstraints`). That function branches on the
   submitted value's JavaScript runtime type, not the declared one.
 
   `file` and a plugin (custom) type offer every key. `typeMatches`
@@ -2106,8 +2210,8 @@ Stage-by-stage status is in `ROADMAP.md`.
   devcontainer's one Postgres database with `bun run serve`, `bun run seed`
   and any browser session. That sharing was not benign.
 
-  `src/http/server.ts:526` starts four background pollers through
-  `startEngine` (`src/engine/host.ts:87`). One of them claims outbox rows
+  `src/http/server.ts` starts four background pollers through
+  `src/engine/host.ts::startEngine`. One of them claims outbox rows
   every 500 ms. Another resolves parked instances, a third fires timers. A dev
   server left running therefore drove the same tables a test run drove. It
   took rows the suite was about to claim.
@@ -2115,8 +2219,9 @@ Stage-by-stage status is in `ROADMAP.md`.
   Measured on one unchanged tree, twenty runs each: three red runs with a dev
   server up, zero with none. The runs yielded four captured assertions. Three
   of them read a state that had not advanced (`"running"` where the test expected
-  `"cancelled"` or `"completed"`, `1` where it expected `2`). The fourth,
-  `test/outbox.test.ts:745`, asserts over fully awaited `UPDATE` statements on
+  `"cancelled"` or `"completed"`, `1` where it expected `2`). The fourth is
+  the stale-writeback test in `test/outbox.test.ts`, which covers an instance
+  migrated after enqueue. It asserts over fully awaited `UPDATE` statements on
   instance-scoped rows after a `TRUNCATE`. Nothing inside that test can race
   it, which is what settled the diagnosis.
 
@@ -2165,7 +2270,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   `"retention"`.
 
   The per-item boundary is the one that needed the work. Every drain holds one
-  inside its loop: `outbox.ts:338`, `resolution.ts:107`, `timers.ts:84`,
+  inside its loop: `outbox.ts:350`, `resolution.ts:107`, `timers.ts:84`,
   `retention.ts:72`. It catches inside the loop, so the drain returns normally
   and the tick never throws. The tick line does not cover this case at all.
 
@@ -2870,7 +2975,7 @@ Stage-by-stage status is in `ROADMAP.md`.
 
   The admin area's `/users` screen edits the roles cell in place: a text
   input holding the comma-separated current roles, with save and cancel,
-  Enter and Escape, and the six reserved `system:*` roles as chips that
+  Enter and Escape, and the eight reserved `system:*` roles as chips that
   append to the input. The screen keeps the pending text across the
   window-focus refetch `useRefresh` fires unasked. A picker over known
   roles was rejected for now, since nothing knows which business roles
@@ -3006,7 +3111,7 @@ in segment count or in a literal segment.
 
 The preflight reads that same table. An `OPTIONS` request matches by path
 alone. The answer lists every method the table holds for the matched pattern,
-in table order. Three patterns list `GET` before `POST`, so the join
+in table order. Five patterns list `GET` before `POST`, so the join
 reproduces the `"GET, POST"` the tests pin.
 
 Three routes stay outside the table. `GET /livez`, `GET /readyz` and
@@ -3020,7 +3125,7 @@ branch. `OPTIONS /reporting/processes` therefore fell through to the 404.
 The spec required a `204`. Deriving the answer closed that gap without a line
 naming reporting.
 
-49 entries, one per route. The typecheck is the completeness check.
+One entry per route. The typecheck is the completeness check.
 `noUnusedLocals` reports any handler import no entry names.
 
 ## Shared server helpers (`dedup-server-helpers`)
@@ -3028,12 +3133,14 @@ naming reporting.
 Ponytail audit findings 2, 5, 6, 14 and 15, landed together. All five were
 duplication or dead code on the server side. None changed behavior.
 
-Four modules answer HTTP routes. The three written after `routes.ts` copied
-its plumbing. Each of `resolveActor`, `errorContext` and `guarded` stood in
-four copies. `parseLimit` stood in two. Every copy carried a comment saying
-so, in the form "Same shape as routes.ts::guarded".
+Four modules answered HTTP routes when this landed. The three written after
+`routes.ts` copied its plumbing. Each of `resolveActor`, `errorContext` and
+`guarded` stood in four copies. `parseLimit` stood in two. Every copy carried
+a comment saying so, in the form "Same shape as routes.ts::guarded".
 
-`routes.ts` now exports all four, and the three siblings import them. The
+`routes.ts` now exports all four, and every sibling imports them. Six route
+modules sit there today: `ui-strings-routes.ts` and `account-routes.ts`
+arrived after this change and took the plumbing rather than copying it. The
 generic `guarded<T>` covers what the fixed-to-`HttpResult` copies did, since
 every sibling call site infers `T = HttpResult`. The cost of the choice is
 that `routes.ts` is both a route module and the plumbing home. The
@@ -3278,10 +3385,11 @@ the match, round-trip and half-match coverage `admin-routing.test.ts`
 already had. The studio and app routers each gained the one case they
 lacked.
 
-`docs/browser-checks.md` holds the four checks that stay manual. One is
+`docs/browser-checks.md` held four checks when this landed. One is
 `iframe` framing from a second origin. Another is the attachment
 download's Save-not-render behavior. A third is the form editor's pointer
-work. The fourth is the panels screen's own walk.
+work. The fourth is the panels screen's own walk. Every UI change since has
+appended its own, so the file is longer than that and no gate counts it.
 
 Each entry names the address rule, the frontend build step, and the
 change that first asked for it. The address rule is `127.0.0.1`, not
@@ -3294,8 +3402,9 @@ created the 2026-08-06 debt. It now refuses the same class of debt.
 
 ## Personal profile page (`add-personal-profile-page`)
 
-`src/http/account-routes.ts` is a third route module beside `admin-routes.ts`
-and `studio-routes.ts`. It holds two routes, `GET /account/me` and `PATCH
+`src/http/account-routes.ts` is a sixth route module, beside `routes.ts`,
+`admin-routes.ts`, `studio-routes.ts`, `reporting-routes.ts` and
+`ui-strings-routes.ts`. It holds two routes, `GET /account/me` and `PATCH
 /account/me`. Both read the caller's id off the resolved actor. Neither takes
 an id in the path, and neither checks a role. Any resolvable session reaches
 them. `admin-routes.ts` stays the operator's act-on-any-account surface.

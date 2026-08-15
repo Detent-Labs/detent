@@ -156,10 +156,11 @@ adds the skip, with a row naming what the increase covers.
 count at the pushed range's base against the count at its tip. It blocks only a
 rise. A file already carrying findings passes, as long as the push adds none.
 
-Measurement sets that rule. The live specs under `openspec/specs/` hold about
-3166 findings across 52 of 80 files. `instance-migration` alone holds 287,
-`timers` 220, `transition-execution` 167. A whole-file gate makes each of those
-unpushable until somebody clears its debt in full.
+Measurement sets that rule. Measured on 2026-08-04, the live specs under
+`openspec/specs/` held about 3166 findings across 52 of the 80 files that
+existed then; the directory carries 89 today. `instance-migration` alone held
+287, `timers` 220, `transition-execution` 167. A whole-file gate makes each of
+those unpushable until somebody clears its debt in full.
 
 That happened on 2026-08-04. A change synced one requirement into
 `development-toolchain/spec.md` and paid a 28-finding prose rewrite. Every one
@@ -190,16 +191,19 @@ carries the reasoning.
 ```
 .devcontainer/             Dockerfile + docker-compose.yml + devcontainer.json (Node 22 + Bun, Postgres 16)
 package.json               Bun workspace root (workspaces: packages/*); engine package's exports map
-                            (./schema, ./cel/check, ./schema/compile, ./engine/registry, ./engine/registry-check)
+                            (./schema, ./schema/canonical-json, ./schema/strip-compiled, ./cel/check,
+                             ./schema/compile, ./engine/registry, ./engine/registry-check)
 tsconfig.json              strict; NodeNext ESM; covers src + test
 src/schema/definition.ts   Zod schemas = the definition contract; TS types via z.infer; invariants included
 src/engine/                executor: instance store, outbox, transitions, timers, subprocess, drafts,
                             definitions, migration, admin queries
 src/runtime/api.ts         Runtime API Layer: createProcessInstance / getInstanceView / submitAndTransition
                             / claimStep / releaseClaim / cancelInstance / listInstances / getInstanceRecord
-src/http/                  REST/JSON wrapper over Bun.serve (routes.ts, admin-routes.ts, studio-routes.ts)
+src/http/                  REST/JSON wrapper over Bun.serve; one route file per surface (routes.ts,
+                            admin-routes.ts, studio-routes.ts, reporting-routes.ts, account-routes.ts,
+                            ui-strings-routes.ts) beside server.ts, static.ts, health.ts, metrics.ts, errors.ts
 src/auth/                  ActorResolver seam (dev-header + JWT), local accounts, login, roles, CLI
-src/handlers/              action handlers; http.request and notification.email ship
+src/handlers/              action handlers; http.request, notification.email and process.start ship
 examples/                  serialized example definitions
 test/                      bun:test suites; tests run inside the container
 packages/web/              the ONE browser package (React + Vite). One build, one login, one session,
@@ -209,9 +213,12 @@ packages/web/              the ONE browser package (React + Vite). One build, on
   src/api/                  API_BASE, AppClientError, parseErrorBody, request, login, errorText
   src/i18n/                 locale selection and persistence; chrome/area catalogs stay per area
   src/areas/app/            participant: My-tasks / Task / Start-a-process (Login is the shell's)
-  src/areas/admin/          operator: instances, merged record, outbox, timers, users, migrations
-  src/areas/studio/         developer: drafts, canvas, panels-as-inspector, JSON surface, publish,
-                            versions+diff, migration-plan authoring, Tools, Player
+  src/areas/admin/          operator: instances, merged record, outbox, timers, users, migrations,
+                            data lists, UI strings
+  src/areas/studio/         developer: drafts, canvas, inspector panels, the routed panels screen
+                            (field catalog, data sources, contract, field matrix), form editor,
+                            JSON surface, publish, versions+diff, migration-plan authoring,
+                            Templates, Tools, Player
   src/areas/reporting/      process owner: cycle time, bottlenecks, SLA
 packages/form-ui/          shared step-form renderer (source-only, no build step); consumed by both
                             the studio area's Player and the app area, so what an author previews is

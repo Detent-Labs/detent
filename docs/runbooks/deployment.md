@@ -11,7 +11,7 @@ image reads one build argument and no runtime variable.
 
 ## Runtime variables the engine reads
 
-The engine reads twenty variables. A blank cell in the last column means the
+The engine reads twenty-one variables. A blank cell in the last column means the
 default is safe for a deployment.
 
 | Variable | What it controls | Mandatory | Default | Unsafe default, and what to set |

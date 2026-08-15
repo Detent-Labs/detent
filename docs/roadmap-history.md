@@ -1067,19 +1067,22 @@ as it stands.
     started it. It does, and the read access the question asked for already
     holds. What is missing is the list.
     `Instance.startedBy` is optional in the contract
-    (`src/schema/definition.ts:1079`) and `createProcessInstance` writes the
-    calling actor's id into it (`src/runtime/api.ts:687`). A subprocess spawn
-    passes `startedBy: undefined` on purpose (`src/engine/subprocess.ts:132`),
-    since a child instance has no human starter.
-    `loadInstanceForActor` (`src/runtime/api.ts:726`) already admits a
+    (`src/schema/definition.ts`) and `createProcessInstance` writes the
+    calling actor's id into it (`src/runtime/api.ts::createProcessInstance`).
+    A subprocess spawn passes `startedBy: undefined` on purpose
+    (`src/engine/subprocess.ts`), since a child instance has no human starter.
+    `loadInstanceForActor` (`src/runtime/api.ts::loadInstanceForActor`)
+    already admits a
     non-admin caller who is the starter, the current claimant, or an eligible
     candidate on the current step. So the starter reads the instance view for
     the whole run, including after the step moves to somebody else. Two other
     rules key on the same field: only the starter or an admin cancels an
-    instance (`api.ts:944`), and a step carrying no assignment accepts a
-    submission from the starter or an admin alone (`api.ts:831`).
+    instance (`api.ts::cancelInstance`), and a step carrying no assignment
+    accepts a submission from the starter or an admin alone
+    (`api.ts::submitAndTransition`).
     The gap is discovery. `GET /instances` carries a `startedBy` filter
-    (`src/http/routes.ts:376`), but `parseScope` defaults to `scope=all`,
+    (`src/http/routes.ts::handleListInstances`), but `parseScope` defaults to
+    `scope=all`,
     which demands `system:admin`. The only other scope is `scope=mine`, and
     that one forces `assignedTo = actor.id` plus the actor's roles. A
     participant therefore reads an instance they started when they hold its
@@ -1089,8 +1092,8 @@ as it stands.
     value beside `mine` and `all` or a separate filter, since `scope=mine`
     already means "assigned to me" and must keep meaning it. Whether the
     starter's access stays read-only, which it is not today — the comment and
-    attachment routes share `loadInstanceForActor`'s predicate
-    (`api.ts:1104`, `api.ts:1179`), so a starter already writes both. And
+    attachment routes share `loadInstanceForActor`'s predicate, so a starter
+    already writes both. And
     whether a started list shows completed and cancelled instances, which the
     task inbox does not.
     The change answered all three. The scope is a third value, `scope=started`,

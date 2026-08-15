@@ -8,7 +8,9 @@ info:
     (create, view, submit, claim/release/delegate, comment, attach a
     file, cancel, and the audit record), plus the caller's own account.
     Excludes `admin/*`, `drafts/*`,
-    `migration-plans/*`, `reporting/*`,
+    `migration-plans/*`, `reporting/*`, `templates/*`,
+    the two `processes/{processId}/versions/{version}` studio reads (the
+    version body and the orphan-key scan),
     and `registry`, which serve the operator, developer and process-owner
     areas of `packages/web`
     frontends directly, not a customer integration. Each exclusion is named
@@ -21,7 +23,10 @@ info:
     without a token, but its token is `METRICS_TOKEN`, not an actor's JWT.
     A request lacking a required
     reserved role gets 403. A malformed request body gets 400 (request
-    shape) or 422 (field-level validation).
+    shape) or 422 (field-level validation). `POST /processes` is the one
+    exception to that order: its permission check needs the `processId` the
+    body carries, so it runs after the shape check, and a caller lacking the
+    role whose body is malformed reads 400 rather than 403.
 
 
     Every JSON envelope this API returns carries `Cache-Control: no-store`.
@@ -94,7 +99,10 @@ paths:
       tags: [processes]
       operationId: publishProcess
       summary: Publish a process definition
-      description: Requires the `system:publish` role.
+      description: >-
+        Requires the `system:publish` role. The check reads the `processId`
+        the body carries, so it runs after the request-shape check: a caller
+        lacking the role whose body is malformed reads 400, not 403.
       requestBody:
         required: true
         content:
@@ -515,6 +523,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          description: >-
+            `toActorId` names no account in the deployment's local directory.
+            Checked only where the delegating actor's own id resolves there;
+            an externally issued identity skips the check.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 
   /instances/{instanceId}/comments:
     post:
@@ -805,9 +822,10 @@ paths:
       operationId: getInstanceRecord
       summary: Read the merged transition/event audit record of an instance
       description: >-
-        Requires the `system:admin` role, or `system:developer` together
-        with `startedBy === actor.id` (a developer may read the record of
-        an instance their own Player session created).
+        Requires the `system:admin` role, or `system:developer` or
+        `system:author` together with `startedBy === actor.id` (an author
+        may read the record of an instance their own Player session
+        created).
       parameters:
         - $ref: "#/components/parameters/instanceId"
         - $ref: "#/components/parameters/limit"
@@ -832,7 +850,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor holds neither `system:admin` nor `system:developer` plus starter status on this instance.
+          description: The actor holds neither `system:admin` nor `system:developer` or `system:author` plus starter status on this instance.
           content:
             application/json:
               schema:
@@ -1014,7 +1032,7 @@ paths:
       summary: Prometheus scrape target
       description: >-
         Computed fresh from the database on every request, no in-process
-        aggregation. No CORS handling. Three gauges:
+        aggregation. No CORS handling. Four gauges:
         `workflow_outbox_backlog{status}`, `workflow_timer_overdue_count`,
         `workflow_timer_lag_seconds`, and `workflow_instances_faulted`.
 
@@ -1210,7 +1228,15 @@ components:
                     - type: string
                     - type: number
                     - type: boolean
-      required: [field, required, readonly]
+        span:
+          type: integer
+          enum: [1, 2]
+          description: >-
+            How many of the view's columns this field occupies, resolved from
+            the matching `ViewField.span` and 1 when the view declares none.
+            This is the declared span, not the drawn one — the renderer clamps
+            it to the view's own column count.
+      required: [field, required, readonly, span]
 
     AvailablePath:
       type: object
@@ -1254,7 +1280,20 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AvailablePath"
-      required: [instanceId, processId, version, status, step, fields, availablePaths]
+        columns:
+          type: integer
+          enum: [1, 2]
+          description: The step view's column count, 1 when the view declares none.
+        assignment:
+          type: object
+          allOf:
+            - $ref: "#/components/schemas/AssignmentState"
+          nullable: true
+        redactedAt:
+          type: string
+          format: date-time
+          description: Set when data retention has redacted this instance's payload.
+      required: [instanceId, processId, version, status, step, fields, availablePaths, columns]
 
     InstanceSummary:
       type: object
@@ -1420,7 +1459,8 @@ components:
       type: object
       description: >-
         A `HistoryEntry` (`kind` is `transition`) or an `InstanceEvent`
-        (`kind` is `event`). See CLAUDE.md's "Runtime record" section.
+        (`kind` is `event`). See `.claude/rules/process-contract.md`'s
+        "Runtime record" section.
       properties:
         kind:
           type: string
