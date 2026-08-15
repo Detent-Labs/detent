@@ -12,11 +12,13 @@ paths:
 ---
 
 <!-- antislop: allow-file synonym-rotation em-dash passive-voice sentence-length run-ons paragraph-length -->
-# The contract: load-bearing rules
+# The definition contract: load-bearing rules
 
 JSON is the one artifact; the Zod schemas (with TS types derived via z.infer)
-are the contract. All of the following are facts the engine and studio must
-uphold, not open questions. The root `CLAUDE.md` carries the short form.
+are the definition contract. All of the following are facts the engine and
+studio must uphold, not open questions. The root `CLAUDE.md` carries the short
+form. `contract` alone names the `ProcessContract` a subprocess declares, the
+subject of the "Subprocesses" section below, never this document's subject.
 
 **Identity.** Every entity has an opaque `id` (UUIDv4 with a type prefix, e.g.
 `step_...`, lowercase, immutable) which is the SOLE reference anchor. `key` is a

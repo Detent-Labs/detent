@@ -42,9 +42,9 @@ three are the checks rail.
 
 ## 2. Domain terms as the UI shows them
 
-The JSON definition is the contract. Its words win in UI text, in commit
-messages, and in conversation. A rendering layer may hold a different word
-internally, and that word stays inside the layer.
+The JSON definition is the definition contract. Its words win in UI text, in
+commit messages, and in conversation. A rendering layer may hold a different
+word internally, and that word stays inside the layer.
 
 | JSON term | The word we use | The layer's own word | Rule |
 |---|---|---|---|

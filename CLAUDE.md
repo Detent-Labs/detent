@@ -25,17 +25,19 @@ The builders cover the canvas, the form editor, plugin config, path guards and
 view overrides, migration plans and templates. Three sites keep a raw input on
 purpose: a timer deadline must infer to `string`, an `Action.output` value reads
 `result` alone, and the JSON view is the escape hatch for what no builder
-expresses. That direction relaxes none of the contract rules. Every authoring
-surface produces the same JSON definition.
+expresses. That direction relaxes none of the definition contract rules. Every
+authoring surface produces the same JSON definition.
 
 The paradigm is a state-based finite-state machine: Steps (states) connected by
 explicit Paths (transitions). This is NOT BPMN token flow.
 
 Three roles share one artifact, the serialized JSON process definition: the
 engine executes it, the studio builds it on a canvas, and hand-authoring writes
-it directly as JSON (rare). That definition is the contract between engine and
-studio. `src/schema/definition.ts` is that contract, expressed as TypeScript
-types.
+it directly as JSON (rare). That definition is the definition contract between
+engine and studio. `src/schema/definition.ts` is that definition contract,
+expressed as TypeScript types. The word `contract` alone names something else
+here, the `ProcessContract` a subprocess declares. Write `definition contract`
+whenever the whole JSON definition is meant.
 
 ### Hard v1 boundaries (do not cross without a deliberate decision)
 - Exactly one active step per instance (single FSM). No parallelism, no
@@ -43,7 +45,7 @@ types.
 - Subprocesses are synchronous call-and-return only. No fan-out.
 - Action execution is async (post-commit). `blocking` is reserved but not built.
 
-## The contract in brief
+## The definition contract in brief
 Full detail in `.claude/rules/process-contract.md` and
 `.claude/rules/authoring-invariants.md`. Those load automatically when you touch
 `src/schema`, `src/engine`, `src/cel`, the studio area, `examples/` or
@@ -65,9 +67,9 @@ short form, true in every session:
 
 ## Change workflow (OpenSpec)
 This repo is spec-driven via OpenSpec (`openspec/`). Every non-trivial change —
-new capability, contract/schema change, tooling or infra switch — goes through an
-OpenSpec change, not a direct edit: propose -> generate specs/tasks -> implement
--> verify -> archive. Start one with the `opsx:` skills (`opsx:new`, or
+new capability, definition contract or schema change, tooling or infra switch —
+goes through an OpenSpec change, not a direct edit: propose -> generate
+specs/tasks -> implement -> verify -> archive. Start one with the `opsx:` skills (`opsx:new`, or
 `opsx:propose` for a full proposal in one step); `opsx:apply` implements tasks and
 `opsx:archive` closes it. The project context OpenSpec shows the AI when
 generating artifacts lives in `openspec/config.yaml` (`context:`) — keep it
@@ -190,7 +192,7 @@ carries the reasoning.
 package.json               Bun workspace root (workspaces: packages/*); engine package's exports map
                             (./schema, ./cel/check, ./schema/compile, ./engine/registry, ./engine/registry-check)
 tsconfig.json              strict; NodeNext ESM; covers src + test
-src/schema/definition.ts   Zod schemas = the contract; TS types via z.infer; invariants included
+src/schema/definition.ts   Zod schemas = the definition contract; TS types via z.infer; invariants included
 src/engine/                executor: instance store, outbox, transitions, timers, subprocess, drafts,
                             definitions, migration, admin queries
 src/runtime/api.ts         Runtime API Layer: createProcessInstance / getInstanceView / submitAndTransition
@@ -327,8 +329,8 @@ after a substantial change lands.
   touch. Exclude every backup branch explicitly, or the rewrite takes the backup
   too and leaves no untouched copy.
 - Comments state facts, not process history. Concise and technically precise.
-- The JSON contract is the foundation. Change the schema (definition.ts / the
-  Zod source) deliberately, never as a casual side effect of another task.
+- The definition contract is the foundation. Change the schema (definition.ts /
+  the Zod source) deliberately, never as a casual side effect of another task.
 - An OpenSpec change that changes a rule `docs/authoring-guide.md` states must
   change the guide in the same commit.
 - Every invariant that lands ships with a test that rejects a violating input.

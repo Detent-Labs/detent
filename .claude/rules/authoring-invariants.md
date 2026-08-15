@@ -63,8 +63,8 @@ only the cancel-sink count.
   checks stay a Zod refinement in `authoredProcessBody`. A compiled body
   legitimately carries all three, so generalizing them would reject every
   compiled body on sight.
-- The authored body carries no key the contract does not declare. This
-  applies at any depth: process, contract, field, data source, workflow,
+- The authored body carries no key the definition contract does not declare.
+  This applies at any depth: process, contract, field, data source, workflow,
   step, path, action, timer, view field, validation. It includes fields
   nested inside a group. The compile pass checks this
   (`compile.ts::checkUnknownKeys`). The read path (`processBody.parse`)
