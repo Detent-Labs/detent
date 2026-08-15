@@ -1183,3 +1183,62 @@ as it stands.
     Presentation throughout. Position stays in the opaque `layout` blob, so no
     schema, no hash and no published body moves. Specs: `studio-canvas`
     (modified).
+
+39. Process chaining: DONE. Change: `process-chaining`. Raised 2026-08-15 in
+    conversation, proposed and archived the same day.
+
+    An offer process reaches its terminal step and must start a procurement
+    process from the data it collected. It must not wait for that process.
+    A `subprocess` step could not express this. It is call-and-return: the
+    parent parks until the child returns. This stage adds the
+    fire-and-forget direction instead, as a new action type,
+    `process.start`, on the `onEntry` site a terminal step already carries.
+
+    The roadmap's own premise did not survive. It named `createProcessInstance`
+    as the mechanism and said it needed an optional `id`. That function needs
+    an `Actor` and a `DataSourceRegistry`, and `HandlerContext` carries
+    neither.
+
+    The handler mirrors `makeSpawnHandler`'s own low-level pattern instead.
+    It resolves the target's latest published body itself. It evaluates
+    `inputMapping` with `evalFieldMap`. It calls the low-level
+    `store.ts::createInstance` directly.
+
+    Unlike the subprocess pair, though, it takes `ctx.db` per delivery. It
+    does not close over a handle built at registry time. This follows
+    `action-handlers`' own rule for an author-facing action. It registers in
+    the shared, stateless `createDefaultRegistry()`, beside `http.request`
+    and `notification.email`, not in the per-tenant wiring `subprocess.ts`
+    needs.
+
+    The started instance's id derives from `ctx.idempotencyKey` directly.
+    `HandlerContext` already carries it, a per-delivery, redelivery-stable
+    UUIDv5. No new id-derivation helper was needed. The started instance
+    records `chainedFrom`, a new field distinct from `parent`. Reusing
+    `parent` would have cancel-cascaded the chained instance. It would also
+    have misrouted it into the subprocess return path on its own terminal
+    step.
+
+    The review pass earned its place on one Critical finding. The planned
+    redelivery branch skipped `resolveAutomatic` on the already-exists path.
+    That reproduced a defect class `subprocess-execution` was written to
+    close. A crash between creation and drive-to-rest would have stranded
+    the started instance forever. The handler now drives to rest
+    unconditionally on both branches, matching `makeSpawnHandler`'s own
+    shape. A redelivery test proves it.
+
+    The pass also found a gap in the publish-time check. That type is
+    authorable at five action positions, not one per-step field like
+    `subprocess`. The check now reuses `registry-check.ts`'s own exported
+    `collect`, the same five-position walk `checkActionRegistry` uses.
+
+    Verification found two further gaps. The spec's own "no return path"
+    scenario and its "runs the newest published version" scenario both
+    lacked test coverage. Both closed the same day.
+
+    Applied and verified 2026-08-15. Full suite: 2651 pass, 1 skip
+    (pre-existing, unrelated), 0 fail.
+
+    Archived as `openspec/changes/archive/2026-08-15-process-chaining`. The
+    deltas landed in `process-chaining` (new) and `cross-process-validation`.
+    `tmp/open-work-priority.md` closes the second queue with this item.

@@ -9,6 +9,7 @@ import { staticAssignmentConfigSchema } from "../src/engine/registry.js";
 import { staticDataSourceConfigSchema, dbListDataSourceConfigSchema } from "../src/engine/host.js";
 import { notificationEmailConfigSchema } from "../src/handlers/notification-email.js";
 import { httpConfigSchema } from "../src/handlers/http.js";
+import { processStartConfigSchema } from "../src/handlers/process-start.js";
 
 test("staticAssignmentConfigSchema produces a descriptor", () => {
   const descriptor = describeConfigSchema(staticAssignmentConfigSchema, "static");
@@ -57,6 +58,14 @@ test("staticDataSourceConfigSchema produces no descriptor (nested object array e
 // `z.unknown()`, `headers` is a record, and `url` carries a non-email format.
 test("httpConfigSchema produces no descriptor (unknown body, record, non-email format)", () => {
   expect(describeConfigSchema(httpConfigSchema, "http.request")).toBeUndefined();
+});
+
+// inputMapping is a record, the same shape that already sends httpConfigSchema
+// to the fallback above. This is the fallback studio-plugin-config-form relies
+// on: process.start needs no generator delta, the raw JSON editor already
+// covers it.
+test("processStartConfigSchema produces no descriptor (record-valued inputMapping)", () => {
+  expect(describeConfigSchema(processStartConfigSchema, "process.start")).toBeUndefined();
 });
 
 test("a refined schema whose properties are all supported now produces a descriptor", () => {

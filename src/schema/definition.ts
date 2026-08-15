@@ -1114,6 +1114,11 @@ export const instance = z.object({
   assignment: assignmentState.nullable().optional(),
   timers: z.array(timerState).optional(),
   parent: z.object({ instanceId, stepId }).optional(),
+  // A `process.start` action's reporting-only backlink to the instance that
+  // started this one. Distinct from `parent`: nothing that treats `parent`
+  // as a call-and-return link (cancel cascade, the subprocess return path)
+  // reads this field.
+  chainedFrom: instanceId.optional(),
   status: instanceStatus,
   startedAt: timestamp,
   startedBy: z.string().optional(),

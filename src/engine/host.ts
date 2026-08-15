@@ -27,6 +27,7 @@ import {
 } from "./registry.js";
 import { HTTP_ACTION_TYPE, httpHandlerDef } from "../handlers/http.js";
 import { NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef } from "../handlers/notification-email.js";
+import { PROCESS_START_ACTION_TYPE, processStartHandlerDef } from "../handlers/process-start.js";
 import { z } from "zod";
 import { fieldOption, type FieldOption } from "../schema/definition.js";
 import { MAX_KEY_LENGTH } from "../schema/compile.js";
@@ -42,15 +43,17 @@ import { MAX_KEY_LENGTH } from "../schema/compile.js";
  * default registry here is acyclic; registry.ts stays the leaf module it
  * already was.
  *
- * It takes no database. `notification.email` reads `ctx.db` per delivery, so
- * one registry serves every tenant — a handle bound here would resolve every
- * tenant's addresses against one account directory. `http.request` takes no
+ * It takes no database. `notification.email` and `process.start` both read
+ * `ctx.db` per delivery, so one registry serves every tenant — a handle
+ * bound here would resolve every tenant's addresses, or start every
+ * tenant's chained instances, against one database. `http.request` takes no
  * database at all and ignores the field.
  */
 export function createDefaultRegistry(): Registry {
   const reg = createRegistry();
   register(reg, HTTP_ACTION_TYPE, httpHandlerDef);
   register(reg, NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef);
+  register(reg, PROCESS_START_ACTION_TYPE, processStartHandlerDef);
   return reg;
 }
 

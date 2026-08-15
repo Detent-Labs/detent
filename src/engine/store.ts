@@ -498,6 +498,10 @@ export async function createInstance(
     data?: Instance["data"];
     parent?: { instanceId: string; stepId: StepId };
     startedBy?: string;
+    // A `process.start` action's reporting-only backlink to the instance
+    // that started this one. Never set alongside `parent`: the two name
+    // different relationships (chain vs. call-and-return).
+    chainedFrom?: string;
     // The initial step's already-resolved candidate set. Creation is a step
     // entry, so an assignment-bearing initial step carries candidates — but the
     // caller resolves them (`registry.ts::resolveStepAssignment`), never this
@@ -541,6 +545,7 @@ export async function createInstance(
     data: opts.data ?? {},
     timers: [],
     ...(opts.parent ? { parent: opts.parent } : {}),
+    ...(opts.chainedFrom !== undefined ? { chainedFrom: opts.chainedFrom } : {}),
     status: initial?.terminal ? "completed" : "running",
     startedAt,
     currentStepEnteredAt: startedAt,

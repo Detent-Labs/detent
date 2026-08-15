@@ -18,6 +18,7 @@
 import { SQL } from "bun";
 import {
   processBody,
+  collectFieldsDeep,
   type ProcessBody,
   type ProcessId,
   type ProcessVersion,
@@ -27,10 +28,16 @@ import {
 import { compileProcessBody } from "../schema/compile.js";
 import { definitionHash, contractHash } from "../schema/hash.js";
 import { validateProcessBody, checkSubprocessChildRefs, type CelIssue } from "../cel/check.js";
-import { checkActionRegistry, checkAssignmentRegistry, checkDataSourceRegistry, type RegistryIssue } from "./registry-check.js";
+import { checkActionRegistry, checkAssignmentRegistry, checkDataSourceRegistry, collect, type RegistryIssue } from "./registry-check.js";
 import { sql } from "./store.js";
 import type { ResolveBody } from "./resolution.js";
-import { createDefaultAssignmentRegistry, type Registry, type DataSourceRegistry, type AssignmentRegistry } from "./registry.js";
+import {
+  createDefaultAssignmentRegistry,
+  PROCESS_START_ACTION_TYPE,
+  type Registry,
+  type DataSourceRegistry,
+  type AssignmentRegistry,
+} from "./registry.js";
 
 /** Resolve the newest child version whose contract signature equals `contractRef`. */
 export type ResolveLatestByContract = (
@@ -166,6 +173,36 @@ async function validateCrossProcess(
 }
 
 /**
+ * Publish-time process-chaining check: every `process.start` action must
+ * reference a resolvable process, and map only into that process's declared
+ * fields. Unlike the subprocess check above, no `contract` is required — a
+ * chain target declares none — and the walk covers all five action
+ * positions `collect` visits, not one step-level field, since `process.start`
+ * is an ordinary action an author may place anywhere.
+ */
+async function validateProcessChaining(body: ProcessBody, resolvers: { resolveLatest: ResolveLatest }): Promise<void> {
+  const sites = collect(body).filter((s) => s.action.type === PROCESS_START_ACTION_TYPE);
+
+  for (const { action, loc } of sites) {
+    const config = action.config as { processId?: string; inputMapping?: Record<string, unknown> };
+    const target = config.processId ? await resolvers.resolveLatest(config.processId as ProcessId) : undefined;
+    if (!target) {
+      throw new CrossProcessValidationError(
+        `process.start action at '${loc}' references process '${config.processId}' which is not published`,
+      );
+    }
+    const fields = new Set(collectFieldsDeep(target.body.fields).map((f) => f.id as string));
+    for (const key of Object.keys(config.inputMapping ?? {})) {
+      if (!fields.has(key)) {
+        throw new CrossProcessValidationError(
+          `process.start action at '${loc}' maps into field '${key}', not declared on process '${config.processId}'`,
+        );
+      }
+    }
+  }
+}
+
+/**
  * Publish an authored body: compile it (cancel-sink injection), hash the compiled
  * body, and persist it as an immutable version. An identical body already
  * published for this processId is a no-op returning the existing version;
@@ -236,9 +273,14 @@ export async function publishBody(
   const celIssues = validateProcessBody(body);
   if (celIssues.length > 0) throw new CelValidationError(celIssues);
 
-  // Then subprocess wiring, against the (immutable, already-validated) published
-  // children. Nothing above this point has persisted.
-  await validateCrossProcess(body, createDefinitionStore(db));
+  // Then subprocess wiring and process-chaining targets, against the
+  // (immutable, already-validated) published processes they reference.
+  // Nothing above this point has persisted. One store instance serves both
+  // checks, so a process referenced by both a subprocess step and a
+  // process.start action resolves from one cache, not two.
+  const definitionStore = createDefinitionStore(db);
+  await validateCrossProcess(body, definitionStore);
+  await validateProcessChaining(body, definitionStore);
 
   const max = (await db`SELECT COALESCE(MAX(version), 0) AS m FROM definitions
     WHERE process_id = ${processId}`) as { m: number }[];

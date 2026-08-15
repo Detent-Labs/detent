@@ -350,6 +350,12 @@ not care.
 For a worked pair, read `examples/subprocess-loan-parent.json` and
 `examples/subprocess-credit-check-child.json`.
 
+A `process.start` action is the fire-and-forget alternative. It starts
+another process from the current one's data. It does not wait for it: no
+wait-state, no outcome, no contract. Use it when one process's terminal
+step should start an unrelated process, not call one and park for its
+result.
+
 ## Building a process
 
 Ten steps, in the order the model forces. A path needs two steps before you

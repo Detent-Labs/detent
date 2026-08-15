@@ -130,37 +130,6 @@ Spec: `development-toolchain`.
     shifts it, the defect stage 37 closed.
     Spec: `studio-canvas`.
 
-39. **Process chaining: NOT STARTED.** Raised 2026-08-15 in conversation. An
-    offer process reaches its terminal step `approved` and must start a
-    procurement process from the data it collected. The offer itself is done
-    and must not wait for the procurement to finish.
-
-    A subprocess step does not express this. It is call-and-return, so the
-    parent parks until the child returns an outcome. What this stage adds is
-    the fire-and-forget direction: the source instance completes, the target
-    instance runs on its own.
-
-    The enqueue site already exists. A terminal step carries `onEntry` actions
-    like any other step, and `planStepEntry` sets `status` to `completed` at
-    that entry and enqueues them. The subprocess return rides that same site
-    today, as `core.returnSubprocess` in `transition.ts`. What is missing is a
-    handler. Only `http.request` and `notification.email` ship.
-
-    The handler takes `{ processId, inputMapping }` and calls
-    `createProcessInstance`. The mapping keeps the shape
-    `SubprocessSpec.inputMapping` already has: one CEL expression per target
-    field, evaluated over the source instance, and a raising entry leaves its
-    target unwritten and records `mapping.entry-dropped` rather than failing
-    the start. That reuses the decided semantics and the existing editor.
-
-    Two points need care. The outbox is at-least-once, so a redelivery would
-    otherwise start a second target instance; deriving the new instance id from
-    the delivery's `idempotencyKey` turns a redelivery into a primary-key
-    collision, and needs an optional `id` in `createProcessInstance`. And the
-    `processId` in the config must resolve at publish time, beside the checks
-    `cross-process-validation` already runs. Specs: `action-handlers`,
-    `instance-creation`, `cross-process-validation`.
-
 40. **Permission model rework: DESIGNED, NOT BUILT.** Raised 2026-08-15 in
     conversation. A design pass ran the same day and took the decisions below.
     Nobody is blocked by the current model, so this stage records a direction
@@ -405,6 +374,7 @@ Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
 | 35 | Starter access to a started instance | `starter-instance-list` | `http-wrapper`, `end-user-app` |
 | 36 | Panels screen | `studio-panels-screen` | `studio-app`, `studio-checks-rail`, `studio-form-editor` |
 | 37 | Canvas nodes snap to the grid | `canvas-grid-snap` | `studio-canvas` |
+| 39 | Process chaining | `process-chaining` | `process-chaining`, `cross-process-validation` |
 
 ## Changes with no stage
 

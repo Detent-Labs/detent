@@ -79,6 +79,15 @@ export interface HandlerDef {
 export const SPAWN_ACTION_TYPE = "core.spawnSubprocess";
 export const RETURN_ACTION_TYPE = "core.returnSubprocess";
 
+/**
+ * The `process.start` action type, homed here for the same reason as the
+ * pair above. `handlers/process-start.ts` imports `createDefinitionStore`
+ * from `engine/definitions.ts`, and `definitions.ts` needs this constant for
+ * its own publish-time check, so defining it in the handler file would cycle
+ * back through `definitions.ts`.
+ */
+export const PROCESS_START_ACTION_TYPE = "process.start";
+
 export type Registry = Map<string, HandlerDef>;
 
 export function createRegistry(): Registry {

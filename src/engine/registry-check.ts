@@ -32,7 +32,7 @@ export interface RegistryIssue {
   message: string;
 }
 
-interface Site {
+export interface Site {
   action: Action;
   loc: string;
 }
@@ -77,8 +77,14 @@ function checkTypedConfig(
   return issues;
 }
 
-/** Collect every Action in the body with a locating path, mirroring src/cel/check.ts's collect(). */
-function collect(body: ProcessBody): Site[] {
+/**
+ * Collect every Action in the body with a locating path, mirroring
+ * src/cel/check.ts's collect(). Exported for `validateProcessChaining`
+ * (definitions.ts), which needs the same five-position walk to find every
+ * `process.start` action — an author-visible action, unlike `subprocess`,
+ * which lives once per step and needs no such walk.
+ */
+export function collect(body: ProcessBody): Site[] {
   const sites: Site[] = [];
   const push = (actions: readonly Action[] | undefined, loc: string) => {
     (actions ?? []).forEach((a, i) => sites.push({ action: a, loc: `${loc}[${i}]` }));

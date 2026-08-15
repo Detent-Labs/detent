@@ -183,11 +183,13 @@ claimant delegated their claim to a named target actor, who does not join
 `assignment.candidates`; payload `{fromActorId, toActorId}`), `instance.faulted` (an
 automatic cascade re-entered a step it already entered and was parked `faulted`;
 payload `{stepId, reason}`, `stepId` the repeated step), and `mapping.entry-dropped`
-(a subprocess `inputMapping`/`outputMapping` entry raised, or its result could not
-be made JSON-safe, so its target field went unwritten; payload `{fieldId,
-direction, reason}`, `direction` `"input"` or `"output"`; recorded on the PARENT,
-since both mappings evaluate over its context, in the same transaction as the
-spawn's or the return's own commit), and `assignment.unresolved` (a step entry
+(an `inputMapping`/`outputMapping` entry raised, or its result could not be made
+JSON-safe, so its target field went unwritten; payload `{fieldId, direction,
+reason}`, `direction` `"input"` or `"output"`; a subprocess spawn or return
+records it on the PARENT, and a `process.start` action records it on the ACTING
+instance, since in each case that is whose context the mapping evaluated, in the
+same transaction as the spawn's, the return's, or the chain-start's own commit),
+and `assignment.unresolved` (a step entry
 resolved its declared assignment to no candidate, because the resolver raised,
 exceeded its deadline, or answered empty; payload `{stepId, reason}`, reason one
 of `resolver-raised`/`timed-out`/`no-candidates`; resolution is total, so the
