@@ -30,7 +30,7 @@ import {
   isEligibleCandidate,
 } from "../engine/transition.js";
 import { buildGuardContext, evalGuard, type Actor } from "../cel/eval.js";
-import { requireRole, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE, AuthorizationError } from "../auth/authorize.js";
+import { requireRole, can, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE, AuthorizationError } from "../auth/authorize.js";
 import { knownUserIds } from "../auth/users.js";
 import { definitionHash } from "../schema/hash.js";
 import { NotFoundError, InstanceNotRunningError } from "../errors.js";
@@ -1008,10 +1008,17 @@ export async function delegateClaim(instanceId: InstanceId, actor: Actor, toActo
  * one cancel `HistoryEntry`, cascade to running children. A non-running
  * instance is returned unchanged, matching the engine's own no-op there.
  *
- * Requires `CANCEL_ANY_ROLE` on `actor` (`src/auth/authorize.ts`), checked
- * before the instance is loaded — a caller without the role is rejected
- * regardless of whether the target instance exists, is running, or is
- * already terminal.
+ * Two independent tests admit a caller (`src/auth/authorize.ts`). The
+ * load-free one is `CANCEL_ANY_ROLE`, checked before the instance is loaded —
+ * a holder is admitted regardless of whether the target instance exists, is
+ * running, or is already terminal. The loaded one is
+ * `can(actor, "cancel", instance.processId)` beside the `startedBy` test.
+ *
+ * `can` answers false there today, because the fast path already put the same
+ * question and lost. That call is the process-scoped seam, not dead code: a
+ * scoped grant names a process, and the process id only arrives with the
+ * instance. The two tests stay independent so neither can mask the other once
+ * a grant carries a scope.
  */
 export async function cancelInstance(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<Instance> {
   // Fast, load-free path: a system:cancel-any caller is authorized before any
@@ -1038,7 +1045,7 @@ export async function cancelInstance(instanceId: InstanceId, actor: Actor, db: S
   } catch {
     throw new AuthorizationError(`actor '${actor.id}' may not cancel instance '${instanceId}'`);
   }
-  if (instance.startedBy !== actor.id) {
+  if (!can(actor, "cancel", instance.processId) && instance.startedBy !== actor.id) {
     throw new AuthorizationError(`actor '${actor.id}' may not cancel instance '${instanceId}'`);
   }
   const store = getStore(db);

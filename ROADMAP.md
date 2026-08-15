@@ -84,11 +84,42 @@ Spec: `development-toolchain`.
     straight line from it. A control that moved under the pointer is harder to
     press, and a drag in flight has no target to face.
 
-40. **Permission model rework: DESIGNED, NOT BUILT.** Raised 2026-08-15 in
-    conversation. A design pass ran the same day and took the decisions below.
-    Nobody is blocked by the current model, so this stage records a direction
-    rather than queued work. `tmp/open-work-priority.md` carries it as a
-    deferral and names the trigger that moves it.
+40. **Permission model rework: SEAM DONE, STORAGE NOT BUILT.** Raised
+    2026-08-15 in conversation. A design pass ran the same day and took the
+    decisions below. Nobody is blocked by the current model, so the storage
+    half records a direction rather than queued work.
+    `tmp/open-work-priority.md` carries it as a deferral and names the trigger
+    that moves it.
+
+    The seam shipped 2026-08-15 as `process-scoped-permission-seam`, ahead of
+    that trigger, because it was the one piece carrying no storage question.
+    `can(actor, permission, processId)` and `requirePermission` sit in
+    `src/auth/authorize.ts`, over three permissions: `"publish"`, `"cancel"`
+    and `"migrate"`. A private `PERMISSION_ROLE` map answers each one with the
+    global role that gates it today, so no actor gained or lost access.
+
+    Six call sites now ask through the seam. Four swapped one call for another.
+    Two did not, and each taught something the design had not stated.
+
+    The publish route reads its target `processId` out of the request body, so
+    its gate moved behind the parse and the shape check. A pre-parse global
+    floor is not a cheap extra: it refuses the exact caller a scoped grant
+    exists to admit, so it is what a later change has to delete. Moving it now
+    costs one response code. A caller lacking the role who sends a malformed
+    body reads 400 where it read 403, an answer about that caller's own body.
+    `openspec/specs/http-wrapper/spec.md` carries the ordering and both cases.
+
+    `cancelInstance` keeps its load-free fast path and asks `can` in the branch
+    that already holds the loaded instance, beside the `startedBy` test. A
+    scoped grant names a process, and the process id only arrives with the
+    instance. That call answers false there today, because the fast path
+    already put the same question and lost. The two tests stay independent so
+    neither masks the other once a grant carries a scope.
+
+    One gap stays open for the storage half, and it is not a defect here. A
+    scoped grant names an existing process id, and the publish route mints a
+    new process where that id is fresh. A first publish therefore stays a
+    global question under any storage this stage picks.
 
     Every role today is global. `src/auth/authorize.ts` declares eight
     constants and `requireRole` reads one line: does `Actor.roles` contain the

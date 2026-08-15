@@ -1,9 +1,13 @@
 /**
  * requireRole gates process-admin operations against Actor.roles. Pure — no DB.
+ * can/requirePermission are the same check behind a process-scoped seam.
  */
 import { test, expect } from "bun:test";
+import type { ProcessId } from "../src/schema/definition.js";
 import {
   requireRole,
+  can,
+  requirePermission,
   AuthorizationError,
   PUBLISH_ROLE,
   CANCEL_ANY_ROLE,
@@ -31,6 +35,8 @@ test("no authorization registry/plugin envelope exists alongside the fixed role 
   // Canary for design.md's "checked directly, not an extension point": if this
   // module ever grows a createXRegistry/registerX/resolveX export (the
   // Registry/DataSourceRegistry pattern in engine/registry.ts), this fails.
+  // `can`/`requirePermission` are the process-scoped seam and belong here;
+  // PERMISSION_ROLE deliberately does not, since nothing outside may replace it.
   expect(Object.keys(authorize).sort()).toEqual([
     "ADMIN_ROLE",
     "AUTHOR_ROLE",
@@ -41,6 +47,8 @@ test("no authorization registry/plugin envelope exists alongside the fixed role 
     "PUBLISH_ROLE",
     "REPORTS_ROLE",
     "TEMPLATES_ROLE",
+    "can",
+    "requirePermission",
     "requireRole",
   ]);
 });
@@ -113,4 +121,60 @@ test("an actor missing the required role is rejected", () => {
 
 test("an actor with no roles at all is rejected", () => {
   expect(() => requireRole({ id: "user_1", roles: [] }, CANCEL_ANY_ROLE)).toThrow(AuthorizationError);
+});
+
+// The process-scoped seam. `can`'s body is the global-role check that already
+// ships, so these assert the mapping and the one property that outlives it:
+// the processId argument changes nothing today.
+const PID_A = "proc_seam_a" as ProcessId;
+const PID_B = "proc_seam_b" as ProcessId;
+
+test("each permission answers true for the role it maps to", () => {
+  expect(can({ id: "user_1", roles: [PUBLISH_ROLE] }, "publish", PID_A)).toBe(true);
+  expect(can({ id: "user_1", roles: [CANCEL_ANY_ROLE] }, "cancel", PID_A)).toBe(true);
+  expect(can({ id: "user_1", roles: [DEVELOPER_ROLE] }, "migrate", PID_A)).toBe(true);
+});
+
+test("each permission answers false for an actor missing that role", () => {
+  expect(can({ id: "user_1", roles: ["employee"] }, "publish", PID_A)).toBe(false);
+  expect(can({ id: "user_1", roles: [] }, "cancel", PID_A)).toBe(false);
+  expect(can({ id: "user_1", roles: ["employee"] }, "migrate", PID_A)).toBe(false);
+});
+
+test("no permission implies another", () => {
+  // Same rule the eight role constants hold: DEVELOPER_ROLE reaches migrate
+  // and nothing else, so the map cannot quietly widen a grant.
+  const developer = { id: "user_1", roles: [DEVELOPER_ROLE] };
+  expect(can(developer, "migrate", PID_A)).toBe(true);
+  expect(can(developer, "publish", PID_A)).toBe(false);
+  expect(can(developer, "cancel", PID_A)).toBe(false);
+});
+
+test("the processId argument does not change the answer", () => {
+  // The seam's whole invariant while no grant carries a scope. A future
+  // scoped implementation is what makes this test meaningful to change.
+  for (const permission of ["publish", "cancel", "migrate"] as const) {
+    for (const roles of [[PUBLISH_ROLE], [CANCEL_ANY_ROLE], [DEVELOPER_ROLE], []]) {
+      const actor = { id: "user_1", roles };
+      expect(can(actor, permission, PID_A)).toBe(can(actor, permission, PID_B));
+    }
+  }
+});
+
+test("requirePermission throws where can answers false", () => {
+  expect(() => requirePermission({ id: "user_1", roles: [] }, "cancel", PID_A)).toThrow(AuthorizationError);
+  expect(() => requirePermission({ id: "user_1", roles: [DEVELOPER_ROLE] }, "publish", PID_A)).toThrow(AuthorizationError);
+});
+
+test("requirePermission returns where can answers true", () => {
+  expect(() => requirePermission({ id: "user_1", roles: [PUBLISH_ROLE] }, "publish", PID_A)).not.toThrow();
+  expect(() => requirePermission({ id: "user_1", roles: [DEVELOPER_ROLE] }, "migrate", PID_A)).not.toThrow();
+});
+
+test("requirePermission names the role an operator must grant", () => {
+  // The message keeps requireRole's "lacks required role 'X'" prefix, so a
+  // grep over logs still finds both, and adds the process the gate named.
+  expect(() => requirePermission({ id: "user_1", roles: [] }, "publish", PID_A)).toThrow(
+    /lacks required role 'system:publish' for process 'proc_seam_a'/,
+  );
 });

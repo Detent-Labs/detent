@@ -1900,6 +1900,30 @@ test.skipIf(!DB)("POST /processes without the system:publish role maps to 403 an
   expect(resolved).toBeUndefined();
 });
 
+// The publish gate reads its target processId out of the body, so it runs
+// after the parse and the shape check. These two pin both halves of that
+// ordering: a well-formed body from an unauthorized caller still reads 403,
+// and a malformed one reads 400 about the caller's own body.
+test.skipIf(!DB)("POST /processes with a malformed body, without the role, maps to 400 and persists nothing", async () => {
+  const PID = "proc_http_publish_malformed";
+  const res = await fetch(
+    new Request("http://x/processes", {
+      method: "POST",
+      headers: { ...authHeaders(user1), "content-type": "application/json" },
+      body: "{not json",
+    }),
+  );
+  expect(res.status).toBe(400);
+
+  const store = createDefinitionStore(sql);
+  expect(await store.resolveBody(PID as ProcessId, 1)).toBeUndefined();
+});
+
+test.skipIf(!DB)("POST /processes with a well-shaped body but no processId, without the role, maps to 400", async () => {
+  const res = await fetch(jsonReq("http://x/processes", "POST", user1, { body: simpleBody() }));
+  expect(res.status).toBe(400);
+});
+
 test.skipIf(!DB)("POST /instances/:instanceId/cancel without the system:cancel-any role, by a non-starter, maps to 403 and leaves the instance unchanged", async () => {
   const PID = pid("proc_http_cancel_forbidden");
   await publishBody(PID, simpleBody(), reg, dataSourceReg);

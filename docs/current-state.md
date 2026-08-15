@@ -959,8 +959,10 @@ Stage-by-stage status is in `ROADMAP.md`.
   `Actor.roles` every `ActorResolver` populates — `PUBLISH_ROLE =
   "system:publish"` and `CANCEL_ANY_ROLE = "system:cancel-any"` — gate the two
   process-admin operations that previously had no permission check at all:
-  `POST /processes` (`handlePublish`, checked immediately after actor
-  resolution, before the request body is even parsed) and
+  `POST /processes` (`handlePublish`, checked after the body parse and the
+  shape check, since the gate names the target process and the body carries
+  it, still before `publishBody`, so no store, registry or CEL check runs
+  for a caller without the role) and
   `POST /instances/:id/cancel` (`runtime/api.ts::cancelInstance`, checked
   before the target instance is loaded — a caller without the role is
   rejected whether or not the instance exists). `requireRole(actor, role)`

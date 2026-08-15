@@ -126,7 +126,15 @@ test.skipIf(!DB)("the reports role grants no operator, authoring, publish or can
 
   expect((await fetch(req("http://x/admin/outbox", owner))).status).toBe(403);
   expect((await fetch(req("http://x/drafts", owner))).status).toBe(403);
-  expect((await fetch(req("http://x/processes", owner, "POST"))).status).toBe(403);
+  // A well-formed body, because the publish gate names its target process and
+  // reads that id out of the body — so it runs after the parse. A bodyless
+  // POST reports the body (400) and never reaches the role question.
+  const publish = new Request("http://x/processes", {
+    method: "POST",
+    headers: { "X-Actor-Id": owner.id, "X-Actor-Roles": owner.roles.join(","), "content-type": "application/json" },
+    body: JSON.stringify({ processId: pid(), body: body("v1") }),
+  });
+  expect((await fetch(publish)).status).toBe(403);
   expect((await fetch(req(`http://x/instances/${inst.instanceId}/cancel`, owner, "POST"))).status).toBe(403);
 });
 

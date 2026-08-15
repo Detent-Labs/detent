@@ -31,7 +31,7 @@ import { publishBody, listProcesses, listVersions } from "../engine/definitions.
 import { instanceStatus } from "../schema/definition.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
-import { requireRole, PUBLISH_ROLE, ADMIN_ROLE } from "../auth/authorize.js";
+import { requireRole, requirePermission, ADMIN_ROLE } from "../auth/authorize.js";
 import {
   type Registry,
   type DataSourceRegistry,
@@ -429,9 +429,18 @@ export async function handleCancel(instanceId: string, req: Request, resolver: A
  * one the client could supply.
  *
  * Resolves the actor through the same `ActorResolver` seam every other route
- * uses, and additionally requires `PUBLISH_ROLE` on the resolved actor before
- * the request body is even parsed (`src/auth/authorize.ts`) — publish carries
- * no other use for the actor value.
+ * uses, and additionally requires the `"publish"` permission on the resolved
+ * actor (`src/auth/authorize.ts`), which maps to `PUBLISH_ROLE` today —
+ * publish carries no other use for the actor value.
+ *
+ * That gate sits AFTER the body parse and the shape check, not before them,
+ * because it names the target process and the body is what carries it. The
+ * property the earlier placement protected still holds: an actor without the
+ * permission never reaches `publishBody`, so no definition store, registry or
+ * CEL check runs and no version is consumed. The one visible consequence is
+ * that a caller lacking the permission who also sends a malformed body reads
+ * 400 rather than 403 — an answer about that caller's own body, disclosing
+ * nothing about this installation.
  */
 export async function handlePublish(
   req: Request,
@@ -443,7 +452,6 @@ export async function handlePublish(
 ): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, PUBLISH_ROLE);
     let parsed: { processId?: unknown; body?: unknown };
     try {
       parsed = (await req.json()) as { processId?: unknown; body?: unknown };
@@ -453,6 +461,10 @@ export async function handlePublish(
     if (typeof parsed.processId !== "string" || !parsed.body) {
       throw new RequestShapeError("request body must be { processId: string, body: ProcessBody }");
     }
+    // The shape check proves only that this is a string; the `proc_` prefix is
+    // publishBody's to enforce. `can` ignores the value today, and a scoped
+    // grant later must not read it as an id the store already holds.
+    requirePermission(actor, "publish", parsed.processId as ProcessId);
     const published = await publishBody(parsed.processId as ProcessId, parsed.body as ProcessBody, registry, dataSourceRegistry, db, assignmentRegistry);
     return {
       status: 200,

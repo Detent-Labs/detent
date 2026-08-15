@@ -10,8 +10,10 @@
  *   publish route (beside `PUBLISH_ROLE`) and `GET /registry`.
  * - `requireStudioRead` (those two OR templates) on the two template reads and
  *   the published version body.
- * - `requireRole(actor, DEVELOPER_ROLE)` alone on the two migration-plan
- *   routes and the orphan-key scan.
+ * - `requirePermission(actor, "migrate", processId)` alone on the two
+ *   migration-plan routes and the orphan-key scan. That permission maps to
+ *   `DEVELOPER_ROLE` today, so the gate is unchanged; the three routes name one
+ *   process, so they ask through the seam (`src/auth/authorize.ts`).
  */
 import type { SQL } from "bun";
 import { sql, withTransaction } from "../engine/store.js";
@@ -30,7 +32,7 @@ import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies
 import { describeConfigSchema, type ConfigFieldDescriptor } from "../engine/config-descriptor.js";
 import type { ZodTypeAny } from "zod";
 import type { ActorResolver } from "../auth/resolve.js";
-import { requireRole, AuthorizationError, DEVELOPER_ROLE, PUBLISH_ROLE, TEMPLATES_ROLE, AUTHOR_ROLE } from "../auth/authorize.js";
+import { requireRole, requirePermission, AuthorizationError, DEVELOPER_ROLE, TEMPLATES_ROLE, AUTHOR_ROLE } from "../auth/authorize.js";
 import { RequestShapeError, type HttpResult } from "./errors.js";
 import { resolveActor, guarded } from "./routes.js";
 import type { ProcessId, ProcessBody, MigrationSpec } from "../schema/definition.js";
@@ -148,7 +150,7 @@ export async function handlePublishDraft(
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     requireAuthoring(actor);
-    requireRole(actor, PUBLISH_ROLE);
+    requirePermission(actor, "publish", processId as ProcessId);
     const draft = await getDraft(processId as ProcessId, db);
     if (!draft) return { status: 404, body: { error: { type: "not-found", message: `no draft: ${processId}` } } };
     const published = await withTransaction(db, async (tx) => {
@@ -202,7 +204,7 @@ export async function handleGetMigrationPlan(
 ): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, DEVELOPER_ROLE);
+    requirePermission(actor, "migrate", processId as ProcessId);
     const fromVersion = parseVersion(fromRaw, "fromVersion");
     const toVersion = parseVersion(toRaw, "toVersion");
     const plan = await resolveMigrationPlan(processId as ProcessId, fromVersion, toVersion, db);
@@ -222,7 +224,7 @@ export async function handlePutMigrationPlan(
 ): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, DEVELOPER_ROLE);
+    requirePermission(actor, "migrate", processId as ProcessId);
     const fromVersion = parseVersion(fromRaw, "fromVersion");
     const toVersion = parseVersion(toRaw, "toVersion");
     let spec: unknown;
@@ -241,7 +243,7 @@ export async function handlePutMigrationPlan(
 export async function handleGetOrphanKeys(processId: string, versionRaw: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, DEVELOPER_ROLE);
+    requirePermission(actor, "migrate", processId as ProcessId);
     const version = parseVersion(versionRaw, "version");
     const scan = await findOrphanKeys(processId as ProcessId, version, db);
     return { status: 200, body: scan };
