@@ -19,6 +19,7 @@ import { PALETTE_FIELD_KINDS, mintCatalogField, type PaletteFieldKind } from "..
 import { seedLocalizedText } from "../draft/localized-text";
 import { BooleanOrExpressionInput } from "../panels/shared/BooleanOrExpressionInput";
 import { isExpression, type BoolOrExpr } from "../panels/shared/overrideMode";
+import { effectiveFlag, gatedKeys, setFlag, type FlagKey } from "../draft/view-flags";
 
 type DraftStep = DraftOf<Step>;
 type DraftView = DraftOf<View>;
@@ -47,21 +48,42 @@ const MINT_KIND_LABEL: Record<PaletteFieldKind, TranslationKey> = {
 /** One override field: a plain checkbox, always reachable, and a
  * "Developer view" disclosure holding the same field's CEL escape hatch —
  * collapsed by default, per this change's `studio-form-editor` addition.
- * Flipping the checkbox writes a literal boolean regardless of what the
- * value held before; an author who wants to keep or edit the CEL opens
- * the disclosure instead. */
-function OverrideField({ label, value, stepId, onChange }: { label: string; value: BoolOrExpr; stepId?: string; onChange: (next: BoolOrExpr) => void }) {
+ * The checkbox reads the engine's resolved default for an absent key
+ * (`effectiveFlag`), not `value === true`. Flipping it writes a literal
+ * boolean regardless of what the value held before; an author who wants to
+ * keep or edit the CEL opens the disclosure instead. `disabled` is set when
+ * `visible: false` gates this flag off (`gatedKeys`). */
+function OverrideField({
+  label,
+  value,
+  flagKey,
+  disabled,
+  stepId,
+  onChange,
+}: {
+  label: string;
+  value: BoolOrExpr;
+  flagKey: FlagKey;
+  disabled?: boolean;
+  stepId?: string;
+  onChange: (next: BoolOrExpr) => void;
+}) {
   const cel = isExpression(value);
   return (
     <div className="studio-form-strip-override">
       <label className="studio-form-strip-field">
         {label}
-        <input type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} />
+        <input
+          type="checkbox"
+          checked={effectiveFlag(value, flagKey) === true}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.checked)}
+        />
       </label>
       {cel && <span className="studio-form-cel">{t("formEditor.markCel")}</span>}
       <details className="studio-devview">
         <summary>{t("formEditor.developerView")}</summary>
-        <BooleanOrExpressionInput label={label} value={value} stepId={stepId} onChange={onChange} />
+        <BooleanOrExpressionInput label={label} value={value} flagKey={flagKey} stepId={stepId} onChange={onChange} />
       </details>
     </div>
   );
@@ -122,6 +144,14 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
 
   const updateRow = (rowIndex: number, patch: Partial<DraftViewField>) => {
     setRows(rows.map((r, i) => (i === rowIndex ? { ...r, ...patch } : r)));
+  };
+
+  /** The one writer for the three view flags: `setFlag` deletes a key on a
+   * return to the engine's default instead of writing it, and deletes
+   * `required`/`readonly` too when `visible` goes to literal `false`
+   * (view-flags.ts). `updateRow`'s plain spread cannot delete a key. */
+  const setViewFlag = (rowIndex: number, key: FlagKey, next: BoolOrExpr) => {
+    setRows(rows.map((r, i) => (i === rowIndex ? setFlag(r, key, next) : r)));
   };
 
   const removeRow = (rowIndex: number) => {
@@ -362,20 +392,25 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
               <OverrideField
                 label={t("formEditor.visible")}
                 stepId={step.id}
+                flagKey="visible"
                 value={selectedRow.visible}
-                onChange={(visible) => updateRow(selected!, { visible })}
+                onChange={(visible) => setViewFlag(selected!, "visible", visible)}
               />
               <OverrideField
                 label={t("formEditor.required")}
                 stepId={step.id}
+                flagKey="required"
+                disabled={gatedKeys(selectedRow).includes("required")}
                 value={selectedRow.required}
-                onChange={(required) => updateRow(selected!, { required })}
+                onChange={(required) => setViewFlag(selected!, "required", required)}
               />
               <OverrideField
                 label={t("formEditor.readonly")}
                 stepId={step.id}
+                flagKey="readonly"
+                disabled={gatedKeys(selectedRow).includes("readonly")}
                 value={selectedRow.readonly}
-                onChange={(readonly) => updateRow(selected!, { readonly })}
+                onChange={(readonly) => setViewFlag(selected!, "readonly", readonly)}
               />
               {/* No span control on a group: it draws at the form's full width
                   and `form-ui` reads no span on it, so the control would write

@@ -253,13 +253,18 @@ Spec: `development-toolchain`.
 
     Specs: `authorization`, `admin-user-management`, `instance-query`.
 
-41. **Field matrix: DESIGNED, NOT BUILT.** Raised 2026-08-15 in conversation.
-    One surface lists every catalog field against every step and sets
-    `required`, `readonly` and `visible` in place, so an author stops opening
-    each step's form editor in turn. The aim is authoring speed. A design pass
-    ran the same day and took the decisions below. The six numbered points
-    after them stay the reference. Each one names a property of the current
-    engine that the first-guess build gets wrong.
+41. **Field matrix: SHARED MODULE DONE, GRID NOT STARTED.** Raised 2026-08-15
+    in conversation. One surface lists every catalog field against every step
+    and sets `required`, `readonly` and `visible` in place, so an author stops
+    opening each step's form editor in turn. The aim is authoring speed. A
+    design pass ran the same day and took the decisions below. The six
+    numbered points after them stay the reference. Each one names a property
+    of the current engine that the first-guess build gets wrong.
+
+    The shared module `draft/view-flags.ts`, the form editor's default-aware
+    controls and the two stopping-state checks shipped 2026-08-15 as
+    `studio-view-flags-module`, this stage's first half. The grid at
+    `/processes/:id/edit/panels/matrix` does not exist yet.
 
     **The surface writes flags alone.** A cell exists only where the step
     already declares the field. `purchase-requisition.json` gives 54 such cells
@@ -284,19 +289,22 @@ Spec: `development-toolchain`.
     the studio keeps the JSON's own three words.
 
     **The standardization lives in one shared module**, `draft/view-flags.ts`.
-    The form editor calls it too. `BooleanOrExpressionInput` renders
-    `checked={value === true}` today. An absent `visible` therefore draws
-    unticked while the field shows. The matrix would repeat that defect 54
-    times over.
+    The form editor calls it too. `BooleanOrExpressionInput` rendered
+    `checked={value === true}` before this stage's first half shipped. An
+    absent `visible` had therefore drawn unticked while the field showed. The
+    matrix would have repeated that defect 54 times over; the checkbox now
+    reads `effectiveFlag` instead, and the defect is fixed everywhere the
+    module reaches.
 
     **The two stopping states report rather than block.** The fifth point below
     names both. The JSON view authors either one, so gating the matrix alone
-    catches nothing. The readonly-with-required rule reports only where no step
-    makes the field editable, and no `Action.output`,
-    `SubprocessSpec.outputMapping` or `FieldDef.columnMapping` writes it. Real
-    reachability over a cyclic graph costs more than a warning earns. The
-    checks rail carries five engine-validator sources today. Both rules need a
-    sixth, for the studio's own findings.
+    would catch nothing. The readonly-with-required rule reports only where no
+    step makes the field editable, and no `Action.output`,
+    `SubprocessSpec.outputMapping`, `FieldDef.columnMapping` or
+    `ProcessContract.inputFields` entry writes it. Real reachability over a
+    cyclic graph costs more than a warning earns. The checks rail carried five
+    engine-validator sources before this stage's first half. Both rules now
+    report under the sixth, `view`, for the studio's own findings.
 
     **The surface joins the panels screen as a fourth view**, at
     `/processes/:id/edit/panels/matrix`. It inherits the deep link, the Back
@@ -345,7 +353,8 @@ Spec: `development-toolchain`.
     so nobody can supply the value. `visible: false` with `required: true` drops
     the requirement silently, because `resolveFields` removes the field before
     `requiredFieldIds` counts it. Both read off `view.fields[]` alone, so both
-    belong in the checks rail whether or not this stage ships.
+    belong in the checks rail whether or not the grid ships — and both do,
+    reported under `checkViewFlags` since this stage's first half.
 
     Sixth, a grid is a keyboard problem. 286 cells need a roving focus, a header
     that names each column to a screen reader, and a scroll region that holds no

@@ -21,7 +21,11 @@ function findFieldById(fields: DraftField[] | undefined, id: string): DraftField
 // outputMapping/contract field ids, non-identifier field keys, over-long
 // authored strings), all reported in the same {loc, value, message} shape as
 // "duration".
-export type IssueSource = "zod" | "cel" | "registry" | "duration" | "structural";
+// "view" covers checkViewFlags (draft/view-flags.ts) — the studio's own
+// findings over view.fields[], not an engine validator. It never blocks a
+// publish; see studio-checks-rail's "Every publish blocker is visible"
+// requirement.
+export type IssueSource = "zod" | "cel" | "registry" | "duration" | "structural" | "view";
 export type EntityType = "process" | "field" | "dataSource" | "step" | "path" | "timer" | "action" | "contract";
 
 export interface EditorIssue {

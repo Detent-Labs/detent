@@ -5,6 +5,7 @@ import { checkActionRegistry } from "workflow-engine/engine/registry-check";
 import type { Registry } from "workflow-engine/engine/registry";
 import type { Draft } from "./types";
 import { resolveLoc, type EditorIssue, type IssueSource } from "./issues";
+import { checkViewFlags } from "./view-flags";
 
 function pushIssues(
   issues: EditorIssue[],
@@ -41,13 +42,17 @@ export interface ValidationResult {
 
 /**
  * Runs the engine's own, unmodified publish-time validators against the
- * Draft — no second rule set. Zod gates
+ * Draft, plus one studio-owned pass, `checkViewFlags`. An entry from the
+ * five engine sources (zod, structural, cel, registry, duration) blocks a
+ * publish; an entry from `view` does not — it reports a view-flag state the
+ * engine publishes without complaint (see `studio-checks-rail`'s "Every
+ * publish blocker is visible" requirement). Zod gates
  * everything else: `validateProcessBody`/`checkActionRegistry`/
  * `validateDurations` are written against a structurally-complete
  * `ProcessBody` (they walk `body.workflow.steps` etc. unconditionally), so
  * running them against a still-incomplete Draft would throw a TypeError,
  * not produce a located issue. A Zod-invalid Draft only ever shows its Zod
- * issues; the CEL/registry/duration/cross-process dimensions all report
+ * issues; the CEL/registry/duration/cross-process/view dimensions all report
  * "not checked" (via an empty result) until the Draft parses.
  *
  * Runs registry/CEL checks against the *compiled* body (mirroring
@@ -104,6 +109,7 @@ export function runValidation(
   const issues: EditorIssue[] = [];
 
   pushIssues(issues, body, validateDurations(body), "duration");
+  issues.push(...checkViewFlags(body));
 
   let compiled: ProcessBody | undefined;
   let structuralChecked = true;

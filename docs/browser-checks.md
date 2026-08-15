@@ -895,3 +895,42 @@ still draws.
 One case this walk leaves to a test. A path may carry a waypoint into a group
 that then collapses. `studio-canvas-groups.test.ts` asserts two things about
 its route. It passes through the waypoint, and it ends on the box's own side.
+
+### View flags in the form editor (`studio-view-flags-module`)
+
+Open Studio, `purchase-requisition`, step `finance_review`, the form editor,
+and select the `vendor` field. Pass: the Visible checkbox reads ticked. This
+field carries no `visible` key, and the old checkbox read this state
+unticked.
+
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: `.claude/rules/ui-glossary.md` fixes "JSON surface" as the one name
+     for the raw definition view. The rule reads its "surface" as a synonym for
+     the "render" this file uses of a browser painting a page. -->
+Untick Visible. Pass: the Required and Read-only checkboxes disable, and any
+tick each held clears. Tick Visible again. Pass: both re-enable, still
+unticked. Open the JSON surface. Pass: this field's view entry carries no
+`visible` key, no `required` key and no `readonly` key.
+
+Tick Required, without touching Visible. Open the JSON surface. Pass: the
+entry carries `required: true` alone. Untick Required. Pass: the key goes.
+
+Open the checks rail. Pass: a `view` group sits after `duration`, reading
+clear.
+
+The strip itself cannot author `visible: false` beside `required: true`
+anymore: unticking Visible clears Required in the same write. Reach the
+hidden-required state through the JSON surface instead. Give a view entry
+`visible: false` and `required: true` there. Pass: the checks rail's `view`
+group shows one entry, naming the step and the field: hidden but required.
+Set `visible` back to `true` (or delete the key). Pass: the entry clears.
+
+Give a field `readonly: true` and `required: true` through the JSON surface.
+Pick a step no other step's view lists that field editable on. Pass: the
+`view` group shows a second kind of entry, naming that step and field. It
+reads required and read-only, with nothing writing it. Add that field to
+`Action.output` on any action. Pass: the entry clears.
+
+Repeat the walk in German. Pass: the Visible, Required and Read-only labels
+and the checks rail heading translate. The two new rail messages stay in
+English, the same as every other engine-validator message the rail shows.

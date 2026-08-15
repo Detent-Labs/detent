@@ -122,3 +122,27 @@ describe("totalOpenIssueCount", () => {
     expect(totalOpenIssueCount(groups)).toEqual({ kind: "held-back" });
   });
 });
+
+describe("the view group (task 5.18-5.19)", () => {
+  it("holds back on a Zod-invalid draft, like every other group", () => {
+    const groups = groupChecksBySource(validation({ zodValid: false, structurallyValid: false, structuralChecked: false }));
+    const view = groups.find((g) => g.source === "view");
+    expect(view?.heldBack).toBe(true);
+  });
+
+  it("runs on a Zod-valid draft that fails to compile, unlike CEL and registry", () => {
+    const groups = groupChecksBySource(
+      validation({
+        zodValid: true,
+        structurallyValid: false,
+        structuralChecked: true,
+        issues: [{ entityType: "step", entityId: "s", message: "view finding", source: "view" }],
+      }),
+    );
+    const view = groups.find((g) => g.source === "view");
+    const cel = groups.find((g) => g.source === "cel");
+    expect(view?.heldBack).toBe(false);
+    expect(view?.issues).toHaveLength(1);
+    expect(cel?.heldBack).toBe(true);
+  });
+});

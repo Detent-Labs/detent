@@ -159,6 +159,22 @@ Stage-by-stage status is in `ROADMAP.md`.
   strips undeclared keys before `compileProcessBody` ever sees them. Only the
   real `POST /processes` publish call catches an unknown key, since it runs
   `compileProcessBody` on the raw, un-parsed body.
+
+  `draft/view-flags.ts` (stage 41's first half, `studio-view-flags-module`)
+  holds the view-flag primitives the form editor and a later field matrix
+  both need.
+
+  `FLAG_DEFAULT` carries the engine's own three defaults.
+  `effectiveFlag` resolves an absent value to that default.
+  `setFlag` writes a departure from the default. It deletes the key on a
+  return, and deletes `required`/`readonly` too when `visible` goes to
+  literal `false`. `gatedKeys` names which controls that gate disables.
+
+  `checkViewFlags`, in the same file, is the studio's own validation pass.
+  It reports under a sixth, non-blocking `IssueSource`: `"view"`. Two states
+  earn it. A required field can sit hidden by `visible: false`. A required,
+  read-only field can sit unwritten. `runValidation` calls it beside
+  `validateDurations`.
 - Subprocess execution (`src/engine/subprocess.ts`, `test/subprocess.test.ts`):
   makes a `subprocess` step live via two engine-internal outbox handlers. The
   compile pass rejects the reserved `core.` type prefix at publish; see the
