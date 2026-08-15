@@ -217,14 +217,18 @@ packages/form-ui/          shared step-form renderer (source-only, no build step
 ```
 
 ## Where the rest is documented
-- `.claude/rules/process-contract.md` — the load-bearing contract rules, in full.
+- `.claude/rules/process-contract.md` — the load-bearing definition contract
+  rules, in full.
 - `.claude/rules/authoring-invariants.md` — what the validation layer enforces.
 - `.claude/rules/ui-glossary.md` — the one word for each part of the UI, and the
   domain term each rendering word maps to.
 - `docs/current-state.md` — per-subsystem descriptive counterpart to this file.
 - `docs/decisions.md` — open questions, and what is decided but not yet built.
-- `docs/authoring-guide.md` — teaches the contract to process authors.
-- `ROADMAP.md` — stage-by-stage status (DONE / NOT STARTED).
+- `docs/authoring-guide.md` — teaches the definition contract to process authors.
+- `ROADMAP.md` — stage-by-stage status (DONE / NOT STARTED). Open stages in
+  full; one table row per finished stage.
+- `docs/roadmap-history.md` — what each finished stage was, under the same
+  number. Read it only for a stage the table sends you to.
 
 For "what does X do" prefer the knowledge graph below over any of them — the
 code is the source of truth, those files are the map.
