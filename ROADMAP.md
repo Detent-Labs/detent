@@ -161,10 +161,11 @@ Spec: `development-toolchain`.
     `cross-process-validation` already runs. Specs: `action-handlers`,
     `instance-creation`, `cross-process-validation`.
 
-40. **Permission model rework: NOT STARTED.** Raised 2026-08-15 in
-    conversation. This stage is an open question, not a decided design. It
-    records that the current model does not carry the cases the product now
-    has, and it names what a proposal must answer.
+40. **Permission model rework: DESIGNED, NOT BUILT.** Raised 2026-08-15 in
+    conversation. A design pass ran the same day and took the decisions below.
+    Nobody is blocked by the current model, so this stage records a direction
+    rather than queued work. `tmp/open-work-priority.md` carries it as a
+    deferral and names the trigger that moves it.
 
     Every role today is global. `src/auth/authorize.ts` declares eight
     constants and `requireRole` reads one line: does `Actor.roles` contain the
@@ -173,10 +174,54 @@ Spec: `development-toolchain`.
     other process too. `system:cancel-any` cancels any instance of any process.
     A grant for one process cannot be written down.
 
-    The `system:*` roles stay for what is genuinely cross-cutting. User
-    administration, the outbox and the timer views belong to the installation,
-    not to a process, and `system:admin` keeps them. The rest needs a second
-    look, and the eight constants split into three groups under it.
+    **The eight `system:*` roles keep their exact meaning.** They serve the
+    cases that are genuinely installation-wide. User administration, the outbox
+    and the timer views belong to the installation, and `system:admin` keeps
+    them. A scoped grant is a second and narrower thing beside them. It never
+    replaces one, and no migration rewrites a grant anybody already holds.
+
+    **One function answers every process-scoped question.** `can(actor,
+    permission, processId)` takes over from the bare `requireRole` at the call
+    sites that hold a process. Its body today is the check that ships: does
+    `Actor.roles` hold the global role. Storage, scope shape and any directory
+    mapping live behind it. That seam is what this stage protects, and it is
+    the one piece worth landing early. A later change to how a grant is stored
+    then moves one file rather than six call sites.
+
+    **A directory group name is a principal, not a permission.** The identity
+    provider is the authority on who someone is and which groups they hold. The
+    installation is the authority on what a group may do inside it.
+    `claimToRoles` (`src/auth/jwt.ts:81`) already passes an issuer's claim
+    through verbatim, so `Actor.roles` needs no new shape, and a sync from
+    Active Directory or Entra ID needs no new field. `auth_users.roles` stays a
+    `TEXT[]` of free text.
+
+    A grant therefore lives in the installation, and maps a role string to a
+    permission and a scope. One row covers every holder of `finance-authors`.
+    The alternative encodes the scope into the grant's own name, and that name
+    then needs re-cutting in the directory as well as the database each time
+    the scope idea grows. A customer with 40 processes, 12 of them finance,
+    writes one row under this decision and 72 directory assignments under the
+    other one.
+
+    **A scope follows the `{type, config}` pattern**, the shape `plugin`
+    already gives actions, data sources and assignment strategies
+    (`src/schema/definition.ts:469`). `{ type: "process", config: { processId
+    } }` is the only type a first version ships. A later `"label"` or `"owner"`
+    type resolves through the same registry and moves no call site.
+
+    **The scoped-role string stays a documented fallback**, for an installation
+    that wants every grant managed in its directory. Such an installation
+    writes `system:publish@proc_3f8a1c2e-9b4d-4e7a-a1c8-2e5f7b9d0a13` as an
+    Entra app role value, and the engine reads it behind the same `can`. Three
+    format rules hold wherever that path runs. The separator is `@` and the
+    process id is the entire remainder, because `processId` is
+    `regex(/^proc_/)` with an unconstrained tail, so no right-hand split is
+    safe. The string carries no space and stays under 120 characters, which is
+    what an Entra app role value permits. App roles carry this and groups do
+    not, because the `groups` claim emits object ids by default.
+
+    The eight constants split into three groups under those decisions.
 
     The first group scopes cleanly, because the process is known at the call
     site. Publish reads it from the body. Cancel reads it from the loaded
@@ -185,17 +230,28 @@ Spec: `development-toolchain`.
     The second group turns a gate into a filter. `scope=all` on `GET
     /instances` has no single process, so a scoped grant changes which rows the
     query returns. That is the expensive part, and it reaches `instance-query`
-    rather than the authorization module.
+    rather than the authorization module. `system:reports` belongs here too:
+    every `/reporting/*` route aggregates across processes, and meets the same
+    problem.
 
-    The third group has no process at all and stays as it is.
+    The third group has no process at all and stays as it is. `system:admin`
+    over users, the outbox, the timers and the UI strings, beside
+    `system:datalists` and `system:templates`.
 
-    Two constraints hold for any proposal. A scoped grant must carry the opaque
+    The two authoring roles sit outside all three. A draft for a new process
+    holds no `proc_` id to name, so `system:author` and `system:developer` stay
+    global on the four draft routes. Publish takes the scope instead, because
+    the body names its target.
+
+    Three constraints hold for any build. A scoped grant carries the opaque
     process `id`, never the `key`, since the contract lets a key change and
-    references nothing. And the studio, the operator area and the reporting
-    area each read their own role today, so a change to the shape reaches all
-    three. Whether the answer is a scoped role string, a grant table or
-    something else stays open. Specs: `authorization`, `admin-user-management`,
-    `instance-query`.
+    references nothing. `actor.roles` sits in the CEL context
+    (`src/cel/eval.ts:83`), so an authored guard reads that array, and the
+    decisions above leave its shape untouched on purpose. And the studio, the
+    operator area and the reporting area each read their own role today, so a
+    change to the shape reaches all three plus their i18n catalogs.
+
+    Specs: `authorization`, `admin-user-management`, `instance-query`.
 
 41. **Field matrix: DESIGNED, NOT BUILT.** Raised 2026-08-15 in conversation.
     One surface lists every catalog field against every step and sets

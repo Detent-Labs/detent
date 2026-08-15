@@ -11,6 +11,42 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   deliberately minimal; widen when the engine surfaces a concrete need.
 
 ## Decided, not yet built (each needs its own OpenSpec change)
+- **Process-scoped permissions.** Every role in `src/auth/authorize.ts` is
+  global today, so `system:publish` publishes every process and
+  `system:cancel-any` stops any instance of any process. A design pass on
+  2026-08-15 settled the shape; `ROADMAP.md` stage 40 carries it in full. Four
+  decisions matter beyond that stage.
+
+  The eight `system:*` roles keep their exact meaning, for the cases that are
+  genuinely installation-wide. A scoped grant sits beside them and never
+  replaces one, so no migration rewrites a grant anybody already holds.
+
+  A directory group name is a principal, not a permission. The identity
+  provider is the authority on who someone is and which groups they hold; the
+  installation is the authority on what a group may do inside it. That split is
+  what keeps an Active Directory or Entra ID sync out of the design: the grant
+  maps a role string to a permission and a scope, and lives here. Encoding the
+  scope into the grant's own name (`system:publish@proc_...`) inverts the
+  split, and makes the directory admin the authority on this engine's
+  permissions, expressed in this engine's opaque ids. That form stays a
+  documented fallback for an installation that wants it, behind the same check.
+
+  A scope follows `{type, config}`, the shape `plugin` already gives actions,
+  data sources and assignment strategies. `{ type: "process" }` is the only
+  type a first version ships.
+
+  `Actor.roles` keeps its current shape, a `string[]` of free text from either
+  source. That is deliberate and load-bearing: `actor.roles` sits in the CEL
+  context (`src/cel/eval.ts:83`), `claimToRoles` (`src/auth/jwt.ts:81`) passes
+  an issuer's claim through verbatim, and `auth_users.roles` is a `TEXT[]` the
+  admin area edits. None of the three moves.
+
+  Nobody is blocked by the current model, so nothing is queued.
+  `tmp/open-work-priority.md` carries the trigger. The one piece worth landing
+  ahead of a need is the seam: `can(actor, permission, processId)` at the call
+  sites that hold a process, with today's global-role check as its whole body.
+  Behind that function, the storage question stops being one a later change can
+  get wrong.
 - **CEL-readable data-source results.** Runtime option-list resolution for
   `field.dataSource` is DONE (see `docs/current-state.md`) — but `src/cel/check.ts`
   still registers a data source at no site (guards/output/transforms), so a CEL
