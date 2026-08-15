@@ -3,12 +3,13 @@ import { t, type TranslationKey } from "../catalog.js";
 import { mintId } from "../draft/ids";
 import { addToDraftArray } from "../draft/draft-array-crud";
 import { seedLocalizedText } from "../draft/localized-text";
-import { flattenRailFields, issueCountForEntityType, panelEntityCounts } from "../draft/panel-rail";
+import { flattenRailFields, issueCountForEntityType, issueCountForSource, panelEntityCounts } from "../draft/panel-rail";
 import type { EntityType } from "../draft/issues";
 import { PANEL_VIEWS, type PanelView } from "../routing";
 import { FieldCatalogPanel } from "../panels/FieldCatalogPanel";
 import { DataSourcesPanel } from "../panels/DataSourcesPanel";
 import { ContractPanel } from "../panels/ContractPanel";
+import { FieldMatrixPanel } from "../panels/FieldMatrixPanel";
 import { ChecksRail } from "../panels/ChecksRail";
 
 export { PANEL_VIEWS, type PanelView };
@@ -17,11 +18,15 @@ const VIEW_LABEL: Record<PanelView, TranslationKey> = {
   fields: "fieldCatalog.heading",
   dataSources: "dataSources.heading",
   contract: "contract.heading",
+  matrix: "fieldMatrix.heading",
 };
 
 /** One `EntityType` per view — the dimension `resolveLoc` reports an issue in
- * this view under. Contract issues all land on the single `"contract"` id. */
-const VIEW_ENTITY_TYPE: Record<PanelView, EntityType> = {
+ * this view under. Contract issues all land on the single `"contract"` id.
+ * Matrix carries no entry: `checkViewFlags` issues share `entityType: "step"`
+ * with every other per-step issue, so its rail badge counts by `source`
+ * instead (`issueCountForSource`, below). */
+const VIEW_ENTITY_TYPE: Record<Exclude<PanelView, "matrix">, EntityType> = {
   fields: "field",
   dataSources: "dataSource",
   contract: "contract",
@@ -35,8 +40,9 @@ interface Props {
 }
 
 /**
- * The three process-wide panels — field catalogue, data sources, contract — on
- * their own routed screen (`studio-app`'s panels-screen requirements).
+ * The four process-wide panels — field catalogue, data sources, contract,
+ * field matrix — on their own routed screen (`studio-app`'s panels-screen
+ * requirements).
  *
  * It replaced a native `<dialog>`. The overlay hid the checks rail while an
  * author edited field keys and data source keys, and those two produce most of
@@ -45,10 +51,11 @@ interface Props {
  * not: no link reached a view, Back did not close it, and a reload landed on
  * the canvas.
  *
- * All three views stay MOUNTED and two hide. Rendering only the open one would
- * drop `ContractPanel`'s half-typed outcome name (its own `useState`) and
- * refetch `DataSourcesPanel`'s list keys on every switch. `hidden` keeps the
- * subtree and takes it out of the accessibility tree, with no CSS of ours.
+ * All four views stay MOUNTED and three hide. Rendering only the open one
+ * would drop `ContractPanel`'s half-typed outcome name (its own `useState`)
+ * and refetch `DataSourcesPanel`'s list keys on every switch, and it would
+ * drop the field matrix's selected cell. `hidden` keeps the subtree and
+ * takes it out of the accessibility tree, with no CSS of ours.
  *
  * The screen carries no Save. Every panel writes straight into the in-browser
  * draft through `useDraft()`, and the edit screen's own toolbar stays the only
@@ -95,7 +102,13 @@ export function PanelsScreen({ openView, onBack, onOpenView, token }: Props) {
         <nav className="studio-panels-rail" aria-label={t("panelsScreen.railLabel")}>
           <ul className="studio-panels-rail-list">
             {PANEL_VIEWS.map((view) => {
-              const issues = issueCountForEntityType(validation.issues, VIEW_ENTITY_TYPE[view]);
+              // The matrix's badge counts `source: "view"` findings instead: its
+              // issues share `entityType: "step"` with every other per-step
+              // issue, so `VIEW_ENTITY_TYPE` carries no entry for it.
+              const issues =
+                view === "matrix"
+                  ? issueCountForSource(validation.issues, "view")
+                  : issueCountForEntityType(validation.issues, VIEW_ENTITY_TYPE[view]);
               return (
                 <li key={view}>
                   <button
@@ -140,7 +153,7 @@ export function PanelsScreen({ openView, onBack, onOpenView, token }: Props) {
         </nav>
 
         <main className="studio-panels-screen-view">
-          {/* All three mount; `hidden` shows one. See the component note. */}
+          {/* All four mount; `hidden` shows one. See the component note. */}
           <div hidden={openView !== "fields"}>
             <FieldCatalogPanel token={token} />
           </div>
@@ -149,6 +162,9 @@ export function PanelsScreen({ openView, onBack, onOpenView, token }: Props) {
           </div>
           <div hidden={openView !== "contract"}>
             <ContractPanel />
+          </div>
+          <div hidden={openView !== "matrix"}>
+            <FieldMatrixPanel />
           </div>
         </main>
 

@@ -1081,6 +1081,183 @@
   padding-left: var(--space-6);
 }
 
+/* The field matrix: a register table, not a spreadsheet. Sticky header row
+   and first column keep the reader's place; `role="grid"` gives it a roving
+   tabindex instead of one tab stop per cell. */
+.studio-matrix {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.studio-matrix-scroll {
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--color-border);
+  max-height: 32rem;
+}
+
+.studio-matrix-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.9rem;
+}
+
+.studio-matrix-corner,
+.studio-matrix-col-header,
+.studio-matrix-row-header {
+  position: sticky;
+  background: var(--color-surface);
+  font-family: var(--font-body);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  text-align: left;
+}
+
+/* Fixed from the spacing scale, not from measured text: a German step label
+   runs up to 40% longer than English and wraps inside this width instead of
+   widening the column (`.claude/rules/design-language.md`). */
+.studio-matrix-corner,
+.studio-matrix-col-header {
+  top: 0;
+  width: 8rem;
+  padding: var(--space-2);
+  border-bottom: 2px solid var(--color-divider);
+  z-index: 2;
+}
+
+.studio-matrix-corner {
+  left: 0;
+  z-index: 3;
+}
+
+.studio-matrix-row-header {
+  left: 0;
+  width: 10rem;
+  padding: var(--space-1) var(--space-3);
+  border-right: 2px solid var(--color-divider);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* A group field's children indent once, matching the rail's own cap. */
+.studio-matrix-row-header[data-depth="1"] {
+  padding-left: var(--space-6);
+}
+
+tr[data-group="true"] .studio-matrix-row-header {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.studio-matrix-cell {
+  border-bottom: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border);
+  padding: var(--space-1) var(--space-2);
+  text-align: center;
+  min-width: 3.5rem;
+  cursor: default;
+}
+
+.studio-matrix-cell:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.studio-matrix-cell[data-selected="true"] {
+  background: var(--color-surface-muted);
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+
+/* Hatched: the step declares no view at all, so the whole column repeats
+   this pattern regardless of row. No accent — nothing here is a state an
+   author authored, so nothing here earns ink. */
+.studio-matrix-cell[data-state="hatched"] {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--color-surface-muted),
+    var(--color-surface-muted) 3px,
+    var(--color-surface) 3px,
+    var(--color-surface) 8px
+  );
+  cursor: not-allowed;
+}
+
+.studio-matrix-cell[data-state="live"] {
+  cursor: pointer;
+}
+
+.studio-matrix-cell[data-state="live"]:hover {
+  background: var(--color-surface-muted);
+}
+
+.studio-matrix-summary {
+  display: inline-flex;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.studio-matrix-mark {
+  color: var(--color-border);
+}
+
+/* A departure from the engine's own default earns ink — the same "the
+   accent is a stamp, not a paint" rule the checks rail's issue count takes. */
+.studio-matrix-mark[data-active="true"] {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* A CEL-holding flag takes the stamp's own 2px-outline treatment, at cell
+   scale, in place of a resolved boolean it cannot know at author time. */
+.studio-matrix-mark[data-cel="true"] {
+  color: var(--color-accent);
+  border: 2px solid currentcolor;
+  padding: 0 2px;
+  font-weight: 600;
+}
+
+.studio-matrix-editor {
+  border-top: 2px solid var(--color-divider);
+  padding-top: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.studio-matrix-editor-heading {
+  margin: 0 0 var(--space-2);
+  font-size: 1rem;
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+.studio-matrix-editor-step {
+  color: var(--color-text-muted);
+  font-weight: 400;
+  font-size: 0.85rem;
+}
+
+.studio-matrix-flag-fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.studio-matrix-flag-fieldset:disabled {
+  opacity: 0.45;
+}
+
+.studio-matrix-editor-empty {
+  color: var(--color-text-muted);
+  border-top: 2px solid var(--color-divider);
+  padding-top: var(--space-3);
+  margin: 0;
+}
+
 /* The section index: the same register form as the rail, one scale down. */
 .step-section-index {
   list-style: none;

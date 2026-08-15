@@ -222,116 +222,6 @@ Spec: `development-toolchain`.
 
     Specs: `authorization`, `admin-user-management`, `instance-query`.
 
-41. **Field matrix: SHARED MODULE DONE, GRID NOT STARTED.** Raised 2026-08-15
-    in conversation. One surface lists every catalog field against every step
-    and sets `required`, `readonly` and `visible` in place, so an author stops
-    opening each step's form editor in turn. The aim is authoring speed. A
-    design pass ran the same day and took the decisions below. The six
-    numbered points after them stay the reference. Each one names a property
-    of the current engine that the first-guess build gets wrong.
-
-    The shared module `draft/view-flags.ts`, the form editor's default-aware
-    controls and the two stopping-state checks shipped 2026-08-15 as
-    `studio-view-flags-module`, this stage's first half. The grid at
-    `/processes/:id/edit/panels/matrix` does not exist yet.
-
-    **The surface writes flags alone.** A cell exists only where the step
-    already declares the field. `purchase-requisition.json` gives 54 such cells
-    against 286 in the full grid. The form editor keeps `view.fields[]`
-    membership, array order, `group` and `span`. That answers the fourth point
-    below instead of paying it. `view.group` is free text per step, and the 13
-    steps invent 10 different labels, so the matrix has no basis to pick one.
-
-    **The grid stays 22 by 13.** A step that declares no view draws an inert
-    column. A field that a step never lists draws an inert cell.
-
-    **The three flags keep their names and gain one behaviour.** Each control
-    starts at the engine's resolved default. Each writes its key only where the
-    author departs from that default, and deletes the key on return. Each takes
-    a boolean or CEL through one control. `visible` gates the other two.
-    Switching it off disables both and clears their keys.
-
-    A polarity flip lost on one fact. Every flag is `boolean | Expression`, and
-    nobody can invert an expression. `readonly: data.amount > 5000` under an
-    "Editable" label would store `!(data.amount > 5000)`. The JSON view would
-    then show the author text they never wrote. That view stays first-class, so
-    the studio keeps the JSON's own three words.
-
-    **The standardization lives in one shared module**, `draft/view-flags.ts`.
-    The form editor calls it too. `BooleanOrExpressionInput` rendered
-    `checked={value === true}` before this stage's first half shipped. An
-    absent `visible` had therefore drawn unticked while the field showed. The
-    matrix would have repeated that defect 54 times over; the checkbox now
-    reads `effectiveFlag` instead, and the defect is fixed everywhere the
-    module reaches.
-
-    **The two stopping states report rather than block.** The fifth point below
-    names both. The JSON view authors either one, so gating the matrix alone
-    would catch nothing. The readonly-with-required rule reports only where no
-    step makes the field editable, and no `Action.output`,
-    `SubprocessSpec.outputMapping`, `FieldDef.columnMapping` or
-    `ProcessContract.inputFields` entry writes it. Real reachability over a
-    cyclic graph costs more than a warning earns. The checks rail carried five
-    engine-validator sources before this stage's first half. Both rules now
-    report under the sixth, `view`, for the studio's own findings.
-
-    **The surface joins the panels screen as a fourth view**, at
-    `/processes/:id/edit/panels/matrix`. It inherits the deep link, the Back
-    behaviour, the role gate and the checks rail column. `routing.ts` and
-    `.claude/rules/ui-glossary.md` each name three views today. Both go to
-    four.
-
-    The cost sits on the field, not on the step.
-    `purchase-requisition.json` in the working tree carries 22 fields, four of
-    them nested in the `line_item` group, over 13 steps, and 54 view entries.
-    `line_item.item_description` appears in six steps, so one decision about
-    that field costs six visits today.
-
-    First, `visible` is not a peer of the other two flags. `resolveFields`
-    (`src/runtime/api.ts:441`) applies it as a `continue`: a field that fails it
-    leaves the loop and never reaches the returned list, while `required` and
-    `readonly` become properties of a field that stayed. `ResolvedViewField`
-    shows the split. It carries those two and never carries `visible`. A cell of
-    three equal switches states this wrongly. Membership belongs above the two
-    modifiers, and `visible` belongs beside a CEL input.
-
-    Second, the three flags default apart. `resolveFlag` reads an absent
-    `visible` as true and an absent `required` or `readonly` as false. The
-    surface must write a key only where the author departs from the default, and
-    must delete that key when the author returns to it. The 54 entries in
-    `purchase-requisition.json` carry no `visible` key at all. One `visible:
-    true` per entry alters `ProcessBody`, so `definitionHash` moves for an edit
-    that alters no behavior, and an identical re-publish stops being a no-op.
-
-    Third, the steps are not peers either. Three of the 13 —
-    `approval_routing`, `issue_po` and `receipt_check` — hold automatic paths,
-    carry no assignment and declare no view, so no person ever stands at one.
-    Three more are terminal and show a receipt. The full grid is 22 by 13, which
-    is 286 cells over 54 entries. Decide which steps the surface admits, or it
-    draws 232 cells that answer nothing.
-
-    Fourth, `view.fields[]` gets a second writer. The form editor owns array
-    order, `group` and `span`. The array position of a field the matrix adds
-    decides where the form renders it, and the matrix holds one row order for
-    all steps while each step holds its own. Name the owner of each key before
-    either surface writes.
-
-    Fifth, two field states stop a step, and the surface can see both.
-    `readonly` with `required`, on a field no earlier step writes, makes every
-    submission raise `required-missing`: `editableFieldIds` excludes the field,
-    so nobody can supply the value. `visible: false` with `required: true` drops
-    the requirement silently, because `resolveFields` removes the field before
-    `requiredFieldIds` counts it. Both read off `view.fields[]` alone, so both
-    belong in the checks rail whether or not the grid ships — and both do,
-    reported under `checkViewFlags` since this stage's first half.
-
-    Sixth, a grid is a keyboard problem. 286 cells need a roving focus, a header
-    that names each column to a screen reader, and a scroll region that holds no
-    focus trap. `spa-accessibility` carries the standing rules.
-
-    Specs: `studio-form-editor`, `studio-app`, `studio-checks-rail`,
-    `spa-accessibility`.
-
 ## Done
 
 Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
@@ -375,6 +265,7 @@ Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
 | 36 | Panels screen | `studio-panels-screen` | `studio-app`, `studio-checks-rail`, `studio-form-editor` |
 | 37 | Canvas nodes snap to the grid | `canvas-grid-snap` | `studio-canvas` |
 | 39 | Process chaining | `process-chaining` | `process-chaining`, `cross-process-validation` |
+| 41 | Field matrix | `studio-view-flags-module`, `studio-field-matrix` | `studio-app`, `studio-canvas`, `spa-accessibility`, `studio-form-editor`, `studio-checks-rail` |
 
 ## Changes with no stage
 

@@ -1243,3 +1243,158 @@ as it stands.
     deltas landed in `process-chaining` (new) and `cross-process-validation`.
     `tmp/open-work-priority.md` carries the work as item 14. Item 17b is
     next.
+
+41. **Field matrix: DONE.** Raised 2026-08-15 in conversation. One surface
+    lists every catalog field against every step and sets `required`,
+    `readonly` and `visible` in place, so an author stops opening each step's
+    form editor in turn. The aim is authoring speed. A design pass ran the
+    same day and took the decisions below. The six numbered points after them
+    stay the reference. Each one names a property of the current engine the
+    first-guess build gets wrong.
+
+    The shared module `draft/view-flags.ts`, the form editor's default-aware
+    controls and the two stopping-state checks shipped 2026-08-15 as
+    `studio-view-flags-module`, this stage's first half. The grid at
+    `/processes/:id/edit/panels/matrix` shipped the same day as
+    `studio-field-matrix`, this stage's second half.
+
+    `panels/FieldMatrixPanel.tsx` and `panels/fieldMatrixLogic.ts` carry the
+    grid: a `role="grid"` table with a roving tabindex, sticky header row and
+    first column, and one below-grid editor per selected live cell, driven by
+    the same three `BooleanOrExpressionInput`s the form editor's strip
+    already used. The rail badge needed a sixth counting function beside
+    `issueCountForEntityType`: `checkViewFlags` findings carry `entityType:
+    "step"`, the same entity type every other per-step issue already
+    carries, so `issueCountForSource` filters by `source: "view"` instead.
+
+    **The surface writes flags alone.** A cell exists only where the step
+    already declares the field. `purchase-requisition.json` gives 54 such cells
+    against 286 in the full grid. The form editor keeps `view.fields[]`
+    membership, array order, `group` and `span`. That answers the fourth point
+    below instead of paying it. `view.group` is free text per step, and the 13
+    steps invent 10 different labels, so the matrix has no basis to pick one.
+
+    **The grid stays 22 by 13.** A step that declares no view draws an inert
+    column. A field that a step never lists draws an inert cell.
+
+    **The three flags keep their names and gain one behaviour.** Each control
+    starts at the engine's resolved default. Each writes its key only where the
+    author departs from that default, and deletes the key on return. Each takes
+    a boolean or CEL through one control. `visible` gates the other two.
+    Switching it off disables both and clears their keys.
+
+    A polarity flip lost on one fact. Every flag is `boolean | Expression`, and
+    nobody can invert an expression. `readonly: data.amount > 5000` under an
+    "Editable" label would store `!(data.amount > 5000)`. The JSON view would
+    then show the author text they never wrote. That view stays first-class, so
+    the studio keeps the JSON's own three words.
+
+    **The standardization lives in one shared module**, `draft/view-flags.ts`.
+    The form editor calls it too. `BooleanOrExpressionInput` rendered
+    `checked={value === true}` before this stage's first half shipped. An
+    absent `visible` had therefore drawn unticked while the field showed. The
+    matrix would have repeated that defect 54 times over; the checkbox now
+    reads `effectiveFlag` instead, and the defect is fixed everywhere the
+    module reaches.
+
+    **The two stopping states report rather than block.** The fifth point below
+    names both. The JSON view authors either one, so gating the matrix alone
+    would catch nothing. The readonly-with-required rule reports only where no
+    step makes the field editable, and no `Action.output`,
+    `SubprocessSpec.outputMapping`, `FieldDef.columnMapping` or
+    `ProcessContract.inputFields` entry writes it. Real reachability over a
+    cyclic graph costs more than a warning earns. The checks rail carried five
+    engine-validator sources before this stage's first half. Both rules now
+    report under the sixth, `view`, for the studio's own findings.
+
+    **The surface joins the panels screen as a fourth view**, at
+    `/processes/:id/edit/panels/matrix`. It inherits the deep link, the Back
+    behaviour, the role gate and the checks rail column. `routing.ts` and
+    `.claude/rules/ui-glossary.md` named three views before this shipped.
+    Both name four now.
+
+    The cost sits on the field, not on the step.
+    `purchase-requisition.json` in the working tree carries 22 fields, four of
+    them nested in the `line_item` group, over 13 steps, and 54 view entries.
+    `line_item.item_description` appears in six steps, so one decision about
+    that field costs six visits today.
+
+    First, `visible` is not a peer of the other two flags. `resolveFields`
+    (`src/runtime/api.ts:441`) applies it as a `continue`: a field that fails it
+    leaves the loop and never reaches the returned list, while `required` and
+    `readonly` become properties of a field that stayed. `ResolvedViewField`
+    shows the split. It carries those two and never carries `visible`. A cell of
+    three equal switches states this wrongly. Membership belongs above the two
+    modifiers, and `visible` belongs beside a CEL input.
+
+    Second, the three flags default apart. `resolveFlag` reads an absent
+    `visible` as true and an absent `required` or `readonly` as false. The
+    surface must write a key only where the author departs from the default, and
+    must delete that key when the author returns to it. The 54 entries in
+    `purchase-requisition.json` carry no `visible` key at all. One `visible:
+    true` per entry alters `ProcessBody`, so `definitionHash` moves for an edit
+    that alters no behavior, and an identical re-publish stops being a no-op.
+
+    Third, the steps are not peers either. Three of the 13 —
+    `approval_routing`, `issue_po` and `receipt_check` — hold automatic paths,
+    carry no assignment and declare no view, so no person ever stands at one.
+    Three more are terminal and show a receipt. The full grid is 22 by 13, which
+    is 286 cells over 54 entries. Decided: all 13. The grid draws a hatched
+    column for the three that declare no view, rather than filtering them out —
+    a filter would change what "22 by 13" means per author, and no task in the
+    shipped design asked for one.
+
+    Fourth, `view.fields[]` gets a second writer. The form editor owns array
+    order, `group` and `span`. The array position of a field the matrix adds
+    decides where the form renders it, and the matrix holds one row order for
+    all steps while each step holds its own. Decided: the matrix writes flags
+    alone. Membership, order, `group` and `span` stay the form editor's.
+
+    Fifth, two field states stop a step, and the surface can see both.
+    `readonly` with `required`, on a field no earlier step writes, makes every
+    submission raise `required-missing`: `editableFieldIds` excludes the field,
+    so nobody can supply the value. `visible: false` with `required: true` drops
+    the requirement silently, because `resolveFields` removes the field before
+    `requiredFieldIds` counts it. Both read off `view.fields[]` alone, so both
+    belong in the checks rail whether or not the grid ships, and both do,
+    reported under `checkViewFlags` since this stage's first half.
+
+    Sixth, a grid is a keyboard problem. 286 cells need a roving focus, a header
+    that names each column to a screen reader, and a scroll region that holds no
+    focus trap. `spa-accessibility` carries the pattern as its own requirement
+    now, the same split `studio-canvas` already takes for the disclosure
+    pattern.
+
+    The review pass earned its place four times over. Two findings named a
+    TypeScript consequence the design's own prose implied but the tasks never
+    spelled out: `panelEntityCounts`'s parameter type had no `workflow` field
+    to read the live-cell total from, and `VIEW_ENTITY_TYPE`'s
+    `Record<PanelView, EntityType>` would have forced a bogus `matrix` entry
+    with no correct value to give it. A third found the cell editor's three
+    `BooleanOrExpressionInput`s missing `stepId`, the prop the condition
+    builder's `child.*` operands need on a subprocess step, matching the form
+    editor's own strip. A fourth found the design's own prose overclaiming an
+    `aria-rowindex` requirement the actual `spa-accessibility` delta never
+    asked for; the grid renders all 286 cells at once, so nothing here
+    virtualizes and the attribute would only repeat what the DOM already says.
+
+    A live check against `purchase-requisition` confirmed the grid draws 22
+    rows by 13 columns: 54 live, 66 hatched (three columns:
+    `approval_routing`, `issue_po`, `receipt_check`), 166 blank, summing to
+    286. Selecting a live cell and changing a flag updated the same entry in
+    the JSON surface. Turning a cell's `visible` off disabled and cleared
+    `required`/`readonly` in the same write. A CEL `visible` expression
+    round-tripped through the JSON surface unmangled. Keyboard traversal
+    (arrows, Home/End, Ctrl+Home/Ctrl+End, Enter, Escape) all worked as
+    specified, and the grid stayed the page's one tab stop throughout.
+    Authoring an unwritable-required entry through the matrix's own cell
+    editor reported exactly one `view`-group finding in the checks rail, with
+    every other group reading clear.
+
+    Applied and verified 2026-08-15. Full suite: 2667 pass, 1 skip
+    (pre-existing, unrelated), 0 fail.
+
+    Archived as `openspec/changes/archive/2026-08-15-studio-field-matrix`.
+    The deltas landed in `studio-app`, `studio-canvas` and
+    `spa-accessibility`. `tmp/open-work-priority.md` carries the work as item
+    17b. Item 15 is next.

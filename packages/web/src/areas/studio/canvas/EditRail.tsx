@@ -24,21 +24,23 @@ const ADD_ENTRIES: { kind: StepKind; label: TranslationKey; Icon: typeof SquareP
   { kind: "end", label: "palette.end", Icon: Flag },
 ];
 
+const PROCESS_ROW_LABEL: Record<PanelView, TranslationKey> = {
+  fields: "panelsScreen.linkFields",
+  dataSources: "panelsScreen.linkDataSources",
+  contract: "panelsScreen.linkContract",
+  matrix: "panelsScreen.linkFieldMatrix",
+};
+
 const PROCESS_ROWS: { view: PanelView; label: TranslationKey }[] = PANEL_VIEWS.map((view) => ({
   view,
-  label:
-    view === "fields"
-      ? "panelsScreen.linkFields"
-      : view === "dataSources"
-        ? "panelsScreen.linkDataSources"
-        : "panelsScreen.linkContract",
+  label: PROCESS_ROW_LABEL[view],
 }));
 
 /**
  * The canvas edit screen's one rail (design.md: "One rail component, not
  * two side-by-side ones"). Two labeled sections share this single column:
  * "Add to canvas" — the place-on-canvas palette, ported unchanged from the
- * now-deleted `StepPalette` — and "Process" — the three entry points into the
+ * now-deleted `StepPalette` — and "Process" — the four entry points into the
  * panels screen that the now-removed `studio-panel-links` nav used to render.
  * Both groups are register rows, ruled the same way, with a structural
  * divider between the two sections.

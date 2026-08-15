@@ -3531,10 +3531,11 @@ meets `scope=started` should infer no new permission tier from it.
   on the canvas. `routePath` emits the form path when both fields arrive. One
   route object never yields two paths.
 
-  All three views stay MOUNTED, and `hidden` shows one. Rendering the open view
+  All four views stay MOUNTED, and `hidden` shows one. Rendering the open view
   alone would drop `ContractPanel`'s half-typed outcome name. It would also
-  refetch `DataSourcesPanel`'s list keys on every switch. The attribute keeps
-  the subtree and takes it out of the accessibility tree, with no CSS.
+  refetch `DataSourcesPanel`'s list keys on every switch, and drop the field
+  matrix's selected cell. The attribute keeps the subtree and takes it out of
+  the accessibility tree, with no CSS.
 
   `panelEntityCounts` in `draft/panel-rail.ts` is the one source of the count
   beside each view's name. The canvas edit rail and the screen's index rail
@@ -3546,6 +3547,36 @@ meets `scope=started` should infer no new permission tier from it.
   writes into the in-browser draft, and the edit screen's toolbar persists it.
   A note beside the back control states that, so leaving never reads as a
   cancel.
+
+- Process Studio, the field matrix (`packages/web/src/areas/studio/panels/
+  FieldMatrixPanel.tsx`, `fieldMatrixLogic.ts`, `studio-app`,
+  `spa-accessibility`): stage 41's second half. The panels screen's fourth
+  view, at `/processes/:id/edit/panels/matrix`. Rows are the field catalog,
+  `flattenRailFields`' own depth-first order. `line_item` heads its four
+  children. Columns are `workflow.steps`, in array order.
+
+  Three cell states. A step with no `view` at all hatches its whole column.
+  A field absent from a view-bearing step's `fields` draws blank. A
+  matching entry draws live. It carries a compact mono mark per flag that
+  departs from `FLAG_DEFAULT`, boxed where the flag holds a CEL expression.
+
+  Selecting a live cell opens one editor below the grid. Three
+  `BooleanOrExpressionInput`s drive it, the same component the form
+  editor's strip already wires to `setFlag`. `gatedKeys` disables
+  `required`/`readonly` the same way there too. Escape, a different cell's
+  activation, or a click outside the grid and the editor, closes it.
+
+  The grid is `role="grid"` with a roving tabindex. It is one tab stop.
+  Arrow keys move a tracked position inside it. `Home`/`End` jump within
+  the row. `Ctrl+Home`/`Ctrl+End` jump within the grid. The
+  `spa-accessibility` capability carries the pattern as its own
+  requirement, since a two-dimensional data grid is generic.
+
+  The rail badge needed a new counting function once
+  `panelEntityCounts` gained a `matrix` key, the live-cell total. A
+  `checkViewFlags` finding carries `entityType: "step"`, the type every
+  other per-step issue carries too. `panel-rail.ts`'s
+  `issueCountForSource` filters by `source` instead.
 
 - Process Studio, the column-mapping editor
   (`packages/web/src/areas/studio/panels/columnMappingLogic.ts`,

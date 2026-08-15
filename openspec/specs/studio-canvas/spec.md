@@ -643,8 +643,8 @@ a profile rather than added speculatively.
 
 The canvas edit screen SHALL show three columns, in order. The first is
 a rail. It holds the place-on-canvas palette. Below the palette sits the
-`studio-app` capability's Process section: the Fields, Data sources, and
-Contract links.
+`studio-app` capability's Process section: the Fields, Data sources,
+Contract, and Field matrix links.
 
 The second column is the canvas. The third column shows either the
 `studio-checks-rail` capability's checks rail or the selection-driven

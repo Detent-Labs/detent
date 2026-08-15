@@ -229,10 +229,17 @@ export const en = {
   "panelsScreen.linkFields": "Fields",
   "panelsScreen.linkDataSources": "Data sources",
   "panelsScreen.linkContract": "Contract",
+  "panelsScreen.linkFieldMatrix": "Field matrix",
   "panelsScreen.railLabel": "Editors",
   "panelsScreen.unnamedField": "(unnamed field)",
   "panelsScreen.backToCanvas": "← Canvas",
   "panelsScreen.keepsChanges": "This screen keeps every change. Save from the toolbar to persist it.",
+
+  "fieldMatrix.heading": "Field matrix",
+  "fieldMatrix.scrollRegionLabel": "Field matrix grid",
+  "fieldMatrix.hatchedCell": "No view on this step",
+  "fieldMatrix.editorHeading": "Selected cell",
+  "fieldMatrix.noCellSelected": "Select a live cell to edit its flags.",
 
   "stepSections.identity": "Identity",
   "stepSections.assignment": "Assignment",

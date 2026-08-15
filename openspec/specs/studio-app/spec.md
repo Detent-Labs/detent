@@ -307,19 +307,15 @@ capability requires an author to declare a non-English base locale
 without leaving the Structure surface. The panels screen SHALL NOT hold
 it.
 
-<!-- antislop: allow synonym-rotation -->
-<!-- Why: "edit screen" is this screen's fixed name, set by the route
-     `/processes/:id/edit` and by `EditScreen.tsx`. The rule reads it as a
-     synonym for the "change" a draft holds, which is a different thing. -->
-Three links SHALL sit in the canvas edit screen's rail, under a Process
-heading: Fields, Data sources, Contract. See the `studio-canvas`
-capability's layout requirement for the rail. Each link SHALL navigate
-to the panels screen, opened at its own view. These three views cover
-the whole process, not one step. The links stay reachable whether or
-not the author has selected a step on the canvas.
+Four links SHALL sit in the canvas edit screen's rail, under a Process
+heading: Fields, Data sources, Contract, Field matrix. See the
+`studio-canvas` capability's layout requirement for the rail. Each link
+SHALL navigate to the panels screen, opened at its own view. These four
+views cover the whole process, not one step. The links stay reachable
+whether or not the author has selected a step on the canvas.
 
 The links SHALL belong to the Structure surface alone. The screen SHALL
-NOT offer them while the JSON surface is active. All three views mutate
+NOT offer them while the JSON surface is active. All four views mutate
 the draft body, and the `studio-json-view` capability requires that no
 draft-body-mutating control stays reachable there.
 
@@ -383,8 +379,8 @@ success, the screen SHALL confirm the new version number and
 
 #### Scenario: A Structure-surface link opens the panels screen
 
-- **WHEN** the developer clicks the Fields, Data sources, or Contract
-  link in the rail's Process section
+- **WHEN** the developer clicks the Fields, Data sources, Contract, or
+  Field matrix link in the rail's Process section
 - **THEN** the panels screen opens at that view, and the address bar
   carries that view's own path
 
@@ -397,7 +393,7 @@ success, the screen SHALL confirm the new version number and
 #### Scenario: The JSON surface renders no link into the panels screen
 
 - **WHEN** the developer switches to the JSON surface
-- **THEN** the three links are absent, and no control on screen reaches
+- **THEN** the four links are absent, and no control on screen reaches
   the panels screen
 
 #### Scenario: Publishing with unsaved changes prompts a save first
@@ -416,9 +412,9 @@ success, the screen SHALL confirm the new version number and
 
 ### Requirement: The panels screen is a routed sub-state of the edit screen
 
-The three process-wide views SHALL sit on a routed screen, not behind a
+The four process-wide views SHALL sit on a routed screen, not behind a
 dialog. The path SHALL read `/processes/:id/edit/panels/:view`. Here
-`:view` is one of `fields`, `dataSources` or `contract`.
+`:view` is one of `fields`, `dataSources`, `contract` or `matrix`.
 
 That path SHALL be a sub-state of the `edit` route. It rides as an
 optional field on the same route object, the shape `formStepId` already
@@ -490,16 +486,17 @@ plainly, so leaving never reads as a cancel.
 
 A panel's own unsubmitted input SHALL survive a switch between views.
 The contract panel holds a half-typed outcome name in component state.
-The data sources panel fetches its list keys on mount. All three views
-SHALL therefore stay mounted for as long as the panels screen is open.
+The data sources panel fetches its list keys on mount. The field matrix
+holds its selected cell in component state. All four views SHALL
+therefore stay mounted for as long as the panels screen is open.
 Switching a view SHALL reveal and hide them, rather than mount them.
 
-An index rail SHALL list the three views. Each entry SHALL carry two
+An index rail SHALL list the four views. Each entry SHALL carry two
 numbers, and they SHALL read as different things. The entity count says
-how many fields, data sources or outcomes the view holds. The issue
-count says how many of them are wrong. Only the issue count takes the
-refusal tone. An entry SHALL surface no issue count when the view holds
-no issue.
+how many fields, data sources, outcomes or live cells the view holds.
+The issue count says how many of them are wrong. Only the issue count
+takes the refusal tone. An entry SHALL surface no issue count when the
+view holds no issue.
 
 For the Fields view the rail SHALL also list the field catalogue and an
 Add entry. Choosing a field SHALL scroll that field's row into view
@@ -529,6 +526,12 @@ the draft's own field tree SHALL keep whatever depth it declares.
 - **WHEN** the developer types an outcome name in the Contract view,
   switches to Fields without adding it, then switches back
 - **THEN** the typed text is still in the input
+
+#### Scenario: Switching views keeps the field matrix's selected cell
+
+- **WHEN** the developer selects a live cell in the Field matrix view,
+  switches to Contract, then switches back
+- **THEN** the same cell is still selected, and its editor still shows
 
 #### Scenario: The screen offers no Save of its own
 
@@ -573,6 +576,141 @@ the draft's own field tree SHALL keep whatever depth it declares.
   a `label` carrying the base-locale value but no `de` value
 - **THEN** the screen's Fields view shows the missing-translation
   warning next to that field's label input
+
+### Requirement: The field matrix lists every catalog field against every workflow step
+
+The field matrix view SHALL draw a grid. Its rows are the field
+catalog, depth-first flattened in catalog order: a group field
+immediately followed by its own children. Its columns are
+`workflow.steps`, in array order. The grid SHALL include every catalog
+field and every step. This holds whether or not a given step's view
+references a given field.
+
+Each cell SHALL draw in one of three states:
+
+- **Hatched**, where the column's step declares no `view` at all. Every
+  cell in that column SHALL draw hatched, regardless of the row.
+- **Blank**, where the step declares a `view` and that view's `fields`
+  carries no entry referencing the row's field.
+- **Live**, where such an entry exists. A live cell SHALL show a
+  compact summary of that entry's `visible`, `required` and `readonly`
+  flags. That summary SHALL show whether any of the three carries a CEL
+  expression.
+
+#### Scenario: The grid covers the whole catalog and the whole step list
+
+- **WHEN** the developer opens the field matrix on a draft with N
+  catalog fields and M workflow steps
+- **THEN** the grid draws N rows and M columns, independent of how many
+  view entries exist
+
+#### Scenario: A group field heads its own children
+
+- **WHEN** the field catalog declares a group field with nested fields
+- **THEN** the group's row sits immediately above its children's rows,
+  in the same order the field catalog panel lists them
+
+#### Scenario: A step with no view hatches its whole column
+
+- **WHEN** a workflow step declares no `view`
+- **THEN** every cell in that step's column draws hatched, for every
+  field row
+
+#### Scenario: An unreferenced field on a view-bearing step draws blank
+
+- **WHEN** a workflow step declares a `view` whose `fields` carries no
+  entry for a given catalog field
+- **THEN** that field's cell in that step's column draws blank
+
+#### Scenario: A referenced field draws live with its flags summarized
+
+- **WHEN** a workflow step's view carries an entry referencing a
+  catalog field
+- **THEN** that cell draws live
+- **AND** its summary reflects the entry's resolved `visible`,
+  `required` and `readonly` values
+
+### Requirement: Selecting a live cell opens one flag editor for that (step, field) pair
+
+The field matrix SHALL offer no per-cell input controls. Selecting a
+live cell SHALL open one editor region below the grid. It SHALL appear
+once, and it SHALL target exactly the selected cell's view entry.
+
+The editor SHALL offer `visible`, `required` and `readonly` as
+independent boolean-or-CEL controls. Each SHALL start from the entry's
+own resolved value: an absent key reads the engine's own default, not
+false. Changing a control SHALL write to that entry's key on selection.
+It SHALL delete the key on a return to its default. That is the same
+write the `studio-form-editor` capability's strip already performs
+through `setFlag`.
+
+Where the selected cell's own `visible` is a literal `false`, the
+editor SHALL disable `required` and `readonly`, the same gating
+`studio-form-editor`'s strip already applies.
+
+Selecting a hatched or a blank cell SHALL close the editor, or leave it
+closed. Neither state names a view entry to edit.
+
+#### Scenario: Selecting a live cell opens its editor
+
+- **WHEN** the developer selects a live cell
+- **THEN** the editor appears below the grid, showing that cell's
+  `visible`, `required` and `readonly` controls at their resolved
+  values
+
+#### Scenario: Editing a control writes the same entry the form editor writes
+
+- **WHEN** the developer changes one of the editor's three controls
+- **THEN** the underlying step's view entry for that field updates
+  immediately, in the in-browser draft, without a Save control
+
+#### Scenario: A control returning to its default clears the key
+
+- **WHEN** the developer sets a control back to the engine's own
+  default for that flag
+- **THEN** the corresponding key is absent from the view entry. It does
+  not carry the default value instead
+
+#### Scenario: Turning visible off disables the other two controls
+
+- **WHEN** the developer sets the selected cell's `visible` control to
+  literal `false`
+- **THEN** the `required` and `readonly` controls disable, and their
+  keys clear from the entry
+
+#### Scenario: Selecting a hatched or blank cell shows no editor
+
+- **WHEN** the developer selects a hatched cell or a blank cell
+- **THEN** no flag editor appears for it
+
+### Requirement: The field matrix's rail entry counts view entries and view findings
+
+The panels screen's index rail SHALL show the field matrix's entity
+count. That count is the total number of view entries across every
+step in the draft. A live cell represents one of that same total.
+
+This is the matrix's analogue of two other counts. The Fields view
+counts catalog rows. The Contract view counts outcomes.
+
+The field matrix's issue count SHALL equal the number of open findings
+`checkViewFlags` reports over the whole draft. Those are the
+`view`-sourced findings the `studio-checks-rail` capability's rail
+already groups under that name. The count SHALL NOT come from the step
+entity type. A `checkViewFlags` finding shares that entity type with
+every other per-step issue in the draft.
+
+#### Scenario: The entity count matches the live-cell total
+
+- **WHEN** the developer opens the field matrix on a draft with 54 view
+  entries across its steps
+- **THEN** the rail's Field matrix entry shows 54 as its entity count
+
+#### Scenario: The issue count reflects only view-source findings
+
+- **WHEN** the draft carries one `checkViewFlags` finding and several
+  unrelated issues on the same steps, from other sources
+- **THEN** the rail's Field matrix entry shows an issue count of 1, not
+  a count including the unrelated issues
 
 ### Requirement: The process header declares the process's base locale
 

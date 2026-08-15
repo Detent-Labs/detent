@@ -934,3 +934,59 @@ reads required and read-only, with nothing writing it. Add that field to
 Repeat the walk in German. Pass: the Visible, Required and Read-only labels
 and the checks rail heading translate. The two new rail messages stay in
 English, the same as every other engine-validator message the rail shows.
+
+<!-- antislop: allow-file synonym-rotation -->
+<!-- Why: this file already carries the rule's two collisions elsewhere.
+     "JSON surface" is `.claude/rules/ui-glossary.md`'s fixed name, and an
+     earlier canvas section's "render" (of a browser painting a page) is a
+     different concept the rule reads as a synonym for it. This section's
+     own "issue" names the checks rail's EditorIssue concept, per the
+     "View flags" walk just above it; an earlier canvas section's "defect"
+     names an unrelated rendering bug the rule also conflates it with. -->
+### The field matrix (`studio-field-matrix`)
+
+Open Studio, `purchase-requisition`, the canvas rail's Process section.
+Pass: a fourth row, Field matrix, sits below Contract, reading 54 as its
+count.
+
+Open the field matrix. Pass: 22 rows, `line_item` drawn as a group header
+over its four children, indented once. Pass: 13 columns, in the process's
+own step order. Pass: three columns hatch. They are `approval_routing`,
+`issue_po` and `receipt_check`, the three steps with no view at all.
+
+Select a live cell. Pass: an editor opens below the grid, showing that
+cell's Visible, Required and Read-only controls at their resolved values.
+Change Required. Pass: the same entry updates in the JSON surface, in
+place.
+
+Turn the selected cell's Visible off. Pass: Required and Read-only
+disable, and both keys clear from the entry in the same write.
+
+Author a CEL expression for Visible through the cell editor. Pass: it
+round-trips through the JSON surface unmangled. The live cell's mark
+shows it carries an expression, not a resolved boolean.
+
+Select a hatched cell, then a blank cell. Pass: neither opens an editor.
+Press Escape while a cell's editor is open. Pass: it closes. Click
+outside the grid and the editor while one is open. Pass: it closes.
+
+Tab to the grid. Pass: focus lands on it once, not once per cell.
+
+Press an arrow key. Pass: focus moves one cell in that direction, and
+the grid stays the page's one tab stop. Press Home and End. Pass: focus
+moves to the first and last cell in the current row.
+
+Press Ctrl+Home and Ctrl+End. Pass: focus moves to the grid's first and
+last cell. Press Enter or Space on a live cell. Pass: its editor opens,
+the same as a click.
+
+Switch the studio's content locale to German. Pass: no column clips or
+overflows at 1280px. No column width visibly derives from the English
+step label; a German label wraps inside its column instead.
+
+Open the panels screen's index rail. Pass: the Field matrix entry's
+issue count reflects only `checkViewFlags` findings. It excludes an
+unrelated per-step issue, a path's CEL issue say, on the same steps.
+Author a hidden-required or unwritable-required entry through the field
+matrix's own cell editor. Pass: the same `view` group entry the form
+editor's walk above already covers appears in the checks rail.

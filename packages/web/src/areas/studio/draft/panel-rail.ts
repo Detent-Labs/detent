@@ -1,7 +1,7 @@
 import type { Step } from "workflow-engine/schema";
 import type { DraftOf } from "./types";
 import type { DraftField } from "./fields";
-import type { EditorIssue, EntityType } from "./issues";
+import type { EditorIssue, EntityType, IssueSource } from "./issues";
 import type { PanelView } from "../routing";
 
 type DraftStep = DraftOf<Step>;
@@ -14,16 +14,21 @@ type DraftStep = DraftOf<Step>;
  *
  * `fields` counts rail rows, not catalog entries: a group field contributes
  * itself and its children, which is what either rail lists.
+ *
+ * `matrix` counts live cells: every `view.fields[]` entry across every step,
+ * the same total the field matrix's grid draws one live cell per.
  */
 export function panelEntityCounts(draft: {
   fields?: DraftField[];
   dataSources?: unknown[];
   contract?: { outcomes?: unknown[] };
+  workflow?: { steps?: { view?: { fields?: unknown[] } }[] };
 }): Record<PanelView, number> {
   return {
     fields: flattenRailFields(draft.fields).length,
     dataSources: (draft.dataSources ?? []).length,
     contract: (draft.contract?.outcomes ?? []).length,
+    matrix: (draft.workflow?.steps ?? []).reduce((sum, step) => sum + (step.view?.fields?.length ?? 0), 0),
   };
 }
 
@@ -65,6 +70,14 @@ export function flattenRailFields(fields: DraftField[] | undefined): RailFieldRo
  * `field` for Fields, `dataSource` for Data sources, `contract` for Contract. */
 export function issueCountForEntityType(issues: readonly EditorIssue[], entityType: EntityType): number {
   return issues.filter((i) => i.entityType === entityType).length;
+}
+
+/** The field matrix's own issue count, filtered by `source` rather than
+ * `entityType`: `checkViewFlags` issues carry `entityType: "step"`, the same
+ * type every other per-step issue (a path's CEL issue, an action's registry
+ * issue) already carries, so `issueCountForEntityType` cannot isolate them. */
+export function issueCountForSource(issues: readonly EditorIssue[], source: IssueSource): number {
+  return issues.filter((i) => i.source === source).length;
 }
 
 /**
