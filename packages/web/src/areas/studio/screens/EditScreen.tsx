@@ -18,6 +18,8 @@ import { CanvasView } from "../canvas/CanvasView.js";
 import { EditRail } from "../canvas/EditRail.js";
 import { snapToGrid, svgPointFromClient, DEFAULT_EDGE_STYLE, type Point, type EdgeStyle } from "../canvas/geometry.js";
 import { canGroup, groupMatching, type StepGroup } from "../canvas/groups.js";
+import { arrangeSteps, hasHandPlacedStep } from "../canvas/arrange.js";
+import type { LayoutStep } from "../canvas/layout.js";
 import { newStep, type StepKind } from "../draft/createStep.js";
 import { addToDraftArray } from "../draft/draft-array-crud.js";
 import { JsonView } from "../panels/JsonView.js";
@@ -143,6 +145,20 @@ function EditorArea({ processId, formStepId, panel, token, initialRevision, init
   // model's `mutate()` (design.md: the two are separate existing surfaces).
   const onMoveStep = (stepId: string, point: Point) => {
     setSaveState((s) => ({ ...s, layout: { ...s.layout, [stepId]: point } }));
+  };
+
+  // Overwrites every step's position at once, unlike onMoveStep's one-step
+  // write, and clears every waypoint too (design.md, Decisions 2 and 4).
+  // Gated by hasHandPlacedStep, the same confirm()/t() pattern DraftToolbar
+  // already uses for Publish and Discard (design.md, Decision 5).
+  const onArrange = () => {
+    if (hasHandPlacedStep(steps as LayoutStep[], saveState.layout) && !confirm(t("canvas.arrangeConfirm"))) return;
+    const arranged = arrangeSteps(steps as LayoutStep[], groups, draft.workflow?.initialStep, saveState.layout);
+    setSaveState((s) => {
+      const next: Record<string, unknown> = { ...s.layout, waypoints: {} };
+      for (const [stepId, point] of Object.entries(arranged)) next[stepId] = snapToGrid(point);
+      return { ...s, layout: next };
+    });
   };
 
   // The second argument carries a clicked path's id (task 3.13); a node
@@ -305,6 +321,7 @@ function EditorArea({ processId, formStepId, panel, token, initialRevision, init
               <CanvasView
                 layout={saveState.layout}
                 onMoveStep={onMoveStep}
+                onArrange={onArrange}
                 selectedStepIds={selectedStepIds}
                 onSelectStep={onSelectStep}
                 onSelectSteps={onSelectSteps}

@@ -1184,6 +1184,73 @@ as it stands.
     schema, no hash and no published body moves. Specs: `studio-canvas`
     (modified).
 
+38. Automatic canvas layout: DONE. Change: `studio-canvas-auto-layout`.
+    Raised 2026-08-15 in conversation, proposed and archived the same day.
+
+    The roadmap's own branch condition did not survive a real run. It held
+    that `d3-dag` v1's `graphConnect` might throw on a cycle, and that a
+    throw would decide the library in `@dagrejs/dagre`'s favor. Neither
+    `graphConnect`/`sugiyama()` nor `dagre.layout()` threw, tested against
+    the real cyclic edge lists from `expense-approval.json` (one back
+    edge) and `purchase-requisition.json` (four back edges), inside an
+    isolated scratch package outside this repo's workspace glob. Three
+    measured properties decided `dagre` instead: 16.9kb gzipped against
+    `d3-dag`'s 37.7kb, a `rankdir: "LR"` axis assignment matching
+    `autoPlaceSteps`'s own depth-to-column convention with no transform
+    needed, and first-party TypeScript types through `dagre`'s own
+    `exports` map.
+
+    A collapsed or an expanded group arranges as one rigid unit: fed to
+    `dagre` as a single synthetic node, sized by its current box, with
+    every member then moved by the same delta as the box itself. Arrange
+    overwrites every step's position at once and clears every stored
+    waypoint, behind a confirm gate that gathers over both a hand-placed
+    step and an existing waypoint. Flow order exempts a path that closes
+    a cycle: a two-step cycle makes both directions of the ordering
+    impossible to satisfy at once, so the delta spec's own requirement
+    carries that exemption rather than an unconditional rule its own
+    reference data would violate.
+
+    The review pass earned its place nine times over, across two
+    Critical findings and seven Warnings, all confirmed after adversarial
+    verification with zero refutations. The first Critical: `arrangeSteps`
+    sized a group's box against the raw `existingLayout` blob, and
+    `groupBox`/`drawnBox` return `undefined` under two members with a
+    real position, a state a never-dragged group reaches easily. The fix
+    builds a resolved position map first, the same fallback
+    `CanvasView.tsx`'s own `positionOf` already applies. The second
+    Critical: the delta spec's flow-order requirement was unconditional,
+    and a back edge makes it mathematically impossible to satisfy in both
+    directions of a cycle. The fix narrows the requirement to exempt a
+    path that closes one.
+
+    The Warnings ranged from a misattributed open question (the
+    group-handling decision traces to `tmp/open-work-priority.md`'s own
+    planning note, not to `ROADMAP.md`'s stage entry, which never
+    mentions groups) to task-ordering (the i18n group ran after the
+    wiring group that references its keys) to an untested confirm
+    predicate, now extracted as `hasHandPlacedStep` with its own test.
+
+    Applied and verified 2026-08-15. Full suite: 2680 pass, 1 skip
+    (pre-existing, unrelated), 0 fail.
+
+    A live check against `purchase-requisition` confirmed Arrange ran
+    with no confirm on a never-dragged draft, positioned all 13 steps at
+    distinct non-overlapping points on the lattice, and produced no
+    console error. A real pointer-driven drag on an arranged step, by
+    exactly 3 grid steps in `x` and 2 in `y`, landed at exactly that
+    delta with no extra offset. Grouping two steps and re-arranging kept
+    their relative offset (180, -100) exactly, both expanded and,
+    separately, collapsed. A real waypoint, dragged onto a path by hand,
+    cleared on the next arrange. The studio catalog carries English only,
+    confirmed again here: the Arrange button read "Arrange" under the
+    German UI locale too, and the toolbar held three buttons within
+    579px, well inside 1280px, either way.
+
+    Archived as `openspec/changes/archive/2026-08-15-studio-canvas-auto-layout`.
+    The delta landed in `studio-canvas`. `tmp/open-work-priority.md`
+    carries the work as item 15, the queue's last row.
+
 39. Process chaining: DONE. Change: `process-chaining`. Raised 2026-08-15 in
     conversation, proposed and archived the same day.
 

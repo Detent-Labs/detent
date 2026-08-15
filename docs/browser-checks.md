@@ -990,3 +990,38 @@ unrelated per-step issue, a path's CEL issue say, on the same steps.
 Author a hidden-required or unwritable-required entry through the field
 matrix's own cell editor. Pass: the same `view` group entry the form
 editor's walk above already covers appears in the checks rail.
+
+### Automatic canvas layout (`studio-canvas-auto-layout`)
+
+Open Studio, `purchase-requisition`, the canvas. Pass: the toolbar
+carries a third control, Arrange, beside Fit to view and Rounded
+corners.
+
+Click Arrange on the freshly seeded draft. Pass: no confirm dialog
+appears, since no step carries a hand-placed position yet. All 13 steps
+land at distinct, non-overlapping positions, in a legible left-to-right
+flow. The browser console shows no error.
+
+Click Arrange again. Pass: a confirm dialog appears this time, since
+every step now carries an explicit position from the first arrange.
+Decline it. Pass: every step's position stays exactly where the first
+arrange left it.
+
+Drag a step Arrange has just positioned, by a real pointer gesture
+covering exactly 3 grid steps in `x` and 2 in `y`. Pass: the step lands
+at exactly that delta from its arranged position, with no extra offset.
+
+Select two steps and group them. Note their relative offset. Click
+Arrange, accept the confirm. Pass: the group's own position on the
+canvas changes, and the two members keep their exact prior relative
+offset.
+
+Collapse the group. Drag a waypoint onto a nearby path by hand. Click
+Arrange, and accept the confirm. Pass: the collapsed group still
+renders as one box, and its members still keep their relative offset.
+The waypoint is gone.
+
+Switch the account menu's Language to German. Pass: the button still
+reads "Arrange". The studio catalog carries English only, the same
+finding the field matrix's own walk above already made. The toolbar's
+three buttons stay well inside a 1280px viewport either way.

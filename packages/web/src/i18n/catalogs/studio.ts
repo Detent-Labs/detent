@@ -291,6 +291,9 @@ export const en = {
   "issues.notChecked": "not checked",
 
   "canvas.fitToView": "Fit to view",
+  "canvas.arrange": "Arrange",
+  "canvas.arrangeConfirm":
+    "Arrange every step from the workflow graph? This overwrites every saved position and clears any waypoint a path carries.",
   "canvas.elseMarker": "else",
   "canvas.initialStamp": "start",
   "canvas.inspectorEmpty": "Select a step or a path to edit it.",

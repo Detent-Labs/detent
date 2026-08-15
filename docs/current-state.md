@@ -1467,6 +1467,27 @@ Stage-by-stage status is in `ROADMAP.md`.
   candidate and the user declined it: a 813 KB beta WASM module against a
   712 KB bundle, buying obstacle avoidance alone. Stage 33's control points are
   the intended answer to a crossing edge.
+- Automatic canvas layout (`packages/web/src/areas/studio/canvas/arrange.ts`,
+  `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`,
+  `i18n/catalogs/studio.ts`, `studio-canvas`): the canvas toolbar's third
+  control, "Arrange", beside "Fit to view" and the edge-style toggle.
+
+  `arrangeSteps` computes a position for every step at once, through
+  `@dagrejs/dagre`'s layered algorithm (`rankdir: "LR"`), unlike
+  `autoPlaceSteps`'s missing-only default. A collapsed or an expanded
+  group arranges as one rigid node, sized by its current box; every
+  member then moves by that same delta, keeping its position inside the
+  group unchanged. Arrange overwrites every stored step position and
+  clears every stored waypoint. A confirm dialog gates the call whenever
+  the draft carries a hand-placed step or an existing waypoint, through
+  the extracted `hasHandPlacedStep`, and skips it on a never-touched
+  draft.
+
+  Neither `d3-dag` nor `@dagrejs/dagre` throws on a cycle, contrary to
+  the stage's own original premise; `dagre` won on bundle weight and on
+  matching `autoPlaceSteps`'s own depth-to-column axis convention. Flow
+  order exempts a path that closes a cycle, since a rework loop makes
+  both directions of that ordering impossible to satisfy at once.
 - Process Studio — lifecycle (`src/http/studio-routes.ts`, `src/engine/drafts.ts`,
   `src/http/errors.ts`, `packages/web/src/areas/studio/panels/DraftToolbar.tsx`,
   `packages/web/src/areas/studio/screens/{VersionsScreen,MigrationPlanScreen}.tsx`,

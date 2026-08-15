@@ -22,7 +22,9 @@ export const ROW_HEIGHT = 120;
  *
  * Returns positions for the missing steps only — a step already present in
  * `existingLayout` is left untouched (design.md: this is a rendering
- * default, not persisted until the step is dragged).
+ * default, not persisted until the step is dragged). `arrange.ts`'s
+ * `arrangeSteps` is the opposite: every step, always, on explicit
+ * invocation.
  */
 export function autoPlaceSteps(
   steps: LayoutStep[],

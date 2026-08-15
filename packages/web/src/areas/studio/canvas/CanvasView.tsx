@@ -40,6 +40,9 @@ const REJECT_MESSAGE_MS = 4000;
 interface Props {
   layout: Record<string, unknown>;
   onMoveStep: (stepId: string, point: Point) => void;
+  /** Overwrites every step's position at once and clears every waypoint,
+   * behind its own confirm gate (design.md, Decisions 2, 4 and 5). */
+  onArrange: () => void;
   /** The selection is a set, not one id (design.md): it is the interaction
    * state stages 30 to 34 build on, and multi-move and multi-delete come with
    * it. A set of one behaves exactly as the single selection did. */
@@ -78,6 +81,7 @@ function isPoint(value: unknown): value is Point {
 export function CanvasView({
   layout,
   onMoveStep,
+  onArrange,
   selectedStepIds,
   onSelectStep,
   onSelectSteps,
@@ -668,6 +672,9 @@ export function CanvasView({
           onClick={() => onEdgeStyleChange(edgeStyle === "smoothstep" ? "step" : "smoothstep")}
         >
           {t("canvas.edgeStyleToggle")}
+        </button>
+        <button type="button" className="btn btn-secondary" onClick={onArrange}>
+          {t("canvas.arrange")}
         </button>
       </div>
       <svg

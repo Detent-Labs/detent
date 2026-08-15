@@ -84,52 +84,6 @@ Spec: `development-toolchain`.
     straight line from it. A control that moved under the pointer is harder to
     press, and a drag in flight has no target to face.
 
-38. **Automatic canvas layout: NOT STARTED.** Raised 2026-08-15 in
-    conversation. Today `autoPlaceSteps` in `canvas/layout.ts` positions a step
-    only when `layout` carries none for it. It walks breadth-first from
-    `initialStep`, maps depth to a column at `COLUMN_WIDTH` 240 and arrival
-    order to a row at `ROW_HEIGHT` 120, and appends an unreachable step one
-    column past the deepest it reached. It never reads a node's size, never
-    orders the steps inside a column, and treats a path that returns to an
-    earlier step as one more edge to skip. This stage adds one arrange over the
-    whole graph, invoked by the author. It does not change the placement
-    default for a new step.
-
-    The graphs hold cycles, and that fact decides the library. A depth-first
-    pass over the examples counts one back edge in `expense-approval.json`,
-    `booking_error -> book`, and four in the 13-step
-    `purchase-requisition.json` in the working tree, `manager_approval ->
-    draft` among them. Both are ordinary rework loops. A layered layout
-    therefore has to break the cycles before it ranks, and restore them after,
-    or it fails on the definitions this repository already carries.
-
-    Two candidates, both MIT. `@dagrejs/dagre` documents the cycle break as the
-    first step of its pipeline: `acyclic.run` reverses a back edge and
-    `acyclic.undo` restores its direction once the layout is computed. It is
-    also the maintained fork, since plain `dagre` was archived in 2023.
-    `d3-dag` is TypeScript-native and lets the layering, the crossing pass and
-    the coordinate pass be chosen apart from each other. One question separates
-    the two: whether its v1 `graphConnect` builder breaks a cycle or throws on
-    one. The v0 line threw. Answer that before choosing. If it throws, the
-    caller owns about twenty lines of back-edge detection, which is the work
-    the library was meant to supply.
-
-    Three candidates were dropped. `elkjs` is EPL-2.0 against this package's
-    AGPL-3.0-or-later, and it ships a GWT-compiled artifact large enough to
-    want a worker. Its one clear advantage, nested compound nodes, has no use
-    here: a subprocess is call-and-return and never draws inside its parent.
-    Graphviz through `@hpcc-js/wasm` is EPL-1.0 and takes DOT strings. A
-    force-directed layout settles differently on each run and produces no flow
-    direction.
-
-    Two constraints hold whichever wins. Position stays in the opaque `layout`
-    blob, so no schema, no `definitionHash` and no published body moves, the
-    property stage 37 also rests on. And the result must land on the 20-unit
-    lattice `snapToGrid` enforces, so the rank and node separations stay whole
-    multiples of `GRID_STEP`. Otherwise the first drag of an arranged step
-    shifts it, the defect stage 37 closed.
-    Spec: `studio-canvas`.
-
 40. **Permission model rework: DESIGNED, NOT BUILT.** Raised 2026-08-15 in
     conversation. A design pass ran the same day and took the decisions below.
     Nobody is blocked by the current model, so this stage records a direction
@@ -264,6 +218,7 @@ Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
 | 35 | Starter access to a started instance | `starter-instance-list` | `http-wrapper`, `end-user-app` |
 | 36 | Panels screen | `studio-panels-screen` | `studio-app`, `studio-checks-rail`, `studio-form-editor` |
 | 37 | Canvas nodes snap to the grid | `canvas-grid-snap` | `studio-canvas` |
+| 38 | Automatic canvas layout | `studio-canvas-auto-layout` | `studio-canvas` |
 | 39 | Process chaining | `process-chaining` | `process-chaining`, `cross-process-validation` |
 | 41 | Field matrix | `studio-view-flags-module`, `studio-field-matrix` | `studio-app`, `studio-canvas`, `spa-accessibility`, `studio-form-editor`, `studio-checks-rail` |
 

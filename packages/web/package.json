@@ -10,6 +10,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^3.1.1",
     "@panzoom/panzoom": "^4.6.0",
     "form-ui": "file:../form-ui",
     "immer": "^11.1.15",
