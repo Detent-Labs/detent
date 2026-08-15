@@ -1241,4 +1241,5 @@ as it stands.
 
     Archived as `openspec/changes/archive/2026-08-15-process-chaining`. The
     deltas landed in `process-chaining` (new) and `cross-process-validation`.
-    `tmp/open-work-priority.md` closes the second queue with this item.
+    `tmp/open-work-priority.md` carries the work as item 14. Item 17b is
+    next.
