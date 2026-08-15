@@ -1394,7 +1394,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   `EditorArea` holds `selectedStepIds: string[]`. A set of one drives the
   inspector exactly as the single id did. A set of several drives a summary
   instead — a count, a Remove steps control, and the same collapsed checks rail
-  the inspector docks — because the inspector edits one step.
+  the inspector shows — because the inspector edits one step.
 
   `canvas/selection.ts` exports `toggleSelection`, `normalizeRect` and
   `nodesInRect`, all pure and covered by
@@ -3670,3 +3670,68 @@ meets `scope=started` should infer no new permission tier from it.
   `Bun.serve` misses a test that binds through `startHttpServer`. The sweep
   that finds both reads every file naming `process.env.PORT`, `startHttpServer`
   or `Bun.serve`.
+
+- The editor dock (`packages/web/src/areas/studio/dock/`,
+  `screens/EditScreen.tsx`, `areas/studio/app.css`, `studio-canvas`): the
+  canvas edit screen left its lower band empty on a tall window. The grid
+  `.studio-canvas-layout` grows with the viewport, and the canvas fills its
+  middle column. The 12rem `EditRail` and the 22rem `ChecksRail` do not. The
+  dock is a collapsible strip below that grid, full width, collapsed by
+  default.
+
+  It is a flex SIBLING of the grid, never a fourth grid child. That template is
+  a strict three columns, so a fourth child lands in an implicit fourth one.
+  The parent `.studio-edit-screen` is already a flex column, and item 1 gave
+  the grid `flex: 1 1 auto` with `min-height: 36rem`. The dock takes
+  `flex: 0 0 auto`. The grid therefore yields its height down to that floor,
+  and the page scrolls past it.
+
+  Measured at 1440 by 900: the grid draws 40rem collapsed and 36rem open, over
+  186px of header rows.
+
+  It renders in the canvas sub-state of the Structure surface alone. That is a
+  rule rather than a preference. The Field matrix tab writes the draft body
+  through `setFlag`. The capability `studio-json-view` keeps every such
+  component out of reach while the JSON surface is active. Mounting the dock
+  inside the ladder's last arm satisfies that rule for free.
+
+  Three tabs ship. All three mount while the dock is open, and `hidden` reveals
+  one. That is the reveal-rather-than-mount rule `PanelsScreen` already
+  follows.
+
+  The Changes tab runs `diffJson(strippedBase, draft)` over the LIVE draft,
+  unsaved edits included. Base first is load-bearing. The function reports a
+  key present in its second argument alone as `added`, and it reads `from` off
+  the first. So the draft-first order `VersionsScreen.diffAgainstBase()` uses
+  would read every addition as a removal.
+
+  The Field matrix tab mounts `FieldMatrixPanel`, which takes no props and
+  shares the one `DraftProvider`. The Paths tab is the one new view. It gives
+  one row per path over source step, trigger, priority, guard and target.
+
+  The module `dock/pathRows.ts` carries that derivation as a pure function,
+  with `packages/web/test/studio-dock-path-rows.test.ts` behind it. Every row
+  carries `guardSrc`, with no branch on the trigger. The schema puts `guard` on
+  the path beside `trigger`, and `resolveAvailablePaths` evaluates a manual
+  path's guard before offering it. The inspector `PathsPanel` shows the guard
+  editor for an automatic path only. Switching a guarded path back to manual
+  keeps the guard, so a real draft reaches that state.
+
+  `EditorAreaProps` gained `loadedBaseVersion`, which `EditScreen.load`
+  discarded before. That prop cannot move, because `load` depends on
+  `processId`, `token` and `onUnauthorized` alone. So `EditorArea` derives
+  `publishResult?.version ?? loadedBaseVersion`. The Changes tab then refetches
+  after a publish with no reload.
+
+  The dock persists nothing. The open flag and the active tab are `EditorArea`
+  component state. The `layout` blob takes no key: it is per-draft, so one
+  author's open dock would open for every author.
+
+  The browser check found what no test could. The rule
+  `.studio-matrix-scroll` caps at 32rem and scrolls itself. The dock scopes
+  that cap DOWN to 11rem rather than lifting it.
+
+  Lifting it looks right and breaks the sticky headers. The declaration
+  `overflow: auto` keeps that box a scroll container. A `position: sticky`
+  header therefore resolves against it, not against the dock body. The column
+  header moved 858px to 608px under a 250px scroll.

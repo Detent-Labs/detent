@@ -23,8 +23,9 @@ pairs that go wrong span both sections, so both live in one file.
 | inspector panel | one section inside the inspector | `panels/StepsPanel.tsx` and what it nests |
 | edit rail | the creation palette: add a step, a path, an outcome | `canvas/EditRail.tsx` |
 | checks rail | the validation issue list | `panels/ChecksRail.tsx` |
+| dock | the collapsible strip below the canvas columns | `dock/EditorDock.tsx` |
 | panels screen | the routed screen holding the four process-wide views | `screens/PanelsScreen.tsx` |
-| field matrix | the panels-screen view listing every field against every step | `panels/FieldMatrixPanel.tsx` |
+| field matrix | the grid of every field against every step, on the panels screen and in the dock | `panels/FieldMatrixPanel.tsx` |
 | player | the step-form preview an author drives | `screens/PlayerScreen.tsx` |
 | JSON surface | the raw definition view | `panels/JsonView.tsx` |
 
@@ -36,8 +37,13 @@ the canvas. Say *edit rail* or *checks rail*, every time.
 contract, and the field matrix. The component name carries the word
 `Panels`. The views are not inspector panels.
 
+**dock** names the strip below the canvas columns, and nothing else. It is a
+noun here. Several live specs still use "dock" as a verb for the collapsed
+checks rail. The class `.studio-checks-rail-docked` carries that verb too.
+Neither reading names the strip.
+
 The checks rail renders in three places. It sits beside the canvas in full
-until an author selects a step. The inspector then docks a second instance,
+until an author selects a step. The inspector then shows a second instance,
 collapsed, at its bottom edge. The panels screen carries a third, in full. All
 three are the checks rail.
 

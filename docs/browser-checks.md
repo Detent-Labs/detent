@@ -97,7 +97,7 @@ Pass: the panels screen opens, the canvas is gone, and the address bar reads
 `/studio/processes/<id>/edit/panels/fields`.
 
 Read the third column. Pass: it lists every open check, grouped, in full. It
-is not the one-line summary the inspector docks.
+is not the one-line summary the inspector shows.
 
 Type a name into the Contract view's outcome input without adding it. Switch
 to Fields, then back. Pass: the typed text is still there. A remount would
@@ -140,7 +140,7 @@ added:
   grouped-list state, each source group (zod, structural, cel, registry,
   duration). Check the held-back state too (a later group waiting on an
   earlier one), and the all-clear state.
-- **Checks rail, docked in the inspector** (`studio-edit-header-cleanup`):
+- **Checks rail, collapsed in the inspector** (`studio-edit-header-cleanup`):
   a step or a path selected. Check the collapsed one-line summary at the
   inspector's bottom edge. It carries three states: a count, "no count"
   when clear, the held-back indicator. Expand it in place. The grouped
@@ -324,9 +324,9 @@ Source: `studio-canvas-fills-vertically` tasks 2.1, 2.2 and 2.6.
 Seed the database. Open a draft on the canvas edit screen, in a window 1440px
 tall or taller.
 
-Pass: the three columns end at the window's bottom edge, less the screen's own
-`padding-bottom`. The canvas stands taller than 36rem. No page scrollbar
-appears.
+Pass: the three columns end at the top edge of the collapsed dock, which
+`studio-editor-dock` added below them. The canvas stands taller than 36rem. No
+page scrollbar appears.
 
 Resize the window under 700px tall. Pass: the columns hold at 36rem, and the
 page scrolls to reach their bottom edge. That is the floor, and it renders what
@@ -703,7 +703,7 @@ others stay, and the column shows the full checks rail again. If one of them
 was the initial step, the start marker moved to a remaining step.
 
 Select two steps and read the bottom of the column. Pass: the collapsed checks
-summary still docks there, with the same count the inspector shows.
+summary still sits there, with the same count the inspector shows.
 
 Now pan the canvas with a plain drag. Pass: it pans, as it always did. The
 marquee took nothing away.
@@ -1025,3 +1025,59 @@ Switch the account menu's Language to German. Pass: the button still
 reads "Arrange". The studio catalog carries English only, the same
 finding the field matrix's own walk above already made. The toolbar's
 three buttons stay well inside a 1280px viewport either way.
+
+### The editor dock (`studio-editor-dock`)
+
+Source: `studio-editor-dock` tasks 9.6 to 9.14.
+
+<!-- "canvas edit screen" is the glossary name of the screen. The linter reads
+     its "edit" as a synonym of "change". -->
+<!-- antislop: allow synonym-rotation -->
+
+Seed the database and open a draft on the canvas edit screen.
+
+Pass: the dock sits below the three columns, collapsed. It shows one control
+row and no tab body. That control is a `<button type="button">` carrying
+`aria-expanded="false"` and `aria-controls="studio-dock-body"`.
+
+Open the dock. Pass: three tabs appear, Changes active. The grid holds at or
+above 36rem, and the canvas stays visible above the dock.
+
+Measure the height at a 1440 by 900 window. The header rows take 186px. The
+grid therefore draws 40rem collapsed and 36rem open, and the page then
+scrolls. Both numbers are the point of the check. Read them rather than
+judging them.
+
+Choose Paths. Pass: `purchase-requisition` gives 22 rows over five columns.
+Each row names the step the path leaves and the step it enters. An automatic
+path shows its priority and its guard's CEL.
+
+A manual path with neither reads "No priority" and "No guard". The body holds
+16rem. It scrolls inside itself.
+
+Choose Field matrix. Pass: the grid draws inside the dock. Scroll it and watch
+the column header. Pass: the header stays put.
+
+That is the check that earns this walk. Lifting `.studio-matrix-scroll`'s cap
+leaves the header behind. The cap comes down instead. `overflow: auto` keeps
+that box a scroll container with nothing to scroll.
+
+Rename the process without saving, then read Changes. Pass: the entry reads
+`label.en`, its first value is the published name and its second is the unsaved
+one. That order is the whole point. The reverse reads every addition as a
+removal.
+
+Save, then publish from the header menu. Pass: the tab refetches with no
+reload, and it reports that the draft matches the version just published.
+
+Open the panels screen, the form editor, and the JSON surface in turn. Pass:
+none of the three shows the dock, control included. The JSON one is a rule
+rather than a preference. The Field matrix tab writes the draft body, and
+`studio-json-view` keeps every such component out of reach there.
+
+Narrow the window to 1024px wide with Paths open. Pass: the table scrolls
+inside the dock. Neither the page nor the screen scrolls sideways.
+
+Switch the account menu's Language to German. Pass: the dock still reads
+English. The studio catalog carries English only, the same finding the two
+walks above already made.

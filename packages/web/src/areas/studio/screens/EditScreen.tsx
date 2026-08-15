@@ -23,6 +23,7 @@ import type { LayoutStep } from "../canvas/layout.js";
 import { newStep, type StepKind } from "../draft/createStep.js";
 import { addToDraftArray } from "../draft/draft-array-crud.js";
 import { JsonView } from "../panels/JsonView.js";
+import { EditorDock, type DockTab } from "../dock/EditorDock.js";
 import { describeCaughtError } from "../errors.js";
 import { FormEditorScreen } from "./FormEditorScreen.js";
 
@@ -46,6 +47,13 @@ interface EditorAreaProps {
   token: string;
   initialRevision: number;
   initialLayout: Record<string, unknown>;
+  /** The published version this draft sits on, for the dock's Changes tab.
+   * Not `initialBaseVersion`: `initialRevision` and `initialLayout` seed a
+   * useState, and this one seeds nothing. `EditScreen` never refreshes the
+   * loaded record — `load` depends on processId/token/onUnauthorized alone —
+   * so a publish moves the real base version without moving this prop.
+   * `EditorArea` folds `publishResult.version` over it instead. */
+  loadedBaseVersion: number | null;
   navigate: (route: Route) => void;
   onUnauthorized: () => void;
 }
@@ -56,7 +64,7 @@ interface EditorAreaProps {
  * remaining direct consumer of `DraftToolbarProps`; `DraftToolbar` itself no
  * longer mounts here (design.md: "DraftToolbar keeps its logic.
  * ProcessHeaderBar renders the buttons."). */
-function EditorArea({ processId, formStepId, panel, token, initialRevision, initialLayout, navigate, onUnauthorized }: EditorAreaProps) {
+function EditorArea({ processId, formStepId, panel, token, initialRevision, initialLayout, loadedBaseVersion, navigate, onUnauthorized }: EditorAreaProps) {
   const { draft, mutate, validation, replace, contentLocale } = useDraft();
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
   // The canvas selection is a set (design.md). A set of one drives the
@@ -65,6 +73,13 @@ function EditorArea({ processId, formStepId, panel, token, initialRevision, init
   const [selectedStepIds, setSelectedStepIds] = useState<string[]>([]);
   const [selectedPathId, setSelectedPathId] = useState<string | undefined>(undefined);
   const [surface, setSurface] = useState<"structure" | "json">("structure");
+  // The dock persists nothing. Component state, so both survive a canvas
+  // selection and a trip to the panels screen (this component stays mounted
+  // across the ladder), and a reload returns the dock to collapsed. Neither
+  // goes into `saveState.layout`: that blob is per-draft, so one author's
+  // open dock would open for every author of the draft.
+  const [dockOpen, setDockOpen] = useState(false);
+  const [dockTab, setDockTab] = useState<DockTab>("changes");
   const fields = draftFields(draft);
 
   const steps = draft.workflow?.steps ?? [];
@@ -76,6 +91,12 @@ function EditorArea({ processId, formStepId, panel, token, initialRevision, init
   // they live moves up one level, the same way saveState already works.
   const [savedBody, dispatchSavedBody] = useReducer(savedBodyReducer, draft, initialSavedBody);
   const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
+  // `loadedBaseVersion` cannot move: `EditScreen.load` depends on
+  // processId/token/onUnauthorized alone, and neither the publish path nor
+  // the conflict reload re-runs it. A publish DOES move the stored base
+  // version — `markDraftPublished` sets `base_version` inside the publish
+  // transaction — and the response carries the new number, so fold it over.
+  const dockBaseVersion = publishResult?.version ?? loadedBaseVersion;
   // Client-only, set on every successful save (never on a reload) — new
   // state DraftToolbar tracks nowhere today.
   const [lastSavedAt, setLastSavedAt] = useState<Date | undefined>(undefined);
@@ -316,6 +337,7 @@ function EditorArea({ processId, formStepId, panel, token, initialRevision, init
               <p className="studio-error">{t("formEditor.stepNotFound")}</p>
             )
           ) : (
+            <>
             <div className="studio-canvas-layout">
               <EditRail onDrop={onPaletteDrop} onOpenPanel={(view) => navigate({ name: "edit", processId, panel: view })} />
               <CanvasView
@@ -422,6 +444,25 @@ function EditorArea({ processId, formStepId, panel, token, initialRevision, init
                 <ChecksRail validation={validation} />
               )}
             </div>
+            {/* The dock is a flex SIBLING of the grid, not a fourth grid
+              * child: `.studio-canvas-layout`'s template is a strict three
+              * columns, so a fourth child would land in an implicit fourth
+              * one. `.studio-edit-screen` is already a flex column, and the
+              * grid inside it carries `flex: 1 1 auto` with `min-height:
+              * 36rem`, so the grid yields its height to the dock down to that
+              * floor and the page scrolls past it. Item 1 built that pair. */}
+            <EditorDock
+              processId={processId}
+              token={token}
+              draft={draft}
+              contentLocale={contentLocale}
+              baseVersion={dockBaseVersion}
+              open={dockOpen}
+              onOpenChange={setDockOpen}
+              tab={dockTab}
+              onTabChange={setDockTab}
+            />
+            </>
           )}
         </>
       ) : (
@@ -507,6 +548,7 @@ export function EditScreen({ processId, formStepId, panel, token, navigate, onUn
         token={token}
         initialRevision={state.record.revision}
         initialLayout={state.record.layout}
+        loadedBaseVersion={state.record.baseVersion}
         navigate={navigate}
         onUnauthorized={onUnauthorized}
       />
