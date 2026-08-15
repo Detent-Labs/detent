@@ -1,0 +1,1289 @@
+{
+  "processId": "proc_7d41e0b6-5c2a-4f19-9e83-6b0d4a71c58f",
+  "version": 1,
+  "definitionHash": "f0f139c0dbce34f733b939d6455f5fbed1f44058089426aaa5ec111aa13ced2b",
+  "status": "published",
+  "publishedAt": "2026-08-15T09:00:00Z",
+  "definition": {
+    "key": "purchase_requisition",
+    "label": {
+      "en": "Purchase Requisition"
+    },
+    "description": {
+      "en": "Requisition to paid invoice: capture, manager approval, amount-based finance approval, PO issue against the ERP, goods receipt with a quantity check, and invoice matching. Two routing steps carry the automatic decisions; the PO step is a wait-state whose paths branch on what the ERP wrote back."
+    },
+    "baseLocale": "en",
+    "contract": {
+      "inputFields": [
+        "field_9c7e5b31-0001-4a1c-8e2f-000000000001",
+        "field_9c7e5b31-0002-4a1c-8e2f-000000000002",
+        "field_9c7e5b31-0004-4a1c-8e2f-000000000004",
+        "field_9c7e5b31-0005-4a1c-8e2f-000000000005",
+        "field_9c7e5b31-0006-4a1c-8e2f-000000000006",
+        "field_9c7e5b31-0007-4a1c-8e2f-000000000007",
+        "field_9c7e5b31-0008-4a1c-8e2f-000000000008",
+        "field_9c7e5b31-0010-4a1c-8e2f-000000000010",
+        "field_9c7e5b31-0011-4a1c-8e2f-000000000011"
+      ],
+      "outputFields": [
+        "field_9c7e5b31-0016-4a1c-8e2f-000000000016",
+        "field_9c7e5b31-0021-4a1c-8e2f-000000000021"
+      ],
+      "outcomes": [
+        "closed",
+        "rejected",
+        "withdrawn"
+      ]
+    },
+    "fields": [
+      {
+        "id": "field_9c7e5b31-0001-4a1c-8e2f-000000000001",
+        "key": "cost_center",
+        "label": {
+          "en": "Cost Center"
+        },
+        "type": "select",
+        "options": [
+          {
+            "value": "cc_1000",
+            "label": {
+              "en": "CC-1000 Engineering"
+            }
+          },
+          {
+            "value": "cc_2000",
+            "label": {
+              "en": "CC-2000 Marketing"
+            }
+          },
+          {
+            "value": "cc_3000",
+            "label": {
+              "en": "CC-3000 Operations"
+            }
+          }
+        ]
+      },
+      {
+        "id": "field_9c7e5b31-0002-4a1c-8e2f-000000000002",
+        "key": "category",
+        "label": {
+          "en": "Category"
+        },
+        "type": "select",
+        "options": [
+          {
+            "value": "it_hardware",
+            "label": {
+              "en": "IT Hardware"
+            }
+          },
+          {
+            "value": "software_license",
+            "label": {
+              "en": "Software License"
+            }
+          },
+          {
+            "value": "professional_services",
+            "label": {
+              "en": "Professional Services"
+            }
+          },
+          {
+            "value": "facilities",
+            "label": {
+              "en": "Facilities"
+            }
+          }
+        ]
+      },
+      {
+        "id": "field_9c7e5b31-0003-4a1c-8e2f-000000000003",
+        "key": "line_item",
+        "label": {
+          "en": "Line Item"
+        },
+        "description": {
+          "en": "Catalog grouping only. The payload stays flat: a guard reads data.quantity, not data.line_item.quantity."
+        },
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_9c7e5b31-0004-4a1c-8e2f-000000000004",
+            "key": "item_description",
+            "label": {
+              "en": "What is being bought"
+            },
+            "type": "string",
+            "validation": {
+              "minLength": 5,
+              "maxLength": 200
+            }
+          },
+          {
+            "id": "field_9c7e5b31-0005-4a1c-8e2f-000000000005",
+            "key": "quantity",
+            "label": {
+              "en": "Quantity"
+            },
+            "type": "number",
+            "validation": {
+              "min": 1,
+              "max": 1000
+            }
+          },
+          {
+            "id": "field_9c7e5b31-0006-4a1c-8e2f-000000000006",
+            "key": "unit_price",
+            "label": {
+              "en": "Unit Price"
+            },
+            "type": "number",
+            "validation": {
+              "min": 0
+            }
+          },
+          {
+            "id": "field_9c7e5b31-0007-4a1c-8e2f-000000000007",
+            "key": "currency",
+            "label": {
+              "en": "Currency"
+            },
+            "type": "select",
+            "options": [
+              {
+                "value": "CHF",
+                "label": {
+                  "en": "CHF"
+                }
+              },
+              {
+                "value": "EUR",
+                "label": {
+                  "en": "EUR"
+                }
+              },
+              {
+                "value": "USD",
+                "label": {
+                  "en": "USD"
+                }
+              }
+            ],
+            "default": "CHF"
+          }
+        ]
+      },
+      {
+        "id": "field_9c7e5b31-0008-4a1c-8e2f-000000000008",
+        "key": "vendor",
+        "label": {
+          "en": "Vendor"
+        },
+        "description": {
+          "en": "Options come from the approved-vendor data source. Picking a row copies its payment_terms column into the field below."
+        },
+        "type": "select",
+        "dataSource": "ds_6f2a8d47-0001-4a1c-8e2f-000000000001",
+        "columnMapping": {
+          "payment_terms": "field_9c7e5b31-0009-4a1c-8e2f-000000000009"
+        }
+      },
+      {
+        "id": "field_9c7e5b31-0009-4a1c-8e2f-000000000009",
+        "key": "payment_terms",
+        "label": {
+          "en": "Payment Terms"
+        },
+        "description": {
+          "en": "Written by the vendor field's columnMapping. Read-only everywhere a participant sees it."
+        },
+        "type": "string"
+      },
+      {
+        "id": "field_9c7e5b31-0010-4a1c-8e2f-000000000010",
+        "key": "needed_by",
+        "label": {
+          "en": "Needed By"
+        },
+        "type": "date"
+      },
+      {
+        "id": "field_9c7e5b31-0011-4a1c-8e2f-000000000011",
+        "key": "justification",
+        "label": {
+          "en": "Business Justification"
+        },
+        "type": "string",
+        "validation": {
+          "minLength": 20,
+          "maxLength": 1000
+        }
+      },
+      {
+        "id": "field_9c7e5b31-0012-4a1c-8e2f-000000000012",
+        "key": "budget_ok",
+        "label": {
+          "en": "Covered by the cost center's remaining budget"
+        },
+        "type": "boolean"
+      },
+      {
+        "id": "field_9c7e5b31-0013-4a1c-8e2f-000000000013",
+        "key": "manager_note",
+        "label": {
+          "en": "Manager Note"
+        },
+        "type": "string",
+        "validation": {
+          "maxLength": 500
+        }
+      },
+      {
+        "id": "field_9c7e5b31-0014-4a1c-8e2f-000000000014",
+        "key": "finance_note",
+        "label": {
+          "en": "Finance Note"
+        },
+        "type": "string",
+        "validation": {
+          "maxLength": 500
+        }
+      },
+      {
+        "id": "field_9c7e5b31-0015-4a1c-8e2f-000000000015",
+        "key": "rejection_reason",
+        "label": {
+          "en": "Rejection Reason"
+        },
+        "description": {
+          "en": "Fill this in when you reject. A path carries no data of its own, so a reviewer records the reason in the form before taking the reject path."
+        },
+        "type": "select",
+        "options": [
+          {
+            "value": "over_budget",
+            "label": {
+              "en": "Over budget"
+            }
+          },
+          {
+            "value": "no_business_case",
+            "label": {
+              "en": "No business case"
+            }
+          },
+          {
+            "value": "vendor_not_approved",
+            "label": {
+              "en": "Vendor not approved"
+            }
+          },
+          {
+            "value": "duplicate_request",
+            "label": {
+              "en": "Duplicate request"
+            }
+          }
+        ]
+      },
+      {
+        "id": "field_9c7e5b31-0016-4a1c-8e2f-000000000016",
+        "key": "po_number",
+        "label": {
+          "en": "PO Number"
+        },
+        "description": {
+          "en": "Written back by the ERP action, never typed by a participant."
+        },
+        "type": "string"
+      },
+      {
+        "id": "field_9c7e5b31-0017-4a1c-8e2f-000000000017",
+        "key": "po_status",
+        "label": {
+          "en": "PO Status"
+        },
+        "description": {
+          "en": "Written back by the ERP action. The two automatic paths out of Issue PO read this and nothing else."
+        },
+        "type": "select",
+        "options": [
+          {
+            "value": "pending",
+            "label": {
+              "en": "Pending"
+            }
+          },
+          {
+            "value": "issued",
+            "label": {
+              "en": "Issued"
+            }
+          },
+          {
+            "value": "failed",
+            "label": {
+              "en": "Failed"
+            }
+          }
+        ],
+        "default": "pending"
+      },
+      {
+        "id": "field_9c7e5b31-0018-4a1c-8e2f-000000000018",
+        "key": "received_quantity",
+        "label": {
+          "en": "Quantity Received"
+        },
+        "type": "number",
+        "validation": {
+          "min": 0
+        }
+      },
+      {
+        "id": "field_9c7e5b31-0019-4a1c-8e2f-000000000019",
+        "key": "receipt_note",
+        "label": {
+          "en": "Receipt Note"
+        },
+        "type": "string",
+        "validation": {
+          "maxLength": 500
+        }
+      },
+      {
+        "id": "field_9c7e5b31-0020-4a1c-8e2f-000000000020",
+        "key": "discrepancy_note",
+        "label": {
+          "en": "Discrepancy Note"
+        },
+        "type": "string",
+        "validation": {
+          "maxLength": 500
+        }
+      },
+      {
+        "id": "field_9c7e5b31-0021-4a1c-8e2f-000000000021",
+        "key": "invoice_number",
+        "label": {
+          "en": "Invoice Number"
+        },
+        "type": "string",
+        "validation": {
+          "maxLength": 60
+        }
+      },
+      {
+        "id": "field_9c7e5b31-0022-4a1c-8e2f-000000000022",
+        "key": "invoice_amount",
+        "label": {
+          "en": "Invoice Amount"
+        },
+        "type": "number",
+        "validation": {
+          "min": 0
+        }
+      }
+    ],
+    "dataSources": [
+      {
+        "id": "ds_6f2a8d47-0001-4a1c-8e2f-000000000001",
+        "key": "approved_vendors",
+        "type": "static",
+        "config": {
+          "options": [
+            {
+              "value": "helvetia_hardware",
+              "label": {
+                "en": "Helvetia Hardware AG"
+              },
+              "attributes": {
+                "payment_terms": "Net 30"
+              }
+            },
+            {
+              "value": "alpine_office",
+              "label": {
+                "en": "Alpine Office Supplies"
+              },
+              "attributes": {
+                "payment_terms": "Net 14"
+              }
+            },
+            {
+              "value": "northwind_consulting",
+              "label": {
+                "en": "Northwind Consulting"
+              },
+              "attributes": {
+                "payment_terms": "Net 45"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "workflow": {
+      "initialStep": "step_2d6f8a04-0001-4a1c-8e2f-000000000001",
+      "steps": [
+        {
+          "id": "step_2d6f8a04-0001-4a1c-8e2f-000000000001",
+          "key": "draft",
+          "label": {
+            "en": "Draft Requisition"
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": ["requester"]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_9c7e5b31-0001-4a1c-8e2f-000000000001",
+                "group": "Request",
+                "required": true
+              },
+              {
+                "ref": "field_9c7e5b31-0002-4a1c-8e2f-000000000002",
+                "group": "Request",
+                "required": true
+              },
+              {
+                "ref": "field_9c7e5b31-0010-4a1c-8e2f-000000000010",
+                "group": "Request",
+                "required": true
+              },
+              {
+                "ref": "field_9c7e5b31-0011-4a1c-8e2f-000000000011",
+                "group": "Request",
+                "required": true,
+                "span": 2
+              },
+              {
+                "ref": "field_9c7e5b31-0004-4a1c-8e2f-000000000004",
+                "group": "Line item",
+                "required": true,
+                "span": 2
+              },
+              {
+                "ref": "field_9c7e5b31-0005-4a1c-8e2f-000000000005",
+                "group": "Line item",
+                "required": true
+              },
+              {
+                "ref": "field_9c7e5b31-0006-4a1c-8e2f-000000000006",
+                "group": "Line item",
+                "required": true
+              },
+              {
+                "ref": "field_9c7e5b31-0007-4a1c-8e2f-000000000007",
+                "group": "Line item",
+                "required": true
+              },
+              {
+                "ref": "field_9c7e5b31-0008-4a1c-8e2f-000000000008",
+                "group": "Vendor",
+                "required": true
+              },
+              {
+                "ref": "field_9c7e5b31-0009-4a1c-8e2f-000000000009",
+                "group": "Vendor",
+                "readonly": true
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_5e1b7c93-0001-4a1c-8e2f-000000000001",
+              "key": "submit",
+              "label": "Submit for approval",
+              "to": "step_2d6f8a04-0002-4a1c-8e2f-000000000002",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_5e1b7c93-0002-4a1c-8e2f-000000000002",
+              "key": "withdraw",
+              "label": "Withdraw",
+              "to": "step_2d6f8a04-0013-4a1c-8e2f-000000000013",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_2d6f8a04-0002-4a1c-8e2f-000000000002",
+          "key": "manager_approval",
+          "label": {
+            "en": "Manager Approval"
+          },
+          "description": {
+            "en": "Assigned by org.manager-of-starter: the manager of whoever started the instance, resolved at entry against the account directory."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "org.manager-of-starter",
+              "config": {}
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_9c7e5b31-0004-4a1c-8e2f-000000000004",
+                "group": "Request",
+                "readonly": true,
+                "span": 2
+              },
+              {
+                "ref": "field_9c7e5b31-0005-4a1c-8e2f-000000000005",
+                "group": "Request",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0006-4a1c-8e2f-000000000006",
+                "group": "Request",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0007-4a1c-8e2f-000000000007",
+                "group": "Request",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0001-4a1c-8e2f-000000000001",
+                "group": "Request",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0011-4a1c-8e2f-000000000011",
+                "group": "Request",
+                "readonly": true,
+                "span": 2
+              },
+              {
+                "ref": "field_9c7e5b31-0012-4a1c-8e2f-000000000012",
+                "group": "Decision",
+                "required": true
+              },
+              {
+                "ref": "field_9c7e5b31-0015-4a1c-8e2f-000000000015",
+                "group": "Decision"
+              },
+              {
+                "ref": "field_9c7e5b31-0013-4a1c-8e2f-000000000013",
+                "group": "Decision",
+                "span": 2
+              }
+            ]
+          },
+          "timers": [
+            {
+              "id": "timer_7a3d9e15-0001-4a1c-8e2f-000000000001",
+              "description": "Reminder when the manager has not decided after 3 days.",
+              "duration": "P3D",
+              "onFire": {
+                "actions": [
+                  {
+                    "id": "action_4b8c2f60-0001-4a1c-8e2f-000000000001",
+                    "type": "notification.email",
+                    "config": {
+                      "to": ["manager@example.com"],
+                      "subject": "Purchase requisition waiting for your approval",
+                      "body": "A purchase requisition has waited three days for your decision."
+                    },
+                    "execution": "async",
+                    "retry": {
+                      "maxAttempts": 3,
+                      "backoff": "exponential",
+                      "baseDelay": "PT10S"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "timer_7a3d9e15-0002-4a1c-8e2f-000000000002",
+              "description": "After 7 days the manager step is skipped and finance decides. A timer-forced transition bypasses the target path's guard.",
+              "duration": "P7D",
+              "onFire": {
+                "targetPath": "path_5e1b7c93-0006-4a1c-8e2f-000000000006"
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "path_5e1b7c93-0003-4a1c-8e2f-000000000003",
+              "key": "approve",
+              "label": "Approve",
+              "to": "step_2d6f8a04-0003-4a1c-8e2f-000000000003",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_5e1b7c93-0004-4a1c-8e2f-000000000004",
+              "key": "request-changes",
+              "label": "Send back for changes",
+              "to": "step_2d6f8a04-0001-4a1c-8e2f-000000000001",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_5e1b7c93-0005-4a1c-8e2f-000000000005",
+              "key": "reject",
+              "label": "Reject",
+              "to": "step_2d6f8a04-0012-4a1c-8e2f-000000000012",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_5e1b7c93-0006-4a1c-8e2f-000000000006",
+              "key": "escalate",
+              "label": "Escalate to finance",
+              "to": "step_2d6f8a04-0004-4a1c-8e2f-000000000004",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_2d6f8a04-0003-4a1c-8e2f-000000000003",
+          "key": "approval_routing",
+          "label": {
+            "en": "Route by Amount"
+          },
+          "description": {
+            "en": "No form and no assignee: the instance passes straight through. Anything at or above 10000 needs a second signature from finance; everything else goes to the PO."
+          },
+          "type": "task",
+          "paths": [
+            {
+              "id": "path_5e1b7c93-0007-4a1c-8e2f-000000000007",
+              "key": "needs-finance",
+              "label": "Needs finance approval",
+              "to": "step_2d6f8a04-0004-4a1c-8e2f-000000000004",
+              "trigger": "automatic",
+              "priority": 1,
+              "guard": {
+                "lang": "cel",
+                "src": "data.quantity * data.unit_price >= 10000.0"
+              }
+            },
+            {
+              "id": "path_5e1b7c93-0008-4a1c-8e2f-000000000008",
+              "key": "under-threshold",
+              "label": "Under threshold",
+              "to": "step_2d6f8a04-0005-4a1c-8e2f-000000000005",
+              "trigger": "automatic",
+              "priority": 2
+            }
+          ]
+        },
+        {
+          "id": "step_2d6f8a04-0004-4a1c-8e2f-000000000004",
+          "key": "finance_review",
+          "label": {
+            "en": "Finance Review"
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": ["finance-approver"]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_9c7e5b31-0004-4a1c-8e2f-000000000004",
+                "group": "Request",
+                "readonly": true,
+                "span": 2
+              },
+              {
+                "ref": "field_9c7e5b31-0005-4a1c-8e2f-000000000005",
+                "group": "Request",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0006-4a1c-8e2f-000000000006",
+                "group": "Request",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0007-4a1c-8e2f-000000000007",
+                "group": "Request",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0001-4a1c-8e2f-000000000001",
+                "group": "Request",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0008-4a1c-8e2f-000000000008",
+                "group": "Vendor",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0009-4a1c-8e2f-000000000009",
+                "group": "Vendor",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0013-4a1c-8e2f-000000000013",
+                "group": "Decision",
+                "readonly": true,
+                "span": 2
+              },
+              {
+                "ref": "field_9c7e5b31-0014-4a1c-8e2f-000000000014",
+                "group": "Decision",
+                "required": true,
+                "span": 2
+              },
+              {
+                "ref": "field_9c7e5b31-0015-4a1c-8e2f-000000000015",
+                "group": "Decision"
+              }
+            ]
+          },
+          "timers": [
+            {
+              "id": "timer_7a3d9e15-0003-4a1c-8e2f-000000000003",
+              "description": "Reminder when finance has not decided after 5 days.",
+              "duration": "P5D",
+              "onFire": {
+                "actions": [
+                  {
+                    "id": "action_4b8c2f60-0002-4a1c-8e2f-000000000002",
+                    "type": "notification.email",
+                    "config": {
+                      "to": ["finance-approver@example.com"],
+                      "subject": "Purchase requisition waiting for finance approval",
+                      "body": "A purchase requisition has waited five days for a finance decision."
+                    },
+                    "execution": "async",
+                    "retry": {
+                      "maxAttempts": 3,
+                      "backoff": "exponential",
+                      "baseDelay": "PT10S"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "path_5e1b7c93-0009-4a1c-8e2f-000000000009",
+              "key": "approve",
+              "label": "Approve",
+              "to": "step_2d6f8a04-0005-4a1c-8e2f-000000000005",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_5e1b7c93-0010-4a1c-8e2f-000000000010",
+              "key": "reject",
+              "label": "Reject",
+              "to": "step_2d6f8a04-0012-4a1c-8e2f-000000000012",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_2d6f8a04-0005-4a1c-8e2f-000000000005",
+          "key": "issue_po",
+          "label": {
+            "en": "Issue Purchase Order"
+          },
+          "description": {
+            "en": "Wait-state. onEntry posts the order to the ERP; the response writes po_number and po_status back into the payload. Two guarded automatic paths and no default: no match means wait, bounded by the 1-day timer. The devcontainer's webhook sink echoes the request body, so config.body is what comes back."
+          },
+          "type": "task",
+          "onEntry": [
+            {
+              "id": "action_4b8c2f60-0003-4a1c-8e2f-000000000003",
+              "type": "http.request",
+              "config": {
+                "url": "http://webhook-sink:8080/hooks/purchase-order",
+                "method": "POST",
+                "body": {
+                  "po_number": "PO-2026-000123",
+                  "status": "issued"
+                }
+              },
+              "output": {
+                "field_9c7e5b31-0016-4a1c-8e2f-000000000016": {
+                  "lang": "cel",
+                  "src": "result.body.po_number"
+                },
+                "field_9c7e5b31-0017-4a1c-8e2f-000000000017": {
+                  "lang": "cel",
+                  "src": "result.body.status"
+                }
+              },
+              "execution": "async",
+              "idempotencyKey": null,
+              "retry": {
+                "maxAttempts": 5,
+                "backoff": "exponential",
+                "baseDelay": "PT30S"
+              },
+              "timeout": "PT30S"
+            }
+          ],
+          "onCancel": [
+            {
+              "id": "action_4b8c2f60-0006-4a1c-8e2f-000000000006",
+              "type": "http.request",
+              "config": {
+                "url": "http://webhook-sink:8080/hooks/purchase-order-cancelled",
+                "method": "POST"
+              },
+              "execution": "async",
+              "idempotencyKey": null,
+              "retry": {
+                "maxAttempts": 3,
+                "backoff": "exponential",
+                "baseDelay": "PT10S"
+              },
+              "timeout": "PT10S"
+            }
+          ],
+          "timers": [
+            {
+              "id": "timer_7a3d9e15-0004-4a1c-8e2f-000000000004",
+              "description": "Escape hatch: the ERP answered neither issued nor failed within a day.",
+              "duration": "P1D",
+              "onFire": {
+                "targetPath": "path_5e1b7c93-0012-4a1c-8e2f-000000000012"
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "path_5e1b7c93-0011-4a1c-8e2f-000000000011",
+              "key": "po-issued",
+              "label": "PO issued",
+              "to": "step_2d6f8a04-0007-4a1c-8e2f-000000000007",
+              "trigger": "automatic",
+              "priority": 1,
+              "guard": {
+                "lang": "cel",
+                "src": "data.po_status == 'issued'"
+              }
+            },
+            {
+              "id": "path_5e1b7c93-0012-4a1c-8e2f-000000000012",
+              "key": "po-failed",
+              "label": "PO failed",
+              "to": "step_2d6f8a04-0006-4a1c-8e2f-000000000006",
+              "trigger": "automatic",
+              "priority": 2,
+              "guard": {
+                "lang": "cel",
+                "src": "data.po_status == 'failed'"
+              }
+            }
+          ]
+        },
+        {
+          "id": "step_2d6f8a04-0006-4a1c-8e2f-000000000006",
+          "key": "po_error",
+          "label": {
+            "en": "PO Error"
+          },
+          "description": {
+            "en": "A visible fault state instead of a hidden rollback. Procurement decides whether to retry the ERP call or drop the requisition."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": ["procurement"]
+              }
+            }
+          },
+          "view": {
+            "fields": [
+              {
+                "ref": "field_9c7e5b31-0004-4a1c-8e2f-000000000004",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0008-4a1c-8e2f-000000000008",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0017-4a1c-8e2f-000000000017",
+                "readonly": true
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_5e1b7c93-0013-4a1c-8e2f-000000000013",
+              "key": "retry",
+              "label": "Retry the ERP call",
+              "to": "step_2d6f8a04-0005-4a1c-8e2f-000000000005",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_5e1b7c93-0014-4a1c-8e2f-000000000014",
+              "key": "abandon",
+              "label": "Abandon",
+              "to": "step_2d6f8a04-0012-4a1c-8e2f-000000000012",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_2d6f8a04-0007-4a1c-8e2f-000000000007",
+          "key": "await_goods",
+          "label": {
+            "en": "Await Delivery"
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": ["requester"]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_9c7e5b31-0004-4a1c-8e2f-000000000004",
+                "group": "Ordered",
+                "readonly": true,
+                "span": 2
+              },
+              {
+                "ref": "field_9c7e5b31-0005-4a1c-8e2f-000000000005",
+                "group": "Ordered",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0016-4a1c-8e2f-000000000016",
+                "group": "Ordered",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0018-4a1c-8e2f-000000000018",
+                "group": "Receipt",
+                "required": true
+              },
+              {
+                "ref": "field_9c7e5b31-0019-4a1c-8e2f-000000000019",
+                "group": "Receipt",
+                "span": 2
+              }
+            ]
+          },
+          "timers": [
+            {
+              "id": "timer_7a3d9e15-0005-4a1c-8e2f-000000000005",
+              "description": "Chase the vendor when nothing has been booked in 30 days.",
+              "duration": "P30D",
+              "onFire": {
+                "actions": [
+                  {
+                    "id": "action_4b8c2f60-0004-4a1c-8e2f-000000000004",
+                    "type": "notification.email",
+                    "config": {
+                      "to": ["procurement@example.com"],
+                      "subject": "Purchase order overdue",
+                      "body": "A purchase order has been open for 30 days with no goods receipt."
+                    },
+                    "execution": "async",
+                    "retry": {
+                      "maxAttempts": 3,
+                      "backoff": "exponential",
+                      "baseDelay": "PT10S"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "path_5e1b7c93-0015-4a1c-8e2f-000000000015",
+              "key": "record-receipt",
+              "label": "Record the receipt",
+              "to": "step_2d6f8a04-0008-4a1c-8e2f-000000000008",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_2d6f8a04-0008-4a1c-8e2f-000000000008",
+          "key": "receipt_check",
+          "label": {
+            "en": "Check the Receipt"
+          },
+          "description": {
+            "en": "The quantity half of a three-way match. A short delivery goes to procurement; a complete one goes to invoicing."
+          },
+          "type": "task",
+          "paths": [
+            {
+              "id": "path_5e1b7c93-0016-4a1c-8e2f-000000000016",
+              "key": "delivered-in-full",
+              "label": "Delivered in full",
+              "to": "step_2d6f8a04-0010-4a1c-8e2f-000000000010",
+              "trigger": "automatic",
+              "priority": 1,
+              "guard": {
+                "lang": "cel",
+                "src": "data.received_quantity >= data.quantity"
+              }
+            },
+            {
+              "id": "path_5e1b7c93-0017-4a1c-8e2f-000000000017",
+              "key": "short-delivery",
+              "label": "Short delivery",
+              "to": "step_2d6f8a04-0009-4a1c-8e2f-000000000009",
+              "trigger": "automatic",
+              "priority": 2
+            }
+          ]
+        },
+        {
+          "id": "step_2d6f8a04-0009-4a1c-8e2f-000000000009",
+          "key": "discrepancy",
+          "label": {
+            "en": "Resolve Discrepancy"
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": ["procurement"]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_9c7e5b31-0005-4a1c-8e2f-000000000005",
+                "group": "Ordered vs received",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0018-4a1c-8e2f-000000000018",
+                "group": "Ordered vs received",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0019-4a1c-8e2f-000000000019",
+                "group": "Ordered vs received",
+                "readonly": true,
+                "span": 2
+              },
+              {
+                "ref": "field_9c7e5b31-0020-4a1c-8e2f-000000000020",
+                "group": "Resolution",
+                "required": true,
+                "span": 2
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_5e1b7c93-0018-4a1c-8e2f-000000000018",
+              "key": "accept-partial",
+              "label": "Accept the partial delivery",
+              "to": "step_2d6f8a04-0010-4a1c-8e2f-000000000010",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_5e1b7c93-0019-4a1c-8e2f-000000000019",
+              "key": "expect-remainder",
+              "label": "Wait for the remainder",
+              "to": "step_2d6f8a04-0007-4a1c-8e2f-000000000007",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_5e1b7c93-0020-4a1c-8e2f-000000000020",
+              "key": "reject",
+              "label": "Return to the vendor and reject",
+              "to": "step_2d6f8a04-0012-4a1c-8e2f-000000000012",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_2d6f8a04-0010-4a1c-8e2f-000000000010",
+          "key": "invoice_match",
+          "label": {
+            "en": "Match the Invoice"
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": ["accounts-payable"]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_9c7e5b31-0016-4a1c-8e2f-000000000016",
+                "group": "Order",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0009-4a1c-8e2f-000000000009",
+                "group": "Order",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0005-4a1c-8e2f-000000000005",
+                "group": "Order",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0006-4a1c-8e2f-000000000006",
+                "group": "Order",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0021-4a1c-8e2f-000000000021",
+                "group": "Invoice",
+                "required": true
+              },
+              {
+                "ref": "field_9c7e5b31-0022-4a1c-8e2f-000000000022",
+                "group": "Invoice",
+                "required": true
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_5e1b7c93-0021-4a1c-8e2f-000000000021",
+              "key": "approve-payment",
+              "label": "Approve for payment",
+              "to": "step_2d6f8a04-0011-4a1c-8e2f-000000000011",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_5e1b7c93-0022-4a1c-8e2f-000000000022",
+              "key": "dispute",
+              "label": "Dispute the invoice",
+              "to": "step_2d6f8a04-0009-4a1c-8e2f-000000000009",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_2d6f8a04-0011-4a1c-8e2f-000000000011",
+          "key": "closed",
+          "label": {
+            "en": "Closed"
+          },
+          "type": "task",
+          "terminal": true,
+          "outcome": "closed",
+          "onEntry": [
+            {
+              "id": "action_4b8c2f60-0005-4a1c-8e2f-000000000005",
+              "type": "notification.email",
+              "config": {
+                "to": ["accounts-payable@example.com"],
+                "subject": "Requisition closed",
+                "body": "Goods were received and the invoice was approved for payment."
+              },
+              "execution": "async",
+              "retry": {
+                "maxAttempts": 3,
+                "backoff": "exponential",
+                "baseDelay": "PT10S"
+              }
+            }
+          ],
+          "view": {
+            "fields": [
+              {
+                "ref": "field_9c7e5b31-0016-4a1c-8e2f-000000000016",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0021-4a1c-8e2f-000000000021",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0022-4a1c-8e2f-000000000022",
+                "readonly": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "step_2d6f8a04-0012-4a1c-8e2f-000000000012",
+          "key": "rejected",
+          "label": {
+            "en": "Rejected"
+          },
+          "type": "task",
+          "terminal": true,
+          "outcome": "rejected",
+          "view": {
+            "fields": [
+              {
+                "ref": "field_9c7e5b31-0015-4a1c-8e2f-000000000015",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0013-4a1c-8e2f-000000000013",
+                "readonly": true
+              },
+              {
+                "ref": "field_9c7e5b31-0014-4a1c-8e2f-000000000014",
+                "readonly": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "step_2d6f8a04-0013-4a1c-8e2f-000000000013",
+          "key": "withdrawn",
+          "label": {
+            "en": "Withdrawn"
+          },
+          "description": {
+            "en": "The requester pulled the request before anyone reviewed it."
+          },
+          "type": "task",
+          "terminal": true,
+          "outcome": "withdrawn",
+          "view": {
+            "fields": [
+              {
+                "ref": "field_9c7e5b31-0004-4a1c-8e2f-000000000004",
+                "readonly": true
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

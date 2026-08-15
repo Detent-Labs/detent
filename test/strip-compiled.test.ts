@@ -14,6 +14,7 @@ const EXAMPLES = [
   "expense-approval.json",
   "subprocess-credit-check-child.json",
   "subprocess-loan-parent.json",
+  "purchase-requisition.json",
 ];
 
 function readExample(name: string): ProcessBody {

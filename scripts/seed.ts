@@ -4,7 +4,8 @@
  * devcontainer database has something to look at instead of nothing.
  *
  * Reserved for seed data — do not reuse for an unrelated process: the keys
- * `expense_approval`, `loan_application`, `credit_check`, and the literal
+ * `expense_approval`, `purchase_requisition`, `loan_application`,
+ * `credit_check`, and the literal
  * processId `proc_credit_check` (pinned by `examples/subprocess-loan-parent.json`'s
  * subprocess reference, so `credit_check` always publishes under that exact id,
  * never a script-minted one).
@@ -20,6 +21,7 @@ import { readFileSync } from "node:fs";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody, listProcesses, listVersions } from "../src/engine/definitions.js";
 import { createDefaultRegistry, createDefaultDataSourceRegistry } from "../src/engine/host.js";
+import { createDefaultAssignmentRegistry } from "../src/engine/assignment-strategies.js";
 import { createUser, listUsers, setRoles, setPassword } from "../src/auth/users.js";
 import {
   PUBLISH_ROLE,
@@ -55,6 +57,7 @@ const EXAMPLES: { path: string; fixedProcessId?: ProcessId }[] = [
   { path: "../examples/subprocess-credit-check-child.json", fixedProcessId: "proc_credit_check" as ProcessId },
   { path: "../examples/subprocess-loan-parent.json" },
   { path: "../examples/expense-approval.json" },
+  { path: "../examples/purchase-requisition.json" },
 ];
 
 function readExampleBody(path: string): ProcessBody {
@@ -76,7 +79,10 @@ async function seedProcess(
   const body = readExampleBody(example.path);
   const processId = example.fixedProcessId ?? (await resolveProcessId(body.key));
   const versionsBefore = await listVersions(processId, sql);
-  const published = await publishBody(processId, body, registry, dataSourceReg, sql);
+  // The full assignment registry, the one the HTTP layer wires: publishBody's
+  // own default carries `static` alone, so an example naming
+  // `org.manager-of-starter` publishes through the studio and fails here.
+  const published = await publishBody(processId, body, registry, dataSourceReg, sql, createDefaultAssignmentRegistry());
   const isNew = versionsBefore.length === 0 || !versionsBefore.some((v) => v.definitionHash === published.definitionHash);
   console.log(`- ${body.key} (${processId}): ${isNew ? "published" : "already up to date"} at v${published.version}`);
 }
