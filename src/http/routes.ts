@@ -464,7 +464,7 @@ export async function handlePublish(
     // The shape check proves only that this is a string; the `proc_` prefix is
     // publishBody's to enforce. `can` ignores the value today, and a scoped
     // grant later must not read it as an id the store already holds.
-    requirePermission(actor, "publish", parsed.processId as ProcessId);
+    await requirePermission(actor, "publish", parsed.processId as ProcessId, db);
     const published = await publishBody(parsed.processId as ProcessId, parsed.body as ProcessBody, registry, dataSourceRegistry, db, assignmentRegistry);
     return {
       status: 200,

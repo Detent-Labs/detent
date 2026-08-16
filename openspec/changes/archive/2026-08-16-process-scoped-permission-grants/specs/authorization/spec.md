@@ -1,6 +1,6 @@
 ## ADDED Requirements
 
-### Requirement: A process-scoped gate asks one function over three tests
+### Requirement: A process-scoped gate asks one function over two tests
 
 Six gated operations name one process. The engine SHALL route each one through
 a single pair of functions in `src/auth/authorize.ts`. Grant storage lives
@@ -20,27 +20,29 @@ ProcessId, db: SQL): Promise<boolean>`. It SHALL answer one question: may
 - `"cancel"` takes `CANCEL_ANY_ROLE`
 - `"migrate"` takes `DEVELOPER_ROLE`
 
-`can` SHALL answer true where any one of three tests passes. It SHALL run them
-in this order:
+`can` SHALL answer true where either of two tests passes. It SHALL run them in
+this order:
 
 1. **The global role.** `actor.roles` holds the mapped reserved role. This test
    SHALL run first and SHALL short-circuit. Where it passes, `can` SHALL read
    no row. An installation that writes no grant therefore pays nothing.
-2. **The scoped-role string.** `actor.roles` holds the mapped reserved role,
-   then `@`, then `processId` in full. The engine SHALL compare the assembled
-   string. It SHALL NOT split a role on `@`, because a `ProcessId` has an
-   unconstrained tail and no split is safe.
-3. **A stored grant.** The grant store holds a matching row. Its permission
+2. **A stored grant.** The grant store holds a matching row. Its permission
    equals `permission`, its role appears in `actor.roles`, and its scope
    resolves to `processId`.
 
-`can` SHALL answer false where all three fail. It SHALL NOT throw on an
+The engine SHALL NOT read a scope out of a role string. A role string is a
+principal the identity provider names. The grant rows are the one place a
+scope lives. The engine therefore treats `system:publish@proc_…` in
+`actor.roles` as a role like any other. It matches no grant unless an operator
+writes a row naming that exact string.
+
+`can` SHALL answer false where both fail. It SHALL NOT throw on an
 unresolvable `processId`. A caller may pass a value naming no stored process.
 The publish route reads its target out of an unvalidated request body.
 
 `processId` therefore changes the answer. Two calls differing only in
-`processId` MAY disagree. They SHALL disagree where a grant or a scoped-role
-string names one of the two.
+`processId` MAY disagree. They SHALL disagree where a grant names one of the
+two.
 
 The engine SHALL expose `requirePermission(actor: Actor, permission:
 Permission, processId: ProcessId, db: SQL): Promise<void>`. It SHALL throw the
@@ -69,8 +71,12 @@ Every operation whose target is not one process SHALL keep the gate it has:
 - the four draft routes call `requireAuthoring`, the two-role helper in
   `src/http/studio-routes.ts`, and the template reads call `requireStudioRead`
 
-A draft holds no `proc_` id to name, so the two authoring roles stay global.
-`requireRole` SHALL stay exported and SHALL stay synchronous.
+A draft carries its `proc_` id from its first save, since `drafts.process_id`
+is the table's key and `PUT /drafts/:processId` names it. The four draft routes
+are therefore scopeable, and this change leaves them global on purpose. A
+draft-scoped `"author"` permission is a later change, and it moves those four
+call sites and the drafts list. `requireRole` SHALL stay exported and SHALL
+stay synchronous.
 
 #### Scenario: The module exports the permission seam
 
@@ -113,20 +119,12 @@ A draft holds no `proc_` id to name, so the two authoring roles stay global.
   process A
 - **THEN** it answers false
 
-#### Scenario: A scoped-role string admits its own process
+#### Scenario: A role string carries no scope
 
 - **WHEN** `can(actor, "publish", processId, db)` runs for an actor whose
   `roles` is exactly `["system:publish@" + processId]`, over a store holding no
   grant
-- **THEN** it answers true
-- **AND** the same actor answers false over any other process id
-
-#### Scenario: A scoped-role string is not split on its separator
-
-- **WHEN** an actor holds `"system:publish@proc_a@b"` and `can` runs over the
-  process id `"proc_a@b"`
-- **THEN** it answers true
-- **AND** the same actor answers false over the process id `"proc_a"`
+- **THEN** it answers false
 
 #### Scenario: The global role short-circuits the store
 
@@ -156,7 +154,6 @@ A draft holds no `proc_` id to name, so the two authoring roles stay global.
 
 - **WHEN** an actor calls any of the six gated operations, over a store holding
   no grant row
-- **AND** `actor.roles` holds no scoped-role string
 - **THEN** the operation admits the actors it admitted before this change
 - **AND** it refuses the actors it refused before this change
 
@@ -301,15 +298,23 @@ The engine SHALL reject a scope carrying an unknown `type`, at the write path
 rather than at read time. A stored grant SHALL stay readable after a later
 version adds a second type.
 
+A later scope type SHALL enumerate to a finite set of process ids from the
+store alone. The reasoning sits in `design.md`. The `scope=all` listing and the
+reporting aggregates turn this gate into a filter. A filter needs the set
+rather than a per-id answer.
+
 A scope SHALL carry the opaque process `id`, never the `key`. The definition
 contract lets a `key` change and lets it reference nothing. A key-scoped grant
 would therefore follow a rename to the wrong process, or to none.
 
 The engine SHALL NOT check that a scope's `processId` resolves to a stored
 process. A grant is a row about a role. An operator writes it before or after
-the process exists. Take a process id nobody has published, that no grant
-names. A first publish under that id therefore still needs the global
-`system:publish`.
+the process exists.
+
+A draft carries its `proc_` id from its first save. An operator reads the id
+off the draft and writes the grant ahead of the first publish. Take a process
+id nobody has published, that no grant names. A first publish under that id
+therefore still needs the global `system:publish`.
 
 #### Scenario: The store accepts the process scope type
 
@@ -353,6 +358,12 @@ A grant's role SHALL be free text. The engine SHALL NOT need the `system:`
 prefix on it. It SHALL NOT need any account to hold that role today. A grant
 written ahead of the directory sync that creates the group is valid and inert.
 
+An external issuer's claim value reaches `actor.roles` verbatim, through
+`claimToRoles` in `src/auth/jwt.ts`. Entra ID's `groups` claim emits object
+ids by default. A grant to such a group therefore names the object id, and
+the listing shows that id. That is a display concern for a later operator screen,
+not a rule of the store.
+
 The eight `system:*` roles SHALL keep their exact meaning. They serve the cases
 that are genuinely installation-wide. Account administration, the outbox and
 the timer views stay behind `system:admin`. A scoped grant is a second and
@@ -385,52 +396,6 @@ role anybody already holds.
 - **THEN** every `/admin/*` route, every `/reporting/*` route and every studio
   route answers `403` for that actor, unchanged
 
-### Requirement: The scoped-role string is a documented directory fallback
-
-An installation may manage every grant in its identity provider. It SHALL then
-be able to state a scoped grant as a role string alone, and write no grant row.
-The engine SHALL read `<reserved-role>@<processId>` from `actor.roles`.
-It SHALL treat that string as a grant of the role's permission over that one
-process.
-
-Three format rules SHALL hold wherever that path runs:
-
-- The separator is `@`, and the process id is the entire remainder. A
-  `ProcessId` matches `/^proc_/` with an unconstrained tail. The engine SHALL
-  therefore assemble and compare the expected string, and SHALL split no stored
-  one.
-- The string SHALL carry no space and SHALL stay under 120 characters, which is
-  what an Entra app role value permits.
-- The value belongs on an app role, not a group. The `groups` claim emits
-  object ids by default, so a group cannot carry this string.
-
-A scoped-role string SHALL grant exactly what an equivalent stored grant grants,
-and nothing more.
-
-#### Scenario: A scoped-role string publishes one process
-
-- **WHEN** an actor whose `roles` is exactly
-  `["system:publish@proc_3f8a1c2e-9b4d-4e7a-a1c8-2e5f7b9d0a13"]` publishes that
-  process
-- **THEN** the engine authorizes the publish
-
-#### Scenario: The same string publishes no other process
-
-- **WHEN** that same actor publishes a different process id
-- **THEN** the response is `403`
-
-#### Scenario: The unscoped role name alone grants nothing extra
-
-- **WHEN** an actor's `roles` is exactly `["system:publish@proc_a"]` and they
-  call an `/admin/*` route
-- **THEN** the response is `403`
-
-#### Scenario: A scoped string for one permission does not carry another
-
-- **WHEN** an actor's `roles` is exactly `["system:publish@proc_a"]` and they
-  call a migration-plan route on process `proc_a`
-- **THEN** the response is `403`
-
 ## REMOVED Requirements
 
 ### Requirement: A process-scoped gate asks one function
@@ -442,13 +407,13 @@ rule is the one thing this change reverses. A scoped grant is precisely a
 `can`'s signature also gains a `db` argument and a `Promise` return, so no
 scenario in it survives unedited.
 
-"A process-scoped gate asks one function over three tests" replaces it in full.
+"A process-scoped gate asks one function over two tests" replaces it in full.
 That replacement keeps every rule that still holds. Those are the three fixed
 permissions, the private `PERMISSION_ROLE` map, the six call sites, and the
 gates that stay global.
 
-**Migration**: None for a deployment. An installation that writes no grant and
-no scoped-role string keeps every answer it had. The replacing requirement
+**Migration**: None for a deployment. An installation that writes no grant
+keeps every answer it had. The replacing requirement
 asserts that as its own scenario. In-process callers of `can` and
 `requirePermission` await them and pass the `SQL` handle. The replacing
 requirement names the six of them in this repository.

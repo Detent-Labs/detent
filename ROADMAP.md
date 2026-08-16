@@ -83,13 +83,28 @@ Specs: `development-toolchain`, `devcontainer-preflight`.
     straight line from it. A control that moved under the pointer is harder to
     press, and a drag in flight has no target to face.
 
-40. **Permission model rework: SEAM DONE, STORAGE NOT BUILT.** Raised
-    2026-08-15 in conversation. A design pass ran the same day and took the
-    decisions below. Nobody is blocked by the current model. The storage half
-    is now proposed as the OpenSpec change `process-scoped-permission-grants`,
-    which stores one row per grant in a `permission_grants` table, and no task
-    of it is applied. `tmp/open-work-priority.md` carries it as a deferral and
-    names the trigger that moves it.
+40. **Permission model rework: SEAM AND STORAGE DONE, FILTER AND DRAFT SCOPE
+    NOT BUILT.** Raised 2026-08-15 in conversation. A design pass ran the
+    same day and took the decisions below. Nobody was blocked by the seam
+    alone, and the storage half landed 2026-08-16 as
+    `process-scoped-permission-grants`. A `permission_grants` table holds one
+    row per grant; `src/auth/grants.ts` carries its SQL, and three operator
+    routes administer it — `GET /admin/permission-grants`, `POST
+    /admin/permission-grants` and `POST /admin/permission-grants/revoke`,
+    behind `system:admin`. `can` answers true on either of two tests: the
+    global role, then a stored grant. No account gained or lost access on the
+    day this landed; an installation that writes no grant row keeps every
+    answer it had.
+
+    Three pieces stay open, and each is its own later change. The `scope=all`
+    filter and the reporting aggregates turn a gate into a query predicate,
+    which reaches `instance-query` rather than `authorization`. A
+    draft-scoped `"author"` permission would let a multi-team installation
+    limit who sees and edits which draft — today every author reaches every
+    draft. And the web areas read `actor.roles` directly, so a grant holder
+    reaches a permission over HTTP alone until the resource views carry
+    server-computed `permissions` booleans. `tmp/open-work-priority.md`
+    tracks these three.
 
     The seam shipped 2026-08-15 as `process-scoped-permission-seam`, ahead of
     that trigger, because it was the one piece carrying no storage question.
@@ -112,14 +127,24 @@ Specs: `development-toolchain`, `devcontainer-preflight`.
     `cancelInstance` keeps its load-free fast path and asks `can` in the branch
     that already holds the loaded instance, beside the `startedBy` test. A
     scoped grant names a process, and the process id only arrives with the
-    instance. That call answers false there today, because the fast path
-    already put the same question and lost. The two tests stay independent so
-    neither masks the other once a grant carries a scope.
+    instance, which is why a `system:cancel-any` holder pays no instance load
+    and a grant holder does. The two tests stay independent so neither masks
+    the other.
 
-    One gap stays open for the storage half, and it is not a defect here. A
-    scoped grant names an existing process id, and the publish route mints a
-    new process where that id is fresh. A first publish therefore stays a
-    global question under any storage this stage picks.
+    One gap is deliberate, not a defect. A scoped grant names an existing
+    process id, and the publish route mints a new process where that id is
+    fresh. A first publish therefore stays a global question under the
+    shipped storage. The gap is narrower than it first read. A draft carries
+    its `proc_` id from its first save, since `drafts.process_id` is the
+    table's key and `PUT /drafts/:processId` names it. An operator reads the
+    id off the draft and writes the grant before anybody publishes. Only a
+    first publish nobody prepared for stays global.
+
+    A second review ran 2026-08-16 and corrected four things below. Two of
+    them are marked in place. The `@` fallback is dropped. The draft surface
+    is scopeable, which reverses what the two-authoring-roles paragraph said.
+    Two more join the constraints at the end: a scope type must enumerate to
+    a process-id set, and the web areas read role strings.
 
     Every role today is global. `src/auth/authorize.ts` declares eight
     constants and `requireRole` reads one line: does `Actor.roles` contain the
@@ -135,12 +160,11 @@ Specs: `development-toolchain`, `devcontainer-preflight`.
     replaces one, and no migration rewrites a grant anybody already holds.
 
     **One function answers every process-scoped question.** `can(actor,
-    permission, processId)` takes over from the bare `requireRole` at the call
-    sites that hold a process. Its body today is the check that ships: does
-    `Actor.roles` hold the global role. Storage, scope shape and any directory
-    mapping live behind it. That seam is what this stage protects, and it is
-    the one piece worth landing early. A later change to how a grant is stored
-    then moves one file rather than six call sites.
+    permission, processId, db)` takes over from the bare `requireRole` at the
+    call sites that hold a process. Its body runs two tests: `Actor.roles`
+    against the global role, then `hasGrant` against the store. Storage lives
+    in `src/auth/grants.ts` alone, behind that seam, so this stage's storage
+    half moved one file rather than the six call sites.
 
     **A directory group name is a principal, not a permission.** The identity
     provider is the authority on who someone is and which groups they hold. The
@@ -164,16 +188,22 @@ Specs: `development-toolchain`, `devcontainer-preflight`.
     } }` is the only type a first version ships. A later `"label"` or `"owner"`
     type resolves through the same registry and moves no call site.
 
-    **The scoped-role string stays a documented fallback**, for an installation
-    that wants every grant managed in its directory. Such an installation
-    writes `system:publish@proc_3f8a1c2e-9b4d-4e7a-a1c8-2e5f7b9d0a13` as an
-    Entra app role value, and the engine reads it behind the same `can`. Three
-    format rules hold wherever that path runs. The separator is `@` and the
-    process id is the entire remainder, because `processId` is
-    `regex(/^proc_/)` with an unconstrained tail, so no right-hand split is
-    safe. The string carries no space and stays under 120 characters, which is
-    what an Entra app role value permits. App roles carry this and groups do
-    not, because the `groups` claim emits object ids by default.
+    **A role string carries no scope.** The 2026-08-15 pass kept
+    `system:publish@proc_…` as a documented fallback for an installation that
+    manages every grant in its directory. The owner dropped it 2026-08-16. It
+    was a second place for a scope beside the grant table, it needed three
+    format rules and a length bound of its own, and no installation had asked
+    for it. A role string stays a principal, and the grant table stays the one
+    place a scope lives. Where an installation later wants directory-managed
+    scopes, that is its own change.
+
+    **A grant to an Entra ID group names the object id.** `claimToRoles`
+    passes the `groups` claim through, and that claim emits object ids by
+    default. So the grant row holds the GUID, and the grant list shows it. The
+    installation creates no second copy of the group. It writes one row that
+    names what the token carries. App roles carry a readable value instead,
+    at the price of Entra ID P1 for group assignment. A later operator screen
+    settles how a GUID displays.
 
     The eight constants split into three groups under those decisions.
 
@@ -192,20 +222,35 @@ Specs: `development-toolchain`, `devcontainer-preflight`.
     over users, the outbox, the timers and the UI strings, beside
     `system:datalists` and `system:templates`.
 
-    The two authoring roles sit outside all three. A draft for a new process
-    holds no `proc_` id to name, so `system:author` and `system:developer` stay
-    global on the four draft routes. Publish takes the scope instead, because
-    the body names its target.
+    The two authoring roles belong to the first group, and stay global for
+    now. The 2026-08-15 pass said a draft for a new process holds no `proc_`
+    id to name. That was wrong. `drafts.process_id` is the table's key, and
+    the studio names the id in `PUT /drafts/:processId` from the first save.
+    So `system:author` and `system:developer` are scopeable on the four draft
+    routes, and a draft-scoped `"author"` permission is where a multi-team
+    installation gains the most: without it, every author sees and edits every
+    draft. That is its own change. It moves the four draft call sites and
+    filters the drafts list.
 
-    Three constraints hold for any build. A scoped grant carries the opaque
+    Five constraints hold for any build. A scoped grant carries the opaque
     process `id`, never the `key`, since the contract lets a key change and
     references nothing. `actor.roles` sits in the CEL context
     (`src/cel/eval.ts:83`), so an authored guard reads that array, and the
-    decisions above leave its shape untouched on purpose. And the studio, the
-    operator area and the reporting area each read their own role today, so a
-    change to the shape reaches all three plus their i18n catalogs.
+    decisions above leave its shape untouched on purpose. Every scope type
+    enumerates to a finite set of process ids from the store alone, because
+    the second group needs the set to build a filter, and a type that only
+    answers per id would leave that half unbuildable. The studio, the operator
+    area and the reporting area each read their own role today, so a change
+    to the shape reaches all three plus their i18n catalogs. And that same
+    reading means a grant holder reaches publish over HTTP alone: the studio
+    shows its publish control to a `system:publish` holder. The fix is
+    server-computed `permissions` booleans on the resource views, so a screen
+    asks the server what the caller may do rather than reading role strings.
+    That is its own change, and it is the one that stops a second client-side
+    gate from growing.
 
-    Specs: `authorization`, `admin-user-management`, `instance-query`.
+    Specs: `authorization`, `permission-grant-administration`, `http-wrapper`,
+    `studio-publish`, `admin-user-management`, `instance-query`.
 
 42. **Field catalog and data sources as list and detail: NOT STARTED.** Raised
     2026-08-15 in conversation. A design pass ran the same day and took the

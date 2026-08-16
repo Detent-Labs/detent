@@ -24,7 +24,7 @@ const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
 beforeAll(initDb);
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE drafts, templates, outbox, instances, history_entries, instance_events, definitions, migration_plans`;
+  if (DB) await sql`TRUNCATE drafts, templates, outbox, instances, history_entries, instance_events, definitions, migration_plans, permission_grants`;
 });
 
 const developer: Actor = { id: "user_dev", roles: [DEVELOPER_ROLE] };
@@ -34,6 +34,13 @@ const publishOnly: Actor = { id: "user_publish_only", roles: [PUBLISH_ROLE] };
 const curator: Actor = { id: "user_curator", roles: [TEMPLATES_ROLE] };
 const author: Actor = { id: "user_author", roles: [AUTHOR_ROLE] };
 const authorPublisher: Actor = { id: "user_author_publisher", roles: [AUTHOR_ROLE, PUBLISH_ROLE] };
+const financeAuthor: Actor = { id: "user_finance_author", roles: [AUTHOR_ROLE, "finance-authors"] };
+const financeGrantOnly: Actor = { id: "user_finance_grant_only", roles: ["finance-authors"] };
+
+/** Writes a `"publish"` grant directly, bypassing the admin route — that route's own behavior is covered in `test/http-admin.test.ts`. */
+const grantPublish = async (role: string, processId: string): Promise<void> => {
+  await sql`INSERT INTO permission_grants (role, permission, scope) VALUES (${role}, ${"publish"}, ${{ type: "process", config: { processId } }})`;
+};
 
 let n = 0;
 const pid = () => `proc_http_studio_${++n}`;
@@ -227,6 +234,37 @@ test.skipIf(!DB)("POST /drafts/:processId/publish without system:publish maps to
   const processId = pid();
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
   const res = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", developer));
+  expect(res.status).toBe(403);
+});
+
+test.skipIf(!DB)("an author holding a grant publishes their own process without system:publish", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", financeAuthor, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await grantPublish("finance-authors", processId);
+
+  const res = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", financeAuthor));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { version: number };
+  expect(body.version).toBe(1);
+});
+
+test.skipIf(!DB)("that same grant publishes no other process", async () => {
+  const grantedProcessId = pid();
+  const otherProcessId = pid();
+  await fetch(authedReq(`http://x/drafts/${grantedProcessId}`, "PUT", financeAuthor, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await fetch(authedReq(`http://x/drafts/${otherProcessId}`, "PUT", financeAuthor, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await grantPublish("finance-authors", grantedProcessId);
+
+  const res = await fetch(authedReq(`http://x/drafts/${otherProcessId}/publish`, "POST", financeAuthor));
+  expect(res.status).toBe(403);
+});
+
+test.skipIf(!DB)("a grant carries no authoring role: a grant holder with neither system:author nor system:developer still gets 403", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await grantPublish("finance-authors", processId);
+
+  const res = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", financeGrantOnly));
   expect(res.status).toBe(403);
 });
 

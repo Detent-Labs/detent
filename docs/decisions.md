@@ -11,51 +11,48 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   deliberately minimal; widen when the engine surfaces a concrete need.
 
 ## Decided, not yet built (each needs its own OpenSpec change)
-- **Process-scoped permissions.** Every role in `src/auth/authorize.ts` is
-  global today, so `system:publish` publishes every process and
-  `system:cancel-any` stops any instance of any process. A design pass on
-  2026-08-15 settled the shape; `ROADMAP.md` stage 40 carries it in full. Four
-  decisions matter beyond that stage.
+- **Process-scoped permissions: the filter, the draft scope, and the
+  `permissions` booleans.** A design pass on 2026-08-15 settled the shape;
+  `ROADMAP.md` stage 40 carries it in full. The seam shipped 2026-08-15 as
+  `process-scoped-permission-seam`, and the storage half shipped 2026-08-16
+  as `process-scoped-permission-grants`. `can(actor, permission, processId,
+  db)` and `requirePermission` sit in `src/auth/authorize.ts` over three
+  permissions; `src/auth/grants.ts` holds the `permission_grants` table's SQL
+  behind them, and three `system:admin`-gated routes administer a grant.
+  Nobody was blocked by the seam alone, and no account gained or lost access
+  the day storage landed: an installation that writes no grant row keeps
+  every answer it had.
 
-  The eight `system:*` roles keep their exact meaning, for the cases that are
-  genuinely installation-wide. A scoped grant sits beside them and never
-  replaces one, so no migration rewrites a grant anybody already holds.
+  Three pieces stay open, each its own later OpenSpec change.
 
-  A directory group name is a principal, not a permission. The identity
-  provider is the authority on who someone is and which groups they hold; the
-  installation is the authority on what a group may do inside it. That split is
-  what keeps an Active Directory or Entra ID sync out of the design: the grant
-  maps a role string to a permission and a scope, and lives here. Encoding the
-  scope into the grant's own name (`system:publish@proc_...`) inverts the
-  split, and makes the directory admin the authority on this engine's
-  permissions, expressed in this engine's opaque ids. That form stays a
-  documented fallback for an installation that wants it, behind the same check.
+  The `scope=all` filter and the reporting aggregates turn a gate into a
+  query predicate. That reaches `instance-query`, not `authorization`.
 
-  A scope follows `{type, config}`, the shape `plugin` already gives actions,
-  data sources and assignment strategies. `{ type: "process" }` is the only
-  type a first version ships.
+  A draft-scoped `"author"` permission would let an installation limit who
+  sees and edits which draft. `drafts.process_id` is scopeable — it is the
+  table's own key, named from `PUT /drafts/:processId`'s first save — but
+  every author reaches every draft today.
 
-  `Actor.roles` keeps its current shape, a `string[]` of free text from either
-  source. That is deliberate and load-bearing: `actor.roles` sits in the CEL
-  context (`src/cel/eval.ts:83`), `claimToRoles` (`src/auth/jwt.ts:81`) passes
-  an issuer's claim through verbatim, and `auth_users.roles` is a `TEXT[]` the
-  admin area edits. None of the three moves.
+  The web areas read `actor.roles` directly, so a grant holder reaches a
+  permission over HTTP alone until the resource views carry server-computed
+  `permissions` booleans. That is the change that stops a second client-side
+  gate from growing.
 
-  Nobody is blocked by the current model. `tmp/open-work-priority.md` carries
-  the trigger.
+  A directory group name is a principal, not a permission, and that decision
+  is built, not pending: the identity provider is the authority on who
+  someone is and which groups they hold, and the installation is the
+  authority on what a group may do inside it. `claimToRoles`
+  (`src/auth/jwt.ts:81`) passes an issuer's claim through verbatim, so
+  `Actor.roles` needed no new shape. A grant maps a role string to a
+  permission and a scope, `{ type: "process", config: { processId } }` the
+  only type shipped. Encoding the scope into the grant's own name
+  (`system:publish@proc_...`) was considered and dropped 2026-08-16: it would
+  have inverted the split, making the directory admin the authority on this
+  engine's own opaque ids, for an installation that never asked for it.
+  `Actor.roles` stays a `string[]` of free text from either source;
+  `auth_users.roles` stays a `TEXT[]`.
 
-  The seam shipped 2026-08-15 as `process-scoped-permission-seam`.
-  `can(actor, permission, processId)` and `requirePermission` sit in
-  `src/auth/authorize.ts` over three permissions, and a private
-  `PERMISSION_ROLE` map answers each one with the global role that gates it
-  today, so `processId` reaches no branch. Six call sites ask through them.
-  Behind that function, the storage question stopped being one a later change
-  can get wrong.
-
-  What stays unbuilt is the storage half: where a scoped grant lives and how it
-  is written. It is drafted as the OpenSpec change
-  `process-scoped-permission-grants`, which proposes a `permission_grants`
-  table holding one row per grant. No task of it is applied.
+  `tmp/open-work-priority.md` tracks the three open pieces above.
 - **CEL-readable data-source results.** Runtime option-list resolution for
   `field.dataSource` is DONE (see `docs/current-state.md`) — but `src/cel/check.ts`
   still registers a data source at no site (guards/output/transforms), so a CEL

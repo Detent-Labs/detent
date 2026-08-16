@@ -25,12 +25,20 @@ Tenancy is database-per-tenant. `tenants` is the one control-plane table, and
 
 `Actor.roles` is `string[]`. It reaches the CEL context at `src/cel/eval.ts:83`,
 where an authored guard reads it. Nothing in this change touches that shape.
+An external issuer's claim reaches it verbatim through `claimToRoles`
+(`src/auth/jwt.ts:81`). An Entra ID group therefore lands here as whatever the
+`groups` claim emits, an object id by default.
+
+A draft carries its `proc_` id from its first save. `drafts.process_id` is the
+table's key (`src/engine/drafts.ts`). The studio names it in `PUT
+/drafts/:processId`. ROADMAP.md stage 40 states the opposite, and this change
+corrects it there.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Fill `can`'s body with the three tests the `authorization` delta states.
+- Fill `can`'s body with the two tests the `authorization` delta states.
   Change nothing else about how a gate asks.
 - Keep the cost at zero for an installation that writes no grant.
 - Keep the store's write path strict and its read path permissive. A version
@@ -48,6 +56,9 @@ where an authored guard reads it. Nothing in this change touches that shape.
 - A deny form, a priority between grants, or a grant that names one account.
   Each one is a policy engine in a small disguise, and the `authorization`
   capability rules a policy engine out.
+- A scope read out of a role string. See the decision below.
+- A draft-scoped `"author"` permission, and `permissions` booleans on the
+  resource views. proposal.md names both as follow-on changes.
 
 ## Decisions
 
@@ -67,9 +78,9 @@ sites use it.
 
 ### The global role short-circuits before any query
 
-The three tests run in order: global role, scoped-role string, stored grant.
-The first two are array membership on `Actor.roles`, and cost nothing. Only the
-third opens a query. It runs only where the answer would otherwise be a 403.
+The two tests run in order: global role, then stored grant. The first is array
+membership on `Actor.roles`, and costs nothing. Only the second opens a query.
+It runs only where the answer would otherwise be a 403.
 
 An installation with no grants therefore pays no query, and a `system:publish`
 holder pays no query either. The query lands on the path that was already about
@@ -78,22 +89,37 @@ to refuse. One round trip there is not worth a cache.
 `// ponytail: one SELECT per otherwise-refused gate; add a cache when a gate
 shows up in a profile.`
 
-### The engine assembles the scoped-role string, and never splits one
+### A role string carries no scope
 
-The third format rule in ROADMAP.md stage 40 puts the whole remainder after `@`
-into the process id. The reason is that `ProcessId` is `regex(/^proc_/)` with an
-unconstrained tail. A right-hand split on `@` is therefore unsafe. `proc_a@b` is
-a legal id, so splitting `system:publish@proc_a@b` from the right yields
-`system:publish@proc_a` and `b`.
+ROADMAP.md stage 40 kept `system:publish@proc_…` in `actor.roles` as a
+documented fallback. An earlier draft of this design carried it as a second
+test in `can`. The owner dropped it on 2026-08-16.
 
-Assembling the string sidesteps the whole question:
+The code was one line. The commitment was not. A documented string shape needs
+three format rules and a length bound Entra dictates. It needs a scenario
+guarding the `proc_a@b` case. All of that serves an installation that does not
+exist.
 
-```ts
-if (actor.roles.includes(`${PERMISSION_ROLE[permission]}@${processId}`)) return true;
-```
+It also puts a scope in two places. The whole design rests on the grant table
+being the one place. A role string stays what the identity provider says it
+is: a principal. An installation that later wants directory-managed scopes
+gets its own change. That change puts the line back in, with its rules.
 
-One line, exactly correct, no parser. The spec keeps a scenario over
-`proc_a@b`, so a later rewrite to a split fails a named test.
+So `can` treats `system:publish@proc_a` as an ordinary role. It matches no
+grant unless an operator writes a row naming that exact string. The store
+accepts such a row, and the row does nothing useful.
+
+### Every scope type enumerates to a process-id set
+
+`{ type: "process" }` names one id. A later `"label"` or `"owner"` type must
+still answer "which process ids does this scope cover" from the store alone.
+The `scope=all` listing and every `/reporting/*` route need the set to create
+a filter. A type that only answers "does this one id match" would leave the
+filter half of stage 40 unbuildable. A predicate over process metadata is such
+a type.
+
+The `authorization` delta states the rule. A reviewer then checks a second
+type against it at review time, rather than a filter discovering it.
 
 ### One table, no surrogate id
 
@@ -134,9 +160,11 @@ Matching the extracted fields survives a later version that adds a key to a
 scope's `config`. A whole-value equality would match nothing the day that
 happens.
 
-`CREATE INDEX permission_grants_lookup_idx ON permission_grants (permission,
-role)` covers the two selective columns. The scope predicate then runs over the
-few rows a `(permission, role)` pair leaves.
+The primary key is the index. It is a btree on `(role, permission, scope)`,
+and it leads with `role`, the selective column. `permission` holds three
+values. An `= ANY` list on a leading key column is an index scan, so the
+lookup needs no second index. A `(permission, role)` index would lead with the
+weaker column and duplicate what the key already covers.
 
 A second scope type later adds a second branch here. A third adds a resolver.
 Neither one moves a call site, which is the property the `{type, config}`
@@ -163,6 +191,10 @@ row an older release cannot interpret therefore stays listable and revocable.
 ROADMAP.md stage 40 leaves one gap open. A scoped grant names an existing
 process id. The publish route mints a new process, where that id is fresh. A
 first publish therefore stays a global question.
+
+The gap is narrower than the roadmap says. The draft carries the id from its
+first save. An operator reads it off the draft and writes the grant before
+anybody publishes.
 
 This design closes that gap with neither a foreign key nor an existence check.
 Two reasons rule both out. A check creates an ordering trap. An operator
@@ -200,7 +232,7 @@ shipped.**
 
 It stays contained. Six call sites, all already `async`, all already holding the
 handle. `tsc --noEmit` finds every one. One silent failure mode remains: a
-missed `await` on a `Promise<boolean>` inside an `if`. It fails open. Task 5.6
+missed `await` on a `Promise<boolean>` inside an `if`. It fails open. Task 5.5
 rejects a role-less, grant-less actor at each of the six, which catches it.
 
 **A typo in `permission` or `role` stores a grant that admits nobody.**
@@ -216,6 +248,21 @@ deployment uses.**
 
 `system:admin` gates the list, and the spec states that reason.
 
+**A grant to an Entra ID group lists as a GUID.**
+
+The `groups` claim emits object ids by default, and `claimToRoles` passes them
+through. The grant row then names the GUID, and `GET /admin/permission-grants`
+shows it. The store is right to hold the id, since that is what the token
+carries. A later operator screen settles how a GUID reads. It takes a label
+the operator types, or a lookup. This change does not decide which.
+
+**A grant holder reaches publish over HTTP alone.**
+
+The studio shows its publish control to a `system:publish` holder, because the
+web areas read `actor.roles`. This change leaves that as it is. The fix is
+server-computed `permissions` booleans on the resource views. proposal.md names
+it as a follow-on change. Until it lands, a grant works over HTTP alone.
+
 **A grant widens access, so a bad row escalates privilege rather than locking
 somebody out.**
 
@@ -223,6 +270,40 @@ Two bounds hold it. A grant reaches only the three process-scoped permissions.
 It never reaches `/admin/*`, `/reporting/*` or the studio surface. The spec
 carries a scenario for that. A revoke also takes effect at once, because nothing
 caches a grant.
+
+### The pure authorization test file splits
+
+`test/auth-authorize.test.ts` claims purity in its header, and it earns that
+today. `can` reads an array and answers.
+
+Test 2 reads the store on every false answer. So `can({roles: ["employee"]},
+"publish", …)` reaches `hasGrant` and touches `sql`, which throws where
+`DATABASE_URL` is unset (`src/engine/store.ts:45`). The file therefore splits.
+The role constants, `requireRole` and the export canary stay pure. The `can`
+and `requirePermission` tests move behind `test.skipIf(!DB)`.
+
+Two alternatives lose more. A `db: SQL = sql` default would make `src/auth`
+import the engine's handle. That is the dependency this module has kept out,
+and the false path would still query. Marking the whole file `skipIf(!DB)`
+would drop the pure `requireRole` coverage that the capability's oldest
+scenarios rest on.
+
+The export canary needs no change. This change adds no export to
+`src/auth/authorize.ts`. Both `can` and `requirePermission` keep their names
+and gain a signature. `hasGrant` lives in `grants.ts` and stays out of that
+list.
+
+## Open Questions
+
+None blocking. Two questions wait, and each has a named owner.
+
+The `scope=all` filter decides how a scope enumerates against a query rather
+than against one id. Stage 40 keeps it, and the `authorization` delta states
+the constraint any later scope type meets.
+
+The operator screen decides how an Entra ID object id reads to a person. A
+grant to a group names the id the `groups` claim emits, and the list shows it.
+That question stays with `admin-app`, together with the screen itself.
 
 ## Migration Plan
 

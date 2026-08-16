@@ -35,7 +35,7 @@ const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
 beforeAll(initDb);
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_comments, instance_attachments, definitions`;
+  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_comments, instance_attachments, definitions, permission_grants`;
 });
 
 // ============================================================
@@ -186,6 +186,11 @@ const assignedBody = (): ProcessBody =>
 
 const pid = (n: string) => n as ProcessId;
 
+/** Writes a process-scoped grant directly, bypassing the admin route — that route's own behavior is covered in `test/http-admin.test.ts`. */
+const grantRole = async (role: string, permission: "publish" | "cancel" | "migrate", processId: string): Promise<void> => {
+  await sql`INSERT INTO permission_grants (role, permission, scope) VALUES (${role}, ${permission}, ${{ type: "process", config: { processId } }})`;
+};
+
 
 
 /** A POST request carrying auth headers plus a JSON body (defaulting to `{}` so route handlers that call req.json() unconditionally never see an empty body). */
@@ -198,6 +203,7 @@ const jsonReq = (url: string, method: string, actor: Actor, body: unknown = {}) 
 
 /** A GET/no-body request carrying only auth headers (view, claim, release). */
 const user1: Actor = { id: "user_1", roles: [] };
+const financeAuthor: Actor = { id: "user_finance", roles: ["finance-authors"] };
 /** Carries all three reserved roles, for the publish / cancel-any-instance / admin-gated routes this suite exercises as an administrator. */
 const admin: Actor = { id: "user_admin", roles: [PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE] };
 /** Neither the reserved role nor (in these tests) the instance's starter — a plain third party. */
@@ -1900,6 +1906,27 @@ test.skipIf(!DB)("POST /processes without the system:publish role maps to 403 an
   expect(resolved).toBeUndefined();
 });
 
+test.skipIf(!DB)("POST /processes: a grant admits a caller without system:publish, scoped to that process", async () => {
+  const PID = "proc_http_publish_grant";
+  await grantRole("finance-authors", "publish", PID);
+  const res = await fetch(publishReq(financeAuthor, PID, simpleBody()));
+  expect(res.status).toBe(200);
+
+  const store = createDefinitionStore(sql);
+  expect(await store.resolveBody(PID as ProcessId, 1)).toBeDefined();
+});
+
+test.skipIf(!DB)("POST /processes: that same grant admits no other process", async () => {
+  const PID = "proc_http_publish_grant_scoped";
+  const otherPid = "proc_http_publish_grant_other";
+  await grantRole("finance-authors", "publish", PID);
+  const res = await fetch(publishReq(financeAuthor, otherPid, simpleBody()));
+  expect(res.status).toBe(403);
+
+  const store = createDefinitionStore(sql);
+  expect(await store.resolveBody(otherPid as ProcessId, 1)).toBeUndefined();
+});
+
 // The publish gate reads its target processId out of the body, so it runs
 // after the parse and the shape check. These two pin both halves of that
 // ordering: a well-formed body from an unauthorized caller still reads 403,
@@ -1954,6 +1981,30 @@ test.skipIf(!DB)("POST /instances/:instanceId/cancel authorizes the instance's o
   expect(res.status).toBe(200);
   const body = (await res.json()) as { status: string };
   expect(body.status).toBe("cancelled");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel: a grant holder cancels an instance of their own process, without system:cancel-any or being the starter", async () => {
+  const PID = pid("proc_http_cancel_by_grant");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await grantRole("finance-authors", "cancel", PID);
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", financeAuthor));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { status: string };
+  expect(body.status).toBe("cancelled");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel: that same grant does not cancel an instance of another process", async () => {
+  const grantedPid = pid("proc_http_cancel_grant_scoped");
+  const otherPid = pid("proc_http_cancel_grant_other");
+  await publishBody(grantedPid, simpleBody(), reg, dataSourceReg);
+  await publishBody(otherPid, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${otherPid}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await grantRole("finance-authors", "cancel", grantedPid);
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", financeAuthor));
+  expect(res.status).toBe(403);
 });
 
 test.skipIf(!DB)("POST /instances/:instanceId/cancel with the system:cancel-any role is authorized before any instance lookup, even for a nonexistent instance", async () => {

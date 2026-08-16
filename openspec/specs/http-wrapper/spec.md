@@ -928,9 +928,12 @@ process body, and SHALL publish it through the existing publish operation of
 the definition store. The response SHALL carry `processId`, `version`,
 `definitionHash` and `status`.
 
-Publishing SHALL need the `system:publish` role on the caller's resolved
-`Actor`. The `authorization` capability states that role. The gate SHALL put
-that question through `requirePermission(actor, "publish", processId)`.
+Publishing SHALL need `can(actor, "publish", processId, db)` to answer true.
+The `authorization` capability states the two tests behind that answer. The
+global `system:publish` role admits every process. A stored grant of
+`"publish"` scoped to this `processId` admits this one. The gate SHALL put the
+question through `await requirePermission(actor, "publish", processId, db)`,
+and SHALL NOT read `Actor.roles` itself.
 
 That call needs the target process id, and the request body carries it. The
 gate SHALL therefore run after the body parse and the shape check. It SHALL run
@@ -940,11 +943,11 @@ The shape check proves only that the body's `processId` is a string. The
 publish chain checks the `proc_` prefix later. The gate SHALL NOT treat that
 string as a process the store already holds.
 
-The property that the earlier ordering protected SHALL hold. A caller without
-the role SHALL never reach the definition store, the registry, or the CEL
+The property that the earlier ordering protected SHALL hold. A caller the gate
+refuses SHALL never reach the definition store, the registry, or the CEL
 check. Such a call SHALL consume no version and SHALL persist no definition.
 
-One response changes. Take a caller who lacks the role. Two bodies from that
+One response changes. Take a caller the gate refuses. Two bodies from that
 caller now read 400 rather than 403:
 
 - a body that is not valid JSON
@@ -986,22 +989,36 @@ idempotent on an identical body.
 #### Scenario: Publishing without the required role is rejected
 
 - **WHEN** `POST /processes` is requested by an actor whose resolved
-  `Actor.roles` does not include `system:publish`
+  `Actor.roles` omits `system:publish`
+- **AND** no grant admits that actor for that `processId`
 - **THEN** the response is 403 with `error.type` equal to `"authorization"`
 - **AND** no definition is persisted, even if the request body would
   otherwise have been valid
 
+#### Scenario: A grant admits a caller without the global role
+
+- **WHEN** `POST /processes` is requested by an actor lacking `system:publish`
+- **AND** the store holds a grant of `"publish"` to a role that actor holds
+- **AND** that grant is scoped to the body's `processId`
+- **THEN** the engine authorizes the publish
+
+#### Scenario: That same grant admits no other process
+
+- **WHEN** that same actor publishes a body naming a different `processId`
+- **THEN** the response is 403 with `error.type` equal to `"authorization"`
+
 #### Scenario: A malformed body from an unauthorized caller reports the body
 
 - **WHEN** `POST /processes` is requested with a body that is not valid JSON,
-  by an actor whose resolved `Actor.roles` does not include `system:publish`
+  by an actor the gate would refuse
 - **THEN** the response is 400 with a typed error body
 - **AND** no definition is persisted
 
 #### Scenario: The gate still precedes the publish chain
 
 - **WHEN** `POST /processes` is requested with a well-formed body by an actor
-  whose resolved `Actor.roles` does not include `system:publish`
+  whose resolved `Actor.roles` omits `system:publish`
+- **AND** no grant admits that actor
 - **THEN** the response is 403
 - **AND** the definition store, the action registry and the CEL check are never
   reached

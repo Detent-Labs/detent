@@ -1,8 +1,15 @@
 /**
- * requireRole gates process-admin operations against Actor.roles. Pure — no DB.
- * can/requirePermission are the same check behind a process-scoped seam.
+ * requireRole gates process-admin operations against Actor.roles. Pure — no
+ * DB, and so are the role-constant and export-canary tests below.
+ *
+ * can/requirePermission are the same seam's process-scoped half, and they are
+ * NOT pure: the global-role test short-circuits with no query, but the
+ * grant test opens one on every call that test doesn't win. Those tests sit
+ * in their own DB-gated block near the bottom of this file.
  */
-import { test, expect } from "bun:test";
+import { test, expect, beforeAll, beforeEach } from "bun:test";
+import { sql } from "../src/engine/store.js";
+import { DB, initDb } from "./helpers/http-fixture.js";
 import type { ProcessId } from "../src/schema/definition.js";
 import {
   requireRole,
@@ -19,6 +26,11 @@ import {
   AUTHOR_ROLE,
 } from "../src/auth/authorize.js";
 import * as authorize from "../src/auth/authorize.js";
+
+beforeAll(initDb);
+beforeEach(async () => {
+  if (DB) await sql`TRUNCATE permission_grants`;
+});
 
 test("the reserved role constants carry their documented literal values", () => {
   expect(PUBLISH_ROLE).toBe("system:publish");
@@ -123,58 +135,93 @@ test("an actor with no roles at all is rejected", () => {
   expect(() => requireRole({ id: "user_1", roles: [] }, CANCEL_ANY_ROLE)).toThrow(AuthorizationError);
 });
 
-// The process-scoped seam. `can`'s body is the global-role check that already
-// ships, so these assert the mapping and the one property that outlives it:
-// the processId argument changes nothing today.
+// The process-scoped seam. `can`'s first test is the global-role check and
+// costs no query; every scenario below that expects `false`, or that holds
+// no global role, reaches the grant store instead, which is why this whole
+// block needs a database.
 const PID_A = "proc_seam_a" as ProcessId;
 const PID_B = "proc_seam_b" as ProcessId;
 
-test("each permission answers true for the role it maps to", () => {
-  expect(can({ id: "user_1", roles: [PUBLISH_ROLE] }, "publish", PID_A)).toBe(true);
-  expect(can({ id: "user_1", roles: [CANCEL_ANY_ROLE] }, "cancel", PID_A)).toBe(true);
-  expect(can({ id: "user_1", roles: [DEVELOPER_ROLE] }, "migrate", PID_A)).toBe(true);
+const writeGrant = async (role: string, permission: "publish" | "cancel" | "migrate", processId: ProcessId): Promise<void> => {
+  await sql`INSERT INTO permission_grants (role, permission, scope) VALUES (${role}, ${permission}, ${{ type: "process", config: { processId } }})`;
+};
+
+test.skipIf(!DB)("each permission answers true for the role it maps to", async () => {
+  expect(await can({ id: "user_1", roles: [PUBLISH_ROLE] }, "publish", PID_A, sql)).toBe(true);
+  expect(await can({ id: "user_1", roles: [CANCEL_ANY_ROLE] }, "cancel", PID_A, sql)).toBe(true);
+  expect(await can({ id: "user_1", roles: [DEVELOPER_ROLE] }, "migrate", PID_A, sql)).toBe(true);
 });
 
-test("each permission answers false for an actor missing that role", () => {
-  expect(can({ id: "user_1", roles: ["employee"] }, "publish", PID_A)).toBe(false);
-  expect(can({ id: "user_1", roles: [] }, "cancel", PID_A)).toBe(false);
-  expect(can({ id: "user_1", roles: ["employee"] }, "migrate", PID_A)).toBe(false);
+test.skipIf(!DB)("each permission answers false for an actor missing that role, over a store holding no grant", async () => {
+  expect(await can({ id: "user_1", roles: ["employee"] }, "publish", PID_A, sql)).toBe(false);
+  expect(await can({ id: "user_1", roles: [] }, "cancel", PID_A, sql)).toBe(false);
+  expect(await can({ id: "user_1", roles: ["employee"] }, "migrate", PID_A, sql)).toBe(false);
 });
 
-test("no permission implies another", () => {
+test.skipIf(!DB)("no permission implies another", async () => {
   // Same rule the eight role constants hold: DEVELOPER_ROLE reaches migrate
   // and nothing else, so the map cannot quietly widen a grant.
   const developer = { id: "user_1", roles: [DEVELOPER_ROLE] };
-  expect(can(developer, "migrate", PID_A)).toBe(true);
-  expect(can(developer, "publish", PID_A)).toBe(false);
-  expect(can(developer, "cancel", PID_A)).toBe(false);
+  expect(await can(developer, "migrate", PID_A, sql)).toBe(true);
+  expect(await can(developer, "publish", PID_A, sql)).toBe(false);
+  expect(await can(developer, "cancel", PID_A, sql)).toBe(false);
 });
 
-test("the processId argument does not change the answer", () => {
-  // The seam's whole invariant while no grant carries a scope. A future
-  // scoped implementation is what makes this test meaningful to change.
-  for (const permission of ["publish", "cancel", "migrate"] as const) {
-    for (const roles of [[PUBLISH_ROLE], [CANCEL_ANY_ROLE], [DEVELOPER_ROLE], []]) {
-      const actor = { id: "user_1", roles };
-      expect(can(actor, permission, PID_A)).toBe(can(actor, permission, PID_B));
-    }
-  }
+test.skipIf(!DB)("a grant admits one process and not another — the opposite of the pre-storage invariant that processId changed nothing", async () => {
+  await writeGrant("finance-authors", "publish", PID_A);
+  const actor = { id: "user_1", roles: ["finance-authors"] };
+  expect(await can(actor, "publish", PID_A, sql)).toBe(true);
+  expect(await can(actor, "publish", PID_B, sql)).toBe(false);
 });
 
-test("requirePermission throws where can answers false", () => {
-  expect(() => requirePermission({ id: "user_1", roles: [] }, "cancel", PID_A)).toThrow(AuthorizationError);
-  expect(() => requirePermission({ id: "user_1", roles: [DEVELOPER_ROLE] }, "publish", PID_A)).toThrow(AuthorizationError);
+test.skipIf(!DB)("a grant admits one permission and not another", async () => {
+  await writeGrant("finance-authors", "publish", PID_A);
+  const actor = { id: "user_1", roles: ["finance-authors"] };
+  expect(await can(actor, "cancel", PID_A, sql)).toBe(false);
 });
 
-test("requirePermission returns where can answers true", () => {
-  expect(() => requirePermission({ id: "user_1", roles: [PUBLISH_ROLE] }, "publish", PID_A)).not.toThrow();
-  expect(() => requirePermission({ id: "user_1", roles: [DEVELOPER_ROLE] }, "migrate", PID_A)).not.toThrow();
+test.skipIf(!DB)("a grant admits its role and not an actor holding a different one", async () => {
+  await writeGrant("finance-authors", "publish", PID_A);
+  const actor = { id: "user_1", roles: ["hr-authors"] };
+  expect(await can(actor, "publish", PID_A, sql)).toBe(false);
 });
 
-test("requirePermission names the role an operator must grant", () => {
+test.skipIf(!DB)("one grant covers every holder of a role, since it names no account", async () => {
+  // The whole point of granting to a role rather than an id: an operator
+  // writes one row, and the directory decides who holds it.
+  await writeGrant("finance-authors", "publish", PID_A);
+  expect(await can({ id: "user_1", roles: ["finance-authors"] }, "publish", PID_A, sql)).toBe(true);
+  expect(await can({ id: "user_2", roles: ["finance-authors"] }, "publish", PID_A, sql)).toBe(true);
+});
+
+test.skipIf(!DB)("a grant to a role nobody holds admits nobody", async () => {
+  await writeGrant("role-nobody-holds", "publish", PID_A);
+  expect(await can({ id: "user_1", roles: [] }, "publish", PID_A, sql)).toBe(false);
+  expect(await can({ id: "user_2", roles: ["finance-authors"] }, "publish", PID_A, sql)).toBe(false);
+});
+
+test.skipIf(!DB)("a role string carries no scope", async () => {
+  // The `@` fallback ROADMAP.md once named as a documented directory shape
+  // was dropped 2026-08-16: a scope lives in the grant table alone, so a
+  // role string that merely looks scoped matches no grant.
+  const actor = { id: "user_1", roles: [`${PUBLISH_ROLE}@${PID_A}`] };
+  expect(await can(actor, "publish", PID_A, sql)).toBe(false);
+});
+
+test.skipIf(!DB)("requirePermission throws where can answers false", async () => {
+  await expect(requirePermission({ id: "user_1", roles: [] }, "cancel", PID_A, sql)).rejects.toThrow(AuthorizationError);
+  await expect(requirePermission({ id: "user_1", roles: [DEVELOPER_ROLE] }, "publish", PID_A, sql)).rejects.toThrow(AuthorizationError);
+});
+
+test.skipIf(!DB)("requirePermission returns where can answers true", async () => {
+  await expect(requirePermission({ id: "user_1", roles: [PUBLISH_ROLE] }, "publish", PID_A, sql)).resolves.toBeUndefined();
+  await expect(requirePermission({ id: "user_1", roles: [DEVELOPER_ROLE] }, "migrate", PID_A, sql)).resolves.toBeUndefined();
+});
+
+test.skipIf(!DB)("requirePermission names the role an operator must grant", async () => {
   // The message keeps requireRole's "lacks required role 'X'" prefix, so a
   // grep over logs still finds both, and adds the process the gate named.
-  expect(() => requirePermission({ id: "user_1", roles: [] }, "publish", PID_A)).toThrow(
+  await expect(requirePermission({ id: "user_1", roles: [] }, "publish", PID_A, sql)).rejects.toThrow(
     /lacks required role 'system:publish' for process 'proc_seam_a'/,
   );
 });

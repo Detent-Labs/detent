@@ -37,6 +37,7 @@ import {
   type DataListColumn,
 } from "../engine/host.js";
 import { listUiStringOverrides, setUiStringOverride, countUiStringOverrides, uiStringOverrideExists } from "../engine/ui-strings.js";
+import { listGrants, writeGrant, revokeGrant, grantSchema, type PermissionGrant } from "../auth/grants.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, ADMIN_ROLE, DATALISTS_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE } from "../auth/authorize.js";
@@ -806,5 +807,47 @@ export async function handleAdminPutUiString(req: Request, resolver: ActorResolv
     }
     const written = await setUiStringOverride(area, locale, key, value, actor.id, db);
     return { status: 200, body: { area, locale, key, value, deleted: value === null && written } };
+  });
+}
+
+/** Shared by the write and revoke routes: the triple is the whole request body for both, and `grantSchema` is strict on every field. */
+function parseGrantBody(body: unknown): PermissionGrant {
+  const parsed = grantSchema.safeParse(body);
+  if (!parsed.success) throw new RequestShapeError(`grant is invalid: ${parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ")}`);
+  return parsed.data;
+}
+
+/**
+ * Lists every stored process-scoped permission grant. A grant names which
+ * processes a role reaches, so the list is as sensitive as the roles and
+ * processes it discloses — `ADMIN_ROLE` alone gates it, never a grant.
+ */
+export async function handleListPermissionGrants(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver, db);
+    requireRole(actor, ADMIN_ROLE);
+    return { status: 200, body: { grants: await listGrants(db) } };
+  });
+}
+
+/** Idempotent: writing a triple the store already holds succeeds and changes nothing, matching `writeGrant`'s `ON CONFLICT DO NOTHING`. */
+export async function handleWritePermissionGrant(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver, db);
+    requireRole(actor, ADMIN_ROLE);
+    const grant = parseGrantBody(await readJson(req));
+    await writeGrant(grant, db);
+    return { status: 200, body: grant };
+  });
+}
+
+/** Idempotent: revoking a triple the store does not hold succeeds and changes nothing. Exact — it never reaches a grant differing in role, permission or scope. */
+export async function handleRevokePermissionGrant(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver, db);
+    requireRole(actor, ADMIN_ROLE);
+    const grant = parseGrantBody(await readJson(req));
+    await revokeGrant(grant, db);
+    return { status: 200, body: grant };
   });
 }

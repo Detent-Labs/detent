@@ -69,6 +69,9 @@ import {
   handleAdminDeleteDataList,
   handleAdminListUiStrings,
   handleAdminPutUiString,
+  handleListPermissionGrants,
+  handleWritePermissionGrant,
+  handleRevokePermissionGrant,
 } from "./admin-routes.js";
 import { handleGetAccount, handlePatchAccount } from "./account-routes.js";
 import {
@@ -607,6 +610,12 @@ export function createServer(
       handler: (_p, req, _c, db) => handleAdminListUiStrings(req, resolver, db) },
     { method: "PUT", segments: seg("/admin/ui-strings"),
       handler: (_p, req, _c, db) => handleAdminPutUiString(req, resolver, db) },
+    { method: "GET", segments: seg("/admin/permission-grants"),
+      handler: (_p, req, _c, db) => handleListPermissionGrants(req, resolver, db) },
+    { method: "POST", segments: seg("/admin/permission-grants"),
+      handler: (_p, req, _c, db) => handleWritePermissionGrant(req, resolver, db) },
+    { method: "POST", segments: seg("/admin/permission-grants/revoke"),
+      handler: (_p, req, _c, db) => handleRevokePermissionGrant(req, resolver, db) },
     { method: "GET", segments: seg("/reporting/processes"),
       handler: (_p, req, _c, db) => handleReportingListProcesses(req, resolver, db) },
     { method: "GET", segments: seg("/reporting/:processId/cycle-time"),

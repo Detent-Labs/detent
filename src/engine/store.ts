@@ -295,6 +295,24 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // already-stored row unreadable. Its own statement for the same reason
   // manager_user_id has one.
   await db`ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS locale text`;
+  // Process-scoped permission grants (src/auth/grants.ts): one row maps a role
+  // string to a permission and a scope, so any holder of that role gets that
+  // permission over the process(es) the scope names. Read by
+  // src/auth/authorize.ts::can, behind the global-role check, which is why an
+  // installation that writes no grant pays no query and gains no access. No
+  // tenant column: tenancy here is database-per-tenant, the same convention
+  // auth_users uses. The triple IS the identity — a surrogate id would be a
+  // second name for a row that already has one, and the composite key gives
+  // the write its ON CONFLICT DO NOTHING idempotence and the revoke its exact
+  // target for free. scope is jsonb so a second scope type never needs a
+  // migration; Postgres normalizes key order inside a jsonb value, so the
+  // primary key sees one canonical encoding per logical scope.
+  await db`CREATE TABLE IF NOT EXISTS permission_grants (
+    role       text  NOT NULL,
+    permission text  NOT NULL,
+    scope      jsonb NOT NULL,
+    PRIMARY KEY (role, permission, scope)
+  )`;
   // Studio's mutable draft store: one row per process, the authored (uncompiled)
   // body an author is still editing. Deliberately not `definitions` with
   // `status='draft'` — that table is what resolution.ts and the timer worker

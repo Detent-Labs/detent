@@ -1008,18 +1008,46 @@ Stage-by-stage status is in `ROADMAP.md`.
   **BREAKING**: any account that published or cancelled instances before this
   change needs the relevant role granted, or it now gets `403`.
 
-  A process-scoped seam sits on top of that check since
-  `process-scoped-permission-seam` (roadmap #40). `src/auth/authorize.ts`
-  exports `can(actor, permission, processId)` and `requirePermission`. Three
+  A process-scoped seam sits on top of that check, filled in by
+  `process-scoped-permission-grants` (roadmap #40). `src/auth/authorize.ts`
+  exports `async can(actor, permission, processId, db)` and
+  `requirePermission`, both taking the caller's `SQL` handle. Three
   permissions reach them: `"publish"`, `"cancel"` and `"migrate"`. A private
   `PERMISSION_ROLE` map answers each one with the global role that gates it
   today. The `migrate` entry names `DEVELOPER_ROLE`, a role the paragraph
-  above does not. The body voids `processId`, so nobody gained or lost access.
+  above does not.
 
-  Six call sites ask through it: the publish route, the four studio migration
-  routes, and `cancelInstance`. What the seam buys is the storage question.
-  A later change to where a grant lives moves one file, not six sites.
-  `docs/decisions.md` carries the half that stays unbuilt.
+  `can` answers true on either of two tests, in order. The first is the global
+  role: array membership, no query. The second is a stored grant.
+  `src/auth/grants.ts` holds the `permission_grants` table's SQL: `hasGrant`,
+  `listGrants`, `writeGrant`, `revokeGrant` and the strict write-path
+  `grantSchema`. `authorize.ts` itself stays SQL-free. A grant's scope takes
+  the `{ type, config }` envelope the definition contract already gives
+  plugins. `{ type: "process", config: { processId } }` is the only type this
+  version ships.
+
+  Three operator routes administer a grant: `GET /admin/permission-grants`,
+  `POST /admin/permission-grants` and `POST /admin/permission-grants/revoke`,
+  all behind `ADMIN_ROLE` like every other `/admin/*` route. An installation
+  that writes no grant row pays no query, and keeps every answer it had
+  before this change. A written grant admits on the next call. A revoke
+  refuses on the next call, since nothing caches one.
+
+  A role string alone carries no scope. ROADMAP.md's design pass once named
+  an `@`-suffixed fallback for that; the owner dropped it 2026-08-16, before
+  this change shipped. A scope lives in the grant table alone.
+
+  Six call sites ask through the seam. Two are the publish route
+  (`handlePublish`, `handlePublishDraft`). Three are the studio migration
+  routes (`handleGetMigrationPlan`, `handlePutMigrationPlan`,
+  `handleGetOrphanKeys`). The sixth is `cancelInstance`. It asks `can` in its
+  loaded branch beside the `startedBy` test. A `system:cancel-any` holder
+  still pays no instance load; a grant holder does.
+
+  `docs/decisions.md` carries what stays unbuilt: the `scope=all` filter and
+  a draft-scoped `"author"` permission. It also carries `permissions`
+  booleans for the resource views, which the web areas read as role strings
+  today.
 - Login rate limiting (`src/auth/login.ts`, `add-login-rate-limit`): closes
   the gap the `add-authentication` entry recorded. `handleLogin` tracks
   attempts per normalized email (`trim().toLowerCase()`) in an in-memory

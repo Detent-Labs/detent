@@ -25,7 +25,7 @@ const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
 beforeAll(initDb);
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, auth_users, migration_plans`;
+  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, auth_users, migration_plans, permission_grants`;
 });
 
 const admin: Actor = { id: "user_admin", roles: [ADMIN_ROLE] };
@@ -1032,4 +1032,167 @@ test.skipIf(!DB)("POST /admin/instances/:id/redact is idempotent on a re-call", 
   expect(first.status).toBe(200);
   const second = await fetch(redactReq(inst.instanceId, admin));
   expect(second.status).toBe(200);
+});
+
+// ============================================================
+// GET/POST /admin/permission-grants, POST /admin/permission-grants/revoke
+// ============================================================
+
+let grantN = 0;
+const grantProcessId = () => `proc_http_admin_grant_${++grantN}`;
+const financeGrantOnly: Actor = { id: "user_finance_grant_only", roles: ["finance-authors"] };
+
+const grantBody = (processId: string, overrides: Record<string, unknown> = {}) => ({
+  role: "finance-authors",
+  permission: "publish",
+  scope: { type: "process", config: { processId } },
+  ...overrides,
+});
+
+const listGrantsReq = () => authedReq("http://x/admin/permission-grants", "GET", admin);
+const writeGrantReq = (body: unknown, actor: Actor = admin) => authedReq("http://x/admin/permission-grants", "POST", actor, body);
+const revokeGrantReq = (body: unknown, actor: Actor = admin) => authedReq("http://x/admin/permission-grants/revoke", "POST", actor, body);
+
+test.skipIf(!DB)("GET /admin/permission-grants with no resolvable credential maps to 401", async () => {
+  const res = await fetch(new Request("http://x/admin/permission-grants"));
+  expect(res.status).toBe(401);
+});
+
+test.skipIf(!DB)("GET /admin/permission-grants without system:admin maps to 403", async () => {
+  const res = await fetch(authedReq("http://x/admin/permission-grants", "GET", bystander));
+  expect(res.status).toBe(403);
+});
+
+test.skipIf(!DB)("a grant holder does not thereby administer grants", async () => {
+  await fetch(writeGrantReq(grantBody(grantProcessId())));
+  const res = await fetch(authedReq("http://x/admin/permission-grants", "GET", financeGrantOnly));
+  expect(res.status).toBe(403);
+});
+
+test.skipIf(!DB)("an operator writes a grant and reads it back", async () => {
+  const processId = grantProcessId();
+  const write = await fetch(writeGrantReq(grantBody(processId)));
+  expect(write.status).toBe(200);
+
+  const res = await fetch(listGrantsReq());
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { grants: { role: string; permission: string; scope: { config: { processId: string } } }[] };
+  expect(body.grants.some((g) => g.role === "finance-authors" && g.permission === "publish" && g.scope.config.processId === processId)).toBe(true);
+});
+
+test.skipIf(!DB)("a repeated write changes nothing: the list carries one row for it", async () => {
+  const processId = grantProcessId();
+  await fetch(writeGrantReq(grantBody(processId)));
+  const second = await fetch(writeGrantReq(grantBody(processId)));
+  expect(second.status).toBe(200);
+
+  const res = await fetch(listGrantsReq());
+  const body = (await res.json()) as { grants: { scope: { config: { processId: string } } }[] };
+  expect(body.grants.filter((g) => g.scope.config.processId === processId).length).toBe(1);
+});
+
+test.skipIf(!DB)("a revoke removes the grant", async () => {
+  const processId = grantProcessId();
+  await fetch(writeGrantReq(grantBody(processId)));
+  const revoke = await fetch(revokeGrantReq(grantBody(processId)));
+  expect(revoke.status).toBe(200);
+
+  const res = await fetch(listGrantsReq());
+  const body = (await res.json()) as { grants: { scope: { config: { processId: string } } }[] };
+  expect(body.grants.some((g) => g.scope.config.processId === processId)).toBe(false);
+});
+
+test.skipIf(!DB)("a revoke of an absent grant succeeds and changes the list not at all", async () => {
+  const before = (await (await fetch(listGrantsReq())).json()) as { grants: unknown[] };
+  const res = await fetch(revokeGrantReq(grantBody(grantProcessId())));
+  expect(res.status).toBe(200);
+  const after = (await (await fetch(listGrantsReq())).json()) as { grants: unknown[] };
+  expect(after.grants.length).toBe(before.grants.length);
+});
+
+test.skipIf(!DB)("a revoke does not reach a sibling grant over another process", async () => {
+  const processIdA = grantProcessId();
+  const processIdB = grantProcessId();
+  await fetch(writeGrantReq(grantBody(processIdA)));
+  await fetch(writeGrantReq(grantBody(processIdB)));
+
+  await fetch(revokeGrantReq(grantBody(processIdA)));
+  const res = await fetch(listGrantsReq());
+  const body = (await res.json()) as { grants: { scope: { config: { processId: string } } }[] };
+  expect(body.grants.some((g) => g.scope.config.processId === processIdA)).toBe(false);
+  expect(body.grants.some((g) => g.scope.config.processId === processIdB)).toBe(true);
+});
+
+test.skipIf(!DB)("the list order is stable across two calls", async () => {
+  await fetch(writeGrantReq(grantBody(grantProcessId())));
+  await fetch(writeGrantReq(grantBody(grantProcessId())));
+  const first = (await (await fetch(listGrantsReq())).json()) as { grants: unknown[] };
+  const second = (await (await fetch(listGrantsReq())).json()) as { grants: unknown[] };
+  expect(second.grants).toEqual(first.grants);
+});
+
+test.skipIf(!DB)("the engine refuses an unknown permission with 400 and stores no row", async () => {
+  const processId = grantProcessId();
+  const res = await fetch(writeGrantReq(grantBody(processId, { permission: "admin" })));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { message: string } };
+  expect(body.error.message).toContain("permission");
+
+  const list = (await (await fetch(listGrantsReq())).json()) as { grants: { scope: { config: { processId: string } } }[] };
+  expect(list.grants.some((g) => g.scope.config.processId === processId)).toBe(false);
+});
+
+test.skipIf(!DB)("the engine refuses an unknown scope type with 400 and stores no row", async () => {
+  const processId = grantProcessId();
+  const res = await fetch(writeGrantReq(grantBody(processId, { scope: { type: "label", config: { processId } } })));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { message: string } };
+  expect(body.error.message).toContain("scope");
+
+  const list = (await (await fetch(listGrantsReq())).json()) as { grants: { scope: { config: { processId: string } } }[] };
+  expect(list.grants.some((g) => g.scope.config.processId === processId)).toBe(false);
+});
+
+test.skipIf(!DB)("the engine refuses a process scope with no processId, with 400 and stores no row", async () => {
+  const res = await fetch(writeGrantReq(grantBody("proc_unused", { scope: { type: "process", config: {} } })));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { message: string } };
+  expect(body.error.message).toContain("processId");
+});
+
+test.skipIf(!DB)("the engine refuses an empty role with 400 and stores no row", async () => {
+  const processId = grantProcessId();
+  const res = await fetch(writeGrantReq(grantBody(processId, { role: "" })));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { message: string } };
+  expect(body.error.message).toContain("role");
+
+  const list = (await (await fetch(listGrantsReq())).json()) as { grants: { scope: { config: { processId: string } } }[] };
+  expect(list.grants.some((g) => g.scope.config.processId === processId)).toBe(false);
+});
+
+test.skipIf(!DB)("POST /admin/permission-grants without system:admin maps to 403 and writes no row", async () => {
+  const processId = grantProcessId();
+  const res = await fetch(writeGrantReq(grantBody(processId), bystander));
+  expect(res.status).toBe(403);
+
+  const list = (await (await fetch(listGrantsReq())).json()) as { grants: { scope: { config: { processId: string } } }[] };
+  expect(list.grants.some((g) => g.scope.config.processId === processId)).toBe(false);
+});
+
+test.skipIf(!DB)("POST /admin/permission-grants/revoke without system:admin maps to 403", async () => {
+  const res = await fetch(revokeGrantReq(grantBody(grantProcessId()), bystander));
+  expect(res.status).toBe(403);
+});
+
+test.skipIf(!DB)("a grant takes effect at once, and a revoke refuses at once, inside one unchanged session", async () => {
+  const processId = grantProcessId();
+  await fetch(writeGrantReq(grantBody(processId)));
+
+  const admitted = await fetch(authedReq(`http://x/processes`, "POST", financeGrantOnly, { processId, body: { key: "wf", label: { en: "x" }, baseLocale: "en", fields: [], workflow: { initialStep: "step_a", steps: [{ id: "step_a", key: "a", label: { en: "A" }, type: "task", terminal: true }] } } }));
+  expect(admitted.status).toBe(200);
+
+  await fetch(revokeGrantReq(grantBody(processId)));
+  const refused = await fetch(authedReq(`http://x/processes`, "POST", financeGrantOnly, { processId, body: { key: "wf", label: { en: "x2" }, baseLocale: "en", fields: [], workflow: { initialStep: "step_a", steps: [{ id: "step_a", key: "a", label: { en: "A" }, type: "task", terminal: true }] } } }));
+  expect(refused.status).toBe(403);
 });

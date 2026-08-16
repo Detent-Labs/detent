@@ -54,7 +54,7 @@ const body = (label: string): ProcessBody =>
 
 beforeAll(async () => { if (DB) await initSchema(); });
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, auth_users, migration_plans`;
+  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, auth_users, migration_plans, permission_grants`;
 });
 
 const VIEWS = ["cycle-time", "bottleneck", "sla"] as const;
@@ -136,6 +136,22 @@ test.skipIf(!DB)("the reports role grants no operator, authoring, publish or can
   });
   expect((await fetch(publish)).status).toBe(403);
   expect((await fetch(req(`http://x/instances/${inst.instanceId}/cancel`, owner, "POST"))).status).toBe(403);
+});
+
+test.skipIf(!DB)("a process-scoped grant opens no reporting route", async () => {
+  // The `authorization` capability's "A grant grants no installation-wide
+  // access": a grant reaches the three process-scoped permissions and never
+  // `/reporting/*`, which aggregates across processes and keeps REPORTS_ROLE.
+  const P = pid();
+  await publishBody(P, body("v1"), reg, dataSourceReg);
+  await sql`INSERT INTO permission_grants (role, permission, scope)
+    VALUES (${"finance-authors"}, ${"publish"}, ${{ type: "process", config: { processId: P } }})`;
+  const grantHolder: Actor = { id: "user_grant_only", roles: ["finance-authors"] };
+
+  expect((await fetch(req("http://x/reporting/processes", grantHolder))).status).toBe(403);
+  for (const view of VIEWS) {
+    expect((await fetch(req(`http://x/reporting/${P}/${view}?${RANGE}`, grantHolder))).status).toBe(403);
+  }
 });
 
 test.skipIf(!DB)("no reporting route mutates engine state", async () => {

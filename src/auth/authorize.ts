@@ -13,10 +13,17 @@
  * through a bare `requireRole`, so a later change to how a grant is stored
  * moves this module alone. Still not an extension point: three fixed
  * permissions in a module-private map, no registry, nothing configurable.
- * ROADMAP.md stage 40 carries the design.
+ *
+ * `can` now carries a body of two tests: the global role, then a stored
+ * grant. `src/auth/grants.ts` holds the grant store and its SQL; this module
+ * imports `hasGrant` alone and stays SQL-free itself. Both `can` and
+ * `requirePermission` are therefore `async` and take the caller's `SQL`
+ * handle. ROADMAP.md stage 40 carries the design.
  */
+import type { SQL } from "bun";
 import type { Actor } from "../cel/eval.js";
 import type { ProcessId } from "../schema/definition.js";
+import { hasGrant } from "./grants.js";
 
 /** Required to call `POST /processes`. */
 export const PUBLISH_ROLE = "system:publish";
@@ -82,23 +89,25 @@ const PERMISSION_ROLE: Record<Permission, string> = {
 };
 
 /**
- * May `actor` perform `permission` on the process `processId` names? The whole
- * body is the global-role check that already shipped, so every process answers
- * the same and no caller gains or loses access.
+ * May `actor` perform `permission` on the process `processId` names? Two
+ * tests, in order. The global role is array membership on `actor.roles` and
+ * short-circuits before any query, so an installation that writes no grant
+ * pays nothing and a global-role holder pays nothing either. A stored grant
+ * is the one round trip this function ever spends, and only on a call that
+ * would otherwise be refused.
  *
- * `processId` is the seam itself. It reaches no branch today; a scoped grant
- * lands here rather than in the six call sites that hold a process. Callers
- * must not assume it names a process the store already holds — the publish
- * route reads it straight out of an unvalidated request body.
+ * Callers must not assume `processId` names a process the store already
+ * holds — the publish route reads it straight out of an unvalidated request
+ * body, and `hasGrant` answers false rather than throwing over such an id.
  */
-export function can(actor: Actor, permission: Permission, processId: ProcessId): boolean {
-  void processId; // no grant carries a scope yet; stage 40's storage half reads this
-  return actor.roles.includes(PERMISSION_ROLE[permission]);
+export async function can(actor: Actor, permission: Permission, processId: ProcessId, db: SQL): Promise<boolean> {
+  if (actor.roles.includes(PERMISSION_ROLE[permission])) return true;
+  return hasGrant(actor.roles, permission, processId, db);
 }
 
 /** `can` in the throwing shape `requireRole` already gave every HTTP gate. */
-export function requirePermission(actor: Actor, permission: Permission, processId: ProcessId): void {
-  if (!can(actor, permission, processId)) {
+export async function requirePermission(actor: Actor, permission: Permission, processId: ProcessId, db: SQL): Promise<void> {
+  if (!(await can(actor, permission, processId, db))) {
     throw new AuthorizationError(
       `actor '${actor.id}' lacks required role '${PERMISSION_ROLE[permission]}' for process '${processId}'`,
     );

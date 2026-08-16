@@ -1011,14 +1011,14 @@ export async function delegateClaim(instanceId: InstanceId, actor: Actor, toActo
  * Two independent tests admit a caller (`src/auth/authorize.ts`). The
  * load-free one is `CANCEL_ANY_ROLE`, checked before the instance is loaded —
  * a holder is admitted regardless of whether the target instance exists, is
- * running, or is already terminal. The loaded one is
- * `can(actor, "cancel", instance.processId)` beside the `startedBy` test.
+ * running, or is already terminal. The loaded one is `await can(actor,
+ * "cancel", instance.processId, db)` beside the `startedBy` test.
  *
- * `can` answers false there today, because the fast path already put the same
- * question and lost. That call is the process-scoped seam, not dead code: a
- * scoped grant names a process, and the process id only arrives with the
- * instance. The two tests stay independent so neither can mask the other once
- * a grant carries a scope.
+ * A grant names a process, and the process id only arrives with the
+ * instance, which is why `can` sits in the loaded branch rather than the fast
+ * path. A `system:cancel-any` holder never pays that load; a grant holder
+ * does, because the fast path already put the global question and lost. The
+ * two tests stay independent so neither can mask the other.
  */
 export async function cancelInstance(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<Instance> {
   // Fast, load-free path: a system:cancel-any caller is authorized before any
@@ -1045,7 +1045,7 @@ export async function cancelInstance(instanceId: InstanceId, actor: Actor, db: S
   } catch {
     throw new AuthorizationError(`actor '${actor.id}' may not cancel instance '${instanceId}'`);
   }
-  if (!can(actor, "cancel", instance.processId) && instance.startedBy !== actor.id) {
+  if (!(await can(actor, "cancel", instance.processId, db)) && instance.startedBy !== actor.id) {
     throw new AuthorizationError(`actor '${actor.id}' may not cancel instance '${instanceId}'`);
   }
   const store = getStore(db);
