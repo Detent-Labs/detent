@@ -1,6 +1,6 @@
 ---
 name: openspec-review-change
-description: Use when an OpenSpec change's artifacts (proposal, specs, design, tasks) are fresh or edited and no code exists yet. Reviews the plan before /opsx:apply and reports Critical, Warning and Suggestion findings to work in first.
+description: Use when an OpenSpec change's artifacts (proposal, specs, design, tasks) are fresh or edited and no code exists yet. Reviews the plan before /openspec-apply-change and reports Critical, Warning and Suggestion findings to work in first.
 ---
 
 # Reviewing an OpenSpec change before apply
@@ -14,7 +14,7 @@ implementation against the artifacts.
 ## Depth
 
 This review has no budget. A change that carries no fault is worth more than
-the cost of finding one. Run the review to the end before `/opsx:apply`.
+the cost of finding one. Run the review to the end before `/openspec-apply-change`.
 
 - Read every artifact end to end. No sampling. No `head`.
 - Read the whole base spec of every MODIFIED capability.
@@ -177,6 +177,6 @@ file. The findings exist for the user to work into the artifacts. A stale
 `review.md` beside `design.md` is worse than none.
 
 Close with one line. It gives the count per severity, and it states whether the
-change is ready for `/opsx:apply`. It is ready when no Critical finding remains.
+change is ready for `/openspec-apply-change`. It is ready when no Critical finding remains.
 
 Then stop. Touch the artifacts only when the user asks.

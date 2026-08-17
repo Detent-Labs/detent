@@ -69,11 +69,18 @@ short form, true in every session:
 This repo is spec-driven via OpenSpec (`openspec/`). Every non-trivial change —
 new capability, definition contract or schema change, tooling or infra switch —
 goes through an OpenSpec change, not a direct edit: propose -> generate
-specs/tasks -> implement -> verify -> archive. Start one with the `opsx:` skills (`opsx:new`, or
-`opsx:propose` for a full proposal in one step); `opsx:apply` implements tasks and
-`opsx:archive` closes it. The project context OpenSpec shows the AI when
-generating artifacts lives in `openspec/config.yaml` (`context:`) — keep it
-current.
+specs/tasks -> implement -> verify -> archive. Start one with the `openspec-*`
+skills (`openspec-new-change`, or `openspec-propose` for a full proposal in
+one step); `openspec-apply-change` implements tasks and
+`openspec-archive-change` closes it. The project context OpenSpec shows the AI
+when generating artifacts lives in `openspec/config.yaml` (`context:`) — keep
+it current.
+
+**`.claude/commands/opsx/` stays deleted.** The skills above are the set to
+keep; the commands under that directory once mirrored eleven of them and
+carried no instruction the skills lack. `openspec update` regenerates the
+directory with no opt-out flag. If a run of it puts the eleven files back,
+delete `.claude/commands/opsx/` again.
 
 **A trivial fix touches one file, no spec and no test.** It skips the cycle.
 Everything else is a change, whatever it looked like at first glance. Count the
@@ -94,8 +101,9 @@ cut across all of them. A screen that needs new data adds the API-side spec too,
 `instance-query` or `admin-operations-api` for example.
 
 **No phase inside the cycle is optional.** Do not propose skipping the spec or
-the plan phase. That holds for `opsx:propose` and for the brainstorming skill.
-Run the `openspec-review-change` skill before `opsx:apply`, every time. Resolve
+the plan phase. That holds for `openspec-propose` and for the brainstorming
+skill. Run the `openspec-review-change` skill before `openspec-apply-change`,
+every time. Resolve
 every finding it reports first. Apply starts at zero open findings. That review
 keeps finding real errors: a missed second consumer of `GET /instances`, a
 design resting on a false `InstanceView.assignment` premise, a migration
