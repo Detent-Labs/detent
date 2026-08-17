@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { listVersions, getVersionBody, getDraft, StudioClientError } from "../api/client.js";
+import { listVersions, getVersionBody, getDraft } from "../api/client.js";
 import type { VersionSummary } from "../api/types.js";
 import type { ProcessBody } from "workflow-engine/schema";
 import { stripCompiledContent } from "workflow-engine/schema/strip-compiled";
@@ -7,6 +7,7 @@ import { canDiff, diffJson, type VersionSelection, type DiffEntry } from "./vers
 import { buildPromotionFile, promotionFilename } from "./promotionExportLogic.js";
 import type { Route } from "../routing.js";
 import { describeCaughtError } from "../errors.js";
+import { useFail } from "../../../shell/useFail.js";
 import { t } from "../catalog.js";
 
 interface VersionsScreenProps {
@@ -55,6 +56,8 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized, may
   // The version currently being fetched for export, so only its own row's
   // button reports the wait instead of every row going busy at once.
   const [exporting, setExporting] = useState<number | null>(null);
+  const failLoad = useFail(onUnauthorized, (e) => setLoadError(describeCaughtError(e)));
+  const fail = useFail(onUnauthorized, (e) => setError(describeCaughtError(e)));
 
   const load = useCallback(() => {
     let cancelled = false;
@@ -68,11 +71,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized, may
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        if (e instanceof StudioClientError && e.status === 401) {
-          onUnauthorized();
-          return;
-        }
-        setLoadError(describeCaughtError(e));
+        failLoad(e);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -80,7 +79,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized, may
     return () => {
       cancelled = true;
     };
-  }, [processId, token, onUnauthorized]);
+  }, [processId, token, failLoad]);
 
   useEffect(() => load(), [load]);
 
@@ -102,11 +101,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized, may
       const [bodyA, bodyB] = await Promise.all([getVersionBody(processId, selection.a, token), getVersionBody(processId, selection.b, token)]);
       await runDiff(bodyA, bodyB);
     } catch (e) {
-      if (e instanceof StudioClientError && e.status === 401) {
-        onUnauthorized();
-        return;
-      }
-      setError(describeCaughtError(e));
+      fail(e);
     }
   };
 
@@ -122,11 +117,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized, may
       // publish. Strip the base so both sides are the same kind of artifact.
       await runDiff(draft?.body, stripCompiledContent(baseBody as ProcessBody));
     } catch (e) {
-      if (e instanceof StudioClientError && e.status === 401) {
-        onUnauthorized();
-        return;
-      }
-      setError(describeCaughtError(e));
+      fail(e);
     }
   };
 
@@ -143,11 +134,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized, may
       const body = await getVersionBody(processId, v.version, token);
       downloadJson(promotionFilename(body, v.version, processId), buildPromotionFile(processId, v, body));
     } catch (e) {
-      if (e instanceof StudioClientError && e.status === 401) {
-        onUnauthorized();
-        return;
-      }
-      setError(describeCaughtError(e));
+      fail(e);
     } finally {
       setExporting(null);
     }

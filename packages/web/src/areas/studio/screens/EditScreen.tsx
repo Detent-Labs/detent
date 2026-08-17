@@ -9,7 +9,7 @@ import { useDraftToolbarActions } from "../panels/DraftToolbar.js";
 import { ProcessHeaderBar } from "../panels/ProcessHeaderBar.js";
 import { ChecksRail } from "../panels/ChecksRail.js";
 import { seedLocalizedText } from "../draft/localized-text";
-import { getDraft, StudioClientError } from "../api/client.js";
+import { getDraft } from "../api/client.js";
 import type { DraftRecord, PublishResult } from "../api/types.js";
 import type { Route, PanelView } from "../routing.js";
 import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
@@ -22,9 +22,11 @@ import { arrangeSteps, hasHandPlacedStep } from "../canvas/arrange.js";
 import type { LayoutStep } from "../canvas/layout.js";
 import { newStep, type StepKind } from "../draft/createStep.js";
 import { addToDraftArray } from "../draft/draft-array-crud.js";
+import { insertOnPath } from "../draft/insertOnPath.js";
 import { JsonView } from "../panels/JsonView.js";
 import { EditorDock, type DockTab } from "../dock/EditorDock.js";
 import { describeCaughtError } from "../errors.js";
+import { useFail } from "../../../shell/useFail.js";
 import { FormEditorScreen } from "./FormEditorScreen.js";
 
 interface EditScreenProps {
@@ -72,6 +74,11 @@ function EditorArea({ processId, formStepId, panel, token, initialRevision, init
   // summary instead, since the inspector edits one step.
   const [selectedStepIds, setSelectedStepIds] = useState<string[]>([]);
   const [selectedPathId, setSelectedPathId] = useState<string | undefined>(undefined);
+  // The path an edit-rail drag currently sits over, resolved the same way the
+  // drop itself resolves one (design.md: "The rail reports its moving
+  // position"). Drives the drop-target render in `CanvasView`; not the
+  // selection, which the drag never touches until release.
+  const [insertTargetPathId, setInsertTargetPathId] = useState<string | undefined>(undefined);
   const [surface, setSurface] = useState<"structure" | "json">("structure");
   // The dock persists nothing. Component state, so both survive a canvas
   // selection and a trip to the panels screen (this component stays mounted
@@ -217,14 +224,55 @@ function EditorArea({ processId, formStepId, panel, token, initialRevision, init
     onSelectStep(undefined);
   };
 
+  /** The DOM hit test behind both the drop branch and the drag-move
+   * highlight (design.md: "The hit test runs through the DOM, not through
+   * geometry"). `CanvasView` stamps the edge group and its guard label's
+   * `foreignObject` with `data-path-id`/`data-step-id`; `.canvas-edge-hitarea`
+   * supplies the pointer tolerance, since the browser — not this code — tests
+   * its wide transparent stroke. Undefined when nothing under the point
+   * carries a path id, e.g. a node (which draws over a path) or empty canvas. */
+  const resolveDropPath = (clientX: number, clientY: number): { pathId: string; sourceStepId: string } | undefined => {
+    const group = document.elementFromPoint(clientX, clientY)?.closest("[data-path-id]");
+    const pathId = group?.getAttribute("data-path-id") ?? undefined;
+    const sourceStepId = group?.getAttribute("data-step-id") ?? undefined;
+    return pathId && sourceStepId ? { pathId, sourceStepId } : undefined;
+  };
+
+  /** `EditRail.onDragMove` (task 4.1): fired on every pointer move a rail drag
+   * makes. An `end` drag resolves to no target — a terminal step never lands
+   * inside a path, so nothing may suggest that it does. */
+  const onPaletteDragMove = (kind: StepKind, clientX: number, clientY: number) => {
+    setInsertTargetPathId(kind === "end" ? undefined : resolveDropPath(clientX, clientY)?.pathId);
+  };
+
+  /** Combines the new step's position with clearing the split path's stored
+   * waypoints (design.md, Decision "The insert clears that path's
+   * waypoints") in the one `saveState.layout` write task 3.5 asks for, rather
+   * than two separate `setSaveState` calls. */
+  const onInsertLayoutWrite = (stepId: string, point: Point, splitPathId: string) => {
+    setSaveState((s) => {
+      const nextWaypoints = { ...((s.layout.waypoints as Record<string, Point[]> | undefined) ?? {}) };
+      delete nextWaypoints[splitPathId];
+      return { ...s, layout: { ...s.layout, [stepId]: point, waypoints: nextWaypoints } };
+    });
+  };
+
   /** The rail's own drag-to-place (task 2.3), through the same `newStep`/
    * `addToDraftArray` creation path every step-creating control in this
    * screen shares. Screen coordinates in, since `EditRail` holds no canvas
    * geometry of its own: `elementFromPoint` finds the live `.canvas-svg`
    * element (or none, when the drop misses the canvas), and
    * `svgPointFromClient` converts through its current pan/zoom transform —
-   * the same conversion `CanvasView`'s own node/handle drags use. */
+   * the same conversion `CanvasView`'s own node/handle drags use.
+   *
+   * A drop over a rendered path inserts the new step into it instead of
+   * placing it free-standing (design.md: "The gesture is a drop, not a
+   * control on the edge") — the topmost element under the pointer decides,
+   * the same rule `elementFromPoint` already gives every other drop. An `end`
+   * step never takes this branch: a terminal step has no outgoing path, so it
+   * cannot stand between two steps. */
   const onPaletteDrop = (kind: StepKind, clientX: number, clientY: number) => {
+    setInsertTargetPathId(undefined);
     const target = document.elementFromPoint(clientX, clientY);
     // Resolve through `.canvas-wrap`, not through the SVG under the pointer.
     // Panzoom scales the SVG element itself, so a zoomed-out canvas leaves
@@ -241,6 +289,18 @@ function EditorArea({ processId, formStepId, panel, token, initialRevision, init
     // the lattice the author can see.
     const point = snapToGrid(svgPointFromClient(svg, clientX, clientY));
     const created = newStep(kind, seedLocalizedText(contentLocale));
+
+    const dropTarget = kind !== "end" ? resolveDropPath(clientX, clientY) : undefined;
+    if (dropTarget && created.id) {
+      mutate((d) => {
+        d.workflow ??= {};
+        d.workflow.steps = insertOnPath(d.workflow.steps ?? [], dropTarget.sourceStepId, dropTarget.pathId, created);
+      });
+      onInsertLayoutWrite(created.id, point, dropTarget.pathId);
+      onSelectStep(created.id);
+      return;
+    }
+
     addToDraftArray(
       mutate,
       (d) => {
@@ -339,7 +399,11 @@ function EditorArea({ processId, formStepId, panel, token, initialRevision, init
           ) : (
             <>
             <div className="studio-canvas-layout">
-              <EditRail onDrop={onPaletteDrop} onOpenPanel={(view) => navigate({ name: "edit", processId, panel: view })} />
+              <EditRail
+                onDrop={onPaletteDrop}
+                onDragMove={onPaletteDragMove}
+                onOpenPanel={(view) => navigate({ name: "edit", processId, panel: view })}
+              />
               <CanvasView
                 layout={saveState.layout}
                 onMoveStep={onMoveStep}
@@ -353,6 +417,7 @@ function EditorArea({ processId, formStepId, panel, token, initialRevision, init
                 waypoints={waypoints}
                 onWaypointsChange={onWaypointsChange}
                 groups={groups}
+                insertTargetPathId={insertTargetPathId}
               />
               {/* The third column has three states (studio-canvas). Nothing
                   selected shows the full checks rail. One step or a path
@@ -485,6 +550,7 @@ type EditLoadState =
 
 export function EditScreen({ processId, formStepId, panel, token, navigate, onUnauthorized }: EditScreenProps) {
   const [state, setState] = useState<EditLoadState>({ kind: "loading" });
+  const fail = useFail(onUnauthorized, (e) => setState({ kind: "error", message: describeCaughtError(e) }));
 
   const load = useCallback(() => {
     let cancelled = false;
@@ -496,16 +562,12 @@ export function EditScreen({ processId, formStepId, panel, token, navigate, onUn
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        if (e instanceof StudioClientError && e.status === 401) {
-          onUnauthorized();
-          return;
-        }
-        setState({ kind: "error", message: describeCaughtError(e) });
+        fail(e);
       });
     return () => {
       cancelled = true;
     };
-  }, [processId, token, onUnauthorized]);
+  }, [processId, token, fail]);
 
   useEffect(() => load(), [load]);
 

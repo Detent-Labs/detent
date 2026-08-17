@@ -17,6 +17,7 @@ import {
 } from "../api/client.js";
 import { AppClientError } from "../api/client.js";
 import { describeError, type ErrorOutcome } from "../errors.js";
+import { is401 } from "../../../shell/useFail.js";
 import { resolveClaimControls, maySubmit, type ClaimControls } from "./claimLogic.js";
 import { t } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
@@ -76,11 +77,15 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
       try {
         await fn();
       } catch (err) {
+        // This ladder tests `validation`, `refresh-and-remove` and a claim
+        // reload after the 401 branch, none of which `useFail`'s void
+        // callback can express — so it keeps its own check, sharing only the
+        // `is401` predicate the hook exports.
+        if (is401(err)) {
+          onUnauthorized();
+          return;
+        }
         if (err instanceof AppClientError) {
-          if (err.status === 401) {
-            onUnauthorized();
-            return;
-          }
           if (err.error.type === "validation") {
             setValidationIssues(err.error.issues);
             return;

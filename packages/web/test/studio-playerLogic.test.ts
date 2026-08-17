@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { describeRecordElement, seedFormValues } from "../src/areas/studio/screens/playerLogic.js";
+import { describeRecordElement } from "../src/api/record.js";
+import { seedFormValues } from "../src/areas/studio/screens/playerLogic.js";
 import type { InstanceRecordElement } from "../src/areas/studio/api/types.js";
 
 describe("describeRecordElement", () => {

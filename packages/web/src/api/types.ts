@@ -1,11 +1,36 @@
 /**
- * The three types every area shares. Domain types stay per area on purpose:
- * each declares only the fields it reads, off different endpoints with
- * different projections, so pairs that look identical today will drift.
+ * The types every area shares, of two different kinds.
+ *
+ * Most of what follows are domain types split per area on purpose: each
+ * declares only the fields it reads, off different endpoints with different
+ * projections, so pairs that look identical today will drift.
+ *
+ * `VersionSummary`, `InstanceRecordElement` and `InstanceRecordPage` are the
+ * exception: each is a whole mirror of an engine type
+ * (`src/engine/definitions.ts::VersionSummary`,
+ * `src/runtime/api.ts::InstanceRecordElement`), not a projection of one. They
+ * move when the engine type moves, and at no other time.
  */
 import type { SubmissionIssue } from "form-ui";
+import type { HistoryEntry, InstanceEvent } from "workflow-engine/schema";
 
 export type { SubmissionIssue };
+
+/** Mirrors src/engine/definitions.ts::VersionSummary. */
+export interface VersionSummary {
+  version: number;
+  definitionHash: string;
+  status: string;
+  publishedAt: string;
+}
+
+/** Mirrors src/runtime/api.ts::InstanceRecordElement. */
+export type InstanceRecordElement = { kind: "transition"; entry: HistoryEntry } | { kind: "event"; event: InstanceEvent };
+
+export interface InstanceRecordPage {
+  items: InstanceRecordElement[];
+  cursor?: string;
+}
 
 export interface Actor {
   id: string;

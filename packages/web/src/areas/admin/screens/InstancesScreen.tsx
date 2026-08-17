@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { listInstances, AdminClientError } from "../api/client.js";
+import { listInstances } from "../api/client.js";
 import type { DegradedInstanceSummary, InstanceSummaryItem } from "../api/types.js";
 import type { Route } from "../routing.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
+import { useFail } from "../../../shell/useFail.js";
 import { EMPTY_INSTANCE_FILTER, toListParams, labelText, type InstanceFilterState } from "./instancesLogic.js";
 import { t, tFill } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
@@ -29,6 +30,7 @@ export function InstancesScreen({ token, locale, navigate, onUnauthorized }: Ins
   const [error, setError] = useState<string | undefined>(undefined);
   const [filter, setFilter] = useState<InstanceFilterState>(EMPTY_INSTANCE_FILTER);
   const { reloadToken, refresh } = useRefresh();
+  const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,12 +40,11 @@ export function InstancesScreen({ token, locale, navigate, onUnauthorized }: Ins
       setItems(page.items);
       setCursor(page.cursor);
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setLoading(false);
     }
-  }, [token, filter, locale, onUnauthorized]);
+  }, [token, filter, locale, fail]);
 
   const loadMore = useCallback(async () => {
     if (!cursor) return;
@@ -54,12 +55,11 @@ export function InstancesScreen({ token, locale, navigate, onUnauthorized }: Ins
       setItems((prev) => [...prev, ...page.items]);
       setCursor(page.cursor);
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setLoading(false);
     }
-  }, [token, filter, cursor, locale, onUnauthorized]);
+  }, [token, filter, cursor, locale, fail]);
 
   useEffect(() => {
     void load();

@@ -3,7 +3,7 @@ import type { Step } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { useDraft } from "../draft/store";
-import { t, type TranslationKey } from "../catalog.js";
+import { t, type CatalogKey } from "../catalog.js";
 import { updateInDraftArray } from "../draft/draft-array-crud";
 import { performedByFor, performedByPatch, type PerformedBy } from "../draft/performedBy";
 import { ActionListEditor } from "./ActionListEditor";
@@ -29,7 +29,7 @@ type DraftStep = DraftOf<Step>;
  * path-guard's own CEL "Developer view" toggle (`studio-condition-builder`). */
 type StepSection = "identity" | "assignment" | "paths" | "timers" | "actions" | "subprocess" | "view" | "developerView";
 
-const SECTION_LABEL: Record<StepSection, TranslationKey> = {
+const SECTION_LABEL: Record<StepSection, CatalogKey> = {
   identity: "stepSections.identity",
   assignment: "stepSections.assignment",
   paths: "stepSections.paths",
@@ -40,7 +40,7 @@ const SECTION_LABEL: Record<StepSection, TranslationKey> = {
   developerView: "stepSections.developerView",
 };
 
-const PERFORMED_BY_LABEL: Record<PerformedBy, TranslationKey> = {
+const PERFORMED_BY_LABEL: Record<PerformedBy, CatalogKey> = {
   participant: "stepSections.performedByParticipant",
   subprocess: "stepSections.performedBySubprocess",
   terminal: "stepSections.performedByTerminal",

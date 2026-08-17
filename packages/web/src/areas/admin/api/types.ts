@@ -1,7 +1,7 @@
-export type { Actor, LoginResponse, ClientError } from "../../../api/types.js";
-import type { LocalizedText, LocaleCode, HistoryEntry, InstanceEvent } from "workflow-engine/schema";
+export type { Actor, LoginResponse, ClientError, VersionSummary, InstanceRecordElement, InstanceRecordPage } from "../../../api/types.js";
+import type { LocalizedText, LocaleCode } from "workflow-engine/schema";
 
-export type { LocalizedText, LocaleCode, HistoryEntry, InstanceEvent };
+export type { LocalizedText, LocaleCode };
 
 export type InstanceStatus = "running" | "completed" | "cancelled" | "faulted";
 
@@ -56,22 +56,6 @@ export interface InstanceView {
   status: InstanceStatus;
   step: { id: string; key: string; label: LocalizedText; type: string };
   redactedAt?: string;
-}
-
-/** Mirrors src/runtime/api.ts::InstanceRecordElement. */
-export type InstanceRecordElement = { kind: "transition"; entry: HistoryEntry } | { kind: "event"; event: InstanceEvent };
-
-export interface InstanceRecordPage {
-  items: InstanceRecordElement[];
-  cursor?: string;
-}
-
-/** Mirrors src/engine/definitions.ts::VersionSummary. */
-export interface VersionSummary {
-  version: number;
-  definitionHash: string;
-  status: string;
-  publishedAt: string;
 }
 
 /** Mirrors src/engine/definitions.ts::ProcessSummary — the newest-version summary GET /processes returns per process. `baseLocale` is process-level and stable across versions, so this is also where the instance screen resolves a step label's active locale. */

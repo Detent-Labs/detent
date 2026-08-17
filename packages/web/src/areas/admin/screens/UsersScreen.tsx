@@ -1,8 +1,9 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
-import { listUsers, createUser, disableUser, enableUser, setUserRoles, setUserManager, setUserPassword, AdminClientError } from "../api/client.js";
+import { listUsers, createUser, disableUser, enableUser, setUserRoles, setUserManager, setUserPassword } from "../api/client.js";
 import type { UserSummary } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
+import { useFail } from "../../../shell/useFail.js";
 import { parseRoles, appendRole, managerChoices, managerLabel, managerValueOf } from "./usersLogic.js";
 import { t, tFill } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
@@ -69,6 +70,7 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
   const [newPassword, setNewPassword] = useState("");
   const [newRoles, setNewRoles] = useState("");
   const { reloadToken, refresh } = useRefresh();
+  const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
 
   const editingRoles = (userId: string) => editing?.userId === userId && editing.field === "roles";
   const editingManager = (userId: string) => editing?.userId === userId && editing.field === "manager";
@@ -92,12 +94,11 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
       } while (cursor);
       setItems(all);
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setLoading(false);
     }
-  }, [token, locale, onUnauthorized]);
+  }, [token, locale, fail]);
 
   useEffect(() => {
     void load();
@@ -111,8 +112,7 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
       else await disableUser(user.userId, token);
       refresh();
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setBusyId(undefined);
     }
@@ -168,8 +168,7 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
     } catch (err) {
       // A self-strip refusal reads through `describeError`'s `self-role-strip`
       // case, like every other typed failure on this screen.
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setBusyId(undefined);
     }
@@ -184,8 +183,7 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
     } catch (err) {
       // A refusal leaves the editor open and the row's stored manager on
       // screen: nothing was written, so nothing should read as written.
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setBusyId(undefined);
     }
@@ -200,8 +198,7 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
       // rest of the screen may have moved while the editor was open.
       refresh();
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setBusyId(undefined);
     }
@@ -216,8 +213,7 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
     } catch (err) {
       // A taken email reads through `describeError`'s `email-in-use` case. The
       // form stays open holding what was typed, so only the address changes.
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setBusyId(undefined);
     }

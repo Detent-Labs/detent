@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { resolveText } from "form-ui";
 import { createInstance, listProcesses } from "../api/client.js";
-import { AppClientError } from "../api/client.js";
 import { describeCaughtError } from "../errors.js";
+import { useFail } from "../../../shell/useFail.js";
 import { t } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
 import type { ProcessSummary } from "../api/types.js";
@@ -20,6 +20,7 @@ export function StartScreen({ token, locale, navigate, onUnauthorized }: StartSc
   const [loading, setLoading] = useState(false);
   const [loadingList, setLoadingList] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+  const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
 
   const load = useCallback(() => {
     setLoadingList(true);
@@ -27,11 +28,10 @@ export function StartScreen({ token, locale, navigate, onUnauthorized }: StartSc
     return listProcesses(token)
       .then(setProcesses)
       .catch((err) => {
-        if (err instanceof AppClientError && err.status === 401) onUnauthorized();
-        else setError(describeCaughtError(err, locale));
+        fail(err);
       })
       .finally(() => setLoadingList(false));
-  }, [token, onUnauthorized, locale]);
+  }, [token, fail, locale]);
 
   useEffect(() => {
     void load();
@@ -43,8 +43,7 @@ export function StartScreen({ token, locale, navigate, onUnauthorized }: StartSc
       const created = await createInstance(processId, token);
       navigate({ name: "task", instanceId: created.instanceId });
     } catch (err) {
-      if (err instanceof AppClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setLoading(false);
     }

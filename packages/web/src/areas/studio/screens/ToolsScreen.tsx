@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { checkAgainstFields } from "workflow-engine/cel/check";
-import { getRegistry, listProcesses, listVersions, getDraft, getVersionBody, StudioClientError } from "../api/client.js";
+import { getRegistry, listProcesses, listVersions, getDraft, getVersionBody } from "../api/client.js";
 import type { ProcessSummary, VersionSummary, RegistryInfo } from "../api/types.js";
 import { extractFields } from "./toolsScratchpadLogic.js";
 import type { Route } from "../routing.js";
 import { describeCaughtError } from "../errors.js";
 import { t } from "../catalog.js";
+import { useFail } from "../../../shell/useFail.js";
 
 interface ToolsScreenProps {
   token: string;
@@ -27,6 +28,8 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
   const [fields, setFields] = useState<import("workflow-engine/schema").FieldDef[]>([]);
   const [catalogError, setCatalogError] = useState<string | undefined>(undefined);
   const [expression, setExpression] = useState("");
+  const failLoad = useFail(onUnauthorized, (e) => setLoadError(describeCaughtError(e)));
+  const failCatalog = useFail(onUnauthorized, (e) => setCatalogError(describeCaughtError(e)));
 
   const load = useCallback(() => {
     let cancelled = false;
@@ -40,11 +43,7 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        if (e instanceof StudioClientError && e.status === 401) {
-          onUnauthorized();
-          return;
-        }
-        setLoadError(describeCaughtError(e));
+        failLoad(e);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -52,7 +51,7 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
     return () => {
       cancelled = true;
     };
-  }, [token, onUnauthorized]);
+  }, [token, failLoad]);
 
   useEffect(() => load(), [load]);
 
@@ -72,15 +71,9 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
           setVersions(vs);
           setHasDraft(!!draft);
         })
-        .catch((e: unknown) => {
-          if (e instanceof StudioClientError && e.status === 401) {
-            onUnauthorized();
-            return;
-          }
-          setCatalogError(describeCaughtError(e));
-        });
+        .catch(failCatalog);
     },
-    [token, onUnauthorized],
+    [token, failCatalog],
   );
 
   const selectCatalog = useCallback(
@@ -92,17 +85,9 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
         return;
       }
       const fetchBody = source === "draft" ? getDraft(processId, token).then((d) => d?.body) : getVersionBody(processId, Number(source), token);
-      fetchBody
-        .then((body) => setFields(extractFields(body)))
-        .catch((e: unknown) => {
-          if (e instanceof StudioClientError && e.status === 401) {
-            onUnauthorized();
-            return;
-          }
-          setCatalogError(describeCaughtError(e));
-        });
+      fetchBody.then((body) => setFields(extractFields(body))).catch(failCatalog);
     },
-    [processId, token, onUnauthorized],
+    [processId, token, failCatalog],
   );
 
   const checkResult = useMemo(() => {

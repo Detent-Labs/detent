@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useDraft } from "../draft/store.js";
 import { t } from "../catalog.js";
-import { saveDraft, getDraft, deleteDraft, publishDraft, StudioClientError } from "../api/client.js";
+import { saveDraft, getDraft, deleteDraft, publishDraft } from "../api/client.js";
 import { applySaveResult, applyReload, type DraftSaveState } from "../screens/draftSaveLogic.js";
 import { isDirty } from "../screens/draftToolbarState.js";
 import { describeCaughtError } from "../errors.js";
+import { useFail } from "../../../shell/useFail.js";
 import type { Draft } from "../draft/types.js";
 import type { PublishResult } from "../api/types.js";
 
@@ -68,17 +69,14 @@ export function useDraftToolbarActions({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
+  const fail = useFail(onUnauthorized, (e) => setError(describeCaughtError(e)));
 
   const withUnauthorized = async (action: () => Promise<void>) => {
     try {
       await action();
       setError(null);
     } catch (e) {
-      if (e instanceof StudioClientError && e.status === 401) {
-        onUnauthorized();
-        return;
-      }
-      setError(describeCaughtError(e));
+      fail(e);
     }
   };
 

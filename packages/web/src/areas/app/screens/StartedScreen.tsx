@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { listStartedByMe, AppClientError } from "../api/client.js";
+import { listInstances } from "../api/client.js";
 import { describeCaughtError } from "../errors.js";
+import { useFail } from "../../../shell/useFail.js";
 import { t } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
 import type { InstanceSummary } from "../api/types.js";
@@ -32,37 +33,36 @@ export function StartedScreen({ token, locale, navigate, onUnauthorized }: Start
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+  const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(undefined);
     try {
-      const page = await listStartedByMe(token, { limit: 200 });
+      const page = await listInstances("started", token, { limit: 200 });
       setItems(page.items);
       setCursor(page.cursor);
     } catch (err) {
-      if (err instanceof AppClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setLoading(false);
     }
-  }, [token, onUnauthorized, locale]);
+  }, [token, fail, locale]);
 
   const loadMore = useCallback(async () => {
     if (!cursor) return;
     setLoading(true);
     setError(undefined);
     try {
-      const page = await listStartedByMe(token, { limit: 200, cursor });
+      const page = await listInstances("started", token, { limit: 200, cursor });
       setItems((prev) => [...prev, ...page.items]);
       setCursor(page.cursor);
     } catch (err) {
-      if (err instanceof AppClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setLoading(false);
     }
-  }, [token, cursor, onUnauthorized, locale]);
+  }, [token, cursor, fail, locale]);
 
   useEffect(() => {
     void load();

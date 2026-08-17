@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { cancelInstance, redactInstance, getInstanceRecord, getInstanceView, listPendingTimers, listProcesses, listVersions, AdminClientError } from "../api/client.js";
+import { cancelInstance, redactInstance, getInstanceRecord, getInstanceView, listPendingTimers, listProcesses, listVersions } from "../api/client.js";
 import type { InstanceRecordElement, InstanceView, PendingTimer, VersionSummary } from "../api/types.js";
+import { describeRecordElement } from "../../../api/record.js";
 import type { Route } from "../routing.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
+import { useFail } from "../../../shell/useFail.js";
 import { labelText } from "./instancesLogic.js";
 import { t, tFill } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
@@ -38,23 +40,18 @@ function deriveFromRecord(items: InstanceRecordElement[]): { transitionSeq?: num
 }
 
 /**
- * One record line, built from engine vocabulary alone. `transition` and `event`
- * name the two record kinds, `actions` and `attempts` name fields, and the
- * cause, the event kind and every id are values the engine stores. None of it
- * enters the catalog, so this stays pure and locale-free.
+ * `describeRecordElement`'s `{at, summary}` plus the one field only this
+ * screen renders: `actions` and `attempts` name fields, the cause, the event
+ * kind and every id are values the engine stores, and none of it enters the
+ * catalog, so this stays pure and locale-free.
  */
 function describeElement(el: InstanceRecordElement): { at: string; summary: string; detail: string } {
+  const { at, summary } = describeRecordElement(el);
   if (el.kind === "transition") {
-    const e = el.entry;
-    const actions = (e.actions ?? []).map((a) => `${a.resolvedHandler}:${a.status} (attempts ${a.attempts})`).join(", ");
-    return {
-      at: e.at,
-      summary: `transition — ${e.cause}${e.pathId ? ` via ${e.pathId}` : ""} — ${e.fromStepId ?? "(start)"} → ${e.toStepId}`,
-      detail: actions ? `actions: ${actions}` : "",
-    };
+    const actions = (el.entry.actions ?? []).map((a) => `${a.resolvedHandler}:${a.status} (attempts ${a.attempts})`).join(", ");
+    return { at, summary, detail: actions ? `actions: ${actions}` : "" };
   }
-  const ev = el.event;
-  return { at: ev.at, summary: `event — ${ev.kind}`, detail: JSON.stringify(ev.payload) };
+  return { at, summary, detail: JSON.stringify(el.event.payload) };
 }
 
 export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthorized }: InstanceScreenProps) {
@@ -72,6 +69,7 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
   const [cancelling, setCancelling] = useState(false);
   const [redacting, setRedacting] = useState(false);
   const { reloadToken, refresh } = useRefresh();
+  const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -91,12 +89,11 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
       setTimer(timers.items.find((t) => t.instanceId === instanceId));
       setBaseLocale(processes.find((p) => p.processId === v.processId)?.baseLocale);
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setLoading(false);
     }
-  }, [instanceId, token, locale, onUnauthorized]);
+  }, [instanceId, token, locale, fail]);
 
   const loadMoreRecord = useCallback(async () => {
     if (!recordCursor) return;
@@ -107,12 +104,11 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
       setRecord((prev) => [...prev, ...rec.items]);
       setRecordCursor(rec.cursor);
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setLoading(false);
     }
-  }, [instanceId, token, recordCursor, locale, onUnauthorized]);
+  }, [instanceId, token, recordCursor, locale, fail]);
 
   useEffect(() => {
     void load();
@@ -124,8 +120,7 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
       await cancelInstance(instanceId, token);
       refresh();
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setCancelling(false);
     }
@@ -138,8 +133,7 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
       await redactInstance(instanceId, token);
       refresh();
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setRedacting(false);
     }

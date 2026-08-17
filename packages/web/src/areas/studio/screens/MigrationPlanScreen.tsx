@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getMigrationPlan, putMigrationPlan, getOrphanKeys, getVersionBody, StudioClientError } from "../api/client.js";
+import { getMigrationPlan, putMigrationPlan, getOrphanKeys, getVersionBody } from "../api/client.js";
 import {
   EMPTY_ROWS,
   formatSpecText,
@@ -15,6 +15,7 @@ import type { Route } from "../routing.js";
 import type { OrphanKeyScan } from "../api/types.js";
 import { describeCaughtError } from "../errors.js";
 import { t } from "../catalog.js";
+import { useFail } from "../../../shell/useFail.js";
 
 interface MigrationPlanScreenProps {
   processId: string;
@@ -50,6 +51,8 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
   const [error, setError] = useState<string | null>(null);
   const [orphans, setOrphans] = useState<OrphanKeyScan | undefined>(undefined);
   const [scanning, setScanning] = useState(false);
+  const failLoad = useFail(onUnauthorized, (e) => setLoadError(describeCaughtError(e)));
+  const fail = useFail(onUnauthorized, (e) => setError(describeCaughtError(e)));
 
   const load = useCallback(() => {
     let cancelled = false;
@@ -65,12 +68,7 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
       .then(([plan, sourceBody, targetBody]) => {
         if (cancelled) return;
         if (plan.status === "rejected") {
-          const e: unknown = plan.reason;
-          if (e instanceof StudioClientError && e.status === 401) {
-            onUnauthorized();
-            return;
-          }
-          setLoadError(describeCaughtError(e));
+          failLoad(plan.reason);
           return;
         }
         if (plan.value) {
@@ -88,7 +86,7 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
     return () => {
       cancelled = true;
     };
-  }, [processId, fromVersion, toVersion, token, onUnauthorized]);
+  }, [processId, fromVersion, toVersion, token, failLoad]);
 
   useEffect(() => load(), [load]);
 
@@ -127,11 +125,7 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
       const result = await putMigrationPlan(processId, fromVersion, toVersion, spec, token);
       setAppliedAt(result.appliedAt);
     } catch (e) {
-      if (e instanceof StudioClientError && e.status === 401) {
-        onUnauthorized();
-        return;
-      }
-      setError(describeCaughtError(e));
+      fail(e);
     } finally {
       setSaving(false);
     }
@@ -143,11 +137,7 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
     try {
       setOrphans(await getOrphanKeys(processId, version, token));
     } catch (e) {
-      if (e instanceof StudioClientError && e.status === 401) {
-        onUnauthorized();
-        return;
-      }
-      setError(describeCaughtError(e));
+      fail(e);
     } finally {
       setScanning(false);
     }

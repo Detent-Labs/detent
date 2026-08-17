@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
-import { listProcesses, listVersions, runMigration, AdminClientError } from "../api/client.js";
+import { useEffect, useState } from "react";
+import { listProcesses, listVersions, runMigration } from "../api/client.js";
 import type { ProcessSummary, VersionSummary, MigrationResult } from "../api/types.js";
 import { describeCaughtError } from "../errors.js";
+import { useFail } from "../../../shell/useFail.js";
 import { labelText } from "./instancesLogic.js";
 import { parseVersionInput, buildRunConfirmation, migrationBuckets } from "./migrationsLogic.js";
 import { t } from "../catalog.js";
@@ -22,20 +23,13 @@ export function MigrationsScreen({ token, locale, onUnauthorized }: MigrationsSc
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [result, setResult] = useState<MigrationResult | undefined>(undefined);
-
-  const handleUnauthorized = useCallback(
-    (err: unknown) => {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
-    },
-    [locale, onUnauthorized],
-  );
+  const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
 
   useEffect(() => {
     listProcesses(token)
       .then(setProcesses)
-      .catch(handleUnauthorized);
-  }, [token, handleUnauthorized]);
+      .catch(fail);
+  }, [token, fail]);
 
   useEffect(() => {
     setVersions([]);
@@ -44,8 +38,8 @@ export function MigrationsScreen({ token, locale, onUnauthorized }: MigrationsSc
     if (!processId) return;
     listVersions(processId, token)
       .then(setVersions)
-      .catch(handleUnauthorized);
-  }, [processId, token, handleUnauthorized]);
+      .catch(fail);
+  }, [processId, token, fail]);
 
   const from = parseVersionInput(fromVersion);
   const to = parseVersionInput(toVersion);
@@ -60,7 +54,7 @@ export function MigrationsScreen({ token, locale, onUnauthorized }: MigrationsSc
     try {
       setResult(await runMigration(processId, from!, to!, token));
     } catch (err) {
-      handleUnauthorized(err);
+      fail(err);
     } finally {
       setRunning(false);
     }

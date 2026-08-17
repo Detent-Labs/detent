@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { listPendingTimers, AdminClientError } from "../api/client.js";
+import { listPendingTimers } from "../api/client.js";
 import type { PendingTimer } from "../api/types.js";
 import type { Route } from "../routing.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
+import { useFail } from "../../../shell/useFail.js";
 import { isOverdue } from "./timersLogic.js";
 import { t, tFill } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
@@ -23,6 +24,7 @@ export function TimersScreen({ token, locale, navigate, onUnauthorized }: Timers
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const { reloadToken, refresh } = useRefresh();
+  const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -32,12 +34,11 @@ export function TimersScreen({ token, locale, navigate, onUnauthorized }: Timers
       setItems(page.items);
       setCursor(page.cursor);
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setLoading(false);
     }
-  }, [token, locale, onUnauthorized]);
+  }, [token, locale, fail]);
 
   const loadMore = useCallback(async () => {
     if (!cursor) return;
@@ -48,12 +49,11 @@ export function TimersScreen({ token, locale, navigate, onUnauthorized }: Timers
       setItems((prev) => [...prev, ...page.items]);
       setCursor(page.cursor);
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setLoading(false);
     }
-  }, [token, cursor, locale, onUnauthorized]);
+  }, [token, cursor, locale, fail]);
 
   useEffect(() => {
     void load();

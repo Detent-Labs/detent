@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { listUiStringOverrides, putUiStringOverride, AdminClientError } from "../api/client.js";
+import { listUiStringOverrides, putUiStringOverride } from "../api/client.js";
 import type { UiStringOverrideMap } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
+import { useFail } from "../../../shell/useFail.js";
 import { loadUiStringOverrides } from "../../../i18n/overrides.js";
 import { OVERRIDABLE_AREAS, localesOf, rowsFor, pendingWrites } from "./uiStringsLogic.js";
 import { t, tFill } from "../catalog.js";
@@ -39,6 +40,7 @@ export function UiStringsScreen({ token, locale: uiLocale, onUnauthorized }: UiS
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const { reloadToken, refresh } = useRefresh();
+  const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, uiLocale)));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -47,12 +49,11 @@ export function UiStringsScreen({ token, locale: uiLocale, onUnauthorized }: UiS
       setOverrides(await listUiStringOverrides(token));
       setDrafts({});
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, uiLocale));
+      fail(err);
     } finally {
       setLoading(false);
     }
-  }, [token, uiLocale, onUnauthorized]);
+  }, [token, uiLocale, fail]);
 
   useEffect(() => {
     void load();
@@ -83,8 +84,7 @@ export function UiStringsScreen({ token, locale: uiLocale, onUnauthorized }: UiS
       setSaved(true);
       refresh();
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, uiLocale));
+      fail(err);
     } finally {
       setSaving(false);
     }

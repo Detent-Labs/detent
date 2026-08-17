@@ -3,7 +3,6 @@ import type {
   DataListDetail,
   DataListPage,
   InstancePage,
-  InstanceRecordPage,
   InstanceView,
   MigrationResult,
   OutboxPage,
@@ -15,10 +14,11 @@ import type {
   UserSummary,
   VersionSummary,
 } from "./types.js";
-import { AppClientError, request } from "../../../api/client.js";
+import { AppClientError, getInstanceRecord, getJson, request } from "../../../api/client.js";
 
 /** The admin area threw its own error class before the consolidation; this keeps the name its screens use. */
 export { AppClientError as AdminClientError };
+export { getInstanceRecord };
 
 export interface InstanceListParams {
   processId?: string;
@@ -39,22 +39,11 @@ export async function listInstances(token: string, params: InstanceListParams = 
   if (params.claimedBy) query.set("claimedBy", params.claimedBy);
   if (params.limit !== undefined) query.set("limit", String(params.limit));
   if (params.cursor !== undefined) query.set("cursor", params.cursor);
-  const res = await request(`/instances?${query}`, token);
-  return (await res.json()) as InstancePage;
+  return getJson<InstancePage>(`/instances?${query}`, token);
 }
 
 export async function getInstanceView(instanceId: string, token: string): Promise<InstanceView> {
-  const res = await request(`/instances/${encodeURIComponent(instanceId)}`, token);
-  return (await res.json()) as InstanceView;
-}
-
-export async function getInstanceRecord(instanceId: string, token: string, opts: { limit?: number; cursor?: string } = {}): Promise<InstanceRecordPage> {
-  const query = new URLSearchParams();
-  if (opts.limit !== undefined) query.set("limit", String(opts.limit));
-  if (opts.cursor !== undefined) query.set("cursor", opts.cursor);
-  const qs = query.toString();
-  const res = await request(`/instances/${encodeURIComponent(instanceId)}/record${qs ? `?${qs}` : ""}`, token);
-  return (await res.json()) as InstanceRecordPage;
+  return getJson<InstanceView>(`/instances/${encodeURIComponent(instanceId)}`, token);
 }
 
 export async function cancelInstance(instanceId: string, token: string): Promise<void> {
@@ -66,13 +55,11 @@ export async function redactInstance(instanceId: string, token: string): Promise
 }
 
 export async function listVersions(processId: string, token: string): Promise<VersionSummary[]> {
-  const res = await request(`/processes/${encodeURIComponent(processId)}/versions`, token);
-  return (await res.json()) as VersionSummary[];
+  return getJson<VersionSummary[]>(`/processes/${encodeURIComponent(processId)}/versions`, token);
 }
 
 export async function listProcesses(token: string): Promise<ProcessSummary[]> {
-  const res = await request("/processes", token);
-  return (await res.json()) as ProcessSummary[];
+  return getJson<ProcessSummary[]>("/processes", token);
 }
 
 export interface OutboxListParams {
@@ -88,8 +75,7 @@ export async function listOutbox(token: string, params: OutboxListParams = {}): 
   if (params.instanceId) query.set("instanceId", params.instanceId);
   if (params.limit !== undefined) query.set("limit", String(params.limit));
   if (params.cursor !== undefined) query.set("cursor", params.cursor);
-  const res = await request(`/admin/outbox?${query}`, token);
-  return (await res.json()) as OutboxPage;
+  return getJson<OutboxPage>(`/admin/outbox?${query}`, token);
 }
 
 export async function retryOutboxRow(idempotencyKey: string, token: string): Promise<OutboxRow> {
@@ -106,16 +92,14 @@ export async function listPendingTimers(token: string, opts: { limit?: number; c
   const query = new URLSearchParams();
   if (opts.limit !== undefined) query.set("limit", String(opts.limit));
   if (opts.cursor !== undefined) query.set("cursor", opts.cursor);
-  const res = await request(`/admin/timers?${query}`, token);
-  return (await res.json()) as PendingTimerPage;
+  return getJson<PendingTimerPage>(`/admin/timers?${query}`, token);
 }
 
 export async function listUsers(token: string, opts: { limit?: number; cursor?: string } = {}): Promise<UserPage> {
   const query = new URLSearchParams();
   if (opts.limit !== undefined) query.set("limit", String(opts.limit));
   if (opts.cursor !== undefined) query.set("cursor", opts.cursor);
-  const res = await request(`/admin/users?${query}`, token);
-  return (await res.json()) as UserPage;
+  return getJson<UserPage>(`/admin/users?${query}`, token);
 }
 
 /** Creates a local account. A 409 means an account already holds that email. The password travels to its holder out of band: the engine sends no mail. */
@@ -182,8 +166,7 @@ export async function runMigration(processId: string, fromVersion: number, toVer
 // what lets the studio's data source panel offer the existing keys.
 
 export async function listDataLists(token: string): Promise<DataListPage> {
-  const res = await request("/admin/data-lists", token);
-  return (await res.json()) as DataListPage;
+  return getJson<DataListPage>("/admin/data-lists", token);
 }
 
 export async function createDataList(
@@ -201,8 +184,7 @@ export async function createDataList(
 }
 
 export async function getDataList(listKey: string, token: string): Promise<DataListDetail> {
-  const res = await request(`/admin/data-lists/${encodeURIComponent(listKey)}`, token);
-  return (await res.json()) as DataListDetail;
+  return getJson<DataListDetail>(`/admin/data-lists/${encodeURIComponent(listKey)}`, token);
 }
 
 /** `columns` omitted leaves the declaration as it stands; an array replaces it, and `[]` clears it. */
@@ -239,8 +221,7 @@ export async function deleteDataList(listKey: string, token: string): Promise<vo
 
 /** The screen's own read. Same data the public `GET /ui-strings` returns, behind `system:admin`. */
 export async function listUiStringOverrides(token: string): Promise<UiStringOverrideMap> {
-  const res = await request("/admin/ui-strings", token);
-  const body = (await res.json()) as { overrides: UiStringOverrideMap };
+  const body = await getJson<{ overrides: UiStringOverrideMap }>("/admin/ui-strings", token);
   return body.overrides;
 }
 

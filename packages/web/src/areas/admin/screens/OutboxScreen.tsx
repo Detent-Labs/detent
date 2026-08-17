@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { discardOutboxRow, listOutbox, retryOutboxRow, AdminClientError } from "../api/client.js";
+import { discardOutboxRow, listOutbox, retryOutboxRow } from "../api/client.js";
 import type { OutboxRow } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
+import { useFail } from "../../../shell/useFail.js";
 import { t } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
 
@@ -24,6 +25,7 @@ export function OutboxScreen({ token, locale, onUnauthorized }: OutboxScreenProp
   const [error, setError] = useState<string | undefined>(undefined);
   const [busyKey, setBusyKey] = useState<string | undefined>(undefined);
   const { reloadToken, refresh } = useRefresh();
+  const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,12 +40,11 @@ export function OutboxScreen({ token, locale, onUnauthorized }: OutboxScreenProp
       setCursor(page.cursor);
       setCounts(page.counts);
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setLoading(false);
     }
-  }, [token, statusFilter, instanceIdFilter, locale, onUnauthorized]);
+  }, [token, statusFilter, instanceIdFilter, locale, fail]);
 
   const loadMore = useCallback(async () => {
     if (!cursor) return;
@@ -59,12 +60,11 @@ export function OutboxScreen({ token, locale, onUnauthorized }: OutboxScreenProp
       setItems((prev) => [...prev, ...page.items]);
       setCursor(page.cursor);
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setLoading(false);
     }
-  }, [token, statusFilter, instanceIdFilter, cursor, locale, onUnauthorized]);
+  }, [token, statusFilter, instanceIdFilter, cursor, locale, fail]);
 
   useEffect(() => {
     void load();
@@ -77,8 +77,7 @@ export function OutboxScreen({ token, locale, onUnauthorized }: OutboxScreenProp
       await retryOutboxRow(key, token);
       refresh();
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setBusyKey(undefined);
     }
@@ -90,8 +89,7 @@ export function OutboxScreen({ token, locale, onUnauthorized }: OutboxScreenProp
       await discardOutboxRow(key, token);
       refresh();
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setBusyKey(undefined);
     }

@@ -9,7 +9,7 @@
  * whole page, so it is made once, here.
  */
 import type { AccountView } from "../api/types.js";
-import type { ShellKey } from "../i18n/catalogs/shell.js";
+import type { CatalogKey } from "../i18n/catalogs/shell.js";
 import { asUiLocale, type UiLocale } from "../i18n/locale.js";
 
 /** Printed where a local account holds no value for a row the page still shows. */
@@ -24,7 +24,7 @@ export type ProfileFieldKey = "id" | "email" | "roles" | "managerUserId" | "disp
  */
 export interface ProfileRow {
   key: ProfileFieldKey;
-  labelKey: ShellKey;
+  labelKey: CatalogKey;
   value: string;
   mono: boolean;
   control: "read-only" | "text" | "locale";

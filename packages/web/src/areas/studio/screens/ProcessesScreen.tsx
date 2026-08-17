@@ -9,7 +9,6 @@ import {
   publishProcess,
   listTemplates,
   getTemplate,
-  StudioClientError,
 } from "../api/client.js";
 import {
   deriveProcessRows,
@@ -25,6 +24,7 @@ import { mintId } from "../draft/ids.js";
 import type { Route } from "../routing.js";
 import { describeCaughtError } from "../errors.js";
 import { t } from "../catalog.js";
+import { is401, useFail } from "../../../shell/useFail.js";
 
 interface ProcessesScreenProps {
   token: string;
@@ -167,6 +167,8 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
   // so the list screen issues no template request an author may never need.
   const [picking, setPicking] = useState(false);
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
+  const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err)));
+  const failImport = useFail(onUnauthorized, (err) => setImportError(describeCaughtError(err)));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -175,12 +177,11 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
       const [processes, drafts] = await Promise.all([listProcesses(token), listDrafts(token)]);
       setRows(deriveProcessRows(processes, drafts));
     } catch (err) {
-      if (err instanceof StudioClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      fail(err);
     } finally {
       setLoading(false);
     }
-  }, [token, onUnauthorized]);
+  }, [token, fail]);
 
   useEffect(() => {
     void load();
@@ -198,8 +199,7 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
       await saveDraft(processId, input, token);
       navigate({ name: "edit", processId });
     } catch (err) {
-      if (err instanceof StudioClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      fail(err);
     }
   };
 
@@ -214,7 +214,10 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
     try {
       setTemplates(await listTemplates(token));
     } catch (err) {
-      if (err instanceof StudioClientError && err.status === 401) return onUnauthorized();
+      // A 401 here skips the picker entirely, unlike every other error on this
+      // screen — `fail`'s void return cannot express that, so this site keeps
+      // its own `is401` check instead of the shared callback.
+      if (is401(err)) return onUnauthorized();
       setTemplates([]);
       setError(describeCaughtError(err));
     }
@@ -238,8 +241,7 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
       await saveDraft(processId, input, token);
       navigate({ name: "edit", processId });
     } catch (err) {
-      if (err instanceof StudioClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      fail(err);
     }
   };
 
@@ -280,8 +282,7 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
       setPending(undefined);
       await load();
     } catch (err) {
-      if (err instanceof StudioClientError && err.status === 401) onUnauthorized();
-      else setImportError(describeCaughtError(err));
+      failImport(err);
     } finally {
       setImporting(false);
     }
@@ -311,8 +312,7 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
       await deleteDraft(processId, token);
       await load();
     } catch (err) {
-      if (err instanceof StudioClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err));
+      fail(err);
     }
   };
 

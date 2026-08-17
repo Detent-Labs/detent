@@ -1,13 +1,10 @@
 import type { UiLocale } from "../../i18n/locale.js";
 import { reportingCatalog, type CatalogKey } from "../../i18n/catalogs/reporting.js";
-import { resolveOverride } from "../../i18n/overrides.js";
+import { makeCatalog } from "../../i18n/makeCatalog.js";
 
 export type { CatalogKey };
 
-/** Looks up `key` in `locale`'s catalog, preferring a deployment's stored override. */
-export function t(locale: UiLocale, key: CatalogKey): string {
-  return resolveOverride("reporting", locale, key) ?? reportingCatalog[locale][key];
-}
+export const t = makeCatalog("reporting", reportingCatalog);
 
 /**
  * A count-bearing sentence, with `{n}` filled in. One key holds the whole

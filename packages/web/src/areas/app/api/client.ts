@@ -1,32 +1,21 @@
 import type { AttachmentPage, CommentPage, InstanceAttachment, InstanceComment, InstancePage, InstanceView, ProcessSummary } from "./types.js";
-import { AppClientError, request } from "../../../api/client.js";
+import { AppClientError, createInstance, getJson, request, submitPath } from "../../../api/client.js";
 
-export { AppClientError };
-
-export async function listMyTasks(token: string, opts: { limit?: number; cursor?: string } = {}): Promise<InstancePage> {
-  const params = new URLSearchParams({ scope: "mine" });
-  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
-  if (opts.cursor !== undefined) params.set("cursor", opts.cursor);
-  const res = await request(`/instances?${params}`, token);
-  return (await res.json()) as InstancePage;
-}
+export { AppClientError, createInstance, submitPath };
 
 /**
- * Every case this actor started, whatever its status. `scope=started` derives
- * the starter from the credential, so this sends no `startedBy` of its own —
- * the route rejects the pair.
+ * `scope=started` derives the starter from the credential, so that case sends
+ * no `startedBy` of its own — the route rejects the pair.
  */
-export async function listStartedByMe(token: string, opts: { limit?: number; cursor?: string } = {}): Promise<InstancePage> {
-  const params = new URLSearchParams({ scope: "started" });
+export function listInstances(scope: "mine" | "started", token: string, opts: { limit?: number; cursor?: string } = {}): Promise<InstancePage> {
+  const params = new URLSearchParams({ scope });
   if (opts.limit !== undefined) params.set("limit", String(opts.limit));
   if (opts.cursor !== undefined) params.set("cursor", opts.cursor);
-  const res = await request(`/instances?${params}`, token);
-  return (await res.json()) as InstancePage;
+  return getJson(`/instances?${params}`, token);
 }
 
-export async function getInstanceView(instanceId: string, token: string): Promise<InstanceView> {
-  const res = await request(`/instances/${encodeURIComponent(instanceId)}`, token);
-  return (await res.json()) as InstanceView;
+export function getInstanceView(instanceId: string, token: string): Promise<InstanceView> {
+  return getJson(`/instances/${encodeURIComponent(instanceId)}`, token);
 }
 
 export async function claim(instanceId: string, token: string): Promise<void> {
@@ -54,12 +43,11 @@ export async function postComment(instanceId: string, text: string, token: strin
   return (await res.json()) as InstanceComment;
 }
 
-export async function listComments(instanceId: string, token: string, cursor?: string): Promise<CommentPage> {
+export function listComments(instanceId: string, token: string, cursor?: string): Promise<CommentPage> {
   const params = new URLSearchParams();
   if (cursor !== undefined) params.set("cursor", cursor);
   const qs = params.toString();
-  const res = await request(`/instances/${encodeURIComponent(instanceId)}/comments${qs ? `?${qs}` : ""}`, token);
-  return (await res.json()) as CommentPage;
+  return getJson(`/instances/${encodeURIComponent(instanceId)}/comments${qs ? `?${qs}` : ""}`, token);
 }
 
 export async function uploadAttachment(instanceId: string, filename: string, contentType: string, dataBase64: string, token: string): Promise<InstanceAttachment> {
@@ -71,12 +59,11 @@ export async function uploadAttachment(instanceId: string, filename: string, con
   return (await res.json()) as InstanceAttachment;
 }
 
-export async function listAttachments(instanceId: string, token: string, cursor?: string): Promise<AttachmentPage> {
+export function listAttachments(instanceId: string, token: string, cursor?: string): Promise<AttachmentPage> {
   const params = new URLSearchParams();
   if (cursor !== undefined) params.set("cursor", cursor);
   const qs = params.toString();
-  const res = await request(`/instances/${encodeURIComponent(instanceId)}/attachments${qs ? `?${qs}` : ""}`, token);
-  return (await res.json()) as AttachmentPage;
+  return getJson(`/instances/${encodeURIComponent(instanceId)}/attachments${qs ? `?${qs}` : ""}`, token);
 }
 
 /** Returns the raw file as a `Blob` — the caller already has `filename` from the listed `InstanceAttachment` to name the saved file with. */
@@ -85,28 +72,10 @@ export async function downloadAttachment(instanceId: string, attachmentId: strin
   return res.blob();
 }
 
-export async function submitPath(instanceId: string, pathId: string, data: Record<string, unknown>, token: string): Promise<void> {
-  await request(`/instances/${encodeURIComponent(instanceId)}/submit`, token, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ pathId, data }),
-  });
-}
-
 export async function cancelInstance(instanceId: string, token: string): Promise<void> {
   await request(`/instances/${encodeURIComponent(instanceId)}/cancel`, token, { method: "POST" });
 }
 
-export async function listProcesses(token: string): Promise<ProcessSummary[]> {
-  const res = await request("/processes", token);
-  return (await res.json()) as ProcessSummary[];
-}
-
-export async function createInstance(processId: string, token: string): Promise<{ instanceId: string }> {
-  const res = await request(`/processes/${encodeURIComponent(processId)}/instances`, token, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({}),
-  });
-  return (await res.json()) as { instanceId: string };
+export function listProcesses(token: string): Promise<ProcessSummary[]> {
+  return getJson("/processes", token);
 }

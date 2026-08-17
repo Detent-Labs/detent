@@ -76,6 +76,6 @@ export const de: Record<keyof typeof en, string> = {
   "error.retry": "Erneut versuchen",
 };
 
-export type ShellKey = keyof typeof en;
+export type CatalogKey = keyof typeof en;
 
-export const shellCatalog: Record<UiLocale, Record<ShellKey, string>> = { en, de };
+export const shellCatalog: Record<UiLocale, Record<CatalogKey, string>> = { en, de };

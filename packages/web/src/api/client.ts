@@ -6,7 +6,7 @@
  * Login lives here rather than in an area, because the shell owns the login
  * screen and must not import downward from an area.
  */
-import type { AccountView, ClientError, LoginResponse, PublishIssue, SubmissionIssue } from "./types.js";
+import type { AccountView, ClientError, InstanceRecordPage, LoginResponse, PublishIssue, SubmissionIssue } from "./types.js";
 
 /** Same-origin by default (the engine serves this bundle); override for local dev via VITE_API_URL. */
 export const API_BASE = import.meta.env.VITE_API_URL ?? "";
@@ -107,6 +107,40 @@ export async function request(path: string, token: string | undefined, init?: Re
   }
   if (!res.ok) throw new AppClientError(await parseErrorBody(res), res.status);
   return res;
+}
+
+/** Every GET route that returns JSON as-is fits this one line; the four area clients call it instead of repeating it. */
+export async function getJson<T>(path: string, token: string): Promise<T> {
+  const res = await request(path, token);
+  return (await res.json()) as T;
+}
+
+/** Two areas declared this byte-for-byte (admin, studio); it moved up rather than staying duplicated. */
+export function getInstanceRecord(instanceId: string, token: string, opts: { limit?: number; cursor?: string } = {}): Promise<InstanceRecordPage> {
+  const params = new URLSearchParams();
+  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
+  if (opts.cursor !== undefined) params.set("cursor", opts.cursor);
+  const qs = params.toString();
+  return getJson(`/instances/${encodeURIComponent(instanceId)}/record${qs ? `?${qs}` : ""}`, token);
+}
+
+/** Two areas declared this identically (app, studio); it moved up rather than staying duplicated. */
+export async function createInstance(processId: string, token: string): Promise<{ instanceId: string }> {
+  const res = await request(`/processes/${encodeURIComponent(processId)}/instances`, token, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  return (await res.json()) as { instanceId: string };
+}
+
+/** Two areas declared this identically (app, studio); it moved up rather than staying duplicated. */
+export async function submitPath(instanceId: string, pathId: string, data: Record<string, unknown>, token: string): Promise<void> {
+  await request(`/instances/${encodeURIComponent(instanceId)}/submit`, token, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ pathId, data }),
+  });
 }
 
 export async function login(email: string, password: string): Promise<LoginResponse> {

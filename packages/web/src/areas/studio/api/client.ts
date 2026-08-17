@@ -8,36 +8,32 @@ import type {
   OrphanKeyScan,
   RegistryInfo,
   InstanceView,
-  InstanceRecordPage,
   TemplateSummary,
   TemplateRecord,
   StudioDataList,
 } from "./types.js";
-import { AppClientError, request } from "../../../api/client.js";
+import { AppClientError, createInstance, getInstanceRecord, getJson, request, submitPath } from "../../../api/client.js";
 
 /** The studio area threw its own error class before the consolidation; this keeps the name its screens use. */
 export { AppClientError as StudioClientError };
+export { createInstance, getInstanceRecord, submitPath };
 
-export async function listProcesses(token: string): Promise<ProcessSummary[]> {
-  const res = await request("/processes", token);
-  return (await res.json()) as ProcessSummary[];
+export function listProcesses(token: string): Promise<ProcessSummary[]> {
+  return getJson("/processes", token);
 }
 
-export async function listVersions(processId: string, token: string): Promise<VersionSummary[]> {
-  const res = await request(`/processes/${encodeURIComponent(processId)}/versions`, token);
-  return (await res.json()) as VersionSummary[];
+export function listVersions(processId: string, token: string): Promise<VersionSummary[]> {
+  return getJson(`/processes/${encodeURIComponent(processId)}/versions`, token);
 }
 
-export async function listDrafts(token: string): Promise<DraftSummary[]> {
-  const res = await request("/drafts", token);
-  return (await res.json()) as DraftSummary[];
+export function listDrafts(token: string): Promise<DraftSummary[]> {
+  return getJson("/drafts", token);
 }
 
 /** `undefined` for a process with no draft (404), never thrown — a missing draft is an expected, not exceptional, shape for this call. */
 export async function getDraft(processId: string, token: string): Promise<DraftRecord | undefined> {
   try {
-    const res = await request(`/drafts/${encodeURIComponent(processId)}`, token);
-    return (await res.json()) as DraftRecord;
+    return await getJson(`/drafts/${encodeURIComponent(processId)}`, token);
   } catch (err) {
     if (err instanceof AppClientError && err.error.type === "not-found") return undefined;
     throw err;
@@ -97,16 +93,14 @@ export async function publishProcess(processId: string, body: unknown, token: st
 }
 
 /** The compiled body of one published version — opaque JSON, used for diffing (process-version-inspection spec). */
-export async function getVersionBody(processId: string, version: number, token: string): Promise<unknown> {
-  const res = await request(`/processes/${encodeURIComponent(processId)}/versions/${version}`, token);
-  return await res.json();
+export function getVersionBody(processId: string, version: number, token: string): Promise<unknown> {
+  return getJson(`/processes/${encodeURIComponent(processId)}/versions/${version}`, token);
 }
 
 /** `undefined` for a key with no registered plan (404), never thrown — same "expected shape" reasoning as getDraft. */
 export async function getMigrationPlan(processId: string, fromVersion: number, toVersion: number, token: string): Promise<MigrationPlan | undefined> {
   try {
-    const res = await request(`/migration-plans/${encodeURIComponent(processId)}/${fromVersion}/${toVersion}`, token);
-    return (await res.json()) as MigrationPlan;
+    return await getJson(`/migration-plans/${encodeURIComponent(processId)}/${fromVersion}/${toVersion}`, token);
   } catch (err) {
     if (err instanceof AppClientError && err.error.type === "not-found") return undefined;
     throw err;
@@ -123,9 +117,8 @@ export async function putMigrationPlan(processId: string, fromVersion: number, t
   return (await res.json()) as MigrationPlan;
 }
 
-export async function getOrphanKeys(processId: string, version: number, token: string): Promise<OrphanKeyScan> {
-  const res = await request(`/processes/${encodeURIComponent(processId)}/versions/${version}/orphan-keys`, token);
-  return (await res.json()) as OrphanKeyScan;
+export function getOrphanKeys(processId: string, version: number, token: string): Promise<OrphanKeyScan> {
+  return getJson(`/processes/${encodeURIComponent(processId)}/versions/${version}/orphan-keys`, token);
 }
 
 /**
@@ -133,9 +126,8 @@ export async function getOrphanKeys(processId: string, version: number, token: s
  * assignment-strategy type names (studio-tools spec), plus a config-schema
  * description per type where one exists (studio-plugin-config-form spec).
  */
-export async function getRegistry(token: string): Promise<RegistryInfo> {
-  const res = await request("/registry", token);
-  return (await res.json()) as RegistryInfo;
+export function getRegistry(token: string): Promise<RegistryInfo> {
+  return getJson("/registry", token);
 }
 
 // ============================================================
@@ -143,26 +135,8 @@ export async function getRegistry(token: string): Promise<RegistryInfo> {
 // the app area's TaskScreen already calls.
 // ============================================================
 
-export async function createInstance(processId: string, token: string): Promise<{ instanceId: string }> {
-  const res = await request(`/processes/${encodeURIComponent(processId)}/instances`, token, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({}),
-  });
-  return (await res.json()) as { instanceId: string };
-}
-
-export async function getInstanceView(instanceId: string, token: string): Promise<InstanceView> {
-  const res = await request(`/instances/${encodeURIComponent(instanceId)}`, token);
-  return (await res.json()) as InstanceView;
-}
-
-export async function submitPath(instanceId: string, pathId: string, data: Record<string, unknown>, token: string): Promise<void> {
-  await request(`/instances/${encodeURIComponent(instanceId)}/submit`, token, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ pathId, data }),
-  });
+export function getInstanceView(instanceId: string, token: string): Promise<InstanceView> {
+  return getJson(`/instances/${encodeURIComponent(instanceId)}`, token);
 }
 
 export async function claimStep(instanceId: string, token: string): Promise<void> {
@@ -171,16 +145,6 @@ export async function claimStep(instanceId: string, token: string): Promise<void
 
 export async function releaseClaim(instanceId: string, token: string): Promise<void> {
   await request(`/instances/${encodeURIComponent(instanceId)}/release`, token, { method: "POST" });
-}
-
-/** The merged transition/event record beside the Player (studio-player spec). Authorized either by `system:admin` or, additively, by `system:developer` plus having started the instance (authorization spec). */
-export async function getInstanceRecord(instanceId: string, token: string, opts: { limit?: number; cursor?: string } = {}): Promise<InstanceRecordPage> {
-  const params = new URLSearchParams();
-  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
-  if (opts.cursor !== undefined) params.set("cursor", opts.cursor);
-  const qs = params.toString();
-  const res = await request(`/instances/${encodeURIComponent(instanceId)}/record${qs ? `?${qs}` : ""}`, token);
-  return (await res.json()) as InstanceRecordPage;
 }
 
 /**
@@ -192,8 +156,7 @@ export async function getInstanceRecord(instanceId: string, token: string, opts:
  * and the mapping editor offers those keys rather than free text.
  */
 export async function listDataLists(token: string): Promise<StudioDataList[]> {
-  const res = await request("/admin/data-lists", token);
-  const page = (await res.json()) as { items: StudioDataList[] };
+  const page = await getJson<{ items: StudioDataList[] }>("/admin/data-lists", token);
   return page.items.map((item) => ({ listKey: item.listKey, columns: item.columns ?? [] }));
 }
 
@@ -201,14 +164,12 @@ export async function listDataLists(token: string): Promise<StudioDataList[]> {
  * The template routes. Reading accepts `system:developer`, so the picker works
  * for every author; writing and deleting need `system:templates`.
  */
-export async function listTemplates(token: string): Promise<TemplateSummary[]> {
-  const res = await request("/templates", token);
-  return (await res.json()) as TemplateSummary[];
+export function listTemplates(token: string): Promise<TemplateSummary[]> {
+  return getJson("/templates", token);
 }
 
-export async function getTemplate(templateKey: string, token: string): Promise<TemplateRecord> {
-  const res = await request(`/templates/${encodeURIComponent(templateKey)}`, token);
-  return (await res.json()) as TemplateRecord;
+export function getTemplate(templateKey: string, token: string): Promise<TemplateRecord> {
+  return getJson(`/templates/${encodeURIComponent(templateKey)}`, token);
 }
 
 export async function saveTemplate(templateKey: string, body: unknown, layout: Record<string, unknown>, token: string): Promise<TemplateRecord> {

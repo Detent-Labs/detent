@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { listDataLists, createDataList, AdminClientError } from "../api/client.js";
+import { listDataLists, createDataList } from "../api/client.js";
 import type { DataListSummary } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
+import { useFail } from "../../../shell/useFail.js";
 import type { Route } from "../routing.js";
 import { t } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
@@ -27,6 +28,7 @@ export function DataListsScreen({ token, locale, navigate, onUnauthorized }: Dat
   const [label, setLabel] = useState("");
   const [creating, setCreating] = useState(false);
   const { reloadToken, refresh } = useRefresh();
+  const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -35,12 +37,11 @@ export function DataListsScreen({ token, locale, navigate, onUnauthorized }: Dat
       const page = await listDataLists(token);
       setItems(page.items);
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setLoading(false);
     }
-  }, [token, locale, onUnauthorized]);
+  }, [token, locale, fail]);
 
   useEffect(() => {
     void load();
@@ -55,8 +56,7 @@ export function DataListsScreen({ token, locale, navigate, onUnauthorized }: Dat
       setLabel("");
       refresh();
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setCreating(false);
     }

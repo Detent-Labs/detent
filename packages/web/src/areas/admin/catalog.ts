@@ -1,13 +1,10 @@
 import type { UiLocale } from "../../i18n/locale.js";
 import { adminCatalog, type CatalogKey } from "../../i18n/catalogs/admin.js";
-import { resolveOverride } from "../../i18n/overrides.js";
+import { makeCatalog } from "../../i18n/makeCatalog.js";
 
 export type { CatalogKey };
 
-/** Looks up `key` in `locale`'s catalog, preferring a deployment's stored override. */
-export function t(locale: UiLocale, key: CatalogKey): string {
-  return resolveOverride("admin", locale, key) ?? adminCatalog[locale][key];
-}
+export const t = makeCatalog("admin", adminCatalog);
 
 /**
  * A catalog sentence with its `{name}` placeholders filled in. One key holds

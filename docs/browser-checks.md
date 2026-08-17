@@ -1081,3 +1081,92 @@ inside the dock. Neither the page nor the screen scrolls sideways.
 Switch the account menu's Language to German. Pass: the dock still reads
 English. The studio catalog carries English only, the same finding the two
 walks above already made.
+
+### `useFail`: no refetch loop
+
+Source: `ponytail-web-client-catalog-dedup` design.md decision 2.
+
+Open any screen that loads on mount through `useFail`, for example the admin
+Users screen. Watch the network panel for ten seconds. Pass: the load request
+fires once. Reload the page and repeat on a second screen from a different
+area, for example the studio Templates screen.
+
+This stays manual because the hazard is a render loop, not a wrong value.
+`useFail`'s returned callback must keep one identity for the life of the
+component. A re-created callback would make every effect listing it as a
+dependency re-run each render. That re-run would refetch in a loop.
+`packages/web` has no DOM test runner. `studio-draftToolbarState.test.ts` and
+`studio-processHeaderLogic.test.ts` both note this in their own headers. No
+suite here ever re-renders a component, so none could catch it. A pure-logic
+test covers `is401`, the branch inside the hook; it cannot cover the hook's
+own render stability.
+
+### Studio canvas: drop a rail step onto a path to insert it
+
+Source: `canvas-edge-affordances` tasks 6.6-6.8.
+
+Open a draft holding at least one path between two steps. Drag a Step from
+the edit rail and hold it over that path before releasing.
+
+Pass: the path renders in a heavier, accent-colored stroke while the drag
+holds over it. No other path does. Release. Pass: a new step lands at the
+release point, selected. The source step's path now names the new step, with
+its guard and priority unchanged. The new step holds one path naming the old
+target.
+
+Drag an End from the rail over the same kind of path and release. Pass: the
+end step drops free-standing, at the release point. The path it released over
+still names its original target. No drop-target stroke drew during that drag
+either.
+
+Then collapse a group holding the source step, so its path renders to the
+group's box. Repeat the first drag over that path. Pass: the drop still
+inserts the new step. The new step joins no group and stays visible.
+
+A synthetic `click` cannot drive this. The rail's drag reports its moving
+position through `onPointerMove`. Only a real pointer sequence fires that, a
+tool that dispatches trusted pointer events, e.g. `playwright-cli`.
+
+### Panels screen: Fields and Data sources as list and detail (`panels-list-and-detail`)
+
+Source: `panels-list-and-detail` tasks 6.5-6.6.
+
+Open a draft with many fields (`purchase_requisition`, 22 fields, one data
+source) and go to `/edit/panels/fields`.
+
+Pass: the rail lists all 22 field keys under Fields, indenting `line_item`'s
+four children once. The main view renders one field's editor, the first
+(`cost_center`), not all 22 stacked. That row alone carries `aria-current`.
+
+Click a top-level field (`line_item`, a group). Pass: the view switches to
+that field's editor and the rail marks it current.
+
+Click a nested child (`item_description`, under `line_item`). Pass: the rail
+marks the parent (`line_item`) current, not the child. The child's own input
+scrolls into view, inside the still-open group editor.
+
+Click "+ Add field" (either the rail's own entry or the panel's own button;
+both call the same handler). Pass: a new "(unnamed field)" row appears at
+the end of the rail sub-list, selected at once. Its key input is empty and
+focus-ready. It carries an issue-mark badge reading "1", aria-label "1
+issues": the empty key is a real validation issue, live.
+
+Click "Remove field". Pass: the neighbour (the field before it, since it was
+last) becomes selected.
+
+Open the Data sources view. Pass: the Fields sub-list disappears, and a Data
+sources sub-list appears in its place. The two never show at once. The new
+sub-list lists `approved_vendors` and an "+ Add data source" entry.
+
+Click "+ Add data source". Pass: a new "(unnamed data source)" appears,
+selected at once. Click "Remove data source". Pass: `approved_vendors`, the
+only remaining entry, becomes selected.
+
+Reload the page: a fresh navigation to the same URL. Pass: selection resets
+to the first field, `cost_center`. That matches the reset a canvas round
+trip already gives every other screen-owned selection here.
+
+Throughout: zero console errors or warnings. `playwright-cli console`
+reported 0/0. A screenshot confirmed the field CSS: label above control, the
+`key` input in the mono face, hairline dividers between rail rows. Every
+input took a sharp corner, and the checks rail read clean throughout.

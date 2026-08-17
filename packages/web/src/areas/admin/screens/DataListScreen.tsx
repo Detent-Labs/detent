@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { getDataList, updateDataList, putDataListValues, deleteDataList, AdminClientError } from "../api/client.js";
+import { getDataList, updateDataList, putDataListValues, deleteDataList } from "../api/client.js";
 import type { DataListDetail } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
+import { useFail } from "../../../shell/useFail.js";
 import {
   attributesToInputs,
   badNumberAttributes,
@@ -51,6 +52,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const { reloadToken, refresh } = useRefresh();
+  const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -70,12 +72,11 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
         })),
       );
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setLoading(false);
     }
-  }, [listKey, token, locale, onUnauthorized]);
+  }, [listKey, token, locale, fail]);
 
   useEffect(() => {
     void load();
@@ -124,8 +125,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
       setSaved(true);
       refresh();
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setSaving(false);
     }
@@ -139,8 +139,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
       await deleteDataList(listKey, token);
       navigate({ name: "dataLists" });
     } catch (err) {
-      if (err instanceof AdminClientError && err.status === 401) onUnauthorized();
-      else setError(describeCaughtError(err, locale));
+      fail(err);
     } finally {
       setSaving(false);
     }

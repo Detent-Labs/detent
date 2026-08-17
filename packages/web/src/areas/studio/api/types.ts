@@ -1,9 +1,9 @@
-import type { LocalizedText, LocaleCode, HistoryEntry, InstanceEvent } from "workflow-engine/schema";
+import type { LocalizedText, LocaleCode } from "workflow-engine/schema";
 import type { ResolvedViewField, AvailablePath, SubmissionIssue } from "form-ui";
 
-export type { LocalizedText, LocaleCode, HistoryEntry, InstanceEvent, ResolvedViewField, AvailablePath, SubmissionIssue };
+export type { LocalizedText, LocaleCode, ResolvedViewField, AvailablePath, SubmissionIssue };
 
-export type { Actor, LoginResponse, ClientError, PublishIssue } from "../../../api/types.js";
+export type { Actor, LoginResponse, ClientError, PublishIssue, VersionSummary, InstanceRecordElement, InstanceRecordPage } from "../../../api/types.js";
 
 /** Mirrors src/engine/definitions.ts::ProcessSummary — the newest-version summary GET /processes returns per process. */
 export interface ProcessSummary {
@@ -13,14 +13,6 @@ export interface ProcessSummary {
   key: string;
   label: LocalizedText;
   baseLocale: LocaleCode;
-}
-
-/** Mirrors src/engine/definitions.ts::VersionSummary. */
-export interface VersionSummary {
-  version: number;
-  definitionHash: string;
-  status: string;
-  publishedAt: string;
 }
 
 /** Mirrors src/engine/drafts.ts::Draft. `body`/`layout` are opaque — never parsed against ProcessBody client-side either. */
@@ -115,14 +107,6 @@ export interface InstanceView {
    * type: a response predating the key omits it, and the form reads that as 1. */
   columns?: 1 | 2;
   availablePaths: AvailablePath[];
-}
-
-/** Mirrors src/runtime/api.ts::InstanceRecordElement. */
-export type InstanceRecordElement = { kind: "transition"; entry: HistoryEntry } | { kind: "event"; event: InstanceEvent };
-
-export interface InstanceRecordPage {
-  items: InstanceRecordElement[];
-  cursor?: string;
 }
 
 /**

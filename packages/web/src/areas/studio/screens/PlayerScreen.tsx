@@ -7,6 +7,7 @@ import { describeRecordElement, seedFormValues } from "./playerLogic.js";
 import type { Route } from "../routing.js";
 import { describeError, describeCaughtError } from "../errors.js";
 import { t } from "../catalog.js";
+import { is401, useFail } from "../../../shell/useFail.js";
 
 interface PlayerScreenProps {
   processId: string;
@@ -30,6 +31,7 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
   const [loading, setLoading] = useState(false);
   const [outcome, setOutcome] = useState<string | undefined>(undefined);
   const [validationIssues, setValidationIssues] = useState<SubmissionIssue[]>([]);
+  const failRecord = useFail(onUnauthorized, (e) => setRecordError(describeCaughtError(e)));
 
   const loadRecord = useCallback(
     (id: string) => {
@@ -39,15 +41,9 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
           setRecordCursor(page.cursor);
           setRecordError(undefined);
         })
-        .catch((e: unknown) => {
-          if (e instanceof StudioClientError && e.status === 401) {
-            onUnauthorized();
-            return;
-          }
-          setRecordError(describeCaughtError(e));
-        });
+        .catch(failRecord);
     },
-    [token, onUnauthorized],
+    [token, failRecord],
   );
 
   const applyView = useCallback(
@@ -69,16 +65,20 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
       try {
         await fn();
       } catch (err) {
+        // This ladder tests `validation` and the claim-state fields after the
+        // 401 branch, which `useFail`'s void callback can't express — so it
+        // keeps its own check, sharing only the `is401` predicate the hook
+        // exports.
+        if (is401(err)) {
+          onUnauthorized();
+          return;
+        }
         if (err instanceof StudioClientError) {
-          if (err.status === 401) {
-            onUnauthorized();
-            return;
-          }
           if (err.error.type === "validation") {
             setValidationIssues(err.error.issues);
             return;
           }
-          setOutcome(describeError(err.error, err.status));
+          setOutcome(describeError(err.error));
           if (err.error.type === "not-claimant" || err.error.type === "not-claimed" || err.error.type === "already-claimed") {
             setClaimedByMe(false);
           }
@@ -141,14 +141,8 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
         setRecord((prev) => [...prev, ...page.items]);
         setRecordCursor(page.cursor);
       })
-      .catch((e: unknown) => {
-        if (e instanceof StudioClientError && e.status === 401) {
-          onUnauthorized();
-          return;
-        }
-        setRecordError(describeCaughtError(e));
-      });
-  }, [instanceId, recordCursor, token, onUnauthorized]);
+      .catch(failRecord);
+  }, [instanceId, recordCursor, token, failRecord]);
 
   const fieldIds = new Set(view?.fields.map((f) => f.field.id) ?? []);
   const issuesByField = new Map<string, SubmissionIssue[]>();

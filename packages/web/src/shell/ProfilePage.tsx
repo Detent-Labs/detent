@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { fetchAccount, patchAccount, AppClientError } from "../api/client.js";
+import { fetchAccount, patchAccount } from "../api/client.js";
+import { useFail } from "./useFail.js";
 import { t } from "./catalog.js";
 import { accountChanges, editSeed, profileFields, type ProfileEdits, type ProfileRow } from "./profileFields.js";
 import type { AccountView } from "../api/types.js";
@@ -30,6 +31,8 @@ export function ProfilePage({ token, locale, onSaved, onUnauthorized }: ProfileP
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
+  const failLoad = useFail(onUnauthorized, () => setLoadFailed(true));
+  const failSave = useFail(onUnauthorized, () => setSaveFailed(true));
 
   useEffect(() => {
     let live = true;
@@ -41,8 +44,7 @@ export function ProfilePage({ token, locale, onSaved, onUnauthorized }: ProfileP
       })
       .catch((err: unknown) => {
         if (!live) return;
-        if (err instanceof AppClientError && err.status === 401) onUnauthorized();
-        else setLoadFailed(true);
+        failLoad(err);
       });
     return () => {
       live = false;
@@ -50,7 +52,7 @@ export function ProfilePage({ token, locale, onSaved, onUnauthorized }: ProfileP
     // `locale` seeds the picker only for an account that never chose one, and a
     // language change mid-page must not refetch and discard a typed name.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, onUnauthorized]);
+  }, [token, failLoad]);
 
   const submit = async (current: ProfileEdits) => {
     setSaving(true);
@@ -63,8 +65,7 @@ export function ProfilePage({ token, locale, onSaved, onUnauthorized }: ProfileP
       setSaved(true);
       onSaved(updated);
     } catch (err) {
-      if (err instanceof AppClientError && err.status === 401) onUnauthorized();
-      else setSaveFailed(true);
+      failSave(err);
     } finally {
       setSaving(false);
     }

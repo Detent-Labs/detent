@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { stripCompiledContent } from "workflow-engine/schema/strip-compiled";
-import { listTemplates, saveTemplate, deleteTemplate, listProcesses, getVersionBody, StudioClientError } from "../api/client.js";
+import { listTemplates, saveTemplate, deleteTemplate, listProcesses, getVersionBody } from "../api/client.js";
+import { useFail } from "../../../shell/useFail.js";
 import type { ProcessBody } from "workflow-engine/schema";
 import type { TemplateSummary, ProcessSummary } from "../api/types.js";
 import { templateDisplayName } from "./processListLogic.js";
@@ -42,13 +43,7 @@ export function TemplatesScreen({ token, locale, onUnauthorized }: TemplatesScre
   const [selected, setSelected] = useState("");
   const [creating, setCreating] = useState(false);
 
-  const fail = useCallback(
-    (err: unknown) => {
-      if (err instanceof StudioClientError && err.status === 401) onUnauthorized();
-      else setError(err instanceof Error ? err.message : String(err));
-    },
-    [onUnauthorized],
-  );
+  const fail = useFail(onUnauthorized, (err) => setError(err instanceof Error ? err.message : String(err)));
 
   const load = useCallback(async () => {
     setLoading(true);

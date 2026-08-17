@@ -3,7 +3,7 @@ import type { FieldId, Step, View } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { useDraft } from "../draft/store";
-import { t, type TranslationKey } from "../catalog.js";
+import { t, type CatalogKey } from "../catalog.js";
 import { updateInDraftArray } from "../draft/draft-array-crud";
 import {
   clampSpan,
@@ -37,7 +37,7 @@ function typeLabel(type: DraftField["type"]): string | undefined {
   return typeof type === "string" ? type : type?.type;
 }
 
-const MINT_KIND_LABEL: Record<PaletteFieldKind, TranslationKey> = {
+const MINT_KIND_LABEL: Record<PaletteFieldKind, CatalogKey> = {
   text: "formEditor.mintText",
   choice: "formEditor.mintChoice",
   date: "formEditor.mintDate",
