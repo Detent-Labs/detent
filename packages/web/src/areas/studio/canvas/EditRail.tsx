@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { SquarePlus, Share2, Flag, ChevronRight } from "lucide-react";
-import { t, type TranslationKey } from "../catalog.js";
+import { t, type CatalogKey } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
 import type { StepKind } from "../draft/createStep.js";
 import { PANEL_VIEWS, type PanelView } from "../routing.js";
@@ -13,25 +13,29 @@ interface Props {
    * resolving a client point to a canvas point is the caller's job
    * (`EditorArea`). */
   onDrop: (kind: StepKind, clientX: number, clientY: number) => void;
+  /** Fires on every pointer move a drag makes, screen coordinates, the same
+   * shape as `onDrop` (design.md: "The rail reports its moving position").
+   * Drives the canvas's drop-target highlight while the drag is still live. */
+  onDragMove: (kind: StepKind, clientX: number, clientY: number) => void;
   /** Navigates to the panels screen at the given view. It set component
    * state before the screen was routed (`setOpenPanel`). */
   onOpenPanel: (view: PanelView) => void;
 }
 
-const ADD_ENTRIES: { kind: StepKind; label: TranslationKey; Icon: typeof SquarePlus }[] = [
+const ADD_ENTRIES: { kind: StepKind; label: CatalogKey; Icon: typeof SquarePlus }[] = [
   { kind: "task", label: "palette.step", Icon: SquarePlus },
   { kind: "subprocess", label: "palette.subprocess", Icon: Share2 },
   { kind: "end", label: "palette.end", Icon: Flag },
 ];
 
-const PROCESS_ROW_LABEL: Record<PanelView, TranslationKey> = {
+const PROCESS_ROW_LABEL: Record<PanelView, CatalogKey> = {
   fields: "panelsScreen.linkFields",
   dataSources: "panelsScreen.linkDataSources",
   contract: "panelsScreen.linkContract",
   matrix: "panelsScreen.linkFieldMatrix",
 };
 
-const PROCESS_ROWS: { view: PanelView; label: TranslationKey }[] = PANEL_VIEWS.map((view) => ({
+const PROCESS_ROWS: { view: PanelView; label: CatalogKey }[] = PANEL_VIEWS.map((view) => ({
   view,
   label: PROCESS_ROW_LABEL[view],
 }));
@@ -49,7 +53,7 @@ const PROCESS_ROWS: { view: PanelView; label: TranslationKey }[] = PANEL_VIEWS.m
  * count and a chevron per row. They opened a modal before stage 36 routed the
  * panels screen.
  */
-export function EditRail({ onDrop, onOpenPanel }: Props) {
+export function EditRail({ onDrop, onDragMove, onOpenPanel }: Props) {
   const { draft } = useDraft();
   const [dragging, setDragging] = useState<{ kind: StepKind; x: number; y: number } | null>(null);
 
@@ -65,6 +69,7 @@ export function EditRail({ onDrop, onOpenPanel }: Props) {
   const onPointerMove = (e: React.PointerEvent) => {
     if (!dragging) return;
     setDragging({ ...dragging, x: e.clientX, y: e.clientY });
+    onDragMove(dragging.kind, e.clientX, e.clientY);
   };
 
   const onPointerUp = (e: React.PointerEvent) => {

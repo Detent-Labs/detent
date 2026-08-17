@@ -117,9 +117,13 @@ the only way to perform any authoring operation, including deletion, which
 SHALL remain panel-only.
 
 The insert gesture holds to this rule by composition. It performs no mutation
-the panels lack. `StepsPanel` adds a step. `PathsPanel` retargets a path and
-adds one. The canvas spends one gesture where the panels spend four
-operations, and reaches the same draft.
+the panels lack. The rail's own existing step-creation drag creates the step.
+Then `PathsPanel` retargets the source step's existing path to the new step.
+It also adds a new path on it, naming the old target. Both are
+already-existing panel actions.
+
+The canvas spends one gesture where the panels spend four operations, and
+reaches the same draft.
 
 That composition is also what a keyboard reaches. Every canvas gesture is
 pointer-driven, and the panel route is the equivalent that is not.
@@ -135,7 +139,7 @@ pointer-driven, and the panel route is the equivalent that is not.
 
 #### Scenario: The panels reach an inserted step's end state
 
-- **WHEN** the developer adds a step in `StepsPanel`
+- **WHEN** the developer drags a Step from the edit rail onto empty canvas
 - **AND** retargets the source step's path to it in `PathsPanel`
 - **AND** adds a path on the new step naming the old target
 - **THEN** the draft matches what one drop on that path produces

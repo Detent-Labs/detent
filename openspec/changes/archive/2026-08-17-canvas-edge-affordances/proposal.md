@@ -72,11 +72,18 @@ None. The change adds requirements to a capability that exists.
   drop-target class from a new prop.
 - `packages/web/src/areas/studio/draft/`: one new module. It holds the insert as
   a pure transform over a step list, with a `bun:test` suite.
-- `packages/web/src/app.css`: one class, for the drop-target stroke.
+- `packages/web/src/areas/studio/app.css`: one class, for the drop-target
+  stroke. The studio's own stylesheet, already imported by
+  `areas/studio/root.tsx` and already holding `.canvas-edge`,
+  `.canvas-edge-hitarea` and `.canvas-edge-group-selected`.
 - No engine change, and no definition contract change. The insert produces the
   JSON any author could have typed by hand. It runs through `newStep` and
   `newPath`, the two functions every other add-a-step and add-a-path entry
   point already shares.
 - No new i18n key. The drop-target state is a stroke, not a label.
-- `ROADMAP.md` and `docs/roadmap-history.md`: stage 31 closes and moves to the
-  table.
+- Tests: `packages/web/test/studio-insertOnPath.test.ts`, the `bun:test` suite
+  for the pure insert transform.
+- Documents: `ROADMAP.md`, `docs/roadmap-history.md`, `docs/current-state.md`
+  and `docs/browser-checks.md`.
+- Stage 31 closes and moves to the table. The canvas entry and the
+  browser-check list pick up the insert gesture.

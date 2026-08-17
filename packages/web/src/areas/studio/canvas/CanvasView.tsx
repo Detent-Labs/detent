@@ -66,6 +66,11 @@ interface Props {
   /** Presentation only, in the same `layout` blob (design.md). A group never
    * reaches `ProcessBody`, so the engine cannot see one. */
   groups: StepGroup[];
+  /** The path under the pointer during an edit-rail drag (design.md: "The
+   * rail reports its moving position"), or `undefined` outside a drag or
+   * over an `end` step. Drawn as the drop-target state on the matching edge
+   * group and its guard label; adds no permanent control. */
+  insertTargetPathId?: string;
 }
 
 function isPoint(value: unknown): value is Point {
@@ -91,6 +96,7 @@ export function CanvasView({
   waypoints,
   onWaypointsChange,
   groups,
+  insertTargetPathId,
 }: Props) {
   const { draft, mutate, contentLocale, loadedChildren } = useDraft();
   const steps = draft.workflow?.steps ?? [];
@@ -809,10 +815,13 @@ export function CanvasView({
                 insertAt: legOfSegment(routed.legStarts, mid.segment),
               });
             }
+            const isInsertTarget = path.id !== undefined && path.id === insertTargetPathId;
             return (
               <g
                 key={path.id ?? `${step.id}-${pathIndex}`}
-                className={`canvas-edge-group panzoom-exclude${isSelected ? " canvas-edge-group-selected" : ""}`}
+                className={`canvas-edge-group panzoom-exclude${isSelected ? " canvas-edge-group-selected" : ""}${isInsertTarget ? " canvas-edge-insert-target" : ""}`}
+                data-path-id={path.id}
+                data-step-id={path.id !== undefined ? step.id : undefined}
                 onPointerUp={(e) => {
                   e.stopPropagation();
                   onSelectStep(step.id, path.id);
@@ -965,6 +974,8 @@ export function CanvasView({
             width={label.maxWidth}
             height={16}
             className="panzoom-exclude"
+            data-path-id={label.pathId}
+            data-step-id={label.pathId !== undefined ? label.stepId : undefined}
           >
             <div
               className="canvas-edge-guard-label"

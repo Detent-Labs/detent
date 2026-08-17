@@ -43,8 +43,9 @@ pointer movement.
 - Any control that stays on the canvas after the drag ends.
 - Any change to `routeEdge`, `anchorsForEdge` or `routeThroughWaypoints`. The
   geometry of an edge does not move here.
-- A keyboard equivalent on the canvas. No canvas gesture has one, and the
-  panels carry that role.
+- A keyboard equivalent on the canvas. No canvas gesture has one. The panels do
+  not currently provide a keyboard-operable route to step creation either; see
+  Risks / Trade-offs below.
 
 ## Decisions
 
@@ -148,8 +149,11 @@ sit.
 - The gesture stays invisible until an author tries it → the drop-target state
   is the affordance. It draws as soon as the drag crosses a path, and the panel
   route stays for anyone who never drags.
-- A keyboard author cannot insert on the canvas → the panels compose the same
-  end state. The modified requirement names the three operations.
+- A keyboard author cannot insert on the canvas → true, and the panels do not
+  close that gap either. `EditRail`'s palette buttons wire pointer events only,
+  not `onClick` or `onKeyDown`. A keyboard author therefore cannot reach any
+  part of this composition that involves creating a new step. That gap
+  predates this change. This change neither introduces it nor closes it.
 - An edge under a node loses the drop → the topmost element decides. That is
   the element the author sees. A release there places a free-standing step, as
   it does today.
@@ -170,3 +174,14 @@ path, and only where an author inserts.
 
 Rollback is a revert of the commit. A draft saved after an insert stays valid
 under the reverted code, since it holds nothing new.
+
+## Open Questions
+
+- Should a later, accessibility-focused stage give canvas step-creation (the
+  rail drag, or a new mechanism) a keyboard-operable route? Out of scope here.
+  Per the corrected Non-Goals/Risks text above, this gap predates this change,
+  and this change does not close it.
+- Does `insertOnPath`'s trigger-inheritance rule apply when the retargeted
+  path is the exempt guardless-default among 3+ automatic paths? The rule
+  states: the new path inherits the trigger, and nothing else. The current
+  decision does not address this case.
