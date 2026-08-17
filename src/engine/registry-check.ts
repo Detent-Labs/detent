@@ -16,7 +16,7 @@
  */
 
 import { z } from "zod";
-import type { Action, DataSourceDef, ProcessBody, Step } from "../schema/definition.js";
+import type { Action, ProcessBody } from "../schema/definition.js";
 import {
   resolve,
   type Registry,
@@ -126,20 +126,6 @@ export function checkActionRegistry(body: ProcessBody, registry: Registry): Regi
   return checkTypedConfig(sites, (type) => resolve(registry, type), "action");
 }
 
-interface AssignmentSite {
-  step: Step;
-  loc: string;
-}
-
-/** Collect every step declaring an `assignment`, with a locating path. */
-function collectAssignments(body: ProcessBody): AssignmentSite[] {
-  const sites: AssignmentSite[] = [];
-  body.workflow.steps.forEach((s, si) => {
-    if (s.assignment) sites.push({ step: s, loc: `steps[${si}].assignment` });
-  });
-  return sites;
-}
-
 /**
  * Validate every step's `assignment.strategy` against `assignmentRegistry`,
  * through the same resolve-then-parse loop the action and data-source checks
@@ -149,19 +135,11 @@ function collectAssignments(body: ProcessBody): AssignmentSite[] {
  * an assignment strategy, so a `core.` type is an unknown type like any other.
  */
 export function checkAssignmentRegistry(body: ProcessBody, assignmentRegistry: AssignmentRegistry): RegistryIssue[] {
-  const sites = collectAssignments(body)
-    .map(({ step, loc }) => ({ loc, type: step.assignment!.strategy.type, config: step.assignment!.strategy.config }));
+  const sites: TypedSite[] = [];
+  body.workflow.steps.forEach((s, si) => {
+    if (s.assignment) sites.push({ loc: `steps[${si}].assignment`, type: s.assignment.strategy.type, config: s.assignment.strategy.config });
+  });
   return checkTypedConfig(sites, (type) => resolveAssignmentStrategy(assignmentRegistry, type), "assignment strategy");
-}
-
-interface DataSourceSite {
-  dataSource: DataSourceDef;
-  loc: string;
-}
-
-/** Collect every declared data source, with a locating path. */
-function collectDataSources(body: ProcessBody): DataSourceSite[] {
-  return (body.dataSources ?? []).map((dataSource, i) => ({ dataSource, loc: `dataSources[${i}]` }));
 }
 
 /**
@@ -171,7 +149,10 @@ function collectDataSources(body: ProcessBody): DataSourceSite[] {
  * (`body.dataSources`), not several action positions to visit.
  */
 export function checkDataSourceRegistry(body: ProcessBody, dataSourceRegistry: DataSourceRegistry): RegistryIssue[] {
-  const sites = collectDataSources(body)
-    .map(({ dataSource, loc }) => ({ loc, type: dataSource.type, config: dataSource.config }));
+  const sites: TypedSite[] = (body.dataSources ?? []).map((dataSource, i) => ({
+    loc: `dataSources[${i}]`,
+    type: dataSource.type,
+    config: dataSource.config,
+  }));
   return checkTypedConfig(sites, (type) => resolveDataSource(dataSourceRegistry, type), "data source");
 }

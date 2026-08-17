@@ -63,7 +63,7 @@ type DraftRow = {
 };
 
 /** jsonb columns arrive already parsed under Bun.sql; the string guard is portability only. */
-function parseJsonb(raw: unknown): unknown {
+export function parseJsonb(raw: unknown): unknown {
   return typeof raw === "string" ? JSON.parse(raw) : raw;
 }
 
@@ -103,13 +103,28 @@ function isJsonObject(v: unknown): v is Record<string, unknown> {
 // and a body cannot be legal as one and oversized as the other.
 export const MAX_DRAFT_ENVELOPE_BYTES = 8 * 1024 * 1024; // 8 MiB
 
+/**
+ * The half of the envelope check a template shares: both object guards and
+ * the size bound. `kind` carries the noun ("draft" or "template") into every
+ * thrown message, so each stays the string it is today. Exported for
+ * `templates.ts`, which has neither a `revision` nor a `baseVersion` to check
+ * beyond this shared half.
+ */
+export function checkJsonEnvelope(kind: string, body: unknown, layout: unknown): void {
+  if (!isJsonObject(body)) {
+    throw new RequestShapeError(`${kind} body must be a JSON object`);
+  }
+  if (!isJsonObject(layout)) {
+    throw new RequestShapeError(`${kind} layout must be a JSON object`);
+  }
+  const size = Buffer.byteLength(JSON.stringify(body), "utf8") + Buffer.byteLength(JSON.stringify(layout), "utf8");
+  if (size > MAX_DRAFT_ENVELOPE_BYTES) {
+    throw new RequestShapeError(`${kind} envelope exceeds the ${MAX_DRAFT_ENVELOPE_BYTES}-byte bound`);
+  }
+}
+
 function checkEnvelope(input: SaveDraftInput): void {
-  if (!isJsonObject(input.body)) {
-    throw new RequestShapeError("draft body must be a JSON object");
-  }
-  if (!isJsonObject(input.layout)) {
-    throw new RequestShapeError("draft layout must be a JSON object");
-  }
+  checkJsonEnvelope("draft", input.body, input.layout);
   if (typeof input.revision !== "number" || !Number.isInteger(input.revision) || input.revision < 0) {
     throw new RequestShapeError("draft revision must be a non-negative integer");
   }
@@ -118,10 +133,6 @@ function checkEnvelope(input: SaveDraftInput): void {
     (typeof input.baseVersion !== "number" || !Number.isInteger(input.baseVersion) || input.baseVersion < 1)
   ) {
     throw new RequestShapeError("draft baseVersion must be a positive integer");
-  }
-  const size = Buffer.byteLength(JSON.stringify(input.body), "utf8") + Buffer.byteLength(JSON.stringify(input.layout), "utf8");
-  if (size > MAX_DRAFT_ENVELOPE_BYTES) {
-    throw new RequestShapeError(`draft envelope exceeds the ${MAX_DRAFT_ENVELOPE_BYTES}-byte bound`);
   }
 }
 
