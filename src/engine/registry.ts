@@ -206,9 +206,10 @@ export interface ResolvedAssignment {
  * `assignment` (unrestricted): resolution does not run for it, and it records
  * nothing.
  *
- * Called by the step-entry callers — `commitTransition`, `startInstance`, the
- * subprocess spawn handler, `createProcessInstance` — never by `planStepEntry`
- * (which stays pure and synchronous) and never by `createInstance` (which stays
+ * Called by the step-entry callers — `commitTransition`, `startInstance`,
+ * `createSeededInstance` (shared by the subprocess spawn handler and
+ * `process.start`), `createProcessInstance` — never by `planStepEntry` (which
+ * stays pure and synchronous) and never by `createInstance` (which stays
  * persistence-only). Migration reaches none of this: it passes
  * `assignment: { carry: true }` and keeps the candidates the instance holds.
  *

@@ -28,7 +28,7 @@
 
 import type { SQL } from "bun";
 import { z } from "zod";
-import { createInstance, withTransaction } from "./store.js";
+import { withTransaction, loadInstance, parseInstance } from "./store.js";
 import {
   resolveAutomatic,
   executeAutomaticTransition,
@@ -37,27 +37,19 @@ import {
 } from "./transition.js";
 import { buildGuardContext, evalFieldMap, SYSTEM_ACTOR } from "../cel/eval.js";
 import { subprocessChildId } from "./idempotency.js";
-import { instance as instanceSchema, type Instance, type InstanceEvent, type ProcessBody, type StepId } from "../schema/definition.js";
-import { appendInstanceEvent, newInstanceEventId, makeAssignmentUnresolvedEvent } from "./store.js";
+import type { Instance, InstanceEvent, ProcessBody, StepId } from "../schema/definition.js";
+import { appendInstanceEvent, newInstanceEventId } from "./store.js";
+import { createSeededInstance } from "./seeded-create.js";
 import type { ResolveLatestByContract } from "./definitions.js";
 import type { ResolveBody } from "./resolution.js";
 import {
   register,
   createDefaultAssignmentRegistry,
-  resolveStepAssignment,
   type Registry,
   type HandlerContext,
   type AssignmentRegistry,
 } from "./registry.js";
 import { SPAWN_ACTION_TYPE, RETURN_ACTION_TYPE } from "./transition.js";
-
-const parseInstance = (raw: unknown): Instance =>
-  instanceSchema.parse(typeof raw === "string" ? JSON.parse(raw) : raw);
-
-async function loadInstance(db: SQL, instanceId: string): Promise<Instance | undefined> {
-  const rows = (await db`SELECT body FROM instances WHERE instance_id = ${instanceId} LIMIT 1`) as { body: unknown }[];
-  return rows.length > 0 ? parseInstance(rows[0].body) : undefined;
-}
 
 /** core.spawnSubprocess handler. Registered by `registerSubprocessHandlers` below, its only caller. */
 function makeSpawnHandler(
@@ -105,62 +97,17 @@ function makeSpawnHandler(
       if (!spawnedBody || childVersion === undefined) throw new Error(`spawn: child body unresolved for ${spec.processId}`);
       childBody = spawnedBody;
 
-      // Seed the child from inputMapping (parent context; targets keyed by child fieldId).
-      // A raising entry — most often reading a parent field the instance never
-      // wrote, the ordinary case for an optional field — is total: it is
-      // omitted rather than failing the spawn, and recorded on the PARENT.
-      const { patch: childData, drops: inputDrops } = evalFieldMap(spec.inputMapping, buildGuardContext(parentBody, parent, SYSTEM_ACTOR));
-      const droppedAt = new Date().toISOString();
-      const dropEvents: InstanceEvent[] = inputDrops.map((d) => ({
-        id: newInstanceEventId(),
-        instanceId: parent.instanceId,
-        transitionSeq: parent.transitionSeq,
-        version: parent.version,
-        kind: "mapping.entry-dropped",
-        payload: { fieldId: d.fieldId, direction: "input", reason: d.reason },
-        at: droppedAt,
-      }));
-
-      // Creation is a step entry, so an assignment-bearing initial step carries
-      // candidates. Resolved HERE, before the transaction below opens: the child
-      // body, its initial step and its seed data are all in hand, and a resolver
-      // must not run while a connection and a row lock are held.
-      const childInitial = childBody.workflow.steps.find((s) => s.id === childBody.workflow.initialStep);
-      const childResolved = childInitial
-        ? await resolveStepAssignment(
-            childInitial,
-            assignmentRegistry,
-            { id: childId, startedBy: undefined, data: childData as Instance["data"] },
-            db,
-          )
-        : undefined;
-      // A resolution that produced no candidate is the CHILD's fact, so this
-      // event carries the child's id, the child's version and seq 0. It rides
-      // createInstance's own event list rather than the parent-scoped dropEvents
-      // above, whose entries all carry `instanceId: parent.instanceId`.
-      const childEvents: InstanceEvent[] = childResolved?.unresolved && childInitial
-        ? [makeAssignmentUnresolvedEvent({
-            instanceId: childId as Instance["instanceId"],
-            transitionSeq: 0,
-            version: childVersion,
-            stepId: childInitial.id,
-            reason: childResolved.unresolved,
-            at: droppedAt,
-          })]
-        : [];
-
-      // The drop events land on the parent in the same transaction as the
-      // child's creation: withTransaction nests as a savepoint inside
-      // createInstance's own transaction when `db` is already one (see
-      // store.ts::withTransaction), so both commit or roll back together.
-      child = await withTransaction(db, async (tx) => {
-        const created = await createInstance(
-          childBody,
-          { processId: spec.processId, version: childVersion, instanceId: childId, data: childData as Instance["data"], parent: { instanceId: parentId, stepId: subprocessStepId as StepId }, assignment: childResolved?.assignment, events: childEvents },
-          tx,
-        );
-        for (const event of dropEvents) await appendInstanceEvent(tx, event);
-        return created;
+      // Seed, resolve the initial step's assignment and create: the shared
+      // seam with processStartHandler. See seeded-create.ts.
+      child = await createSeededInstance(db, {
+        instanceId: childId,
+        processId: spec.processId,
+        version: childVersion,
+        body: childBody,
+        source: { instance: parent, body: parentBody },
+        mapping: spec.inputMapping,
+        link: { parent: { instanceId: parentId, stepId: subprocessStepId as StepId } },
+        assignmentRegistry,
       });
     }
 

@@ -405,6 +405,18 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   )`;
 }
 
+// Exported (not merely loadInstance-private) because subprocess.ts's return
+// handler parses one row read under `FOR UPDATE`, which loadInstance's own
+// unlocked SELECT cannot serve.
+export const parseInstance = (raw: unknown): Instance =>
+  instanceSchema.parse(typeof raw === "string" ? JSON.parse(raw) : raw);
+
+/** Load one instance by id, or `undefined` if no row matches. */
+export async function loadInstance(db: SQL, instanceId: string): Promise<Instance | undefined> {
+  const rows = (await db`SELECT body FROM instances WHERE instance_id = ${instanceId} LIMIT 1`) as { body: unknown }[];
+  return rows.length > 0 ? parseInstance(rows[0].body) : undefined;
+}
+
 /**
  * Run `fn` in a transaction, joining one already in progress rather than opening
  * a second. Bun rejects `begin` on a transaction-scoped client ("cannot call
