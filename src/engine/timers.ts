@@ -14,7 +14,7 @@ import { fireTimer } from "./transition.js";
 import { createDefaultAssignmentRegistry, type AssignmentRegistry } from "./registry.js";
 import { instance as instanceSchema, type Instance } from "../schema/definition.js";
 import type { ResolveBody } from "./resolution.js";
-import { pollForever, logSkippedItem } from "./poll.js";
+import { logSkippedItem } from "./poll.js";
 
 function parseInstance(raw: unknown): Instance {
   return instanceSchema.parse(typeof raw === "string" ? JSON.parse(raw) : raw);
@@ -92,14 +92,4 @@ export async function drainTimers(
     }
   }
   return fired;
-}
-
-/** Poll drainTimers on an interval. Returns a stop handle. */
-export function startTimerScheduler(
-  db: SQL = sql,
-  resolveBody: ResolveBody = () => undefined,
-  intervalMs = 500,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
-): { stop: () => void } {
-  return pollForever("timers", () => drainTimers(db, resolveBody, assignmentRegistry), intervalMs);
 }

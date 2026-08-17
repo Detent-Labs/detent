@@ -1,22 +1,12 @@
-# engine-poll-loop-consolidation
+<!-- antislop: allow-file passive-voice -->
+<!-- Every scenario in this file uses the fixed SHALL/WHEN/THEN Gherkin
+     grammar the rest of this repo's specs already use (see
+     data-retention/spec.md's own allow-file passive-voice for the same
+     reason). That grammar is structurally passive ("WHEN X is called",
+     "THEN Y is redacted"); rewriting it to dodge the rule would break the
+     required Scenario format. -->
 
-## Purpose
-
-A structural (mechanism-level) constraint on the engine's background
-workers: `startEngine` (`src/engine/host.ts`) drives the outbox,
-resolution and timer drains (`drainOutbox`, `drainResolutions`,
-`drainTimers`) through one shared poll-loop scheduling implementation
-(`pollForever` in `src/engine/poll.ts`), instead of independently
-maintained, structurally identical copies. External behavior (polling
-cadence, swallow-and-retry on a transient drain failure, stop semantics)
-is unaffected — this is a pure, behavior-preserving extraction that
-touches none of [[transactional-outbox]]'s or [[timers]]'s delivery/firing
-semantics. This capability exists purely to keep the "don't re-duplicate
-this" constraint from silently regressing as more poll-loop-driven engine
-workers are added. Added for `PONYTAIL-AUDIT.md`'s 2026-07-26 scan,
-finding 2.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Engine poll-loop workers share one scheduling implementation
 

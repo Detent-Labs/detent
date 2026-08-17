@@ -17,7 +17,7 @@ import { getAccountById, updateAccount, validateDisplayName, DISPLAY_NAME_MAX_LE
 import type { ActorResolver } from "../auth/resolve.js";
 import { AuthorizationError } from "../auth/authorize.js";
 import { RequestShapeError, type HttpResult } from "./errors.js";
-import { resolveActor, guarded } from "./routes.js";
+import { resolveActor, guarded, readJson } from "./routes.js";
 
 /**
  * The locale values `packages/web`'s `UiLocale` type declares
@@ -26,7 +26,7 @@ import { resolveActor, guarded } from "./routes.js";
  * this list is refused with 400, which is the loud failure — a stored value the
  * two shipped catalogs do not cover would render nothing.
  */
-export const SUPPORTED_LOCALES = ["en", "de"];
+const SUPPORTED_LOCALES = ["en", "de"];
 
 /** The two keys `PATCH /account/me` accepts. Every other key is a 400, not a silently ignored field: a self-service write path is a trust boundary. */
 const WRITABLE_KEYS = ["displayName", "locale"];
@@ -114,12 +114,9 @@ function parseAccountChanges(body: Record<string, unknown>): { displayName?: str
 export async function handlePatchAccount(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
-    let raw: unknown;
-    try {
-      raw = await req.json();
-    } catch {
-      throw new RequestShapeError("request body is not valid JSON");
-    }
+    const raw = await readJson(req);
+    // `readJson` types the body as an object and does not check it — an array
+    // decodes as one too, so that shape still needs its own rejection here.
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new RequestShapeError("request body must be a JSON object");
     const changes = parseAccountChanges(raw as Record<string, unknown>);
     const updated = await updateAccount(actor.id, changes, db);

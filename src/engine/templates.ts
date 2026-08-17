@@ -17,7 +17,7 @@
  */
 import type { SQL } from "bun";
 import { sql } from "./store.js";
-import { MAX_DRAFT_ENVELOPE_BYTES } from "./drafts.js";
+import { checkJsonEnvelope, parseJsonb } from "./drafts.js";
 import { RequestShapeError } from "../errors.js";
 
 export type Template = {
@@ -64,11 +64,6 @@ type TemplateRow = {
 
 type SummaryRow = Omit<TemplateRow, "body" | "layout"> & { label: unknown; description: unknown };
 
-/** jsonb columns arrive already parsed under Bun.sql; the string guard is portability only. */
-function parseJsonb(raw: unknown): unknown {
-  return typeof raw === "string" ? JSON.parse(raw) : raw;
-}
-
 function toTemplate(row: TemplateRow): Template {
   return {
     templateKey: row.template_key,
@@ -89,12 +84,7 @@ function toSummary(row: SummaryRow): TemplateSummary {
   };
 }
 
-/** A JSON object, excluding arrays, `null`, and scalars. */
-function isJsonObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
-
-export function checkTemplateKey(key: string): void {
+function checkTemplateKey(key: string): void {
   if (key.length > MAX_TEMPLATE_KEY_LENGTH) {
     throw new RequestShapeError(`template key exceeds the ${MAX_TEMPLATE_KEY_LENGTH}-character bound`);
   }
@@ -104,17 +94,7 @@ export function checkTemplateKey(key: string): void {
 }
 
 function checkEnvelope(input: SaveTemplateInput): void {
-  if (!isJsonObject(input.body)) {
-    throw new RequestShapeError("template body must be a JSON object");
-  }
-  if (!isJsonObject(input.layout)) {
-    throw new RequestShapeError("template layout must be a JSON object");
-  }
-  const size =
-    Buffer.byteLength(JSON.stringify(input.body), "utf8") + Buffer.byteLength(JSON.stringify(input.layout), "utf8");
-  if (size > MAX_DRAFT_ENVELOPE_BYTES) {
-    throw new RequestShapeError(`template envelope exceeds the ${MAX_DRAFT_ENVELOPE_BYTES}-byte bound`);
-  }
+  checkJsonEnvelope("template", input.body, input.layout);
 }
 
 export async function getTemplate(templateKey: string, db: SQL = sql): Promise<Template | undefined> {

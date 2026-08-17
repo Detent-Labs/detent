@@ -11,7 +11,6 @@ export interface WireField {
   id: string;
   key: string;
   label: LocalizedText;
-  description?: LocalizedText;
   type: BaseFieldType | Plugin;
   options?: FieldOption[];
   dataSource?: string;

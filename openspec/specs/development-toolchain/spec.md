@@ -685,9 +685,9 @@ Every action `type` that a file under `examples/` names SHALL resolve in
 `createDefaultRegistry()`. A contributor SHALL reach a terminal step in the
 running dev server without registering a handler by hand.
 
-`scripts/seed.ts` and `scripts/demo-expense-approval.ts` SHALL register no
-placeholder handler. Their registries publish and drive the same example the
-server runs. A placeholder there hides a type the server cannot dispatch.
+`scripts/seed.ts` SHALL register no placeholder handler. Its registry
+publishes and drives the same examples the server runs. A placeholder
+there hides a type the server cannot dispatch.
 
 #### Scenario: The seed script needs no placeholder handler
 

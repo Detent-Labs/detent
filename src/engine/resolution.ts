@@ -18,7 +18,7 @@ import { createDefaultAssignmentRegistry, type AssignmentRegistry } from "./regi
 import { definitionHash } from "../schema/hash.js";
 import { instance as instanceSchema, type Instance, type ProcessBody } from "../schema/definition.js";
 import { SYSTEM_ACTOR } from "../cel/eval.js";
-import { pollForever, logSkippedItem } from "./poll.js";
+import { logSkippedItem } from "./poll.js";
 
 export { SYSTEM_ACTOR };
 
@@ -116,15 +116,4 @@ export async function drainResolutions(
     processed++;
   }
   return processed;
-}
-
-/** Poll drainResolutions on an interval. Returns a stop handle. */
-export function startResolutionWorker(
-  db: SQL = sql,
-  resolveBody: ResolveBody = () => undefined,
-  intervalMs = 500,
-  leaseMs: number = CLAIM_LEASE_MS,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
-): { stop: () => void } {
-  return pollForever("resolution", () => drainResolutions(db, resolveBody, leaseMs, assignmentRegistry), intervalMs);
 }

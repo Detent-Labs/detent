@@ -135,11 +135,6 @@
   margin: 0 0 var(--space-3);
 }
 
-/* A success confirmation is the Settled tone, ink, never green. */
-.studio-publish-result {
-  color: var(--color-text);
-}
-
 .studio-json-editor {
   display: block;
   width: 100%;
@@ -725,29 +720,6 @@
   color: var(--color-text);
 }
 
-/* Full-screen fallback for a render-time throw the ErrorBoundary catches — see ErrorBoundary.tsx for what this does and does not cover. */
-.studio-boundary-fallback {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-  min-height: 60vh;
-  text-align: center;
-}
-
-.studio-boundary-stamp {
-  font-family: var(--font-mono);
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--color-refusal);
-  border: 2px solid currentcolor;
-  padding: 4px 12px;
-  transform: rotate(-2deg);
-}
-
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
@@ -1201,6 +1173,55 @@
    `flattenRailFields` caps it there, so no third step exists. */
 .studio-panels-rail-field[data-depth="1"] {
   padding-left: var(--space-6);
+}
+
+/* --- Field catalog and data source detail panels ------------------------ */
+/* `.field-catalog-panel`, `.field-row`, `.option-row` and `.data-source-row`
+   exist in the markup and carried no rule until this change. The heading
+   rule matches `.studio-panels-screen-header`'s own 2px structural weight;
+   the label-above-control spacing matches `.steps-panel label`'s. */
+
+.field-catalog-panel > h3,
+.data-sources-panel > h3 {
+  margin: 0 0 var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 2px solid var(--color-divider);
+}
+
+.field-row,
+.data-source-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+/* Direct children only: `PluginEnvelopeEditor` and `FieldValidationEditor`
+   nest their own `<label>`s inside a `<fieldset>`/`<details>` of their own,
+   several levels deeper, and keep whatever styling they already carry. */
+.field-row > label,
+.data-source-row > label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.9rem;
+  width: 100%;
+}
+
+/* A value the engine matches exactly — a field's `key`, a data source's
+   `key`, a field's `type` — uses the mono face, the same rule
+   `.admin-mono` already applies to a machine value in the admin area. */
+.studio-mono {
+  font-family: var(--font-mono);
+}
+
+/* The one row the design language calls out by name: three controls (a
+   value, a label, remove) on one line, not stacked. */
+.option-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
 }
 
 /* The field matrix: a register table, not a spreadsheet. Sticky header row
@@ -1789,18 +1810,6 @@ tr[data-group="true"] .studio-matrix-row-header {
 
 /* --- Palette (studio-canvas: "A palette offers Step, Subprocess, and End") */
 
-.studio-palette {
-  min-width: 0;
-  overflow-y: auto;
-  border: 1px solid var(--color-border);
-  padding: var(--space-2) 0;
-}
-
-.studio-palette h2 {
-  margin: 0;
-  padding: 0 var(--space-3) var(--space-2);
-}
-
 .studio-palette-list {
   list-style: none;
   margin: 0;
@@ -2376,6 +2385,18 @@ tr[data-group="true"] .studio-matrix-row-header {
 
 .canvas-edge-group-selected .canvas-edge {
   stroke: var(--color-accent);
+}
+
+/* The edit-rail drag's drop-target signal (design.md: "The drop-target state
+   is a stroke, so it needs no catalog key"). Heavier and in the accent, so
+   the signal survives without color; no permanent control, and no radius —
+   both joins and caps stay sharp, the design language's rule for every
+   surface here. */
+.canvas-edge-insert-target .canvas-edge {
+  stroke: var(--color-accent);
+  stroke-width: 3;
+  stroke-linecap: butt;
+  stroke-linejoin: miter;
 }
 
 .canvas-rename-input {

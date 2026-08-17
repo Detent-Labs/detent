@@ -15,7 +15,7 @@
 import type { SQL } from "bun";
 import { sql } from "./store.js";
 import { resolve, type OutboxActors, type Registry } from "./registry.js";
-import { pollForever, logSkippedItem } from "./poll.js";
+import { logSkippedItem } from "./poll.js";
 import { durationMs } from "./duration.js";
 import { evalOutput } from "../cel/eval.js";
 import { collectFieldsDeep, typeMatches, type FieldId, type FieldDef, type Literal } from "../schema/definition.js";
@@ -357,14 +357,4 @@ export async function drainOutbox(
    }
   }
   return delivered;
-}
-
-/** Poll `drainOutbox` on an interval. Returns a stop handle. */
-export function startOutboxWorker(
-  db: SQL = sql,
-  registry: Registry = new Map(),
-  intervalMs = 500,
-  resolveBody: ResolveBody = () => undefined,
-): { stop: () => void } {
-  return pollForever("outbox", () => drainOutbox(db, registry, deliver, CLAIM_LEASE_MS, resolveBody), intervalMs);
 }

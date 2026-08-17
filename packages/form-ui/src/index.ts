@@ -1,6 +1,5 @@
-export { FieldForm, FieldInput, effectiveSpan, optionText, OPTION_ATTRIBUTE_SEPARATOR } from "./FieldForm.js";
+export { FieldForm } from "./FieldForm.js";
 export { PathButtons } from "./PathButtons.js";
-export { editableFieldIds, filterToEditable } from "./submit.js";
+export { filterToEditable } from "./submit.js";
 export { resolveText } from "./locale.js";
-export { issueMessage } from "./issue-messages.js";
-export type { WireField, ResolvedViewField, AvailablePath, SubmissionIssue } from "./types.js";
+export type { ResolvedViewField, AvailablePath, SubmissionIssue } from "./types.js";

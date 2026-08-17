@@ -276,29 +276,6 @@
   color: var(--color-text);
 }
 
-/* Full-screen fallback for a render-time throw the ErrorBoundary catches — see ErrorBoundary.tsx for what this does and does not cover. */
-.app-boundary-fallback {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-  min-height: 60vh;
-  text-align: center;
-}
-
-.app-boundary-stamp {
-  font-family: var(--font-mono);
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--color-refusal);
-  border: 2px solid currentcolor;
-  padding: 4px 12px;
-  transform: rotate(-2deg);
-}
-
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;

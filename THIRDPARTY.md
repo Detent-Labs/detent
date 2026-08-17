@@ -72,53 +72,11 @@ range and keeps 18.3.1 under it.
 
 ## Transitive dependencies
 
-Pulled in by the packages above. Most of it is build tooling: Rolldown and
-Lightning CSS under Vite, plus small runtime helpers for React. Grouped by
-license.
+<!-- antislop: allow sentence-length -->
 
-### MIT
-
-`@dagrejs/graphlib` 4.0.5, `@oxc-project/types` 0.143.0,
-`@rolldown/binding-android-arm64` 1.2.3,
-`@rolldown/binding-darwin-arm64` 1.2.3, `@rolldown/binding-darwin-x64` 1.2.3,
-`@rolldown/binding-freebsd-x64` 1.2.3,
-`@rolldown/binding-linux-arm-gnueabihf` 1.2.3,
-`@rolldown/binding-linux-arm64-gnu` 1.2.3,
-`@rolldown/binding-linux-arm64-musl` 1.2.3,
-`@rolldown/binding-linux-ppc64-gnu` 1.2.3,
-`@rolldown/binding-linux-s390x-gnu` 1.2.3,
-`@rolldown/binding-linux-x64-gnu` 1.2.3,
-`@rolldown/binding-linux-x64-musl` 1.2.3,
-`@rolldown/binding-openharmony-arm64` 1.2.3,
-`@rolldown/binding-win32-arm64-msvc` 1.2.3,
-`@rolldown/binding-win32-x64-msvc` 1.2.3, `@rolldown/pluginutils` 1.0.1,
-`@types/node` 26.1.1, `@types/prop-types` 15.7.15, `bun-types` 1.3.14,
-`csstype` 3.2.3, `fdir` 6.5.0, `fsevents` 2.3.3 (optional, Darwin-only, not
-installed on this platform), `js-tokens` 4.0.0, `loose-envify` 1.4.0, `nanoid`
-3.3.18, `picomatch` 4.0.5, `postcss` 8.5.26, `rolldown` 1.2.3, `scheduler`
-0.23.2, `scheduler` 0.27.0, `tinyglobby` 0.2.17, `undici-types` 8.3.0
-
-### ISC
-
-`picocolors` 1.1.1
-
-### Apache-2.0
-
-`detect-libc` 2.1.2
-
-### BSD-3-Clause
-
-`source-map-js` 1.2.1
-
-### MPL-2.0
-
-`lightningcss` 1.33.0, plus its platform binaries at that same version:
-`lightningcss-android-arm64`, `lightningcss-darwin-arm64`,
-`lightningcss-darwin-x64`, `lightningcss-freebsd-x64`,
-`lightningcss-linux-arm-gnueabihf`, `lightningcss-linux-arm64-gnu`,
-`lightningcss-linux-arm64-musl`, `lightningcss-linux-x64-gnu`,
-`lightningcss-linux-x64-musl`, `lightningcss-win32-arm64-msvc` and
-`lightningcss-win32-x64-msvc`, each 1.33.0
+Pulled in by the packages above, mostly Rolldown and Lightning CSS under
+Vite plus small runtime helpers for React. `bun.lock` names every one, with
+its resolved version.
 
 ## Notes
 

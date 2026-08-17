@@ -71,7 +71,8 @@
    spa-accessibility-pass moved the issue <ul> out of the <label> it used to
    sit inside, since <label> permits phrasing content only and nesting it
    folded the error text into the control's accessible name. */
-.form-ui-field {
+.form-ui-field,
+.form-ui-field-control {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -87,8 +88,7 @@
 }
 
 .form-ui-field input,
-.form-ui-field select,
-.form-ui-field textarea {
+.form-ui-field select {
   font: inherit;
   font-size: 14px;
   padding: var(--space-2);
@@ -98,16 +98,9 @@
 }
 
 .form-ui-field input:focus-visible,
-.form-ui-field select:focus-visible,
-.form-ui-field textarea:focus-visible {
+.form-ui-field select:focus-visible {
   border-color: var(--color-accent);
   outline-offset: 0;
-}
-
-.form-ui-field-control {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
 }
 
 .form-ui-field-group {

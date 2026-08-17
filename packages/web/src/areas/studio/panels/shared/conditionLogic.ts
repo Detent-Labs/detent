@@ -19,9 +19,6 @@ import type { DraftField } from "../../draft/fields";
 import { flattenDraftFields } from "../../draft/fields";
 import { resolveDraftLocalizedText } from "../../draft/localized-text";
 
-/** The CEL types the builder knows how to offer operators and an editor for. */
-export type OperandCelType = "double" | "bool" | "string" | "list<string>" | "dyn";
-
 export interface OperandOption {
   value: string;
   label: string;

@@ -1,91 +1,23 @@
-# One-command devcontainer bring-up (PowerShell 7+ variant of dev-up.sh, for
-# Windows systems without Git Bash / WSL). Starts the compose services,
-# installs deps, seeds the example processes + demo users, ensures a
-# demo-superuser with all eight system:* roles, and (re)starts the HTTP
-# server. Safe to re-run — every step is idempotent, and the JWT signing
-# secret is generated once and reused, so restarts don't invalidate
-# existing logins.
+# One-command devcontainer bring-up, PowerShell entry point. It runs
+# dev-up.sh rather than restate its flow, so the two entry points agree by
+# construction. Same shape scripts/preflight.ps1 already uses for
+# preflight.sh.
 #
-# Runs on the HOST (it drives `docker compose` itself); the actual
-# bun/tsc/test commands it shells out to all run inside the app container,
-# per CLAUDE.md. Usage: pwsh scripts/dev-up.ps1
+# Delegating needs bash on the host. That is no new requirement in
+# practice: dev-up.sh already shells into the app container for every
+# bun/tsc/test command, and Git for Windows ships Git Bash.
+#
+# Usage: pwsh scripts/dev-up.ps1
 
 Set-StrictMode -Version Latest
 Set-Location (Join-Path $PSScriptRoot "..")
 
-$SuperuserEmail = "demo-superuser@example.test"
-$SuperuserPassword = "seed-demo-password"
-$SuperuserRoles = "system:publish,system:cancel-any,system:admin,system:developer,system:author,system:reports,system:datalists,system:templates"
-$SecretFile = ".devcontainer/.auth-secret"
-
-$overridePath = ".devcontainer/docker-compose.override.yml"
-if (-not (Test-Path $overridePath)) {
-    Write-Host "No $overridePath -- creating one to publish the dev ports to the host."
-    @'
-services:
-  app:
-    ports:
-      - "127.0.0.1:3000:3000"
-      - "127.0.0.1:5173:5173"
-
-  # Mailpit's web interface. The 127.0.0.1 prefix is load-bearing on Windows:
-  # without it Docker binds [::], and the host browser meets a connection reset.
-  mailpit:
-    ports:
-      - "127.0.0.1:8025:8025"
-'@ | Set-Content -Path $overridePath -NoNewline
+$bash = (Get-Command bash -ErrorAction SilentlyContinue).Source
+if (-not $bash) {
+    Write-Host "dev-up: no bash on this host, and the bring-up flow lives in dev-up.sh"
+    Write-Host "  Install Git for Windows, which ships Git Bash, then run: bash scripts/dev-up.sh"
+    exit 1
 }
 
-$ComposeFiles = @("-f", ".devcontainer/docker-compose.yml", "-f", $overridePath)
-
-function Invoke-Compose {
-    docker compose @ComposeFiles @args
-}
-
-Write-Host "==> Starting containers"
-Invoke-Compose up -d
-
-Write-Host "==> Installing dependencies"
-Invoke-Compose exec -w /workspace app bun install
-
-if (-not (Test-Path $SecretFile)) {
-    Write-Host "==> Generating AUTH_JWT_SECRET ($SecretFile, gitignored, reused on every future run)"
-    $bytes = [byte[]]::new(32)
-    [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
-    [Convert]::ToBase64String($bytes) | Set-Content -Path $SecretFile -NoNewline
-}
-$Secret = Get-Content -Path $SecretFile -Raw
-
-Write-Host "==> Seeding example processes + per-role demo users"
-Invoke-Compose exec -e SEED_ALLOW=1 -w /workspace app bun run seed
-
-Write-Host "==> Ensuring $SuperuserEmail (all system:* roles)"
-# The redirect sits on the native command, not on Invoke-Compose: stderr from
-# a native command inside a function bypasses a redirect written at the call
-# site. On a re-run add-user hits the unique constraint on auth_users.email,
-# and set-roles below is the expected path.
-docker compose @ComposeFiles exec -w /workspace app bun run src/auth/cli.ts add-user $SuperuserEmail $SuperuserPassword $SuperuserRoles 2>$null
-if ($LASTEXITCODE -ne 0) {
-    Invoke-Compose exec -w /workspace app bun run src/auth/cli.ts set-roles $SuperuserEmail $SuperuserRoles
-}
-
-Write-Host "==> (Re)starting the HTTP server"
-try { Invoke-Compose exec -w /workspace app pkill -f "src/http/server.ts" 2>$null } catch {}
-Start-Sleep -Seconds 1
-# docker logs/compose logs only capture the container's PID 1 (sleep
-# infinity) -- a detached `exec -d` process's stdout/stderr are never
-# captured, so the server's structured logs (src/log.ts) went nowhere.
-# Redirecting to a file under /workspace makes them readable both inside
-# the container and on the host (bind mount), e.g. `Get-Content
-# .devcontainer/server.log -Wait`.
-Invoke-Compose exec -d -e "AUTH_JWT_SECRET=$Secret" -w /workspace app `
-    bash -c 'bun run serve > .devcontainer/server.log 2>&1'
-Start-Sleep -Seconds 2
-
-Write-Host "==> Confirming the stack is ready"
-& (Join-Path $PSScriptRoot "preflight.ps1") serve
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-Write-Host ""
-Write-Host "Ready: http://localhost:3000/"
-Write-Host "Login: $SuperuserEmail / $SuperuserPassword"
+& $bash (Join-Path $PSScriptRoot "dev-up.sh") @args
+exit $LASTEXITCODE

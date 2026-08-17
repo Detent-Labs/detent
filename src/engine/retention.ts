@@ -10,10 +10,9 @@ import type { SQL } from "bun";
 import { sql, withTransaction } from "./store.js";
 import { instance as instanceSchema, type Instance, type InstanceId } from "../schema/definition.js";
 import { NotFoundError, InstanceRunningError } from "../errors.js";
-import { pollForever, logSkippedItem } from "./poll.js";
+import { logSkippedItem } from "./poll.js";
 
 const BATCH = 500;
-const SWEEP_INTERVAL_MS = 60 * 60 * 1000;
 
 export async function redactInstance(instanceId: InstanceId, db: SQL = sql): Promise<Instance> {
   return withTransaction(db, async (tx) => {
@@ -79,8 +78,4 @@ export async function sweepRetention(db: SQL, days: number): Promise<void> {
       }
     }
   }
-}
-
-export function startRetentionSweep(db: SQL, days: number): { stop: () => void } {
-  return pollForever("retention", () => sweepRetention(db, days), SWEEP_INTERVAL_MS);
 }

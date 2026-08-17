@@ -80,11 +80,11 @@ comment/attachment deletes.
 
 ### Requirement: An automatic sweep is opt-in via DATA_RETENTION_DAYS
 
-An automatic sweep worker (`startRetentionSweep`, `src/engine/retention.ts`)
-SHALL run only when the `DATA_RETENTION_DAYS` environment variable is
-set and parses as a positive integer. `startEngine`
-(`src/engine/host.ts`) SHALL NOT start the sweep when the variable is
-unset. It SHALL NOT apply a default retention window.
+`startEngine` (`src/engine/host.ts`) SHALL start the retention sweep's
+`pollForever` call only when the `DATA_RETENTION_DAYS` environment
+variable is set and parses as a positive integer. It SHALL NOT start
+that call when the variable is unset. It SHALL NOT apply a default
+retention window.
 
 A `DATA_RETENTION_DAYS` value that is set but does not parse as a
 positive integer SHALL cause `startEngine` to throw. It SHALL throw

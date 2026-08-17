@@ -14,20 +14,15 @@ export const en = {
     "Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below).",
   "app.processLegend": "Process",
 
-  "draftToolbar.legend": "Draft",
   "draftToolbar.save": "Save",
   "draftToolbar.saving": "Saving…",
   "draftToolbar.discard": "Discard draft",
   "draftToolbar.discardConfirm": "Discard this draft? Unpublished edits will be lost.",
-  "draftToolbar.operationFailed": "operation failed",
   "draftToolbar.conflictMessage": "This draft was changed elsewhere.",
   "draftToolbar.conflictReload": "Reload",
-  "draftToolbar.unsaved": "Unsaved changes",
-  "draftToolbar.saved": "Saved",
   "draftToolbar.publish": "Publish",
   "draftToolbar.publishing": "Publishing…",
   "draftToolbar.publishConfirmSave": "Save your changes and publish?",
-  "draftToolbar.publishSuccess": "Published",
 
   "fieldCatalog.heading": "Field catalog",
   "fieldCatalog.empty": "No fields yet.",
@@ -53,14 +48,11 @@ export const en = {
   "dataSources.addDataSource": "+ Add data source",
   "dataSources.removeDataSource": "Remove data source",
   "dataSources.pickListKey": "Pick a data list",
+  "dataSources.dataListLabel": "data list",
 
-  "steps.heading": "Steps",
-  "steps.empty": "No steps yet.",
-  "steps.addStep": "+ Add step",
   "steps.removeStep": "Remove step",
   "steps.unnamedStep": "(unnamed step)",
   "steps.terminalBadge": "terminal",
-  "steps.selectInitialStep": "(select initial step)",
   "steps.crossProcessLegend": "cross-process check (checkSubprocessChildRefs)",
   "steps.crossProcessChecked": "checked against loaded child —",
   "steps.unload": "unload",
@@ -199,7 +191,6 @@ export const en = {
   "ruleBuilder.developerView": "Developer view",
   "ruleBuilder.unparseable": "This does not parse as CEL, so the builder cannot open it.",
 
-  "subprocess.legend": "subprocess",
   "subprocess.processIdPlaceholder": "proc_...",
   "subprocess.removeMappingEntry": "remove",
   "subprocess.addInputMapping": "+ Add input mapping",
@@ -225,13 +216,14 @@ export const en = {
   "columnMapping.removeRow": "Remove",
   "columnMapping.staleColumn": "The list no longer declares this column. The mapping writes nothing until an operator declares it again, or you remove the row.",
 
-  "panelsScreen.linksLabel": "Process-wide editors",
   "panelsScreen.linkFields": "Fields",
   "panelsScreen.linkDataSources": "Data sources",
   "panelsScreen.linkContract": "Contract",
   "panelsScreen.linkFieldMatrix": "Field matrix",
   "panelsScreen.railLabel": "Editors",
   "panelsScreen.unnamedField": "(unnamed field)",
+  "panelsScreen.unnamedDataSource": "(unnamed data source)",
+  "panelsScreen.issueMark": "issues",
   "panelsScreen.backToCanvas": "← Canvas",
   "panelsScreen.keepsChanges": "This screen keeps every change. Save from the toolbar to persist it.",
 
@@ -261,7 +253,6 @@ export const en = {
   "stepSections.viewBuildForm": "Build the form",
   "stepSections.viewFieldsConfigured": "fields configured",
   "stepSections.noSelection": "Select a step or a path to edit it.",
-  "stepSections.addStep": "+ Add step",
   "stepSections.renameLabel": "Step name",
 
   "palette.heading": "Add to canvas",
@@ -296,7 +287,6 @@ export const en = {
     "Arrange every step from the workflow graph? This overwrites every saved position and clears any waypoint a path carries.",
   "canvas.elseMarker": "else",
   "canvas.initialStamp": "start",
-  "canvas.inspectorEmpty": "Select a step or a path to edit it.",
   "canvas.edgeStyleToggle": "Rounded corners",
   "canvas.selectionHeading": "Steps selected",
   "canvas.selectionRemove": "Remove steps",
@@ -394,6 +384,6 @@ export const en = {
   "error.generic": "Something went wrong. Try again.",
 } as const;
 
-export type TranslationKey = keyof typeof en;
+export type CatalogKey = keyof typeof en;
 
 export const studioCatalog = { en };
