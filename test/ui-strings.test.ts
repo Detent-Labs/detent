@@ -6,14 +6,10 @@
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
-import {
-  listUiStringOverrides,
-  countUiStringOverrides,
-  setUiStringOverride,
-  uiStringOverrideExists,
-} from "../src/engine/ui-strings.js";
+import { listUiStringOverrides, countUiStringOverrides, setUiStringOverride } from "../src/engine/ui-strings.js";
 
 const DB = !!process.env.DATABASE_URL;
+const MAX = 100;
 
 beforeAll(async () => {
   if (DB) await initSchema();
@@ -28,9 +24,9 @@ test.skipIf(!DB)("an empty table lists as an empty map, not as null or an array"
 });
 
 test.skipIf(!DB)("listUiStringOverrides nests area, then locale, then key", async () => {
-  await setUiStringOverride("shell", "en", "login.title", "Sign in", "user_admin", sql);
-  await setUiStringOverride("shell", "de", "login.title", "Anmeldung", "user_admin", sql);
-  await setUiStringOverride("app", "en", "tasks.title", "My work", "user_admin", sql);
+  await setUiStringOverride("shell", "en", "login.title", "Sign in", "user_admin", MAX, sql);
+  await setUiStringOverride("shell", "de", "login.title", "Anmeldung", "user_admin", MAX, sql);
+  await setUiStringOverride("app", "en", "tasks.title", "My work", "user_admin", MAX, sql);
 
   expect(await listUiStringOverrides(sql)).toEqual({
     app: { en: { "tasks.title": "My work" } },
@@ -39,8 +35,8 @@ test.skipIf(!DB)("listUiStringOverrides nests area, then locale, then key", asyn
 });
 
 test.skipIf(!DB)("a second write to the same key replaces the value and records the new author", async () => {
-  await setUiStringOverride("shell", "en", "login.title", "Sign in", "user_first", sql);
-  await setUiStringOverride("shell", "en", "login.title", "Enter", "user_second", sql);
+  await setUiStringOverride("shell", "en", "login.title", "Sign in", "user_first", MAX, sql);
+  await setUiStringOverride("shell", "en", "login.title", "Enter", "user_second", MAX, sql);
 
   const rows = (await sql`SELECT value, updated_by FROM ui_string_overrides`) as { value: string; updated_by: string }[];
   expect(rows).toEqual([{ value: "Enter", updated_by: "user_second" }]);
@@ -48,23 +44,27 @@ test.skipIf(!DB)("a second write to the same key replaces the value and records 
 });
 
 test.skipIf(!DB)("a null value deletes the row rather than blanking it", async () => {
-  await setUiStringOverride("shell", "en", "login.title", "Sign in", "user_admin", sql);
-  expect(await setUiStringOverride("shell", "en", "login.title", null, "user_admin", sql)).toBe(true);
+  await setUiStringOverride("shell", "en", "login.title", "Sign in", "user_admin", MAX, sql);
+  expect(await setUiStringOverride("shell", "en", "login.title", null, "user_admin", MAX, sql)).toBe("written");
 
   expect(await listUiStringOverrides(sql)).toEqual({});
   expect(await countUiStringOverrides(sql)).toBe(0);
 });
 
 test.skipIf(!DB)("clearing a key that has no row reports that it removed nothing", async () => {
-  expect(await setUiStringOverride("shell", "en", "never.stored", null, "user_admin", sql)).toBe(false);
+  expect(await setUiStringOverride("shell", "en", "never.stored", null, "user_admin", MAX, sql)).toBe("missing");
   expect(await countUiStringOverrides(sql)).toBe(0);
 });
 
-test.skipIf(!DB)("uiStringOverrideExists distinguishes a stored key from an unstored one", async () => {
-  await setUiStringOverride("shell", "en", "login.title", "Sign in", "user_admin", sql);
+test.skipIf(!DB)("the bound refuses a new key once the table is full, but allows an overwrite and a clear", async () => {
+  await setUiStringOverride("shell", "en", "login.title", "Sign in", "user_admin", 1, sql);
 
-  expect(await uiStringOverrideExists("shell", "en", "login.title", sql)).toBe(true);
-  // Same key, other locale: the primary key is the triple, so this is a different row.
-  expect(await uiStringOverrideExists("shell", "de", "login.title", sql)).toBe(false);
-  expect(await uiStringOverrideExists("app", "en", "login.title", sql)).toBe(false);
+  expect(await setUiStringOverride("app", "en", "tasks.title", "My work", "user_admin", 1, sql)).toBe("at-bound");
+  expect(await countUiStringOverrides(sql)).toBe(1);
+
+  expect(await setUiStringOverride("shell", "en", "login.title", "Anmeldung", "user_admin", 1, sql)).toBe("written");
+  expect(await countUiStringOverrides(sql)).toBe(1);
+
+  expect(await setUiStringOverride("shell", "en", "login.title", null, "user_admin", 1, sql)).toBe("written");
+  expect(await countUiStringOverrides(sql)).toBe(0);
 });

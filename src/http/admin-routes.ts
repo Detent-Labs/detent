@@ -36,20 +36,13 @@ import {
   parseJsonb,
   type DataListColumn,
 } from "../engine/host.js";
-import { listUiStringOverrides, setUiStringOverride, countUiStringOverrides, uiStringOverrideExists } from "../engine/ui-strings.js";
+import { listUiStringOverrides, setUiStringOverride } from "../engine/ui-strings.js";
 import { listGrants, writeGrant, revokeGrant, grantSchema, type PermissionGrant } from "../auth/grants.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, ADMIN_ROLE, DATALISTS_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE } from "../auth/authorize.js";
 import { RequestShapeError, type HttpResult } from "./errors.js";
-import { resolveActor, guarded, parseLimit } from "./routes.js";
-
-/** Same rejection rule as studio-routes.ts::parseVersion, applied to a request-body field instead of a path segment. */
-function parseVersionField(raw: unknown, label: string): number {
-  const n = Number(raw);
-  if (!Number.isInteger(n)) throw new RequestShapeError(`${label} must be an integer`);
-  return n;
-}
+import { resolveActor, guarded, parseLimit, readJson, parseVersion } from "./routes.js";
 
 /**
  * `requeueOutboxRow`/`discardOutboxRow` report no row affected for two
@@ -166,12 +159,7 @@ export async function handleAdminSetUserRoles(userId: string, req: Request, reso
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
-    let body: { roles?: unknown };
-    try {
-      body = (await req.json()) as typeof body;
-    } catch {
-      throw new RequestShapeError("request body is not valid JSON");
-    }
+    const body = (await readJson(req)) as { roles?: unknown };
     const roles = parseRoles(body.roles);
     if (actor.id === userId && !roles.includes(ADMIN_ROLE)) {
       return { status: 409, body: { error: { type: "self-role-strip", message: `an actor cannot remove ${ADMIN_ROLE} from its own account` } } };
@@ -212,12 +200,7 @@ export async function handleAdminCreateUser(req: Request, resolver: ActorResolve
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
-    let body: { email?: unknown; password?: unknown; roles?: unknown };
-    try {
-      body = (await req.json()) as typeof body;
-    } catch {
-      throw new RequestShapeError("request body is not valid JSON");
-    }
+    const body = (await readJson(req)) as { email?: unknown; password?: unknown; roles?: unknown };
     const email = requireNonBlank(body.email, "email").trim();
     const password = requireNonBlank(body.password, "password");
     const roles = body.roles === undefined ? [] : parseRoles(body.roles);
@@ -260,12 +243,7 @@ export async function handleAdminSetUserPassword(userId: string, req: Request, r
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
-    let body: { password?: unknown };
-    try {
-      body = (await req.json()) as typeof body;
-    } catch {
-      throw new RequestShapeError("request body is not valid JSON");
-    }
+    const body = (await readJson(req)) as { password?: unknown };
     const password = requireNonBlank(body.password, "password");
     const updated = await setPasswordById(userId, password, db);
     if (!updated) return { status: 404, body: { error: { type: "not-found", message: `no user: ${userId}` } } };
@@ -289,12 +267,7 @@ export async function handleAdminSetUserManager(userId: string, req: Request, re
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
-    let body: { managerUserId?: unknown };
-    try {
-      body = (await req.json()) as typeof body;
-    } catch {
-      throw new RequestShapeError("request body is not valid JSON");
-    }
+    const body = (await readJson(req)) as { managerUserId?: unknown };
     const raw = body.managerUserId;
     if (raw !== null && typeof raw !== "string") throw new RequestShapeError("managerUserId must be a string or null");
     const managerUserId = raw === null ? null : raw.trim();
@@ -332,12 +305,7 @@ export async function handleAdminSetUserName(userId: string, req: Request, resol
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
-    let body: { displayName?: unknown };
-    try {
-      body = (await req.json()) as typeof body;
-    } catch {
-      throw new RequestShapeError("request body is not valid JSON");
-    }
+    const body = (await readJson(req)) as { displayName?: unknown };
     const raw = body.displayName;
     if (raw !== null && typeof raw !== "string") throw new RequestShapeError("displayName must be a string or null");
     const checked = validateDisplayName(raw);
@@ -378,15 +346,10 @@ export async function handleAdminRunMigration(req: Request, resolver: ActorResol
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     requireRole(actor, ADMIN_ROLE);
-    let body: { processId?: unknown; fromVersion?: unknown; toVersion?: unknown };
-    try {
-      body = (await req.json()) as typeof body;
-    } catch {
-      throw new RequestShapeError("request body is not valid JSON");
-    }
+    const body = (await readJson(req)) as { processId?: unknown; fromVersion?: unknown; toVersion?: unknown };
     if (typeof body.processId !== "string" || !body.processId) throw new RequestShapeError("processId is required");
-    const fromVersion = parseVersionField(body.fromVersion, "fromVersion");
-    const toVersion = parseVersionField(body.toVersion, "toVersion");
+    const fromVersion = parseVersion(body.fromVersion, "fromVersion");
+    const toVersion = parseVersion(body.toVersion, "toVersion");
     const result = await migrateInstances(body.processId as ProcessId, fromVersion, toVersion, db);
     return { status: 200, body: result };
   });
@@ -417,14 +380,6 @@ export async function handleAdminRedactInstance(instanceId: string, req: Request
 function requireDataListRead(actor: Actor): void {
   if (actor.roles.includes(DEVELOPER_ROLE) || actor.roles.includes(AUTHOR_ROLE)) return;
   requireRole(actor, DATALISTS_ROLE);
-}
-
-async function readJson(req: Request): Promise<Record<string, unknown>> {
-  try {
-    return (await req.json()) as Record<string, unknown>;
-  } catch {
-    throw new RequestShapeError("request body is not valid JSON");
-  }
 }
 
 function requireString(raw: unknown, label: string): string {
@@ -785,10 +740,11 @@ export async function handleAdminListUiStrings(req: Request, resolver: ActorReso
  * One route for both set and clear: `value` a string upserts, `null` deletes.
  *
  * The row bound is checked only for a write that would add a row, so an
- * overwrite and a clear stay possible at the bound. The check and the write are
- * not one transaction; two concurrent admins could cross it by one row. That
- * costs nothing worth a lock, since the bound exists to keep the public read
- * small rather than to enforce an exact count.
+ * overwrite and a clear stay possible at the bound. `setUiStringOverride`
+ * carries the check and the write in one statement; two concurrent admins
+ * could still cross it by one row. That costs nothing worth a lock, since the
+ * bound exists to keep the public read small rather than to enforce an exact
+ * count.
  */
 export async function handleAdminPutUiString(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
   return guarded(req, async () => {
@@ -799,14 +755,11 @@ export async function handleAdminPutUiString(req: Request, resolver: ActorResolv
     const locale = requireString(body.locale, "locale");
     const key = requireString(body.key, "key");
     const value = parseOverrideValue(body.value);
-    if (value !== null && !(await uiStringOverrideExists(area, locale, key, db))) {
-      const count = await countUiStringOverrides(db);
-      if (count >= MAX_OVERRIDES) {
-        throw new RequestShapeError(`the deployment holds at most ${MAX_OVERRIDES} UI string overrides`);
-      }
+    const result = await setUiStringOverride(area, locale, key, value, actor.id, MAX_OVERRIDES, db);
+    if (result === "at-bound") {
+      throw new RequestShapeError(`the deployment holds at most ${MAX_OVERRIDES} UI string overrides`);
     }
-    const written = await setUiStringOverride(area, locale, key, value, actor.id, db);
-    return { status: 200, body: { area, locale, key, value, deleted: value === null && written } };
+    return { status: 200, body: { area, locale, key, value, deleted: value === null && result === "written" } };
   });
 }
 

@@ -1,6 +1,6 @@
 /**
  * Per-deployment UI-chrome wording: the storage half of the white-label
- * overrides. Three statements, no query builder, the shape `admin-queries.ts`
+ * overrides. Three functions, no query builder, the shape `admin-queries.ts`
  * uses.
  *
  * The engine stores and returns these strings and never reads one. A UI string
@@ -46,9 +46,15 @@ export async function countUiStringOverrides(db: SQL = sql): Promise<number> {
  * back on `""` — and render a blank label. The route refuses `""` before it
  * reaches here.
  *
- * Returns true when a row was written or removed, false when a delete matched
- * nothing. The caller needs the difference only to avoid counting a no-op
- * clear against the row bound.
+ * `max` bounds the table for the token-less public read (see
+ * `listUiStringOverrides`). The insert's `WHERE` holds two disjuncts: the
+ * table sits under `max`, OR the target row already exists (an overwrite or a
+ * typo fix stays possible at the bound; only a brand-new key draws the
+ * refusal). A clear takes `max` but never reads it — the delete branch
+ * returns first, since removing a row cannot cross the bound.
+ *
+ * Returns `"written"` when a row landed, `"missing"` when a delete matched
+ * nothing, `"at-bound"` when the insert's `WHERE` refused a new row.
  */
 export async function setUiStringOverride(
   area: string,
@@ -56,29 +62,26 @@ export async function setUiStringOverride(
   key: string,
   value: string | null,
   updatedBy: string,
+  max: number,
   db: SQL = sql,
-): Promise<boolean> {
+): Promise<"written" | "missing" | "at-bound"> {
   if (value === null) {
     const deleted = await db<{ key: string }[]>`
       DELETE FROM ui_string_overrides
        WHERE area = ${area} AND locale = ${locale} AND key = ${key}
       RETURNING key
     `;
-    return deleted.length > 0;
+    return deleted.length > 0 ? "written" : "missing";
   }
-  await db`
+  const written = await db<{ key: string }[]>`
     INSERT INTO ui_string_overrides (area, locale, key, value, updated_by, updated_at)
-    VALUES (${area}, ${locale}, ${key}, ${value}, ${updatedBy}, now())
+    SELECT ${area}, ${locale}, ${key}, ${value}, ${updatedBy}, now()
+     WHERE (SELECT count(*) FROM ui_string_overrides) < ${max}
+        OR EXISTS (SELECT 1 FROM ui_string_overrides
+                    WHERE area = ${area} AND locale = ${locale} AND key = ${key})
     ON CONFLICT (area, locale, key)
     DO UPDATE SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = now()
+    RETURNING key
   `;
-  return true;
-}
-
-/** True when `(area, locale, key)` already has a row, so an upsert adds no row to the count. */
-export async function uiStringOverrideExists(area: string, locale: string, key: string, db: SQL = sql): Promise<boolean> {
-  const rows = await db<{ key: string }[]>`
-    SELECT key FROM ui_string_overrides WHERE area = ${area} AND locale = ${locale} AND key = ${key}
-  `;
-  return rows.length > 0;
+  return written.length > 0 ? "written" : "at-bound";
 }

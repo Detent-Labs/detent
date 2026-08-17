@@ -60,8 +60,8 @@ beforeEach(async () => {
 // --- The public read -------------------------------------------------------
 
 test.skipIf(!DB)("an unauthenticated request returns every stored override as one nested map", async () => {
-  await setUiStringOverride("shell", "en", "login.title", "Sign in", admin.id, sql);
-  await setUiStringOverride("app", "de", "tasks.title", "Meine Arbeit", admin.id, sql);
+  await setUiStringOverride("shell", "en", "login.title", "Sign in", admin.id, MAX_OVERRIDES, sql);
+  await setUiStringOverride("app", "de", "tasks.title", "Meine Arbeit", admin.id, MAX_OVERRIDES, sql);
 
   // No X-Actor-Id header at all: this is a browser fetch before any token exists.
   const res = await fetch(new Request(PUBLIC));
@@ -73,7 +73,7 @@ test.skipIf(!DB)("an unauthenticated request returns every stored override as on
 });
 
 test.skipIf(!DB)("the public read answers the same map to an anonymous caller and to an admin", async () => {
-  await setUiStringOverride("shell", "en", "login.title", "Sign in", admin.id, sql);
+  await setUiStringOverride("shell", "en", "login.title", "Sign in", admin.id, MAX_OVERRIDES, sql);
 
   const anonymous = await overridesFrom(await fetch(new Request(PUBLIC)));
   const authenticated = await overridesFrom(await fetch(req(PUBLIC, "GET", admin)));
@@ -89,7 +89,7 @@ test.skipIf(!DB)("the public read returns an empty map, not an error, when nothi
 });
 
 test.skipIf(!DB)("the public read carries no updated_by, updated_at or any other column", async () => {
-  await setUiStringOverride("shell", "en", "login.title", "Sign in", admin.id, sql);
+  await setUiStringOverride("shell", "en", "login.title", "Sign in", admin.id, MAX_OVERRIDES, sql);
 
   const body = (await (await fetch(new Request(PUBLIC))).json()) as Record<string, unknown>;
   expect(Object.keys(body)).toEqual(["overrides"]);
