@@ -2,7 +2,7 @@
  * Pure view-model helpers, mirroring the admin area's migrationsLogic.ts's
  * convention: everything a test can assert lives here, components stay thin.
  */
-import { ReportingClientError } from "../api/client.js";
+import { AppClientError } from "../api/client.js";
 import type { ClientError, StepLabel } from "../api/types.js";
 import type { UiLocale } from "../../../i18n/locale.js";
 import { t } from "../catalog.js";
@@ -135,7 +135,7 @@ export function rankByMedian<T extends { medianMs: number }>(rows: T[]): T[] {
  * rather than a screen that looks like "no data".
  */
 export function describeCaughtError(cause: unknown): ClientError {
-  if (cause instanceof ReportingClientError) return cause.error;
+  if (cause instanceof AppClientError) return cause.error;
   return { type: "internal", message: cause instanceof Error ? cause.message : "Unexpected error" };
 }
 

@@ -7,14 +7,11 @@ import { t } from "./catalog.js";
  * Maps a client error to operator-facing text, keyed on `error.type`. Never
  * reads `error.message`: the server does not guarantee that string is safe to
  * show, and after `correct-api-error-responses` an unexpected 500 sends none
- * at all. `status` is unused now that "network" (a fetch that never reached
- * the server) and "internal" (the server answering with a failure) are
- * distinct `ClientError` members — kept in the signature since `describeCaughtError`
- * below passes `err.status` positionally. Same file position and name as
- * `packages/app/src/errors.ts::describeError`, so the three packages read
+ * at all. Same file position and name as
+ * `packages/web/src/areas/app/errors.ts::describeError`, so the three packages read
  * alike; narrower because admin does not drive a claim state machine.
  */
-export function describeError(error: ClientError, locale: UiLocale, _status?: number): string {
+export function describeError(error: ClientError, locale: UiLocale): string {
   switch (error.type) {
     case "authorization":
       return t(locale, "error.authorization");
@@ -56,6 +53,6 @@ export function describeError(error: ClientError, locale: UiLocale, _status?: nu
  * an unhandled rejection.
  */
 export function describeCaughtError(err: unknown, locale: UiLocale): string {
-  if (err instanceof AdminClientError) return describeError(err.error, locale, err.status);
+  if (err instanceof AdminClientError) return describeError(err.error, locale);
   return t(locale, "error.genericRetry");
 }

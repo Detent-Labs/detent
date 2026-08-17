@@ -1,5 +1,4 @@
 import { createContext, useContext, useMemo, useReducer, useState, type ReactNode } from "react";
-import { produce, type Draft as Immer } from "immer";
 import type { ProcessBody } from "workflow-engine/schema";
 import type { Registry } from "workflow-engine/engine/registry";
 import type { Draft } from "./types";
@@ -8,7 +7,7 @@ import { collectUsedLocales } from "./localized-text";
 
 const EMPTY_DRAFT: Draft = {};
 
-export type Mutate = (recipe: (draft: Immer<Draft>) => void) => void;
+export type Mutate = (recipe: (draft: Draft) => void) => void;
 
 interface DraftContextValue {
   draft: Draft;
@@ -35,19 +34,25 @@ interface DraftContextValue {
 
 const DraftContext = createContext<DraftContextValue | null>(null);
 
-export type Action = { kind: "mutate"; recipe: (draft: Immer<Draft>) => void } | { kind: "replace"; next: Draft };
+type Action = { kind: "mutate"; recipe: (draft: Draft) => void } | { kind: "replace"; next: Draft };
 
-export interface ReducerState {
+interface ReducerState {
   draft: Draft;
   loadGeneration: number;
 }
 
-/** Exported for a direct unit test (`draft-store-reducer.test.ts`) — pure
- * function, no DOM/React needed to exercise the `loadGeneration` invariant. */
-export function reducer(state: ReducerState, action: Action): ReducerState {
+function reducer(state: ReducerState, action: Action): ReducerState {
   switch (action.kind) {
-    case "mutate":
-      return { ...state, draft: produce(state.draft, action.recipe) };
+    case "mutate": {
+      // ponytail: structuredClone copies the whole draft on every mutate,
+      // where produce() shared every subtree the recipe left alone. A
+      // component keyed on an untouched subtree now re-renders on every
+      // keystroke. Restore produce()/immer if canvas render cost rises
+      // measurably.
+      const next = structuredClone(state.draft);
+      action.recipe(next);
+      return { ...state, draft: next };
+    }
     case "replace":
       return { draft: action.next, loadGeneration: state.loadGeneration + 1 };
   }

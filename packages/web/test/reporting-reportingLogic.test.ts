@@ -17,7 +17,7 @@ import {
   describeCaughtError,
   describeError,
 } from "../src/areas/reporting/screens/reportingLogic.js";
-import { ReportingClientError } from "../src/areas/reporting/api/client.js";
+import { AppClientError } from "../src/areas/reporting/api/client.js";
 
 test("the default range covers the thirty days before a fixed reference instant", () => {
   // The bounds sit on local day edges, so the span is not exactly thirty days:
@@ -179,7 +179,7 @@ test("the ranking orders longest median first, without mutating its input", () =
 });
 
 test("a typed client error keeps its type, and an unknown throw still yields a stated error", () => {
-  const typed = new ReportingClientError({ type: "authorization", message: "denied" }, 403);
+  const typed = new AppClientError({ type: "authorization", message: "denied" }, 403);
   expect(describeCaughtError(typed)).toEqual({ type: "authorization", message: "denied" });
   expect(describeCaughtError(new Error("boom"))).toEqual({ type: "internal", message: "boom" });
   expect(describeCaughtError("not an error")).toEqual({ type: "internal", message: "Unexpected error" });

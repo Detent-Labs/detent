@@ -26,7 +26,7 @@ interface Props {
  * Shared across step onEntry/onExit/onCancel, path onPath, and timer
  * onFire.actions positions. Never
  * mutates in place — always calls `onChange` with a full new array so the
- * caller's own immer recipe stays the single source of the write.
+ * caller's own `mutate` recipe stays the single source of the write.
  */
 export function ActionListEditor({ label, actions, onChange, fields, registryTypes, registrySchemas }: Props) {
   const list = actions ?? [];

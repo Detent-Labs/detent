@@ -58,7 +58,7 @@ describe("a server error type maps through every layer", () => {
 
   it("gives self-role-strip its own operator-facing text, not the generic fallback", async () => {
     const parsed = await parse(409, "self-role-strip", "an actor cannot remove system:admin from its own account");
-    const text = describeAdminError(parsed, "en", 409);
+    const text = describeAdminError(parsed, "en");
     expect(text).toContain("your own account");
     expect(text).not.toBe("Something went wrong.");
     expect(text).not.toBe("The server hit an error. Try again.");
@@ -77,7 +77,7 @@ describe("a server error type maps through every layer", () => {
 
   it("gives email-in-use its own operator-facing text, not the generic fallback", async () => {
     const parsed = await parse(409, "email-in-use", "an account already holds jane@co.test");
-    const text = describeAdminError(parsed, "en", 409);
+    const text = describeAdminError(parsed, "en");
     expect(text).toContain("email address");
     expect(text).not.toBe("Something went wrong.");
     expect(text).not.toBe("The server hit an error. Try again.");
@@ -89,14 +89,14 @@ describe("a server error type maps through every layer", () => {
   });
 
   it("gives each manager refusal its own operator-facing text", async () => {
-    expect(describeAdminError(await parse(400, "self-manager", "x"), "en", 400)).toContain("their own manager");
-    expect(describeAdminError(await parse(400, "unknown-manager", "x"), "en", 400)).toContain("no longer exists");
+    expect(describeAdminError(await parse(400, "self-manager", "x"), "en")).toContain("their own manager");
+    expect(describeAdminError(await parse(400, "unknown-manager", "x"), "en")).toContain("no longer exists");
   });
 
   it("still collapses a type no layer knows into internal", async () => {
     const parsed = await parse(500, "type-from-the-future", "x");
     expect(parsed.type).toBe("internal");
-    expect(describeAdminError(parsed, "en", 500)).toBe("The server hit an error. Try again.");
+    expect(describeAdminError(parsed, "en")).toBe("The server hit an error. Try again.");
   });
 });
 
@@ -123,7 +123,7 @@ describe("a network failure keeps its own message, not the generic fallback", ()
   });
 
   it("admin: does not collapse network into the generic fallback", () => {
-    const text = describeAdminError({ type: "network", message: "fetch failed" }, "en", undefined);
+    const text = describeAdminError({ type: "network", message: "fetch failed" }, "en");
     expect(text).not.toBe("Something went wrong.");
     expect(text).toContain("reach the server");
   });

@@ -35,7 +35,6 @@
         "@dagrejs/dagre": "^3.1.1",
         "@panzoom/panzoom": "^4.6.0",
         "form-ui": "file:../form-ui",
-        "immer": "^11.1.15",
         "lucide-react": "1.29.0",
         "react": "^19",
         "react-dom": "^19",
@@ -115,8 +114,6 @@
     "form-ui": ["form-ui@workspace:packages/form-ui"],
 
     "fsevents": ["fsevents@2.3.3", "", { "os": "darwin" }, "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw=="],
-
-    "immer": ["immer@11.1.15", "", {}, "sha512-VrNANlmnWQnh5COXIIOQXM9oOJw7naGKlBT74ZOOR6lpVXc3gFEu9FJLDFcpCJ2j+NWr8TIwtWD//T6ZX6TKiQ=="],
 
     "jose": ["jose@6.2.4", "", {}, "sha512-N8acGzVsQy6M/fjFcxtysNc4Q379TcM5dM/qKkNtsHFji88yANnXTr7BLeP75iPnFwBfQzM/jg2BZ9+HZrHCZA=="],
 

@@ -19,31 +19,31 @@ describe("a publish-time rejection keeps its located detail", () => {
         { loc: "steps[2].onEntry[0]", message: "action type 'accounting.postInvoice' is not registered" },
       ],
     };
-    const text = describeError(error, 422);
+    const text = describeError(error);
     expect(text).toContain("steps[1].timers[0].onFire.actions[0]: action type 'notify.email' is not registered");
     expect(text).toContain("steps[2].onEntry[0]: action type 'accounting.postInvoice' is not registered");
   });
 
   it("drops the separator for an issue with no location", () => {
-    const text = describeError({ type: "publish-validation", kind: "schema-validation", issues: [{ loc: "", message: "invalid body" }] }, 422);
+    const text = describeError({ type: "publish-validation", kind: "schema-validation", issues: [{ loc: "", message: "invalid body" }] });
     expect(text).toContain("invalid body");
     expect(text).not.toContain(": invalid body");
   });
 
   it("still says something when the server sends no issues at all", () => {
-    const text = describeError({ type: "publish-validation", kind: "cel-validation", issues: [] }, 422);
+    const text = describeError({ type: "publish-validation", kind: "cel-validation", issues: [] });
     expect(text.length).toBeGreaterThan(0);
     expect(text).not.toBe("");
   });
 
   it("shows a cross-process rejection's own message", () => {
     const message = "subprocess step 'check' references child 'proc_credit_check' (version 1) which is not published";
-    expect(describeError({ type: "cross-process-validation", message }, 422)).toContain(message);
+    expect(describeError({ type: "cross-process-validation", message })).toContain(message);
   });
 
   it("does not collapse a publish rejection into the generic server error", () => {
-    const generic = describeError({ type: "internal", message: "" }, 500);
-    const rejection = describeError({ type: "publish-validation", kind: "compile-validation", issues: [{ loc: "uiMeta", message: "unknown key 'uiMeta'" }] }, 422);
+    const generic = describeError({ type: "internal", message: "" });
+    const rejection = describeError({ type: "publish-validation", kind: "compile-validation", issues: [{ loc: "uiMeta", message: "unknown key 'uiMeta'" }] });
     expect(rejection).not.toBe(generic);
     expect(rejection).toContain("uiMeta");
   });

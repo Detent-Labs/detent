@@ -6,14 +6,11 @@ import { t } from "./catalog.js";
  * Maps a client error to developer-facing text, keyed on `error.type`. Never
  * reads `error.message`: the server does not guarantee that string is safe to
  * show, and after `correct-api-error-responses` an unexpected 500 sends none
- * at all. `status` is unused now that "network" (a fetch that never reached
- * the server) and "internal" (the server answering with a failure) are
- * distinct `ClientError` members — kept in the signature since both call
- * sites pass `err.status` positionally. Same file position and name as
- * `packages/app/src/errors.ts::describeError`, so the three packages read
+ * at all. Same file position and name as
+ * `packages/web/src/areas/app/errors.ts::describeError`, so the three packages read
  * alike; narrower because studio does not drive a claim state machine.
  */
-export function describeError(error: ClientError, _status?: number): string {
+export function describeError(error: ClientError): string {
   switch (error.type) {
     case "authorization":
       return t("error.authorization");
@@ -76,6 +73,6 @@ export function describeError(error: ClientError, _status?: number): string {
  * an unhandled rejection.
  */
 export function describeCaughtError(err: unknown): string {
-  if (err instanceof StudioClientError) return describeError(err.error, err.status);
+  if (err instanceof StudioClientError) return describeError(err.error);
   return t("error.generic");
 }
