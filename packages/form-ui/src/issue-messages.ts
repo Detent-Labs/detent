@@ -9,11 +9,10 @@ import type { SubmissionIssue } from "./types.js";
  * consumers"). The seven kinds below are every kind `submitAndTransition`
  * (`src/runtime/api.ts::SubmissionIssue`) can produce as of this writing; a
  * kind added there later falls back to its raw discriminator here (see
- * `issueMessage`) rather than crashing or rendering nothing.
+ * `issueMessage`) rather than crashing or rendering nothing. Five kinds hold
+ * a constant message per locale in `MESSAGES`; `constraint` and
+ * `type-mismatch` interpolate and are handled inline in `issueMessage`.
  */
-
-type MessageFn = (issue: SubmissionIssue) => string;
-type Catalog = Record<string, MessageFn>;
 
 const CONSTRAINT_LABEL: Record<string, { en: string; de: string }> = {
   min: { en: "too small", de: "zu klein" },
@@ -36,27 +35,22 @@ function typeMismatchMessage(issue: SubmissionIssue, locale: "en" | "de"): strin
   return expected ? `This value has the wrong type (expected ${expected}).` : "This value has the wrong type.";
 }
 
-const en: Catalog = {
-  "unknown-field": () => "This field isn't part of the form.",
-  "readonly-field": () => "This field can't be edited.",
-  "type-mismatch": (issue) => typeMismatchMessage(issue, "en"),
-  "invalid-option": () => "Choose one of the listed options.",
-  constraint: (issue) => constraintMessage(issue, "en"),
-  "rule-failed": () => "This value isn't valid.",
-  "required-missing": () => "This field is required.",
+const MESSAGES: Record<string, Record<string, string>> = {
+  en: {
+    "unknown-field": "This field isn't part of the form.",
+    "readonly-field": "This field can't be edited.",
+    "invalid-option": "Choose one of the listed options.",
+    "rule-failed": "This value isn't valid.",
+    "required-missing": "This field is required.",
+  },
+  de: {
+    "unknown-field": "Dieses Feld ist nicht Teil des Formulars.",
+    "readonly-field": "Dieses Feld kann nicht bearbeitet werden.",
+    "invalid-option": "Wählen Sie eine der aufgeführten Optionen.",
+    "rule-failed": "Dieser Wert ist ungültig.",
+    "required-missing": "Dieses Feld ist erforderlich.",
+  },
 };
-
-const de: Catalog = {
-  "unknown-field": () => "Dieses Feld ist nicht Teil des Formulars.",
-  "readonly-field": () => "Dieses Feld kann nicht bearbeitet werden.",
-  "type-mismatch": (issue) => typeMismatchMessage(issue, "de"),
-  "invalid-option": () => "Wählen Sie eine der aufgeführten Optionen.",
-  constraint: (issue) => constraintMessage(issue, "de"),
-  "rule-failed": () => "Dieser Wert ist ungültig.",
-  "required-missing": () => "Dieses Feld ist erforderlich.",
-};
-
-const catalogs: Record<string, Catalog> = { en, de };
 
 /**
  * `issue.kind` resolved to a localized sentence, falling back through
@@ -65,6 +59,8 @@ const catalogs: Record<string, Catalog> = { en, de };
  * rendering nothing or throwing.
  */
 export function issueMessage(issue: SubmissionIssue, locale: LocaleCode, baseLocale: LocaleCode = locale): string {
-  const fn = catalogs[locale]?.[issue.kind] ?? catalogs[baseLocale]?.[issue.kind] ?? catalogs.en[issue.kind];
-  return fn ? fn(issue) : issue.kind;
+  const loc = (locale in MESSAGES ? locale : baseLocale in MESSAGES ? baseLocale : "en") as "en" | "de";
+  if (issue.kind === "constraint") return constraintMessage(issue, loc);
+  if (issue.kind === "type-mismatch") return typeMismatchMessage(issue, loc);
+  return MESSAGES[loc][issue.kind] ?? MESSAGES.en[issue.kind] ?? issue.kind;
 }

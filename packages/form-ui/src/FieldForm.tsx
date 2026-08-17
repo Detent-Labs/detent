@@ -50,7 +50,7 @@ export function optionText(
   const parts = Object.values(attributes).map((v) =>
     typeof v === "number" ? new Intl.NumberFormat(locale).format(v) : String(v),
   );
-  return parts.length === 0 ? label : [label, ...parts].join(OPTION_ATTRIBUTE_SEPARATOR);
+  return [label, ...parts].join(OPTION_ATTRIBUTE_SEPARATOR);
 }
 
 /** Renders every root-level (non-nested) field from an `InstanceView` in a
