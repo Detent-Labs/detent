@@ -37,52 +37,6 @@ Specs: `development-toolchain`, `devcontainer-preflight`.
 
 ## Open stages
 
-31. **Custom and floating canvas edges: ANCHORS DONE, EDGE AFFORDANCES NOT
-    STARTED.** Raised 2026-08-10 in
-    conversation, alongside stage 30. The anchors were fixed then: every Path
-    left a step's right-middle and entered the target's left-middle, even when
-    the target sat above, below, or left of the source. React Flow's
-    "floating edges" example computes the anchor from the angle between the
-    two node centers instead, so each node's border point actually faces the
-    other node. React Flow's "custom edges" example renders arbitrary content
-    along an edge, not only a stroke; here that could mean a delete or insert
-    affordance on the edge itself, beyond today's guard-label and priority
-    badges. Designed 2026-08-13, in `canvas-edge-routing-styles`'s
-    `design.md`, and not yet built. The anchor snaps to the midpoint of the
-    side facing the target. The larger of the two centre offsets picks that
-    side. A free-angle border point suits a straight edge and fights an
-    orthogonal one, because a segment leaving at 37 degrees has no clean turn.
-    `routeEdge` gains the axis each anchor leaves on, and the routing itself
-    does not change. This design defers the stage's second half, the
-    affordances drawn on the edge. The inspector deletes a path already, and a
-    control on the edge is a second way to do one thing.
-    One premise did not survive the design pass. Stage 30's library choice was
-    held to decide this stage's cost. These anchors are trigonometry between
-    two centres, and no router reaches them.
-    The anchors shipped 2026-08-13 as `canvas-floating-anchors`.
-    `anchorsForEdge` in `canvas/geometry.ts` reads `|dx| >= |dy|` between two
-    node positions, and both anchors take that one comparison, so they always
-    sit on opposing sides and every segment stays on one axis. A tie takes the
-    horizontal. A zero offset takes the right side, which two steps stacked on
-    one position reach.
-    The vertical and backward cases run through a transform rather than a
-    second copy of the routing arithmetic. `routeEdge` gains a leaving
-    direction, maps both anchors into the canonical "leaves rightward" space,
-    runs unchanged, and maps every returned point back. The four transforms are
-    identity, negate x, swap, and swap-then-negate-both. Each composes with
-    itself to the identity, which is what lets one table serve both ways.
-    The review earned its place on that table. The design named the up case as
-    swap-then-negate-x. That reaches the canonical space and composes to a
-    180-degree rotation, so every upward edge would have returned drawn on the
-    far side of the canvas.
-    A backward path is now short rather than a detour. A target to the left
-    that does not overlap its source is ahead along the leaving axis, so it
-    takes one segment or three. The five-segment route survives only for nodes
-    that overlap along that axis.
-    The connect handle stays at the right-middle and the drag preview stays a
-    straight line from it. A control that moved under the pointer is harder to
-    press, and a drag in flight has no target to face.
-
 40. **Permission model rework: SEAM AND STORAGE DONE, FILTER AND DRAFT SCOPE
     NOT BUILT.** Raised 2026-08-15 in conversation. A design pass ran the
     same day and took the decisions below. Nobody was blocked by the seam
@@ -252,76 +206,6 @@ Specs: `development-toolchain`, `devcontainer-preflight`.
     Specs: `authorization`, `permission-grant-administration`, `http-wrapper`,
     `studio-publish`, `admin-user-management`, `instance-query`.
 
-42. **Field catalog and data sources as list and detail: NOT STARTED.** Raised
-    2026-08-15 in conversation. A design pass ran the same day and took the
-    decisions below. Two problems drive the stage. Neither one concerns what
-    the two panels hold.
-
-    `panels/FieldCatalogPanel.tsx` renders every field expanded, always. One
-    field carries a key, a label, a description, a type, an options fieldset
-    with its data source and column mapping, a validation editor and an issue
-    list. A group field repeats all of that for each child.
-    `examples/purchase-requisition.json` declares 22 fields, so the view stacks
-    22 of those blocks under one scrollbar. `panels/DataSourcesPanel.tsx`
-    stacks its own rows the same way.
-
-    Neither panel carries CSS. `.field-catalog-panel`, `.field-row`,
-    `.option-row` and `.data-source-row` appear in no stylesheet. Neither
-    `app.css` nor `shell.css` declares a bare `label`, `input` or `fieldset`
-    rule. One rule of that kind exists, `.steps-panel label` in `app.css`,
-    and it sets label above control at `--space-1`. The design language's field
-    rule already ships in the area. These two panels never got it.
-
-    **The panels rail becomes the master.** `screens/PanelsScreen.tsx` already
-    lists every field key under the Fields entry, indents a group's children
-    and carries an Add entry. Choosing an entry scrolls that field into view
-    today. It selects the field instead, and the view renders that one field's
-    editor. The scroll shrinks from 22 fields to one. The screen keeps its
-    three columns.
-
-    **Selection is component state and resets on a reload.** Mount selects the
-    first field. Add selects the new field, so an author types into it at once.
-    Remove selects the neighbour. A switch to another view and back keeps the
-    selection. The editor dock takes the same position, for the same reason. No
-    area holds a per-author preference store, and a lost selection lands an
-    author on the view they already had open. A field takes no address of its
-    own either. `/edit/panels/fields/<fieldId>` would carry an opaque id that
-    one draft alone resolves, and the rail reaches any field in one click.
-
-    **A group keeps its recursive editor.** Choosing a child selects the parent
-    group and scrolls to the child inside it. `field-row-<id>` in
-    `FieldCatalogPanel.tsx` and `scrollToField` in `PanelsScreen.tsx` both
-    survive. They then cover one group rather than the whole catalog.
-
-    **Each rail entry marks its own issues.** The checks rail expands and
-    collapses, and nothing in it navigates to an entity. One field at a time
-    would hide a broken field behind the entry an author has open. The rail
-    counts issues per view already, through `issueCountForEntityType`. A
-    per-id sibling gives each field entry the same mark. That part is not
-    optional. Without it the stage trades a scroll for a hunt.
-
-    **Two of the four views take the pattern.** Fields and data sources both
-    stack rows, so both become list and detail. Contract holds one editor, and
-    the spec grants it no sublist already. The field matrix is a table. One
-    further fix falls out of the pair. A sublist renders only under the open
-    view, since two sublists at once fill the 16rem column.
-
-    The CSS half copies what the area states already. A `key` and a `type`
-    print in mono, because the engine matches both exactly. A hairline divides
-    rail rows and a 2px rule sits under the heading. A label sits above its
-    control at 4px. The border is the field. No corner takes a radius.
-
-    Three things stay out. The rail gets no filter, since 22 fields do not earn
-    one and 100 do. The screen gets no overview table, since the field matrix
-    maps a field against a step already. Neither panel gains a duplicate or a
-    reorder control, since neither problem drove the stage.
-
-    The stage lands after the editor dock. Both of them change `app.css` and
-    `src/i18n/catalogs/studio.ts`, and both append to those two files.
-
-    Spec: `studio-app`. The rail's scroll-into-view requirement becomes a
-    selection, and the per-field issue mark joins it.
-
 ## Done
 
 Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
@@ -358,6 +242,7 @@ Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
 | 28 | Zod v4 migration | `migrate-to-zod-v4` | `development-toolchain`, `studio-plugin-config-form` |
 | 29 | Table-shaped data sources | `table-shaped-data-sources` | `db-data-source-type`, `persistence`, `data-list-administration`, `definition-contract`, `data-source-resolution`, `runtime-api`, `runtime-events`, `form-ui`, `admin-app`, `studio-column-mapping-form`, `studio-app` |
 | 30 | Canvas edge routing styles (step/smoothstep) | `canvas-edge-routing-styles` | `studio-canvas` |
+| 31 | Custom and floating canvas edges (floating anchors, drop-to-insert on a path) | `canvas-floating-anchors`, `canvas-edge-affordances` | `studio-canvas` |
 | 32 | Shape per step/path kind on the canvas | `canvas-subprocess-step-shape` | `studio-canvas` |
 | 33 | Editable edges with draggable control points | `canvas-edge-waypoints` | `studio-canvas` |
 | 34 | Selection grouping (group/ungroup nodes) | `canvas-multi-select`, `canvas-step-groups` | `studio-canvas` |
@@ -367,6 +252,7 @@ Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
 | 38 | Automatic canvas layout | `studio-canvas-auto-layout` | `studio-canvas` |
 | 39 | Process chaining | `process-chaining` | `process-chaining`, `cross-process-validation` |
 | 41 | Field matrix | `studio-view-flags-module`, `studio-field-matrix` | `studio-app`, `studio-canvas`, `spa-accessibility`, `studio-form-editor`, `studio-checks-rail` |
+| 42 | Field catalog and data sources as list and detail | `panels-list-and-detail` | `studio-app` |
 
 ## Changes with no stage
 

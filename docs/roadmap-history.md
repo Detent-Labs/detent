@@ -917,6 +917,66 @@ as it stands.
     Git ignores `docs/superpowers/`, and stage 24 already lost a design there.
     Change: `canvas-edge-routing-styles`. Spec: `studio-canvas`.
 
+31. **Custom and floating canvas edges: DONE.** Raised 2026-08-10 in
+    conversation, alongside stage 30. The anchors were fixed then: every Path
+    left a step's right-middle and entered the target's left-middle, even when
+    the target sat above, below, or left of the source. React Flow's
+    "floating edges" example computes the anchor from the angle between the
+    two node centers instead, so each node's border point actually faces the
+    other node. React Flow's "custom edges" example renders arbitrary content
+    along an edge, not only a stroke; here that could mean a delete or insert
+    affordance on the edge itself, beyond today's guard-label and priority
+    badges. Designed 2026-08-13, in `canvas-edge-routing-styles`'s
+    `design.md`. The anchor snaps to the midpoint of the side facing the
+    target. The larger of the two centre offsets picks that side. A
+    free-angle border point suits a straight edge and fights an orthogonal
+    one, because a segment leaving at 37 degrees has no clean turn. `routeEdge`
+    gains the axis each anchor leaves on, and the routing itself does not
+    change. This design deferred the stage's second half, the affordances
+    drawn on the edge. The inspector deletes a path already, and a control on
+    the edge is a second way to do one thing.
+    One premise did not survive the design pass. Stage 30's library choice was
+    held to decide this stage's cost. These anchors are trigonometry between
+    two centres, and no router reaches them.
+    The anchors shipped 2026-08-13 as `canvas-floating-anchors`.
+    `anchorsForEdge` in `canvas/geometry.ts` reads `|dx| >= |dy|` between two
+    node positions, and both anchors take that one comparison, so they always
+    sit on opposing sides and every segment stays on one axis. A tie takes the
+    horizontal. A zero offset takes the right side, which two steps stacked on
+    one position reach.
+    The vertical and backward cases run through a transform rather than a
+    second copy of the routing arithmetic. `routeEdge` gains a leaving
+    direction, maps both anchors into the canonical "leaves rightward" space,
+    runs unchanged, and maps every returned point back. The four transforms are
+    identity, negate x, swap, and swap-then-negate-both. Each composes with
+    itself to the identity, which is what lets one table serve both ways.
+    The review earned its place on that table. The design named the up case as
+    swap-then-negate-x. That reaches the canonical space and composes to a
+    180-degree rotation, so every upward edge would have returned drawn on the
+    far side of the canvas.
+    A backward path is now short rather than a detour. A target to the left
+    that does not overlap its source is ahead along the leaving axis, so it
+    takes one segment or three. The five-segment route survives only for nodes
+    that overlap along that axis.
+    The connect handle stays at the right-middle and the drag preview stays a
+    straight line from it. A control that moved under the pointer is harder to
+    press, and a drag in flight has no target to face.
+    The stage's second half stayed open after the anchors shipped. An
+    objection stood against a delete affordance on the edge, recorded above:
+    the inspector deletes a path already, and a control on the edge is a
+    second way to do one thing. That objection covered delete. It never
+    covered insert — neither a panel nor a canvas gesture put a step onto a
+    path. Shipped 2026-08-17 as `canvas-edge-affordances`: a step dropped
+    from the edit rail onto a rendered path now lands inside it. The source
+    step's path retargets to the new step, keeping its id, key, guard and
+    priority; the new step takes one path to the old target, inheriting the
+    retargeted path's trigger alone. The path under the pointer draws in a
+    drop-target stroke for the length of the drag, and that stroke is the
+    whole affordance — the canvas gains no permanent control on an edge. No
+    delete affordance shipped on the edge, on purpose: the objection above
+    still holds for delete, and this change weakens no part of it. Change:
+    `canvas-edge-affordances`. Spec: `studio-canvas`.
+
 32. **Shape per step/path kind on the canvas: DONE.** Raised 2026-08-10 in
     conversation, alongside stages 30 and 31. The ask spans both node and
     edge, in this repo's own vocabulary (`.claude/rules/ui-glossary.md`):
@@ -1468,3 +1528,56 @@ as it stands.
     The deltas landed in `studio-app`, `studio-canvas` and
     `spa-accessibility`. `tmp/open-work-priority.md` carries the work as item
     17b. Item 15 is next.
+
+42. **Field catalog and data sources as list and detail: DONE.** Raised
+    2026-08-15 in conversation. Change: `panels-list-and-detail`. The panels
+    rail became the master for the Fields and Data sources views: choosing a
+    rail entry selects that entity instead of merely scrolling to it, and each
+    view renders one entity's editor rather than stacking every one under a
+    single scrollbar. `examples/purchase-requisition.json`'s 22 fields
+    collapsed from 22 stacked blocks to one.
+
+    `draft/panel-rail.ts`'s `RailFieldRow` gained `rootId`, the id of the
+    top-level field a row sits under regardless of the rendered indent depth,
+    so choosing a relocated (depth-2+) row still opens the group editor that
+    actually contains it. A new `issueCountForEntityId` joined its five
+    siblings for the per-row issue mark. `PanelsScreen.tsx` now holds
+    `selectedFieldId`/`selectedDataSourceId` as component state, resolving
+    each against the current draft on every render and falling back to the
+    first entity — a canvas round trip unmounts the screen and resets both,
+    matching the mount-selects-first rule. The Data sources rail entry gained
+    its own sub-list, gated (with the Fields one) to render only under the
+    open view, so two sub-lists never compete for the rail's 16rem column.
+    `FieldCatalogPanel` and `DataSourcesPanel` narrowed to a `selectedId` prop
+    and screen-owned `onAdd`/`onRemove`, each returning or resolving the id
+    the screen needs to select the new entity or the post-removal neighbour.
+
+    Both panels gained the field CSS the design language already states
+    elsewhere in the area: a label above its control at `--space-1`
+    (`.field-row > label`, `.data-source-row > label`, scoped to direct
+    children only — `PluginEnvelopeEditor` and `FieldValidationEditor` nest
+    their own labels several levels deeper and keep their own styling), a 2px
+    rule under each panel's heading, and a new `.studio-mono` utility (mirroring
+    the admin area's `.admin-mono`) on the `key` inputs and the `type` select —
+    the values the engine matches exactly. The rail's hairline divider needed
+    no new rule: the new data-source sub-list rows reuse the existing
+    `.studio-panels-rail-field` class, which already carries one.
+
+    One deliberate deviation from design.md: its CSS section asked to
+    catalogue `key`, `label`, `description`, `type` and `dataSource` as
+    literal bare field labels. `catalogs/studio.ts`'s own header states the
+    opposite rule in as many words — "Deliberately NOT translated: raw
+    contract vocabulary shown as a bare field label" — since all five are
+    exact `FieldDef`/`DataSourceDef` property names and cataloguing them would
+    decouple the on-screen label from the JSON property it names. Those five
+    stayed literal; `dataSources.dataListLabel` ("data list") catalogued
+    instead, since that string names no schema property.
+
+    Applied and verified 2026-08-17. Full suite: 2738 pass, 1 skip
+    (pre-existing, unrelated), 0 fail. A real browser check drove the
+    selection, both Add controls, both Remove-selects-neighbour behaviours, a
+    group child scroll, the per-row issue mark, and a reload resetting to the
+    first entity, in both the Fields and Data sources views.
+
+    Archived as `openspec/changes/archive/2026-08-17-panels-list-and-detail`.
+    The delta landed in `studio-app`.

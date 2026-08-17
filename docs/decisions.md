@@ -171,26 +171,3 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   entry leaves the section when that change archives; the decisions that
   outlive it are the Player rejection, the two deferred tabs and the
   no-persistence rule.
-- **List and detail for the panel views.** `panels/FieldCatalogPanel.tsx`
-  renders every field expanded at once, and `panels/DataSourcesPanel.tsx`
-  stacks its rows the same way. Neither carries any CSS: `.field-row`,
-  `.option-row` and `.data-source-row` appear in no stylesheet, and the area's
-  one label rule is `.steps-panel label` (in `app.css`). A design pass on
-  2026-08-15 settled the shape; `ROADMAP.md` stage 42 carries it in full.
-  Three decisions outlive that stage.
-
-  The panels rail is the master, not a second list beside one. It lists every
-  field key already, so a register inside the view would put the same list on
-  screen twice. Choosing an entry selects instead of scrolling, and the view
-  renders one entity's editor. That shape is what a later panel view adopts,
-  and it is why neither view gains a table of its own.
-
-  A selection is component state and takes no address. This matches the editor
-  dock above for the same reason: no area holds a per-author preference store,
-  and an opaque `field_` id resolves inside one draft only. A linkable field is
-  a separate ask, and it needs a reason the rail cannot already serve.
-
-  A rail entry carries its own issue mark. The checks rail navigates to
-  nothing, so one entity at a time would otherwise hide a broken field behind
-  whichever entry an author has open. Any view that adopts this shape owes the
-  same mark, or it trades a scroll for a hunt.

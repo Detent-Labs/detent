@@ -557,8 +557,10 @@ Stage-by-stage status is in `ROADMAP.md`.
   and an authorization change do not belong in one.) A target step's declared
   `assignment` resolves to a fresh `Instance["assignment"]` (candidates,
   unclaimed) at step entry via `registry.ts::resolveStepAssignment`, called by
-  the step-entry CALLER — `commitTransition`, the subprocess spawn handler,
-  `startInstance`, `api.ts::createProcessInstance` — never by `planStepEntry`
+  the step-entry CALLER — `commitTransition`, `createSeededInstance`
+  (`seeded-create.ts`, shared by the subprocess spawn handler and
+  `process.start`), `startInstance`, `api.ts::createProcessInstance` — never
+  by `planStepEntry`
   (pure and synchronous, it takes the resolved set as a required
   `StepEntryOpts.assignment` field) and never by `createInstance`
   (persistence-only, it takes the set as an option). Required rather than
@@ -1569,6 +1571,27 @@ Stage-by-stage status is in `ROADMAP.md`.
   overlap along that axis. The connect handle stays at the right-middle and
   the drag preview stays a straight line from it: a control that moved under
   the pointer is harder to press, and a drag in flight has no target to face.
+- Canvas edge insert (`packages/web/src/areas/studio/draft/insertOnPath.ts`,
+  `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`, `canvas/EditRail.tsx`,
+  `canvas-edge-affordances`, roadmap #31): an edit-rail drag released over a
+  rendered path inserts the dragged step into it instead of placing it
+  free-standing. `EditScreen.onPaletteDrop` resolves the path under the
+  release point through `elementFromPoint`'s `closest("[data-path-id]")`, the
+  edge group and its guard label's `foreignObject` both carrying
+  `data-path-id`/`data-step-id`. `insertOnPath` (`draft/`) is the pure
+  transform: it retargets the split path's `to` to the new step, keeping its
+  id, key, guard and priority, and gives the new step one path (via
+  `newPath`) to the old target, inheriting the split path's trigger alone.
+  The insert clears the split path's stored waypoints in the same
+  `saveState.layout` write that places the new step, the same reason
+  `Arrange` already clears every waypoint. While the drag is live,
+  `EditRail.onDragMove` reports the pointer's moving position, and the path
+  it currently sits over renders in a drop-target stroke
+  (`.canvas-edge-insert-target`) — heavier, in the accent, no other control.
+  An `end` step never takes this branch: a terminal step has no outgoing
+  path, so it drops free-standing, as it always has. No delete affordance
+  ships on an edge; the inspector deletes a path already, and a control on
+  the edge would be a second way to do one thing.
 - Canvas edge waypoints (`packages/web/src/areas/studio/canvas/`,
   `canvas-edge-waypoints`, roadmap #33): a path may carry a list of
   waypoints, and its route runs from the source anchor through each one in
@@ -3175,6 +3198,14 @@ that `routes.ts` is both a route module and the plumbing home. The
 `http-route-handling-consolidation` spec records that, and `errors.ts` stays
 the fallback home if the set grows.
 
+Two more joined the set later, under the same spec: `readJson` and
+`parseVersion`. The decoder, `readJson`, raises `RequestShapeError` on
+malformed JSON. The three sibling route modules, `admin-routes.ts`,
+`studio-routes.ts` and `account-routes.ts`, import it instead of writing
+the decode block by hand. The parser, `parseVersion`, accepts `unknown`, so
+a path segment and a request-body field both reach it. Both
+`admin-routes.ts` and `studio-routes.ts` import it too.
+
 The audit named three of the four. `errorContext` was the fourth, found while
 reading the files.
 
@@ -3737,6 +3768,39 @@ meets `scope=started` should infer no new permission tier from it.
   `checkViewFlags` finding carries `entityType: "step"`, the type every
   other per-step issue carries too. `panel-rail.ts`'s
   `issueCountForSource` filters by `source` instead.
+
+- Process Studio, the panels screen's Fields and Data sources views
+  (`packages/web/src/areas/studio/screens/PanelsScreen.tsx`,
+  `panels/FieldCatalogPanel.tsx`, `panels/DataSourcesPanel.tsx`,
+  `draft/panel-rail.ts`, `studio-app`): stage 42. Both views render one
+  entity's editor now, instead of stacking every one. The rail is the
+  master. Choosing an entry selects it, not just scrolls to it. Data sources
+  gained the same rail sub-list Fields already had. A sub-list renders only
+  under its own open view, so two never share the rail's column.
+
+  A row in `RailFieldRow` gained `rootId`. That id names the top-level
+  ancestor a row resolves to, regardless of the row's rendered indent depth.
+  A relocated (depth-2+) row therefore still selects the group that contains
+  it. The module `panel-rail.ts` gained `issueCountForEntityId`, joining its
+  other counting functions for the per-row issue mark.
+
+  `PanelsScreen` holds both selections as component state. It resolves each
+  against the current draft on every render, with a fallback to the first
+  entity. That matches the reset a canvas round trip already gives every
+  other screen-owned state here.
+
+  The components `FieldCatalogPanel` and `DataSourcesPanel` lost their own
+  Add and Remove handlers. The screen owns both now. It needs the new id to
+  select after an Add. It needs the removed index to pick a neighbour after
+  a Remove.
+
+  Both panels gained the field CSS the area already states elsewhere. A
+  label sits above its control. A 2px rule sits under each heading. A new
+  `.studio-mono` utility marks the `key` inputs and the `type` select, the
+  values the engine matches exactly. `key`, `label`, `description`, `type`
+  and `dataSource` stay literal, uncatalogued labels. `catalogs/studio.ts`'s
+  own header already excludes raw contract vocabulary shown as a bare field
+  label from translation.
 
 - Process Studio, the column-mapping editor
   (`packages/web/src/areas/studio/panels/columnMappingLogic.ts`,

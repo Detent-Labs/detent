@@ -4,9 +4,8 @@ import type { DraftOf } from "../draft/types";
 import { useDraft } from "../draft/store";
 import { t } from "../catalog.js";
 import { mintId } from "../draft/ids";
-import { mintCatalogField } from "../draft/mintField";
 import { removeAt, updateAt } from "../draft/list-ops";
-import { addToDraftArray, updateInDraftArray } from "../draft/draft-array-crud";
+import { updateInDraftArray } from "../draft/draft-array-crud";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { useDataLists } from "./shared/useDataLists.js";
 import { columnMappingRows, declaredColumns, mappableTargets, showsColumnMapping } from "./columnMappingLogic.js";
@@ -99,7 +98,12 @@ function FieldRow({ field, dataSources, lists, onChange, onRemove }: FieldRowPro
     <div className="field-row" id={field.id === undefined ? undefined : `field-row-${field.id}`}>
       <label>
         key
-        <input type="text" value={field.key ?? ""} onChange={(e) => onChange({ key: e.target.value })} />
+        <input
+          type="text"
+          className="studio-mono"
+          value={field.key ?? ""}
+          onChange={(e) => onChange({ key: e.target.value })}
+        />
       </label>
       <label>
         label
@@ -123,6 +127,7 @@ function FieldRow({ field, dataSources, lists, onChange, onRemove }: FieldRowPro
       <label>
         type
         <select
+          className="studio-mono"
           value={typeSelectValue}
           onChange={(e) => {
             if (e.target.value === "__custom__") onChange({ type: { type: "", config: {} } });
@@ -286,43 +291,47 @@ function FieldRow({ field, dataSources, lists, onChange, onRemove }: FieldRowPro
   );
 }
 
-export function FieldCatalogPanel({ token }: { token: string }) {
-  const { draft, mutate, contentLocale } = useDraft();
+interface Props {
+  token: string;
+  /** The one top-level field this panel renders. `undefined` only while the
+   * catalog holds none at all — the screen otherwise keeps it resolved. */
+  selectedId: string | undefined;
+  onAdd: () => void;
+  onRemove: (index: number) => void;
+}
+
+export function FieldCatalogPanel({ token, selectedId, onAdd, onRemove }: Props) {
+  const { draft, mutate } = useDraft();
   const fields = draft.fields ?? [];
   const dataSources = draft.dataSources ?? [];
   // The same hook `DataSourcesPanel` reads, so the key picker beside this one
   // and the column picker here cannot offer different lists.
   const lists = useDataLists(token);
 
-  const addField = () => {
-    addToDraftArray(mutate, (d) => (d.fields ??= []), mintCatalogField("text", seedLocalizedText(contentLocale)));
-  };
+  const index = fields.findIndex((f) => f.id === selectedId);
+  const field = index === -1 ? undefined : fields[index];
 
-  const removeField = (index: number) => {
-    mutate((d) => {
-      d.fields?.splice(index, 1);
-    });
-  };
-
-  const updateField = (index: number, patch: Partial<DraftField>) => {
+  const updateField = (patch: Partial<DraftField>) => {
+    if (index === -1) return;
     updateInDraftArray(mutate, (d) => d.fields?.[index], patch);
   };
 
   return (
     <div className="field-catalog-panel">
       <h3>{t("fieldCatalog.heading")}</h3>
-      {fields.length === 0 && <p className="empty">{t("fieldCatalog.empty")}</p>}
-      {fields.map((field, index) => (
+      {field === undefined ? (
+        <p className="empty">{t("fieldCatalog.empty")}</p>
+      ) : (
         <FieldRow
           key={field.id ?? index}
           field={field}
           dataSources={dataSources}
           lists={lists}
-          onChange={(patch) => updateField(index, patch)}
-          onRemove={() => removeField(index)}
+          onChange={updateField}
+          onRemove={() => onRemove(index)}
         />
-      ))}
-      <button type="button" className="btn btn-secondary" onClick={addField}>
+      )}
+      <button type="button" className="btn btn-secondary" onClick={onAdd}>
         {t("fieldCatalog.addField")}
       </button>
     </div>

@@ -75,12 +75,6 @@ Two reasons. The screen must select the added entity, so it needs the
 new id at the call site. It must select the neighbour after a Remove, so
 it needs the removed index. Both facts live at the call, not after it.
 
-That move also closes a divergence the code carries today. The rail's
-Add mints `{key: "", type: "string"}` through `mintId("field")`
-(`PanelsScreen.tsx:71-78`). The panel's Add mints through
-`mintCatalogField("text", ...)` (`FieldCatalogPanel.tsx:297-299`). The
-two produce different fields from one control name. One owner ends that.
-
 ### A rail row carries its top-level ancestor
 
 `RailFieldRow` (`draft/panel-rail.ts:39-44`) gains a `rootId`: the id of
@@ -126,8 +120,7 @@ Several labels in these panels reach the screen as literal strings.
 (`FieldCatalogPanel.tsx:101,105,115,124,155`). So do `key` and
 `data list` (`DataSourcesPanel.tsx:57,61`). Catalogue them in the same
 pass. The new field rule makes each one a visible label. A hard-coded
-label ships an untranslatable screen. `i18n-catalog-parity` requires an
-EN and a DE entry for each.
+label ships an untranslatable screen.
 
 ## Risks / Trade-offs
 

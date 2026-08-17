@@ -63,6 +63,9 @@ None. The `studio-app` spec covers the screen and its rail already.
   anchors.
 - `packages/web/src/areas/studio/panels/DataSourcesPanel.tsx`: renders the
   selected data source.
+- `packages/web/src/areas/studio/draft/panel-rail.ts`: `RailFieldRow` gains
+  `rootId`; a new `issueCountForEntityId` helper joins
+  `issueCountForEntityType`.
 - `packages/web/src/areas/studio/app.css`: the field rule for both panels, the
   rail sub-list rows, the heading rule.
 - `packages/web/src/i18n/catalogs/studio.ts`: strings for an empty selection

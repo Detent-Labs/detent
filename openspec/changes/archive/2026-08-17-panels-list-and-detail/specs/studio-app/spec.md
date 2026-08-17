@@ -164,6 +164,24 @@ the draft's own field tree SHALL keep whatever depth it declares.
 - **WHEN** the developer reloads the browser on the Fields view
 - **THEN** the view renders the first field in the catalog
 
+#### Scenario: The Data sources rail adds a data source
+
+- **WHEN** the developer chooses the rail's Add entry under Data sources
+- **THEN** the draft carries one more data source, the rail lists it, and
+  the view renders that new data source
+
+#### Scenario: Removing a data source selects its neighbour
+
+- **WHEN** the developer removes the selected data source from a draft
+  that carries three
+- **THEN** the view renders a neighbouring data source, and it reports no
+  empty selection
+
+#### Scenario: A reload selects the first data source
+
+- **WHEN** the developer reloads the browser on the Data sources view
+- **THEN** the view renders the first data source in the draft
+
 #### Scenario: Each entity entry marks its own issue
 
 - **WHEN** a draft's second field holds a validation issue, and the

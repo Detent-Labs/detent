@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   flattenRailFields,
+  issueCountForEntityId,
   issueCountForEntityType,
   issueCountForSource,
   panelEntityCounts,
@@ -33,14 +34,15 @@ describe("flattenRailFields", () => {
       { id: OUTER, key: "address", type: "group", fields: [{ id: LEAF, key: "city", type: "string" }] },
     ] as DraftField[];
     expect(flattenRailFields(fields)).toEqual([
-      { id: OUTER, key: "address", depth: 0 },
-      { id: LEAF, key: "city", depth: 1 },
+      { id: OUTER, key: "address", depth: 0, rootId: OUTER },
+      { id: LEAF, key: "city", depth: 1, rootId: OUTER },
     ]);
   });
 
-  it("relocates a twice-nested field to its own top-level row instead of a third indent", () => {
+  it("relocates a twice-nested field to its own top-level row instead of a third indent, keeping its real ancestor as rootId", () => {
     // The rail caps indentation at two levels. The draft keeps its own
-    // nesting: this function reads the tree, it never rewrites it.
+    // nesting: this function reads the tree, it never rewrites it. rootId
+    // stays the true top-level ancestor (OUTER) even though depth reads 0.
     const fields = [
       {
         id: OUTER,
@@ -50,20 +52,20 @@ describe("flattenRailFields", () => {
       },
     ] as DraftField[];
     expect(flattenRailFields(fields)).toEqual([
-      { id: OUTER, key: "address", depth: 0 },
-      { id: MIDDLE, key: "street", depth: 1 },
-      { id: LEAF, key: "number", depth: 0 },
+      { id: OUTER, key: "address", depth: 0, rootId: OUTER },
+      { id: MIDDLE, key: "street", depth: 1, rootId: OUTER },
+      { id: LEAF, key: "number", depth: 0, rootId: OUTER },
     ]);
   });
 
   it("skips a field with no id, since the rail has no anchor for it", () => {
     const fields = [{ key: "unsaved", type: "string" }, { id: LEAF, key: "city", type: "string" }] as DraftField[];
-    expect(flattenRailFields(fields)).toEqual([{ id: LEAF, key: "city", depth: 0 }]);
+    expect(flattenRailFields(fields)).toEqual([{ id: LEAF, key: "city", depth: 0, rootId: LEAF }]);
   });
 
   it("reads an untyped key as the empty string rather than dropping the row", () => {
     expect(flattenRailFields([{ id: LEAF, type: "string" }] as DraftField[])).toEqual([
-      { id: LEAF, key: "", depth: 0 },
+      { id: LEAF, key: "", depth: 0, rootId: LEAF },
     ]);
   });
 
@@ -150,6 +152,18 @@ describe("issueCountForSource", () => {
 
   it("reads zero for a draft with no issue of that source", () => {
     expect(issueCountForSource([issue("step", STEP, "cel")], "view")).toBe(0);
+  });
+});
+
+describe("issueCountForEntityId", () => {
+  it("counts only issues resolved to the given entity", () => {
+    const issues = [issue("field", LEAF), issue("field", LEAF), issue("field", OUTER)];
+    expect(issueCountForEntityId(issues, LEAF)).toBe(2);
+    expect(issueCountForEntityId(issues, OUTER)).toBe(1);
+  });
+
+  it("reads zero for an entity with no issue", () => {
+    expect(issueCountForEntityId([issue("field", LEAF)], OUTER)).toBe(0);
   });
 });
 
