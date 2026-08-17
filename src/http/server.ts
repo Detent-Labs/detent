@@ -101,6 +101,7 @@ import { handleLivez, handleReadyz } from "./health.js";
 import { handleMetrics } from "./metrics.js";
 import type { HttpResult, HttpBinaryResult } from "./errors.js";
 import { log } from "../log.js";
+import { z } from "zod";
 
 /**
  * Bun's `Server`, with its WebSocket payload type filled in. `Bun.serve` is
@@ -327,6 +328,10 @@ function match(segments: string[], parts: string[]): string[] | null {
  * than silently disabling issuers — the composition root lets this propagate
  * so startup fails loudly (design.md "Configuration selects the resolver").
  */
+const issuerConfigSchema = z.array(
+  z.object({ iss: z.string(), jwksUrl: z.string(), audience: z.string(), rolesClaim: z.string() }),
+);
+
 export function parseAuthIssuers(raw: string | undefined): IssuerConfig[] | undefined {
   if (!raw || !raw.trim()) return undefined;
   let parsed: unknown;
@@ -335,20 +340,13 @@ export function parseAuthIssuers(raw: string | undefined): IssuerConfig[] | unde
   } catch {
     throw new Error("AUTH_ISSUERS is not valid JSON");
   }
-  if (!Array.isArray(parsed)) throw new Error("AUTH_ISSUERS must be a JSON array");
-  return parsed.map((entry, i) => {
-    if (
-      typeof entry !== "object" ||
-      entry === null ||
-      typeof (entry as Record<string, unknown>).iss !== "string" ||
-      typeof (entry as Record<string, unknown>).jwksUrl !== "string" ||
-      typeof (entry as Record<string, unknown>).audience !== "string" ||
-      typeof (entry as Record<string, unknown>).rolesClaim !== "string"
-    ) {
-      throw new Error(`AUTH_ISSUERS[${i}] must be { iss, jwksUrl, audience, rolesClaim } (all strings)`);
-    }
-    return entry as IssuerConfig;
-  });
+  const result = issuerConfigSchema.safeParse(parsed);
+  if (!result.success) {
+    const i = result.error.issues[0]?.path[0];
+    const at = typeof i === "number" ? `[${i}]` : "";
+    throw new Error(`AUTH_ISSUERS${at} must be { iss, jwksUrl, audience, rolesClaim } (all strings)`);
+  }
+  return result.data;
 }
 
 /** Minimum `AUTH_JWT_SECRET` length in encoded bytes: the HS256 (HMAC-SHA-256) output size, per RFC 7518 §3.2. */

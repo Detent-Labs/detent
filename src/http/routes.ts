@@ -110,17 +110,45 @@ const submitBodySchema = z.object({
   data: z.record(z.string(), z.unknown()).default({}),
 });
 
-/** Parses `req`'s JSON body against `schema`, raising `RequestShapeError` (400) for invalid JSON or a shape mismatch alike — never a bare `ZodError`, which `mapError` maps to 422, the field-validation status, not the request-shape one. */
-async function parseJsonBody<T>(req: Request, schema: z.ZodType<T>): Promise<T> {
-  let raw: unknown;
+/**
+ * Decodes `req`'s JSON body, raising `RequestShapeError` (400) when it is not
+ * valid JSON. Does not check the decoded value's shape — a caller that needs
+ * that guarantee keeps its own runtime check or parses the result against a
+ * schema. The same rule already governs `guarded`, `errorContext`,
+ * `resolveActor` and `parseLimit`.
+ *
+ * Exported: `admin-routes.ts`, `studio-routes.ts` and `account-routes.ts`
+ * import it. Each wrote this block by hand until `http-route-handling-consolidation`.
+ */
+export async function readJson(req: Request): Promise<Record<string, unknown>> {
   try {
-    raw = await req.json();
+    return (await req.json()) as Record<string, unknown>;
   } catch {
     throw new RequestShapeError("request body is not valid JSON");
   }
+}
+
+/** Parses `req`'s JSON body against `schema`, raising `RequestShapeError` (400) for invalid JSON or a shape mismatch alike — never a bare `ZodError`, which `mapError` maps to 422, the field-validation status, not the request-shape one. */
+async function parseJsonBody<T>(req: Request, schema: z.ZodType<T>): Promise<T> {
+  const raw = await readJson(req);
   const parsed = schema.safeParse(raw);
   if (!parsed.success) throw new RequestShapeError(`request body does not match the expected shape: ${parsed.error.message}`);
   return parsed.data;
+}
+
+/**
+ * Shared rejection rule for a version number, whether it arrives as a path
+ * segment (a `string`) or a request-body field (`unknown`). `unknown` admits
+ * both callers: `Number(raw)` is total either way.
+ *
+ * Exported: `admin-routes.ts` and `studio-routes.ts` import it. Each wrote
+ * its own copy — `parseVersionField`, `parseVersion` — until
+ * `http-route-handling-consolidation`.
+ */
+export function parseVersion(raw: unknown, label: string): number {
+  const n = Number(raw);
+  if (!Number.isInteger(n)) throw new RequestShapeError(`${label} must be an integer`);
+  return n;
 }
 
 /**
@@ -452,12 +480,7 @@ export async function handlePublish(
 ): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
-    let parsed: { processId?: unknown; body?: unknown };
-    try {
-      parsed = (await req.json()) as { processId?: unknown; body?: unknown };
-    } catch {
-      throw new RequestShapeError("request body is not valid JSON");
-    }
+    const parsed = (await readJson(req)) as { processId?: unknown; body?: unknown };
     if (typeof parsed.processId !== "string" || !parsed.body) {
       throw new RequestShapeError("request body must be { processId: string, body: ProcessBody }");
     }

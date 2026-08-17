@@ -34,16 +34,9 @@ import { describeConfigSchema, type ConfigFieldDescriptor } from "../engine/conf
 import type { ZodTypeAny } from "zod";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, requirePermission, AuthorizationError, DEVELOPER_ROLE, TEMPLATES_ROLE, AUTHOR_ROLE } from "../auth/authorize.js";
-import { RequestShapeError, type HttpResult } from "./errors.js";
-import { resolveActor, guarded } from "./routes.js";
+import { type HttpResult } from "./errors.js";
+import { resolveActor, guarded, readJson, parseVersion } from "./routes.js";
 import type { ProcessId, ProcessBody, MigrationSpec } from "../schema/definition.js";
-
-/** Shared by every `:version`/`:fromVersion`/`:toVersion` path segment — no existing HTTP handler parses a numeric path param, so this is the one place that convention starts. */
-function parseVersion(raw: string, label: string): number {
-  const n = Number(raw);
-  if (!Number.isInteger(n)) throw new RequestShapeError(`${label} must be an integer`);
-  return n;
-}
 
 /**
  * Either authoring role admits. The whole no-code authoring surface takes it:
@@ -97,12 +90,7 @@ export async function handleSaveDraft(processId: string, req: Request, resolver:
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     requireAuthoring(actor);
-    let parsed: { body?: unknown; layout?: unknown; revision?: unknown; baseVersion?: unknown };
-    try {
-      parsed = (await req.json()) as { body?: unknown; layout?: unknown; revision?: unknown; baseVersion?: unknown };
-    } catch {
-      throw new RequestShapeError("request body is not valid JSON");
-    }
+    const parsed = (await readJson(req)) as { body?: unknown; layout?: unknown; revision?: unknown; baseVersion?: unknown };
     const saved = await saveDraft(
       processId as ProcessId,
       {
@@ -228,12 +216,7 @@ export async function handlePutMigrationPlan(
     await requirePermission(actor, "migrate", processId as ProcessId, db);
     const fromVersion = parseVersion(fromRaw, "fromVersion");
     const toVersion = parseVersion(toRaw, "toVersion");
-    let spec: unknown;
-    try {
-      spec = await req.json();
-    } catch {
-      throw new RequestShapeError("request body is not valid JSON");
-    }
+    const spec = await readJson(req);
     await registerMigrationPlan(processId as ProcessId, fromVersion, toVersion, spec as MigrationSpec, db);
     const plan = await resolveMigrationPlan(processId as ProcessId, fromVersion, toVersion, db);
     return { status: 200, body: plan };
@@ -330,12 +313,7 @@ export async function handleSaveTemplate(templateKey: string, req: Request, reso
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     requireRole(actor, TEMPLATES_ROLE);
-    let parsed: { body?: unknown; layout?: unknown };
-    try {
-      parsed = (await req.json()) as { body?: unknown; layout?: unknown };
-    } catch {
-      throw new RequestShapeError("request body is not valid JSON");
-    }
+    const parsed = (await readJson(req)) as { body?: unknown; layout?: unknown };
     const saved = await saveTemplate(templateKey, { body: parsed.body, layout: parsed.layout, createdBy: actor.id }, db);
     return { status: 200, body: saved };
   });
