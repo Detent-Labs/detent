@@ -18,9 +18,9 @@ duplication or indirection.
   `useFetchOnce(token, fetcher)` hook; both existing hooks call it.
 - Replace `playerLogic.ts`'s `seedFormValues` hand-rolled `for` loop with
   `Object.fromEntries(fields.map((f) => [f.field.id, f.value]))`.
-- Inline `processListLogic.ts`'s `templateDraftInput` at its one caller,
-  `ProcessesScreen.tsx:237`. Move its tests onto the underlying
-  `readTemplate` reader it already delegates to.
+- Leave `processListLogic.ts`'s `templateDraftInput` unchanged. Deleting it
+  would drop test coverage with nowhere for it to land. Finding 9 does not
+  land in this change.
 - Add `listTenants` to the static `tenantByKey` import from `./store.js` in
   `src/tenancy/connections.ts`. Drop the `await import("./store.js")`
   dynamic import in `createTenantConnections`'s default for `listAll`.
@@ -44,9 +44,9 @@ no observable behavior change, no schema or definition-contract touch. Marked
   `useRegistry.ts` (both edited), new `useFetchOnce.ts` alongside them.
 - `packages/web/src/areas/studio/screens/playerLogic.ts` (edited, existing
   test kept).
-- `packages/web/src/areas/studio/screens/processListLogic.ts` (function
-  removed), `ProcessesScreen.tsx` (call site inlined). Tests for the removed
-  function move to cover `readTemplate` directly, wherever that reader is
-  already tested or exercised.
+- This change does not touch
+  `packages/web/src/areas/studio/screens/processListLogic.ts` or
+  `ProcessesScreen.tsx`. `templateDraftInput` and its existing tests in
+  `packages/web/test/studio-processListLogic.test.ts` stay as they are.
 - `src/tenancy/connections.ts` (one import line).
 - No API, schema, or dependency changes. No new files beyond `useFetchOnce.ts`.

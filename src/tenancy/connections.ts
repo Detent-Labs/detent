@@ -11,7 +11,7 @@
  */
 
 import { SQL } from "bun";
-import { tenantByKey, type TenantRecord } from "./store.js";
+import { listTenants, tenantByKey, type TenantRecord } from "./store.js";
 
 /** A tenant's key and the handle its requests run against. */
 export interface TenantHandle {
@@ -62,7 +62,7 @@ export function createTenantConnections(
   } = {},
 ): TenantConnections {
   const lookup = deps.lookup ?? tenantByKey;
-  const listAll = deps.listAll ?? (async (db: SQL) => (await import("./store.js")).listTenants(db));
+  const listAll = deps.listAll ?? listTenants;
   const connect = deps.connect ?? ((url: string) => new SQL(url));
   const pools = new Map<string, SQL>();
 

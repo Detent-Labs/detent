@@ -37,23 +37,23 @@ entry points.
 function's name, signature, and doc comment stay.
 
 Alternative considered: dropping the wrapper entirely and inlining at its
-call site. Rejected. `playerLogic.ts`'s own module comment names why this
-function exists as a named, tested unit. The studio-app spec requires
-studio to extract its testable logic from its components. That reasoning
-still holds after the one-line body swap.
+call site. Rejected. `playerLogic.ts` carries no module-level comment of its
+own. The testability reasoning instead comes from `processListLogic.ts`,
+which documents it beside its sibling `seededDraftInput`. The studio-app
+spec requires studio to extract its testable logic from its components.
+That reasoning still holds after the one-line body swap.
 
-**Delete `templateDraftInput` instead of renaming it.** Its only caller,
-`ProcessesScreen.tsx:237`, gets the two statements inline. The exact
-shape, read at implementation time:
+**Keep `templateDraftInput` instead of deleting it.** The real delegate,
+`getTemplate` in `packages/web/src/areas/studio/api/client.ts`, has no
+existing tests of its own. No function named `readTemplate` exists anywhere
+in the repo. That name only ever labeled the local parameter
+`templateDraftInput` takes. Deleting the wrapper would drop test coverage
+with nowhere for it to land.
 
-```
-const template = await readTemplate(templateKey);
-const draft = { body: template.body, layout: template.layout, revision: 0 };
-```
-
-Its existing tests move to exercise `readTemplate` directly, wherever that
-reader's own tests already live. `readTemplate` is the injected dependency.
-The deleted wrapper never added logic on top of it.
+This wrapper stays a named, tested unit for the same testability reason.
+Its sibling `seededDraftInput`, in `processListLogic.ts`, already documents
+that reason. The studio-app spec requires studio to extract its testable
+logic from its components.
 
 **`connections.ts` moves `listTenants` into the static `store.js` import.**
 `import { listTenants, tenantByKey } from "./store.js"` replaces the
@@ -76,7 +76,8 @@ See finding 6.
 ## Migration Plan
 
 No deployment or data migration. Land as one commit, or one small stack,
-touching the five files in Impact. Verify per this repo's standard gate:
+touching the five files Impact names as edited. Verify per this repo's
+standard gate:
 `bun run typecheck`, `bun run build`, then the full `bun test` with
 `DATABASE_URL` set, `git diff --check`, and the antislop check on any
 touched Markdown. Rollback is a plain revert. Nothing here is stateful.

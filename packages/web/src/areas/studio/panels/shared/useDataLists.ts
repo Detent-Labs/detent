@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
 import { listDataLists } from "../../api/client.js";
 import type { StudioDataList } from "../../api/types.js";
+import { useFetchOnce } from "./useFetchOnce.js";
 
 /**
  * Fetches the server's data lists once per mount. `undefined` until it
@@ -12,17 +12,5 @@ import type { StudioDataList } from "../../api/types.js";
  * for the column keys its mapping editor offers.
  */
 export function useDataLists(token: string): StudioDataList[] | undefined {
-  const [lists, setLists] = useState<StudioDataList[] | undefined>(undefined);
-
-  useEffect(() => {
-    let live = true;
-    listDataLists(token)
-      .then((l) => live && setLists(l))
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, [token]);
-
-  return lists;
+  return useFetchOnce(token, listDataLists);
 }
