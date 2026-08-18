@@ -6,7 +6,6 @@
  * is caught and mapped via `errors.ts`.
  */
 import type { SQL } from "bun";
-import { sql } from "../engine/store.js";
 import {
   AutomaticCascadeLoop,
   createProcessInstance,
@@ -199,12 +198,36 @@ export async function guarded<T>(req: Request, fn: () => Promise<T>): Promise<T 
   }
 }
 
+/**
+ * Resolves the actor, runs `gate(actor)`, then runs `fn(actor)` — the
+ * repeated "resolve actor, then require a role" preamble, folded into one
+ * call. The whole body is one `guarded(req, ...)` call, so a throw from
+ * `resolveActor` or `gate` reaches `mapError` the same way a throw from `fn`
+ * already does.
+ *
+ * A handler whose gate needs the request body (`handlePublish`) keeps its
+ * own inline `resolveActor` call instead — `gate` never sees the body.
+ */
+export async function route<T>(
+  req: Request,
+  resolver: ActorResolver,
+  db: SQL,
+  gate: (actor: Actor) => void | Promise<void>,
+  fn: (actor: Actor) => Promise<T>,
+): Promise<T | HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver, db);
+    await gate(actor);
+    return fn(actor);
+  });
+}
+
 export async function handleCreateInstance(
   processId: string,
   req: Request,
   resolver: ActorResolver,
   dataSourceRegistry: DataSourceRegistry,
-  db: SQL = sql,
+  db: SQL,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<HttpResult> {
   return guarded(req, async () => {
@@ -220,7 +243,7 @@ export async function handleGetInstanceView(
   req: Request,
   resolver: ActorResolver,
   dataSourceRegistry: DataSourceRegistry,
-  db: SQL = sql,
+  db: SQL,
 ): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
@@ -234,7 +257,7 @@ export async function handleSubmit(
   req: Request,
   resolver: ActorResolver,
   dataSourceRegistry: DataSourceRegistry,
-  db: SQL = sql,
+  db: SQL,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<HttpResult> {
   let actor: Actor | undefined;
@@ -254,7 +277,7 @@ export async function handleSubmit(
   }
 }
 
-export async function handleClaim(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handleClaim(instanceId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     const updated = await claimStep(instanceId as InstanceId, actor, db);
@@ -262,7 +285,7 @@ export async function handleClaim(instanceId: string, req: Request, resolver: Ac
   });
 }
 
-export async function handleRelease(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handleRelease(instanceId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     const updated = await releaseClaim(instanceId as InstanceId, actor, db);
@@ -270,7 +293,7 @@ export async function handleRelease(instanceId: string, req: Request, resolver: 
   });
 }
 
-export async function handleDelegate(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handleDelegate(instanceId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     const body = await parseJsonBody(req, delegateBodySchema);
@@ -279,7 +302,7 @@ export async function handleDelegate(instanceId: string, req: Request, resolver:
   });
 }
 
-export async function handlePostComment(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handlePostComment(instanceId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     const body = await parseJsonBody(req, commentBodySchema);
@@ -288,7 +311,7 @@ export async function handlePostComment(instanceId: string, req: Request, resolv
   });
 }
 
-export async function handleListComments(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handleListComments(instanceId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     const url = new URL(req.url);
@@ -299,7 +322,7 @@ export async function handleListComments(instanceId: string, req: Request, resol
   });
 }
 
-export async function handleUploadAttachment(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handleUploadAttachment(instanceId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     const body = await parseJsonBody(req, attachmentBodySchema);
@@ -317,7 +340,7 @@ export async function handleUploadAttachment(instanceId: string, req: Request, r
   });
 }
 
-export async function handleListAttachments(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handleListAttachments(instanceId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     const url = new URL(req.url);
@@ -334,7 +357,7 @@ export async function handleGetAttachment(
   attachmentId: string,
   req: Request,
   resolver: ActorResolver,
-  db: SQL = sql,
+  db: SQL,
 ): Promise<HttpBinaryResult | HttpResult> {
   return guarded(req, async (): Promise<HttpBinaryResult> => {
     const actor = await resolveActor(req, resolver, db);
@@ -383,53 +406,64 @@ function parseScope(url: URL): "mine" | "started" | "all" {
   return raw;
 }
 
-export async function handleListInstances(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    const url = new URL(req.url);
-    const scope = parseScope(url);
-    const assignedTo = url.searchParams.get("assignedTo") ?? undefined;
-    const startedBy = url.searchParams.get("startedBy") ?? undefined;
-    // scope=mine derives "mine" from the resolved actor — a caller cannot
-    // pair it with its own assignedTo value to see another actor's instances.
-    if (scope === "mine" && assignedTo !== undefined) {
-      throw new RequestShapeError("scope=mine cannot be combined with an explicit assignedTo");
-    }
-    // Same rule one filter over: scope=started derives the starter from the
-    // credential, so an explicit startedBy beside it would be the one way to
-    // read another actor's cases without a role.
-    if (scope === "started" && startedBy !== undefined) {
-      throw new RequestShapeError("scope=started cannot be combined with an explicit startedBy");
-    }
-    if (scope === "all") {
-      requireRole(actor, ADMIN_ROLE);
-    }
-    const filter: InstanceListFilter = {
-      processId: (url.searchParams.get("processId") as ProcessId) ?? undefined,
-      status: parseStatuses(url),
-      currentStepId: (url.searchParams.get("currentStepId") as StepId) ?? undefined,
-      // scope=started applies no assignment predicate of its own. An explicit
-      // assignedTo still narrows conjunctively, and reaches nothing outside
-      // what this caller started.
-      startedBy: scope === "started" ? actor.id : startedBy,
-      claimedBy: url.searchParams.get("claimedBy") ?? undefined,
-      assignedTo: scope === "mine" ? actor.id : assignedTo,
-      assignedToRoles: scope === "mine" ? actor.roles : undefined,
-      // scope=all already required ADMIN_ROLE above — reusing that check
-      // instead of adding a second one. See design.md "Gate visibility with
-      // an includeDegraded filter field". Neither scope=mine nor
-      // scope=started sets it; each lists one actor's own instances, and the
-      // screens behind them render a resolved summary alone.
-      includeDegraded: scope === "all",
-    };
-    const limit = parseLimit(url, MAX_LIST_LIMIT);
-    const cursor = url.searchParams.get("cursor") ?? undefined;
-    const page = await listInstances(filter, { limit, cursor }, db);
-    return { status: 200, body: page };
-  });
+export async function handleListInstances(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  const url = new URL(req.url);
+  // `parseScope` runs inside the `gate` closure rather than at this top
+  // level, so an unknown `scope` value still throws inside `guarded`'s
+  // protection (`route`'s whole body is one `guarded(req, ...)` call) and
+  // still maps to 400 instead of escaping as an unhandled rejection ahead of
+  // `route`. `scope` is a `let` in this outer scope so `fn` can read it —
+  // `route` always runs `gate` before `fn`, inside that same `guarded` call.
+  let scope: "mine" | "started" | "all";
+  return route(
+    req,
+    resolver,
+    db,
+    (actor) => {
+      scope = parseScope(url);
+      if (scope === "all") requireRole(actor, ADMIN_ROLE);
+    },
+    async (actor) => {
+      const assignedTo = url.searchParams.get("assignedTo") ?? undefined;
+      const startedBy = url.searchParams.get("startedBy") ?? undefined;
+      // scope=mine derives "mine" from the resolved actor — a caller cannot
+      // pair it with its own assignedTo value to see another actor's instances.
+      if (scope === "mine" && assignedTo !== undefined) {
+        throw new RequestShapeError("scope=mine cannot be combined with an explicit assignedTo");
+      }
+      // Same rule one filter over: scope=started derives the starter from the
+      // credential, so an explicit startedBy beside it would be the one way to
+      // read another actor's cases without a role.
+      if (scope === "started" && startedBy !== undefined) {
+        throw new RequestShapeError("scope=started cannot be combined with an explicit startedBy");
+      }
+      const filter: InstanceListFilter = {
+        processId: (url.searchParams.get("processId") as ProcessId) ?? undefined,
+        status: parseStatuses(url),
+        currentStepId: (url.searchParams.get("currentStepId") as StepId) ?? undefined,
+        // scope=started applies no assignment predicate of its own. An explicit
+        // assignedTo still narrows conjunctively, and reaches nothing outside
+        // what this caller started.
+        startedBy: scope === "started" ? actor.id : startedBy,
+        claimedBy: url.searchParams.get("claimedBy") ?? undefined,
+        assignedTo: scope === "mine" ? actor.id : assignedTo,
+        assignedToRoles: scope === "mine" ? actor.roles : undefined,
+        // scope=all already required ADMIN_ROLE above — reusing that check
+        // instead of adding a second one. See design.md "Gate visibility with
+        // an includeDegraded filter field". Neither scope=mine nor
+        // scope=started sets it; each lists one actor's own instances, and the
+        // screens behind them render a resolved summary alone.
+        includeDegraded: scope === "all",
+      };
+      const limit = parseLimit(url, MAX_LIST_LIMIT);
+      const cursor = url.searchParams.get("cursor") ?? undefined;
+      const page = await listInstances(filter, { limit, cursor }, db);
+      return { status: 200, body: page };
+    },
+  );
 }
 
-export async function handleInstanceRecord(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handleInstanceRecord(instanceId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     const url = new URL(req.url);
@@ -440,7 +474,7 @@ export async function handleInstanceRecord(instanceId: string, req: Request, res
   });
 }
 
-export async function handleCancel(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handleCancel(instanceId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     const updated = await cancelInstance(instanceId as InstanceId, actor, db);
@@ -475,7 +509,7 @@ export async function handlePublish(
   resolver: ActorResolver,
   registry: Registry,
   dataSourceRegistry: DataSourceRegistry,
-  db: SQL = sql,
+  db: SQL,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<HttpResult> {
   return guarded(req, async () => {
@@ -496,14 +530,14 @@ export async function handlePublish(
   });
 }
 
-export async function handleListProcesses(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handleListProcesses(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return guarded(req, async () => {
     await resolveActor(req, resolver, db);
     return { status: 200, body: await listProcesses(db) };
   });
 }
 
-export async function handleListVersions(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handleListVersions(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return guarded(req, async () => {
     await resolveActor(req, resolver, db);
     return { status: 200, body: await listVersions(processId as ProcessId, db) };

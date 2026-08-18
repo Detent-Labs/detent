@@ -30,35 +30,12 @@
      same step of any role matches the others in visual value. Dark-mode
      invariant: the semantic layer below picks a different step per scheme,
      never the ramp itself. */
-  --color-neutral-100: #f8f4f4;
-  --color-neutral-200: #eae7e7;
-  --color-neutral-300: #d7d3d3;
-  --color-neutral-400: #bab6b6;
   --color-neutral-500: #9b9797;
-  --color-neutral-600: #7d7979;
-  --color-neutral-700: #605d5d;
-  --color-neutral-800: #444141;
   --color-neutral-900: #2d2b2b;
 
-  --color-accent-100: #fff2ef;
-  --color-accent-200: #ffe0d9;
-  --color-accent-300: #ffc4b8;
   --color-accent-400: #ff9783;
-  --color-accent-500: #ff563c;
   --color-accent-600: #dd2b0f;
   --color-accent-700: #ae1800;
-  --color-accent-800: #7c1405;
-  --color-accent-900: #4d170e;
-
-  --color-accent-2-100: #fff2ef;
-  --color-accent-2-200: #ffe0da;
-  --color-accent-2-300: #ffc4b9;
-  --color-accent-2-400: #ff9784;
-  --color-accent-2-500: #ef6853;
-  --color-accent-2-600: #c94b39;
-  --color-accent-2-700: #9e3526;
-  --color-accent-2-800: #71261b;
-  --color-accent-2-900: #471d16;
 
   /* semantic aliases — components reference these, never a primitive directly */
   --color-surface: var(--paper-50);
@@ -89,9 +66,8 @@
 
   /* Elevation, derived from the current-scheme ink so it stays correct in
      dark mode too, unlike the fixed light-mode tint the source document
-     shows. Used for exactly one component, the dialog (and shell's dropdown
-     menu, the closest thing to one outside it). */
-  --shadow-sm: 0 1px 2px color-mix(in srgb, var(--color-text) 14%, transparent);
+     shows. `--shadow-md` and `--shadow-lg` are what the dialog and the
+     shell dropdown menu actually use. */
   --shadow-md: 0 3px 10px color-mix(in srgb, var(--color-text) 16%, transparent);
   --shadow-lg: 0 12px 32px color-mix(in srgb, var(--color-text) 22%, transparent);
 

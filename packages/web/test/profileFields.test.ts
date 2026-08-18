@@ -1,14 +1,12 @@
 /**
- * The profile page's presentation decision, asserted without a DOM. The page
- * component renders what these functions return, so the two shapes `GET
- * /account/me` answers with are covered here rather than in a browser.
- *
- * The federated case is unreachable from a browser walk at all: `POST
- * /auth/login` issues an `iss: "bps"` token only (`src/auth/login.ts`), and such
- * a token guarantees a local `auth_users` row.
+ * `profileFields.ts`'s form bookkeeping, asserted without a DOM: seeding the
+ * edit form from a loaded account, building the `PATCH /account/me` body, and
+ * formatting a role list. `ProfilePage.tsx` renders the federated and local
+ * branches directly as JSX; that rendered markup is a browser-check concern
+ * (see `docs/browser-checks.md`), not this file's.
  */
 import { describe, expect, it } from "bun:test";
-import { accountChanges, editSeed, profileFields, ABSENT } from "../src/shell/profileFields.js";
+import { accountChanges, editSeed, rolesText, ABSENT } from "../src/shell/profileFields.js";
 import type { AccountView } from "../src/api/types.js";
 
 const local: AccountView = {
@@ -38,49 +36,13 @@ const unnamed: AccountView = {
   locale: undefined,
 };
 
-const federated: AccountView = { id: "sso|ada", roles: ["system:reports"], editable: false };
-
-describe("profileFields", () => {
-  it("gives a local account its five rows, in the order the page prints them", () => {
-    const view = profileFields(local);
-    expect(view.editable).toBe(true);
-    expect(view.rows.map((r) => r.key)).toEqual(["email", "roles", "managerUserId", "displayName", "locale"]);
-    expect(view.rows.map((r) => r.value)).toEqual(["ada@example.com", "system:admin, system:developer", "usr_2", "Ada Lovelace", "de"]);
+describe("rolesText", () => {
+  it("prints a placeholder for an account with no roles", () => {
+    expect(rolesText([])).toBe(ABSENT);
   });
 
-  it("marks exactly the display name and the locale as the actor's to change", () => {
-    const editable = profileFields(local).rows.filter((r) => r.control !== "read-only");
-    expect(editable.map((r) => [r.key, r.control])).toEqual([
-      ["displayName", "text"],
-      ["locale", "locale"],
-    ]);
-  });
-
-  it("sets the machine-matched values in the mono face and nothing else", () => {
-    expect(
-      profileFields(local)
-        .rows.filter((r) => r.mono)
-        .map((r) => r.key),
-    ).toEqual(["roles", "managerUserId"]);
-  });
-
-  it("prints a placeholder where a local account holds no manager", () => {
-    const view = profileFields({ ...local, managerUserId: undefined });
-    expect(view.rows.find((r) => r.key === "managerUserId")?.value).toBe(ABSENT);
-  });
-
-  it("gives a federated actor an id and roles alone, with no row to change", () => {
-    const view = profileFields(federated);
-    expect(view.editable).toBe(false);
-    expect(view.rows.map((r) => r.key)).toEqual(["id", "roles"]);
-    expect(view.rows.map((r) => r.value)).toEqual(["sso|ada", "system:reports"]);
-    expect(view.rows.every((r) => r.control === "read-only")).toBe(true);
-  });
-
-  it("gives every row a catalog key rather than a literal label", () => {
-    for (const row of [...profileFields(local).rows, ...profileFields(federated).rows]) {
-      expect(row.labelKey).toStartWith("profile.");
-    }
+  it("joins every role the account holds", () => {
+    expect(rolesText(["system:admin", "system:developer"])).toBe("system:admin, system:developer");
   });
 });
 

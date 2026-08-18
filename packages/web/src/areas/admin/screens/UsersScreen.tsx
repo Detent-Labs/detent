@@ -4,6 +4,7 @@ import type { UserSummary } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
+import { ErrorBanner } from "../../../shell/ErrorBanner.js";
 import { parseRoles, appendRole, managerChoices, managerLabel, managerValueOf } from "./usersLogic.js";
 import { t, tFill } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
@@ -76,6 +77,26 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
   const editingManager = (userId: string) => editing?.userId === userId && editing.field === "manager";
   const editingPassword = (userId: string) => editing?.userId === userId && editing.field === "password";
 
+  /**
+   * The set-busy/await/clear-busy sequence every action on this screen runs.
+   * `fail` is generic here, with no per-caller context — the three callers
+   * whose failure means something specific (self-strip, a manager refusal,
+   * a taken email) keep their explanatory comment at the call site instead.
+   */
+  const busy = useCallback(
+    async (id: string, fn: () => Promise<void>) => {
+      setBusyId(id);
+      try {
+        await fn();
+      } catch (err) {
+        fail(err);
+      } finally {
+        setBusyId(undefined);
+      }
+    },
+    [fail],
+  );
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(undefined);
@@ -106,16 +127,11 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
 
   const toggle = async (user: UserSummary) => {
     if (!user.disabled && !window.confirm(t(locale, "users.disableConfirm"))) return;
-    setBusyId(user.userId);
-    try {
+    await busy(user.userId, async () => {
       if (user.disabled) await enableUser(user.userId, token);
       else await disableUser(user.userId, token);
       refresh();
-    } catch (err) {
-      fail(err);
-    } finally {
-      setBusyId(undefined);
-    }
+    });
   };
 
   const startEditing = (user: UserSummary) => {
@@ -159,64 +175,44 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
     setNewRoles("");
   };
 
+  // A self-strip refusal reads through `describeError`'s `self-role-strip`
+  // case, like every other typed failure on this screen.
   const saveRoles = async (user: UserSummary) => {
-    setBusyId(user.userId);
-    try {
+    await busy(user.userId, async () => {
       await setUserRoles(user.userId, parseRoles(draftRoles), token);
       cancelEditing();
       refresh();
-    } catch (err) {
-      // A self-strip refusal reads through `describeError`'s `self-role-strip`
-      // case, like every other typed failure on this screen.
-      fail(err);
-    } finally {
-      setBusyId(undefined);
-    }
+    });
   };
 
+  // A refusal leaves the editor open and the row's stored manager on screen:
+  // nothing was written, so nothing should read as written.
   const saveManager = async (user: UserSummary) => {
-    setBusyId(user.userId);
-    try {
+    await busy(user.userId, async () => {
       await setUserManager(user.userId, managerValueOf(draftManager), token);
       cancelEditing();
       refresh();
-    } catch (err) {
-      // A refusal leaves the editor open and the row's stored manager on
-      // screen: nothing was written, so nothing should read as written.
-      fail(err);
-    } finally {
-      setBusyId(undefined);
-    }
+    });
   };
 
   const savePassword = async (user: UserSummary) => {
-    setBusyId(user.userId);
-    try {
+    await busy(user.userId, async () => {
       await setUserPassword(user.userId, draftPassword, token);
       cancelEditing();
       // Nothing in a row shows a password, so this reloads for one reason: the
       // rest of the screen may have moved while the editor was open.
       refresh();
-    } catch (err) {
-      fail(err);
-    } finally {
-      setBusyId(undefined);
-    }
+    });
   };
 
+  // A taken email reads through `describeError`'s `email-in-use` case. The
+  // form stays open holding what was typed, so only the address changes.
   const saveNewUser = async () => {
-    setBusyId(NEW_USER_ROW);
-    try {
+    await busy(NEW_USER_ROW, async () => {
       await createUser(newEmail, newPassword, parseRoles(newRoles), token);
       cancelCreating();
       refresh();
-    } catch (err) {
-      // A taken email reads through `describeError`'s `email-in-use` case. The
-      // form stays open holding what was typed, so only the address changes.
-      fail(err);
-    } finally {
-      setBusyId(undefined);
-    }
+    });
   };
 
   return (
@@ -232,15 +228,7 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
         </button>
       </div>
 
-      {error && (
-        <div className="admin-error-banner" role="alert">
-          <span className="admin-error-banner-stamp">{t(locale, "common.failed")}</span>
-          <span className="admin-error-banner-message">{error}</span>
-          <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
-            {t(locale, "common.retry")}
-          </button>
-        </div>
-      )}
+      {error && <ErrorBanner error={error} locale={locale} onRetry={refresh} retryDisabled={loading} />}
 
       {items.length === 0 && !creating && !loading && !error && <p className="admin-empty">{t(locale, "users.empty")}</p>}
 

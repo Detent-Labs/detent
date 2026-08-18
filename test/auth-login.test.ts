@@ -58,7 +58,7 @@ function loginRequest(email: string, password: string): Request {
 test.skipIf(!DB)("a valid login returns 200 with a token, expiresAt ~8h ahead, and the actor", async () => {
   await createUser("login@example.com", "correct-horse", ["employee"]);
   const before = Date.now();
-  const result = await handleLogin(loginRequest("login@example.com", "correct-horse"), SECRET);
+  const result = await handleLogin(loginRequest("login@example.com", "correct-horse"), SECRET, sql);
   expect(result.status).toBe(200);
   const body = result.body as { token: string; expiresAt: string; actor: { id: string; roles: string[] } };
   expect(typeof body.token).toBe("string");
@@ -72,20 +72,20 @@ test.skipIf(!DB)("the 200 actor carries the resolved display name, never null or
   await createUser("login-named@example.com", "correct-horse", [], "Rita Alvarez");
   await createUser("login-unnamed@example.com", "correct-horse", []);
 
-  const named = await handleLogin(loginRequest("login-named@example.com", "correct-horse"), SECRET);
+  const named = await handleLogin(loginRequest("login-named@example.com", "correct-horse"), SECRET, sql);
   expect(named.status).toBe(200);
   expect((named.body as { actor: { displayName: string } }).actor.displayName).toBe("Rita Alvarez");
 
   // The fallback is the account's email, so the browser never has to render a
   // blank name for an account nobody has named yet.
-  const unnamed = await handleLogin(loginRequest("login-unnamed@example.com", "correct-horse"), SECRET);
+  const unnamed = await handleLogin(loginRequest("login-unnamed@example.com", "correct-horse"), SECRET, sql);
   expect(unnamed.status).toBe(200);
   expect((unnamed.body as { actor: { displayName: string } }).actor.displayName).toBe("login-unnamed@example.com");
 });
 
 test.skipIf(!DB)("the returned token authenticates a subsequent request", async () => {
   await createUser("login2@example.com", "correct-horse", ["employee", PUBLISH_ROLE]);
-  const loginResult = await handleLogin(loginRequest("login2@example.com", "correct-horse"), SECRET);
+  const loginResult = await handleLogin(loginRequest("login2@example.com", "correct-horse"), SECRET, sql);
   const { token } = loginResult.body as { token: string };
 
   const reg = createRegistry();
@@ -126,7 +126,7 @@ test.skipIf(!DB)("the returned token authenticates a subsequent request", async 
 // built without the lookup still reads no directory (see test/auth-jwt.test.ts).
 test.skipIf(!DB)("a token issued before the user is disabled via the admin route stops authenticating at once", async () => {
   const { userId } = await createUser("login-disable@example.com", "correct-horse", ["employee"]);
-  const loginResult = await handleLogin(loginRequest("login-disable@example.com", "correct-horse"), SECRET);
+  const loginResult = await handleLogin(loginRequest("login-disable@example.com", "correct-horse"), SECRET, sql);
   const { token } = loginResult.body as { token: string };
 
   const reg = createRegistry();
@@ -137,7 +137,7 @@ test.skipIf(!DB)("a token issued before the user is disabled via the admin route
   // A real account, not a hand-signed subject: the admin's own token now has
   // to resolve in the directory too.
   await createUser("login-disable-admin@example.com", "correct-horse", [ADMIN_ROLE]);
-  const adminLogin = await handleLogin(loginRequest("login-disable-admin@example.com", "correct-horse"), SECRET);
+  const adminLogin = await handleLogin(loginRequest("login-disable-admin@example.com", "correct-horse"), SECRET, sql);
   const { token: adminToken } = adminLogin.body as { token: string };
 
   // The token works before the disable, so the 401 below is the disable's
@@ -156,7 +156,7 @@ test.skipIf(!DB)("a token issued before the user is disabled via the admin route
   expect(((await viewRes.json()) as { error: { type: string } }).error.type).toBe("actor-resolution");
 
   // and a fresh login attempt for the now-disabled user fails too
-  const reLogin = await handleLogin(loginRequest("login-disable@example.com", "correct-horse"), SECRET);
+  const reLogin = await handleLogin(loginRequest("login-disable@example.com", "correct-horse"), SECRET, sql);
   expect(reLogin.status).toBe(401);
 });
 
@@ -166,7 +166,7 @@ test.skipIf(!DB)("a token issued before the user is disabled via the admin route
 // before the disable committed.
 test.skipIf(!DB)("an admin's own disabling request still answers 200, and only the next request gets 401", async () => {
   const { userId } = await createUser("login-self-disable@example.com", "correct-horse", [ADMIN_ROLE]);
-  const { token } = (await handleLogin(loginRequest("login-self-disable@example.com", "correct-horse"), SECRET)).body as { token: string };
+  const { token } = (await handleLogin(loginRequest("login-self-disable@example.com", "correct-horse"), SECRET, sql)).body as { token: string };
 
   const fetch = createServer(createDataSourceRegistry(), createRegistry(), sql, resolveAuthResolver({ AUTH_JWT_SECRET: SECRET }));
 
@@ -182,7 +182,7 @@ test.skipIf(!DB)("an admin's own disabling request still answers 200, and only t
 
 test.skipIf(!DB)("an account deleted from the directory loses its live session the same way", async () => {
   const { userId } = await createUser("login-deleted@example.com", "correct-horse", ["employee"]);
-  const { token } = (await handleLogin(loginRequest("login-deleted@example.com", "correct-horse"), SECRET)).body as { token: string };
+  const { token } = (await handleLogin(loginRequest("login-deleted@example.com", "correct-horse"), SECRET, sql)).body as { token: string };
 
   const fetch = createServer(createDataSourceRegistry(), createRegistry(), sql, resolveAuthResolver({ AUTH_JWT_SECRET: SECRET }));
   expect((await fetch(new Request("http://x/instances?scope=mine", { headers: { Authorization: `Bearer ${token}` } }))).status).toBe(200);
@@ -195,7 +195,7 @@ test.skipIf(!DB)("an account deleted from the directory loses its live session t
 
 test.skipIf(!DB)("re-enabling an account restores its live session, since nothing caches the answer", async () => {
   const { userId } = await createUser("login-reenable@example.com", "correct-horse", ["employee"]);
-  const { token } = (await handleLogin(loginRequest("login-reenable@example.com", "correct-horse"), SECRET)).body as { token: string };
+  const { token } = (await handleLogin(loginRequest("login-reenable@example.com", "correct-horse"), SECRET, sql)).body as { token: string };
 
   const fetch = createServer(createDataSourceRegistry(), createRegistry(), sql, resolveAuthResolver({ AUTH_JWT_SECRET: SECRET }));
   const request = (): Request => new Request("http://x/instances?scope=mine", { headers: { Authorization: `Bearer ${token}` } });
@@ -209,8 +209,8 @@ test.skipIf(!DB)("re-enabling an account restores its live session, since nothin
 
 test.skipIf(!DB)("wrong password and unknown email return an identical generic 401", async () => {
   await createUser("login3@example.com", "correct-horse", []);
-  const wrongPw = await handleLogin(loginRequest("login3@example.com", "wrong-password"), SECRET);
-  const unknown = await handleLogin(loginRequest("nobody@example.com", "anything"), SECRET);
+  const wrongPw = await handleLogin(loginRequest("login3@example.com", "wrong-password"), SECRET, sql);
+  const unknown = await handleLogin(loginRequest("nobody@example.com", "anything"), SECRET, sql);
   expect(wrongPw.status).toBe(401);
   expect(unknown.status).toBe(401);
   expect(wrongPw.body).toEqual(unknown.body);
@@ -219,13 +219,13 @@ test.skipIf(!DB)("wrong password and unknown email return an identical generic 4
 test.skipIf(!DB)("a disabled user's login returns the same generic 401", async () => {
   await createUser("login4@example.com", "correct-horse", []);
   await sql`UPDATE auth_users SET disabled = true WHERE email = ${"login4@example.com"}`;
-  const result = await handleLogin(loginRequest("login4@example.com", "correct-horse"), SECRET);
+  const result = await handleLogin(loginRequest("login4@example.com", "correct-horse"), SECRET, sql);
   expect(result.status).toBe(401);
 });
 
 test.skipIf(!DB)("a malformed JSON body maps to 400", async () => {
   const req = new Request("http://x/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: "{not json" });
-  const result = await handleLogin(req, SECRET);
+  const result = await handleLogin(req, SECRET, sql);
   expect(result.status).toBe(400);
 });
 
@@ -274,6 +274,35 @@ test("checkAndRecordAttempt evicts the earliest window once MAX_TRACKED_EMAILS l
   // normally, for the ordinary MAX_ATTEMPTS reason, not because of capacity
   map.set("tracked@example.com", { count: MAX_ATTEMPTS, windowStart: 1 });
   expect(checkAndRecordAttempt(map, "tracked@example.com", now)).toBe("limited");
+});
+
+// The re-arm write must move a key to the end of iteration order, or a
+// re-armed entry keeps its old, early position while carrying the newest
+// windowStart in the map — see design.md's A/B scenario for
+// dedup-runtime-pagination-webhook-sink.
+test("checkAndRecordAttempt evicts the true oldest window after a re-arm, not the entry re-armed last", () => {
+  const map = new Map<string, { count: number; windowStart: number }>();
+  const capacity = 2;
+
+  // Insert A, then insert B while A is still live.
+  expect(checkAndRecordAttempt(map, "A", () => 0, MAX_ATTEMPTS, capacity)).toBe("ok");
+  expect(checkAndRecordAttempt(map, "B", () => WINDOW_MS - 1, MAX_ATTEMPTS, capacity)).toBe("ok");
+
+  // A's window expires, then a later request re-arms it — the newest
+  // windowStart in the map. Map.set on an already-present key does not move
+  // it in iteration order on its own, so this only lands A at the end of
+  // iteration order because checkAndRecordAttempt deletes the key first.
+  const rearmedAt = WINDOW_MS + 500;
+  expect(checkAndRecordAttempt(map, "A", () => rearmedAt, MAX_ATTEMPTS, capacity)).toBe("ok");
+
+  // A third key, C, arrives and forces an eviction at capacity. B is the true
+  // oldest live window and must be the one evicted, not A.
+  expect(checkAndRecordAttempt(map, "C", () => rearmedAt + 100, MAX_ATTEMPTS, capacity)).toBe("ok");
+
+  expect(map.has("B")).toBe(false);
+  expect(map.has("A")).toBe(true);
+  expect(map.has("C")).toBe(true);
+  expect(map.size).toBe(2);
 });
 
 // The rule this replaced refused an untracked email at capacity, so a flood of
@@ -342,7 +371,7 @@ test("a flood of distinct emails leaves the map at its ordinary state once the w
 test.skipIf(!DB)("an email under MAX_ATTEMPTS is not rate-limited", async () => {
   await createUser("login5@example.com", "correct-horse", []);
   for (let i = 0; i < MAX_ATTEMPTS - 1; i++) {
-    const result = await handleLogin(loginRequest("login5@example.com", "wrong-password"), SECRET);
+    const result = await handleLogin(loginRequest("login5@example.com", "wrong-password"), SECRET, sql);
     expect(result.status).toBe(401);
   }
 });
@@ -350,11 +379,11 @@ test.skipIf(!DB)("an email under MAX_ATTEMPTS is not rate-limited", async () => 
 test.skipIf(!DB)("after MAX_ATTEMPTS failed attempts, further attempts are rejected with 429 and verifyLogin is bypassed", async () => {
   await createUser("login6@example.com", "correct-horse", []);
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
-    const result = await handleLogin(loginRequest("login6@example.com", "wrong-password"), SECRET);
+    const result = await handleLogin(loginRequest("login6@example.com", "wrong-password"), SECRET, sql);
     expect(result.status).toBe(401);
   }
   // the correct password would normally succeed — 429 here proves the limiter, not verifyLogin, rejected it
-  const limited = await handleLogin(loginRequest("login6@example.com", "correct-horse"), SECRET);
+  const limited = await handleLogin(loginRequest("login6@example.com", "correct-horse"), SECRET, sql);
   expect(limited.status).toBe(429);
   expect((limited.body as { error: { type: string } }).error.type).toBe("rate-limited");
 });
@@ -362,14 +391,14 @@ test.skipIf(!DB)("after MAX_ATTEMPTS failed attempts, further attempts are rejec
 test.skipIf(!DB)("a successful login resets the counter", async () => {
   await createUser("login7@example.com", "correct-horse", []);
   for (let i = 0; i < MAX_ATTEMPTS - 1; i++) {
-    const result = await handleLogin(loginRequest("login7@example.com", "wrong-password"), SECRET);
+    const result = await handleLogin(loginRequest("login7@example.com", "wrong-password"), SECRET, sql);
     expect(result.status).toBe(401);
   }
-  const success = await handleLogin(loginRequest("login7@example.com", "correct-horse"), SECRET);
+  const success = await handleLogin(loginRequest("login7@example.com", "correct-horse"), SECRET, sql);
   expect(success.status).toBe(200);
 
   // if the counter hadn't been cleared, this next attempt would already be at/over MAX_ATTEMPTS and get 429
-  const afterReset = await handleLogin(loginRequest("login7@example.com", "wrong-password"), SECRET);
+  const afterReset = await handleLogin(loginRequest("login7@example.com", "wrong-password"), SECRET, sql);
   expect(afterReset.status).toBe(401);
 });
 
@@ -377,13 +406,13 @@ test.skipIf(!DB)("two different emails are rate-limited independently", async ()
   await createUser("login8a@example.com", "correct-horse", []);
   await createUser("login8b@example.com", "correct-horse", []);
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
-    const result = await handleLogin(loginRequest("login8a@example.com", "wrong-password"), SECRET);
+    const result = await handleLogin(loginRequest("login8a@example.com", "wrong-password"), SECRET, sql);
     expect(result.status).toBe(401);
   }
-  const limitedA = await handleLogin(loginRequest("login8a@example.com", "wrong-password"), SECRET);
+  const limitedA = await handleLogin(loginRequest("login8a@example.com", "wrong-password"), SECRET, sql);
   expect(limitedA.status).toBe(429);
 
-  const unaffectedB = await handleLogin(loginRequest("login8b@example.com", "wrong-password"), SECRET);
+  const unaffectedB = await handleLogin(loginRequest("login8b@example.com", "wrong-password"), SECRET, sql);
   expect(unaffectedB.status).toBe(401);
 });
 
@@ -391,16 +420,16 @@ test.skipIf(!DB)("rate limiting is keyed by normalized email — case/whitespace
   await createUser("login9@example.com", "correct-horse", []);
   const variants = ["login9@example.com", "LOGIN9@EXAMPLE.COM", " Login9@Example.com ", "login9@example.com", "LOGIN9@example.COM"];
   for (const email of variants) {
-    const result = await handleLogin(loginRequest(email, "wrong-password"), SECRET);
+    const result = await handleLogin(loginRequest(email, "wrong-password"), SECRET, sql);
     expect(result.status).toBe(401);
   }
-  const limited = await handleLogin(loginRequest(" login9@example.com", "wrong-password"), SECRET);
+  const limited = await handleLogin(loginRequest(" login9@example.com", "wrong-password"), SECRET, sql);
   expect(limited.status).toBe(429);
 });
 
 test.skipIf(!DB)("an account whose stored email contains uppercase letters can still log in (normalization is tracker-only)", async () => {
   await createUser("Login10@Example.com", "correct-horse", ["employee"]);
-  const result = await handleLogin(loginRequest("Login10@Example.com", "correct-horse"), SECRET);
+  const result = await handleLogin(loginRequest("Login10@Example.com", "correct-horse"), SECRET, sql);
   expect(result.status).toBe(200);
 });
 
@@ -454,9 +483,9 @@ test.skipIf(!DB)("an undefined address applies the email window alone", async ()
   // No third argument at all: every existing suite calls handleLogin this way,
   // and every one of those requests must keep working.
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
-    expect((await handleLogin(loginRequest("no-address@example.com", "wrong-password"), SECRET)).status).toBe(401);
+    expect((await handleLogin(loginRequest("no-address@example.com", "wrong-password"), SECRET, sql)).status).toBe(401);
   }
-  expect((await handleLogin(loginRequest("no-address@example.com", "wrong-password"), SECRET)).status).toBe(429);
+  expect((await handleLogin(loginRequest("no-address@example.com", "wrong-password"), SECRET, sql)).status).toBe(429);
 });
 
 // ============================================================

@@ -94,14 +94,6 @@ export function createRegistry(): Registry {
   return new Map();
 }
 
-export function register(reg: Registry, type: string, def: HandlerDef): void {
-  reg.set(type, def);
-}
-
-export function resolve(reg: Registry, type: string): HandlerDef | undefined {
-  return reg.get(type);
-}
-
 /**
  * The strategy type an author gets by default, and the only entry the built-in
  * `createDefaultAssignmentRegistry` below registers. It resolves through the
@@ -148,14 +140,6 @@ export function createAssignmentRegistry(): AssignmentRegistry {
   return new Map();
 }
 
-export function registerAssignmentStrategy(reg: AssignmentRegistry, type: string, def: AssignmentStrategyDef): void {
-  reg.set(type, def);
-}
-
-export function resolveAssignmentStrategy(reg: AssignmentRegistry, type: string): AssignmentStrategyDef | undefined {
-  return reg.get(type);
-}
-
 export const staticAssignmentConfigSchema = z.object({ candidates: z.array(z.string()) });
 
 /** The built-in `static` entry: its configured list, verbatim, with no CEL evaluation and no dynamic lookup. */
@@ -174,7 +158,7 @@ export const staticAssignmentStrategyDef: AssignmentStrategyDef = {
  */
 export function createDefaultAssignmentRegistry(): AssignmentRegistry {
   const reg = createAssignmentRegistry();
-  registerAssignmentStrategy(reg, STATIC_ASSIGNMENT_STRATEGY_TYPE, staticAssignmentStrategyDef);
+  reg.set(STATIC_ASSIGNMENT_STRATEGY_TYPE, staticAssignmentStrategyDef);
   return reg;
 }
 
@@ -240,7 +224,7 @@ export async function resolveStepAssignment(
 ): Promise<ResolvedAssignment> {
   if (!step.assignment) return { assignment: undefined };
   const strategy = step.assignment.strategy;
-  const def = resolveAssignmentStrategy(reg, strategy.type);
+  const def = reg.get(strategy.type);
 
   let candidates: string[] = [];
   let unresolved: AssignmentUnresolvedReason | undefined;
@@ -307,12 +291,4 @@ export type DataSourceRegistry = Map<string, DataSourceHandlerDef>;
 
 export function createDataSourceRegistry(): DataSourceRegistry {
   return new Map();
-}
-
-export function registerDataSource(reg: DataSourceRegistry, type: string, def: DataSourceHandlerDef): void {
-  reg.set(type, def);
-}
-
-export function resolveDataSource(reg: DataSourceRegistry, type: string): DataSourceHandlerDef | undefined {
-  return reg.get(type);
 }

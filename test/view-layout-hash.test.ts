@@ -17,14 +17,19 @@ import { canonicalize } from "../src/schema/canonical-json.js";
  *
  * `expense-approval.json`'s literal does not carry that provenance.
  * `give-the-example-a-reachable-target` rewrote its three action bodies, which
- * moves the hash, so this file's entry is a fresh measurement against the
+ * moves the hash, so this file's entry was a fresh measurement against the
  * CURRENT schema, taken in the same run that confirmed the other two literals
- * still pass. All three remain the regression guard from here on: a schema
- * change that alters what `processBody.parse` emits for any of these bodies
- * moves its hash and fails here.
+ * still pass. `dedup-runtime-pagination-webhook-sink` moved it again: its
+ * `book` and `escalated_review` steps' `http.request` targets changed from
+ * `webhook-sink:8080` to `localhost:8080`, so the literal below is a second
+ * fresh measurement, taken the same way — `definitionHash(processBody.parse(
+ * bodyOf("expense-approval.json")))`, run against the post-edit body and the
+ * current schema. All three remain the regression guard from here on: a
+ * schema change that alters what `processBody.parse` emits for any of these
+ * bodies moves its hash and fails here.
  */
 const PRE_CHANGE_HASHES: Record<string, string> = {
-  "expense-approval.json": "484922c2b599780126301db2a75958957a3ebd7a5d984f0d880820244c65d690",
+  "expense-approval.json": "bb641c63033baf8178df99f9e6f330ff3bd0b811b13d3a85bad4fea5382c541f",
   "subprocess-credit-check-child.json": "c585d1b2f94b0b8a8541144ab7fbf110344a245446dd25dd100ede94d63ad80a",
   "subprocess-loan-parent.json": "7faa040f7cbb6d5e310bf6440802e53a043929318eee9f436fa85ad3b47d18c5",
 };

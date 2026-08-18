@@ -9,7 +9,7 @@ import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { executeManualTransition, fireTimer, ConcurrencyConflict } from "../src/engine/transition.js";
 import { drainOutbox, MAX_ATTEMPTS, CLAIM_LEASE_MS, type DeliverFn } from "../src/engine/outbox.js";
-import { createRegistry, register, createDataSourceRegistry } from "../src/engine/registry.js";
+import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { createUser, setDisabled } from "../src/auth/users.js";
 import { idempotencyKey } from "../src/engine/idempotency.js";
@@ -37,11 +37,11 @@ const actOut = (id: string, type: string, field: string, src: string): Action =>
 
 // Registry with one handler; unused by the okDeliver/boom seams.
 const reg = createRegistry();
-register(reg, "setter", { handler: async () => ({ val: 7 }) });
+reg.set("setter", { handler: async () => ({ val: 7 }) });
 // The real http.request handler, for the egress-policy dead-letter cases
 // below — those drive deliver() through the registry, not a deliverFn seam,
 // since the property under test is the handler's own allowlist check.
-register(reg, HTTP_ACTION_TYPE, httpHandlerDef);
+reg.set(HTTP_ACTION_TYPE, httpHandlerDef);
 const dataSourceReg = createDataSourceRegistry();
 
 const okDeliver: DeliverFn = async () => ({});
@@ -1114,8 +1114,8 @@ test.skipIf(!DB)("delivery hands the stamped ids to the handler", async () => {
 
   const seen: (Stamp | undefined)[] = [];
   const spyReg = createRegistry();
-  register(spyReg, "x1", { handler: async (ctx) => { seen.push(ctx.actors as Stamp | undefined); return {}; } });
-  register(spyReg, "e1", { handler: async (ctx) => { seen.push(ctx.actors as Stamp | undefined); return {}; } });
+  spyReg.set("x1", { handler: async (ctx) => { seen.push(ctx.actors as Stamp | undefined); return {}; } });
+  spyReg.set("e1", { handler: async (ctx) => { seen.push(ctx.actors as Stamp | undefined); return {}; } });
   expect(await drainOutbox(sql, spyReg)).toBe(2);
   expect(seen).toEqual([
     { candidates: ["user_second", "user_third"] },
@@ -1131,7 +1131,7 @@ test.skipIf(!DB)("a row predating the stamp still delivers, with no actor ids", 
 
   let saw: unknown = "unset";
   const spyReg = createRegistry();
-  for (const t of ["e1", "p1", "x1"]) register(spyReg, t, { handler: async (ctx) => { saw = ctx.actors; return {}; } });
+  for (const t of ["e1", "p1", "x1"]) spyReg.set(t, { handler: async (ctx) => { saw = ctx.actors; return {}; } });
   expect(await drainOutbox(sql, spyReg)).toBe(3);
   expect(saw).toBeUndefined();
 });

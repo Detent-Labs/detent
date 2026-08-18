@@ -7,7 +7,6 @@ import { missingTranslationWarning } from "../draft/localized-text";
 import { ContentLocaleBadge, AddLocaleControl } from "./shared/ContentLocaleSwitcher.js";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput.js";
 import { IssueList } from "./shared/IssueList.js";
-import { RegistryPanel } from "./RegistryPanel.js";
 import type { DraftToolbarActions } from "./DraftToolbar.js";
 import type { PublishResult } from "../api/types.js";
 
@@ -37,10 +36,10 @@ interface Props {
    * and add-locale control all call `mutate()` directly, and
    * `studio-json-view` requires every draft-body-mutating control stay
    * unreachable while the JSON surface is active — the same rule that kept
-   * the old `ProcessHeader` fieldset Structure-only. Save/Discard/Publish,
-   * the registry selector, and the content-locale switch mutate nothing the
-   * JSON surface itself edits, so that spec names them exempt and this
-   * component renders them regardless of `structureActive`. */
+   * the old `ProcessHeader` fieldset Structure-only. Save/Discard/Publish and
+   * the content-locale switch mutate nothing the JSON surface itself edits,
+   * so that spec names them exempt and this component renders them
+   * regardless of `structureActive`. */
   structureActive: boolean;
 }
 
@@ -53,11 +52,10 @@ interface Props {
  *
  * The `⋮` menu is new. It renders `DraftToolbar`'s Save, Discard draft and
  * Publish actions (via `actions`, design.md: "DraftToolbar keeps its logic.
- * ProcessHeaderBar renders the buttons."), plus two groups split by
- * persistence, not topic: "Process, saved with the draft" (the editable key
- * and the base-locale and add-locale controls) and "This session only" (the
- * action registry selector). The first group renders only while the
- * Structure surface is active (`structureActive`).
+ * ProcessHeaderBar renders the buttons."), plus one group, "Process, saved
+ * with the draft" (the editable key and the base-locale and add-locale
+ * controls). That group renders only while the Structure surface is active
+ * (`structureActive`).
  * `DraftToolbar`'s error message, its
  * save-conflict banner and its publish-success confirmation (the published
  * summary field above) all stay outside the menu, in the header row itself
@@ -135,15 +133,15 @@ export function ProcessHeaderBar({
           label input lives here now, inline, never behind the ⋮ menu.
 
           `disabled` while the JSON surface is active, not conditionally
-          rendered: this header renders on both surfaces (DraftToolbar, the
-          registry selector and the content-locale switcher all "remain
-          visible and usable regardless of which surface is active",
-          studio-json-view), but the process header itself is explicitly
-          named there as one of the draft-body-mutating components that
-          SHALL NOT stay reachable while JSON is active — unlike those
-          three, this field does call `mutate()`. A disabled input drops
-          out of the tab order and fires no onChange, so it satisfies
-          "not reachable" while still showing the current value. */}
+          rendered: this header renders on both surfaces (DraftToolbar and
+          the content-locale switcher both "remain visible and usable
+          regardless of which surface is active", studio-json-view), but the
+          process header itself is explicitly named there as one of the
+          draft-body-mutating components that SHALL NOT stay reachable while
+          JSON is active — unlike those two, this field does call
+          `mutate()`. A disabled input drops out of the tab order and fires
+          no onChange, so it satisfies "not reachable" while still showing
+          the current value. */}
       <h1 className="studio-header-bar-name">
         <LocalizedTextInput
           value={draft.label}
@@ -223,9 +221,9 @@ export function ProcessHeaderBar({
                 state), never mutate() — studio-json-view names "the
                 content-locale switcher" (both halves, this is one of them)
                 exempt from the JSON-surface reachability ban, the same as
-                DraftToolbar and the registry selector. Only key and
-                baseLocale actually mutate the draft body, so only they are
-                structureActive-gated within it. */}
+                DraftToolbar. Only key and baseLocale actually mutate the
+                draft body, so only they are structureActive-gated within
+                it. */}
             <div className="studio-header-bar-menu-group">
               <span className="studio-header-bar-menu-label">{t("headerBar.menuGroupDraft")}</span>
               {structureActive && (
@@ -253,12 +251,6 @@ export function ProcessHeaderBar({
                 </>
               )}
               <AddLocaleControl />
-            </div>
-
-            <div className="studio-header-bar-menu-group">
-              <span className="studio-header-bar-menu-label">{t("headerBar.menuGroupSession")}</span>
-              <RegistryPanel />
-              <p className="studio-header-bar-menu-caption">{t("headerBar.registryCaption")}</p>
             </div>
           </div>
         )}

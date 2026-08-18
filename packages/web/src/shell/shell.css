@@ -97,19 +97,40 @@
   position: relative;
 }
 
+/*
+ * A `popover="auto"` element renders in the top layer, so `.shell-account`'s
+ * `position: relative` no longer reaches it; `top`/`right` are set inline by
+ * Chrome.tsx's `beforetoggle` listener instead, off the trigger's live rect.
+ * `left`/`bottom`/`margin` below counter the UA stylesheet's own
+ * `inset: 0; margin: auto` on every `[popover]` element — left unset, CSS
+ * auto-margin resolution re-centers the box around the JS-set `top`/`right`
+ * instead of pinning it to them.
+ *
+ * `display` stays out of this rule on purpose. The menu now mounts
+ * unconditionally, closed by default; the UA stylesheet's own
+ * `[popover]:not(:popover-open) { display: none }` is what hides it. An
+ * author-origin `display` here — even `flex`, wanted only once open — wins
+ * the cascade over that UA rule regardless of specificity, since author
+ * styles outrank user-agent ones by origin. `:popover-open` below scopes the
+ * layout to the open state alone, leaving the UA's `none` in force while
+ * closed.
+ */
 .shell-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + var(--space-1));
+  left: auto;
+  bottom: auto;
+  margin: 0;
   z-index: 1;
   min-width: 12rem;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
   padding: var(--space-2);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   box-shadow: var(--shadow-md);
+}
+
+.shell-menu:popover-open {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 /* The profile entry heads the menu, so the language row opens the next group
@@ -193,6 +214,39 @@
    site bucket-2 rule. */
 .shell-error {
   color: var(--color-refusal);
+}
+
+/*
+ * Error banner: a failed request reported where the data it would have shown
+ * normally sits, not a toast. Shared by every `app`/`admin` screen through
+ * `ErrorBanner.tsx`, lifted verbatim from the byte-identical per-area rules it
+ * replaced.
+ */
+.shell-error-banner {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  border: 2px solid var(--color-refusal);
+  padding: var(--space-2) var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.shell-error-banner-stamp {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-refusal);
+  border: 2px solid currentcolor;
+  padding: 2px 7px;
+  transform: rotate(-2deg);
+}
+
+.shell-error-banner-message {
+  flex: 1;
+  color: var(--color-text);
 }
 
 .shell-empty,

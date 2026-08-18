@@ -14,7 +14,7 @@ import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql } from "../src/engine/store.js";
 import { DB, initDb, authHeaders, authedReq } from "./helpers/http-fixture.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
-import { createRegistry, register, createDataSourceRegistry, registerDataSource } from "../src/engine/registry.js";
+import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { drainResolutions } from "../src/engine/resolution.js";
 import { ConcurrencyConflict } from "../src/engine/transition.js";
@@ -30,7 +30,7 @@ import type { Actor } from "../src/cel/eval.js";
 const cel = (src: string) => ({ lang: "cel", src });
 const reg = createRegistry();
 const dataSourceReg = createDataSourceRegistry();
-registerDataSource(dataSourceReg, "static", { resolve: async (ctx) => (ctx.config as { options: unknown[] }).options as never });
+dataSourceReg.set("static", { resolve: async (ctx) => (ctx.config as { options: unknown[] }).options as never });
 const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
 beforeAll(initDb);
@@ -1249,8 +1249,8 @@ test.skipIf(!DB)("happy path through expense-approval.json settles the async 'bo
   const raw = JSON.parse(readFileSync(new URL("../examples/expense-approval.json", import.meta.url), "utf8"));
   const authored = raw.definition as ProcessBody;
   const expenseReg = createRegistry();
-  register(expenseReg, "http.request", { handler: async () => ({ body: { status: "booked" } }) });
-  register(expenseReg, "notification.email", { handler: async () => ({}) });
+  expenseReg.set("http.request", { handler: async () => ({ body: { status: "booked" } }) });
+  expenseReg.set("notification.email", { handler: async () => ({}) });
   const expenseFetch = createServer(dataSourceReg, expenseReg, sql, devHeaderResolver);
 
   const PID = pid("proc_http_expense");

@@ -7,7 +7,7 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
-import { createRegistry, register, createDataSourceRegistry } from "../src/engine/registry.js";
+import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { registerMigrationPlan, migrateInstances } from "../src/engine/migration.js";
 import {
@@ -25,7 +25,7 @@ import type { ProcessBody, Instance, MigrationSpec } from "../src/schema/definit
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
-register(reg, "noop", { handler: async () => ({}) });
+reg.set("noop", { handler: async () => ({}) });
 const dataSourceReg = createDataSourceRegistry();
 
 let n = 0;

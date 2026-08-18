@@ -45,6 +45,11 @@ import { log } from "../log.js";
 
 export type HttpResult = { status: number; body: unknown };
 
+/** The shared 404 shape every not-found route response uses. Status is always 404 — every existing call site needs no other. */
+export function notFound(message: string): HttpResult {
+  return { status: 404, body: { error: { type: "not-found", message } } };
+}
+
 /**
  * The one route whose success response is not JSON: an attachment download.
  * `handleGetAttachment` alone returns this, on success; its own errors still

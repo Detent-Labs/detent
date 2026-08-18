@@ -45,4 +45,9 @@ export default defineConfig({
   plugins: [react(), contentSecurityPolicy()],
   server: { port: 5173, strictPort: true },
   define: { __APP_VERSION__: JSON.stringify(appVersion) },
+  // Chrome.tsx's account menu uses the Popover API (`beforetoggle`, for JS
+  // positioning): Chrome 114+, Safari 17+, Firefox 125+. Vite's default
+  // target (esbuild's `baseline-widely-available`, roughly Chrome 107/Safari
+  // 16/Firefox 104) predates that floor, so it must be named explicitly.
+  build: { target: ["chrome114", "safari17", "firefox125"] },
 });

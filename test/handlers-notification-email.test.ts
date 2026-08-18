@@ -17,7 +17,7 @@ import {
   SMTP_DEFAULT_TIMEOUT_MS,
 } from "../src/handlers/notification-email.js";
 import { deliver, PermanentError, type ClaimedRow } from "../src/engine/outbox.js";
-import { createRegistry, register, resolve, type HandlerContext, type OutboxActors } from "../src/engine/registry.js";
+import { createRegistry, type HandlerContext, type OutboxActors } from "../src/engine/registry.js";
 import { createDefaultRegistry } from "../src/engine/host.js";
 import type { Action } from "../src/schema/definition.js";
 
@@ -204,7 +204,7 @@ async function withFake<T>(opts: FakeOptions, fn: (server: FakeServer) => Promis
 // --- default registration ---------------------------------------------------
 
 test("createDefaultRegistry resolves notification.email", () => {
-  expect(resolve(createDefaultRegistry(), NOTIFICATION_EMAIL_ACTION_TYPE)).toBeDefined();
+  expect(createDefaultRegistry().get(NOTIFICATION_EMAIL_ACTION_TYPE)).toBeDefined();
 });
 
 test("a caller-supplied registry without the handler is unaffected", async () => {
@@ -399,7 +399,7 @@ test("a connection dropped after the body was accepted still succeeds", async ()
 test("deliver evaluates an Action.output mapping over the handler's result", async () => {
   await withFake({}, async () => {
     const reg = createRegistry();
-    register(reg, NOTIFICATION_EMAIL_ACTION_TYPE, mailDef);
+    reg.set(NOTIFICATION_EMAIL_ACTION_TYPE, mailDef);
     const row = rowFor(validConfig, { field_sent: { lang: "cel", src: "result.messageId" } });
     const patch = await deliver(row, reg, accountsDb([]));
     expect(patch).toEqual({ field_sent: "<idem_row@example.test>" });
@@ -409,7 +409,7 @@ test("deliver evaluates an Action.output mapping over the handler's result", asy
 test("deliver succeeds with no Action.output mapping and writes no field", async () => {
   await withFake({}, async (server) => {
     const reg = createRegistry();
-    register(reg, NOTIFICATION_EMAIL_ACTION_TYPE, mailDef);
+    reg.set(NOTIFICATION_EMAIL_ACTION_TYPE, mailDef);
     const patch = await deliver(rowFor(validConfig), reg, accountsDb(ACCOUNTS));
     expect(patch).toEqual({});
     expect(server.messages).toHaveLength(1);
@@ -419,7 +419,7 @@ test("deliver succeeds with no Action.output mapping and writes no field", async
 test("an output mapping that cannot read the result fails transiently, after the message is out", async () => {
   await withFake({}, async (server) => {
     const reg = createRegistry();
-    register(reg, NOTIFICATION_EMAIL_ACTION_TYPE, mailDef);
+    reg.set(NOTIFICATION_EMAIL_ACTION_TYPE, mailDef);
     const row = rowFor(validConfig, { field_sent: { lang: "cel", src: "result.noSuchKey" } });
     const err = await rejects(deliver(row, reg, accountsDb([])));
     // Transient, so the outbox retries and the message goes out again. This is

@@ -6,6 +6,8 @@ import type { Route } from "../routing.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
+import { usePagedList } from "../../../shell/usePagedList.js";
+import { ErrorBanner } from "../../../shell/ErrorBanner.js";
 import { labelText } from "./instancesLogic.js";
 import { t, tFill } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
@@ -61,8 +63,6 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
   // via GET /processes so the step label renders in the process's own base
   // locale rather than an arbitrary object-key order.
   const [baseLocale, setBaseLocale] = useState<string | undefined>(undefined);
-  const [record, setRecord] = useState<InstanceRecordElement[]>([]);
-  const [recordCursor, setRecordCursor] = useState<string | undefined>(undefined);
   const [timer, setTimer] = useState<PendingTimer | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -70,6 +70,26 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
   const [redacting, setRedacting] = useState(false);
   const { reloadToken, refresh } = useRefresh();
   const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
+
+  // A pure paged fetch, unlike `load` below: `getInstanceRecord`'s own page,
+  // continuing from wherever `load`'s compound fetch left the cursor (see the
+  // `reset` call in `load`). Errors route through the same `fail`/`error`
+  // pair `load` uses, so one banner covers both.
+  const fetchRecordPage = useCallback(
+    async (cursor?: string) => {
+      setError(undefined);
+      try {
+        const rec = await getInstanceRecord(instanceId, token, { limit: RECORD_PAGE_LIMIT, cursor });
+        return { items: rec.items, cursor: rec.cursor };
+      } catch (err) {
+        fail(err);
+        throw err;
+      }
+    },
+    [instanceId, token, fail],
+  );
+  const recordList = usePagedList<InstanceRecordElement>(fetchRecordPage);
+  const { reset: resetRecordList } = recordList;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -84,8 +104,10 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
         listProcesses(token),
       ]);
       setVersions(vs);
-      setRecord(rec.items);
-      setRecordCursor(rec.cursor);
+      // Seeds the hook's own items/cursor from the page this compound fetch
+      // already retrieved, so `recordList.loadMore()`'s first call continues
+      // from here instead of refetching page one.
+      resetRecordList(rec.items, rec.cursor);
       setTimer(timers.items.find((t) => t.instanceId === instanceId));
       setBaseLocale(processes.find((p) => p.processId === v.processId)?.baseLocale);
     } catch (err) {
@@ -93,22 +115,7 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
     } finally {
       setLoading(false);
     }
-  }, [instanceId, token, locale, fail]);
-
-  const loadMoreRecord = useCallback(async () => {
-    if (!recordCursor) return;
-    setLoading(true);
-    setError(undefined);
-    try {
-      const rec = await getInstanceRecord(instanceId, token, { limit: RECORD_PAGE_LIMIT, cursor: recordCursor });
-      setRecord((prev) => [...prev, ...rec.items]);
-      setRecordCursor(rec.cursor);
-    } catch (err) {
-      fail(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [instanceId, token, recordCursor, locale, fail]);
+  }, [instanceId, token, locale, fail, resetRecordList]);
 
   useEffect(() => {
     void load();
@@ -146,22 +153,14 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
           {t(locale, "instance.back")}
         </button>
         {loading && <p>{t(locale, "common.loading")}</p>}
-        {!loading && error && (
-          <div className="admin-error-banner" role="alert">
-            <span className="admin-error-banner-stamp">{t(locale, "common.failed")}</span>
-            <span className="admin-error-banner-message">{error}</span>
-            <button type="button" className="btn btn-secondary" onClick={refresh}>
-              {t(locale, "common.retry")}
-            </button>
-          </div>
-        )}
+        {!loading && error && <ErrorBanner error={error} locale={locale} onRetry={refresh} />}
         {!loading && !error && <p className="admin-empty">{t(locale, "instance.notFound")}</p>}
       </main>
     );
   }
 
   const definitionHash = versions.find((v) => v.version === view.version)?.definitionHash ?? "—";
-  const derived = deriveFromRecord(record);
+  const derived = deriveFromRecord(recordList.items);
 
   return (
     <main className="admin-screen">
@@ -231,20 +230,12 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
         {t(locale, "common.refresh")}
       </button>
 
-      {error && (
-        <div className="admin-error-banner" role="alert">
-          <span className="admin-error-banner-stamp">{t(locale, "common.failed")}</span>
-          <span className="admin-error-banner-message">{error}</span>
-          <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
-            {t(locale, "common.retry")}
-          </button>
-        </div>
-      )}
+      {error && <ErrorBanner error={error} locale={locale} onRetry={refresh} retryDisabled={loading} />}
 
       <h2>{t(locale, "instance.recordTitle")}</h2>
-      {record.length === 0 && !loading && !error && <p className="admin-empty">{t(locale, "instance.recordEmpty")}</p>}
+      {recordList.items.length === 0 && !loading && !error && <p className="admin-empty">{t(locale, "instance.recordEmpty")}</p>}
       <ul className="admin-timeline">
-        {record.map((el, i) => {
+        {recordList.items.map((el, i) => {
           const d = describeElement(el);
           return (
             <li key={i}>
@@ -255,9 +246,9 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
           );
         })}
       </ul>
-      {recordCursor && (
+      {recordList.cursor && (
         <div className="admin-load-more">
-          <button type="button" className="btn btn-secondary" onClick={() => void loadMoreRecord()} disabled={loading}>
+          <button type="button" className="btn btn-secondary" onClick={() => void recordList.loadMore()} disabled={loading || recordList.loading}>
             {t(locale, "instance.loadMoreHistory")}
           </button>
         </div>

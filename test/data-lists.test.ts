@@ -6,11 +6,10 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { createDefaultDataSourceRegistry, MAX_DATA_LIST_VALUES, DB_LIST_DATA_SOURCE_TYPE } from "../src/engine/host.js";
-import { resolveDataSource } from "../src/engine/registry.js";
 
 const DB = !!process.env.DATABASE_URL;
 
-const handler = () => resolveDataSource(createDefaultDataSourceRegistry(), DB_LIST_DATA_SOURCE_TYPE)!;
+const handler = () => createDefaultDataSourceRegistry().get(DB_LIST_DATA_SOURCE_TYPE)!;
 
 async function seedList(listKey: string, values: { value: string; label: string; active?: boolean; sortOrder?: number }[]): Promise<void> {
   await sql`INSERT INTO data_lists (list_key, label, updated_by) VALUES (${listKey}, ${listKey}, ${"tester"})`;
@@ -149,6 +148,6 @@ test.skipIf(!DB)("an unknown listKey raises a plain canary Error naming the key"
 
 test.skipIf(!DB)("the static handler ignores heldValues", async () => {
   const options = [{ value: "us", label: { en: "United States" } }];
-  const staticDef = resolveDataSource(createDefaultDataSourceRegistry(), "static")!;
+  const staticDef = createDefaultDataSourceRegistry().get("static")!;
   expect(await staticDef.resolve({ config: { options }, heldValues: ["ca"] , db: sql })).toEqual(options);
 });

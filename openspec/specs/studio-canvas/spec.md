@@ -893,12 +893,13 @@ The header bar SHALL show a `⋮` overflow menu. The menu SHALL hold
 what each one does. The menu calls that logic. The menu holds no save,
 discard, or publish logic of its own.
 
-The menu SHALL group its remaining controls under two headings. "Process,
-saved with the draft" SHALL hold the editable process key and the
-base-locale control the `studio-app` capability's base-locale
-requirement governs. "This session only" SHALL hold the `RegistryPanel`
-action-registry selector, with a caption stating it is never written to
-the draft.
+The menu SHALL show its remaining controls under one heading: "Process,
+saved with the draft". That heading SHALL hold the editable process key
+and the base-locale control the `studio-app` capability's base-locale
+requirement governs. The menu SHALL NOT offer an action-registry
+selector or any other session-only control. Nothing in the studio ever
+loads a live `Registry` a registry-resolution check could run against.
+The menu therefore holds nothing session-only.
 
 The header bar's summary fields SHALL stay a read-only pass-through of
 state `EditorArea` owns. Those fields are the process name, the revision
@@ -927,7 +928,8 @@ them carries logic of its own.
 - **WHEN** the developer opens the `⋮` menu
 - **THEN** the key and base-locale control appear under "Process, saved
   with the draft"
-- **AND** the action-registry selector appears under "This session only"
+- **AND** no action-registry selector and no other session-only control
+  appears anywhere in the menu
 
 ### Requirement: A step node on the canvas offers an inline rename
 

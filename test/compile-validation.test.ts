@@ -17,6 +17,7 @@ import {
   CompileValidationError,
   MAX_EXPRESSION_LENGTH,
 } from "../src/schema/compile.js";
+import { canonicalize } from "../src/schema/canonical-json.js";
 
 const example = JSON.parse(
   readFileSync(new URL("../examples/expense-approval.json", import.meta.url), "utf8"),
@@ -161,6 +162,69 @@ describe("compile: unknown-key rejection", () => {
         true,
       ]);
     }
+  });
+
+  // design.md's Risk section: this is the counterexample that rules out
+  // "parse the whole body, then diff" as the detection mechanism. `assignment`
+  // requires `strategy` (definition.ts), so a naive parse-then-diff approach
+  // throws a ZodError on the missing field before it ever gets to report the
+  // unknown key. checkUnknownKeys inspects each object's own keys
+  // independently of whether the rest of the body is well-typed, so it must
+  // still report `zzAssignment` here, as its own explicit assertion — not
+  // folded into the shared planted-cases loop above — so a future regression
+  // on this exact case fails loudly and by name.
+  it("locates an unknown key even when the same object is also missing a required field", () => {
+    const b = baseBody();
+    b.workflow.steps[0].assignment = { zzAssignment: 1 }; // no `strategy`: also invalid on its own
+    const err = rejects(b);
+    expect(err).toBeInstanceOf(CompileValidationError);
+    expect(err.issues.some((i) => i.value === "zzAssignment")).toBe(true);
+  });
+
+  describe("union-dispatch sites", () => {
+    // FieldDef.type: BaseFieldType | Plugin is already covered by the "plugin"
+    // planted case above. The three ViewField sites are lower risk (a boolean
+    // value is never a plain object, so there is no object-vs-object
+    // ambiguity to disambiguate) but still need their own coverage: no
+    // existing test plants an unknown key inside an expression-shaped
+    // visible/required/readonly value.
+    it("catches an unknown key inside an expression-shaped ViewField.visible", () => {
+      const b = baseBody();
+      b.workflow.steps[0].view = {
+        fields: [{ ref: "field_amount", visible: { ...cel("true"), zzVisible: 1 } }],
+      };
+      const err = rejects(b);
+      expect(err.issues.some((i) => i.loc === "workflow.steps[0].view.fields[0].visible.zzVisible" && i.value === "zzVisible")).toBe(true);
+    });
+
+    // FieldDef.default: Expression | Literal needs its own disambiguation
+    // rule (design.md's Decisions section): Literal recurses through
+    // z.record(z.string(), literal), so it can ALSO be a plain object, and
+    // the general primitive-vs-object rule cannot tell the two apart.
+    it("catches an unknown key on the Expression-shaped branch of FieldDef.default", () => {
+      const b = baseBody();
+      b.fields[0].default = { ...cel("true"), zzDefault: 1 };
+      const err = rejects(b);
+      expect(err.issues.some((i) => i.loc === "fields[0].default.zzDefault" && i.value === "zzDefault")).toBe(true);
+    });
+
+    it("raises no unknown-key issue for an object-shaped, non-lang default (an opaque Literal)", () => {
+      const b = baseBody();
+      b.fields[0].default = { foo: "bar" }; // no `lang`: not Expression-shaped, so this is Literal data
+      expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+    });
+  });
+
+  // A cheap regression guard on the walker's own correctness (design.md's
+  // "keep canonicalize out of the detection path" decision), not the
+  // detection mechanism itself: for a body the new walker reports zero
+  // unknown-key issues on, and that also parses cleanly under processBody,
+  // stripping must have changed nothing.
+  it("a full Zod parse leaves a clean body's canonical form unchanged (consistency oracle)", () => {
+    const b = baseBody();
+    expect(() => compileProcessBody(structuredClone(b) as ProcessBody)).not.toThrow();
+    const parsed = processBody.parse(b);
+    expect(canonicalize(parsed)).toEqual(canonicalize(b));
   });
 });
 

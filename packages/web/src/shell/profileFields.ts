@@ -1,39 +1,15 @@
 /**
- * The profile page's presentation decision, kept out of the component so it can
- * be asserted without a DOM. `ProfilePage.tsx` renders exactly what this
- * returns and decides nothing of its own.
- *
- * `GET /account/me` answers in two shapes behind one type: a local account
- * carries `editable: true` with the four stored fields, and a federated actor
- * carries `editable: false` with an id and roles alone. That split decides the
- * whole page, so it is made once, here.
+ * The profile page's two small helpers, kept out of the component so they can
+ * be asserted without a DOM. `ProfilePage.tsx` renders the federated and
+ * local branches directly as JSX; this module holds only what both branches
+ * share: `rolesText`'s formatting, `editSeed`'s and `accountChanges`' form
+ * bookkeeping, and the `ABSENT` placeholder all three use.
  */
 import type { AccountView } from "../api/types.js";
-import type { CatalogKey } from "../i18n/catalogs/shell.js";
 import { asUiLocale, type UiLocale } from "../i18n/locale.js";
 
 /** Printed where a local account holds no value for a row the page still shows. */
 export const ABSENT = "—";
-
-export type ProfileFieldKey = "id" | "email" | "roles" | "managerUserId" | "displayName" | "locale";
-
-/**
- * `read-only` prints `value`; the other two render a control seeded from
- * `ProfileEdits`. `mono` marks a value the engine matches exactly — an actor id,
- * a manager id, a role name — which the design language sets in the mono face.
- */
-export interface ProfileRow {
-  key: ProfileFieldKey;
-  labelKey: CatalogKey;
-  value: string;
-  mono: boolean;
-  control: "read-only" | "text" | "locale";
-}
-
-export interface ProfileView {
-  editable: boolean;
-  rows: ProfileRow[];
-}
 
 /** The two fields `PATCH /account/me` accepts, held as form state. */
 export interface ProfileEdits {
@@ -42,30 +18,8 @@ export interface ProfileEdits {
 }
 
 /** Role names print as one mono list rather than one row each: the row names the fact, the value carries every role the account holds. */
-function rolesText(roles: readonly string[]): string {
+export function rolesText(roles: readonly string[]): string {
   return roles.length === 0 ? ABSENT : roles.join(", ");
-}
-
-export function profileFields(account: AccountView): ProfileView {
-  if (!account.editable) {
-    return {
-      editable: false,
-      rows: [
-        { key: "id", labelKey: "profile.id", value: account.id, mono: true, control: "read-only" },
-        { key: "roles", labelKey: "profile.roles", value: rolesText(account.roles), mono: true, control: "read-only" },
-      ],
-    };
-  }
-  return {
-    editable: true,
-    rows: [
-      { key: "email", labelKey: "profile.email", value: account.email ?? ABSENT, mono: false, control: "read-only" },
-      { key: "roles", labelKey: "profile.roles", value: rolesText(account.roles), mono: true, control: "read-only" },
-      { key: "managerUserId", labelKey: "profile.manager", value: account.managerUserId ?? ABSENT, mono: true, control: "read-only" },
-      { key: "displayName", labelKey: "profile.displayName", value: account.displayName ?? "", mono: false, control: "text" },
-      { key: "locale", labelKey: "profile.locale", value: asUiLocale(account.locale) ?? "", mono: false, control: "locale" },
-    ],
-  };
 }
 
 /**

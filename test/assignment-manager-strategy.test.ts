@@ -15,7 +15,6 @@ import {
 } from "../src/engine/assignment-strategies.js";
 import {
   createAssignmentRegistry,
-  registerAssignmentStrategy,
   resolveStepAssignment,
   DEFAULT_ASSIGNMENT_RESOLUTION_TIMEOUT_MS,
 } from "../src/engine/registry.js";
@@ -138,7 +137,7 @@ test("the shipped registry holds both the static entry and the org one", () => {
 
 const registryOf = (resolve: () => Promise<string[]>) => {
   const reg = createAssignmentRegistry();
-  registerAssignmentStrategy(reg, "test.strategy", { resolve });
+  reg.set("test.strategy", { resolve });
   return reg;
 };
 

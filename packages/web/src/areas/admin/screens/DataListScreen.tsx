@@ -4,6 +4,7 @@ import type { DataListDetail } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
+import { ErrorBanner } from "../../../shell/ErrorBanner.js";
 import {
   attributesToInputs,
   badNumberAttributes,
@@ -152,15 +153,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
       </button>
       <h1>{listKey}</h1>
 
-      {error && (
-        <div className="admin-error-banner" role="alert">
-          <span className="admin-error-banner-stamp">{t(locale, "common.failed")}</span>
-          <span className="admin-error-banner-message">{error}</span>
-          <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
-            {t(locale, "common.retry")}
-          </button>
-        </div>
-      )}
+      {error && <ErrorBanner error={error} locale={locale} onRetry={refresh} retryDisabled={loading} />}
 
       {detail && (
         <>

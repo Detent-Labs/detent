@@ -14,7 +14,7 @@
 
 import type { SQL } from "bun";
 import { sql } from "./store.js";
-import { resolve, type OutboxActors, type Registry } from "./registry.js";
+import type { OutboxActors, Registry } from "./registry.js";
 import { logSkippedItem } from "./poll.js";
 import { durationMs } from "./duration.js";
 import { evalOutput } from "../cel/eval.js";
@@ -93,7 +93,7 @@ export class PermanentError extends Error {
 export type DeliverFn = (row: ClaimedRow, registry: Registry, db: SQL) => Promise<Record<string, unknown>>;
 
 export const deliver: DeliverFn = async (row, registry, db) => {
-  const def = resolve(registry, row.action.type);
+  const def = registry.get(row.action.type);
   if (!def) throw new PermanentError(`no handler registered for type: ${row.action.type}`);
   const result = await def.handler({
     action: row.action,

@@ -1,8 +1,8 @@
 /**
  * The authoring routes. Kept out of `routes.ts`, which stays the
  * participant-facing surface — same reasoning as `admin-routes.ts`. Same
- * framework-agnostic handler shape, and the same `resolveActor` and `guarded`
- * helpers, imported from `routes.ts` rather than copied.
+ * framework-agnostic handler shape, and the same `route` helper, imported
+ * from `routes.ts` rather than copied.
  *
  * Each handler resolves the actor, then applies one of three gates before any
  * read or write:
@@ -17,7 +17,7 @@
  *   seam (`src/auth/authorize.ts`).
  */
 import type { SQL } from "bun";
-import { sql, withTransaction } from "../engine/store.js";
+import { withTransaction } from "../engine/store.js";
 import { getDraft, saveDraft, listDrafts, deleteDraft, markDraftPublished } from "../engine/drafts.js";
 import { getTemplate, listTemplates, saveTemplate, deleteTemplate } from "../engine/templates.js";
 import { publishBody, createDefinitionStore } from "../engine/definitions.js";
@@ -34,8 +34,8 @@ import { describeConfigSchema, type ConfigFieldDescriptor } from "../engine/conf
 import type { ZodTypeAny } from "zod";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, requirePermission, AuthorizationError, DEVELOPER_ROLE, TEMPLATES_ROLE, AUTHOR_ROLE } from "../auth/authorize.js";
-import { type HttpResult } from "./errors.js";
-import { resolveActor, guarded, readJson, parseVersion } from "./routes.js";
+import { notFound, type HttpResult } from "./errors.js";
+import { route, readJson, parseVersion } from "./routes.js";
 import type { ProcessId, ProcessBody, MigrationSpec } from "../schema/definition.js";
 
 /**
@@ -68,28 +68,22 @@ function requireStudioRead(actor: { id: string; roles: readonly string[] }): voi
   );
 }
 
-export async function handleListDrafts(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireAuthoring(actor);
+export async function handleListDrafts(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, requireAuthoring, async () => {
     return { status: 200, body: await listDrafts(db) };
   });
 }
 
-export async function handleGetDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireAuthoring(actor);
+export async function handleGetDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, requireAuthoring, async () => {
     const draft = await getDraft(processId as ProcessId, db);
-    if (!draft) return { status: 404, body: { error: { type: "not-found", message: `no draft: ${processId}` } } };
+    if (!draft) return notFound(`no draft: ${processId}`);
     return { status: 200, body: draft };
   });
 }
 
-export async function handleSaveDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireAuthoring(actor);
+export async function handleSaveDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, requireAuthoring, async (actor) => {
     const parsed = (await readJson(req)) as { body?: unknown; layout?: unknown; revision?: unknown; baseVersion?: unknown };
     const saved = await saveDraft(
       processId as ProcessId,
@@ -107,12 +101,10 @@ export async function handleSaveDraft(processId: string, req: Request, resolver:
   });
 }
 
-export async function handleDeleteDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireAuthoring(actor);
+export async function handleDeleteDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, requireAuthoring, async () => {
     const removed = await deleteDraft(processId as ProcessId, db);
-    if (!removed) return { status: 404, body: { error: { type: "not-found", message: `no draft: ${processId}` } } };
+    if (!removed) return notFound(`no draft: ${processId}`);
     return { status: 204, body: null };
   });
 }
@@ -133,25 +125,31 @@ export async function handlePublishDraft(
   resolver: ActorResolver,
   registry: Registry,
   dataSourceRegistry: DataSourceRegistry,
-  db: SQL = sql,
+  db: SQL,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireAuthoring(actor);
-    await requirePermission(actor, "publish", processId as ProcessId, db);
-    const draft = await getDraft(processId as ProcessId, db);
-    if (!draft) return { status: 404, body: { error: { type: "not-found", message: `no draft: ${processId}` } } };
-    const published = await withTransaction(db, async (tx) => {
-      const result = await publishBody(processId as ProcessId, draft.body as ProcessBody, registry, dataSourceRegistry, tx, assignmentRegistry);
-      await markDraftPublished(processId as ProcessId, result.version, tx);
-      return result;
-    });
-    return {
-      status: 200,
-      body: { processId: published.processId, version: published.version, definitionHash: published.definitionHash, status: published.status },
-    };
-  });
+  return route(
+    req,
+    resolver,
+    db,
+    async (actor) => {
+      requireAuthoring(actor);
+      await requirePermission(actor, "publish", processId as ProcessId, db);
+    },
+    async () => {
+      const draft = await getDraft(processId as ProcessId, db);
+      if (!draft) return notFound(`no draft: ${processId}`);
+      const published = await withTransaction(db, async (tx) => {
+        const result = await publishBody(processId as ProcessId, draft.body as ProcessBody, registry, dataSourceRegistry, tx, assignmentRegistry);
+        await markDraftPublished(processId as ProcessId, result.version, tx);
+        return result;
+      });
+      return {
+        status: 200,
+        body: { processId: published.processId, version: published.version, definitionHash: published.definitionHash, status: published.status },
+      };
+    },
+  );
 }
 
 /**
@@ -164,13 +162,11 @@ export async function handlePublishDraft(
  * body is the one every participant already runs, so it is the safe half of
  * the pair to widen. A draft stays closed to the curator.
  */
-export async function handleGetVersionBody(processId: string, versionRaw: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireStudioRead(actor);
+export async function handleGetVersionBody(processId: string, versionRaw: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, requireStudioRead, async () => {
     const version = parseVersion(versionRaw, "version");
     const body = await createDefinitionStore(db).resolveBody(processId as ProcessId, version);
-    if (!body) return { status: 404, body: { error: { type: "not-found", message: `no published version ${version} for ${processId}` } } };
+    if (!body) return notFound(`no published version ${version} for ${processId}`);
     return { status: 200, body };
   });
 }
@@ -189,15 +185,13 @@ export async function handleGetMigrationPlan(
   toRaw: string,
   req: Request,
   resolver: ActorResolver,
-  db: SQL = sql,
+  db: SQL,
 ): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    await requirePermission(actor, "migrate", processId as ProcessId, db);
+  return route(req, resolver, db, (actor) => requirePermission(actor, "migrate", processId as ProcessId, db), async () => {
     const fromVersion = parseVersion(fromRaw, "fromVersion");
     const toVersion = parseVersion(toRaw, "toVersion");
     const plan = await resolveMigrationPlan(processId as ProcessId, fromVersion, toVersion, db);
-    if (!plan) return { status: 404, body: { error: { type: "not-found", message: `no migration plan: ${processId} ${fromVersion}->${toVersion}` } } };
+    if (!plan) return notFound(`no migration plan: ${processId} ${fromVersion}->${toVersion}`);
     return { status: 200, body: plan };
   });
 }
@@ -209,11 +203,9 @@ export async function handlePutMigrationPlan(
   toRaw: string,
   req: Request,
   resolver: ActorResolver,
-  db: SQL = sql,
+  db: SQL,
 ): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    await requirePermission(actor, "migrate", processId as ProcessId, db);
+  return route(req, resolver, db, (actor) => requirePermission(actor, "migrate", processId as ProcessId, db), async () => {
     const fromVersion = parseVersion(fromRaw, "fromVersion");
     const toVersion = parseVersion(toRaw, "toVersion");
     const spec = await readJson(req);
@@ -224,10 +216,8 @@ export async function handlePutMigrationPlan(
 }
 
 /** Read-only orphan-key dry run, wrapping `findOrphanKeys` unchanged. Version-keyed, not plan-keyed — the scan is independent of any specific migration target. `DEVELOPER_ROLE` alone, for the reason `handleGetMigrationPlan` states. */
-export async function handleGetOrphanKeys(processId: string, versionRaw: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    await requirePermission(actor, "migrate", processId as ProcessId, db);
+export async function handleGetOrphanKeys(processId: string, versionRaw: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requirePermission(actor, "migrate", processId as ProcessId, db), async () => {
     const version = parseVersion(versionRaw, "version");
     const scan = await findOrphanKeys(processId as ProcessId, version, db);
     return { status: 200, body: scan };
@@ -272,11 +262,9 @@ export async function handleGetRegistry(
   db: SQL,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<HttpResult> {
-  return guarded(req, async () => {
-    // Reads no process data, but resolving the actor checks that account is
-    // still live, and that check belongs in the actor's OWN tenant directory.
-    const actor = await resolveActor(req, resolver, db);
-    requireAuthoring(actor);
+  // Reads no process data, but resolving the actor checks that account is
+  // still live, and that check belongs in the actor's OWN tenant directory.
+  return route(req, resolver, db, requireAuthoring, async () => {
     return {
       status: 200,
       body: {
@@ -291,40 +279,32 @@ export async function handleGetRegistry(
   });
 }
 
-export async function handleListTemplates(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireStudioRead(actor);
+export async function handleListTemplates(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, requireStudioRead, async () => {
     return { status: 200, body: await listTemplates(db) };
   });
 }
 
-export async function handleGetTemplate(templateKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireStudioRead(actor);
+export async function handleGetTemplate(templateKey: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, requireStudioRead, async () => {
     const template = await getTemplate(templateKey, db);
-    if (!template) return { status: 404, body: { error: { type: "not-found", message: `no template: ${templateKey}` } } };
+    if (!template) return notFound(`no template: ${templateKey}`);
     return { status: 200, body: template };
   });
 }
 
-export async function handleSaveTemplate(templateKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, TEMPLATES_ROLE);
+export async function handleSaveTemplate(templateKey: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, TEMPLATES_ROLE), async (actor) => {
     const parsed = (await readJson(req)) as { body?: unknown; layout?: unknown };
     const saved = await saveTemplate(templateKey, { body: parsed.body, layout: parsed.layout, createdBy: actor.id }, db);
     return { status: 200, body: saved };
   });
 }
 
-export async function handleDeleteTemplate(templateKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, TEMPLATES_ROLE);
+export async function handleDeleteTemplate(templateKey: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, TEMPLATES_ROLE), async () => {
     const removed = await deleteTemplate(templateKey, db);
-    if (!removed) return { status: 404, body: { error: { type: "not-found", message: `no template: ${templateKey}` } } };
+    if (!removed) return notFound(`no template: ${templateKey}`);
     return { status: 204, body: null };
   });
 }

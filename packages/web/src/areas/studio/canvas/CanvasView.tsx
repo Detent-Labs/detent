@@ -77,6 +77,18 @@ function isPoint(value: unknown): value is Point {
   return !!value && typeof (value as Point).x === "number" && typeof (value as Point).y === "number";
 }
 
+/** The guard-then-merge shape every `on*PointerMove` handler below repeats:
+ * bail when no drag of that kind is active, otherwise merge the
+ * caller-computed patch into it. Node, group, waypoint and connect-drag
+ * callers merge a fresh `toSvgPoint(e)`; the marquee merges the raw client
+ * point into its own `currentClient` field instead (design.md - Decisions).
+ * The helper computes neither: each caller passes its own patch, so this
+ * never assumes a field name or a coordinate space. */
+function trackPointer<T extends object>(drag: T | null, setDrag: (next: T) => void, patch: Partial<T>): void {
+  if (!drag) return;
+  setDrag({ ...drag, ...patch });
+}
+
 /**
  * Interactive, hand-rolled SVG canvas (design.md: not Mermaid, not a graph
  * library). Node position writes to `saveState.layout` via `onMoveStep`
@@ -383,10 +395,7 @@ export function CanvasView({
     setNodeDrag({ stepId, stepIds, startPointer: p, startPos, current: p });
   };
 
-  const onNodePointerMove = (e: React.PointerEvent) => {
-    if (!nodeDrag) return;
-    setNodeDrag({ ...nodeDrag, current: toSvgPoint(e) });
-  };
+  const onNodePointerMove = (e: React.PointerEvent) => trackPointer(nodeDrag, setNodeDrag, { current: toSvgPoint(e) });
 
   /**
    * A waypoint handle's own gesture. Every handler stops propagation: the edge
@@ -407,10 +416,7 @@ export function CanvasView({
     setGroupDrag({ groupId: group.id, startPointer: p, startPos, current: p });
   };
 
-  const onGroupPointerMove = (e: React.PointerEvent) => {
-    if (!groupDrag) return;
-    setGroupDrag({ ...groupDrag, current: toSvgPoint(e) });
-  };
+  const onGroupPointerMove = (e: React.PointerEvent) => trackPointer(groupDrag, setGroupDrag, { current: toSvgPoint(e) });
 
   const onGroupPointerUp = (e: React.PointerEvent, group: StepGroup) => {
     e.stopPropagation();
@@ -436,10 +442,7 @@ export function CanvasView({
     setWaypointDrag({ pathId, ...at, start: p, current: p });
   };
 
-  const onWaypointPointerMove = (e: React.PointerEvent) => {
-    if (!waypointDrag) return;
-    setWaypointDrag({ ...waypointDrag, current: toSvgPoint(e) });
-  };
+  const onWaypointPointerMove = (e: React.PointerEvent) => trackPointer(waypointDrag, setWaypointDrag, { current: toSvgPoint(e) });
 
   const onWaypointPointerUp = (e: React.PointerEvent) => {
     e.stopPropagation();
@@ -526,10 +529,8 @@ export function CanvasView({
     setMarquee({ origin: { x: wrap.left, y: wrap.top }, startClient: client, currentClient: client, startSvg: toSvgPoint(e) });
   };
 
-  const onMarqueePointerMove = (e: React.PointerEvent) => {
-    if (!marquee) return;
-    setMarquee({ ...marquee, currentClient: { x: e.clientX, y: e.clientY } });
-  };
+  const onMarqueePointerMove = (e: React.PointerEvent) =>
+    trackPointer(marquee, setMarquee, { currentClient: { x: e.clientX, y: e.clientY } });
 
   // Restoring `disablePan` is not optional and not only a pointer-up concern:
   // Panzoom binds `up` on `document`, so a release outside the SVG would leave
@@ -576,10 +577,7 @@ export function CanvasView({
     setConnectDrag({ sourceStepId: stepId, current: toSvgPoint(e) });
   };
 
-  const onHandlePointerMove = (e: React.PointerEvent) => {
-    if (!connectDrag) return;
-    setConnectDrag({ ...connectDrag, current: toSvgPoint(e) });
-  };
+  const onHandlePointerMove = (e: React.PointerEvent) => trackPointer(connectDrag, setConnectDrag, { current: toSvgPoint(e) });
 
   const showRejection = (e: { clientX: number; clientY: number }, text: string) => {
     // Screen-relative, not the SVG's (panned/zoomed) user-space `point` — the

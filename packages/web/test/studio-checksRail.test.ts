@@ -77,6 +77,21 @@ describe("groupChecksBySource", () => {
     const groups = groupChecksBySource(validation({}));
     expect(groups.every((g) => !g.heldBack)).toBe(true);
   });
+
+  it("a structurally valid draft with no Registry loaded holds registry back, not cel (fix-studio-registry-panel-example-mismatch)", () => {
+    const groups = groupChecksBySource(
+      validation({ structurallyValid: true, structuralChecked: true, registryChecked: false }),
+    );
+    expect(groups.find((g) => g.source === "registry")!.heldBack).toBe(true);
+    expect(groups.find((g) => g.source === "cel")!.heldBack).toBe(false);
+  });
+
+  it("registry un-holds-back when registryChecked is true, independent of what the rest of the studio can feed it", () => {
+    const groups = groupChecksBySource(
+      validation({ structurallyValid: true, structuralChecked: true, registryChecked: true }),
+    );
+    expect(groups.find((g) => g.source === "registry")!.heldBack).toBe(false);
+  });
 });
 
 describe("allChecksClear", () => {
@@ -91,6 +106,21 @@ describe("allChecksClear", () => {
   it("is false when a group carries an open issue", () => {
     const groups = groupChecksBySource(
       validation({ issues: [{ entityType: "step", entityId: "s", message: "m", source: "cel" }] }),
+    );
+    expect(allChecksClear(groups)).toBe(false);
+  });
+
+  it("is true when registry is held back but every other group is clear (fix-studio-registry-panel-example-mismatch)", () => {
+    const groups = groupChecksBySource(validation({ registryChecked: false }));
+    expect(allChecksClear(groups)).toBe(true);
+  });
+
+  it("is false when registry is held back AND a non-registry group carries an issue", () => {
+    const groups = groupChecksBySource(
+      validation({
+        registryChecked: false,
+        issues: [{ entityType: "step", entityId: "s", message: "m", source: "cel" }],
+      }),
     );
     expect(allChecksClear(groups)).toBe(false);
   });
@@ -120,6 +150,21 @@ describe("totalOpenIssueCount", () => {
       validation({ zodValid: false, structurallyValid: false, structuralChecked: false, issues: [] }),
     );
     expect(totalOpenIssueCount(groups)).toEqual({ kind: "held-back" });
+  });
+
+  it("is clear when registry is held back but every other group is clear (fix-studio-registry-panel-example-mismatch)", () => {
+    const groups = groupChecksBySource(validation({ registryChecked: false }));
+    expect(totalOpenIssueCount(groups)).toEqual({ kind: "clear" });
+  });
+
+  it("reflects only the non-registry count when registry is held back and another group carries issues", () => {
+    const groups = groupChecksBySource(
+      validation({
+        registryChecked: false,
+        issues: [{ entityType: "step", entityId: "s", message: "m", source: "cel" }],
+      }),
+    );
+    expect(totalOpenIssueCount(groups)).toEqual({ kind: "count", count: 1 });
   });
 });
 

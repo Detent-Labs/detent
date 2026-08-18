@@ -17,10 +17,8 @@ import { log } from "../log.js";
 import { registerSubprocessHandlers } from "./subprocess.js";
 import {
   createRegistry,
-  register,
   type Registry,
   createDataSourceRegistry,
-  registerDataSource,
   createDefaultAssignmentRegistry,
   type DataSourceRegistry,
   type AssignmentRegistry,
@@ -51,9 +49,9 @@ import { MAX_KEY_LENGTH } from "../schema/compile.js";
  */
 export function createDefaultRegistry(): Registry {
   const reg = createRegistry();
-  register(reg, HTTP_ACTION_TYPE, httpHandlerDef);
-  register(reg, NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef);
-  register(reg, PROCESS_START_ACTION_TYPE, processStartHandlerDef);
+  reg.set(HTTP_ACTION_TYPE, httpHandlerDef);
+  reg.set(NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef);
+  reg.set(PROCESS_START_ACTION_TYPE, processStartHandlerDef);
   return reg;
 }
 
@@ -142,12 +140,12 @@ export function attributeMatchesColumn(column: DataListColumn, value: unknown): 
  */
 export function createDefaultDataSourceRegistry(): DataSourceRegistry {
   const reg = createDataSourceRegistry();
-  registerDataSource(reg, "static", {
+  reg.set("static", {
     configSchema: staticDataSourceConfigSchema,
     // A static option list holds no notion of a retired value, so heldValues is ignored.
     resolve: async (ctx) => (ctx.config as { options: FieldOption[] }).options,
   });
-  registerDataSource(reg, DB_LIST_DATA_SOURCE_TYPE, {
+  reg.set(DB_LIST_DATA_SOURCE_TYPE, {
     configSchema: dbListDataSourceConfigSchema,
     resolve: async (ctx) => {
       const { listKey } = ctx.config as { listKey: string };

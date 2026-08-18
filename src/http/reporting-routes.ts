@@ -10,14 +10,13 @@
  * which ids do. Read-only throughout: no handler here writes.
  */
 import type { SQL } from "bun";
-import { sql } from "../engine/store.js";
 import { listProcesses } from "../engine/definitions.js";
 import { cycleTime, bottleneck, sla, type DateRange } from "../engine/reporting.js";
 import type { ProcessId } from "../schema/definition.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, REPORTS_ROLE } from "../auth/authorize.js";
-import { RequestShapeError, type HttpResult } from "./errors.js";
-import { resolveActor, guarded } from "./routes.js";
+import { RequestShapeError, notFound, type HttpResult } from "./errors.js";
+import { route } from "./routes.js";
 
 /**
  * Both bounds are required and must parse. The frontend computes the
@@ -37,14 +36,8 @@ function parseRange(url: URL): DateRange {
   return { from: new Date(fromMs).toISOString(), to: new Date(toMs).toISOString() };
 }
 
-function notFound(processId: string): HttpResult {
-  return { status: 404, body: { error: { type: "not-found", message: `no such process: ${processId}` } } };
-}
-
-export async function handleReportingListProcesses(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, REPORTS_ROLE);
+export async function handleReportingListProcesses(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, REPORTS_ROLE), async () => {
     return { status: 200, body: { processes: await listProcesses(db) } };
   });
 }
@@ -61,9 +54,7 @@ async function handleView(
   resolver: ActorResolver,
   db: SQL,
 ): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, REPORTS_ROLE);
+  return route(req, resolver, db, (actor) => requireRole(actor, REPORTS_ROLE), async () => {
     const range = parseRange(new URL(req.url));
     const id = processId as ProcessId;
     const result = view === "cycle-time"
@@ -71,19 +62,19 @@ async function handleView(
       : view === "bottleneck"
         ? await bottleneck(id, range, db)
         : await sla(id, range, db);
-    if (!result) return notFound(processId);
+    if (!result) return notFound(`no such process: ${processId}`);
     return { status: 200, body: result as unknown as Record<string, unknown> };
   });
 }
 
-export async function handleReportingCycleTime(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handleReportingCycleTime(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return handleView(processId, "cycle-time", req, resolver, db);
 }
 
-export async function handleReportingBottleneck(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handleReportingBottleneck(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return handleView(processId, "bottleneck", req, resolver, db);
 }
 
-export async function handleReportingSla(processId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handleReportingSla(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return handleView(processId, "sla", req, resolver, db);
 }

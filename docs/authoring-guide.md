@@ -304,9 +304,10 @@ The `http.request` type reaches only a host the deployment permits. That list
 lives in the deployment's own environment, not in your process. A target
 outside it never opens a connection, and the action dead-letters with the host
 named in the message. Ask your operator to add the host, or pick one already
-on the list. The devcontainer's own entry is `webhook-sink:8080`, the sink
-service the example's `book` and `escalated_review` steps both target. Try
-the example against it before asking for a new host anywhere else.
+on the list. The devcontainer's own entry is `localhost:8080`, the
+in-container webhook sink the example's `book` and `escalated_review` steps
+both target. Try the example against it before asking for a new host
+anywhere else.
 
 Two more rules follow from the same place. The target uses `https`, unless the
 deployment opted into plain HTTP. And the handler does not follow a redirect:

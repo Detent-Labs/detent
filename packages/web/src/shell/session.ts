@@ -2,11 +2,11 @@
  * The one session for the whole frontend. One storage key, one login: an actor
  * holding two roles reaches both areas without signing in twice.
  *
- * `expiresAt` is recorded, never consulted. The `end-user-app` capability
- * requires that the frontend run no client-side expiry check and treat a `401`
- * as the sole signal that a session has ended; storing the value keeps that
- * requirement intact while a later change that wants to act on it has the value
- * already.
+ * The `end-user-app` capability requires that the frontend run no client-side
+ * expiry check and treat a `401` as the sole signal that a session has ended.
+ * `POST /auth/login`'s response still carries an expiry field
+ * (`api/types.ts`'s `LoginResponse`); the session this module stores never
+ * keeps it, since nothing here reads it.
  *
  * The four per-package keys this replaces (`app.session`, `admin.session`,
  * `studio.session`, `reporting.session`) are not read and not migrated.
@@ -19,7 +19,6 @@ export interface Session {
   token: string;
   actorId: string;
   roles: string[];
-  expiresAt: string;
   /**
    * Hydrated from `GET /account/me`, not from the login response. Absent until
    * that call resolves, and absent for good on a federated actor, who holds no
@@ -54,7 +53,6 @@ export function loadSession(storage: StorageLike | undefined = browserStorage())
       token: parsed.token,
       actorId: parsed.actorId,
       roles: parsed.roles,
-      expiresAt: parsed.expiresAt ?? "",
       displayName: typeof parsed.displayName === "string" ? parsed.displayName : undefined,
       locale: asUiLocale(parsed.locale),
     };

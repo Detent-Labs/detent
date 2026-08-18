@@ -639,18 +639,23 @@ therefore never depends on a host binding.
 
 ### Requirement: The devcontainer runs a webhook sink
 
-The devcontainer compose file SHALL run a service that answers an
-`http.request` action. The service SHALL answer every request with `200`. It
-SHALL echo a JSON request body back as its own response body. An
-`Action.output` expression then reads a value the process definition sent.
+The devcontainer SHALL run a service that answers an `http.request` action.
+The service SHALL answer every request with `200`. It SHALL echo a JSON
+request body back as its own response body. An `Action.output` expression
+then reads a value the process definition sent.
 
-The service SHALL run the image the `app` service builds, and a script tracked
-in `scripts/`. It SHALL NOT add a third-party image to the stack.
+The service SHALL run inside the `app` container, as a script tracked in
+`scripts/`. It SHALL NOT run as a separate compose service, and it SHALL NOT
+add a third-party image to the stack.
 
-The service SHALL declare a healthcheck, like every other service in that file.
-It SHALL declare no `ports` entry, exactly like the Postgres service and the
-mail catcher. A contributor who wants to reach it from the host publishes the
-port in their own gitignored `docker-compose.override.yml`.
+The service declares no healthcheck of its own, unlike the standalone
+service this requirement replaces. It runs inside `app`, which already
+declares one healthcheck for the container as a whole. A second, sink-only
+healthcheck would contend with it for no added coverage.
+
+A contributor who wants to reach it from the host publishes the port in
+their own gitignored `docker-compose.override.yml`, against the `app`
+container.
 
 #### Scenario: The shipped example books through the sink
 
@@ -672,12 +677,14 @@ port in their own gitignored `docker-compose.override.yml`.
 
 - **WHEN** the sink answers a request
 - **THEN** it writes the method and the path to stdout, where
-  `docker compose logs` shows them
+  `docker compose logs app` shows them
 
 #### Scenario: The shared compose file publishes no port for the sink
 
 - **WHEN** a contributor reads the tracked `docker-compose.yml`
-- **THEN** the sink service declares no `ports` entry
+- **THEN** the file declares no separate `webhook-sink` service, and the
+  `app` service declares no `ports` entry for the sink it now runs
+  internally
 
 ### Requirement: Every action type the shipped examples name resolves in the default registry
 
@@ -706,9 +713,10 @@ there hides a type the server cannot dispatch.
 
 The devcontainer's `HTTP_ACTION_ALLOWED_HOSTS` value SHALL hold the host of
 every `http.request` target the repository's own examples and scripts name.
-Today that is one host, `webhook-sink:8080`, the sink service the previous
-requirement describes. An entry carries its port whenever the port is not the
-scheme default, because `egressRefusal` compares `URL.host`.
+Today that is one host, `localhost:8080`, the port the in-container sink
+(the sink the previous requirement describes) listens on. An entry carries
+its port whenever the port is not the scheme default, because
+`egressRefusal` compares `URL.host`.
 
 The list SHALL hold no host that no target names. A stale entry permits egress
 to an address nothing in the repository uses.
@@ -726,8 +734,8 @@ operator reads the dead-letter view.
 
 - **WHEN** the demo script drives `examples/expense-approval.json` to its
   escalation step inside the devcontainer
-- **THEN** the `http.request` action's delivery reaches the sink rather than
-  dead-lettering on the egress policy
+- **THEN** the `http.request` action's delivery reaches the in-container
+  sink rather than dead-lettering on the egress policy
 
 #### Scenario: An example gains a new target host
 
@@ -746,6 +754,14 @@ operator reads the dead-letter view.
 - **WHEN** a contributor starts a target on `http://localhost:<port>` and
   points an `http.request` action at it, with that host in the list
 - **THEN** the plain-HTTP scheme does not refuse the delivery
+
+#### Scenario: The example's action targets resolve to the in-container sink
+
+- **WHEN** `examples/expense-approval.json`'s `book` and `escalated_review`
+  steps' `http.request` actions run inside the devcontainer
+- **THEN** each target's host matches the `localhost` port
+  `HTTP_ACTION_ALLOWED_HOSTS` names, and the sink running inside the `app`
+  container answers it
 
 ### Requirement: A browser check lands as an assertion or as a checklist entry
 

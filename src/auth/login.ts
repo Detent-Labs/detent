@@ -14,7 +14,6 @@
  */
 import { SQL } from "bun";
 import { SignJWT } from "jose";
-import { sql } from "../engine/store.js";
 import { verifyLogin } from "./users.js";
 import { LOCAL_ISSUER } from "./jwt.js";
 import type { HttpResult } from "../http/errors.js";
@@ -97,20 +96,20 @@ export function checkAndRecordAttempt(
     // that flood at its source, so what refusal now costs is the larger harm —
     // every untracked account loses its login until the window rolls. The
     // evicted entry is the one closest to resetting on its own, and losing it
-    // costs at worst one unthrottled try.
-    while (map.size >= capacity) {
-      let oldestKey: string | undefined;
-      let oldestStart = Infinity;
-      for (const [trackedKey, trackedEntry] of map) {
-        if (trackedEntry.windowStart < oldestStart) {
-          oldestStart = trackedEntry.windowStart;
-          oldestKey = trackedKey;
-        }
-      }
-      if (oldestKey === undefined) break;
-      map.delete(oldestKey);
-    }
+    // costs at worst one unthrottled try. The guard matters: when the sweep
+    // above already freed enough room, no further eviction runs. Deleting the
+    // map's first key is correct because every write below re-inserts rather
+    // than updates in place, so insertion order always tracks windowStart
+    // order and the first key is always the earliest window.
+    if (map.size >= capacity) map.delete(map.keys().next().value as string);
   }
+  // Delete before re-set: on the re-arm path (entry truthy, window expired)
+  // `key` is already in the map, and Map.set on an existing key updates its
+  // value without moving it in iteration order. Without this delete, a
+  // re-armed entry would keep its old, early position while carrying the
+  // newest windowStart in the map, breaking the invariant the eviction above
+  // relies on. Deleting an absent key (the brand-new-key path) is a no-op.
+  map.delete(key);
   map.set(key, { count: 1, windowStart: t });
   return "ok";
 }
@@ -118,7 +117,7 @@ export function checkAndRecordAttempt(
 export async function handleLogin(
   req: Request,
   secret: string,
-  db: SQL = sql,
+  db: SQL,
   clientAddress?: string,
   tenant?: string,
 ): Promise<HttpResult> {

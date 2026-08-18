@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { checkAgainstFields } from "workflow-engine/cel/check";
 import { getRegistry, listProcesses, listVersions, getDraft, getVersionBody } from "../api/client.js";
 import type { ProcessSummary, VersionSummary, RegistryInfo } from "../api/types.js";
-import { extractFields } from "./toolsScratchpadLogic.js";
+import type { FieldDef } from "workflow-engine/schema";
 import type { Route } from "../routing.js";
 import { describeCaughtError } from "../errors.js";
 import { t } from "../catalog.js";
@@ -25,7 +25,7 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
   const [versions, setVersions] = useState<VersionSummary[]>([]);
   const [hasDraft, setHasDraft] = useState(false);
   const [catalogSource, setCatalogSource] = useState<string>(""); // "draft" or a version number as a string
-  const [fields, setFields] = useState<import("workflow-engine/schema").FieldDef[]>([]);
+  const [fields, setFields] = useState<FieldDef[]>([]);
   const [catalogError, setCatalogError] = useState<string | undefined>(undefined);
   const [expression, setExpression] = useState("");
   const failLoad = useFail(onUnauthorized, (e) => setLoadError(describeCaughtError(e)));
@@ -85,7 +85,17 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
         return;
       }
       const fetchBody = source === "draft" ? getDraft(processId, token).then((d) => d?.body) : getVersionBody(processId, Number(source), token);
-      fetchBody.then((body) => setFields(extractFields(body))).catch(failCatalog);
+      fetchBody
+        .then((body: unknown) => {
+          // Both `DraftRecord.body` and `getVersionBody`'s result are opaque,
+          // unparsed JSON client-side (same convention `JsonView`/
+          // `migrationPlanLogic` already follow) — this reads out only the
+          // one array `checkAgainstFields` needs, defensively, rather than
+          // trusting the shape.
+          const rawFields = typeof body === "object" && body !== null ? (body as { fields?: unknown }).fields : undefined;
+          setFields(Array.isArray(rawFields) ? (rawFields as FieldDef[]) : []);
+        })
+        .catch(failCatalog);
     },
     [processId, token, failCatalog],
   );

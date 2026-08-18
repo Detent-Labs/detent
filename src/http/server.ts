@@ -7,9 +7,8 @@
  *
  * `createServer`'s `routes` table is the ONE place a route's method and path
  * shape appear. The CORS preflight answer is derived from it, so adding a
- * route is one entry and nothing else. Before `http-route-table` a parallel
- * OPTIONS if-chain restated every route beside the handler chain; the two
- * drifted, and the four /reporting/* routes never got a preflight branch.
+ * route is one entry and nothing else: no second per-route chain exists to
+ * drift out of sync with the handler table.
  */
 import { SQL, type Server } from "bun";
 import { timingSafeEqual } from "node:crypto";
@@ -72,6 +71,7 @@ import {
   handleListPermissionGrants,
   handleWritePermissionGrant,
   handleRevokePermissionGrant,
+  handleGetUiStrings,
 } from "./admin-routes.js";
 import { handleGetAccount, handlePatchAccount } from "./account-routes.js";
 import {
@@ -96,10 +96,8 @@ import {
   handleSaveTemplate,
   handleDeleteTemplate,
 } from "./studio-routes.js";
-import { handleGetUiStrings } from "./ui-strings-routes.js";
-import { handleLivez, handleReadyz } from "./health.js";
 import { handleMetrics } from "./metrics.js";
-import type { HttpResult, HttpBinaryResult } from "./errors.js";
+import { notFound, type HttpResult, type HttpBinaryResult } from "./errors.js";
 import { log } from "../log.js";
 import { z } from "zod";
 
@@ -149,11 +147,11 @@ function toResponse({ status, body }: HttpResult, allowed: AllowedOrigins, reque
     // Nearly every envelope this wrapper returns is actor-scoped, and an
     // instance view or a comment list holds data a participant supplied. No
     // intermediary may keep a copy. One header here covers every route, success
-    // and error alike; a per-route opt-out list would drift, as the
-    // hand-written preflight chain did before the route table replaced it.
-    // `GET /ui-strings` is the one envelope that is not actor-scoped and would
-    // not need this. It keeps the header anyway, for that same drift reason,
-    // and it costs one uncached fetch per page load.
+    // and error alike, so no per-route opt-out list exists to drift out of
+    // sync. `GET /ui-strings` is the one envelope that is not actor-scoped and
+    // would not need this. It keeps the header anyway, for that same
+    // one-header-covers-every-route reason, and it costs one uncached fetch
+    // per page load.
     headers: { "content-type": "application/json", "Cache-Control": "no-store", ...corsHeaders(allowed, requestOrigin) },
   });
 }
@@ -471,10 +469,37 @@ function hostTenantKey(req: Request): string | undefined {
  * none — then there is no static branch and every unmatched request keeps the
  * JSON 404. `startHttpServer` sources it from `WEB_ROOT` via `resolveWebRoot`.
  */
+
+/** Runs `SELECT 1` against `db`, resolving `false` instead of throwing on any failure. */
+export async function checkDbReady(db: SQL): Promise<boolean> {
+  try {
+    await db`SELECT 1`;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * `GET /livez`/`GET /readyz`, deliberately outside `routes.ts`'s
+ * `guarded`/`mapError` pipeline: a database-ping failure needs a stable,
+ * deliberate 503, not `mapError`'s generic-failure 500 (design.md "Why not
+ * mapError"). Called from the dispatcher's own special-cased branches below,
+ * which is why they live here rather than in `routes.ts`.
+ */
+export async function handleLivez(): Promise<HttpResult> {
+  return { status: 200, body: { status: "ok" } };
+}
+
+export async function handleReadyz(db: SQL): Promise<HttpResult> {
+  const ready = await checkDbReady(db);
+  return ready ? { status: 200, body: { status: "ok" } } : { status: 503, body: { status: "unavailable" } };
+}
+
 export function createServer(
   dataSourceRegistry: DataSourceRegistry,
   registry: Registry,
-  processDb: SQL = sql,
+  processDb: SQL,
   resolver: ActorResolver,
   allowedOrigins: AllowedOrigins = undefined,
   loginSecret: string | undefined = undefined,
@@ -744,7 +769,7 @@ export function createServer(
       if (asset) return asset;
     }
 
-    return toRes({ status: 404, body: { error: { type: "not-found", message: `no route: ${req.method} ${url.pathname}` } } });
+    return toRes(notFound(`no route: ${req.method} ${url.pathname}`));
   };
 }
 
@@ -767,7 +792,7 @@ export const MAX_REQUEST_BODY_SIZE = 8 * 1024 * 1024; // 8 MiB
 export async function startHttpServer(
   registry: Registry,
   dataSourceRegistry: DataSourceRegistry,
-  db: SQL = sql,
+  db: SQL,
   // The resolver binds no database of its own: its account lookup takes the
   // handle of the request being resolved, so it reads that actor's own tenant.
   resolver: ActorResolver = resolveAuthResolver({
@@ -812,7 +837,7 @@ export async function startHttpServer(
 }
 
 if (import.meta.main) {
-  startHttpServer(createDefaultRegistry(), createDefaultDataSourceRegistry())
+  startHttpServer(createDefaultRegistry(), createDefaultDataSourceRegistry(), sql)
     .then(({ stop }) => {
       // Registered here rather than in `startHttpServer`, which every test
       // calls: a listener per call would leak one per test file. This block

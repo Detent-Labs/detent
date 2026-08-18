@@ -20,7 +20,6 @@ import {
 } from "../src/engine/transition.js";
 import {
   createAssignmentRegistry,
-  registerAssignmentStrategy,
   type AssignmentRegistry,
   type AssignmentContext,
 } from "../src/engine/registry.js";
@@ -263,7 +262,7 @@ const assignedInitialBody = (strategy: { type: string; config: Record<string, un
 const spyRegistry = (candidates: string[] = []): { reg: AssignmentRegistry; calls: AssignmentContext[] } => {
   const calls: AssignmentContext[] = [];
   const reg = createAssignmentRegistry();
-  registerAssignmentStrategy(reg, "spy", {
+  reg.set("spy", {
     resolve: async (ctx) => {
       calls.push(ctx);
       // Yield to the microtask queue: an awaited resolver, not a synchronous one

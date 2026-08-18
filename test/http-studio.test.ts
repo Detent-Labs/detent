@@ -7,7 +7,7 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, createInstance } from "../src/engine/store.js";
 import { DB, initDb, authedReq } from "./helpers/http-fixture.js";
-import { createRegistry, createDataSourceRegistry, register, registerDataSource } from "../src/engine/registry.js";
+import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { createDefinitionStore } from "../src/engine/definitions.js";
 import { migrateInstances } from "../src/engine/migration.js";
 import { createServer } from "../src/http/server.js";
@@ -18,8 +18,8 @@ import type { ProcessId } from "../src/schema/definition.js";
 
 const reg = createRegistry();
 const dataSourceReg = createDataSourceRegistry();
-register(reg, "http.request", { handler: async () => undefined });
-registerDataSource(dataSourceReg, "static", { resolve: async () => [] });
+reg.set("http.request", { handler: async () => undefined });
+dataSourceReg.set("static", { resolve: async () => [] });
 const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
 beforeAll(initDb);

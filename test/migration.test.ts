@@ -13,7 +13,7 @@ import { publishBody, createDefinitionStore } from "../src/engine/definitions.js
 import { startInstance, executeManualTransition, claimStep } from "../src/engine/transition.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { registerSubprocessHandlers } from "../src/engine/subprocess.js";
-import { createRegistry, register, createDataSourceRegistry } from "../src/engine/registry.js";
+import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { subprocessChildId } from "../src/engine/idempotency.js";
 import {
   registerMigrationPlan,
@@ -33,7 +33,7 @@ const actor: Actor = { id: "user_1", roles: [] };
 // `action()` helper below) is "noop" — registered once here and threaded
 // into every publishBody call.
 const reg: Reg = createRegistry();
-register(reg, "noop", { handler: async () => ({}) });
+reg.set("noop", { handler: async () => ({}) });
 const dataSourceReg = createDataSourceRegistry();
 
 const cel = (src: string) => ({ lang: "cel", src });
@@ -680,8 +680,8 @@ test.skipIf(!DB)("a safe row's Action.output target id is remapped through field
   const res = await migrateInstances(p as Instance["processId"], 1, 2, sql);
   expect(res.migrated).toEqual([inst.instanceId]);
   const { registry } = engineRegistry();
-  register(registry, "setX", { handler: async () => ({ val: "X" }) });
-  register(registry, "setY", { handler: async () => ({ val: "Y" }) });
+  registry.set("setX", { handler: async () => ({ val: "X" }) });
+  registry.set("setY", { handler: async () => ({ val: "Y" }) });
   await drainAll(registry);
   const after = await loadInstance(inst.instanceId);
   // action_seta originally targeted field_a -> remapped to field_b, so field_b
@@ -702,7 +702,7 @@ test.skipIf(!DB)("a safe row targeting a field the target catalog no longer decl
   const res = await migrateInstances(p as Instance["processId"], 1, 2, sql);
   expect(res.migrated).toEqual([inst.instanceId]);
   const { registry } = engineRegistry();
-  register(registry, "setter", { handler: async () => ({ val: "orphaned" }) });
+  registry.set("setter", { handler: async () => ({ val: "orphaned" }) });
   await drainAll(registry);
   const after = await loadInstance(inst.instanceId);
   expect(dataField(after, "field_gone")).toBe("orphaned"); // written through despite removal

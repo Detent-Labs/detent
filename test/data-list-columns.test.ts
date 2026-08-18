@@ -14,11 +14,10 @@ import {
   parseJsonb,
   type DataListColumn,
 } from "../src/engine/host.js";
-import { resolveDataSource } from "../src/engine/registry.js";
 
 const DB = !!process.env.DATABASE_URL;
 
-const handler = () => resolveDataSource(createDefaultDataSourceRegistry(), DB_LIST_DATA_SOURCE_TYPE)!;
+const handler = () => createDefaultDataSourceRegistry().get(DB_LIST_DATA_SOURCE_TYPE)!;
 
 async function seedList(
   listKey: string,

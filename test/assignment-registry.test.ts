@@ -15,7 +15,6 @@ import {
   createDataSourceRegistry,
   createAssignmentRegistry,
   createDefaultAssignmentRegistry,
-  registerAssignmentStrategy,
 } from "../src/engine/registry.js";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody, AssignmentRegistryValidationError } from "../src/engine/definitions.js";
@@ -123,7 +122,7 @@ test("the static strategy type constant resolves in the default registry", () =>
 
 test("a registered strategy declaring no config schema accepts any config", () => {
   const reg = createAssignmentRegistry();
-  registerAssignmentStrategy(reg, "schemaless", { resolve: async () => [] });
+  reg.set("schemaless", { resolve: async () => [] });
   const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "schemaless", config: { anything: 1 } }), reg);
   expect(issues.length).toBe(0);
 });

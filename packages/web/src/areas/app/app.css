@@ -243,39 +243,6 @@
   gap: var(--space-2);
 }
 
-/*
- * Error banner: a failed request reported where the data it would have
- * shown normally sits, not a toast. Distinct from the plain .app-error
- * caption TaskScreen already uses for an inline outcome message — this one
- * is for a list/action that failed outright and needs a retry.
- */
-.app-error-banner {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-  border: 2px solid var(--color-refusal);
-  padding: var(--space-2) var(--space-3);
-  margin: var(--space-3) 0;
-}
-
-.app-error-banner-stamp {
-  flex: none;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--color-refusal);
-  border: 2px solid currentcolor;
-  padding: 2px 7px;
-  transform: rotate(-2deg);
-}
-
-.app-error-banner-message {
-  flex: 1;
-  color: var(--color-text);
-}
-
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;

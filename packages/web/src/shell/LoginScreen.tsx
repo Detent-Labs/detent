@@ -22,9 +22,9 @@ export function LoginScreen({ locale, onLoggedIn }: LoginScreenProps) {
     setError(undefined);
     try {
       const result = await login(email, password);
-      // Roles and expiry come straight off the login response. The shell
-      // persists the session; this screen only reports it upward.
-      onLoggedIn({ token: result.token, actorId: result.actor.id, roles: result.actor.roles, expiresAt: result.expiresAt });
+      // Roles come straight off the login response. The shell persists the
+      // session; this screen only reports it upward.
+      onLoggedIn({ token: result.token, actorId: result.actor.id, roles: result.actor.roles });
     } catch (err) {
       // A 401 here is a credential answer — there is no session yet to have
       // expired, so it means "wrong email or password", not session expiry.

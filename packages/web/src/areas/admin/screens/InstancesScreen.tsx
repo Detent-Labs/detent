@@ -5,6 +5,8 @@ import type { Route } from "../routing.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
+import { usePagedList } from "../../../shell/usePagedList.js";
+import { ErrorBanner } from "../../../shell/ErrorBanner.js";
 import { EMPTY_INSTANCE_FILTER, toListParams, labelText, type InstanceFilterState } from "./instancesLogic.js";
 import { t, tFill } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
@@ -24,42 +26,25 @@ function isDegraded(item: InstanceSummaryItem): item is DegradedInstanceSummary 
 }
 
 export function InstancesScreen({ token, locale, navigate, onUnauthorized }: InstancesScreenProps) {
-  const [items, setItems] = useState<InstanceSummaryItem[]>([]);
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [filter, setFilter] = useState<InstanceFilterState>(EMPTY_INSTANCE_FILTER);
   const { reloadToken, refresh } = useRefresh();
   const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(undefined);
-    try {
-      const page = await listInstances(token, toListParams(filter, PAGE_LIMIT));
-      setItems(page.items);
-      setCursor(page.cursor);
-    } catch (err) {
-      fail(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [token, filter, locale, fail]);
-
-  const loadMore = useCallback(async () => {
-    if (!cursor) return;
-    setLoading(true);
-    setError(undefined);
-    try {
-      const page = await listInstances(token, toListParams(filter, PAGE_LIMIT, cursor));
-      setItems((prev) => [...prev, ...page.items]);
-      setCursor(page.cursor);
-    } catch (err) {
-      fail(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [token, filter, cursor, locale, fail]);
+  const fetchPage = useCallback(
+    async (cursor?: string) => {
+      setError(undefined);
+      try {
+        const page = await listInstances(token, toListParams(filter, PAGE_LIMIT, cursor));
+        return { items: page.items, cursor: page.cursor };
+      } catch (err) {
+        fail(err);
+        throw err;
+      }
+    },
+    [token, filter, fail],
+  );
+  const { items, cursor, loading, load, loadMore } = usePagedList<InstanceSummaryItem>(fetchPage);
 
   useEffect(() => {
     void load();
@@ -106,15 +91,7 @@ export function InstancesScreen({ token, locale, navigate, onUnauthorized }: Ins
         </button>
       </div>
 
-      {error && (
-        <div className="admin-error-banner" role="alert">
-          <span className="admin-error-banner-stamp">{t(locale, "common.failed")}</span>
-          <span className="admin-error-banner-message">{error}</span>
-          <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
-            {t(locale, "common.retry")}
-          </button>
-        </div>
-      )}
+      {error && <ErrorBanner error={error} locale={locale} onRetry={refresh} retryDisabled={loading} />}
 
       {items.length === 0 && !loading && !error && <p className="admin-empty">{t(locale, "instances.empty")}</p>}
 

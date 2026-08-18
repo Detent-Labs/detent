@@ -34,6 +34,15 @@ describe("expense-approval definition", () => {
     })).toBe(true);
   });
 
+  it("rejects the dead definitionStatus members 'deprecated' and 'archived'", () => {
+    expect(rejects((d) => {
+      d.status = "deprecated";
+    })).toBe(true);
+    expect(rejects((d) => {
+      d.status = "archived";
+    })).toBe(true);
+  });
+
   it("rejects an outcome on a non-terminal step", () => {
     expect(rejects((d) => {
       d.definition.workflow.steps[0].outcome = "booked";

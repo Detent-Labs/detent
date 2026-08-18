@@ -7,7 +7,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { test, expect } from "bun:test";
 import { z } from "zod";
 import { checkActionRegistry } from "../src/engine/registry-check.js";
-import { createRegistry, register } from "../src/engine/registry.js";
+import { createRegistry } from "../src/engine/registry.js";
 import { createDefaultRegistry } from "../src/engine/host.js";
 import { processBody, type ProcessBody } from "../src/schema/definition.js";
 
@@ -48,7 +48,7 @@ const bodyWithActions = (opts: {
 
 test("a body with all-registered actions and no config schema passes", () => {
   const reg = createRegistry();
-  register(reg, "email", { handler: async () => ({}) });
+  reg.set("email", { handler: async () => ({}) });
   const issues = checkActionRegistry(bodyWithActions({ onEntry: [action("email")] }), reg);
   expect(issues.length).toBe(0);
 });
@@ -75,7 +75,7 @@ test("an unregistered action type is rejected at every action position", () => {
 
 test("a config violating its handler's declared schema is rejected", () => {
   const reg = createRegistry();
-  register(reg, "email", { handler: async () => ({}), configSchema: z.object({ to: z.string() }) });
+  reg.set("email", { handler: async () => ({}), configSchema: z.object({ to: z.string() }) });
   const issues = checkActionRegistry(bodyWithActions({ onEntry: [action("email", { to: 42 })] }), reg);
   expect(issues.length).toBe(1);
   expect(issues[0]!.loc).toContain("onEntry");
@@ -84,7 +84,7 @@ test("a config violating its handler's declared schema is rejected", () => {
 
 test("a handler with no declared schema accepts any config", () => {
   const reg = createRegistry();
-  register(reg, "email", { handler: async () => ({}) });
+  reg.set("email", { handler: async () => ({}) });
   const issues = checkActionRegistry(bodyWithActions({ onEntry: [action("email", { anything: "goes", nested: { x: 1 } })] }), reg);
   expect(issues.length).toBe(0);
 });
@@ -116,7 +116,7 @@ test("a core.-prefixed action type is resolved against the registry like any oth
 // rule and still fails here.
 test("a cross-field rule on a configSchema is a publish error, not a form error", () => {
   const reg = createRegistry();
-  register(reg, "window", {
+  reg.set("window", {
     handler: async () => ({}),
     configSchema: z
       .object({ min: z.number().min(0), max: z.number().min(0) })
@@ -130,7 +130,7 @@ test("a cross-field rule on a configSchema is a publish error, not a form error"
 
 test("a config satisfying the cross-field rule raises no publish issue", () => {
   const reg = createRegistry();
-  register(reg, "window", {
+  reg.set("window", {
     handler: async () => ({}),
     configSchema: z
       .object({ min: z.number().min(0), max: z.number().min(0) })
@@ -141,7 +141,7 @@ test("a config satisfying the cross-field rule raises no publish issue", () => {
 
 test("a core.-prefixed action type registered with a configSchema is config-checked too", () => {
   const reg = createRegistry();
-  register(reg, "core.spawnSubprocess", {
+  reg.set("core.spawnSubprocess", {
     handler: async () => ({}),
     configSchema: z.object({ subprocessStepId: z.string(), parentSeq: z.number() }),
   });
@@ -152,7 +152,7 @@ test("a core.-prefixed action type registered with a configSchema is config-chec
 
 test("multiple invalid actions each produce their own issue, not just the first", () => {
   const reg = createRegistry();
-  register(reg, "email", { handler: async () => ({}), configSchema: z.object({ to: z.string() }) });
+  reg.set("email", { handler: async () => ({}), configSchema: z.object({ to: z.string() }) });
   const body = bodyWithActions({
     onEntry: [action("email", { to: 1 })], // schema violation
     onExit: [action("sms")], // unregistered
@@ -163,7 +163,7 @@ test("multiple invalid actions each produce their own issue, not just the first"
 
 test("a config with multiple violated fields produces one issue per field", () => {
   const reg = createRegistry();
-  register(reg, "email", { handler: async () => ({}), configSchema: z.object({ to: z.string(), subject: z.string() }) });
+  reg.set("email", { handler: async () => ({}), configSchema: z.object({ to: z.string(), subject: z.string() }) });
   const issues = checkActionRegistry(bodyWithActions({ onEntry: [action("email", { to: 1, subject: 2 })] }), reg);
   expect(issues.length).toBe(2);
 });

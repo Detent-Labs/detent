@@ -194,7 +194,7 @@ export type Plugin = z.infer<typeof plugin>;
 // Closed enums (the stable core).
 // ============================================================
 
-export const definitionStatus = z.enum(["draft", "published", "deprecated", "archived"]);
+export const definitionStatus = z.enum(["draft", "published"]);
 export const stepType = z.enum(["task", "subprocess"]); // terminal is a property, not a type
 export const pathTrigger = z.enum(["manual", "automatic"]);
 export const execution = z.enum(["async", "blocking"]); // v1 implements async only
@@ -314,7 +314,7 @@ export const fieldDef: z.ZodType<FieldDef, unknown> = z.lazy(() =>
  * here, and the CEL check/eval layers (src/cel/check.ts, src/cel/eval.ts),
  * all resolve "every field in the body" through this, so they cannot resolve
  * different sets. A caller that needs leaves only (CEL's `data` namespace has
- * no entry for a group container) filters out `f.type === "group"` itself.
+ * no entry for a group container) calls `leafFields` instead.
  */
 export function collectFieldsDeep(fields: FieldDef[]): FieldDef[] {
   const out: FieldDef[] = [];
@@ -326,6 +326,14 @@ export function collectFieldsDeep(fields: FieldDef[]): FieldDef[] {
   };
   walk(fields);
   return out;
+}
+
+/** `collectFieldsDeep`, filtered to leaves: every group container drops out,
+ * since CEL's `data` namespace has no entry for one. The shared helper behind
+ * `dataSchema`/`contractFieldSchema` (src/cel/check.ts) and `fieldKeyById`
+ * (src/cel/eval.ts), which otherwise each reimplemented this same filter. */
+export function leafFields(fields: FieldDef[]): FieldDef[] {
+  return collectFieldsDeep(fields).filter((f) => f.type !== "group");
 }
 
 /**

@@ -8,7 +8,7 @@ import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry } from "../src/engine/registry.js";
-import { createDataSourceRegistry, registerDataSource, type DataSourceHandlerDef } from "../src/engine/registry.js";
+import { createDataSourceRegistry, type DataSourceHandlerDef } from "../src/engine/registry.js";
 import { createProcessInstance, getInstanceView, submitAndTransition, SubmissionValidationError } from "../src/runtime/api.js";
 import type { ProcessBody, ProcessId, PathId, Instance } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
@@ -24,8 +24,9 @@ const COUNTRY_OPTIONS = [
 ];
 
 // step_a: field_country (select, dataSource-bound to ds_countries) and
-// field_tags (multiselect, sharing the same data source — for the
-// resolve-once memoization check) --(path_ab, manual, guardless)--> step_b.
+// field_tags (multiselect, sharing the same data source — each field
+// resolves it through its own independent call) --(path_ab, manual,
+// guardless)--> step_b.
 const dsBody = (): ProcessBody =>
   ({
     key: "ds_body",
@@ -99,7 +100,7 @@ beforeEach(async () => {
 test.skipIf(!DB)("getInstanceView resolves a dataSource-bound field's options", async () => {
   const { handler } = countingStaticHandler();
   const dsReg = createDataSourceRegistry();
-  registerDataSource(dsReg, "static", handler);
+  dsReg.set("static", handler);
   await publishBody(PID, dsBody(), reg, dsReg);
   const created = await createProcessInstance(PID, actor, dsReg);
   const view = await getInstanceView(created.instanceId, actor, dsReg);
@@ -107,22 +108,23 @@ test.skipIf(!DB)("getInstanceView resolves a dataSource-bound field's options", 
   expect(country.options).toEqual(COUNTRY_OPTIONS);
 });
 
-test.skipIf(!DB)("two fields sharing one data source resolve it exactly once per resolveFields call", async () => {
+test.skipIf(!DB)("two fields sharing one data source each resolve it independently", async () => {
   const { handler, calls } = countingStaticHandler();
   const dsReg = createDataSourceRegistry();
-  registerDataSource(dsReg, "static", handler);
+  dsReg.set("static", handler);
   await publishBody(PID, dsBody(), reg, dsReg);
   const created = await createProcessInstance(PID, actor, dsReg); // one resolveFields call, for seed-data validation
   const beforeView = calls();
   await getInstanceView(created.instanceId, actor, dsReg); // a second, independent resolveFields call
-  // Both step_a fields (field_country, field_tags) share ds_countries — this call
-  // resolves it once, not twice, regardless of how many prior calls already ran.
-  expect(calls() - beforeView).toBe(1);
+  // Both step_a fields (field_country, field_tags) share ds_countries. Each
+  // field triggers its own handler.resolve call — resolveDataSourceOptions
+  // carries no cache, so sharing a data source does not reduce the call count.
+  expect(calls() - beforeView).toBe(2);
 });
 
 test.skipIf(!DB)("submitAndTransition accepts a value within the resolved options", async () => {
   const dsReg = createDataSourceRegistry();
-  registerDataSource(dsReg, "static", { resolve: async (ctx) => (ctx.config as { options: typeof COUNTRY_OPTIONS }).options });
+  dsReg.set("static", { resolve: async (ctx) => (ctx.config as { options: typeof COUNTRY_OPTIONS }).options });
   await publishBody(PID, dsBody(), reg, dsReg);
   const created = await createProcessInstance(PID, actor, dsReg);
   const updated = await submitAndTransition(created.instanceId, "path_ab" as PathId, { field_country: "us" } as unknown as Instance["data"], actor, dsReg);
@@ -131,7 +133,7 @@ test.skipIf(!DB)("submitAndTransition accepts a value within the resolved option
 
 test.skipIf(!DB)("submitAndTransition rejects a value outside the resolved options", async () => {
   const dsReg = createDataSourceRegistry();
-  registerDataSource(dsReg, "static", { resolve: async (ctx) => (ctx.config as { options: typeof COUNTRY_OPTIONS }).options });
+  dsReg.set("static", { resolve: async (ctx) => (ctx.config as { options: typeof COUNTRY_OPTIONS }).options });
   await publishBody(PID, dsBody(), reg, dsReg);
   const created = await createProcessInstance(PID, actor, dsReg);
   let raised: unknown;
@@ -146,7 +148,7 @@ test.skipIf(!DB)("submitAndTransition rejects a value outside the resolved optio
 
 test.skipIf(!DB)("createProcessInstance's seed data is validated against resolved dataSource options", async () => {
   const dsReg = createDataSourceRegistry();
-  registerDataSource(dsReg, "static", { resolve: async (ctx) => (ctx.config as { options: typeof COUNTRY_OPTIONS }).options });
+  dsReg.set("static", { resolve: async (ctx) => (ctx.config as { options: typeof COUNTRY_OPTIONS }).options });
   await publishBody(PID, dsBody(), reg, dsReg);
   let raised: unknown;
   try {
@@ -160,7 +162,7 @@ test.skipIf(!DB)("createProcessInstance's seed data is validated against resolve
 test.skipIf(!DB)("a select contributes one held value and a multiselect contributes its whole array", async () => {
   const { handler, heldValueSets } = countingStaticHandler();
   const dsReg = createDataSourceRegistry();
-  registerDataSource(dsReg, "static", handler);
+  dsReg.set("static", handler);
   await publishBody(PID, dsBody(), reg, dsReg);
   const created = await createProcessInstance(PID, actor, dsReg, {
     data: { field_country: "us", field_tags: ["us", "ca"] } as unknown as Instance["data"],
@@ -174,7 +176,7 @@ test.skipIf(!DB)("a select contributes one held value and a multiselect contribu
 test.skipIf(!DB)("two fields sharing one data source resolve twice when their held values differ", async () => {
   const { handler, calls } = countingStaticHandler();
   const dsReg = createDataSourceRegistry();
-  registerDataSource(dsReg, "static", handler);
+  dsReg.set("static", handler);
   await publishBody(PID, dsBody(), reg, dsReg);
   const created = await createProcessInstance(PID, actor, dsReg, {
     data: { field_country: "us", field_tags: ["ca"] } as unknown as Instance["data"],
@@ -184,23 +186,25 @@ test.skipIf(!DB)("two fields sharing one data source resolve twice when their he
   expect(calls() - before).toBe(2);
 });
 
-test.skipIf(!DB)("two fields sharing one data source resolve once when their held values match", async () => {
+test.skipIf(!DB)("two fields sharing one data source each resolve it independently when their held values match", async () => {
   const { handler, calls } = countingStaticHandler();
   const dsReg = createDataSourceRegistry();
-  registerDataSource(dsReg, "static", handler);
+  dsReg.set("static", handler);
   await publishBody(PID, dsBody(), reg, dsReg);
   const created = await createProcessInstance(PID, actor, dsReg, {
     data: { field_country: "us", field_tags: ["us"] } as unknown as Instance["data"],
   });
   const before = calls();
   await getInstanceView(created.instanceId, actor, dsReg);
-  expect(calls() - before).toBe(1);
+  // Matching held values used to share one memoized call; with no cache each
+  // field resolves independently regardless of whether their held values agree.
+  expect(calls() - before).toBe(2);
 });
 
 test.skipIf(!DB)("a retired value the instance holds stays visible and stays submittable", async () => {
   const { handler, retire } = retiringHandler(["cc1", "cc_old"]);
   const dsReg = createDataSourceRegistry();
-  registerDataSource(dsReg, "static", handler);
+  dsReg.set("static", handler);
   await publishBody(PID, dsBody(), reg, dsReg);
   const created = await createProcessInstance(PID, actor, dsReg, { data: { field_country: "cc_old" } as unknown as Instance["data"] });
 
@@ -222,7 +226,7 @@ test.skipIf(!DB)("a retired value the instance holds stays visible and stays sub
 
 test.skipIf(!DB)("a runtime registry mismatch for a published data source type throws a plain canary Error", async () => {
   const dsReg = createDataSourceRegistry();
-  registerDataSource(dsReg, "static", { resolve: async (ctx) => (ctx.config as { options: typeof COUNTRY_OPTIONS }).options });
+  dsReg.set("static", { resolve: async (ctx) => (ctx.config as { options: typeof COUNTRY_OPTIONS }).options });
   await publishBody(PID, dsBody(), reg, dsReg);
   const created = await createProcessInstance(PID, actor, dsReg);
 

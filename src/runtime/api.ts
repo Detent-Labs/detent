@@ -37,7 +37,6 @@ import { NotFoundError, InstanceNotRunningError } from "../errors.js";
 import { encodeCursor, decodeCursor } from "../pagination.js";
 import { instance as instanceSchema, historyEntry as historyEntrySchema, instanceEvent as instanceEventSchema, collectFieldsDeep, typeMatches, expectedTypeLabel } from "../schema/definition.js";
 import {
-  resolveDataSource,
   createDefaultAssignmentRegistry,
   resolveStepAssignment,
   type DataSourceRegistry,
@@ -250,6 +249,62 @@ const DEFAULT_RECORD_LIMIT = 100;
 export const MAX_RECORD_LIMIT = 500;
 
 /**
+ * The hasMore/slice/last-row/encodeCursor tail shared by every
+ * keyset-paginated read in this module (`listInstances`, `getInstanceRecord`,
+ * `listComments`, `listAttachments`). Takes the raw rows overfetched via
+ * `LIMIT limit + 1` and a row-to-cursor-tuple mapper, and returns the sliced
+ * page, whether more remain, and the next cursor. Does not map rows to
+ * items — every call site's mapping is applied to `pageRows` separately,
+ * since the four are not uniform (`listInstances`'s is `async` and filters
+ * out `undefined` results, which a single `toItem` parameter here could not
+ * express without forcing every other caller through `await`). See
+ * design.md.
+ */
+function keysetPage<Row>(
+  rows: Row[],
+  limit: number,
+  cursorOf: (row: Row) => string[],
+): { pageRows: Row[]; hasMore: boolean; cursor: string | undefined } {
+  const hasMore = rows.length > limit;
+  const pageRows = rows.slice(0, limit);
+  const last = pageRows[pageRows.length - 1];
+  const cursor = hasMore && last ? encodeCursor(cursorOf(last)) : undefined;
+  return { pageRows, hasMore, cursor };
+}
+
+/**
+ * Run a keyset-paginated, `instanceId`-scoped read shared by `listComments`
+ * and `listAttachments`, ordered `created_at ASC, id ASC`. `table` and
+ * `columns` are caller-controlled constants, never request input. Always
+ * selects `created_at::text AS created_at_cursor` alongside `columns`:
+ * Postgres's full microsecond precision, unlike the driver's own `Date`
+ * conversion of the plain `created_at` column (millisecond-precise only),
+ * which let a boundary row's true, sub-millisecond-later timestamp compare
+ * greater than its own rounded cursor on the next page, reintroducing that
+ * same row — confirmed via a failing pagination test during this helper's
+ * introduction. Returns the raw overfetched rows (up to `limit + 1`); does
+ * not map rows to items, matching `keysetPage`'s split.
+ */
+async function pagedRead<Row>(
+  db: SQL,
+  table: string,
+  columns: string,
+  instanceId: InstanceId,
+  limit: number,
+  cursor: string | undefined,
+): Promise<Row[]> {
+  const [cursorCreatedAt, cursorId] = cursor ? decodeCursor(cursor, 2) : [undefined, undefined];
+  return (await db.unsafe(
+    `SELECT ${columns}, created_at::text AS created_at_cursor FROM ${table}
+     WHERE instance_id = $1
+       AND ($2::timestamptz IS NULL OR (created_at, id) > ($2::timestamptz, $3))
+     ORDER BY created_at ASC, id ASC
+     LIMIT $4`,
+    [instanceId, cursorCreatedAt ?? null, cursorId ?? null, limit + 1],
+  )) as Row[];
+}
+
+/**
  * The instance's `currentStepId` is not among its pinned body's steps — a
  * structural mismatch, not a not-found condition (see findStep). Local to
  * this module: unlike `NotFoundError`, nothing outside `listInstances`
@@ -384,35 +439,19 @@ function heldValuesOf(value: Literal | undefined): string[] {
 }
 
 /**
- * Resolve a `dataSource`-bound field's options via the registry, memoized by
- * `DataSourceId` together with the held values within one `resolveFields`
- * call, so fields on the same step sharing a data source *and* holding the
- * same values resolve it once. Held values join the key because they change
- * the result: two fields on one data source holding different values are two
- * distinct resolutions. A lookup miss here means the
+ * Resolve a `dataSource`-bound field's options via the registry. Held values
+ * are sorted before reaching the handler, so a multiselect's array order
+ * never leaks into what the handler sees. A missing handler here means the
  * registry passed at runtime differs from the one the body was published
  * against — publish-time `data-source-registry-validation` already confirmed
  * every declared type resolves — so it is a "should never happen" canary,
  * matching the project's existing style (e.g. the `definitionHash` pin
  * mismatch).
  */
-function resolveDataSourceOptions(
-  def: DataSourceDef,
-  heldValues: string[],
-  registry: DataSourceRegistry,
-  cache: Map<string, Promise<FieldOption[]>>,
-  db: SQL,
-): Promise<FieldOption[]> {
-  const sorted = [...heldValues].sort();
-  const key = JSON.stringify([def.id as string, sorted]);
-  let pending = cache.get(key);
-  if (!pending) {
-    const handler = resolveDataSource(registry, def.type);
-    if (!handler) throw new Error(`data source type '${def.type}' is not registered in the runtime registry`);
-    pending = handler.resolve({ config: def.config, heldValues: sorted, db });
-    cache.set(key, pending);
-  }
-  return pending;
+function resolveDataSourceOptions(def: DataSourceDef, heldValues: string[], registry: DataSourceRegistry, db: SQL): Promise<FieldOption[]> {
+  const handler = registry.get(def.type);
+  if (!handler) throw new Error(`data source type '${def.type}' is not registered in the runtime registry`);
+  return handler.resolve({ config: def.config, heldValues: [...heldValues].sort(), db });
 }
 
 /**
@@ -433,7 +472,6 @@ async function resolveFields(body: ProcessBody, step: Step, instance: Instance, 
   const ctx = buildGuardContext(body, instance, actor);
   const fieldsById = new Map(collectFieldsDeep(body.fields).map((f) => [f.id as string, f]));
   const dataSourcesById = new Map((body.dataSources ?? []).map((d) => [d.id as string, d]));
-  const dataSourceCache = new Map<string, Promise<FieldOption[]>>();
   const out: ResolvedViewField[] = [];
   for (const vf of step.view?.fields ?? []) {
     const field = fieldsById.get(vf.ref as string);
@@ -447,7 +485,7 @@ async function resolveFields(body: ProcessBody, step: Step, instance: Instance, 
     if (field.dataSource) {
       const def = dataSourcesById.get(field.dataSource as string);
       if (!def) throw new Error(`data source not found: ${field.dataSource}`); // publish-time invariant guarantees resolution; defensive only
-      options = await resolveDataSourceOptions(def, heldValuesOf(value), registry, dataSourceCache, db);
+      options = await resolveDataSourceOptions(def, heldValuesOf(value), registry, db);
     }
     out.push({ field, value, required, readonly, group: vf.group, options, span: vf.span ?? 1 });
   }
@@ -1103,15 +1141,12 @@ export async function listInstances(
     LIMIT ${limit + 1}
   ` as unknown) as { instance_id: string; body: unknown; created_at: string; created_at_cursor: string }[];
 
-  const hasMore = rows.length > limit;
-  const pageRows = rows.slice(0, limit);
+  const { pageRows, cursor } = keysetPage(rows, limit, (r) => [r.created_at_cursor, r.instance_id]);
   const store = getStore(db);
   const resolved = await Promise.all(
     pageRows.map((r) => toSummaryItem(parseInstance(r.body), r.created_at, store, filter.includeDegraded)),
   );
   const items = resolved.filter((item): item is InstanceSummaryItem => item !== undefined);
-  const last = pageRows[pageRows.length - 1];
-  const cursor = hasMore && last ? encodeCursor([last.created_at_cursor, last.instance_id]) : undefined;
   return { items, cursor };
 }
 
@@ -1180,16 +1215,13 @@ export async function getInstanceRecord(
     LIMIT ${limit + 1}
   ` as unknown) as { id: string; transition_seq: number; kind: "transition" | "event"; payload: unknown; at: string }[];
 
-  const hasMore = rows.length > limit;
-  const pageRows = rows.slice(0, limit);
+  const { pageRows, cursor } = keysetPage(rows, limit, (r) => [String(r.transition_seq), r.at, r.id]);
   const items: InstanceRecordElement[] = pageRows.map((r) => {
     const payload = typeof r.payload === "string" ? JSON.parse(r.payload) : r.payload;
     return r.kind === "transition"
       ? { kind: "transition" as const, entry: historyEntrySchema.parse(payload) }
       : { kind: "event" as const, event: instanceEventSchema.parse(payload) };
   });
-  const last = pageRows[pageRows.length - 1];
-  const cursor = hasMore && last ? encodeCursor([String(last.transition_seq), last.at, last.id]) : undefined;
   return { items, cursor };
 }
 
@@ -1230,29 +1262,16 @@ export async function listComments(
 ): Promise<Page<InstanceComment>> {
   await loadInstanceForActor(instanceId, actor, db);
   const limit = Math.min(page.limit ?? DEFAULT_RECORD_LIMIT, MAX_RECORD_LIMIT);
-  const [cursorCreatedAt, cursorId] = page.cursor ? decodeCursor(page.cursor, 2) : [undefined, undefined];
 
-  // `created_at::text` (`created_at_cursor` below) carries Postgres's full
-  // microsecond precision, unlike the driver's own `Date` conversion of the
-  // plain `created_at` column, which is only millisecond-precise. Building
-  // the cursor from the lossy `Date` value let the boundary row's true,
-  // sub-millisecond-later timestamp compare greater than its own rounded
-  // cursor on the next page, reintroducing that same row — confirmed via a
-  // failing pagination test during this change's implementation. Encoding
-  // from the lossless text avoids that entirely.
-  const rows = (await db`
-    SELECT id, instance_id, actor_id, text, created_at, created_at::text AS created_at_cursor FROM instance_comments
-    WHERE instance_id = ${instanceId}
-      AND (
-        ${cursorCreatedAt ?? null}::timestamptz IS NULL
-        OR (created_at, id) > (${cursorCreatedAt ?? null}::timestamptz, ${cursorId ?? null})
-      )
-    ORDER BY created_at ASC, id ASC
-    LIMIT ${limit + 1}
-  ` as unknown) as { id: string; instance_id: string; actor_id: string; text: string; created_at: Date; created_at_cursor: string }[];
-
-  const hasMore = rows.length > limit;
-  const pageRows = rows.slice(0, limit);
+  const rows = await pagedRead<{ id: string; instance_id: string; actor_id: string; text: string; created_at: Date; created_at_cursor: string }>(
+    db,
+    "instance_comments",
+    "id, instance_id, actor_id, text, created_at",
+    instanceId,
+    limit,
+    page.cursor,
+  );
+  const { pageRows, cursor } = keysetPage(rows, limit, (r) => [r.created_at_cursor, r.id]);
   const items: InstanceComment[] = pageRows.map((r) => ({
     id: r.id,
     instanceId: r.instance_id as InstanceId,
@@ -1260,8 +1279,6 @@ export async function listComments(
     text: r.text,
     createdAt: r.created_at.toISOString(),
   }));
-  const last = pageRows[pageRows.length - 1];
-  const cursor = hasMore && last ? encodeCursor([last.created_at_cursor, last.id]) : undefined;
   return { items, cursor };
 }
 
@@ -1313,18 +1330,10 @@ export async function listAttachments(
 ): Promise<Page<InstanceAttachment>> {
   await loadInstanceForActor(instanceId, actor, db);
   const limit = Math.min(page.limit ?? DEFAULT_RECORD_LIMIT, MAX_RECORD_LIMIT);
-  const [cursorCreatedAt, cursorId] = page.cursor ? decodeCursor(page.cursor, 2) : [undefined, undefined];
 
-  const rows = (await db`
-    SELECT id, instance_id, actor_id, filename, content_type, size_bytes, created_at, created_at::text AS created_at_cursor FROM instance_attachments
-    WHERE instance_id = ${instanceId}
-      AND (
-        ${cursorCreatedAt ?? null}::timestamptz IS NULL
-        OR (created_at, id) > (${cursorCreatedAt ?? null}::timestamptz, ${cursorId ?? null})
-      )
-    ORDER BY created_at ASC, id ASC
-    LIMIT ${limit + 1}
-  ` as unknown) as {
+  // Never selects `data`: this list is metadata only (see InstanceAttachment
+  // above) so a page response can never carry file bytes by accident.
+  const rows = await pagedRead<{
     id: string;
     instance_id: string;
     actor_id: string;
@@ -1333,10 +1342,8 @@ export async function listAttachments(
     size_bytes: number;
     created_at: Date;
     created_at_cursor: string;
-  }[];
-
-  const hasMore = rows.length > limit;
-  const pageRows = rows.slice(0, limit);
+  }>(db, "instance_attachments", "id, instance_id, actor_id, filename, content_type, size_bytes, created_at", instanceId, limit, page.cursor);
+  const { pageRows, cursor } = keysetPage(rows, limit, (r) => [r.created_at_cursor, r.id]);
   const items: InstanceAttachment[] = pageRows.map((r) => ({
     id: r.id,
     instanceId: r.instance_id as InstanceId,
@@ -1346,8 +1353,6 @@ export async function listAttachments(
     sizeBytes: r.size_bytes,
     createdAt: r.created_at.toISOString(),
   }));
-  const last = pageRows[pageRows.length - 1];
-  const cursor = hasMore && last ? encodeCursor([last.created_at_cursor, last.id]) : undefined;
   return { items, cursor };
 }
 

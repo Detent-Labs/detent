@@ -3,6 +3,7 @@ import { resolveText } from "form-ui";
 import { createInstance, listProcesses } from "../api/client.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
+import { ErrorBanner } from "../../../shell/ErrorBanner.js";
 import { t } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
 import type { ProcessSummary } from "../api/types.js";
@@ -52,15 +53,7 @@ export function StartScreen({ token, locale, navigate, onUnauthorized }: StartSc
   return (
     <main className="app-screen app-start">
       <h1>{t(locale, "start.title")}</h1>
-      {error && (
-        <div className="app-error-banner" role="alert">
-          <span className="app-error-banner-stamp">{t(locale, "error.failed")}</span>
-          <span className="app-error-banner-message">{error}</span>
-          <button type="button" className="btn btn-secondary" onClick={() => void load()} disabled={loadingList}>
-            {t(locale, "error.retry")}
-          </button>
-        </div>
-      )}
+      {error && <ErrorBanner error={error} locale={locale} onRetry={() => void load()} retryDisabled={loadingList} />}
       {processes.length === 0 && !loadingList && !error && <p className="app-empty">{t(locale, "start.empty")}</p>}
       <ul className="app-process-list">
         {processes.map((p) => (

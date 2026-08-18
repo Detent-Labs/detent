@@ -4,6 +4,7 @@ import type { UiStringOverrideMap } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
+import { ErrorBanner } from "../../../shell/ErrorBanner.js";
 import { loadUiStringOverrides } from "../../../i18n/overrides.js";
 import { OVERRIDABLE_AREAS, localesOf, rowsFor, pendingWrites } from "./uiStringsLogic.js";
 import { t, tFill } from "../catalog.js";
@@ -94,15 +95,7 @@ export function UiStringsScreen({ token, locale: uiLocale, onUnauthorized }: UiS
     <main className="admin-screen">
       <h1>{t(uiLocale, "uiStrings.title")}</h1>
 
-      {error && (
-        <div className="admin-error-banner" role="alert">
-          <span className="admin-error-banner-stamp">{t(uiLocale, "common.failed")}</span>
-          <span className="admin-error-banner-message">{error}</span>
-          <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
-            {t(uiLocale, "common.retry")}
-          </button>
-        </div>
-      )}
+      {error && <ErrorBanner error={error} locale={uiLocale} onRetry={refresh} retryDisabled={loading} />}
 
       <div className="admin-controls">
         <label className="admin-field">

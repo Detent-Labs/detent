@@ -19,7 +19,7 @@ function recorder() {
   };
 }
 
-const SESSION: Session = { token: "tok-1", actorId: "u-1", roles: ["participant"], expiresAt: "", locale: "en" };
+const SESSION: Session = { token: "tok-1", actorId: "u-1", roles: ["participant"], locale: "en" };
 
 describe("syncLocaleChange", () => {
   it("a signed-in choice reaches the account and the returned session", () => {

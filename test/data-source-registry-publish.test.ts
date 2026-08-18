@@ -10,7 +10,7 @@ import { z } from "zod";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody, DataSourceRegistryValidationError } from "../src/engine/definitions.js";
 import { createRegistry } from "../src/engine/registry.js";
-import { createDataSourceRegistry, registerDataSource } from "../src/engine/registry.js";
+import { createDataSourceRegistry } from "../src/engine/registry.js";
 import { createDefaultDataSourceRegistry, DB_LIST_DATA_SOURCE_TYPE } from "../src/engine/host.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 
@@ -51,7 +51,7 @@ test.skipIf(!DB)("publish rejects an unregistered data source type and writes no
 
 test.skipIf(!DB)("publish rejects a data source config that violates its handler's declared schema", async () => {
   const reg = createDataSourceRegistry();
-  registerDataSource(reg, "static", { resolve: async () => [], configSchema: z.object({ options: z.array(z.unknown()) }) });
+  reg.set("static", { resolve: async () => [], configSchema: z.object({ options: z.array(z.unknown()) }) });
   let caught: unknown;
   try {
     await publishBody(PID, bodyWithDataSource("static", { notOptions: [] }), actionReg, reg);
@@ -63,14 +63,14 @@ test.skipIf(!DB)("publish rejects a data source config that violates its handler
 
 test.skipIf(!DB)("publish accepts a data source with a registered type and valid config", async () => {
   const reg = createDataSourceRegistry();
-  registerDataSource(reg, "static", { resolve: async () => [], configSchema: z.object({ options: z.array(z.unknown()) }) });
+  reg.set("static", { resolve: async () => [], configSchema: z.object({ options: z.array(z.unknown()) }) });
   const v = await publishBody(PID, bodyWithDataSource("static", { options: [] }), actionReg, reg);
   expect(v.version).toBe(1);
 });
 
 test.skipIf(!DB)("an identical re-publish of an already-stored body stays a no-op without invoking the check", async () => {
   const reg = createDataSourceRegistry();
-  registerDataSource(reg, "static", { resolve: async () => [], configSchema: z.object({ options: z.array(z.unknown()) }) });
+  reg.set("static", { resolve: async () => [], configSchema: z.object({ options: z.array(z.unknown()) }) });
   const body = bodyWithDataSource("static", { options: [] });
   const v1 = await publishBody(PID, body, actionReg, reg);
   const v2 = await publishBody(PID, body, actionReg, reg);
@@ -105,7 +105,7 @@ test.skipIf(!DB)("a rejected data-source-registry publish consumes no version nu
     // expected
   }
   const withStatic = createDataSourceRegistry();
-  registerDataSource(withStatic, "static", { resolve: async () => [] });
+  withStatic.set("static", { resolve: async () => [] });
   const v = await publishBody(PID, bodyWithDataSource("static", { options: [] }), actionReg, withStatic);
   expect(v.version).toBe(1); // not 2 — the rejected publish reserved nothing
 });

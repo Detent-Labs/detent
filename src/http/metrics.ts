@@ -9,13 +9,12 @@
  * response (`errors.ts`'s `HttpBinaryResult` doc comment).
  */
 import type { SQL } from "bun";
-import { sql } from "../engine/store.js";
 import { countOutboxByStatus, getTimerLagStats, countInstancesByStatus } from "../engine/admin-queries.js";
 import type { HttpBinaryResult } from "./errors.js";
 
 const CONTENT_TYPE = "text/plain; version=0.0.4; charset=utf-8";
 
-export async function handleMetrics(db: SQL = sql): Promise<HttpBinaryResult> {
+export async function handleMetrics(db: SQL): Promise<HttpBinaryResult> {
   let outboxByStatus: Record<string, number>;
   let timerLag: Awaited<ReturnType<typeof getTimerLagStats>>;
   let instancesByStatus: Record<string, number>;

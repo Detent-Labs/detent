@@ -6,7 +6,7 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { executeManualTransition, startInstance } from "../src/engine/transition.js";
-import { createAssignmentRegistry, registerAssignmentStrategy, createDefaultAssignmentRegistry } from "../src/engine/registry.js";
+import { createAssignmentRegistry, createDefaultAssignmentRegistry } from "../src/engine/registry.js";
 import type { ProcessBody, Instance, InstanceEvent, HistoryEntry } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
@@ -59,7 +59,7 @@ const initialAssignedBody = (strategy: { type: string; config: Record<string, un
 
 const regWith = (resolve: () => Promise<string[]>) => {
   const reg = createAssignmentRegistry();
-  registerAssignmentStrategy(reg, "test.strategy", { resolve });
+  reg.set("test.strategy", { resolve });
   return reg;
 };
 

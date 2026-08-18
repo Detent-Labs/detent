@@ -7,7 +7,7 @@
 
 import { evaluate } from "@marcbachmann/cel-js";
 import { INSTANCE_SCHEMA } from "./check.js";
-import { collectFieldsDeep } from "../schema/definition.js";
+import { leafFields } from "../schema/definition.js";
 import type {
   ProcessBody,
   Instance,
@@ -55,13 +55,12 @@ export function projectInstance(instance: Instance): Record<string, unknown> {
 /**
  * Flatten the catalog to fieldId -> key (data is keyed by id; CEL by key). A
  * `group` field is a container, not a leaf value, so it contributes no entry
- * itself. Built over `collectFieldsDeep`, the one authoritative field-tree
- * walk shared with `definition.ts` and `check.ts`.
+ * itself. Built over `leafFields`, the one authoritative leaf-field walk
+ * shared with `definition.ts` and `check.ts`.
  */
 function fieldKeyById(fields: FieldDef[]): Map<string, string> {
   const m = new Map<string, string>();
-  for (const f of collectFieldsDeep(fields)) {
-    if (typeof f.type === "string" && f.type === "group") continue;
+  for (const f of leafFields(fields)) {
     m.set(f.id, f.key);
   }
   return m;

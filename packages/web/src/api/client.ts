@@ -32,6 +32,37 @@ function toPublishIssues(raw: unknown): PublishIssue[] {
   });
 }
 
+/**
+ * Every one of these 19 kinds returns the byte-identical `{type, message}`
+ * shape below — the type itself IS the payload, so a membership check
+ * replaces 19 `case` labels that would otherwise carry no per-type
+ * information over the `Set` lookup.
+ */
+const PASSTHROUGH = new Set<ClientError["type"]>([
+  "already-claimed",
+  "not-a-candidate",
+  "not-claimed",
+  "not-claimant",
+  "unknown-delegate",
+  "not-assigned",
+  "guard-refused",
+  "authorization",
+  "actor-resolution",
+  "request-shape",
+  "not-found",
+  "conflict",
+  "draft-conflict",
+  "migration-plan",
+  "self-role-strip",
+  "self-manager",
+  "unknown-manager",
+  "email-in-use",
+  "cross-process-validation",
+]);
+
+/** The server's six publish-time error classes collapse to one `ClientError` shape; five of the six (all but `cross-process-validation`, folded into `PASSTHROUGH` above) land here. */
+const PUBLISH_VALIDATION = new Set(["registry-validation", "cel-validation", "duration-validation", "compile-validation", "schema-validation"]);
+
 export async function parseErrorBody(res: Response): Promise<ClientError> {
   let parsed: { error?: { type?: string; message?: string; issues?: unknown[] } } | undefined;
   try {
@@ -41,58 +72,20 @@ export async function parseErrorBody(res: Response): Promise<ClientError> {
   }
   const err = parsed?.error;
   const message = err?.message ?? `HTTP ${res.status}`;
-  switch (err?.type) {
-    case "validation":
-      return { type: "validation", issues: (err.issues ?? []) as SubmissionIssue[] };
-    case "already-claimed":
-      return { type: "already-claimed", message };
-    case "not-a-candidate":
-      return { type: "not-a-candidate", message };
-    case "not-claimed":
-      return { type: "not-claimed", message };
-    case "not-claimant":
-      return { type: "not-claimant", message };
-    case "unknown-delegate":
-      return { type: "unknown-delegate", message };
-    case "not-assigned":
-      return { type: "not-assigned", message };
-    case "guard-refused":
-      return { type: "guard-refused", message };
-    case "concurrency-conflict":
-      return { type: "concurrency-conflict" };
-    case "authorization":
-      return { type: "authorization", message };
-    case "actor-resolution":
-      return { type: "actor-resolution", message };
-    case "request-shape":
-      return { type: "request-shape", message };
-    case "not-found":
-      return { type: "not-found", message };
-    case "conflict":
-      return { type: "conflict", message };
-    case "draft-conflict":
-      return { type: "draft-conflict", message };
-    case "migration-plan":
-      return { type: "migration-plan", message };
-    case "self-role-strip":
-      return { type: "self-role-strip", message };
-    case "self-manager":
-      return { type: "self-manager", message };
-    case "unknown-manager":
-      return { type: "unknown-manager", message };
-    case "email-in-use":
-      return { type: "email-in-use", message };
-    case "registry-validation":
-    case "cel-validation":
-    case "duration-validation":
-    case "compile-validation":
-    case "schema-validation":
-      return { type: "publish-validation", kind: err.type, issues: toPublishIssues(err.issues) };
-    case "cross-process-validation":
-      return { type: "cross-process-validation", message };
-    default:
-      return { type: "internal", message };
+  const type = err?.type;
+  if (type !== undefined && PASSTHROUGH.has(type as ClientError["type"])) {
+    return { type, message } as ClientError;
   }
+  if (type !== undefined && PUBLISH_VALIDATION.has(type)) {
+    return { type: "publish-validation", kind: type, issues: toPublishIssues(err?.issues) };
+  }
+  if (type === "validation") {
+    return { type: "validation", issues: (err?.issues ?? []) as SubmissionIssue[] };
+  }
+  if (type === "concurrency-conflict") {
+    return { type: "concurrency-conflict" };
+  }
+  return { type: "internal", message };
 }
 
 export async function request(path: string, token: string | undefined, init?: RequestInit): Promise<Response> {

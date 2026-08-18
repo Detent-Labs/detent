@@ -9,7 +9,6 @@ interface FieldFormProps {
   values: Record<string, unknown>;
   onChange: (fieldId: string, value: unknown) => void;
   locale: LocaleCode;
-  baseLocale?: LocaleCode;
   issuesByField?: Map<string, SubmissionIssue[]>;
   /** The step view's declared column count. 1 is the width every form had
    * before `view.columns` existed, so an omitted prop renders unchanged. */
@@ -60,7 +59,7 @@ export function optionText(
  * Declaration order stays the render order. The grid fills left to right then
  * wraps down, so a view array built before this grid existed lays out in the
  * order its `↑`/`↓` buttons already gave it. */
-export function FieldForm({ fields, values, onChange, locale, baseLocale = locale, issuesByField, columns = 1 }: FieldFormProps) {
+export function FieldForm({ fields, values, onChange, locale, issuesByField, columns = 1 }: FieldFormProps) {
   const roots = fields.filter((f) => !f.group);
   return (
     // The wrapper carries the size container the collapse rule measures. A
@@ -76,7 +75,6 @@ export function FieldForm({ fields, values, onChange, locale, baseLocale = local
             values={values}
             onChange={onChange}
             locale={locale}
-            baseLocale={baseLocale}
             issuesByField={issuesByField}
             columns={columns}
           />
@@ -92,7 +90,6 @@ interface FieldInputProps {
   values: Record<string, unknown>;
   onChange: (fieldId: string, value: unknown) => void;
   locale: LocaleCode;
-  baseLocale: LocaleCode;
   issuesByField?: Map<string, SubmissionIssue[]>;
   /** The width of the grid this field sits in. A group passes its own value
    * straight down: a group inherits the form's count and declares none of its
@@ -109,9 +106,9 @@ function isGroup(field: ResolvedViewField): boolean {
   return field.field.type === "group";
 }
 
-export function FieldInput({ field, allFields, values, onChange, locale, baseLocale, issuesByField, columns = 1 }: FieldInputProps) {
+export function FieldInput({ field, allFields, values, onChange, locale, issuesByField, columns = 1 }: FieldInputProps) {
   const def = field.field;
-  const label = resolveText(def.label, locale, baseLocale) || def.key;
+  const label = resolveText(def.label, locale, locale) || def.key;
   const issues = issuesByField?.get(def.id) ?? [];
   const span = isGroup(field) ? columns : effectiveSpan(field.span, columns);
 
@@ -128,7 +125,6 @@ export function FieldInput({ field, allFields, values, onChange, locale, baseLoc
             values={values}
             onChange={onChange}
             locale={locale}
-            baseLocale={baseLocale}
             issuesByField={issuesByField}
             columns={columns}
           />
@@ -157,7 +153,7 @@ export function FieldInput({ field, allFields, values, onChange, locale, baseLoc
   // independently-maintained copies of the same map.
   const options = (field.options ?? []).map((o) => (
     <option key={o.value} value={o.value}>
-      {optionText(resolveText(o.label, locale, baseLocale) || o.value, o.attributes, locale)}
+      {optionText(resolveText(o.label, locale, locale) || o.value, o.attributes, locale)}
     </option>
   ));
 
@@ -235,7 +231,7 @@ export function FieldInput({ field, allFields, values, onChange, locale, baseLoc
       {hasIssues && (
         <ul className="form-ui-field-issues" id={issuesId}>
           {issues.map((issue, i) => (
-            <li key={i}>{issueMessage(issue, locale, baseLocale)}</li>
+            <li key={i}>{issueMessage(issue, locale)}</li>
           ))}
         </ul>
       )}

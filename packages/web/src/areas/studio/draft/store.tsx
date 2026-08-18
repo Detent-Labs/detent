@@ -1,6 +1,5 @@
 import { createContext, useContext, useMemo, useReducer, useState, type ReactNode } from "react";
 import type { ProcessBody } from "workflow-engine/schema";
-import type { Registry } from "workflow-engine/engine/registry";
 import type { Draft } from "./types";
 import { runValidation, type ValidationResult } from "./validation";
 import { collectUsedLocales } from "./localized-text";
@@ -14,8 +13,6 @@ interface DraftContextValue {
   mutate: Mutate;
   replace: (next: Draft) => void;
   validation: ValidationResult;
-  registry: Registry | undefined;
-  setRegistry: (registry: Registry | undefined) => void;
   loadedChildren: Record<string, ProcessBody>;
   setChildForStep: (stepId: string, childBody: ProcessBody | undefined) => void;
   /** Which locale of the *authored process content* (label/description
@@ -60,7 +57,6 @@ function reducer(state: ReducerState, action: Action): ReducerState {
 
 export function DraftProvider({ children, initial }: { children: ReactNode; initial?: Draft }) {
   const [{ draft, loadGeneration }, dispatch] = useReducer(reducer, { draft: initial ?? EMPTY_DRAFT, loadGeneration: 0 });
-  const [registry, setRegistry] = useState<Registry | undefined>(undefined);
   const [loadedChildren, setLoadedChildren] = useState<Record<string, ProcessBody>>({});
   // Seeded from the initially-loaded Draft's own baseLocale (falling back to
   // "en" for a brand-new Draft) rather than a hardcoded "en" — opening an
@@ -70,12 +66,12 @@ export function DraftProvider({ children, initial }: { children: ReactNode; init
 
   const usedLocales = useMemo(() => collectUsedLocales(draft), [draft]);
 
-  // A plain, synchronous recompute on every Draft/registry/children change — no
+  // A plain, synchronous recompute on every Draft/children change — no
   // setTimeout debounce. Validating a document this size (dozens of entities,
   // not thousands) runs in low single-digit milliseconds, well under a frame;
   // debouncing would trade correctness (a stale result briefly shown) for a
   // performance problem that doesn't exist yet at this scale.
-  const validation = useMemo(() => runValidation(draft, registry, loadedChildren), [draft, registry, loadedChildren]);
+  const validation = useMemo(() => runValidation(draft, undefined, loadedChildren), [draft, loadedChildren]);
 
   const setChildForStep = (stepId: string, childBody: ProcessBody | undefined) => {
     setLoadedChildren((prev) => {
@@ -93,8 +89,6 @@ export function DraftProvider({ children, initial }: { children: ReactNode; init
       mutate: (recipe) => dispatch({ kind: "mutate", recipe }),
       replace: (next) => dispatch({ kind: "replace", next }),
       validation,
-      registry,
-      setRegistry,
       loadedChildren,
       setChildForStep,
       contentLocale,
@@ -102,7 +96,7 @@ export function DraftProvider({ children, initial }: { children: ReactNode; init
       usedLocales,
       loadGeneration,
     }),
-    [draft, validation, registry, loadedChildren, contentLocale, usedLocales, loadGeneration],
+    [draft, validation, loadedChildren, contentLocale, usedLocales, loadGeneration],
   );
 
   return <DraftContext.Provider value={value}>{children}</DraftContext.Provider>;

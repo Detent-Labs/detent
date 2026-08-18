@@ -16,7 +16,7 @@ import {
   HTTP_MAX_RESPONSE_BYTES,
 } from "../src/handlers/http.js";
 import { deliver, PermanentError, type ClaimedRow } from "../src/engine/outbox.js";
-import { createRegistry, register, type HandlerContext } from "../src/engine/registry.js";
+import { createRegistry, type HandlerContext } from "../src/engine/registry.js";
 
 /** http.request reads no database, so a stand-in handle satisfies the required field. */
 const noDb = (() => Promise.resolve([])) as unknown as SQL;
@@ -283,7 +283,7 @@ test("an over-size response dead-letters via deliver(), the classification the o
     () => new Response(overSize, { status: 200, headers: { "Content-Type": "text/plain" } }),
     async (url) => {
       const reg = createRegistry();
-      register(reg, HTTP_ACTION_TYPE, httpHandlerDef);
+      reg.set(HTTP_ACTION_TYPE, httpHandlerDef);
       const row: ClaimedRow = {
         idempotency_key: "idem_oversize",
         instance_id: "inst_1",
@@ -317,7 +317,7 @@ test("a retried delivery sends the same Idempotency-Key as the original", async 
     () => jsonResponse({}),
     async (url, requests) => {
       const reg = createRegistry();
-      register(reg, HTTP_ACTION_TYPE, httpHandlerDef);
+      reg.set(HTTP_ACTION_TYPE, httpHandlerDef);
       const row: ClaimedRow = {
         idempotency_key: "idem_stable",
         instance_id: "inst_1",

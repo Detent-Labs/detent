@@ -82,7 +82,7 @@ export function RuleInput({ field, value, onChange }: Props) {
         <div className="condition-footer">
           {unparseable && (
             <p className="condition-parse-error" role="status">
-              {t("ruleBuilder.unparseable")}
+              {t("condition.unparseable")}
             </p>
           )}
           <button
@@ -92,7 +92,7 @@ export function RuleInput({ field, value, onChange }: Props) {
             onClick={() => setDevOpen(false)}
             disabled={unparseable}
           >
-            {t("ruleBuilder.developerView")}
+            {t("condition.developerView")}
           </button>
         </div>
       </div>
@@ -104,11 +104,11 @@ export function RuleInput({ field, value, onChange }: Props) {
       <RuleBuilder condition={condition} operands={operands} onChange={commit} />
       <div className="condition-footer">
         <p className="condition-readout">
-          <span className="condition-readout-label">{t("ruleBuilder.celReadout")}</span>
-          <code>{preview ?? t("ruleBuilder.celEmpty")}</code>
+          <span className="condition-readout-label">{t("condition.celReadout")}</span>
+          <code>{preview ?? t("condition.celEmpty")}</code>
         </p>
         <button type="button" className="condition-mode condition-mode-disclosure" aria-expanded={false} onClick={() => setDevOpen(true)}>
-          {t("ruleBuilder.developerView")}
+          {t("condition.developerView")}
         </button>
       </div>
     </div>

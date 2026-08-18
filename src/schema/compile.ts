@@ -32,24 +32,6 @@ import {
   authoredProcessBody,
   publishedProcessBody,
   processBody,
-  processContract,
-  workflow,
-  step,
-  path,
-  action,
-  retryPolicy,
-  timer,
-  timerAction,
-  view,
-  viewField,
-  assignment,
-  subprocessSpec,
-  fieldDef,
-  fieldOption,
-  fieldValidation,
-  plugin,
-  expression,
-  dataSourceDef,
   collectFieldsDeep,
   parseIsoDuration,
   MAX_TIMER_DURATION_MS,
@@ -171,11 +153,10 @@ export const MAX_PATTERN_LENGTH = 4000;
 const isPlainObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 
-// ---- Zod-shape introspection: derive each object schema's known key set from
-// `.shape` rather than transcribing key lists by hand, so a key added to
-// definition.ts does not silently make the walk reject it. Handles the wrapper
-// types the schemas actually use: `z.lazy()` (fieldDef's self-reference) and
-// the optional/nullable/default wrappers.
+// ---- Zod-shape introspection: `unwrapSchema` strips the wrapper types the
+// schemas actually use — `z.lazy()` (fieldDef's self-reference) and the
+// optional/nullable/default wrappers — down to the substantive node whose
+// `_zod.def.type` the generic walker below (checkUnknownKeys) dispatches on.
 //
 // A refined schema needs no unwrapping. Zod v4 declares `refine` as returning
 // `this`, so `.refine()`/`.superRefine()` leave a ZodObject a ZodObject, and
@@ -192,34 +173,6 @@ function unwrapSchema(schema: z.ZodTypeAny): z.ZodTypeAny {
   }
   return s;
 }
-
-function shapeKeys(schema: z.ZodTypeAny): Set<string> {
-  const shape = (unwrapSchema(schema) as unknown as { shape?: Record<string, unknown> }).shape;
-  // An empty set would silently accept every unknown key at this level rather
-  // than failing loudly, so a schema that does not unwrap to an object throws.
-  if (!shape) throw new Error("shapeKeys: schema did not unwrap to an object");
-  return new Set(Object.keys(shape));
-}
-
-const PROCESS_BODY_KEYS = shapeKeys(processBody);
-const CONTRACT_KEYS = shapeKeys(processContract);
-const WORKFLOW_KEYS = shapeKeys(workflow);
-const STEP_KEYS = shapeKeys(step);
-const PATH_KEYS = shapeKeys(path);
-const ACTION_KEYS = shapeKeys(action);
-const RETRY_POLICY_KEYS = shapeKeys(retryPolicy);
-const TIMER_KEYS = shapeKeys(timer);
-const TIMER_ACTION_KEYS = shapeKeys(timerAction);
-const VIEW_KEYS = shapeKeys(view);
-const VIEW_FIELD_KEYS = shapeKeys(viewField);
-const ASSIGNMENT_KEYS = shapeKeys(assignment);
-const SUBPROCESS_SPEC_KEYS = shapeKeys(subprocessSpec);
-const FIELD_DEF_KEYS = shapeKeys(fieldDef);
-const FIELD_OPTION_KEYS = shapeKeys(fieldOption);
-const FIELD_VALIDATION_KEYS = shapeKeys(fieldValidation);
-const PLUGIN_KEYS = shapeKeys(plugin);
-const EXPRESSION_KEYS = shapeKeys(expression);
-const DATA_SOURCE_DEF_KEYS = shapeKeys(dataSourceDef);
 
 // ---- Shared traversal helpers, mirroring the collect()-style walks already
 // used by validateDurations above, src/cel/check.ts and
@@ -289,13 +242,15 @@ function checkReservedActionPrefix(body: ProcessBody): CompileIssue[] {
 }
 
 // ============================================================
-// 3. Unknown-key rejection (task 3). One traversal mirroring the authored
-// body's schema tree; a value's own keys are checked against the schema's
-// `.shape`-derived key set, then recursed into per position. Record-typed
-// positions (localizedText, Action.output, SubprocessSpec.*Mapping,
-// Plugin.config) are never checked for unknown keys on their OWN keys — those
-// are data (locale codes, field ids), not a fixed shape — but their VALUES
-// are still walked when the value has its own fixed shape (an Expression).
+// 3. Unknown-key rejection (task 3). One generic walker recurses the live Zod
+// schema tree (via `unwrapSchema` and each node's `_zod.def`) alongside the
+// raw, duck-typed body — no hand-mirrored key list or recursion shape per
+// nesting level, so a key or a level added to definition.ts needs no
+// companion edit here. Record-typed positions (localizedText, Action.output,
+// SubprocessSpec.*Mapping, Plugin.config) are never checked for unknown keys
+// on their OWN keys — those are data (locale codes, field ids), not a fixed
+// shape — but a record's VALUES are still walked when the value schema has
+// its own fixed shape (an Expression).
 // ============================================================
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -306,125 +261,131 @@ function checkKnownKeys(value: any, known: Set<string>, loc: string, issues: Com
   }
 }
 
+/** Zod types that can never structurally produce a plain-object value — the
+ * "definitely a primitive" half of `unionObjectMatch`'s dispatch rule.
+ * Anything NOT in this set and not itself `"object"` (a `union`, `record`,
+ * `array`, or unresolved `lazy`) stays ambiguous: it could ALSO be a plain
+ * object at some depth (`Literal`, via `z.record(z.string(), literal)`), so
+ * type alone cannot rule it out. */
+const LEAF_TYPES = new Set([
+  "string", "number", "boolean", "null", "bigint", "enum", "literal",
+  "undefined", "void", "never", "any", "unknown", "nan", "symbol", "date",
+]);
+
+/**
+ * Picks the union member schema a plain-object `value` structurally belongs
+ * to, or `undefined` when no member can be matched with confidence. `options`
+ * are the union's own member schemas, unwrapped here.
+ *
+ * General rule: exactly one member unwraps to an object schema, and every
+ * other member is a definite leaf type (`LEAF_TYPES`) that can never be a
+ * plain object — so that one object member is the unambiguous match. This
+ * covers `FieldDef.type` (`BaseFieldType | Plugin`) and the three
+ * `ViewField.visible`/`.required`/`.readonly` sites (`boolean | Expression`).
+ *
+ * `FieldDef.default` (`Expression | Literal`) does not fit that rule:
+ * `Literal` unwraps to a `union`, not a `LEAF_TYPES` member, since it
+ * recurses through `z.record(z.string(), literal)` and so can ALSO be a
+ * plain object. This function does not try to resolve that ambiguity
+ * generically (design.md's Risk section calls out exactly this: no
+ * best-effort resolver that tries every member). It dispatches this one
+ * case the way the original hand-written check did: an Expression-shaped
+ * object always carries a string `lang`. Any other plain-object value is
+ * left unmatched, which is the correct answer for an opaque `Literal` — no
+ * key-set check, no recursion into it at all.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function walkExpressionKeys(e: any, loc: string, issues: CompileIssue[]): void {
-  if (isPlainObject(e)) checkKnownKeys(e, EXPRESSION_KEYS, loc, issues);
+function unionObjectMatch(options: any[], value: Record<string, unknown>): z.ZodTypeAny | undefined {
+  const unwrapped = options.map((m) => unwrapSchema(m));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const typeOf = (m: any): string | undefined => m?._zod?.def?.type;
+  const objectMembers = unwrapped.filter((m) => typeOf(m) === "object");
+  const ambiguousMembers = unwrapped.filter((m) => typeOf(m) !== "object" && !LEAF_TYPES.has(typeOf(m) ?? ""));
+
+  // No known union site in this schema produces zero or two-plus object
+  // members; stay narrow rather than guess at one.
+  if (objectMembers.length !== 1) return undefined;
+  const candidate = objectMembers[0];
+  if (ambiguousMembers.length === 0) return candidate;
+
+  const shape = (candidate as unknown as { shape: Record<string, unknown> }).shape;
+  return shape && "lang" in shape && typeof value.lang === "string" ? candidate : undefined;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function walkActionKeys(a: any, loc: string, issues: CompileIssue[]): void {
-  checkKnownKeys(a, ACTION_KEYS, loc, issues);
-  if (isPlainObject(a?.retry)) checkKnownKeys(a.retry, RETRY_POLICY_KEYS, `${loc}.retry`, issues);
-  if (isPlainObject(a?.output)) {
-    for (const [fid, e] of Object.entries(a.output)) walkExpressionKeys(e, `${loc}.output.${fid}`, issues);
-  }
-}
+/**
+ * The generic walker (tasks 2.2/2.3). Dispatches on the live schema node's
+ * `_zod.def.type`, reading each object's `.shape`, each array's `.element`,
+ * each record's `.valueType`, and each union's `.options` at the moment of
+ * visiting that node — a schema change then needs no mirror updated here.
+ *
+ * - object: check `value`'s own keys against `Object.keys(shape)`, then
+ *   recurse into each declared key the value also carries, against that
+ *   key's own sub-schema.
+ * - array: recurse into each element against the element schema,
+ *   index-chaining `loc` (`foo[0]`, `foo[1]`) — the same pattern
+ *   `walkFieldsIndexed` and `collectActionSites` use elsewhere in this file.
+ * - record: skip the value's own keys — they are data (locale codes, field
+ *   ids), never a fixed shape — and recurse into the declared value-schema
+ *   for each entry's value.
+ * - union: recurse into whichever member `unionObjectMatch` resolves to; no
+ *   match reports nothing here — some other structural check, or the
+ *   eventual Zod parse, reports the real type mismatch. This walker's only
+ *   job is "extra key," never "wrong type."
+ * - anything else (primitives, `ZodLiteral`): no keys to check, no
+ *   recursion.
+ *
+ * Operates on `unknown`/duck-typed input, like the rest of this section: it
+ * runs BEFORE any Zod parse of the authored body, on both compile branches.
+ */
+function walkSchema(schema: z.ZodTypeAny, value: unknown, loc: string, issues: CompileIssue[]): void {
+  const s = unwrapSchema(schema);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const def = (s as any)?._zod?.def;
+  if (!def) return;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function walkActionsKeys(actions: any, loc: string, issues: CompileIssue[]): void {
-  if (!Array.isArray(actions)) return;
-  actions.forEach((a, i) => walkActionKeys(a, `${loc}[${i}]`, issues));
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function walkFieldDefKeys(f: any, loc: string, issues: CompileIssue[]): void {
-  checkKnownKeys(f, FIELD_DEF_KEYS, loc, issues);
-  if (isPlainObject(f?.validation)) {
-    checkKnownKeys(f.validation, FIELD_VALIDATION_KEYS, `${loc}.validation`, issues);
-    walkExpressionKeys(f.validation.rule, `${loc}.validation.rule`, issues);
-  }
-  if (Array.isArray(f?.options)) {
-    f.options.forEach((o: unknown, i: number) => checkKnownKeys(o, FIELD_OPTION_KEYS, `${loc}.options[${i}]`, issues));
-  }
-  // type: BaseFieldType | Plugin — a string is the closed enum (nothing to
-  // check); an object is a plugin-typed field.
-  if (isPlainObject(f?.type)) checkKnownKeys(f.type, PLUGIN_KEYS, `${loc}.type`, issues);
-  // default: Expression | Literal — an Expression-shaped object (carries
-  // `lang`) is checked as one; any other object is an arbitrary JSON literal
-  // and is not subject to an unknown-key check at all.
-  if (isPlainObject(f?.default) && typeof f.default.lang === "string") walkExpressionKeys(f.default, `${loc}.default`, issues);
-  // Recursion into nested fields happens via walkFieldsIndexed's own caller.
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function walkViewKeys(v: any, loc: string, issues: CompileIssue[]): void {
-  checkKnownKeys(v, VIEW_KEYS, loc, issues);
-  if (Array.isArray(v?.fields)) {
-    v.fields.forEach((vf: unknown, i: number) => {
-      checkKnownKeys(vf, VIEW_FIELD_KEYS, `${loc}.fields[${i}]`, issues);
+  switch (def.type) {
+    case "object": {
+      const shape = (s as unknown as { shape: Record<string, z.ZodTypeAny> }).shape;
+      checkKnownKeys(value, new Set(Object.keys(shape)), loc, issues);
+      if (!isPlainObject(value)) return;
+      for (const key of Object.keys(shape)) {
+        if (key in value) walkSchema(shape[key], (value as Record<string, unknown>)[key], loc ? `${loc}.${key}` : key, issues);
+      }
+      return;
+    }
+    case "array": {
+      if (!Array.isArray(value)) return;
+      value.forEach((el, i) => walkSchema(def.element, el, `${loc}[${i}]`, issues));
+      return;
+    }
+    case "record": {
+      if (!isPlainObject(value)) return;
+      for (const [key, v] of Object.entries(value)) walkSchema(def.valueType, v, loc ? `${loc}.${key}` : key, issues);
+      return;
+    }
+    case "union": {
+      if (!isPlainObject(value)) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vff = vf as any;
-      walkExpressionKeys(vff?.visible, `${loc}.fields[${i}].visible`, issues);
-      walkExpressionKeys(vff?.required, `${loc}.fields[${i}].required`, issues);
-      walkExpressionKeys(vff?.readonly, `${loc}.fields[${i}].readonly`, issues);
-    });
+      const match = unionObjectMatch(def.options as any[], value as Record<string, unknown>);
+      if (match) walkSchema(match, value, loc, issues);
+      return;
+    }
+    default:
+      return;
   }
-  if (isPlainObject(v?.renderer)) checkKnownKeys(v.renderer, PLUGIN_KEYS, `${loc}.renderer`, issues);
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function walkSubprocessSpecKeys(s: any, loc: string, issues: CompileIssue[]): void {
-  checkKnownKeys(s, SUBPROCESS_SPEC_KEYS, loc, issues);
-  if (isPlainObject(s?.inputMapping)) {
-    for (const [fid, e] of Object.entries(s.inputMapping)) walkExpressionKeys(e, `${loc}.inputMapping.${fid}`, issues);
-  }
-  if (isPlainObject(s?.outputMapping)) {
-    for (const [fid, e] of Object.entries(s.outputMapping)) walkExpressionKeys(e, `${loc}.outputMapping.${fid}`, issues);
-  }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function walkTimerKeys(t: any, loc: string, issues: CompileIssue[]): void {
-  checkKnownKeys(t, TIMER_KEYS, loc, issues);
-  walkExpressionKeys(t?.deadline, `${loc}.deadline`, issues);
-  if (isPlainObject(t?.onFire)) {
-    checkKnownKeys(t.onFire, TIMER_ACTION_KEYS, `${loc}.onFire`, issues);
-    walkActionsKeys(t.onFire.actions, `${loc}.onFire.actions`, issues);
-  }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function walkPathKeys(p: any, loc: string, issues: CompileIssue[]): void {
-  checkKnownKeys(p, PATH_KEYS, loc, issues);
-  walkExpressionKeys(p?.guard, `${loc}.guard`, issues);
-  walkActionsKeys(p?.onPath, `${loc}.onPath`, issues);
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function walkStepKeys(s: any, loc: string, issues: CompileIssue[]): void {
-  checkKnownKeys(s, STEP_KEYS, loc, issues);
-  walkActionsKeys(s?.onEntry, `${loc}.onEntry`, issues);
-  walkActionsKeys(s?.onExit, `${loc}.onExit`, issues);
-  walkActionsKeys(s?.onCancel, `${loc}.onCancel`, issues);
-  if (isPlainObject(s?.subprocess)) walkSubprocessSpecKeys(s.subprocess, `${loc}.subprocess`, issues);
-  if (isPlainObject(s?.view)) walkViewKeys(s.view, `${loc}.view`, issues);
-  if (isPlainObject(s?.assignment)) {
-    checkKnownKeys(s.assignment, ASSIGNMENT_KEYS, `${loc}.assignment`, issues);
-    if (isPlainObject(s.assignment.strategy)) checkKnownKeys(s.assignment.strategy, PLUGIN_KEYS, `${loc}.assignment.strategy`, issues);
-  }
-  if (Array.isArray(s?.timers)) s.timers.forEach((t: unknown, i: number) => walkTimerKeys(t, `${loc}.timers[${i}]`, issues));
-  if (Array.isArray(s?.paths)) s.paths.forEach((p: unknown, i: number) => walkPathKeys(p, `${loc}.paths[${i}]`, issues));
 }
 
 /** Every key not declared by the corresponding schema, at any depth of the
- * authored body — process, contract, field (incl. nested group fields),
- * data source, workflow, step, path, action, timer, view field, validation. */
+ * authored body — process, contract, field (incl. nested group fields), data
+ * source, workflow, step, path, action, timer, view field, validation. One
+ * call from `processBody`'s root object schema reaches every one of those
+ * positions: the object branch above recurses into every key the schema
+ * declares that the value also carries, so nothing needs wiring position by
+ * position the way the old per-level `walkFooKeys` functions did. */
 function checkUnknownKeys(body: unknown): CompileIssue[] {
   const issues: CompileIssue[] = [];
   if (!isPlainObject(body)) return issues;
-
-  checkKnownKeys(body, PROCESS_BODY_KEYS, "", issues);
-  if (isPlainObject(body.contract)) checkKnownKeys(body.contract, CONTRACT_KEYS, "contract", issues);
-  if (Array.isArray(body.dataSources)) {
-    body.dataSources.forEach((d: unknown, i: number) => checkKnownKeys(d, DATA_SOURCE_DEF_KEYS, `dataSources[${i}]`, issues));
-  }
-  walkFieldsIndexed(body.fields as unknown[] | undefined, "fields", (f, floc) => walkFieldDefKeys(f, floc, issues));
-  if (isPlainObject(body.workflow)) {
-    checkKnownKeys(body.workflow, WORKFLOW_KEYS, "workflow", issues);
-    if (Array.isArray(body.workflow.steps)) {
-      body.workflow.steps.forEach((s: unknown, i: number) => walkStepKeys(s, `workflow.steps[${i}]`, issues));
-    }
-  }
+  walkSchema(processBody, body, "", issues);
   return issues;
 }
 
@@ -434,25 +395,21 @@ function checkUnknownKeys(body: unknown): CompileIssue[] {
 // `validation.pattern`, so a single over-long pattern is reported once.
 // ============================================================
 
-function checkPatterns(body: ProcessBody): CompileIssue[] {
-  const issues: CompileIssue[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  walkFieldsIndexed(body.fields as any, "fields", (f, floc) => {
-    const pattern = f?.validation?.pattern;
-    if (typeof pattern !== "string") return;
-    const loc = `${floc}.validation.pattern`;
-    if (pattern.length > MAX_PATTERN_LENGTH) {
-      issues.push({ loc, value: pattern, message: `pattern exceeds the ${MAX_PATTERN_LENGTH}-character bound` });
-      return; // do not also attempt to compile an oversized pattern
-    }
-    try {
-      // eslint-disable-next-line no-new
-      new RegExp(pattern);
-    } catch {
-      issues.push({ loc, value: pattern, message: "pattern does not compile as a JavaScript RegExp" });
-    }
-  });
-  return issues;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function checkPatterns(f: any, floc: string, issues: CompileIssue[]): void {
+  const pattern = f?.validation?.pattern;
+  if (typeof pattern !== "string") return;
+  const loc = `${floc}.validation.pattern`;
+  if (pattern.length > MAX_PATTERN_LENGTH) {
+    issues.push({ loc, value: pattern, message: `pattern exceeds the ${MAX_PATTERN_LENGTH}-character bound` });
+    return; // do not also attempt to compile an oversized pattern
+  }
+  try {
+    // eslint-disable-next-line no-new
+    new RegExp(pattern);
+  } catch {
+    issues.push({ loc, value: pattern, message: "pattern does not compile as a JavaScript RegExp" });
+  }
 }
 
 // ============================================================
@@ -511,52 +468,44 @@ function checkIdResolution(body: ProcessBody): CompileIssue[] {
  * body written before this key existed carries a `columnMapping`, so an
  * identical re-publish cannot newly fail.
  */
-function checkColumnMapping(body: ProcessBody): CompileIssue[] {
-  const issues: CompileIssue[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const allFields = collectFieldsDeep((body.fields ?? []) as any);
-  const fieldsById = new Map(allFields.map((f) => [f.id as string, f]));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function checkColumnMapping(f: any, floc: string, fieldsById: Map<string, any>, issues: CompileIssue[]): void {
+  const mapping = f?.columnMapping;
+  if (!isPlainObject(mapping)) return;
+  const loc = `${floc}.columnMapping`;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  walkFieldsIndexed(body.fields as any, "fields", (f, floc) => {
-    const mapping = f?.columnMapping;
-    if (!isPlainObject(mapping)) return;
-    const loc = `${floc}.columnMapping`;
+  if (f.dataSource === undefined) {
+    issues.push({ loc, value: String(f.id), message: "columnMapping needs a dataSource: an inline options array declares no columns" });
+  }
+  if (f.type !== "select") {
+    issues.push({ loc, value: String(f.type), message: "columnMapping needs a select field: a multiselect picks several rows for one target" });
+  }
 
-    if (f.dataSource === undefined) {
-      issues.push({ loc, value: String(f.id), message: "columnMapping needs a dataSource: an inline options array declares no columns" });
+  const seenTargets = new Map<string, string>();
+  for (const [column, target] of Object.entries(mapping)) {
+    if (!FIELD_KEY_FORMAT.test(column)) {
+      issues.push({ loc: `${loc}.${column}`, value: column, message: "columnMapping key must match /^[a-z_][a-z0-9_]*$/" });
     }
-    if (f.type !== "select") {
-      issues.push({ loc, value: String(f.type), message: "columnMapping needs a select field: a multiselect picks several rows for one target" });
+    if (column.length > MAX_KEY_LENGTH) {
+      issues.push({ loc: `${loc}.${column}`, value: column, message: `columnMapping key exceeds the ${MAX_KEY_LENGTH}-character bound` });
     }
-
-    const seenTargets = new Map<string, string>();
-    for (const [column, target] of Object.entries(mapping)) {
-      if (!FIELD_KEY_FORMAT.test(column)) {
-        issues.push({ loc: `${loc}.${column}`, value: column, message: "columnMapping key must match /^[a-z_][a-z0-9_]*$/" });
-      }
-      if (column.length > MAX_KEY_LENGTH) {
-        issues.push({ loc: `${loc}.${column}`, value: column, message: `columnMapping key exceeds the ${MAX_KEY_LENGTH}-character bound` });
-      }
-      const tid = String(target);
-      const targetField = fieldsById.get(tid);
-      if (!targetField) {
-        issues.push({ loc: `${loc}.${column}`, value: tid, message: `columnMapping target does not resolve to a field in this process: ${tid}` });
-      } else if (targetField.type === "group") {
-        issues.push({ loc: `${loc}.${column}`, value: tid, message: "columnMapping target is a group field, which takes no value" });
-      }
-      if (tid === String(f.id)) {
-        issues.push({ loc: `${loc}.${column}`, value: tid, message: "columnMapping target is the mapping field itself" });
-      }
-      const prior = seenTargets.get(tid);
-      if (prior !== undefined) {
-        issues.push({ loc: `${loc}.${column}`, value: tid, message: `columnMapping targets one field twice: '${prior}' and '${column}' both write ${tid}` });
-      } else {
-        seenTargets.set(tid, column);
-      }
+    const tid = String(target);
+    const targetField = fieldsById.get(tid);
+    if (!targetField) {
+      issues.push({ loc: `${loc}.${column}`, value: tid, message: `columnMapping target does not resolve to a field in this process: ${tid}` });
+    } else if (targetField.type === "group") {
+      issues.push({ loc: `${loc}.${column}`, value: tid, message: "columnMapping target is a group field, which takes no value" });
     }
-  });
-  return issues;
+    if (tid === String(f.id)) {
+      issues.push({ loc: `${loc}.${column}`, value: tid, message: "columnMapping target is the mapping field itself" });
+    }
+    const prior = seenTargets.get(tid);
+    if (prior !== undefined) {
+      issues.push({ loc: `${loc}.${column}`, value: tid, message: `columnMapping targets one field twice: '${prior}' and '${column}' both write ${tid}` });
+    } else {
+      seenTargets.set(tid, column);
+    }
+  }
 }
 
 // ============================================================
@@ -568,13 +517,32 @@ function checkColumnMapping(body: ProcessBody): CompileIssue[] {
  * catalog already treats keys as lowercase slugs. */
 const FIELD_KEY_FORMAT = /^[a-z_][a-z0-9_]*$/;
 
-function checkFieldKeyFormat(body: ProcessBody): CompileIssue[] {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function checkFieldKeyFormat(f: any, floc: string, issues: CompileIssue[]): void {
+  const key = f?.key;
+  if (typeof key !== "string" || !FIELD_KEY_FORMAT.test(key)) {
+    issues.push({ loc: `${floc}.key`, value: String(key), message: "field key must match /^[a-z_][a-z0-9_]*$/ to be a valid CEL identifier" });
+  }
+}
+
+/** One pass over `body.fields`, running `checkPatterns`, `checkColumnMapping`,
+ * `checkFieldKeyFormat`, and the field-key-length bound together per field, in
+ * that fixed sequence. `fieldsById` is built once, over the whole tree, since
+ * `checkColumnMapping` alone resolves a mapping target that can name any field
+ * in the process, not only the one under walk. */
+function checkFieldTree(body: ProcessBody): CompileIssue[] {
   const issues: CompileIssue[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allFields = collectFieldsDeep((body.fields ?? []) as any);
+  const fieldsById = new Map(allFields.map((f) => [f.id as string, f]));
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   walkFieldsIndexed(body.fields as any, "fields", (f, floc) => {
-    const key = f?.key;
-    if (typeof key !== "string" || !FIELD_KEY_FORMAT.test(key)) {
-      issues.push({ loc: `${floc}.key`, value: String(key), message: "field key must match /^[a-z_][a-z0-9_]*$/ to be a valid CEL identifier" });
+    checkPatterns(f, floc, issues);
+    checkColumnMapping(f, floc, fieldsById, issues);
+    checkFieldKeyFormat(f, floc, issues);
+    if (typeof f?.key === "string" && f.key.length > MAX_KEY_LENGTH) {
+      issues.push({ loc: `${floc}.key`, value: f.key, message: `key exceeds the ${MAX_KEY_LENGTH}-character bound` });
     }
   });
   return issues;
@@ -701,18 +669,13 @@ function collectDurationSites(body: ProcessBody): DurationSite[] {
   return sites;
 }
 
-/** Length bounds on key, Plugin.type, duration and Expression.src — every
+/** Length bounds on Plugin.type, duration and Expression.src — every
  * authored string that reaches an interpreter or an index. Does NOT visit
- * `validation.pattern`: checkPatterns above owns that bound exclusively. */
+ * `validation.pattern`: checkPatterns above owns that bound exclusively. The
+ * field-key-length bound lives in `checkFieldTree` instead, alongside the
+ * other per-field checks. */
 function checkLengthBounds(body: ProcessBody): CompileIssue[] {
   const issues: CompileIssue[] = [];
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  walkFieldsIndexed(body.fields as any, "fields", (f, floc) => {
-    if (typeof f?.key === "string" && f.key.length > MAX_KEY_LENGTH) {
-      issues.push({ loc: `${floc}.key`, value: f.key, message: `key exceeds the ${MAX_KEY_LENGTH}-character bound` });
-    }
-  });
 
   collectPluginTypeSites(body).forEach(({ value, loc }) => {
     if (value.length > MAX_PLUGIN_TYPE_LENGTH) {
@@ -751,10 +714,8 @@ function structuralIssues(body: ProcessBody): CompileIssue[] {
   return [
     ...checkReservedActionPrefix(body),
     ...checkUnknownKeys(body),
-    ...checkPatterns(body),
+    ...checkFieldTree(body),
     ...checkIdResolution(body),
-    ...checkColumnMapping(body),
-    ...checkFieldKeyFormat(body),
     ...checkLengthBounds(body),
   ];
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { savedBodyReducer, initialSavedBody, isDirty } from "../src/areas/studio/screens/draftToolbarState.js";
+import { isDirty } from "../src/areas/studio/screens/draftToolbarState.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
 /**
@@ -8,23 +8,26 @@ import type { Draft } from "../src/areas/studio/draft/types.js";
  * use react-dom/server's renderToStaticMarkup, which never fires an event or
  * re-renders on state change), so a real click-through conflict -> reload -> publish sequence
  * can't be driven directly. This is the documented fallback
- * (render-frontend-error-states design.md, task 6.4): the savedBody
- * transition is extracted into savedBodyReducer, and this test drives it
- * through the exact sequence DraftToolbar's wiring produces.
+ * (render-frontend-error-states design.md, task 6.4): `EditScreen.tsx` seeds
+ * `savedBody` from `useState<Draft>(() => structuredClone(draft))` and
+ * advances it through a `(body: Draft) => setSavedBody(structuredClone(body))`
+ * wrapper, and this test drives that exact sequence `DraftToolbar`'s wiring
+ * produces by calling `structuredClone` directly, the same way the wrapper
+ * does.
  *
- * The bug this guards was in the *wiring*, not in publishGateLogic.ts's
- * isDirty — that function is already correct and already tested
- * (publishGateLogic.test.ts). Before this change, DraftToolbar's reload()
- * called replace(record.body) but never advanced savedBody to match, so
- * isDirty compared the freshly-reloaded body against the stale, discarded
- * local edit and returned true for a draft byte-identical to the server's.
- * A test of isDirty alone cannot see that, because isDirty was never wrong —
- * the two arguments it was called with were.
+ * The bug this guards was in the *wiring*, not in `isDirty` — that function
+ * is already correct and already tested, in the `describe("isDirty", ...)`
+ * block below. Before this change, DraftToolbar's reload() called
+ * replace(record.body) but never advanced savedBody to match, so isDirty
+ * compared the freshly-reloaded body against the stale, discarded local edit
+ * and returned true for a draft byte-identical to the server's. A test of
+ * isDirty alone cannot see that, because isDirty was never wrong — the two
+ * arguments it was called with were.
  */
 describe("DraftToolbar's savedBody transition (draftToolbarState.ts)", () => {
   it("conflict (409) -> reload -> publish: reload leaves the draft clean, so isDirty is false and publish would not prompt", () => {
     const original: Draft = { key: "expense-approval", label: { en: "Expense approval" } };
-    let savedBody = initialSavedBody(original);
+    let savedBody = structuredClone(original);
 
     // The user edits locally.
     const locallyEdited: Draft = { key: "expense-approval", label: { en: "Expense approval (mine)" } };
@@ -36,7 +39,7 @@ describe("DraftToolbar's savedBody transition (draftToolbarState.ts)", () => {
     // The user reloads. The server's stored body may differ from both the
     // original and the local edit (someone else's concurrent save).
     const serverBody: Draft = { key: "expense-approval", label: { en: "Expense approval (someone else's)" } };
-    savedBody = savedBodyReducer(savedBody, serverBody);
+    savedBody = structuredClone(serverBody);
 
     // replace(serverBody) makes the live draft equal serverBody too — the
     // toolbar's `draft` prop reflects that same replace() call.
@@ -46,7 +49,7 @@ describe("DraftToolbar's savedBody transition (draftToolbarState.ts)", () => {
     // Sanity check against the exact regression: comparing the reloaded draft
     // against the *stale* pre-reload savedBody (what the bug left it as) is
     // dirty — that's the false prompt this change removes.
-    const staleSavedBody = initialSavedBody(original);
+    const staleSavedBody = structuredClone(original);
     expect(isDirty(draftAfterReload, staleSavedBody)).toBe(true);
 
     void locallyEdited; // documents the discarded edit; not otherwise asserted on
@@ -54,8 +57,8 @@ describe("DraftToolbar's savedBody transition (draftToolbarState.ts)", () => {
 
   it("reload -> edit -> publish: editing after a reload is dirty again, so the fix does not turn the gate off permanently", () => {
     const serverBody: Draft = { key: "expense-approval", label: { en: "Expense approval" } };
-    let savedBody = initialSavedBody(serverBody);
-    savedBody = savedBodyReducer(savedBody, serverBody);
+    let savedBody = structuredClone(serverBody);
+    savedBody = structuredClone(serverBody);
     expect(isDirty(serverBody, savedBody)).toBe(false);
 
     const editedAfterReload: Draft = { key: "expense-approval", label: { en: "Expense approval — edited" } };
@@ -64,17 +67,17 @@ describe("DraftToolbar's savedBody transition (draftToolbarState.ts)", () => {
 
   it("advances on a successful save the same way it advances on a reload", () => {
     const original: Draft = { key: "p" };
-    let savedBody = initialSavedBody(original);
+    let savedBody = structuredClone(original);
     const edited: Draft = { key: "p", description: { en: "now with a description" } };
 
-    savedBody = savedBodyReducer(savedBody, edited);
+    savedBody = structuredClone(edited);
 
     expect(isDirty(edited, savedBody)).toBe(false);
   });
 
   it("clones rather than aliasing, so mutating the source body afterward does not follow into savedBody", () => {
     const draft: Draft = { key: "p" };
-    const savedBody = savedBodyReducer(initialSavedBody(draft), draft);
+    const savedBody = structuredClone(draft);
 
     expect(savedBody).not.toBe(draft);
     (draft as { key?: string }).key = "mutated-after-the-fact";
@@ -88,21 +91,21 @@ describe("DraftToolbar's savedBody transition (draftToolbarState.ts)", () => {
  * `lastSavedAt` subscribes to a new `onSaved` callback, fired only from
  * `doSave()`'s success branch — never from `reload()`'s conflict-recovery
  * branch, which must keep calling `onSavedBodyChange`
- * (`dispatchSavedBody`) alone. Same no-interactive-DOM constraint as the
- * conflict -> reload -> publish test above: this drives the two call
+ * (the `structuredClone` wrapper) alone. Same no-interactive-DOM constraint
+ * as the conflict -> reload -> publish test above: this drives the two call
  * sites' own sequence of effects by hand, counting how many times each
  * fires, rather than rendering `DraftToolbar` and clicking through it.
  */
-describe("DraftToolbar's onSaved callback (design.md: onSaved vs dispatchSavedBody)", () => {
+describe("DraftToolbar's onSaved callback (design.md: onSaved vs the savedBody wrapper)", () => {
   it("a successful save advances savedBody and fires onSaved once", () => {
-    let savedBody = initialSavedBody({ key: "p" });
+    let savedBody = structuredClone({ key: "p" });
     let onSavedCount = 0;
 
-    // doSave()'s success branch: `if (result) { dispatchSavedBody(draft); onSaved?.(); }`
+    // doSave()'s success branch: `if (result) { onSavedBodyChange(draft); onSaved?.(); }`
     const draft = { key: "p", description: { en: "saved" } };
     const result = { revision: 2, layout: {} };
     if (result) {
-      savedBody = savedBodyReducer(savedBody, draft);
+      savedBody = structuredClone(draft);
       onSavedCount++;
     }
 
@@ -111,7 +114,7 @@ describe("DraftToolbar's onSaved callback (design.md: onSaved vs dispatchSavedBo
   });
 
   it("a save conflict (409) advances neither savedBody nor onSaved", () => {
-    const savedBody = initialSavedBody({ key: "p" });
+    const savedBody = structuredClone({ key: "p" });
     let onSavedCount = 0;
 
     // doSave()'s conflict branch: saveDraft() returns undefined, so the
@@ -120,17 +123,17 @@ describe("DraftToolbar's onSaved callback (design.md: onSaved vs dispatchSavedBo
     if (result) onSavedCount++;
 
     expect(onSavedCount).toBe(0);
-    expect(savedBody).toEqual(initialSavedBody({ key: "p" }));
+    expect(savedBody).toEqual(structuredClone({ key: "p" }));
   });
 
   it("a reload advances savedBody but never fires onSaved", () => {
-    let savedBody = initialSavedBody({ key: "p" });
+    let savedBody = structuredClone({ key: "p" });
     let onSavedCount = 0;
 
-    // reload()'s conflict-recovery branch: `dispatchSavedBody(body);` alone —
+    // reload()'s conflict-recovery branch: `onSavedBodyChange(body);` alone —
     // no `onSaved?.()` call sits beside it.
     const serverBody = { key: "p", description: { en: "someone else's" } };
-    savedBody = savedBodyReducer(savedBody, serverBody);
+    savedBody = structuredClone(serverBody);
 
     expect(isDirty(serverBody, savedBody)).toBe(false);
     expect(onSavedCount).toBe(0);

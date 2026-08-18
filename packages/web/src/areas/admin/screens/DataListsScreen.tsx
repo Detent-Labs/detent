@@ -4,6 +4,7 @@ import type { DataListSummary } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
+import { ErrorBanner } from "../../../shell/ErrorBanner.js";
 import type { Route } from "../routing.js";
 import { t } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
@@ -100,15 +101,7 @@ export function DataListsScreen({ token, locale, navigate, onUnauthorized }: Dat
         </button>
       </form>
 
-      {error && (
-        <div className="admin-error-banner" role="alert">
-          <span className="admin-error-banner-stamp">{t(locale, "common.failed")}</span>
-          <span className="admin-error-banner-message">{error}</span>
-          <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
-            {t(locale, "common.retry")}
-          </button>
-        </div>
-      )}
+      {error && <ErrorBanner error={error} locale={locale} onRetry={refresh} retryDisabled={loading} />}
 
       {items.length === 0 && !loading && !error && <p className="admin-empty">{t(locale, "dataLists.empty")}</p>}
 

@@ -2044,12 +2044,6 @@ tr[data-group="true"] .studio-matrix-row-header {
   gap: var(--space-2);
 }
 
-.studio-header-bar-menu-caption {
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-  margin: 0;
-}
-
 /* --- Checks rail (studio-checks-rail) ----------------------------------- */
 
 .studio-checks-rail {

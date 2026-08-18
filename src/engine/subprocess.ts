@@ -43,7 +43,6 @@ import { createSeededInstance } from "./seeded-create.js";
 import type { ResolveLatestByContract } from "./definitions.js";
 import type { ResolveBody } from "./resolution.js";
 import {
-  register,
   createDefaultAssignmentRegistry,
   type Registry,
   type HandlerContext,
@@ -275,11 +274,11 @@ export function registerSubprocessHandlers(
   resolveLatestByContract: ResolveLatestByContract,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): void {
-  register(registry, SPAWN_ACTION_TYPE, {
+  registry.set(SPAWN_ACTION_TYPE, {
     handler: makeSpawnHandler(db, resolveBody, resolveLatestByContract, assignmentRegistry),
     configSchema: spawnConfigSchema,
   });
-  register(registry, RETURN_ACTION_TYPE, {
+  registry.set(RETURN_ACTION_TYPE, {
     handler: makeReturnHandler(db, resolveBody, assignmentRegistry),
     configSchema: returnConfigSchema,
   });

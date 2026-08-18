@@ -91,18 +91,6 @@ describe("FieldForm: locale resolution with fallback", () => {
     expect(html).toContain("Deutsch");
   });
 
-  it("falls back to baseLocale when the active locale has no entry", () => {
-    const html = renderToStaticMarkup(
-      <FieldForm
-        fields={[{ field: baseField({ id: "f1", label: { en: "English" } }), value: undefined, required: false, readonly: false }]}
-        values={{}}
-        onChange={noop}
-        locale="de"
-        baseLocale="en"
-      />,
-    );
-    expect(html).toContain("English");
-  });
 });
 
 describe("FieldForm: group nesting", () => {

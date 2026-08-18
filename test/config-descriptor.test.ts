@@ -148,3 +148,48 @@ test("a synthetic schema exercises enum, number, boolean, optional and default",
 test("a non-object schema produces no descriptor", () => {
   expect(describeConfigSchema(z.string(), "test.notobject")).toBeUndefined();
 });
+
+test("an exclusive numeric bound sends the whole type to raw JSON", () => {
+  const schema = z.object({ x: z.number().gt(0).lt(10) });
+  expect(describeConfigSchema(schema, "test.exclusive-bound")).toBeUndefined();
+});
+
+test("a pattern-constrained scalar string sends the whole type to raw JSON", () => {
+  const regex = z.object({ x: z.string().regex(/^a/) });
+  const startsWith = z.object({ x: z.string().startsWith("a") });
+  const endsWith = z.object({ x: z.string().endsWith("z") });
+  expect(describeConfigSchema(regex, "test.pattern-regex")).toBeUndefined();
+  expect(describeConfigSchema(startsWith, "test.pattern-starts-with")).toBeUndefined();
+  expect(describeConfigSchema(endsWith, "test.pattern-ends-with")).toBeUndefined();
+});
+
+test("a pattern-constrained string-array element sends the whole type to raw JSON", () => {
+  const schema = z.object({ x: z.array(z.string().regex(/^a/)) });
+  expect(describeConfigSchema(schema, "test.pattern-array")).toBeUndefined();
+});
+
+test("a multipleOf-constrained number sends the whole type to raw JSON", () => {
+  const schema = z.object({ x: z.number().multipleOf(5) });
+  expect(describeConfigSchema(schema, "test.multiple-of")).toBeUndefined();
+});
+
+test("a construct that makes z.toJSONSchema throw produces no descriptor, not a throw", () => {
+  const dateSchema = z.object({ x: z.date() });
+  const bigintSchema = z.object({ x: z.bigint() });
+  expect(describeConfigSchema(dateSchema, "test.throws-date")).toBeUndefined();
+  expect(describeConfigSchema(bigintSchema, "test.throws-bigint")).toBeUndefined();
+});
+
+test("a non-string array property sends the whole type to raw JSON", () => {
+  const numberArray = z.object({ x: z.array(z.number()) });
+  const booleanArray = z.object({ x: z.array(z.boolean()) });
+  const objectArray = z.object({ x: z.array(z.object({ a: z.string() })) });
+  expect(describeConfigSchema(numberArray, "test.array-number")).toBeUndefined();
+  expect(describeConfigSchema(booleanArray, "test.array-boolean")).toBeUndefined();
+  expect(describeConfigSchema(objectArray, "test.array-object")).toBeUndefined();
+});
+
+test("a nested object property sends the whole type to raw JSON", () => {
+  const schema = z.object({ x: z.object({ a: z.string() }) });
+  expect(describeConfigSchema(schema, "test.nested-object")).toBeUndefined();
+});

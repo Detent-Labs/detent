@@ -1170,3 +1170,197 @@ Throughout: zero console errors or warnings. `playwright-cli console`
 reported 0/0. A screenshot confirmed the field CSS: label above control, the
 `key` input in the mono face, hairline dividers between rail rows. Every
 input took a sharp corner, and the checks rail read clean throughout.
+
+### Base-locale control moves the content locale on a well-formed value
+
+Source: `ponytail-studio-small-cuts` task 5.1.
+
+Open a draft's canvas edit screen (`purchase_requisition`). Open the process
+header's `⋮` menu. Type into the `baseLocale` control: first `d` alone, then
+complete it to `de`.
+
+Pass: after `d`, the content-locale switcher still reads `en` selected. A
+`d` option appears in the list, but selection stays put. After `de`, the
+switcher's selection moves to `de`. Typing `en` back over it moves the
+switcher back to `en`.
+
+This exercises the kept `processHeaderLogic.ts` (`resolveBaseLocaleChange`).
+It also exercises task 1's `EditScreen.tsx` `useState` change. The
+base-locale wiring and the `savedBody` state it feeds both had to survive
+that conversion.
+
+### Save, then a 409 conflict and reload, read the unsaved-changes gate correctly
+
+Source: `ponytail-studio-small-cuts` task 5.2.
+
+Open the same draft in two tabs. In tab 2, edit the process label and save.
+That advances the revision. In tab 1, edit the process label differently
+and save.
+
+Pass: tab 1's save answers 409. The header shows "Unsaved changes" before
+that save and after the 409 too. A conflict banner appears with a Reload
+action.
+
+Click Reload. Pass: the header reads "Saved". The revision number advances
+to match tab 2's. Edit the label once more. Pass: the header reads
+"Unsaved changes" again. The reload does not turn the dirty gate off for
+good.
+
+This is the regression task 1's `useReducer`-to-`useState` conversion
+exists to guard. `EditScreen.tsx` now seeds `savedBody` with
+`useState<Draft>(() => structuredClone(draft))`. It advances that state
+only through `(body: Draft) => setSavedBody(structuredClone(body))`.
+`DraftToolbar`'s `reload()` calls that wrapper.
+
+A dropped clone would leave a byte-identical draft reading dirty. So would
+a dropped advance on reload. Either bug persists for the rest of the
+session. `studio-draftToolbarState.test.ts` pins that exact bug at the unit
+level. Here the real save/conflict/reload sequence drives it in a browser
+instead.
+
+### Selecting a path opens the inspector's paths section with the row highlighted
+
+Source: `ponytail-studio-small-cuts` task 5.3.
+
+On the canvas, select a step. Then click one of its outgoing path edges. A
+guard label works as a click target.
+
+Pass: the inspector switches to the path's source step. The Paths section
+opens, marked current. The selected path's own row shows a highlight
+border, distinct from the section's other rows.
+
+This exercises task 2.1's inlined `openSectionForSelection` ternary. It now
+reads as a plain `selectedPathId ? "paths" : undefined`, inline in
+`StepsPanel.tsx`'s selection effect.
+
+### The no-assignment warning renders on a non-terminal step and not on a terminal one
+
+Source: `ponytail-studio-small-cuts` task 5.4.
+
+On the canvas, select a non-terminal step with no `assignment` set. Use
+`approval_routing` on the `purchase_requisition` draft. Open its Assignment
+section. Then select a terminal step with no `assignment`, `closed`, and
+open its Assignment section too.
+
+Pass: the non-terminal step shows "This step has no assignment. Only the
+starter or an admin can act on it, and it stays out of everyone's My-tasks
+inbox. Publishing still works." beside the assignment editor. The terminal
+step shows no such warning.
+
+This exercises task 2.2's inlined `assignmentWarning` guard. It now reads
+as one local `assignmentWarningText`, computed once in `StepsPanel.tsx` and
+read at both the conditional and the paragraph body.
+
+### The Tools screen's CEL scratchpad populates its field catalog
+
+Source: `ponytail-studio-small-cuts` task 5.5.
+
+Open `/studio/tools`. Pick a process (`purchase_requisition`) and its
+current draft as the field catalog. Type a CEL expression that names a real
+field key, `data.quantity > 0`. Then type one that names a bogus key,
+`data.totally_bogus_field_xyz > 0`.
+
+Pass: the real-field expression reports "Parses and type-checks against
+this catalog." The bogus-field expression reports a "No such key" error
+naming it. Both outcomes need the field list to have populated from the
+fetched draft body. Neither reads correctly against an empty list.
+
+This exercises task 2.3's inlined `extractFields` read, now inline in
+`ToolsScreen.tsx`'s `selectCatalog` callback.
+
+### Canvas: node, group, waypoint, connect-drag and marquee gestures still move, connect and select
+
+Source: `ponytail-studio-small-cuts` task 5.6.
+
+On the `purchase_requisition` draft's canvas, run five gestures. Drag a
+step node to a new position. Multi-select two steps, group them, then drag
+the group box. Select a path and drag its midpoint handle to insert a
+waypoint. Drag a non-terminal step's connect handle to another step to
+create a new path. Shift-drag a marquee over several steps.
+
+Pass: each gesture gives the same result the pre-change five separate
+handlers gave. The node's and the group's on-screen position moved to the
+drop point. Each element's `getBoundingClientRect()`, read before and
+after, confirmed the move. The waypoint drag inserted a real waypoint: a
+second midpoint-insert handle appeared past it.
+
+The connect-drag added a new path to the source step's `paths` array,
+targeting the correct step id. The visual edge alone did not confirm this
+at this draft's zoomed-out scale, so the JSON surface did. The marquee
+selected exactly the steps inside its bounding rectangle: "Steps selected:
+5", with all five outlined.
+
+`playwright-cli`'s `drag <start> <end>` command does not apply here. It
+only drags between two existing elements, never to an arbitrary canvas
+point. Every gesture instead needed a raw
+`mousemove`/`mousedown`/`mousemove...`/`mouseup` sequence. Each read fresh
+coordinates from `getBoundingClientRect()`, via `playwright-cli run-code`.
+The accessibility snapshot's refs carry no pixel position. Panzoom's own
+scale and pan also move node positions between actions.
+
+The marquee needed one thing more. It needed
+`page.keyboard.down('Shift')` before the mouse sequence, and `up('Shift')`
+after it. `click --modifiers` only applies to a full click action. It never
+applies to a raw mousedown/mouseup pair.
+
+The connect-drag's target handle is small. At this draft's fit-to-view
+scale it draws as roughly a 5 to 10 pixel circle. `playwright-cli
+mousewheel 0 -- -N` zoomed the canvas in enough to hit it. Pass the `--`
+explicitly. A bare negative delta parses as a flag instead.
+
+A tall inspector column can also push the canvas element far down the
+page. That is a pre-existing layout property, unrelated to this change.
+Reading `getBoundingClientRect()` fresh before each interaction, instead of
+reusing an earlier snapshot's ref, handled that on its own.
+
+### Chrome.tsx account menu: native Popover open, position and dismissal
+
+Source: `web-client-ponytail-cleanup` task 11.6.
+
+Sign in and open the account menu from the header's Account button. Nine
+checks follow. A trigger click, an outside click, and Escape come first.
+Then the language picker, an area-switcher entry, and the profile entry.
+Then a mousedown-inside/drag-outside/mouseup sequence, a same-browser
+floor check, and the logout entry.
+
+Pass, by check:
+
+- Trigger click: the menu opens. `aria-expanded` reads `"true"`. A rect
+  check on the menu and the trigger confirms the position. The menu's top
+  sits at the trigger's bottom edge, plus the gap. Its right edge lines up
+  with the trigger's. It does not center in the viewport.
+- Outside click: the menu closes. `aria-expanded` returns to `"false"`.
+- Escape: the menu closes. `document.activeElement` is the trigger button
+  again.
+- Language picker: a changed selection changes the interface locale. The
+  menu stays open; `:popover-open` still reads true.
+- Area-switcher entry: the menu closes and the shell navigates to that
+  area's URL prefix.
+- Profile entry: the menu closes and the shell navigates to `/profile`. A
+  second click on it while already on `/profile` closes the menu too. That
+  case carries no route change, so `Chrome` never unmounts: the explicit
+  `hidePopover()` call task 7.3 added is what closes it there.
+- Mousedown-inside/drag-outside/mouseup: the menu stays open through the
+  whole sequence. Native light-dismiss keys off the pointerdown location,
+  not the pointerup location. The pointerdown lands inside the menu, so no
+  dismissal arms at all. Design.md's stated risk, that the drag might
+  close the menu, did not materialize.
+- Same-browser floor check: login, the task list and the studio canvas all
+  render and respond. The account menu opens, positions below and
+  right-aligned, and dismisses on an outside click, all on the one browser
+  `playwright-cli` drives. That browser runs materially newer than the
+  `build.target` floor (Chrome 114/Safari 17/Firefox 125). This check did
+  not install and drive those exact versions. It confirms the mechanism
+  works on a modern engine, not on the stated floor itself.
+- Logout entry: the menu closes and the shell returns to `/login`.
+
+A CSS bug surfaced during this walk. `.shell-menu` carried an unconditional
+`display: flex`, needed back when the menu mounted only conditionally.
+That declaration outranked the popover UA stylesheet's
+`[popover]:not(:popover-open) { display: none }`: an author-origin
+`display` wins the cascade over a user-agent one, regardless of
+specificity. The closed menu stayed laid out at its would-be open
+position and intercepted the trigger's own click. The fix moves
+`display: flex` and the rest of the flex layout onto a
+`.shell-menu:popover-open` rule. The UA's `none` now stays in force while
+closed.

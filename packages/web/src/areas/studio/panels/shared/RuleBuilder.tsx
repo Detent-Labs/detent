@@ -33,7 +33,7 @@ function LiteralEditor({
   operand: RuleOperand | undefined;
   onChange: (value: string | number | boolean | undefined) => void;
 }) {
-  const label = t("ruleBuilder.valueLabel");
+  const label = t("condition.valueLabel");
   const current = row.value.kind === "literal" ? row.value.value : undefined;
 
   if (!operand) return null;
@@ -41,8 +41,8 @@ function LiteralEditor({
   if (operand.celType === "bool") {
     return (
       <select aria-label={label} value={current === true || current === "true" ? "true" : "false"} onChange={(e) => onChange(e.target.value === "true")}>
-        <option value="true">{t("ruleBuilder.yes")}</option>
-        <option value="false">{t("ruleBuilder.no")}</option>
+        <option value="true">{t("condition.yes")}</option>
+        <option value="false">{t("condition.no")}</option>
       </select>
     );
   }
@@ -50,7 +50,7 @@ function LiteralEditor({
   if (operand.options?.length) {
     return (
       <select aria-label={label} value={String(current ?? "")} onChange={(e) => onChange(e.target.value || undefined)}>
-        <option value="">{t("ruleBuilder.selectValue")}</option>
+        <option value="">{t("condition.selectValue")}</option>
         {operand.options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
@@ -64,7 +64,7 @@ function LiteralEditor({
     <input
       type={inputTypeFor(operand.declaredType)}
       aria-label={label}
-      placeholder={t("ruleBuilder.valuePlaceholder")}
+      placeholder={t("condition.valuePlaceholder")}
       value={String(current ?? "")}
       spellCheck={false}
       autoComplete="off"
@@ -94,7 +94,7 @@ export function RuleBuilder({ condition, operands, onChange }: Props) {
       <div className="rule-builder">
         <p className="condition-empty">{t("ruleBuilder.empty")}</p>
         <button type="button" className="btn btn-ghost condition-add" onClick={addRow} disabled={!operands.length}>
-          {t("ruleBuilder.addRow")}
+          {t("condition.addRow")}
         </button>
       </div>
     );
@@ -114,7 +114,7 @@ export function RuleBuilder({ condition, operands, onChange }: Props) {
                 <input
                   type="text"
                   className="cel-input condition-raw"
-                  aria-label={t("ruleBuilder.rawRow")}
+                  aria-label={t("condition.rawRow")}
                   value={row.src}
                   spellCheck={false}
                   autoComplete="off"
@@ -123,7 +123,7 @@ export function RuleBuilder({ condition, operands, onChange }: Props) {
               ) : (
                 <>
                   <select
-                    aria-label={t("ruleBuilder.operandLabel")}
+                    aria-label={t("condition.operandLabel")}
                     value={row.operand}
                     onChange={(e) => {
                       const next = byPath.get(e.target.value);
@@ -135,7 +135,7 @@ export function RuleBuilder({ condition, operands, onChange }: Props) {
                       });
                     }}
                   >
-                    <option value="">{t("ruleBuilder.selectOperand")}</option>
+                    <option value="">{t("condition.selectOperand")}</option>
                     {operands.map((o) => (
                       <option key={o.path} value={o.path}>
                         {o.label}
@@ -144,7 +144,7 @@ export function RuleBuilder({ condition, operands, onChange }: Props) {
                   </select>
 
                   <select
-                    aria-label={t("ruleBuilder.operatorLabel")}
+                    aria-label={t("condition.operatorLabel")}
                     value={row.op}
                     onChange={(e) => updateRow(index, { ...row, op: e.target.value as CmpOp })}
                   >
@@ -193,9 +193,9 @@ export function RuleBuilder({ condition, operands, onChange }: Props) {
                 </>
               )}
 
-              {!complete && <span className="condition-flag">{t("ruleBuilder.incomplete")}</span>}
+              {!complete && <span className="condition-flag">{t("condition.incomplete")}</span>}
 
-              <button type="button" className="condition-remove" aria-label={t("ruleBuilder.removeRow")} onClick={() => removeRow(index)}>
+              <button type="button" className="condition-remove" aria-label={t("condition.removeRow")} onClick={() => removeRow(index)}>
                 ×
               </button>
             </li>
@@ -204,7 +204,7 @@ export function RuleBuilder({ condition, operands, onChange }: Props) {
       </ol>
 
       <button type="button" className="btn btn-ghost condition-add" onClick={addRow} disabled={!operands.length}>
-        {t("ruleBuilder.addRow")}
+        {t("condition.addRow")}
       </button>
     </div>
   );

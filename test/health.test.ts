@@ -1,15 +1,15 @@
 /**
- * `src/http/health.ts`: `GET /livez` (unconditional, no DB dependency) and
- * `GET /readyz` (a database ping), plus the CORS/auth exemptions the
- * `http-wrapper` MODIFIED requirements carve out for both routes.
+ * `src/http/server.ts`'s `checkDbReady`/`handleLivez`/`handleReadyz`:
+ * `GET /livez` (unconditional, no DB dependency) and `GET /readyz` (a
+ * database ping), plus the CORS/auth exemptions the `http-wrapper` MODIFIED
+ * requirements carve out for both routes.
  */
 import type { SQL } from "bun";
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
-import { createServer, resolveAuthResolver } from "../src/http/server.js";
+import { createServer, resolveAuthResolver, checkDbReady, handleLivez, handleReadyz } from "../src/http/server.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
-import { checkDbReady, handleLivez, handleReadyz } from "../src/http/health.js";
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();

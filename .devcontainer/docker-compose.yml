@@ -1,10 +1,12 @@
-# Devcontainer services: the `app` container (Node 22 base + Bun), a PostgreSQL
-# 16 datastore, a Mailpit SMTP catcher, and a webhook sink. The engine reaches
-# Postgres via DATABASE_URL (see openspec/specs persistence), Mailpit via
-# SMTP_HOST/PORT (notification-email-action-handler), and the sink via
-# HTTP_ACTION_ALLOWED_HOSTS (give-the-example-a-reachable-target). pgdata
-# persists the database across rebuilds; caught mail and received webhooks are
-# deliberately not persisted.
+# Devcontainer services: the `app` container (Node 22 base + Bun, and running
+# scripts/dev-webhook-sink.ts as its own background process — see the
+# command: entry below), a PostgreSQL 16 datastore, and a Mailpit SMTP
+# catcher. The engine reaches Postgres via DATABASE_URL (see openspec/specs
+# persistence), Mailpit via SMTP_HOST/PORT
+# (notification-email-action-handler), and the in-container sink via
+# HTTP_ACTION_ALLOWED_HOSTS (dedup-runtime-pagination-webhook-sink). pgdata
+# persists the database across rebuilds; caught mail is deliberately not
+# persisted.
 name: workflow-engine
 
 services:
@@ -14,7 +16,15 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ..:/workspace:cached
-    command: sleep infinity
+    working_dir: /workspace
+    # Backgrounds the webhook sink, then idles. The sh -c wrapper is required:
+    # Compose's plain-string command: form word-splits and execs directly with
+    # no shell, so a bare "bun run ... & sleep infinity" string would pass "&"
+    # to bun as a literal argument instead of backgrounding it. Re-runs on
+    # every container start (not just creation), so the sink survives a
+    # stop/start cycle with no rebuild — see
+    # dedup-runtime-pagination-webhook-sink's design.md.
+    command: ["sh", "-c", "bun run scripts/dev-webhook-sink.ts & sleep infinity"]
     environment:
       DATABASE_URL: postgres://postgres:postgres@db:5432/workflow_engine
       # The one frontend dev server, pinned to its own port (see
@@ -36,20 +46,25 @@ services:
       SMTP_FROM: workflow-engine@example.test
       # The http.request handler's egress policy (restrict-http-action-egress).
       # Unset denies every outbound action target, so without an entry here the
-      # dev server reaches nothing at all. webhook-sink:8080 is the sink
-      # service below, the target examples/expense-approval.json's `book` and
-      # `escalated_review` steps both name. A change that points an example or
-      # a script at a new host adds it here in the same commit.
-      HTTP_ACTION_ALLOWED_HOSTS: webhook-sink:8080
+      # dev server reaches nothing at all. localhost:8080 is
+      # scripts/dev-webhook-sink.ts, backgrounded inside this same container by
+      # the command: entry above, the target examples/expense-approval.json's
+      # `book` and `escalated_review` steps and
+      # examples/purchase-requisition.json's `issue_po` step both name. A
+      # change that points an example or a script at a new host adds it here
+      # in the same commit.
+      HTTP_ACTION_ALLOWED_HOSTS: localhost:8080
       # The sink speaks plain HTTP, which the https: rule would otherwise
       # refuse. Devcontainer only, like ALLOW_INSECURE_DEV_AUTH.
       HTTP_ACTION_ALLOW_INSECURE: "1"
     depends_on:
       - db
       - mailpit
-      - webhook-sink
-    # Proves the runtime answers and nothing more — this container runs no
-    # service of its own (see add-devcontainer-preflight).
+    # Proves the runtime answers. Does not check the backgrounded webhook
+    # sink the command: entry starts inside this same container — a crashed
+    # sink surfaces as a connection-refused http.request delivery, not a
+    # failed healthcheck (see add-devcontainer-preflight,
+    # dedup-runtime-pagination-webhook-sink).
     healthcheck:
       test: ["CMD", "bun", "--version"]
       interval: 5s
@@ -88,28 +103,6 @@ services:
     # tracked compose file rather than only in an upstream image detail.
     healthcheck:
       test: ["CMD", "/mailpit", "readyz"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  # Answers every http.request delivery with 200 and echoes the JSON body it
-  # received, so book's and escalated_review's actions in
-  # examples/expense-approval.json reach a target that answers
-  # (give-the-example-a-reachable-target). Runs the same image the app
-  # service builds — compose has no build inheritance, so the block repeats —
-  # plus scripts/dev-webhook-sink.ts. Declares no ports entry, matching db
-  # and mailpit; a contributor who wants to reach it from the host publishes
-  # the port in their own gitignored docker-compose.override.yml.
-  webhook-sink:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    volumes:
-      - ..:/workspace:cached
-    working_dir: /workspace
-    command: bun run scripts/dev-webhook-sink.ts
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
       interval: 5s
       timeout: 3s
       retries: 5

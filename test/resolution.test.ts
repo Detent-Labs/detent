@@ -8,7 +8,7 @@ import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { executeManualTransition } from "../src/engine/transition.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { drainResolutions } from "../src/engine/resolution.js";
-import { createRegistry, register } from "../src/engine/registry.js";
+import { createRegistry } from "../src/engine/registry.js";
 import type { ProcessBody, Instance, Action } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
@@ -57,8 +57,8 @@ const terminalWriteBody = (): ProcessBody =>
   }) as unknown as ProcessBody;
 
 const reg = createRegistry();
-register(reg, "sayYes", { handler: async () => ({ v: "yes" }) });
-register(reg, "sayNo", { handler: async () => ({ v: "no" }) });
+reg.set("sayYes", { handler: async () => ({ v: "yes" }) });
+reg.set("sayNo", { handler: async () => ({ v: "no" }) });
 
 const createFrom = (body: ProcessBody) => createInstance(body, { processId: "proc_1" as Instance["processId"], version: 1 });
 

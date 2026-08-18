@@ -5,12 +5,14 @@
  * password. Kept out of `routes.ts`, which stays the participant-facing
  * surface.
  * Same framework-agnostic handler shape as `routes.ts`, and the same
- * `resolveActor`, `errorContext`, `guarded` and `parseLimit` helpers, imported
+ * `resolveActor`, `errorContext`, `route` and `parseLimit` helpers, imported
  * from it rather than copied. Each handler resolves the actor then requires
- * `ADMIN_ROLE` before any read or write.
+ * `ADMIN_ROLE` before any read or write, except `handleGetUiStrings`: that
+ * one route is public, resolving no actor and requiring no role — see its
+ * own doc comment.
  */
 import type { SQL } from "bun";
-import { sql, withTransaction } from "../engine/store.js";
+import { withTransaction } from "../engine/store.js";
 import { listOutbox, countOutboxByStatus, listPendingTimers, requeueOutboxRow, discardOutboxRow, getOutboxRow, MAX_LIST_LIMIT, type OutboxListFilter } from "../engine/admin-queries.js";
 import {
   listUsers,
@@ -41,8 +43,8 @@ import { listGrants, writeGrant, revokeGrant, grantSchema, type PermissionGrant 
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, ADMIN_ROLE, DATALISTS_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE } from "../auth/authorize.js";
-import { RequestShapeError, type HttpResult } from "./errors.js";
-import { resolveActor, guarded, parseLimit, readJson, parseVersion } from "./routes.js";
+import { RequestShapeError, notFound, type HttpResult } from "./errors.js";
+import { route, guarded, parseLimit, readJson, parseVersion } from "./routes.js";
 
 /**
  * `requeueOutboxRow`/`discardOutboxRow` report no row affected for two
@@ -52,17 +54,15 @@ import { resolveActor, guarded, parseLimit, readJson, parseVersion } from "./rou
  */
 async function notFoundOrConflict(idempotencyKey: string, db: SQL): Promise<HttpResult> {
   const row = await getOutboxRow(idempotencyKey, db);
-  if (!row) return { status: 404, body: { error: { type: "not-found", message: `no outbox row: ${idempotencyKey}` } } };
+  if (!row) return notFound(`no outbox row: ${idempotencyKey}`);
   return {
     status: 409,
     body: { error: { type: "conflict", message: `outbox row '${idempotencyKey}' is not a dead letter (status: ${row.status})` } },
   };
 }
 
-export async function handleAdminListOutbox(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, ADMIN_ROLE);
+export async function handleAdminListOutbox(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
     const url = new URL(req.url);
     const status = url.searchParams.getAll("status");
     const filter: OutboxListFilter = {
@@ -76,28 +76,22 @@ export async function handleAdminListOutbox(req: Request, resolver: ActorResolve
   });
 }
 
-export async function handleAdminOutboxRetry(idempotencyKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, ADMIN_ROLE);
+export async function handleAdminOutboxRetry(idempotencyKey: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
     const updated = await requeueOutboxRow(idempotencyKey, db);
     return updated ? { status: 200, body: updated } : await notFoundOrConflict(idempotencyKey, db);
   });
 }
 
-export async function handleAdminOutboxDiscard(idempotencyKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, ADMIN_ROLE);
+export async function handleAdminOutboxDiscard(idempotencyKey: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
     const updated = await discardOutboxRow(idempotencyKey, db);
     return updated ? { status: 200, body: updated } : await notFoundOrConflict(idempotencyKey, db);
   });
 }
 
-export async function handleAdminListTimers(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, ADMIN_ROLE);
+export async function handleAdminListTimers(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
     const url = new URL(req.url);
     const limit = parseLimit(url, MAX_LIST_LIMIT);
     const cursor = url.searchParams.get("cursor") ?? undefined;
@@ -106,10 +100,8 @@ export async function handleAdminListTimers(req: Request, resolver: ActorResolve
   });
 }
 
-export async function handleAdminListUsers(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, ADMIN_ROLE);
+export async function handleAdminListUsers(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
     const url = new URL(req.url);
     const limit = parseLimit(url, MAX_LIST_LIMIT);
     const cursor = url.searchParams.get("cursor") ?? undefined;
@@ -119,11 +111,9 @@ export async function handleAdminListUsers(req: Request, resolver: ActorResolver
 }
 
 async function handleSetUserDisabled(userId: string, disabled: boolean, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, ADMIN_ROLE);
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
     const updated = await setDisabled(userId, disabled, db);
-    if (!updated) return { status: 404, body: { error: { type: "not-found", message: `no user: ${userId}` } } };
+    if (!updated) return notFound(`no user: ${userId}`);
     return { status: 200, body: updated };
   });
 }
@@ -155,17 +145,15 @@ function parseRoles(value: unknown): string[] {
  * inline, the way `handleSetUserDisabled` returns its 404 — no error class and
  * no mapping entry is added to `errors.ts`.
  */
-export async function handleAdminSetUserRoles(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, ADMIN_ROLE);
+export async function handleAdminSetUserRoles(userId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async (actor) => {
     const body = (await readJson(req)) as { roles?: unknown };
     const roles = parseRoles(body.roles);
     if (actor.id === userId && !roles.includes(ADMIN_ROLE)) {
       return { status: 409, body: { error: { type: "self-role-strip", message: `an actor cannot remove ${ADMIN_ROLE} from its own account` } } };
     }
     const updated = await setRolesById(userId, roles, db);
-    if (!updated) return { status: 404, body: { error: { type: "not-found", message: `no user: ${userId}` } } };
+    if (!updated) return notFound(`no user: ${userId}`);
     return { status: 200, body: updated };
   });
 }
@@ -196,10 +184,8 @@ function requireNonBlank(value: unknown, label: string): string {
  * SELECT ahead of the insert would race a concurrent create for the same
  * address, and the constraint decides the outcome either way.
  */
-export async function handleAdminCreateUser(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, ADMIN_ROLE);
+export async function handleAdminCreateUser(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
     const body = (await readJson(req)) as { email?: unknown; password?: unknown; roles?: unknown };
     const email = requireNonBlank(body.email, "email").trim();
     const password = requireNonBlank(body.password, "password");
@@ -239,14 +225,12 @@ function isEmailUniqueViolation(err: unknown): boolean {
  * claim derives from the password, so an outstanding one keeps authenticating
  * until it expires. Disable is the control that ends a session at once.
  */
-export async function handleAdminSetUserPassword(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, ADMIN_ROLE);
+export async function handleAdminSetUserPassword(userId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
     const body = (await readJson(req)) as { password?: unknown };
     const password = requireNonBlank(body.password, "password");
     const updated = await setPasswordById(userId, password, db);
-    if (!updated) return { status: 404, body: { error: { type: "not-found", message: `no user: ${userId}` } } };
+    if (!updated) return notFound(`no user: ${userId}`);
     return { status: 200, body: updated };
   });
 }
@@ -263,10 +247,8 @@ export async function handleAdminSetUserPassword(userId: string, req: Request, r
  * The unknown-target 400 comes from the column's own foreign key rather than a
  * pre-read, so a concurrent delete cannot slip between a check and the write.
  */
-export async function handleAdminSetUserManager(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, ADMIN_ROLE);
+export async function handleAdminSetUserManager(userId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
     const body = (await readJson(req)) as { managerUserId?: unknown };
     const raw = body.managerUserId;
     if (raw !== null && typeof raw !== "string") throw new RequestShapeError("managerUserId must be a string or null");
@@ -286,7 +268,7 @@ export async function handleAdminSetUserManager(userId: string, req: Request, re
       }
       throw err;
     }
-    if (!updated) return { status: 404, body: { error: { type: "not-found", message: `no user: ${userId}` } } };
+    if (!updated) return notFound(`no user: ${userId}`);
     return { status: 200, body: updated };
   });
 }
@@ -301,10 +283,8 @@ export async function handleAdminSetUserManager(userId: string, req: Request, re
  * rejects an empty-after-trim value outright, while `setDisplayName` normalizes
  * one to `NULL` — telling the caller beats silently accepting.
  */
-export async function handleAdminSetUserName(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, ADMIN_ROLE);
+export async function handleAdminSetUserName(userId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
     const body = (await readJson(req)) as { displayName?: unknown };
     const raw = body.displayName;
     if (raw !== null && typeof raw !== "string") throw new RequestShapeError("displayName must be a string or null");
@@ -316,7 +296,7 @@ export async function handleAdminSetUserName(userId: string, req: Request, resol
     }
 
     const updated = await setDisplayName(userId, checked.displayName, db);
-    if (!updated) return { status: 404, body: { error: { type: "not-found", message: `no user: ${userId}` } } };
+    if (!updated) return notFound(`no user: ${userId}`);
     return { status: 200, body: updated };
   });
 }
@@ -333,19 +313,17 @@ function isManagerForeignKeyViolation(err: unknown): boolean {
   return e.errno === "23503" && e.constraint === "auth_users_manager_user_id_fkey";
 }
 
-export async function handleAdminDisableUser(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handleAdminDisableUser(userId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return handleSetUserDisabled(userId, true, req, resolver, db);
 }
 
-export async function handleAdminEnableUser(userId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handleAdminEnableUser(userId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return handleSetUserDisabled(userId, false, req, resolver, db);
 }
 
 /** Wraps `migrateInstances` unchanged. No new engine logic: `MigrationPlanError` (e.g. no registered plan) falls through to `mapError`, mapped 409 the same way `PUT /migration-plans/...` already maps it. */
-export async function handleAdminRunMigration(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, ADMIN_ROLE);
+export async function handleAdminRunMigration(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
     const body = (await readJson(req)) as { processId?: unknown; fromVersion?: unknown; toVersion?: unknown };
     if (typeof body.processId !== "string" || !body.processId) throw new RequestShapeError("processId is required");
     const fromVersion = parseVersion(body.fromVersion, "fromVersion");
@@ -356,10 +334,8 @@ export async function handleAdminRunMigration(req: Request, resolver: ActorResol
 }
 
 /** Wraps `redactInstance` unchanged. `InstanceRunningError`/`NotFoundError` fall through to `mapError`. */
-export async function handleAdminRedactInstance(instanceId: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, ADMIN_ROLE);
+export async function handleAdminRedactInstance(instanceId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
     const updated = await redactInstance(instanceId as InstanceId, db);
     return { status: 200, body: updated };
   });
@@ -539,14 +515,8 @@ async function readList(listKey: string, db: SQL): Promise<StoredList | undefine
   return { ...row, columns: parsed.success ? parsed.data : [] };
 }
 
-const notFoundList = (listKey: string): HttpResult => ({
-  status: 404,
-  body: { error: { type: "not-found", message: `no data list: ${listKey}` } },
-});
-
-export async function handleAdminListDataLists(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    requireDataListRead(await resolveActor(req, resolver, db));
+export async function handleAdminListDataLists(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, requireDataListRead, async () => {
     const items = (await db`
       SELECT l.list_key AS "listKey", l.label, l.description, l.columns, l.updated_at AS "updatedAt", l.updated_by AS "updatedBy",
              count(v.value) FILTER (WHERE v.active)::int AS "activeValueCount"
@@ -562,10 +532,8 @@ export async function handleAdminListDataLists(req: Request, resolver: ActorReso
   });
 }
 
-export async function handleAdminCreateDataList(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, DATALISTS_ROLE);
+export async function handleAdminCreateDataList(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, DATALISTS_ROLE), async (actor) => {
     const body = await readJson(req);
     const listKey = requireString(body.listKey, "listKey");
     const label = requireString(body.label, "label");
@@ -588,11 +556,10 @@ export async function handleAdminCreateDataList(req: Request, resolver: ActorRes
   });
 }
 
-export async function handleAdminGetDataList(listKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    requireDataListRead(await resolveActor(req, resolver, db));
+export async function handleAdminGetDataList(listKey: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, requireDataListRead, async () => {
     const list = await readList(listKey, db);
-    if (!list) return notFoundList(listKey);
+    if (!list) return notFound(`no data list: ${listKey}`);
     // Inactive values are reported, not hidden: an operator needs to see what a
     // running instance can still hold.
     const values = (await db`
@@ -605,16 +572,14 @@ export async function handleAdminGetDataList(listKey: string, req: Request, reso
   });
 }
 
-export async function handleAdminUpdateDataList(listKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, DATALISTS_ROLE);
+export async function handleAdminUpdateDataList(listKey: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, DATALISTS_ROLE), async (actor) => {
     const body = await readJson(req);
     const label = requireString(body.label, "label");
     const description = body.description === undefined || body.description === null ? null : String(body.description);
     const columns = parseColumns(body.columns);
     const existing = await readList(listKey, db);
-    if (!existing) return notFoundList(listKey);
+    if (!existing) return notFound(`no data list: ${listKey}`);
     // An omitted `columns` leaves the declaration alone; an array replaces it.
     const next = columns ?? existing.columns;
     // A column the request drops takes its attribute with it, in this same
@@ -635,7 +600,7 @@ export async function handleAdminUpdateDataList(listKey: string, req: Request, r
       }
       return updated;
     });
-    if (rows.length === 0) return notFoundList(listKey);
+    if (rows.length === 0) return notFound(`no data list: ${listKey}`);
     return { status: 200, body: { ...rows[0], columns: parseJsonb(rows[0]!.columns) ?? [] } };
   });
 }
@@ -646,15 +611,13 @@ export async function handleAdminUpdateDataList(listKey: string, req: Request, r
  * it is why no route deletes a value row. A value the request names again
  * becomes active.
  */
-export async function handleAdminPutDataListValues(listKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, DATALISTS_ROLE);
+export async function handleAdminPutDataListValues(listKey: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, DATALISTS_ROLE), async (actor) => {
     const body = await readJson(req);
     // The list is read first: an attribute is checked against the column the
     // list declares, so the declaration has to be in hand before the parse.
     const list = await readList(listKey, db);
-    if (!list) return notFoundList(listKey);
+    if (!list) return notFound(`no data list: ${listKey}`);
     const values = parseValues(body.values, list.columns);
     await withTransaction(db, async (tx) => {
       await tx`UPDATE data_list_values SET active = false, updated_by = ${actor.id}, updated_at = now()
@@ -675,11 +638,9 @@ export async function handleAdminPutDataListValues(listKey: string, req: Request
 }
 
 /** Refuses while a published body references the key, the same shape as the guard that protects a version an instance pins. */
-export async function handleAdminDeleteDataList(listKey: string, req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, DATALISTS_ROLE);
-    if (!(await readList(listKey, db))) return notFoundList(listKey);
+export async function handleAdminDeleteDataList(listKey: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, DATALISTS_ROLE), async () => {
+    if (!(await readList(listKey, db))) return notFound(`no data list: ${listKey}`);
     const usedBy = await referencingProcesses(listKey, db);
     if (usedBy.length > 0) {
       return {
@@ -726,11 +687,23 @@ function parseOverrideValue(raw: unknown): string | null {
   return raw;
 }
 
-/** The admin screen's own read. Same data as the public route, behind the role, so the screen needs no second shape. */
-export async function handleAdminListUiStrings(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+/**
+ * `GET /ui-strings`. The bundle fetches this before its first render, so the
+ * pre-login screen carries an override too. It resolves no actor and
+ * requires no role: that table holds no account, instance, process or
+ * definition data, and this reads it whole, so the answer never varies by
+ * caller and no request can probe it for the presence of anything.
+ */
+export async function handleGetUiStrings(req: Request, db: SQL): Promise<HttpResult> {
   return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, ADMIN_ROLE);
+    const overrides = await listUiStringOverrides(db);
+    return { status: 200, body: { overrides } };
+  });
+}
+
+/** The admin screen's own read. Same data as the public route, behind the role, so the screen needs no second shape. */
+export async function handleAdminListUiStrings(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
     const overrides = await listUiStringOverrides(db);
     return { status: 200, body: { overrides } };
   });
@@ -746,10 +719,8 @@ export async function handleAdminListUiStrings(req: Request, resolver: ActorReso
  * bound exists to keep the public read small rather than to enforce an exact
  * count.
  */
-export async function handleAdminPutUiString(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, ADMIN_ROLE);
+export async function handleAdminPutUiString(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async (actor) => {
     const body = await readJson(req);
     const area = requireString(body.area, "area");
     const locale = requireString(body.locale, "locale");
@@ -775,19 +746,15 @@ function parseGrantBody(body: unknown): PermissionGrant {
  * processes a role reaches, so the list is as sensitive as the roles and
  * processes it discloses — `ADMIN_ROLE` alone gates it, never a grant.
  */
-export async function handleListPermissionGrants(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, ADMIN_ROLE);
+export async function handleListPermissionGrants(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
     return { status: 200, body: { grants: await listGrants(db) } };
   });
 }
 
 /** Idempotent: writing a triple the store already holds succeeds and changes nothing, matching `writeGrant`'s `ON CONFLICT DO NOTHING`. */
-export async function handleWritePermissionGrant(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, ADMIN_ROLE);
+export async function handleWritePermissionGrant(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
     const grant = parseGrantBody(await readJson(req));
     await writeGrant(grant, db);
     return { status: 200, body: grant };
@@ -795,10 +762,8 @@ export async function handleWritePermissionGrant(req: Request, resolver: ActorRe
 }
 
 /** Idempotent: revoking a triple the store does not hold succeeds and changes nothing. Exact — it never reaches a grant differing in role, permission or scope. */
-export async function handleRevokePermissionGrant(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
-  return guarded(req, async () => {
-    const actor = await resolveActor(req, resolver, db);
-    requireRole(actor, ADMIN_ROLE);
+export async function handleRevokePermissionGrant(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
     const grant = parseGrantBody(await readJson(req));
     await revokeGrant(grant, db);
     return { status: 200, body: grant };

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { DraftProvider, useDraft } from "../draft/store.js";
 import { draftFields } from "../draft/fields.js";
 import type { Draft } from "../draft/types.js";
@@ -13,7 +13,7 @@ import { getDraft } from "../api/client.js";
 import type { DraftRecord, PublishResult } from "../api/types.js";
 import type { Route, PanelView } from "../routing.js";
 import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
-import { savedBodyReducer, initialSavedBody, isDirty } from "./draftToolbarState.js";
+import { isDirty } from "./draftToolbarState.js";
 import { CanvasView } from "../canvas/CanvasView.js";
 import { EditRail } from "../canvas/EditRail.js";
 import { snapToGrid, svgPointFromClient, DEFAULT_EDGE_STYLE, type Point, type EdgeStyle } from "../canvas/geometry.js";
@@ -96,7 +96,7 @@ function EditorArea({ processId, formStepId, panel, token, initialRevision, init
   // Lifted out of DraftToolbar (design.md: "the header bar reads lifted
   // DraftToolbar state") — DraftToolbar still computes both; only where
   // they live moves up one level, the same way saveState already works.
-  const [savedBody, dispatchSavedBody] = useReducer(savedBodyReducer, draft, initialSavedBody);
+  const [savedBody, setSavedBody] = useState<Draft>(() => structuredClone(draft));
   const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
   // `loadedBaseVersion` cannot move: `EditScreen.load` depends on
   // processId/token/onUnauthorized alone, and neither the publish path nor
@@ -329,7 +329,7 @@ function EditorArea({ processId, formStepId, panel, token, initialRevision, init
     saveState,
     onSaveState: setSaveState,
     savedBody,
-    onSavedBodyChange: dispatchSavedBody,
+    onSavedBodyChange: (body: Draft) => setSavedBody(structuredClone(body)),
     onSaved: () => setLastSavedAt(new Date()),
     publishResult,
     onPublishResult: setPublishResult,
@@ -351,12 +351,12 @@ function EditorArea({ processId, formStepId, panel, token, initialRevision, init
         </button>
       </nav>
       {!validation.zodValid && <p className="draft-incomplete">{t("app.draftIncomplete")}</p>}
-      {/* Renders on both surfaces (studio-json-view: DraftToolbar, the
-          registry selector, and the content-locale switcher "SHALL remain
-          visible and usable regardless of which surface is active") — only
-          its "Process, saved with the draft" menu group is surface-gated,
-          via `structureActive`, since that group's controls mutate the
-          draft body the same way the old Structure-only ProcessHeader did. */}
+      {/* Renders on both surfaces (studio-json-view: DraftToolbar and the
+          content-locale switcher "SHALL remain visible and usable
+          regardless of which surface is active") — only its "Process, saved
+          with the draft" menu group is surface-gated, via `structureActive`,
+          since that group's controls mutate the draft body the same way the
+          old Structure-only ProcessHeader did. */}
       <ProcessHeaderBar
         revision={saveState.revision}
         isDirty={isDirty(draft, savedBody)}

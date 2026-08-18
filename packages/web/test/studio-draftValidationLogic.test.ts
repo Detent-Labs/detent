@@ -121,7 +121,7 @@ describe("runValidation: structurallyValid / structuralChecked", () => {
 });
 
 // add-step-assignment-warning: the studio's assignment-less-step warning
-// (assignmentWarningLogic.ts) stays outside this pipeline entirely, the
+// (inlined in StepsPanel.tsx) stays outside this pipeline entirely, the
 // same way the "db.list" missing-key warning does. This pins that as a
 // regression test rather than relying only on the absence of an import.
 describe("runValidation: an assignment-less step", () => {

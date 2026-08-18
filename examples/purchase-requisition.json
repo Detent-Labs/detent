@@ -1,7 +1,7 @@
 {
   "processId": "proc_7d41e0b6-5c2a-4f19-9e83-6b0d4a71c58f",
   "version": 1,
-  "definitionHash": "f0f139c0dbce34f733b939d6455f5fbed1f44058089426aaa5ec111aa13ced2b",
+  "definitionHash": "4d76f7bcd5642a28892edfb07ac3bfebdb2c54406b715e6478a3b07873f7b174",
   "status": "published",
   "publishedAt": "2026-08-15T09:00:00Z",
   "definition": {
@@ -812,7 +812,7 @@
               "id": "action_4b8c2f60-0003-4a1c-8e2f-000000000003",
               "type": "http.request",
               "config": {
-                "url": "http://webhook-sink:8080/hooks/purchase-order",
+                "url": "http://localhost:8080/hooks/purchase-order",
                 "method": "POST",
                 "body": {
                   "po_number": "PO-2026-000123",
@@ -844,7 +844,7 @@
               "id": "action_4b8c2f60-0006-4a1c-8e2f-000000000006",
               "type": "http.request",
               "config": {
-                "url": "http://webhook-sink:8080/hooks/purchase-order-cancelled",
+                "url": "http://localhost:8080/hooks/purchase-order-cancelled",
                 "method": "POST"
               },
               "execution": "async",

@@ -8,7 +8,7 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
-import { createRegistry, createDataSourceRegistry, registerDataSource } from "../src/engine/registry.js";
+import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { createProcessInstance, submitAndTransition, getInstanceView } from "../src/runtime/api.js";
 import type { ProcessBody, ProcessId, PathId, StepId, Instance, InstanceEvent, FieldOption } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
@@ -24,7 +24,7 @@ const reg = createRegistry();
  */
 function optionRegistry(options: FieldOption[]) {
   const r = createDataSourceRegistry();
-  registerDataSource(r, "test.options", { resolve: async () => options });
+  r.set("test.options", { resolve: async () => options });
   return r;
 }
 

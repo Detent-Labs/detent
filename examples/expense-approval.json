@@ -1,7 +1,7 @@
 {
   "processId": "proc_3f8a1c2e-9b4d-4e7a-a1c8-2e5f7b9d0a13",
   "version": 1,
-  "definitionHash": "08c8f0df1d7eb8703a9b3a0303f39c4f658ed6eff0798290a4ebe685a2c97762",
+  "definitionHash": "d0a17441534b55daca80f06ed88d57a4d60b3f01ac145989e8bb955abb02d1c1",
   "status": "published",
   "publishedAt": "2026-07-18T09:00:00Z",
   "definition": {
@@ -240,7 +240,7 @@
               "id": "action_eeee5555-0002-4a1c-8e2f-000000000002",
               "type": "http.request",
               "config": {
-                "url": "http://webhook-sink:8080/hooks/expense-booked",
+                "url": "http://localhost:8080/hooks/expense-booked",
                 "method": "POST",
                 "body": {
                   "status": "booked"
@@ -402,7 +402,7 @@
               "id": "action_eeee5555-0003-4a1c-8e2f-000000000003",
               "type": "http.request",
               "config": {
-                "url": "http://webhook-sink:8080/hooks/expense-escalated",
+                "url": "http://localhost:8080/hooks/expense-escalated",
                 "method": "POST"
               },
               "execution": "async",

@@ -662,21 +662,21 @@ Stage-by-stage status is in `ROADMAP.md`.
     development list would fail on import to production.
   - Out of scope on purpose: the handler resolves no hostname and refuses no
     private or link-local address. DNS rebinding stays open.
-  - The devcontainer sets `HTTP_ACTION_ALLOWED_HOSTS=webhook-sink:8080`
-    (`give-the-example-a-reachable-target`), the host of a service the
-    devcontainer itself runs — see `webhook-sink` below. It also sets
-    `HTTP_ACTION_ALLOW_INSECURE=1`. Closes the 2026-08-01 review's SEC-2.
-  - `webhook-sink` (`.devcontainer/docker-compose.yml`,
-    `scripts/dev-webhook-sink.ts`): a devcontainer-only service that answers
-    every request with `200` and echoes the JSON body it received.
+  - The devcontainer sets `HTTP_ACTION_ALLOWED_HOSTS=localhost:8080`
+    (`dedup-runtime-pagination-webhook-sink`), the webhook sink's own address
+    — see below. It also sets `HTTP_ACTION_ALLOW_INSECURE=1`. Closes the
+    2026-08-01 review's SEC-2.
+  - The webhook sink (`.devcontainer/docker-compose.yml`,
+    `scripts/dev-webhook-sink.ts`): a devcontainer-only script, backgrounded
+    inside the `app` container by its `command:` entry, that answers every
+    request with `200` and echoes the JSON body it received.
     `examples/expense-approval.json`'s `book` and `escalated_review` steps
     both target it, so `book`'s `Action.output` reads back the same
-    `body.status` the action sent. Runs the image the `app` service already
-    builds, plus one script — no third-party image joins the stack for it.
-    Declares no `ports` entry, matching `db` and `mailpit`; a contributor
-    reaches it via
-    `docker compose logs webhook-sink`, which shows the method, the path, and
-    the `Idempotency-Key` header of every request it receives.
+    `body.status` the action sent. Runs inside the same image and container
+    the `app` service already builds — no second image joins the stack for
+    it. A contributor reaches it via `docker compose logs app`, which shows
+    the method, the path, and the `Idempotency-Key` header of every request
+    it receives, alongside the dev server's own log lines.
 - Notifications (`src/handlers/notification-email.ts`, roadmap #16): a second
   built-in handler, `notification.email`, registered by `createDefaultRegistry`
   next to `httpHandlerDef`. No schema change — the five existing action
@@ -825,8 +825,9 @@ Stage-by-stage status is in `ROADMAP.md`.
   predates a registered/tightened type stays a no-op. `resolveFields`
   (`src/runtime/api.ts`) is now async and takes a `registry: DataSourceRegistry`
   parameter: a `dataSource`-bound field's options are resolved via the
-  registry, memoized by `DataSourceId` within one call (fields on the same
-  step sharing a data source resolve it once). `ResolvedViewField` gained
+  registry, once per view field with no cross-field memoization (fields on
+  the same step sharing a data source each trigger their own resolve call).
+  `ResolvedViewField` gained
   `options?: FieldOption[]` — populated from static `FieldDef.options`
   unchanged, or the resolved data-source result — the single place
   downstream code reads options from; `optionValuesValid` now validates
@@ -1883,9 +1884,9 @@ Stage-by-stage status is in `ROADMAP.md`.
   it) is grouped under "Structure" and unmounted while JSON is shown, so a
   stale textarea can never silently clobber a panel edit made while it was
   open — tightened during review, the change's first draft toggled only
-  Canvas + `StepsPanel`. `DraftToolbar`, the registry selector and the
-  content-locale switcher stay mounted on both surfaces, since none of them
-  mutates the draft body. `JsonView` seeds its local `text` from the current
+  Canvas + `StepsPanel`. `DraftToolbar` and the content-locale switcher stay
+  mounted on both surfaces, since neither mutates the draft body. `JsonView`
+  seeds its local `text` from the current
   draft **once, on mount** — no resync effect, and switching away unmounts it
   so switching back always remounts fresh — and writes only on an explicit
   Apply, through `parseDraftText` (`panels/draftJsonLogic.ts`, mirroring
@@ -1906,7 +1907,7 @@ Stage-by-stage status is in `ROADMAP.md`.
 - Process Studio — tools and Player (`src/cel/check.ts`, `src/runtime/api.ts`,
   `src/http/routes.ts`, `src/http/studio-routes.ts`, `src/http/server.ts`,
   `packages/web/src/areas/studio/screens/{ToolsScreen,PlayerScreen}.tsx`,
-  `packages/web/src/areas/studio/screens/{toolsScratchpadLogic,playerLogic}.ts`,
+  `packages/web/src/areas/studio/screens/playerLogic.ts`,
   `packages/web/src/areas/studio/api/{client,types}.ts`, `studio-tools-and-player`):
   stage 11's fifth and last change. Closes the stage's remaining gap and
   deletes `packages/editor` outright — every capability it alone provided
@@ -2534,11 +2535,11 @@ Stage-by-stage status is in `ROADMAP.md`.
   import it.
 
   `src/shell/` owns what the four each owned a copy of. `session.ts` holds one
-  key, `web.session`, carrying `{token, actorId, roles, expiresAt}`. The expiry
-  is recorded and never consulted: `end-user-app` requires that the frontend
-  run no client-side expiry check and treat a `401` as the sole end-of-session
-  signal, so storing the value keeps that requirement intact. The four old keys
-  are not read and not migrated. `areas.ts` is the one table of area to
+  key, `web.session`, carrying `{token, actorId, roles}`. `end-user-app`
+  requires that the frontend run no client-side expiry check and treat a `401`
+  as the sole end-of-session signal. `POST /auth/login`'s response still
+  carries an expiry field. The session this module stores never keeps it,
+  since nothing reads it. The four old keys are not read and not migrated. `areas.ts` is the one table of area to
   revealing role (app needs only a session, admin `system:admin`, studio
   `system:developer`, reporting `system:reports`), and it drives the switcher,
   the `/` redirect and the direct-hit guard alike, so they cannot disagree. The
@@ -3189,9 +3190,9 @@ Four modules answered HTTP routes when this landed. The three written after
 `guarded` stood in four copies. `parseLimit` stood in two. Every copy carried
 a comment saying so, in the form "Same shape as routes.ts::guarded".
 
-`routes.ts` now exports all four, and every sibling imports them. Six route
-modules sit there today: `ui-strings-routes.ts` and `account-routes.ts`
-arrived after this change and took the plumbing rather than copying it. The
+`routes.ts` now exports all four, and every sibling imports them. Five route
+modules sit there today: `account-routes.ts` arrived after this change and
+took the plumbing rather than copying it. The
 generic `guarded<T>` covers what the fixed-to-`HttpResult` copies did, since
 every sibling call site infers `T = HttpResult`. The cost of the choice is
 that `routes.ts` is both a route module and the plumbing home. The
@@ -3284,12 +3285,17 @@ comment, around one `structuredClone`.
 
 The first of those two is gone. Its `isDirty` moved into
 `draftToolbarState.ts`, which already held the other. Both state one
-invariant: the body the server last confirmed. The reducer writes it, and
-`isDirty` reads it.
+invariant: the body the server last confirmed. `EditScreen.tsx`'s `useState`
+wrapper writes it, and `isDirty` reads it.
 
 The reducer's two-kind action union went at the same time. Both branches were
 the same expression. The call sites already carry the names `doSave` and
 `reload`, so the discriminant told a reader nothing the names did not.
+
+A later change, `ponytail-studio-small-cuts`, dropped the reducer itself. It
+had settled into plain `useState` in disguise too. The screen now seeds
+`savedBody` with a `useState` call, and a small wrapper advances it on save
+and on reload.
 
 The `structuredClone` stays, and so does its comment. The panels mutate the
 draft object in place. Storing the reference would make `savedBody` follow
@@ -3353,11 +3359,11 @@ string. Nothing pins to a row here.
 as a nested `area -> locale -> key -> value` map. One counts the rows. One
 upserts a row, or deletes it when `value` is `null`.
 
-Three routes. `GET /ui-strings` needs no token and no role. It has its own
-module, for the reason `health.ts` has one. Every handler in `admin-routes.ts`
-states the opposite invariant. `GET /admin/ui-strings` and
-`PUT /admin/ui-strings` sit behind `system:admin`. The `PUT` records the acting
-actor.
+Three routes. `GET /ui-strings` needs no token and no role, unlike every
+other handler in `admin-routes.ts`. Its own handler
+(`handleGetUiStrings`) lives there anyway, beside `handleAdminListUiStrings`.
+`GET /admin/ui-strings` and `PUT /admin/ui-strings` sit behind
+`system:admin`. The `PUT` records the acting actor.
 
 The public read sits in `createServer`'s route table. It does not sit beside
 `/livez` and `/readyz`. Those two carry no CORS header, on purpose. This one is
@@ -3461,10 +3467,10 @@ created the 2026-08-06 debt. It now refuses the same class of debt.
 
 ## Personal profile page (`add-personal-profile-page`)
 
-`src/http/account-routes.ts` is a sixth route module, beside `routes.ts`,
-`admin-routes.ts`, `studio-routes.ts`, `reporting-routes.ts` and
-`ui-strings-routes.ts`. It holds two routes, `GET /account/me` and `PATCH
-/account/me`. Both read the caller's id off the resolved actor. Neither takes
+`src/http/account-routes.ts` is a fifth route module, beside `routes.ts`,
+`admin-routes.ts`, `studio-routes.ts` and `reporting-routes.ts`. It holds two
+routes, `GET /account/me` and `PATCH /account/me`. Both read the caller's id
+off the resolved actor. Neither takes
 an id in the path, and neither checks a role. Any resolvable session reaches
 them. `admin-routes.ts` stays the operator's act-on-any-account surface.
 

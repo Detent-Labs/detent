@@ -18,27 +18,34 @@ scope — a CEL reference to a data source remains a publish error.
 
 ### Requirement: A DataSourceRegistry resolves a data source's type to a handler
 
+<!-- antislop: allow sentence-length -->
+<!-- Every sentence below is at or under 20 words. The linter merges a
+sentence that opens with a code span into the sentence before it, doubling
+the counted length; see antislop-sentence-split-breaks-on-code-span.md. -->
 The engine SHALL provide a `DataSourceRegistry` (`src/engine/registry.ts`)
 mirroring the existing action `Registry`: a `Map<string, DataSourceHandlerDef>`
-keyed by `type`, where `DataSourceHandlerDef` is `{ resolve: (ctx:
-DataSourceContext) => Promise<FieldOption[]>, configSchema?: z.ZodTypeAny }`
-and `DataSourceContext` is `{ config: Record<string, unknown>, heldValues?:
-string[] }`. `heldValues` carries the values the instance already holds for
-the field under resolution, so a handler can return a value that is otherwise
-retired; a handler that has no such notion ignores it.
-`createDataSourceRegistry`, `registerDataSource`, and `resolveDataSource`
-SHALL provide construction, registration, and lookup, mirroring the action
-registry's own three functions. `resolve` SHALL be `async` regardless of
-whether a given handler's resolution is itself synchronous, so a future
-I/O-backed handler type is a drop-in rather than an interface change.
+keyed by `type`. `DataSourceHandlerDef` is `{ resolve: (ctx: DataSourceContext)
+=> Promise<FieldOption[]>, configSchema?: z.ZodTypeAny }`. `DataSourceContext`
+is `{ config: Record<string, unknown>, heldValues?: string[] }`. `heldValues`
+carries the values the instance already holds for the field under resolution,
+so a handler can return a value that is otherwise retired; a handler that has
+no such notion ignores it.
+`createDataSourceRegistry` SHALL construct a `DataSourceRegistry`, mirroring
+the action registry's own factory. Registration and lookup use the
+`DataSourceRegistry` `Map` directly. A caller registers a handler with
+`reg.set(type, def)` and looks one up with `reg.get(type)`. `resolve` SHALL
+be `async` regardless of whether a given handler's resolution is itself
+synchronous, so a future I/O-backed handler type is a drop-in rather than an
+interface change.
 
 #### Scenario: A registered type resolves to its handler
-- **WHEN** `resolveDataSource` is called with a type previously registered
-  via `registerDataSource`
+- **WHEN** a caller calls `reg.get(type)` on a `DataSourceRegistry` after a
+  prior `reg.set(type, def)` call
 - **THEN** it returns that type's `DataSourceHandlerDef`
 
 #### Scenario: An unregistered type resolves to nothing
-- **WHEN** `resolveDataSource` is called with a type never registered
+- **WHEN** a caller calls `reg.get(type)` on a `DataSourceRegistry` for a
+  type never set
 - **THEN** it returns `undefined`
 
 ### Requirement: A built-in "static" data source handler echoes a configured option list
@@ -69,10 +76,12 @@ declares `dataSource`, resolve the referenced `DataSourceDef` from
 `resolve({ config: def.config, heldValues })`, and attach the result.
 `heldValues` SHALL carry the values the instance holds for that field: none
 when the field is unset, one for a `select`, and the whole array for a
-`multiselect`. Resolution SHALL be memoized within one `resolveFields` call
-by `DataSourceId` together with those held values, so multiple fields on the
-same step bound to the same data source and holding the same values resolve
-it once.
+`multiselect`. Each view field resolves through its own `resolve` call. Two
+fields on the same step bound to the same data source and holding the same
+values each trigger their own call; neither call's result is shared with the
+other (`dedup-runtime-pagination-webhook-sink`: the per-call memoization this
+requirement once described added 18 lines to dedupe a case `resolveFields`
+does not hit in a hot loop, and was removed).
 
 `ResolvedViewField` SHALL gain an `options?: FieldOption[]` property,
 populated from `field.options` when the field declares static options
@@ -91,18 +100,11 @@ submission validation) SHALL read options from, rather than reading
 - **THEN** the resolved field's `options` equals the result of that data
   source's `resolve` call
 
-#### Scenario: Two fields sharing one data source resolve it once
+#### Scenario: Two fields sharing one data source each resolve it independently
 - **WHEN** two view fields on the same step both declare the same
-  `dataSource` and hold the same values
-- **THEN** the handler's `resolve` is invoked exactly once for that
-  `resolveFields` call, and both fields' resolved `options` reflect its
-  result
-
-#### Scenario: Two fields sharing one data source but holding different values resolve separately
-- **WHEN** two view fields on the same step declare the same `dataSource` and
-  hold different values
-- **THEN** the handler's `resolve` is invoked once per distinct held-value
-  set
+  `dataSource`, whether or not they hold the same values
+- **THEN** the handler's `resolve` is invoked once per field, and each
+  field's resolved `options` reflects its own call's result
 
 #### Scenario: A field with neither options nor dataSource has no resolved options
 - **WHEN** a view field's `FieldDef` declares neither `options` nor

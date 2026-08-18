@@ -104,28 +104,27 @@ An actor with no session at `/` SHALL reach the login screen.
 - **WHEN** an actor holding no reserved role opens `/`
 - **THEN** the browser ends up under `/app`
 
-### Requirement: One session carries the token, actor, roles and expiry
+### Requirement: One session carries the token, actor and roles
 
 The shell SHALL persist one session under one storage key. It SHALL hold
-the bearer token, the actor id, the actor's roles, and the token's expiry.
-It SHALL also hold the actor's `displayName` and `locale` once hydrated.
+the bearer token, the actor id, and the actor's roles. It SHALL also hold
+the actor's `displayName` and `locale` once hydrated.
 
-The token, actor id, roles, and expiry SHALL come from the `POST
-/auth/login` response, `{token, expiresAt, actor: {id, roles}}`. The shell
-SHALL hydrate `displayName` and `locale` separately, with a call to `GET
-/account/me` made once a session exists. Login SHALL NOT block on that
-call. The shell SHALL treat the session as established as soon as the
-login response arrives. It SHALL fill in `displayName`/`locale` when the
-hydration call resolves.
+The token, actor id, and roles SHALL come from the `POST /auth/login`
+response, `{token, expiresAt, actor: {id, roles}}`. The shell SHALL NOT
+store the response's `expiresAt`. The shell SHALL hydrate `displayName` and
+`locale` separately, with a call to `GET /account/me` made once a session
+exists. Login SHALL NOT block on that call. The shell SHALL treat the
+session as established as soon as the login response arrives. It SHALL
+fill in `displayName`/`locale` when the hydration call resolves.
 
 A stored session that carries neither `displayName` nor `locale` SHALL
 stay valid. The shell SHALL hydrate the two missing fields on next use,
 rather than discard the session as malformed.
 
-The shell SHALL record the expiry but SHALL NOT enforce it. A `401` from
-any API call stays the sole signal that a session has ended. The
-`end-user-app` capability already requires this. The shell SHALL run no
-client-side expiry check.
+The shell SHALL NOT track the token's expiry client-side, in storage or
+otherwise. A `401` from any API call stays the sole signal that a session
+has ended. The `end-user-app` capability already requires this.
 
 The shell SHALL NOT read the four previous per-package storage keys. The
 shell SHALL provide no session migration.
@@ -139,7 +138,8 @@ shell SHALL provide no session migration.
 
 #### Scenario: A stored expiry gates nothing
 
-- **WHEN** the stored session's expiry is in the past
+- **WHEN** a persisted token is past the lifetime the login response's
+  `expiresAt` named
 - **THEN** the shell still uses the token, and the session ends only when
   an API call answers `401`
 
@@ -480,6 +480,54 @@ and SHALL present no editable field.
   `editable: false`, opens the profile page
 - **THEN** the page presents that actor's `id` and `roles`
 - **AND** the page presents no field the actor can change
+
+### Requirement: The account menu dismisses via native light-dismiss
+
+The header's account menu SHALL open on a click of its trigger button. It
+SHALL dismiss on an outside pointer interaction or on the Escape key. Both
+SHALL work through the browser's native popover light-dismiss behavior,
+never a hand-written document listener.
+
+A control nested inside the open menu keeps its own action. A pointer
+interaction with that control SHALL NOT dismiss the menu first. Four
+controls carry this rule: the language picker, an area-switcher entry,
+the profile entry, and the logout button.
+
+#### Scenario: A click outside the open menu closes it
+
+- **WHEN** the account menu is open and the actor clicks anywhere outside
+  the menu and its trigger button
+- **THEN** the menu closes and no menu action runs
+
+#### Scenario: Escape closes the open menu
+
+- **WHEN** the account menu is open and the actor presses Escape
+- **THEN** the menu closes and focus returns to the trigger button
+
+#### Scenario: The language picker inside the menu stays usable
+
+- **WHEN** the account menu is open and the actor changes the language
+  picker's selection
+- **THEN** the locale changes and the menu stays open for a further
+  selection
+
+#### Scenario: Selecting an area-switcher entry closes the menu and navigates
+
+- **WHEN** the account menu is open and the actor clicks another permitted
+  area's entry
+- **THEN** the menu closes and the shell navigates to that area
+
+#### Scenario: Selecting the profile entry closes the menu and navigates
+
+- **WHEN** the account menu is open and the actor clicks the profile
+  entry
+- **THEN** the menu closes and the shell navigates to the profile page
+
+#### Scenario: Selecting the logout entry closes the menu and signs out
+
+- **WHEN** the account menu is open and the actor clicks the logout
+  entry
+- **THEN** the menu closes and the shell signs the actor out
 
 ### Requirement: The account menu's language picker persists to the account when signed in
 

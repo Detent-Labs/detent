@@ -58,16 +58,23 @@ one-line checks summary at its bottom edge. An author therefore reads the
 issue count in every state of the column but one. The full rail's own state
 needs no summary, since its grouped list already carries the count.
 
-The summary SHALL show a single count: the total number of open entries
-across every group in `validation.issues[]`. The summary SHALL carry no
-count when every group is clear.
+The summary SHALL show a single count. That count is the total number of
+open entries across the zod, structural, CEL, duration, and view groups
+in `validation.issues[]`. The registry group's own state SHALL NOT enter
+that count, and SHALL NOT decide whether the summary reads clear. The
+registry group stays held back in every draft state this deployment
+reaches, per the held-back requirement below. Counting it, or gating on
+it, would leave the summary unable to read clear on any draft.
 
-When any group holds back, the summary SHALL show a held-back
-indicator instead. That indicator SHALL differ from both a count and
-"no count." A held-back group has not run its checks yet; it is not
-clear. The summary SHALL NOT read as clear or passing while one exists.
-This carries the rail's own held-back requirement into its collapsed
-form.
+Any of the zod, structural, CEL, duration, or view groups can hold back.
+When one does, the summary SHALL show a held-back indicator instead. That
+indicator SHALL differ from both a count and "no count." A held-back
+group has not run its checks yet; it is not clear.
+
+The summary SHALL NOT read as clear or passing while one of those five
+groups holds back. This carries the rail's own held-back requirement into
+its collapsed form. The registry group's own held-back state SHALL NOT,
+by itself, put the summary into this state.
 
 Choosing the summary SHALL expand it to the same grouped list the full
 rail shows when the developer selects nothing.
@@ -85,12 +92,16 @@ rail shows when the developer selects nothing.
 
 #### Scenario: A fully clear draft's summary carries no count
 
-- **WHEN** the loaded draft passes every check
+- **WHEN** the loaded draft passes every zod, structural, CEL, duration,
+  and view check
 - **THEN** the collapsed summary shows no count
+- **AND** it does not show a held-back indicator, even though the
+  registry group itself stays held back
 
 #### Scenario: A structurally invalid draft's summary shows held back, not clear
 
-- **WHEN** the loaded draft is not Zod-valid, so every group holds back
+- **WHEN** the loaded draft is not Zod-valid, so every one of those five
+  groups holds back
 - **THEN** the collapsed summary shows a held-back indicator
 - **AND** it does not show "no count"
 
@@ -116,6 +127,17 @@ groups as held back whenever `validation.structurallyValid` is false.
 It SHALL show the duration group as held back whenever
 `validation.zodValid` is false. It SHALL NOT show a held-back group as
 empty or passing.
+
+The registry group SHALL also show held back whenever the studio holds no
+live `Registry`, independent of `structurallyValid`. No part of this
+deployment ever loads one. The registry group therefore stays held back in
+every draft state the studio can reach.
+
+A held-back registry group is not itself an issue. The check itself,
+`checkActionRegistry`, still runs at publish time on the server, and
+still blocks a publish there. The rail's registry group only reports
+whether that check ran in the browser during this session. It never
+does.
 
 The structural group's own held-back state does not follow from
 `zodValid` alone. `compileProcessBody` (`src/schema/compile.ts`) runs
@@ -166,8 +188,12 @@ needs a compiled body.
 
 - **WHEN** the loaded draft is Zod-valid and `validation.structurallyValid`
   is true
-- **THEN** the checks rail shows each group's actual issues, or a clear
-  pass state when a group has none
+- **THEN** the checks rail shows each of the zod, structural, CEL,
+  duration, and view groups' actual issues
+- **AND** any of those five groups with no issues shows a clear pass state
+  instead
+- **AND** the registry group still shows held back, since the studio never
+  loads a live `Registry`
 
 ### Requirement: The rail adds a consolidated view; it does not replace per-entity issue placements
 
@@ -186,10 +212,23 @@ placements.
 
 ### Requirement: Every publish blocker is visible in the rail with all groups clear
 
-The checks rail SHALL show no unresolved issue in any group under two
-conditions. The draft passes every check publish requires, and it
-carries neither view-flag stopping state. An author SHALL be able to
-tell from the rail alone that a clear draft is publishable.
+The checks rail SHALL show no unresolved issue in the zod, structural,
+CEL, duration, and view groups under two conditions. The draft passes
+every check publish requires, and it carries neither view-flag stopping
+state. An author SHALL be able to tell from those five groups alone that
+a clear draft is publishable.
+
+The registry group is the one exception. It SHALL stay held back in
+every draft state in this deployment, per the held-back requirement
+above. A held-back registry group SHALL NOT read as a publish blocker.
+The server enforces the registry-resolution check at publish time. It
+does so regardless of the rail's own state.
+
+The rail's own "all clear" banner reads the same way, under the same two
+conditions. The zod, structural, CEL, duration, and view groups carry no
+open issue. The draft carries neither view-flag stopping state. The
+registry group's own, separately-shown held-back state SHALL NOT decide
+whether the banner shows.
 
 The reverse does not hold, and the rail SHALL NOT claim it. The view
 group reports rather than blocks. Its two rules find a draft the engine
@@ -201,11 +240,23 @@ those blocks a publish.
 
 #### Scenario: A fully clear draft shows no open issues
 
-- **WHEN** the loaded draft passes every structural, CEL, registry and
+- **WHEN** the loaded draft passes every zod, structural, CEL, and
   duration check
 - **AND** it carries neither view-flag stopping state
-- **THEN** the checks rail shows all groups clear
-- **AND** no entry remains in any group
+- **THEN** the checks rail shows the zod, structural, CEL, duration, and
+  view groups clear
+- **AND** no entry remains in any of those five groups
+- **AND** the registry group shows held back, not clear and not failing
+- **AND** the rail shows its "all clear" banner, unaffected by the
+  registry group's held-back state
+
+#### Scenario: A held-back registry group does not block publish
+
+- **WHEN** the checks rail shows the registry group held back and every
+  other group clear
+- **THEN** the publish control stays available
+- **AND** the server's own `checkActionRegistry` run at publish time
+  stays the actual gate on the registry dimension
 
 #### Scenario: A view entry alone leaves the draft publishable
 

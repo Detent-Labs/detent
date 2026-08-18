@@ -12,7 +12,7 @@ import { executeManualTransition } from "../src/engine/transition.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { drainResolutions } from "../src/engine/resolution.js";
 import { drainTimers } from "../src/engine/timers.js";
-import { createRegistry, register, createDataSourceRegistry } from "../src/engine/registry.js";
+import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { HTTP_ACTION_TYPE, httpHandlerDef } from "../src/handlers/http.js";
 import { NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef } from "../src/handlers/notification-email.js";
 import { compileProcessBody } from "../src/schema/compile.js";
@@ -68,9 +68,9 @@ const waitTimerBody = (): ProcessBody =>
   }) as unknown as ProcessBody;
 
 const reg = createRegistry();
-register(reg, "sayYes", { handler: async () => ({ v: "yes" }) });
-register(reg, "sayNo", { handler: async () => ({ v: "no" }) });
-register(reg, "strict", { handler: async () => ({}), configSchema: z.object({ to: z.string() }) });
+reg.set("sayYes", { handler: async () => ({ v: "yes" }) });
+reg.set("sayNo", { handler: async () => ({ v: "no" }) });
+reg.set("strict", { handler: async () => ({}), configSchema: z.object({ to: z.string() }) });
 const dataSourceReg = createDataSourceRegistry();
 
 beforeAll(async () => {
@@ -304,7 +304,7 @@ test.skipIf(!DB)("re-publishing an already-stored body is a no-op even after its
     VALUES (${PID}, 1, ${hash}, 'published', ${legacy})`;
 
   const tightened = createRegistry();
-  register(tightened, "strict", { handler: async () => ({}), configSchema: z.object({ to: z.string() }) });
+  tightened.set("strict", { handler: async () => ({}), configSchema: z.object({ to: z.string() }) });
   const v = await publishBody(PID, bodyWithActionType("strict", { to: 42 }), tightened, dataSourceReg);
   expect(v.version).toBe(1);
   expect(v.definitionHash).toBe(hash);
@@ -318,7 +318,7 @@ test.skipIf(!DB)("re-publishing an already-stored body is a no-op even after its
 
 test.skipIf(!DB)("publish rejects an http.request action with a missing url", async () => {
   const httpReg = createRegistry();
-  register(httpReg, HTTP_ACTION_TYPE, httpHandlerDef);
+  httpReg.set(HTTP_ACTION_TYPE, httpHandlerDef);
   const err = await publishRegistryFails(bodyWithActionType(HTTP_ACTION_TYPE, { method: "POST" }), httpReg);
   expect(err.issues[0]!.type).toBe(HTTP_ACTION_TYPE);
   expect(await definitionCount()).toBe(0);
@@ -326,7 +326,7 @@ test.skipIf(!DB)("publish rejects an http.request action with a missing url", as
 
 test.skipIf(!DB)("publish rejects an http.request action with method GET and a body", async () => {
   const httpReg = createRegistry();
-  register(httpReg, HTTP_ACTION_TYPE, httpHandlerDef);
+  httpReg.set(HTTP_ACTION_TYPE, httpHandlerDef);
   const err = await publishRegistryFails(
     bodyWithActionType(HTTP_ACTION_TYPE, { url: "http://example.com", method: "GET", body: { a: 1 } }),
     httpReg,
@@ -341,7 +341,7 @@ test.skipIf(!DB)("publish rejects an http.request action with method GET and a b
 
 test.skipIf(!DB)("publish rejects a notification.email action with a malformed recipient", async () => {
   const mailReg = createRegistry();
-  register(mailReg, NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef);
+  mailReg.set(NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef);
   const err = await publishRegistryFails(
     bodyWithActionType(NOTIFICATION_EMAIL_ACTION_TYPE, { to: ["not-an-address"], subject: "s", body: "b" }),
     mailReg,

@@ -21,7 +21,6 @@ import {
   type AssignmentRegistry,
   type AssignmentStrategyDef,
   createDefaultAssignmentRegistry as createStaticAssignmentRegistry,
-  registerAssignmentStrategy,
 } from "./registry.js";
 
 export const MANAGER_OF_STARTER_STRATEGY_TYPE = "org.manager-of-starter";
@@ -67,6 +66,6 @@ export const managerOfStarterStrategyDef: AssignmentStrategyDef = {
  */
 export function createDefaultAssignmentRegistry(): AssignmentRegistry {
   const reg = createStaticAssignmentRegistry();
-  registerAssignmentStrategy(reg, MANAGER_OF_STARTER_STRATEGY_TYPE, managerOfStarterStrategyDef);
+  reg.set(MANAGER_OF_STARTER_STRATEGY_TYPE, managerOfStarterStrategyDef);
   return reg;
 }

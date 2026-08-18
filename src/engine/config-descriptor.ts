@@ -7,18 +7,20 @@
  *
  * `describeConfigSchema` returns `undefined` for any construct outside the
  * supported subset: a nested `ZodObject` property, `z.unknown()`, a string
- * format other than email, or any other unsupported node. The caller then
- * omits a schema description for that type, and the studio area falls back to
- * its raw JSON textarea — unchanged from the behavior before this module
- * existed.
+ * format other than email, a pattern-constrained string, an exclusive
+ * numeric bound, a `multipleOf`-constrained number, a non-string array
+ * element, or any other unsupported node. The caller then omits a schema
+ * description for that type, and the studio area falls back to its raw JSON
+ * textarea — unchanged from the behavior before this module existed.
  *
- * A `.refine()`/`.superRefine()`-wrapped object is NOT outside that subset.
- * Zod v4 declares `refine` as returning `this`, so a refined object stays a
- * `ZodObject` and reaches the per-property walk below. Zod v3 wrapped it as a
- * `ZodEffects`, which the top-level check rejected, so those types used to
- * fall back to the raw JSON textarea. The generated form describes per-field
- * rules only; the cross-field rule the refinement carries still runs at
- * publish, through `registry-check.ts`.
+ * Classification reads `z.toJSONSchema(schema)`'s draft 2020-12 output
+ * rather than Zod's internal `_zod.def` representation. That normalizes
+ * refinements, defaults, optionals, and every string-format spelling into
+ * standard JSON Schema keywords before this module ever inspects a node, so
+ * a `.refine()`/`.superRefine()`-wrapped object reaches the per-property walk
+ * below on the same footing as an unrefined one. See
+ * `openspec/changes/replace-config-descriptor-with-zod-json-schema/design.md`
+ * for the keyword-by-keyword classification this file implements.
  */
 
 import { z } from "zod";
@@ -43,61 +45,57 @@ export interface ConfigFieldDescriptor {
 
 type LeafDescriptor = Omit<ConfigFieldDescriptor, "key" | "required" | "default">;
 
-/** Zod v4 keeps a node's constraints in `_zod.def.checks`, each check carrying
- * its own `_zod.def` with a `check` discriminator. The shapes read below were
- * taken from the running library: a string length check is
- * `{ check: "min_length", minimum }`, a number bound is
- * `{ check: "greater_than", value, inclusive }`, and a string format is
- * `{ check: "string_format", format }`. */
-/** A node's own type tag. Zod v4 gives a formatted string its own class —
- * `z.email()` is a ZodEmail and answers `instanceof z.ZodString` with false —
- * while still reporting `type: "string"` here. Dispatching on the tag keeps
- * such a node inside the supported subset instead of dropping it silently. */
-function nodeType(schema: z.ZodTypeAny): string | undefined {
-  return (schema as unknown as { _zod?: { def?: { type?: string } } })._zod?.def?.type;
+/**
+ * The subset of `z.toJSONSchema`'s draft 2020-12 output this module reads.
+ * Zod's own `z.core.JSONSchema.JSONSchema` type admits a boolean node (a
+ * bare `true`/`false` schema) anywhere a property or an array's `items` can
+ * sit — a shape `z.toJSONSchema` never emits for an object or array Zod
+ * schema. This narrows to the keywords the classifiers below inspect.
+ */
+interface JsonSchemaNode {
+  type?: string;
+  enum?: unknown[];
+  format?: string;
+  pattern?: string;
+  minLength?: number;
+  maxLength?: number;
+  minimum?: number;
+  maximum?: number;
+  exclusiveMinimum?: number | boolean;
+  exclusiveMaximum?: number | boolean;
+  multipleOf?: number;
+  items?: JsonSchemaNode;
+  minItems?: number;
+  maxItems?: number;
+  default?: unknown;
+  properties?: Record<string, JsonSchemaNode>;
+  required?: string[];
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function checkDefs(schema: z.ZodTypeAny): any[] {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (((schema as any)._zod?.def?.checks ?? []) as any[]).map((c) => c?._zod?.def).filter(Boolean);
-}
-
-/** A string format reaches the node two ways. `z.string().email()` appends a
- * `string_format` check, while `z.email()` carries `format` on the node itself
- * and appends no check. Both must resolve, or a schema authored the second way
- * would silently lose its format rather than fail. */
-function stringFormat(schema: z.ZodString): string | undefined {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const nodeFormat = (schema as any)._zod?.def?.format;
-  if (typeof nodeFormat === "string") return nodeFormat;
-  const formatCheck = checkDefs(schema).find((c) => c.check === "string_format");
-  return typeof formatCheck?.format === "string" ? formatCheck.format : undefined;
-}
-
-function describeString(schema: z.ZodString): LeafDescriptor | undefined {
+function describeString(node: JsonSchemaNode): LeafDescriptor | undefined {
+  // `.regex()`, `.startsWith()`, and `.endsWith()` all produce a bare
+  // `pattern` keyword with no `format` key. The email format also carries a
+  // `pattern` keyword (its validation regex), so a pattern paired with
+  // `format: "email"` is not itself an extra constraint to bail on.
+  if (node.pattern !== undefined && node.format !== "email") return undefined;
   const descriptor: LeafDescriptor = { kind: "string" };
-  const format = stringFormat(schema);
-  if (format === "email") descriptor.format = "email";
-  else if (format !== undefined) return undefined;
-  for (const check of checkDefs(schema)) {
-    if (check.check === "min_length") descriptor.minLength = check.minimum;
-    else if (check.check === "max_length") descriptor.maxLength = check.maximum;
-    else if (check.check === "string_format") continue;
-    else return undefined;
-  }
+  if (node.format === "email") descriptor.format = "email";
+  else if (node.format !== undefined) return undefined;
+  if (node.minLength !== undefined) descriptor.minLength = node.minLength;
+  if (node.maxLength !== undefined) descriptor.maxLength = node.maxLength;
   return descriptor;
 }
 
-function describeNumber(schema: z.ZodNumber): LeafDescriptor | undefined {
+function describeNumber(node: JsonSchemaNode): LeafDescriptor | undefined {
+  // `.multipleOf()` produces a `multipleOf` keyword the form cannot render.
+  if (node.multipleOf !== undefined) return undefined;
+  // `.min()`/`.max()` are inclusive bounds, `minimum`/`maximum`. An
+  // exclusive bound (`.gt()`/`.lt()`) describes a range the form cannot
+  // render, so it leaves the subset.
+  if (node.exclusiveMinimum !== undefined || node.exclusiveMaximum !== undefined) return undefined;
   const descriptor: LeafDescriptor = { kind: "number" };
-  for (const check of checkDefs(schema)) {
-    // `.min()`/`.max()` are inclusive bounds. An exclusive bound describes a
-    // range the form cannot render, so it leaves the subset.
-    if (check.check === "greater_than" && check.inclusive) descriptor.min = check.value;
-    else if (check.check === "less_than" && check.inclusive) descriptor.max = check.value;
-    else return undefined;
-  }
+  if (node.minimum !== undefined) descriptor.min = node.minimum;
+  if (node.maximum !== undefined) descriptor.max = node.maximum;
   return descriptor;
 }
 
@@ -113,43 +111,42 @@ function describeNumber(schema: z.ZodNumber): LeafDescriptor | undefined {
  * subset, which drops the descriptor for its WHOLE type — every sibling
  * property falls back to the raw JSON textarea with it.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function describeStringArray(schema: z.ZodArray<any>): LeafDescriptor | undefined {
-  const element = schema.element as z.ZodTypeAny;
+function describeStringArray(node: JsonSchemaNode): LeafDescriptor | undefined {
+  const items = node.items;
+  if (!items) return undefined;
   const descriptor: LeafDescriptor = { kind: "string-array" };
-  if (element instanceof z.ZodEnum) {
-    // v4's `.options` may carry numbers; the generated form renders strings.
-    const values = element.options;
-    if (!values.every((v): v is string => typeof v === "string")) return undefined;
-    descriptor.enumValues = [...values];
+  // Check `items.enum` before `items.type`: a fixed string enum's element
+  // node carries both `type: "string"` and `enum: [...]` at once.
+  if (items.enum !== undefined) {
+    if (!items.enum.every((v): v is string => typeof v === "string")) return undefined;
+    descriptor.enumValues = [...items.enum];
+  } else if (items.type === "string") {
+    if (items.pattern !== undefined && items.format !== "email") return undefined;
+    if (items.format === "email") descriptor.format = "email";
+    else if (items.format !== undefined) return undefined;
   } else {
-    if (nodeType(element) !== "string") return undefined;
-    const elementDescriptor = describeString(element as z.ZodString);
-    if (!elementDescriptor) return undefined;
-    if (elementDescriptor.format) descriptor.format = elementDescriptor.format;
+    return undefined;
   }
-  // An array's own length bounds sit in `checks`, as `min_length`/`max_length`.
-  // v3 carried them on the def as `minLength`/`maxLength` objects instead.
-  for (const check of checkDefs(schema)) {
-    if (check.check === "min_length") descriptor.minItems = check.minimum;
-    else if (check.check === "max_length") descriptor.maxItems = check.maximum;
-    else return undefined;
-  }
+  if (node.minItems !== undefined) descriptor.minItems = node.minItems;
+  if (node.maxItems !== undefined) descriptor.maxItems = node.maxItems;
   return descriptor;
 }
 
-function describeLeaf(schema: z.ZodTypeAny): LeafDescriptor | undefined {
-  const t = nodeType(schema);
-  if (t === "string") return describeString(schema as z.ZodString);
-  if (t === "number") return describeNumber(schema as z.ZodNumber);
-  if (schema instanceof z.ZodBoolean) return { kind: "boolean" };
-  if (schema instanceof z.ZodEnum) {
-    // v4's `.options` may carry numbers; the generated form renders strings.
-    const values = schema.options;
-    if (!values.every((v): v is string => typeof v === "string")) return undefined;
-    return { kind: "enum", enumValues: [...values] };
+function describeLeaf(node: JsonSchemaNode): LeafDescriptor | undefined {
+  // Check `enum` before `type`: a scalar `z.enum()` node carries both
+  // `type: "string"` and `enum: [...]` on the same property node. Checking
+  // `type` first would misclassify it as `kind: "string"` and discard
+  // `enumValues`.
+  if (node.enum !== undefined) {
+    if (!node.enum.every((v): v is string => typeof v === "string")) return undefined;
+    return { kind: "enum", enumValues: [...node.enum] };
   }
-  if (schema instanceof z.ZodArray) return describeStringArray(schema);
+  if (node.type === "string") return describeString(node);
+  if (node.type === "number") return describeNumber(node);
+  if (node.type === "boolean") return { kind: "boolean" };
+  if (node.type === "array") return describeStringArray(node);
+  // A record, a nested object, an unknown/any-typed property (no `type`
+  // keyword at all), or anything else this module does not classify.
   return undefined;
 }
 
@@ -164,25 +161,39 @@ export function describeConfigSchema(schema: z.ZodTypeAny, typeName: string): Co
     log.debug("config schema has no generated-form descriptor", { type: typeName, reason: "not a ZodObject" });
     return undefined;
   }
-  // v4 exposes `.shape` as a property. v3 exposed `_def.shape()`, a call.
+  let jsonSchema: JsonSchemaNode;
+  try {
+    jsonSchema = z.toJSONSchema(schema) as unknown as JsonSchemaNode;
+  } catch (err) {
+    // z.toJSONSchema is not total: it throws on z.date(), z.bigint(),
+    // .transform(), z.void(), z.symbol(), z.nan(), z.map(), and possibly a
+    // future construct a registered config schema adds. describeConfigSchema
+    // runs once per registered type inside describeRegistry's loop, so an
+    // uncaught throw here would crash the whole GET /registry response
+    // instead of dropping just this one type's descriptor.
+    log.debug("config schema has no generated-form descriptor", {
+      type: typeName,
+      reason: `z.toJSONSchema threw: ${err instanceof Error ? err.message : String(err)}`,
+    });
+    return undefined;
+  }
+  // `.shape` gives property existence and iteration order, a stable public
+  // Zod API. `jsonSchema.properties[key]` is the leaf-type oracle for each
+  // property named there.
   const shape = schema.shape as Record<string, z.ZodTypeAny>;
+  const properties = jsonSchema.properties ?? {};
+  const requiredKeys = jsonSchema.required ?? [];
   const descriptors: ConfigFieldDescriptor[] = [];
   for (const key of Object.keys(shape)) {
-    let fieldSchema: z.ZodTypeAny = shape[key]!;
-    let required = true;
-    let defaultValue: unknown;
-    if (fieldSchema instanceof z.ZodDefault) {
-      required = false;
-      // v4 stores the default as a value. v3 stored a thunk.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      defaultValue = (fieldSchema as any)._zod.def.defaultValue;
-      fieldSchema = fieldSchema.unwrap() as z.ZodTypeAny;
+    const propertyNode = properties[key];
+    if (!propertyNode) {
+      log.debug("config schema has no generated-form descriptor", {
+        type: typeName,
+        reason: `property '${key}' has no JSON Schema node`,
+      });
+      return undefined;
     }
-    if (fieldSchema instanceof z.ZodOptional) {
-      required = false;
-      fieldSchema = fieldSchema.unwrap() as z.ZodTypeAny;
-    }
-    const leaf = describeLeaf(fieldSchema);
+    const leaf = describeLeaf(propertyNode);
     if (!leaf) {
       log.debug("config schema has no generated-form descriptor", {
         type: typeName,
@@ -190,10 +201,17 @@ export function describeConfigSchema(schema: z.ZodTypeAny, typeName: string): Co
       });
       return undefined;
     }
+    // z.toJSONSchema lists a `.default()`-carrying property in the schema's
+    // own `required` array, alongside its `default` keyword. Today's
+    // descriptor semantics mark a defaulted field `required: false` with its
+    // default attached, never `required: true`, so `required` reads both
+    // signals together rather than the bare `required` array membership.
+    const hasDefault = "default" in propertyNode;
+    const required = requiredKeys.includes(key) && !hasDefault;
     descriptors.push({
       key,
       required,
-      ...(defaultValue !== undefined ? { default: defaultValue } : {}),
+      ...(hasDefault ? { default: propertyNode.default } : {}),
       ...leaf,
     });
   }

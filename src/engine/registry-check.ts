@@ -17,14 +17,7 @@
 
 import { z } from "zod";
 import type { Action, ProcessBody } from "../schema/definition.js";
-import {
-  resolve,
-  type Registry,
-  resolveAssignmentStrategy,
-  type AssignmentRegistry,
-  resolveDataSource,
-  type DataSourceRegistry,
-} from "./registry.js";
+import { type Registry, type AssignmentRegistry, type DataSourceRegistry } from "./registry.js";
 
 export interface RegistryIssue {
   loc: string;
@@ -123,7 +116,7 @@ export function collect(body: ProcessBody): Site[] {
  */
 export function checkActionRegistry(body: ProcessBody, registry: Registry): RegistryIssue[] {
   const sites = collect(body).map(({ action, loc }) => ({ loc, type: action.type, config: action.config }));
-  return checkTypedConfig(sites, (type) => resolve(registry, type), "action");
+  return checkTypedConfig(sites, (type) => registry.get(type), "action");
 }
 
 /**
@@ -139,7 +132,7 @@ export function checkAssignmentRegistry(body: ProcessBody, assignmentRegistry: A
   body.workflow.steps.forEach((s, si) => {
     if (s.assignment) sites.push({ loc: `steps[${si}].assignment`, type: s.assignment.strategy.type, config: s.assignment.strategy.config });
   });
-  return checkTypedConfig(sites, (type) => resolveAssignmentStrategy(assignmentRegistry, type), "assignment strategy");
+  return checkTypedConfig(sites, (type) => assignmentRegistry.get(type), "assignment strategy");
 }
 
 /**
@@ -154,5 +147,5 @@ export function checkDataSourceRegistry(body: ProcessBody, dataSourceRegistry: D
     type: dataSource.type,
     config: dataSource.config,
   }));
-  return checkTypedConfig(sites, (type) => resolveDataSource(dataSourceRegistry, type), "data source");
+  return checkTypedConfig(sites, (type) => dataSourceRegistry.get(type), "data source");
 }

@@ -18,13 +18,12 @@ const session = {
   token: "tok_abc",
   actorId: "user_1",
   roles: ["system:admin"],
-  expiresAt: "2026-08-02T00:00:00.000Z",
   displayName: "Ada Lovelace",
   locale: "de" as const,
 };
 
 describe("session persistence", () => {
-  it("round-trips a persisted session, roles, expiry and both hydrated fields included", () => {
+  it("round-trips a persisted session, roles and both hydrated fields included", () => {
     // `loadSession` rebuilds the object field by field, so a field absent from
     // that literal is dropped on every reload rather than on none.
     const storage = fakeStorage();
@@ -67,18 +66,9 @@ describe("session persistence", () => {
     expect(loadSession(storage)).toBeUndefined();
   });
 
-  it("keeps a past expiry usable — a 401 is the only end-of-session signal", () => {
-    const storage = fakeStorage();
-    persistSession({ ...session, expiresAt: "2000-01-01T00:00:00.000Z" }, storage);
-    expect(loadSession(storage)?.token).toBe("tok_abc");
-  });
-
   it("loads a session stored before hydration existed, and marks it for hydration", () => {
     const storage = fakeStorage();
-    storage.setItem(
-      SESSION_STORAGE_KEY,
-      JSON.stringify({ token: "tok_abc", actorId: "user_1", roles: ["system:admin"], expiresAt: "2026-08-02T00:00:00.000Z" }),
-    );
+    storage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ token: "tok_abc", actorId: "user_1", roles: ["system:admin"] }));
     const loaded = loadSession(storage);
     expect(loaded?.actorId).toBe("user_1");
     expect(loaded?.displayName).toBeUndefined();
@@ -94,7 +84,7 @@ describe("session persistence", () => {
 });
 
 describe("session hydration", () => {
-  const fresh = { token: "tok_abc", actorId: "user_1", roles: ["system:admin"], expiresAt: "2026-08-02T00:00:00.000Z" };
+  const fresh = { token: "tok_abc", actorId: "user_1", roles: ["system:admin"] };
 
   it("fills in displayName and locale from a GET /account/me response", () => {
     const hydrated = hydrateSession(fresh, { displayName: "Ada Lovelace", locale: "de" });

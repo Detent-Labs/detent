@@ -3,6 +3,7 @@ import { listProcesses, listVersions, runMigration } from "../api/client.js";
 import type { ProcessSummary, VersionSummary, MigrationResult } from "../api/types.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
+import { ErrorBanner } from "../../../shell/ErrorBanner.js";
 import { labelText } from "./instancesLogic.js";
 import { parseVersionInput, buildRunConfirmation, migrationBuckets } from "./migrationsLogic.js";
 import { t } from "../catalog.js";
@@ -103,12 +104,7 @@ export function MigrationsScreen({ token, locale, onUnauthorized }: MigrationsSc
         </button>
       </div>
 
-      {error && (
-        <div className="admin-error-banner" role="alert">
-          <span className="admin-error-banner-stamp">{t(locale, "common.failed")}</span>
-          <span className="admin-error-banner-message">{error}</span>
-        </div>
-      )}
+      {error && <ErrorBanner error={error} locale={locale} />}
 
       {result && (
         <table className="admin-table">

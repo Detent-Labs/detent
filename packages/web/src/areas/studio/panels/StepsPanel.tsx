@@ -17,9 +17,7 @@ import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { ChecksRail } from "./ChecksRail.js";
 import { parseChildProcessJson } from "../draft/io";
 import { missingTranslationWarning } from "../draft/localized-text";
-import { assignmentWarning } from "./assignmentWarningLogic.js";
 import { stepIssueCount } from "../draft/panel-rail";
-import { openSectionForSelection } from "./stepInspectorLogic";
 
 type DraftStep = DraftOf<Step>;
 
@@ -100,8 +98,15 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const [pendingScrollSection, setPendingScrollSection] = useState<StepSection | undefined>(undefined);
 
+  // Selecting a path edge shows its source step's inspector, opened straight
+  // to the paths section, with the selected path's own row highlighted
+  // within it (studio-canvas). A path is not independently addressable — it
+  // only exists nested under its step — so selecting one must open straight
+  // to the paths section. Any other selection change (a plain node click, a
+  // deselect) starts collapsed: the previous step's open section belongs to
+  // that step, not the new one.
   useEffect(() => {
-    setOpenSection(openSectionForSelection(selectedPathId));
+    setOpenSection(selectedPathId ? "paths" : undefined);
   }, [selectedStepId, selectedPathId]);
 
   // Scroll AFTER the section renders. Choosing an entry expands it in the
@@ -184,6 +189,14 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
   const issueTotal = stepIssueCount(validation.issues, step);
   const isInitialStep = draft.workflow?.initialStep === step.id;
   const configuredFieldCount = (step.view?.fields ?? []).length;
+  // A step with no assignment still works: the assignment-less floor in
+  // `submitAndTransition` is starter-or-`system:admin`. That is not thereby
+  // an invariant a self-service step must avoid, so this is a warning, never
+  // an `EditorIssue`. Nothing here reaches the publish path.
+  const assignmentWarningText =
+    step.terminal === true || step.assignment !== undefined
+      ? undefined
+      : "This step has no assignment. Only the starter or an admin can act on it, and it stays out of everyone's My-tasks inbox. Publishing still works.";
 
   return (
     <div className="steps-panel">
@@ -325,9 +338,7 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
           registryTypes={registry?.assignmentStrategyTypes}
           registrySchemas={registry?.assignmentStrategySchemas}
         />
-        {assignmentWarning(step.terminal, step.assignment) && (
-          <p className="studio-warning">{assignmentWarning(step.terminal, step.assignment)}</p>
-        )}
+        {assignmentWarningText && <p className="studio-warning">{assignmentWarningText}</p>}
       </section>
 
       <section id="step-section-paths" ref={registerSection("paths")} hidden={!shows("paths")}>

@@ -41,6 +41,7 @@ export const en = {
   "profile.federated": "This account is managed outside the workflow engine, so nothing on this page can be changed here.",
   "error.generic": "Something went wrong.",
   "error.retry": "Retry",
+  "error.failed": "Failed",
 };
 
 export const de: Record<keyof typeof en, string> = {
@@ -74,6 +75,7 @@ export const de: Record<keyof typeof en, string> = {
   "profile.federated": "Dieses Konto wird außerhalb der Workflow-Engine verwaltet. Auf dieser Seite lässt sich nichts ändern.",
   "error.generic": "Etwas ist schiefgelaufen.",
   "error.retry": "Erneut versuchen",
+  "error.failed": "Fehlgeschlagen",
 };
 
 export type CatalogKey = keyof typeof en;

@@ -21,23 +21,32 @@ export interface CheckGroup {
  * - `zod` never holds back — it is the first check and always runs.
  * - `structural` holds back on `!structuralChecked`, not `!zodValid` alone:
  *   a Zod-valid, duration-failing draft never reaches `structuralIssues`.
- * - `cel`/`registry` hold back on `!structurallyValid` — they run only
- *   against a compiled body.
+ * - `cel` holds back on `!structurallyValid` — it runs only against a
+ *   compiled body.
+ * - `registry` holds back on `!structurallyValid || !registryChecked` — it
+ *   too runs only against a compiled body, and additionally stays held back
+ *   for the whole studio session: no studio code path ever loads a live
+ *   `Registry`, so `registryChecked` reads permanently `false`
+ *   (fix-studio-registry-panel-example-mismatch).
  * - `duration` holds back on `!zodValid` alone — `validateDurations` runs
  *   directly against the parsed body, before compilation.
  * - `view` holds back on `!zodValid` alone too — `checkViewFlags` reads the
  *   Zod-parsed body directly and needs no compiled one, the same placement
  *   `duration` takes.
  */
-function heldBackFor(source: IssueSource, validation: Pick<ValidationResult, "zodValid" | "structurallyValid" | "structuralChecked">): boolean {
+function heldBackFor(
+  source: IssueSource,
+  validation: Pick<ValidationResult, "zodValid" | "structurallyValid" | "structuralChecked" | "registryChecked">,
+): boolean {
   switch (source) {
     case "zod":
       return false;
     case "structural":
       return !validation.zodValid || !validation.structuralChecked;
     case "cel":
-    case "registry":
       return !validation.zodValid || !validation.structurallyValid;
+    case "registry":
+      return !validation.zodValid || !validation.structurallyValid || !validation.registryChecked;
     case "duration":
     case "view":
       return !validation.zodValid;
@@ -54,24 +63,34 @@ export function groupChecksBySource(validation: ValidationResult): CheckGroup[] 
   }));
 }
 
-/** Whether the rail has nothing left to report: every group ran, and none
- * carries an open issue. This no longer tracks publishability alone: the
- * `view` group's entries never block a publish (they are the studio's own
- * findings, not an engine validator), so a draft can be publishable while
- * this reads false, on a `view`-only entry. */
+/** Whether the rail has nothing left to report: every group but `registry`
+ * ran, and none of them carries an open issue. `registry` is excluded before
+ * this check runs, not folded into it: it stays permanently held back for
+ * the whole studio session (see `heldBackFor`), so folding it in would make
+ * this function unable to ever return `true` again, on any draft. This no
+ * longer tracks publishability alone either: the `view` group's entries
+ * never block a publish (they are the studio's own findings, not an engine
+ * validator), so a draft can be publishable while this reads false, on a
+ * `view`-only entry. */
 export function allChecksClear(groups: readonly CheckGroup[]): boolean {
-  return groups.every((g) => !g.heldBack && g.issues.length === 0);
+  return groups.filter((g) => g.source !== "registry").every((g) => !g.heldBack && g.issues.length === 0);
 }
 
 /** The collapsed checks summary's one read of `groups`: a count, "clear", or
  * "held-back". Held-back outranks a raw sum on purpose — the collapsed-summary
  * requirement (`studio-checks-rail`) forbids a held-back group from reading as
  * clear or as a plain count of zero, the same rule the group-level held-back
- * state already carries into the expanded view. */
+ * state already carries into the expanded view. The `registry` group is
+ * excluded from both the held-back check and the sum below, for the same
+ * reason `allChecksClear` excludes it: it stays permanently held back for the
+ * whole studio session, so folding it in would make this function return
+ * `{kind: "held-back"}` for every draft, including one otherwise fully
+ * clear. */
 export type OpenIssueSummary = { kind: "count"; count: number } | { kind: "clear" } | { kind: "held-back" };
 
 export function totalOpenIssueCount(groups: readonly CheckGroup[]): OpenIssueSummary {
-  if (groups.some((g) => g.heldBack)) return { kind: "held-back" };
-  const count = groups.reduce((sum, g) => sum + g.issues.length, 0);
+  const counted = groups.filter((g) => g.source !== "registry");
+  if (counted.some((g) => g.heldBack)) return { kind: "held-back" };
+  const count = counted.reduce((sum, g) => sum + g.issues.length, 0);
   return count === 0 ? { kind: "clear" } : { kind: "count", count };
 }

@@ -12,7 +12,6 @@
  * `handleGetInstanceView` already use.
  */
 import type { SQL } from "bun";
-import { sql } from "../engine/store.js";
 import { getAccountById, updateAccount, validateDisplayName, DISPLAY_NAME_MAX_LENGTH, type AccountRecord } from "../auth/users.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { AuthorizationError } from "../auth/authorize.js";
@@ -60,7 +59,7 @@ const localBody = (id: string, account: AccountRecord) => ({
  * means only that `X-Actor-Id` named no local account, and the answer is the
  * same in both cases. The route returns no 404 for a resolvable actor.
  */
-export async function handleGetAccount(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handleGetAccount(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     const account = await getAccountById(actor.id, db);
@@ -111,7 +110,7 @@ function parseAccountChanges(body: Record<string, unknown>): { displayName?: str
  * landed. The refusal reads off the update's own result, so no separate
  * existence check can disagree with it.
  */
-export async function handlePatchAccount(req: Request, resolver: ActorResolver, db: SQL = sql): Promise<HttpResult> {
+export async function handlePatchAccount(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return guarded(req, async () => {
     const actor = await resolveActor(req, resolver, db);
     const raw = await readJson(req);

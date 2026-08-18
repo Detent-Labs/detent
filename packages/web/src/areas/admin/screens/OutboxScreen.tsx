@@ -4,6 +4,8 @@ import type { OutboxRow } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
+import { usePagedList } from "../../../shell/usePagedList.js";
+import { ErrorBanner } from "../../../shell/ErrorBanner.js";
 import { t } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
 
@@ -16,55 +18,37 @@ interface OutboxScreenProps {
 const PAGE_LIMIT = 50;
 
 export function OutboxScreen({ token, locale, onUnauthorized }: OutboxScreenProps) {
-  const [items, setItems] = useState<OutboxRow[]>([]);
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [statusFilter, setStatusFilter] = useState("");
   const [instanceIdFilter, setInstanceIdFilter] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [busyKey, setBusyKey] = useState<string | undefined>(undefined);
   const { reloadToken, refresh } = useRefresh();
   const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(undefined);
-    try {
-      const page = await listOutbox(token, {
-        status: statusFilter ? [statusFilter] : undefined,
-        instanceId: instanceIdFilter || undefined,
-        limit: PAGE_LIMIT,
-      });
-      setItems(page.items);
-      setCursor(page.cursor);
-      setCounts(page.counts);
-    } catch (err) {
-      fail(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [token, statusFilter, instanceIdFilter, locale, fail]);
-
-  const loadMore = useCallback(async () => {
-    if (!cursor) return;
-    setLoading(true);
-    setError(undefined);
-    try {
-      const page = await listOutbox(token, {
-        status: statusFilter ? [statusFilter] : undefined,
-        instanceId: instanceIdFilter || undefined,
-        limit: PAGE_LIMIT,
-        cursor,
-      });
-      setItems((prev) => [...prev, ...page.items]);
-      setCursor(page.cursor);
-    } catch (err) {
-      fail(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [token, statusFilter, instanceIdFilter, cursor, locale, fail]);
+  const fetchPage = useCallback(
+    async (cursor?: string) => {
+      setError(undefined);
+      try {
+        const page = await listOutbox(token, {
+          status: statusFilter ? [statusFilter] : undefined,
+          instanceId: instanceIdFilter || undefined,
+          limit: PAGE_LIMIT,
+          cursor,
+        });
+        // Only the initial load refreshes the pill counts; today's loadMore
+        // never touched them, and an unconditional call here would start
+        // refreshing them on every page, a real behavior change.
+        if (cursor === undefined) setCounts(page.counts);
+        return { items: page.items, cursor: page.cursor };
+      } catch (err) {
+        fail(err);
+        throw err;
+      }
+    },
+    [token, statusFilter, instanceIdFilter, fail],
+  );
+  const { items, cursor, loading, load, loadMore } = usePagedList<OutboxRow>(fetchPage);
 
   useEffect(() => {
     void load();
@@ -123,15 +107,7 @@ export function OutboxScreen({ token, locale, onUnauthorized }: OutboxScreenProp
         </button>
       </div>
 
-      {error && (
-        <div className="admin-error-banner" role="alert">
-          <span className="admin-error-banner-stamp">{t(locale, "common.failed")}</span>
-          <span className="admin-error-banner-message">{error}</span>
-          <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
-            {t(locale, "common.retry")}
-          </button>
-        </div>
-      )}
+      {error && <ErrorBanner error={error} locale={locale} onRetry={refresh} retryDisabled={loading} />}
 
       {items.length === 0 && !loading && !error && <p className="admin-empty">{t(locale, "outbox.empty")}</p>}
 

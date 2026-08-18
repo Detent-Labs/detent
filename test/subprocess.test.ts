@@ -10,11 +10,7 @@ import { sql, initSchema, createInstance, withTransaction } from "../src/engine/
 import { startInstance, cancelInstance, selectAutomaticPath, executeAutomaticTransition } from "../src/engine/transition.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { registerSubprocessHandlers } from "../src/engine/subprocess.js";
-import {
-  createAssignmentRegistry,
-  registerAssignmentStrategy,
-  type AssignmentRegistry,
-} from "../src/engine/registry.js";
+import { createAssignmentRegistry, type AssignmentRegistry } from "../src/engine/registry.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { drainResolutions } from "../src/engine/resolution.js";
 import { subprocessChildId } from "../src/engine/idempotency.js";
@@ -578,7 +574,7 @@ test.skipIf(!DB)("a spawn resolves the child's initial-step candidates before it
   // ahead of the transaction that creates the row.
   const seen: { childExisted: boolean; stepId: string; data: unknown }[] = [];
   const assignmentRegistry = createAssignmentRegistry();
-  registerAssignmentStrategy(assignmentRegistry, "spy", {
+  assignmentRegistry.set("spy", {
     resolve: async (ctx) => {
       const rows = (await sql`SELECT 1 FROM instances WHERE instance_id = ${ctx.instance.id}`) as unknown[];
       seen.push({ childExisted: rows.length > 0, stepId: ctx.stepId, data: ctx.instance.data });
@@ -610,7 +606,7 @@ test.skipIf(!DB)("the return resolves the parent's candidates while holding the 
   // carved-out path in the assignment-strategy-registry spec.
   const seen: { parentLocked: boolean; stepId: string; result: unknown }[] = [];
   const assignmentRegistry = createAssignmentRegistry();
-  registerAssignmentStrategy(assignmentRegistry, "spy", {
+  assignmentRegistry.set("spy", {
     resolve: async (ctx) => {
       let parentLocked = false;
       try {

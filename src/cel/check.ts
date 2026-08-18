@@ -16,7 +16,7 @@
 
 import { Environment, parse, serialize } from "@marcbachmann/cel-js";
 import type { ASTNode } from "@marcbachmann/cel-js";
-import { collectFieldsDeep } from "../schema/definition.js";
+import { leafFields } from "../schema/definition.js";
 import type { ProcessBody, FieldDef, BaseFieldType, Expression, MigrationSpec } from "../schema/definition.js";
 
 // The formal expression context. instance/actor shapes are pinned here.
@@ -60,13 +60,12 @@ export function celType(t: BaseFieldType | object): string {
 /**
  * Flatten the catalog to key -> CEL type. `data` is flat, so a `group` field
  * (a container, not a leaf value) contributes nothing itself; only its
- * (possibly nested) leaves do. Built over `collectFieldsDeep`, the one
- * authoritative field-tree walk shared with `definition.ts` and `eval.ts`.
+ * (possibly nested) leaves do. Built over `leafFields`, the one
+ * authoritative leaf-field walk shared with `definition.ts` and `eval.ts`.
  */
 function dataSchema(fields: FieldDef[]): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const f of collectFieldsDeep(fields)) {
-    if (typeof f.type === "string" && f.type === "group") continue;
+  for (const f of leafFields(fields)) {
     out[f.key] = celType(f.type);
   }
   return out;
@@ -83,8 +82,7 @@ function contractFieldSchema(fields: FieldDef[], ids: readonly string[] | undefi
   const out: Record<string, string> = {};
   if (!ids || ids.length === 0) return out;
   const allowed = new Set(ids);
-  for (const f of collectFieldsDeep(fields)) {
-    if (typeof f.type === "string" && f.type === "group") continue;
+  for (const f of leafFields(fields)) {
     if (!allowed.has(f.id)) continue;
     out[f.key] = celType(f.type);
   }

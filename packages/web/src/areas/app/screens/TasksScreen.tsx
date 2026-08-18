@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { listInstances } from "../api/client.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
+import { usePagedList } from "../../../shell/usePagedList.js";
+import { ErrorBanner } from "../../../shell/ErrorBanner.js";
 import { t } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
 import type { InstanceSummary } from "../api/types.js";
@@ -30,43 +32,26 @@ interface TasksScreenProps {
 }
 
 export function TasksScreen({ token, actorId, locale, navigate, onUnauthorized }: TasksScreenProps) {
-  const [items, setItems] = useState<InstanceSummary[]>([]);
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
   const [processFilter, setProcessFilter] = useState<string | "all">("all");
   const [sort, setSort] = useState<SortKey>("waiting");
   const [group, setGroup] = useState<GroupKey>("none");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(undefined);
-    try {
-      const page = await listInstances("mine", token, { limit: 200 });
-      setItems(page.items);
-      setCursor(page.cursor);
-    } catch (err) {
-      fail(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [token, fail, locale]);
-
-  const loadMore = useCallback(async () => {
-    if (!cursor) return;
-    setLoading(true);
-    setError(undefined);
-    try {
-      const page = await listInstances("mine", token, { limit: 200, cursor });
-      setItems((prev) => [...prev, ...page.items]);
-      setCursor(page.cursor);
-    } catch (err) {
-      fail(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [token, cursor, fail, locale]);
+  const fetchPage = useCallback(
+    async (cursor?: string) => {
+      setError(undefined);
+      try {
+        const page = await listInstances("mine", token, { limit: 200, cursor });
+        return { items: page.items, cursor: page.cursor };
+      } catch (err) {
+        fail(err);
+        throw err;
+      }
+    },
+    [token, fail],
+  );
+  const { items, cursor, loading, load, loadMore } = usePagedList<InstanceSummary>(fetchPage);
 
   useEffect(() => {
     void load();
@@ -105,15 +90,7 @@ export function TasksScreen({ token, actorId, locale, navigate, onUnauthorized }
         </button>
       </div>
 
-      {error && (
-        <div className="app-error-banner" role="alert">
-          <span className="app-error-banner-stamp">{t(locale, "error.failed")}</span>
-          <span className="app-error-banner-message">{error}</span>
-          <button type="button" className="btn btn-secondary" onClick={() => void load()} disabled={loading}>
-            {t(locale, "error.retry")}
-          </button>
-        </div>
-      )}
+      {error && <ErrorBanner error={error} locale={locale} onRetry={() => void load()} retryDisabled={loading} />}
 
       {visible.length === 0 && !loading && !error && <p className="app-empty">{t(locale, "tasks.empty")}</p>}
 
