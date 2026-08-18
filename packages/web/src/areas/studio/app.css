@@ -1370,8 +1370,14 @@ tr[data-group="true"] .studio-matrix-row-header {
   border-right: 1px solid var(--color-border);
   padding: var(--space-1) var(--space-2);
   vertical-align: top;
-  min-width: 9rem;
+  min-width: 6rem;
   cursor: default;
+}
+
+.studio-matrix-cell-flags {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .studio-matrix-cell:focus-visible {
@@ -1411,35 +1417,8 @@ tr[data-group="true"] .studio-matrix-row-header {
   color: var(--color-neutral-500);
 }
 
-/* One row per flag, ruled the way a register's own rows are — the ledger
-   hairline, not the structural divider (design-language.md). */
-.studio-matrix-cell-flag {
-  border: none;
-  border-top: 1px solid var(--color-border);
-  padding: var(--space-1) 0 0;
-  margin: 0;
-}
-
-.studio-matrix-cell-flag:first-child {
-  border-top: none;
-  padding-top: 0;
-}
-
-.studio-matrix-cell-flag + .studio-matrix-cell-flag {
-  margin-top: var(--space-1);
-}
-
-.studio-matrix-cell-flag:disabled {
+.studio-matrix-cell input:disabled {
   opacity: 0.45;
-}
-
-.studio-matrix-cell-flag label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted);
 }
 
 /* An expression resolves only against an instance, so no control can show

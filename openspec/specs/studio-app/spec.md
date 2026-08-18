@@ -751,21 +751,31 @@ Each live cell's `visible`, `required` and `readonly` controls SHALL
 each be a plain boolean checkbox. The matrix SHALL offer no
 boolean-or-CEL switch. CEL authoring for these three flags happens only
 on the field's own strip: `studio-form-editor`'s "Developer view"
-disclosure. Each checkbox SHALL start from the entry's own resolved
-value: an absent key reads the engine's own default, not `false`.
-Changing a checkbox SHALL write to that entry's key immediately,
-through the same `setFlag` primitive `studio-form-editor` already uses.
-It SHALL clear the key on a return to its default.
+disclosure.
+
+Each checkbox SHALL carry no visible label. It SHALL carry an
+`aria-label` naming its own flag, so a screen reader still announces
+which control it reached. The cell's three flag controls SHALL sit in
+one horizontal row. That row keeps `visible`/`required`/`readonly`
+order, the same order the column and row bulk-toggle badges already
+use.
+
+Each checkbox SHALL start from the entry's own resolved value: an
+absent key reads the engine's own default, not `false`. Changing a
+checkbox SHALL write to that entry's key immediately, through the same
+`setFlag` primitive `studio-form-editor` already uses. It SHALL clear
+the key on a return to its default.
 
 Where a live cell's own `visible` resolves to a literal `false`, that
 cell's `required` and `readonly` checkboxes SHALL disable. That is the
 same gating the field matrix applied before this change.
 
 Where a flag already carries a CEL expression, its checkbox SHALL give
-way entirely to the CEL stamp. The matrix SHALL offer no control there,
-boolean or otherwise. It SHALL offer no way to switch that flag back to
-a boolean from inside the matrix. Editing that flag stays possible only
-on the field's own strip.
+way entirely to the CEL stamp. That stamp sits in the same horizontal
+row as the cell's other controls. The matrix SHALL offer no control
+there, boolean or otherwise. It SHALL offer no way to switch that flag
+back to a boolean from inside the matrix. Editing that flag stays
+possible only on the field's own strip.
 
 #### Scenario: Changing a cell's control writes the same entry the form editor writes
 
@@ -809,6 +819,20 @@ on the field's own strip.
 - **THEN** the matrix shows that flag's CEL stamp only
 - **AND** the matrix offers no checkbox, select, or other way to change
   or clear that flag
+
+#### Scenario: A cell's three controls sit in one row
+
+- **WHEN** the developer inspects a live cell carrying two or more
+  flags
+- **THEN** those flags' controls sit side by side in one horizontal
+  row, not stacked
+
+#### Scenario: A checkbox with no visible label still names its flag
+
+- **WHEN** a screen reader reaches a live cell's `visible`, `required`
+  or `readonly` checkbox
+- **THEN** it announces that flag's own name, through the checkbox's
+  `aria-label`
 
 ### Requirement: Column headers name the step and flag steps with no view
 

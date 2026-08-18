@@ -20,7 +20,7 @@ import {
 } from "./fieldMatrixLogic";
 
 const FLAG_KEYS: FlagKey[] = ["visible", "required", "readonly"];
-const FLAG_LETTER: Record<FlagKey, string> = { visible: "V", required: "R", readonly: "O" };
+const FLAG_LETTER: Record<FlagKey, string> = { visible: "VIS", required: "REQ", readonly: "RO" };
 const FLAG_LABEL_KEY = {
   visible: "formEditor.visible",
   required: "formEditor.required",
@@ -291,27 +291,28 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                         else setActivated(false);
                       }}
                     >
-                      {entry &&
-                        FLAG_KEYS.map((key) => {
-                          const raw = entry[key];
-                          if (isExpression(raw)) {
-                            return <CelStamp key={key} label={t(FLAG_LABEL_KEY[key])} src={raw.src ?? ""} />;
-                          }
-                          const disabled = key !== "visible" && gatedKeys(entry).includes(key);
-                          return (
-                            <fieldset key={key} className="studio-matrix-cell-flag" disabled={disabled}>
-                              <label>
-                                {t(FLAG_LABEL_KEY[key])}
-                                <input
-                                  type="checkbox"
-                                  tabIndex={isActiveCell ? undefined : -1}
-                                  checked={effectiveFlag(raw, key) === true}
-                                  onChange={(e) => writeFlag(stepIndex, row.id, key, e.target.checked)}
-                                />
-                              </label>
-                            </fieldset>
-                          );
-                        })}
+                      {entry && (
+                        <span className="studio-matrix-cell-flags">
+                          {FLAG_KEYS.map((key) => {
+                            const raw = entry[key];
+                            if (isExpression(raw)) {
+                              return <CelStamp key={key} label={t(FLAG_LABEL_KEY[key])} src={raw.src ?? ""} />;
+                            }
+                            const disabled = key !== "visible" && gatedKeys(entry).includes(key);
+                            return (
+                              <input
+                                key={key}
+                                type="checkbox"
+                                aria-label={t(FLAG_LABEL_KEY[key])}
+                                tabIndex={isActiveCell ? undefined : -1}
+                                checked={effectiveFlag(raw, key) === true}
+                                disabled={disabled}
+                                onChange={(e) => writeFlag(stepIndex, row.id, key, e.target.checked)}
+                              />
+                            );
+                          })}
+                        </span>
+                      )}
                       {!entry && state === "blank" && (
                         <span className="studio-matrix-dash" aria-hidden="true">
                           –
