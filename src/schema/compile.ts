@@ -525,11 +525,23 @@ function checkFieldKeyFormat(f: any, floc: string, issues: CompileIssue[]): void
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function checkFieldExpressionLength(f: any, floc: string, issues: CompileIssue[]): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const checkExpr = (v: any, loc: string) => {
+    if (v && typeof v === "object" && v.lang === "cel" && typeof v.src === "string" && v.src.length > MAX_EXPRESSION_LENGTH) {
+      issues.push({ loc, value: v.src, message: `expression source exceeds the ${MAX_EXPRESSION_LENGTH}-character bound` });
+    }
+  };
+  checkExpr(f?.validation?.rule, `${floc}.validation.rule`);
+  checkExpr(f?.default, `${floc}.default`);
+}
+
 /** One pass over `body.fields`, running `checkPatterns`, `checkColumnMapping`,
- * `checkFieldKeyFormat`, and the field-key-length bound together per field, in
- * that fixed sequence. `fieldsById` is built once, over the whole tree, since
- * `checkColumnMapping` alone resolves a mapping target that can name any field
- * in the process, not only the one under walk. */
+ * `checkFieldKeyFormat`, `checkFieldExpressionLength`, and the field-key-length
+ * bound together per field, in that fixed sequence. `fieldsById` is built once,
+ * over the whole tree, since `checkColumnMapping` alone resolves a mapping
+ * target that can name any field in the process, not only the one under walk. */
 function checkFieldTree(body: ProcessBody): CompileIssue[] {
   const issues: CompileIssue[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -541,6 +553,7 @@ function checkFieldTree(body: ProcessBody): CompileIssue[] {
     checkPatterns(f, floc, issues);
     checkColumnMapping(f, floc, fieldsById, issues);
     checkFieldKeyFormat(f, floc, issues);
+    checkFieldExpressionLength(f, floc, issues);
     if (typeof f?.key === "string" && f.key.length > MAX_KEY_LENGTH) {
       issues.push({ loc: `${floc}.key`, value: f.key, message: `key exceeds the ${MAX_KEY_LENGTH}-character bound` });
     }
@@ -582,12 +595,14 @@ interface ExpressionSite {
   loc: string;
 }
 
-/** Every Expression.src site in the body: field validation.rule + default,
- * path guards, every Action.output value (all five action positions), timer
- * deadlines, view field visible/required/readonly, and subprocess
- * input/outputMapping values. Deliberately independent of src/cel/check.ts's
- * own `collect()` — that one also needs scope flags for type-checking, this
- * one needs only `{src, loc}` for a length bound. */
+/** Every Expression.src site outside the field tree: path guards, every
+ * Action.output value (all five action positions), timer deadlines, view
+ * field visible/required/readonly, and subprocess input/outputMapping
+ * values. A field's own `validation.rule` and `default` are bounded inside
+ * `checkFieldTree`'s own pass instead (`checkFieldExpressionLength`), not
+ * here. Deliberately independent of src/cel/check.ts's own `collect()` —
+ * that one also needs scope flags for type-checking, this one needs only
+ * `{src, loc}` for a length bound. */
 function collectExpressionSites(body: ProcessBody): ExpressionSite[] {
   const sites: ExpressionSite[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -604,12 +619,6 @@ function collectExpressionSites(body: ProcessBody): ExpressionSite[] {
       Object.entries(a?.output ?? {}).forEach(([fid, e]) => push(e, `${loc}[${i}].output.${fid}`));
     });
   };
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  walkFieldsIndexed(body.fields as any, "fields", (f, floc) => {
-    push(f?.validation?.rule, `${floc}.validation.rule`);
-    push(f?.default, `${floc}.default`);
-  });
 
   body.workflow.steps.forEach((s, si) => {
     const sloc = `steps[${si}]`;
@@ -669,11 +678,12 @@ function collectDurationSites(body: ProcessBody): DurationSite[] {
   return sites;
 }
 
-/** Length bounds on Plugin.type, duration and Expression.src — every
- * authored string that reaches an interpreter or an index. Does NOT visit
- * `validation.pattern`: checkPatterns above owns that bound exclusively. The
- * field-key-length bound lives in `checkFieldTree` instead, alongside the
- * other per-field checks. */
+/** Length bounds on Plugin.type, duration and every non-field-tree
+ * Expression.src — every authored string that reaches an interpreter or an
+ * index, outside `body.fields`. Does NOT visit `validation.pattern`:
+ * checkPatterns above owns that bound exclusively. The field-key-length
+ * bound and a field's own `validation.rule`/`default` expression length
+ * live in `checkFieldTree` instead, alongside the other per-field checks. */
 function checkLengthBounds(body: ProcessBody): CompileIssue[] {
   const issues: CompileIssue[] = [];
 

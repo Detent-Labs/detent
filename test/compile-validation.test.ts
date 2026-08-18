@@ -365,6 +365,20 @@ describe("compile: authored strings are length-bounded", () => {
   it("the repo's own example raises no length issue", () => {
     expect(() => compileProcessBody(structuredClone(example.definition) as ProcessBody)).not.toThrow();
   });
+
+  it("rejects an over-long field validation.rule", () => {
+    const b = baseBody();
+    b.fields[0].validation = { rule: cel("true == true && " + "a".repeat(MAX_EXPRESSION_LENGTH)) };
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "fields[0].validation.rule")).toBe(true);
+  });
+
+  it("rejects an over-long field default", () => {
+    const b = baseBody();
+    b.fields[0].default = cel("true == true && " + "a".repeat(MAX_EXPRESSION_LENGTH));
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "fields[0].default")).toBe(true);
+  });
 });
 
 describe("compile: idempotent re-publish survives every new check", () => {
