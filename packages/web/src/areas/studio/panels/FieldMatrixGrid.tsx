@@ -2,10 +2,9 @@ import { useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEve
 import { useDraft } from "../draft/store";
 import { t } from "../catalog.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text";
-import { gatedKeys, setFlag, writtenFieldIds, type FlagKey } from "../draft/view-flags";
+import { effectiveFlag, gatedKeys, setFlag, writtenFieldIds, type FlagKey } from "../draft/view-flags";
 import type { BoolOrExpr } from "./shared/overrideMode";
 import { isExpression } from "./shared/overrideMode";
-import { BooleanOrExpressionInput } from "./shared/BooleanOrExpressionInput";
 import {
   matrixRows,
   cellState,
@@ -142,7 +141,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
   // Enter/Space activates the focused cell; Escape hands the stop back to
   // the grid and refocuses it, since nothing else claimed focus on Escape.
   // Arrow-key roving navigation is suspended while a cell is active: the
-  // grid must not steal the arrow keys a native `<select>` inside it needs.
+  // grid must not steal the arrow keys its own checkboxes need for Tab order.
   const onGridKeyDown = (e: KeyboardEvent<HTMLTableElement>) => {
     if (activated) {
       if (e.key === "Escape") {
@@ -197,7 +196,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
   useEffect(() => {
     if (!activated) return;
     const td = cellRefs.current.get(cellKey(focus.row, focus.col));
-    td?.querySelector<HTMLElement>("select, input")?.focus();
+    td?.querySelector<HTMLElement>("input")?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activated]);
 
@@ -301,14 +300,15 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                           const disabled = key !== "visible" && gatedKeys(entry).includes(key);
                           return (
                             <fieldset key={key} className="studio-matrix-cell-flag" disabled={disabled}>
-                              <BooleanOrExpressionInput
-                                label={t(FLAG_LABEL_KEY[key])}
-                                flagKey={key}
-                                stepId={step.id}
-                                value={raw}
-                                tabIndex={isActiveCell ? undefined : -1}
-                                onChange={(next) => writeFlag(stepIndex, row.id, key, next)}
-                              />
+                              <label>
+                                {t(FLAG_LABEL_KEY[key])}
+                                <input
+                                  type="checkbox"
+                                  tabIndex={isActiveCell ? undefined : -1}
+                                  checked={effectiveFlag(raw, key) === true}
+                                  onChange={(e) => writeFlag(stepIndex, row.id, key, e.target.checked)}
+                                />
+                              </label>
                             </fieldset>
                           );
                         })}

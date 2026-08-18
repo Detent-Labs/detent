@@ -987,9 +987,9 @@ the grid stays the page's one tab stop. Press Home, End, Ctrl+Home and
 Ctrl+End. Pass: each moves focus as it did before this change.
 
 Press Enter or Space on a live cell. Pass: its own Visible, Required and
-Read-only controls become the grid's only reachable tab stops — six
-elements, a select and a checkbox each. Press Escape. Pass: focus
-returns to the cell, and the grid is again the page's one tab stop.
+Read-only controls become the grid's only reachable tab stops — three
+checkboxes, one per flag. Press Escape. Pass: focus returns to the
+cell, and the grid is again the page's one tab stop.
 Activate a cell, then click elsewhere on the page. Pass: the cell
 deactivates without focus jumping back to the grid.
 

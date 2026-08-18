@@ -1433,13 +1433,6 @@ tr[data-group="true"] .studio-matrix-row-header {
   opacity: 0.45;
 }
 
-.studio-matrix-cell-flag .bool-or-expr {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: 11px;
-}
-
 .studio-matrix-cell-flag label {
   display: flex;
   align-items: center;
@@ -1447,10 +1440,6 @@ tr[data-group="true"] .studio-matrix-row-header {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--color-text-muted);
-}
-
-.studio-matrix-cell-flag select {
-  font-size: 10px;
 }
 
 /* An expression resolves only against an instance, so no control can show
