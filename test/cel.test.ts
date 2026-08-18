@@ -169,6 +169,45 @@ test("rejects child.* in a deadline but not in the guard of the same subprocess 
   expect(msgs(issues).toLowerCase()).toContain("child");
 });
 
+const ruleStep = (src: string, type: "task" | "subprocess" = "task") => ({
+  id: "step_a",
+  key: "a",
+  label: { en: "A" },
+  type,
+  terminal: true,
+  view: { fields: [{ ref: "field_amount", validation: { rule: { lang: "cel", src } } }] },
+});
+
+test("rejects a syntactically broken step-level validation.rule", () => {
+  const issues = validateProcessBody(body({ steps: [ruleStep("data.amount >")] }));
+  expect(issues.length).toBe(1);
+  expect(issues[0]!.loc).toBe("steps[0].view.fields[0].validation.rule");
+});
+
+test("rejects an unknown field reference in a step-level validation.rule", () => {
+  const issues = validateProcessBody(body({ steps: [ruleStep("data.nope == 1")] }));
+  expect(issues.length).toBe(1);
+  expect(msgs(issues).toLowerCase()).toContain("nope");
+});
+
+// A step-level validation.rule runs during submission against
+// buildGuardContext, which registers no `child` — on a subprocess step
+// either, unlike that step's visible/required/readonly expressions.
+test("rejects child.* in a step-level validation.rule on a subprocess step", () => {
+  const issues = validateProcessBody(body({ steps: [ruleStep("child.outcome == 'ok'", "subprocess")] }));
+  expect(issues.length).toBe(1);
+  expect(msgs(issues).toLowerCase()).toContain("child");
+});
+
+test("rejects result in a step-level validation.rule", () => {
+  const issues = validateProcessBody(body({ steps: [ruleStep("result.status == 'x'")] }));
+  expect(issues.length).toBe(1);
+});
+
+test("accepts a well-typed step-level validation.rule", () => {
+  expect(validateProcessBody(body({ steps: [ruleStep("data.amount > 10")] }))).toEqual([]);
+});
+
 // 5.5b a deadline must infer to a string instant. The engine parses the value and
 // omits a timer it cannot read, and an omitted timer is indistinguishable from an
 // undeclared one at runtime — so a wrong-typed deadline is a publish error.

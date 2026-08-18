@@ -71,8 +71,17 @@ only the cancel-sink count.
   keeps stripping unchanged, so `definitionHash` stays reproducible.
 - Every `FieldValidation.pattern` compiles as a JavaScript `RegExp`, and its
   source stays under the declared length bound. The compile pass checks this
-  (`compile.ts::checkPatterns`). An uncompilable pattern would otherwise
-  brick a step for the life of an immutable published version.
+  (`compile.ts::checkPatterns`) at two call sites: once over the field
+  catalog, once over every `ViewField.validation.pattern`
+  (`checkViewFieldPatterns`), since a step's own validation override carries
+  the same risk. An uncompilable pattern would otherwise brick a step for the
+  life of an immutable published version.
+- A `ViewField` declaring `validationMode` without `validation`, or a
+  `validation` with no key set, fails to parse. Both are a Zod refinement on
+  `viewField` itself, not a compile-pass check: neither shape can exist in a
+  body published before the two keys did, so tightening here carries none of
+  the already-published-body risk the write-path placement above guards
+  against.
 - `SubprocessSpec.outputMapping` keys and `ProcessContract.inputFields`/
   `outputFields` resolve against the process's own recursive field set. The
   compile pass checks this (`compile.ts::checkIdResolution`), not the sibling

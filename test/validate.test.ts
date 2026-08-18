@@ -504,6 +504,45 @@ describe("definition-contract: view layout accepts only 1 or 2 columns and spans
   });
 });
 
+describe("definition-contract: a view field's validation override is well-formed", () => {
+  const overrideBody = (fieldExtra: object) => ({
+    key: "p", label: { en: "P" }, baseLocale: "en",
+    fields: [{ id: "field_a", key: "a", label: { en: "A" }, type: "number" }],
+    workflow: {
+      initialStep: "step_a",
+      steps: [{
+        id: "step_a", key: "a", label: { en: "A" }, type: "task", terminal: true,
+        view: { fields: [{ ref: "field_a", ...fieldExtra }] },
+      }],
+    },
+  });
+
+  it("accepts a view field declaring neither key", () => {
+    expect(processBody.safeParse(overrideBody({})).success).toBe(true);
+  });
+
+  it("accepts an override with no mode, defaulting to merge", () => {
+    expect(processBody.safeParse(overrideBody({ validation: { max: 1000 } })).success).toBe(true);
+  });
+
+  it("accepts an override with mode merge or replace", () => {
+    expect(processBody.safeParse(overrideBody({ validation: { max: 1000 }, validationMode: "merge" })).success).toBe(true);
+    expect(processBody.safeParse(overrideBody({ validation: { max: 1000 }, validationMode: "replace" })).success).toBe(true);
+  });
+
+  it("rejects a mode without an override", () => {
+    expect(processBody.safeParse(overrideBody({ validationMode: "replace" })).success).toBe(false);
+  });
+
+  it("rejects an empty override", () => {
+    expect(processBody.safeParse(overrideBody({ validation: {} })).success).toBe(false);
+  });
+
+  it("rejects an unknown mode", () => {
+    expect(processBody.safeParse(overrideBody({ validation: { max: 1000 }, validationMode: "override" })).success).toBe(false);
+  });
+});
+
 // Mirrors the "duration reaches every action position" coverage below: each of
 // the five action positions was independently deletable from the check with the
 // suite green before this change, since none had a test. Grow the blocks rather

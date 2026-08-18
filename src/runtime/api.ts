@@ -59,6 +59,8 @@ import type {
   LocaleCode,
   FieldDef,
   FieldOption,
+  FieldValidation,
+  ViewField,
   DataSourceDef,
   HistoryEntry,
   InstanceEvent,
@@ -624,6 +626,21 @@ function compiledPattern(body: ProcessBody, pattern: string): RegExp {
 }
 
 /**
+ * The validation in force for `field` in the step whose view field is `vf`.
+ * Absent `vf` or an absent `vf.validation` means the catalog's own value
+ * applies unchanged. A present `vf.validation` overlays the catalog's keys
+ * under `vf.validationMode === "merge"` (the default), or replaces it whole
+ * under `"replace"`. This is deliberately NOT reported on `ResolvedViewField`:
+ * that type reaches `GET /instances/:id` unchanged via `getInstanceView`, and
+ * a bound belongs to the submission check, not the wire.
+ */
+function effectiveValidation(field: FieldDef, vf: ViewField | undefined): FieldValidation | undefined {
+  if (!vf?.validation) return field.validation;
+  if (vf.validationMode === "replace") return vf.validation;
+  return { ...field.validation, ...vf.validation };
+}
+
+/**
  * `pattern` is evaluated only when this value's length constraints raised no
  * violation: a value already rejected on length is going to be rejected
  * regardless, so running a pattern — which may backtrack catastrophically and
@@ -680,6 +697,7 @@ async function validateSubmissionData(
 ): Promise<ResolvedViewField[]> {
   const resolved = await resolveFields(body, step, instance, actor, registry, db);
   const fieldsById = new Map(resolved.map((r) => [r.field.id as string, r]));
+  const viewFieldsByRef = new Map((step.view?.fields ?? []).map((vf) => [vf.ref as string, vf]));
   const editable = editableFieldIds(resolved);
   const required = requiredFieldIds(resolved);
 
@@ -705,10 +723,11 @@ async function validateSubmissionData(
     if (!optionValuesValid(rf.options, value)) {
       issues.push({ kind: "invalid-option", fieldId: fieldId as FieldId });
     }
-    for (const constraint of checkConstraints(body, rf.field.validation, value)) {
+    const validation = effectiveValidation(rf.field, viewFieldsByRef.get(fieldId));
+    for (const constraint of checkConstraints(body, validation, value)) {
       issues.push({ kind: "constraint", fieldId: fieldId as FieldId, constraint });
     }
-    const rule = rf.field.validation?.rule;
+    const rule = validation?.rule;
     if (rule && !evalGuard(rule, guardCtx)) {
       issues.push({ kind: "rule-failed", fieldId: fieldId as FieldId });
     }

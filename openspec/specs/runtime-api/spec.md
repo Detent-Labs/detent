@@ -560,14 +560,23 @@ value, against the merged (not-yet-committed) data, in this order:
    `FieldDef.options`, or from a `dataSource`-bound field's runtime-resolved
    options, per the `data-source-resolution` capability — the value (each
    item, for `multiselect`) must equal one resolved option's `value`.
-3. Its declared constraints (`min`, `max`, `minLength`, `maxLength`,
+3. Its effective constraints (`min`, `max`, `minLength`, `maxLength`,
    `pattern`).
-4. If present, its `validation.rule` CEL expression, evaluated with total
+4. If present, its effective `rule` CEL expression, evaluated with total
    (`evalGuard`-style) semantics against `buildGuardContext(body,
    mergedInstance, actor)` — the identical context `check.ts` type-checks a
    catalog field's `rule` against (no `result`, no `child`). A rule
    referencing the field's own value does so via `data.<key>`, like any
    other guard.
+
+The effective validation for a field in a step is the catalog field's
+`validation` when the step's matching `view.fields[]` entry declares no
+`validation`. When it declares one, per the `definition-contract` capability,
+the effective validation overlays the catalog's keys with the step's under
+`merge` (the default). Under `replace` it takes the step's alone. The step's
+entry is the one whose `ref` names the field. Nothing else about the order or
+the reported issues changes. An effective constraint is checked and reported
+the way a catalog constraint always was.
 
 Then, over the full merged data (not only the submitted keys, and excluding
 any group-container field), `submitAndTransition` — but not
@@ -599,15 +608,56 @@ applies `default` anywhere today, and this change does not add that.
 - **THEN** the result carries an `invalid-option` issue for that field
 
 #### Scenario: A constraint violation is rejected
-- **WHEN** a submitted value violates a declared constraint (`min`, `max`,
+- **WHEN** a submitted value violates an effective constraint (`min`, `max`,
   `minLength`, `maxLength`, or `pattern`)
 - **THEN** the result carries a `constraint` issue naming the violated
   constraint for that field
 
+#### Scenario: A step's narrowed bound rejects a value the catalog allows
+- **WHEN** a catalog field declares `max: 10000`, the current step's view
+  field overrides it with `max: 1000`, and a submission carries 5000
+- **THEN** the result carries a `constraint` issue naming `max` for that
+  field
+
+#### Scenario: A step's widened bound accepts a value the catalog rejects
+- **WHEN** a catalog field declares `max: 10000`, the current step's view
+  field overrides it with `max: 20000`, and a submission carries 15000
+- **THEN** the value passes the constraint check
+
+#### Scenario: The same value is judged by the step it is submitted to
+- **WHEN** two steps override one field's `max` differently and the same
+  value is submitted to each
+- **THEN** each submission is judged against the override of the step it was
+  submitted to. Neither step's override affects the other
+
+#### Scenario: A merge override leaves the catalog's other constraints in force
+- **WHEN** a catalog field declares `min: 0` and `max: 10000`, the current
+  step overrides `max` alone under the default mode. A submission carries
+  a value below 0
+- **THEN** the result carries a `constraint` issue naming `min`
+
+#### Scenario: A replace override discards the catalog's other constraints
+- **WHEN** a catalog field declares `min: 0` and `max: 10000`, the current
+  step declares `validation: { max: 1000 }` with `validationMode: "replace"`,
+  and a submission carries a value below 0
+- **THEN** the value passes the constraint check, because `min` does not
+  apply in that step
+
 #### Scenario: A failing validation rule is rejected
-- **WHEN** a field's `validation.rule` CEL expression evaluates false against
+- **WHEN** a field's effective `rule` CEL expression evaluates false against
   the merged data
 - **THEN** the result carries a `rule-failed` issue for that field
+
+#### Scenario: A step's rule supersedes the catalog's
+- **WHEN** a catalog field declares a `rule` and the current step's view field
+  declares a different `rule`
+- **THEN** the step's rule is the only one evaluated for that field in that
+  step
+
+#### Scenario: A replace override drops the catalog rule entirely
+- **WHEN** a catalog field declares a `rule`, and the current step declares
+  `validation` without `rule` under `validationMode: "replace"`
+- **THEN** no rule is evaluated for that field in that step
 
 #### Scenario: A validation rule may reference the field's own submitted value
 - **WHEN** a field's `validation.rule` references `data.<key>` for its own key
@@ -631,6 +681,21 @@ applies `default` anywhere today, and this change does not add that.
   field the initial step's view marks required
 - **THEN** creation succeeds — the required check runs only on
   `submitAndTransition`, never on creation
+
+### Requirement: The initial step's overrides govern a seeded creation
+
+`createProcessInstance`'s `opts.data` seed SHALL be judged against the
+effective validation of the initial step, the step the seed is resolved
+against. The terms are the same terms a submission faces against the step it
+is submitted to. A `replace` override on the initial step therefore governs
+creation as fully as it governs a submission.
+
+#### Scenario: A seed is judged against the initial step's override
+
+- **WHEN** the initial step's view field overrides a catalog `max`, and
+  `opts.data` carries a value the override rejects but the catalog allows
+- **THEN** `createProcessInstance` fails with a `constraint` issue naming
+  that field
 
 ### Requirement: A pattern constraint is tested only after the length constraints pass, against a cached expression
 

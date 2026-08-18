@@ -224,6 +224,11 @@ function collect(body: ProcessBody): Site[] {
       push(asExpr(vf.visible), `${sloc}.view.fields[${vi}].visible`, false, child);
       push(asExpr(vf.required), `${sloc}.view.fields[${vi}].required`, false, child);
       push(asExpr(vf.readonly), `${sloc}.view.fields[${vi}].readonly`, false, child);
+      // Unlike the three flags above, this runs during submission against
+      // buildGuardContext(body, mergedInstance, actor), which registers no
+      // `child` on any step type — so this site takes `child: false` always,
+      // not `child` from the enclosing step.
+      push(vf.validation?.rule, `${sloc}.view.fields[${vi}].validation.rule`, false, false);
     });
     if (s.subprocess) {
       Object.entries(s.subprocess.inputMapping).forEach(([fid, e]) =>

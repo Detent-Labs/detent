@@ -445,18 +445,37 @@ export type Path = z.infer<typeof path>;
 // View (flat) + Assignment.
 // ============================================================
 
-export const viewField = z.object({
-  ref: fieldId,
-  visible: z.union([z.boolean(), expression]).optional(),
-  required: z.union([z.boolean(), expression]).optional(),
-  readonly: z.union([z.boolean(), expression]).optional(),
-  group: z.string().optional(),
-  /** How many of the view's columns this field occupies. Layout only: it
-   * reaches no guard, no CEL context and no submission check. Absent means 1,
-   * and the renderer clamps to `min(span, columns)`, so a span wider than the
-   * grid is a rendering rule rather than a publish error. */
-  span: z.union([z.literal(1), z.literal(2)]).optional(),
-});
+export const viewField = z
+  .object({
+    ref: fieldId,
+    visible: z.union([z.boolean(), expression]).optional(),
+    required: z.union([z.boolean(), expression]).optional(),
+    readonly: z.union([z.boolean(), expression]).optional(),
+    group: z.string().optional(),
+    /** How many of the view's columns this field occupies. Layout only: it
+     * reaches no guard, no CEL context and no submission check. Absent means 1,
+     * and the renderer clamps to `min(span, columns)`, so a span wider than the
+     * grid is a rendering rule rather than a publish error. */
+    span: z.union([z.literal(1), z.literal(2)]).optional(),
+    /** This step's override of the catalog field's validation, same shape as
+     * `FieldDef.validation`. Absent means the catalog value applies unchanged.
+     * Present, combines with the catalog value per `validationMode`. */
+    validation: fieldValidation.optional(),
+    /** How `validation` combines with the catalog field's own. `"merge"`
+     * (the default when `validation` is present) overlays the step's keys on
+     * the catalog's, keeping every key the step leaves out. `"replace"` drops
+     * the catalog value whole; only the step's keys are in force. Meaningless
+     * without `validation`, and rejected when it is absent. */
+    validationMode: z.enum(["merge", "replace"]).optional(),
+  })
+  .refine((f) => f.validationMode === undefined || f.validation !== undefined, {
+    message: "validationMode requires validation",
+    path: ["validationMode"],
+  })
+  .refine((f) => f.validation === undefined || Object.keys(f.validation).length > 0, {
+    message: "validation must declare at least one key",
+    path: ["validation"],
+  });
 export type ViewField = z.infer<typeof viewField>;
 
 export const view = z.object({

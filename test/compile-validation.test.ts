@@ -273,6 +273,29 @@ describe("compile: catalog validation.pattern compiles at publish", () => {
   });
 });
 
+describe("compile: step-level validation.pattern compiles at publish", () => {
+  const withStepPattern = (pattern: string): any => {
+    const b = baseBody();
+    b.workflow.steps[0].view = { fields: [{ ref: "field_amount", validation: { pattern } }] };
+    return b;
+  };
+
+  it("rejects an uncompilable step-level pattern", () => {
+    const err = rejects(withStepPattern("("));
+    expect(err.issues.some((i) => i.loc === "steps[0].view.fields[0].validation.pattern" && i.value === "(")).toBe(true);
+  });
+
+  it("a well-formed step-level pattern still publishes", () => {
+    expect(() => compileProcessBody(withStepPattern("^[a-z]+$") as ProcessBody)).not.toThrow();
+  });
+
+  it("rejects a step-level pattern whose source exceeds the maximum length", () => {
+    const huge = "a".repeat(5000);
+    const err = rejects(withStepPattern(huge));
+    expect(err.issues.some((i) => i.loc === "steps[0].view.fields[0].validation.pattern")).toBe(true);
+  });
+});
+
 describe("compile: FieldDef.key is a CEL-referenceable identifier", () => {
   const withKey = (key: string): any => {
     const b = baseBody();
@@ -389,6 +412,15 @@ describe("compile: authored strings are length-bounded", () => {
     b.fields[0].default = cel("true == true && " + "a".repeat(MAX_EXPRESSION_LENGTH));
     const err = rejects(b);
     expect(err.issues.some((i) => i.loc === "fields[0].default")).toBe(true);
+  });
+
+  it("rejects an over-long step-level validation.rule", () => {
+    const b = baseBody();
+    b.workflow.steps[0].view = {
+      fields: [{ ref: "field_amount", validation: { rule: cel("true == true && " + "a".repeat(MAX_EXPRESSION_LENGTH)) } }],
+    };
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "steps[0].view.fields[0].validation.rule")).toBe(true);
   });
 });
 

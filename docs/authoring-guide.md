@@ -71,6 +71,17 @@ The example declares four fields. `amount` is a number, `reason` is a string,
 A field key must match `/^[a-z_][a-z0-9_]*$/`, because a guard reads it as
 `data.<key>`.
 
+### Validation
+
+A field can declare `min`, `max`, `minLength`, `maxLength`, `pattern` or
+`rule`. The engine checks these when a participant submits a value, never in
+the browser. A negative `amount` waits until the participant sends the form.
+
+`rule` is a CEL expression. It sees the same data every guard sees, so it can
+compare a field against another: `data.amount <= data.approved_amount`.
+
+A step can override any of these per field. See View, below.
+
 ### Data source
 
 Where a select field gets its options. A field carries its options inline, or
@@ -202,6 +213,14 @@ presents each one: visible, required, readonly, its span, its order, its group.
 
 Requiredness lives in the view, never in the catalog. One step can demand a
 field that the next step only displays.
+
+A step can also override a field's validation, in one of two modes. The
+default mode is `merge`. It keeps every catalog bound the step does not name,
+and replaces only the ones it does. The `replace` mode drops the catalog's
+bounds entirely, so only what the step names is in force.
+
+A small-request step can narrow `amount`'s `max` under `merge`. A step whose
+own `rule` should stand alone, without the catalog's, uses `replace` instead.
 
 The view also sets `columns`, either 1 or 2. That is how many columns the
 step's form lays its fields out in. A field's own `span`, also 1 or 2, is how

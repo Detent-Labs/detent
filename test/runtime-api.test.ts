@@ -773,6 +773,202 @@ test.skipIf(!DB)("multiple validation issues are collected together, not fail-fa
 });
 
 // ============================================================
+// Step-level validation overrides (ViewField.validation/validationMode)
+// ============================================================
+
+/**
+ * field_amount: catalog min 0, max 1000. field_note: catalog rule rejecting
+ * "forbidden". step_a's view overrides each per the caller's extra object,
+ * so the same shape drives every merge/replace/widen/narrow case below.
+ */
+const overrideBody = (amountExtra: object, noteExtra: object = {}): ProcessBody =>
+  ({
+    key: "override_body",
+    label: { en: "Override Body" },
+    baseLocale: "en",
+    fields: [
+      { id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number", validation: { min: 0, max: 1000 } },
+      { id: "field_note", key: "note", label: { en: "Note" }, type: "string", validation: { rule: cel("data.note != 'forbidden'") } },
+    ],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          view: { fields: [{ ref: "field_amount", ...amountExtra }, { ref: "field_note", ...noteExtra }] },
+          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+test.skipIf(!DB)("step override: a narrowed max rejects a value the catalog allows", async () => {
+  const PID = pid(`proc_override_narrow_${crypto.randomUUID()}`);
+  await publishBody(PID, overrideBody({ validation: { max: 500 } }), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, { data: { field_amount: 100 } as unknown as Instance["data"] });
+
+  let raised: unknown;
+  try {
+    await submitAndTransition(created.instanceId, "path_ab" as PathId, { field_amount: 800 } as unknown as Instance["data"], actor, dataSourceReg);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(SubmissionValidationError);
+  expect((raised as SubmissionValidationError).issues).toContainEqual({ kind: "constraint", fieldId: "field_amount" as FieldId, constraint: "max" });
+});
+
+test.skipIf(!DB)("step override: a widened max accepts a value the catalog rejects", async () => {
+  const PID = pid(`proc_override_widen_${crypto.randomUUID()}`);
+  await publishBody(PID, overrideBody({ validation: { max: 2000 } }), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, { data: { field_amount: 100 } as unknown as Instance["data"] });
+
+  const result = await submitAndTransition(created.instanceId, "path_ab" as PathId, { field_amount: 1500 } as unknown as Instance["data"], actor, dataSourceReg);
+  expect(result.data).toMatchObject({ field_amount: 1500 });
+});
+
+test.skipIf(!DB)("step override: merge keeps the catalog keys the step omits", async () => {
+  const PID = pid(`proc_override_merge_${crypto.randomUUID()}`);
+  // No validationMode: the default is merge, so the catalog's min: 0 still applies.
+  await publishBody(PID, overrideBody({ validation: { max: 500 } }), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, { data: { field_amount: 100 } as unknown as Instance["data"] });
+
+  let raised: unknown;
+  try {
+    await submitAndTransition(created.instanceId, "path_ab" as PathId, { field_amount: -5 } as unknown as Instance["data"], actor, dataSourceReg);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(SubmissionValidationError);
+  expect((raised as SubmissionValidationError).issues).toContainEqual({ kind: "constraint", fieldId: "field_amount" as FieldId, constraint: "min" });
+});
+
+test.skipIf(!DB)("step override: replace drops the catalog keys the step omits", async () => {
+  const PID = pid(`proc_override_replace_${crypto.randomUUID()}`);
+  await publishBody(PID, overrideBody({ validation: { max: 500 }, validationMode: "replace" }), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, { data: { field_amount: 100 } as unknown as Instance["data"] });
+
+  // Replace drops the catalog's min: 0, so a negative value now passes.
+  const result = await submitAndTransition(created.instanceId, "path_ab" as PathId, { field_amount: -5 } as unknown as Instance["data"], actor, dataSourceReg);
+  expect(result.data).toMatchObject({ field_amount: -5 });
+});
+
+test.skipIf(!DB)("step override: replace drops the catalog rule when the step declares none of its own", async () => {
+  const PID = pid(`proc_override_replace_rule_${crypto.randomUUID()}`);
+  await publishBody(PID, overrideBody({}, { validation: { minLength: 1 }, validationMode: "replace" }), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, { data: { field_amount: 100 } as unknown as Instance["data"] });
+
+  // The catalog rule (rejects "forbidden") does not apply: replace dropped it.
+  const result = await submitAndTransition(created.instanceId, "path_ab" as PathId, { field_note: "forbidden" } as unknown as Instance["data"], actor, dataSourceReg);
+  expect(result.data).toMatchObject({ field_note: "forbidden" });
+});
+
+test.skipIf(!DB)("step override: a step rule supersedes the catalog rule, and is itself still enforced", async () => {
+  const PID = pid(`proc_override_rule_${crypto.randomUUID()}`);
+  await publishBody(PID, overrideBody({}, { validation: { rule: cel("data.note != 'blocked'") } }), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, { data: { field_amount: 100 } as unknown as Instance["data"] });
+
+  // The catalog rule (rejects "forbidden") no longer applies: only the step's does.
+  const result = await submitAndTransition(created.instanceId, "path_ab" as PathId, { field_note: "forbidden" } as unknown as Instance["data"], actor, dataSourceReg);
+  expect(result.data).toMatchObject({ field_note: "forbidden" });
+});
+
+test.skipIf(!DB)("step override: the step's own rule rejects the value it names", async () => {
+  const PID = pid(`proc_override_rule2_${crypto.randomUUID()}`);
+  await publishBody(PID, overrideBody({}, { validation: { rule: cel("data.note != 'blocked'") } }), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, { data: { field_amount: 100 } as unknown as Instance["data"] });
+
+  let raised: unknown;
+  try {
+    await submitAndTransition(created.instanceId, "path_ab" as PathId, { field_note: "blocked" } as unknown as Instance["data"], actor, dataSourceReg);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(SubmissionValidationError);
+  expect((raised as SubmissionValidationError).issues).toContainEqual({ kind: "rule-failed", fieldId: "field_note" as FieldId });
+});
+
+test.skipIf(!DB)("step override: createProcessInstance's seed is judged by the initial step's override", async () => {
+  const PID = pid(`proc_override_seed_${crypto.randomUUID()}`);
+  await publishBody(PID, overrideBody({ validation: { max: 500 } }), reg, dataSourceReg);
+
+  let raised: unknown;
+  try {
+    await createProcessInstance(PID, actor, dataSourceReg, { data: { field_amount: 800 } as unknown as Instance["data"] });
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(SubmissionValidationError);
+  expect((raised as SubmissionValidationError).issues).toContainEqual({ kind: "constraint", fieldId: "field_amount" as FieldId, constraint: "max" });
+});
+
+test.skipIf(!DB)("step override: the resolved view field carries no new key on the wire", async () => {
+  const PID = pid(`proc_override_wire_${crypto.randomUUID()}`);
+  await publishBody(PID, overrideBody({ validation: { max: 500 } }), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, { data: { field_amount: 100 } as unknown as Instance["data"] });
+
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
+  const amountField = view.fields.find((f) => f.field.key === "amount")!;
+  expect(Object.keys(amountField)).not.toContain("validation");
+});
+
+/**
+ * field_amount: catalog min 0, max 1000. step_a overrides max to 500,
+ * step_b overrides it to 2000 — two steps, two independent overrides on the
+ * same catalog field, so a value judged by one is not judged by the other.
+ */
+const twoStepOverrideBody = (): ProcessBody =>
+  ({
+    key: "two_step_override_body",
+    label: { en: "Two Step Override Body" },
+    baseLocale: "en",
+    fields: [{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number", validation: { min: 0, max: 1000 } }],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a", key: "a", label: { en: "A" }, type: "task",
+          view: { fields: [{ ref: "field_amount", validation: { max: 500 } }] },
+          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+        },
+        {
+          id: "step_b", key: "b", label: { en: "B" }, type: "task",
+          view: { fields: [{ ref: "field_amount", validation: { max: 2000 } }] },
+          paths: [{ id: "path_bc", key: "bc", to: "step_c", trigger: "manual" }],
+        },
+        { id: "step_c", key: "c", label: { en: "C" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+test.skipIf(!DB)("step override: two steps judge the same value by their own override, neither affecting the other", async () => {
+  const PID = pid(`proc_override_two_step_${crypto.randomUUID()}`);
+  await publishBody(PID, twoStepOverrideBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, { data: { field_amount: 100 } as unknown as Instance["data"] });
+
+  // step_a's override (max 500) rejects 800.
+  let raised: unknown;
+  try {
+    await submitAndTransition(created.instanceId, "path_ab" as PathId, { field_amount: 800 } as unknown as Instance["data"], actor, dataSourceReg);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(SubmissionValidationError);
+  expect((raised as SubmissionValidationError).issues).toContainEqual({ kind: "constraint", fieldId: "field_amount" as FieldId, constraint: "max" });
+
+  // Leave step_a with a value both overrides accept.
+  const afterA = await submitAndTransition(created.instanceId, "path_ab" as PathId, { field_amount: 300 } as unknown as Instance["data"], actor, dataSourceReg);
+  expect(afterA.currentStepId as string).toBe("step_b");
+
+  // The same 800 that step_a rejected, step_b's own override (max 2000) accepts.
+  const afterB = await submitAndTransition(created.instanceId, "path_bc" as PathId, { field_amount: 800 } as unknown as Instance["data"], actor, dataSourceReg);
+  expect(afterB.data).toMatchObject({ field_amount: 800 });
+});
+
+// ============================================================
 // Data-loss / stale-data / concurrency regression coverage
 // ============================================================
 

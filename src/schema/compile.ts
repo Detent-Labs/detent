@@ -561,6 +561,21 @@ function checkFieldTree(body: ProcessBody): CompileIssue[] {
   return issues;
 }
 
+/** Every step view field's `validation.pattern`, checked with the same
+ * `checkPatterns` the catalog tree above uses. `checkPatterns` reads
+ * `f?.validation?.pattern` off whatever `floc`-prefixed object it is given,
+ * so a view field entry passes through it unchanged and the resulting issue
+ * locates by step and field. */
+function checkViewFieldPatterns(body: ProcessBody): CompileIssue[] {
+  const issues: CompileIssue[] = [];
+  body.workflow.steps.forEach((s, si) => {
+    (s.view?.fields ?? []).forEach((vf, vi) => {
+      checkPatterns(vf, `steps[${si}].view.fields[${vi}]`, issues);
+    });
+  });
+  return issues;
+}
+
 interface PluginTypeSite {
   value: string;
   loc: string;
@@ -635,6 +650,7 @@ function collectExpressionSites(body: ProcessBody): ExpressionSite[] {
       push(vf.visible, `${sloc}.view.fields[${vi}].visible`);
       push(vf.required, `${sloc}.view.fields[${vi}].required`);
       push(vf.readonly, `${sloc}.view.fields[${vi}].readonly`);
+      push(vf.validation?.rule, `${sloc}.view.fields[${vi}].validation.rule`);
     });
     if (s.subprocess) {
       Object.entries(s.subprocess.inputMapping ?? {}).forEach(([fid, e]) => push(e, `${sloc}.subprocess.inputMapping.${fid}`));
@@ -723,6 +739,7 @@ function structuralIssues(body: ProcessBody): CompileIssue[] {
     ...checkReservedActionPrefix(body),
     ...checkUnknownKeys(body),
     ...checkFieldTree(body),
+    ...checkViewFieldPatterns(body),
     ...checkIdResolution(body),
     ...checkLengthBounds(body),
   ];

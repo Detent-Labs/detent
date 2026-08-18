@@ -365,7 +365,13 @@ Stage-by-stage status is in `ROADMAP.md`.
   `SubmissionValidationError`, not fail-fast), then commits the merged `data`
   and the transition atomically via a new `commitManualTransition` split out
   of `executeManualTransition` (`transition.ts`; unchanged behavior for every
-  existing caller that omits the new optional `dataPatch`). The subsequent
+  existing caller that omits the new optional `dataPatch`). Constraints and
+  `rule` now run against `effectiveValidation(field, viewField)`, not
+  `field.validation` directly. That resolves to the catalog value, or that
+  value overlaid by the step's matching `ViewField.validation` (`merge`, the
+  default). A step declaring `validationMode: "replace"` drops the catalog
+  value entirely. `ResolvedViewField` gains no key for this. It stays off the
+  wire `getInstanceView` reports. The subsequent
   automatic-path cascade (`resolveAutomatic`) runs separately, outside the
   lock, matching every other caller's transactional granularity.
   `createDefinitionStore` gained `resolveLatest(processId)` (newest published
