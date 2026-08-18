@@ -118,7 +118,7 @@ async function handleSetUserDisabled(userId: string, disabled: boolean, req: Req
   });
 }
 
-/** A role string reaches a JWT claim and an assignment candidate list; both stay bounded. No character set is enforced — cli.ts has written role strings unchecked since stage 7, and a pattern would make an existing row unsavable here. */
+/** A role string reaches a JWT claim and an assignment candidate list; both stay bounded. No character set is enforced — cli.ts writes role strings unchecked, and a pattern would make an existing unvalidated row unsavable here. */
 const MAX_ROLE_LENGTH = 64;
 const MAX_ROLES = 64;
 
@@ -133,8 +133,8 @@ function parseRoles(value: unknown): string[] {
     if (role.length > MAX_ROLE_LENGTH) throw new RequestShapeError(`a role is at most ${MAX_ROLE_LENGTH} characters`);
     return role;
   });
-  // A Set keeps first-insertion order, so this is the same array the previous
-  // seen-Set-plus-push loop produced. First occurrence wins.
+  // A Set keeps first-insertion order, so spreading it dedupes while keeping
+  // first occurrence.
   return [...new Set(roles)];
 }
 
@@ -438,10 +438,10 @@ interface ListUsage {
  * The column keys of `listKey` a stored body maps, sorted.
  *
  * Sorted because `columnMapping` lives inside the jsonb body, and Postgres
- * normalizes a jsonb object's key order. `Object.keys` therefore reports the
- * storage's order, not the author's — the defect stage 29 hit and answered by
- * walking the declaration. No declaration reaches here: the delete guard
- * shares this scan and holds none.
+ * normalizes a jsonb object's key order, so `Object.keys` on a stored value
+ * would report storage order, not the author's. This function walks field
+ * declarations via `collectFieldsDeep` instead of trusting that order. No
+ * declaration reaches here: the delete guard shares this scan and holds none.
  *
  * A key the list no longer declares still reports. `checkColumnMapping` never
  * checks a key against a declaration, so a mapping outliving its column is

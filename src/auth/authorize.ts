@@ -14,11 +14,11 @@
  * moves this module alone. Still not an extension point: three fixed
  * permissions in a module-private map, no registry, nothing configurable.
  *
- * `can` now carries a body of two tests: the global role, then a stored
- * grant. `src/auth/grants.ts` holds the grant store and its SQL; this module
+ * `can` runs two tests: the global role, then a stored grant.
+ * `src/auth/grants.ts` holds the grant store and its SQL; this module
  * imports `hasGrant` alone and stays SQL-free itself. Both `can` and
  * `requirePermission` are therefore `async` and take the caller's `SQL`
- * handle. ROADMAP.md stage 40 carries the design.
+ * handle.
  */
 import type { SQL } from "bun";
 import type { Actor } from "../cel/eval.js";

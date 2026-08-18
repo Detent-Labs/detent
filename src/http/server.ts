@@ -727,8 +727,8 @@ export function createServer(
     // The CORS preflight derives from the table: an OPTIONS request matches
     // by path alone, and the answer lists every method the table holds for
     // that pattern, in table order. There is no second per-route chain to
-    // keep in sync. While one existed, the four /reporting/* routes went
-    // unanswered because nobody added their branch to it.
+    // keep in sync, so a route present in this table always answers its own
+    // preflight.
     if (req.method === "OPTIONS") {
       const methods = routes.filter((r) => match(r.segments, parts) !== null).map((r) => r.method);
       if (methods.length > 0) return preflightResponse(methods.join(", "), allowedOrigins, origin);
