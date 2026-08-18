@@ -234,6 +234,58 @@ Specs: `development-toolchain`, `devcontainer-preflight`.
 
     Specs: `definition-contract`, `runtime-api`, `cel-expressions`.
 
+44. **Technical (system-only) field marker: NOT STARTED, no decision made.**
+    Raised 2026-08-19 in conversation, while verifying the
+    `gate-required-readonly-conflict` change (landed 2026-08-18, commit
+    `f4c2db1`) live on `detent.org`. That change gates `required` and
+    `readonly` against each other one-way, but only while nothing else in
+    the draft writes the field (`writtenByOther`, `draft/view-flags.ts`).
+    Live testing on `loan_application` found the gate correctly stays off
+    for `result`: the `check` step's `subprocess.outputMapping` writes it
+    (`field_l_result: { src: "child.outcome", lang: "cel" }`), so
+    `writtenFieldCounts` counts it as written and the gate does not fire.
+    That is the change's own designed behavior, not a defect.
+
+    Putting `result` onto an earlier step's form as `required` exposed a
+    gap the gate does not claim to cover. `writtenFieldCounts` asks only
+    "does anything write this field anywhere in the process," never
+    "before this specific step." `result` is written on `check`, which
+    runs after `submit` in this process's flow, so a `required`+`readonly`
+    entry on `submit` would still fail every time, unblocked, because the
+    gate cannot see step order. `checkViewFlags`'s matching Checks-rail
+    finding (same file) reads the same `written` set and carries the same
+    gap.
+
+    A step further back: `result` is written only by the engine and never
+    by a participant, on any step. Offering it as an editable, `required`
+    field on any form is arguably the wrong shape regardless of order —
+    `required` means "the participant supplies this," which does not
+    apply to a field with no participant-facing writer anywhere. A
+    first-class way to mark a field as technical / system-only (never
+    directly editable) would let the studio warn or block that case
+    outright, independent of the harder step-order question.
+
+    Two directions came up, no decision between them yet. The light one
+    infers "technical" from data the studio already computes: a field
+    with a structural writer (`Action.output`, `subprocess.outputMapping`,
+    `columnMapping`, `contract.inputFields`) and no view entry anywhere
+    that is directly editable (`visible !== false && readonly !== true`)
+    is de facto technical; no schema change, studio-only display and
+    warning. The heavier one adds a declared `technical` (name TBD) key to
+    `FieldDef` in `definition.ts` — a definition-contract change needing
+    full OpenSpec treatment — so an author can state the intent before any
+    writer exists, and the studio can flag a field marked technical that
+    is also wired as directly editable somewhere.
+
+    Step-order/reachability-aware validation (would a write on `check`
+    always precede a read on `submit`, across guards and cycles) is a
+    separate, costlier problem, raised the same session and not pursued:
+    it needs a dominance-style analysis over the step graph, not just the
+    written-anywhere check `writtenFieldCounts` already does.
+
+    Specs: none yet; would touch `studio-form-editor`, `studio-app`, and
+    (for the declared-flag direction) `definition-contract`.
+
 ## Done
 
 Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
