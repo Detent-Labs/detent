@@ -349,8 +349,7 @@
 }
 
 /* The field matrix brings its own scroll box, capped at 32rem — twice this
-   bound. Left alone the grid overflows the dock and pushes the cell editor
-   below it out of reach.
+   bound. Left alone the grid overflows the dock's own 16rem body.
 
    The cap comes DOWN to fit the dock; it is not removed. Removing it looks
    right and breaks the sticky headers: `overflow: auto` still makes
@@ -361,10 +360,11 @@
    inner scrollport also keeps the `tabindex="0"` region `spa-accessibility`
    requires for keyboard scrolling.
 
-   11rem leaves the rest of the 16rem body for the cell editor a selected cell
-   opens below the grid. */
+   15rem sits just under the dock body's own 16rem cap: with no below-grid
+   editor left to share the body with, the grid gets nearly the whole
+   budget. */
 .studio-dock-body .studio-matrix-scroll {
-  max-height: 11rem;
+  max-height: 15rem;
 }
 
 .studio-dock-paths {
@@ -1233,6 +1233,34 @@
   gap: var(--space-3);
 }
 
+/* The toolbar sits above the grid, ruled off it the same way a screen
+   heading is ruled off its content (design-language.md's structural rule). */
+.studio-matrix-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 2px solid var(--color-divider);
+}
+
+.studio-matrix-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.studio-matrix-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
 .studio-matrix-scroll {
   overflow: auto;
   overscroll-behavior: contain;
@@ -1251,21 +1279,19 @@
 .studio-matrix-row-header {
   position: sticky;
   background: var(--color-surface);
-  font-family: var(--font-body);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-text-muted);
   text-align: left;
+  vertical-align: top;
 }
 
-/* Fixed from the spacing scale, not from measured text: a German step label
-   runs up to 40% longer than English and wraps inside this width instead of
-   widening the column (`.claude/rules/design-language.md`). */
+/* Widened from the old 8rem/10rem: a live cell now stacks three controls
+   instead of a three-letter mark, and needs the room. Fixed from the
+   spacing scale, not from measured text — a German step label runs up to
+   40% longer than English and wraps inside this width instead of widening
+   the column (`.claude/rules/design-language.md`). */
 .studio-matrix-corner,
 .studio-matrix-col-header {
   top: 0;
-  width: 8rem;
+  width: 11rem;
   padding: var(--space-2);
   border-bottom: 2px solid var(--color-divider);
   z-index: 2;
@@ -1276,10 +1302,39 @@
   z-index: 3;
 }
 
+.studio-matrix-col-label {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.studio-matrix-col-key {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+/* A step with no view: its whole column hatches too (`data-state="hatched"`
+   below); the note names why, in the same muted register as the label. */
+.studio-matrix-col-note {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
 .studio-matrix-row-header {
   left: 0;
-  width: 10rem;
-  padding: var(--space-1) var(--space-3);
+  width: 11rem;
+  padding: var(--space-2) var(--space-3);
   border-right: 2px solid var(--color-divider);
   border-bottom: 1px solid var(--color-border);
 }
@@ -1294,12 +1349,28 @@ tr[data-group="true"] .studio-matrix-row-header {
   font-weight: 600;
 }
 
+.studio-matrix-field-key {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.studio-matrix-field-type {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
 .studio-matrix-cell {
   border-bottom: 1px solid var(--color-border);
   border-right: 1px solid var(--color-border);
   padding: var(--space-1) var(--space-2);
-  text-align: center;
-  min-width: 3.5rem;
+  vertical-align: top;
+  min-width: 9rem;
   cursor: default;
 }
 
@@ -1308,9 +1379,10 @@ tr[data-group="true"] .studio-matrix-row-header {
   outline-offset: -2px;
 }
 
-.studio-matrix-cell[data-selected="true"] {
-  background: var(--color-surface-muted);
-  box-shadow: inset 0 0 0 2px var(--color-accent);
+/* The flagged marker: the field matrix's own version of a caution stamp —
+   reported, never blocking, so it takes an inset ring rather than fill. */
+.studio-matrix-cell[data-flagged="true"] {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-refusal) 55%, transparent);
 }
 
 /* Hatched: the step declares no view at all, so the whole column repeats
@@ -1327,78 +1399,124 @@ tr[data-group="true"] .studio-matrix-row-header {
   cursor: not-allowed;
 }
 
-.studio-matrix-cell[data-state="live"] {
-  cursor: pointer;
-}
-
 .studio-matrix-cell[data-state="live"]:hover {
   background: var(--color-surface-muted);
 }
 
-.studio-matrix-summary {
-  display: inline-flex;
-  gap: var(--space-1);
+/* A cell the step's view does not declare: a hairline dash, and no control
+   — the grid writes flags, never membership. */
+.studio-matrix-dash {
+  display: block;
   font-family: var(--font-mono);
-  font-size: 11px;
+  color: var(--color-neutral-500);
 }
 
-.studio-matrix-mark {
-  color: var(--color-border);
-}
-
-/* A departure from the engine's own default earns ink — the same "the
-   accent is a stamp, not a paint" rule the checks rail's issue count takes. */
-.studio-matrix-mark[data-active="true"] {
-  color: var(--color-text);
-  font-weight: 600;
-}
-
-/* A CEL-holding flag takes the stamp's own 2px-outline treatment, at cell
-   scale, in place of a resolved boolean it cannot know at author time. */
-.studio-matrix-mark[data-cel="true"] {
-  color: var(--color-accent);
-  border: 2px solid currentcolor;
-  padding: 0 2px;
-  font-weight: 600;
-}
-
-.studio-matrix-editor {
-  border-top: 2px solid var(--color-divider);
-  padding-top: var(--space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.studio-matrix-editor-heading {
-  margin: 0 0 var(--space-2);
-  font-size: 1rem;
-  display: flex;
-  gap: var(--space-2);
-  align-items: baseline;
-}
-
-.studio-matrix-editor-step {
-  color: var(--color-text-muted);
-  font-weight: 400;
-  font-size: 0.85rem;
-}
-
-.studio-matrix-flag-fieldset {
+/* One row per flag, ruled the way a register's own rows are — the ledger
+   hairline, not the structural divider (design-language.md). */
+.studio-matrix-cell-flag {
   border: none;
-  padding: 0;
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-1) 0 0;
   margin: 0;
 }
 
-.studio-matrix-flag-fieldset:disabled {
+.studio-matrix-cell-flag:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.studio-matrix-cell-flag + .studio-matrix-cell-flag {
+  margin-top: var(--space-1);
+}
+
+.studio-matrix-cell-flag:disabled {
   opacity: 0.45;
 }
 
-.studio-matrix-editor-empty {
+.studio-matrix-cell-flag .bool-or-expr {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 11px;
+}
+
+.studio-matrix-cell-flag label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--color-text-muted);
-  border-top: 2px solid var(--color-divider);
-  padding-top: var(--space-3);
-  margin: 0;
+}
+
+.studio-matrix-cell-flag select {
+  font-size: 10px;
+}
+
+/* An expression resolves only against an instance, so no control can show
+   its live value: the stamp names the language, the source prints beside
+   it — the same vocabulary the form editor's own CEL mark uses. */
+.studio-matrix-cel {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-1) 0;
+}
+
+.studio-matrix-cel-stamp {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-accent);
+  border: 2px solid currentcolor;
+  padding: 0 var(--space-1);
+  flex: none;
+}
+
+.studio-matrix-cel-src {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* The bulk badges: one row of three, named by their own flag letter,
+   sitting under a column header's or a row header's own key/label. Pressed
+   takes the accent stamp, same as any other pressed control in this
+   register (design-language.md's "Actions" rule). */
+.studio-matrix-flags {
+  display: flex;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.studio-matrix-flag-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.6;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  background: none;
+  border: 1px solid var(--color-border);
+  padding: 0 var(--space-1);
+  cursor: pointer;
+}
+
+.studio-matrix-flag-badge:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+}
+
+.studio-matrix-flag-badge[aria-pressed="true"] {
+  color: var(--color-accent-contrast);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 /* The section index: the same register form as the rail, one scale down. */

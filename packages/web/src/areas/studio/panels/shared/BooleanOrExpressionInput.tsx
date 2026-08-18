@@ -14,6 +14,11 @@ interface Props {
   /** The step this override sits on, for the condition builder's `child.*` operands. */
   stepId?: string;
   onChange: (next: BoolOrExpr) => void;
+  /** Forwarded to the mode select and the checkbox, so a caller with its own
+   * roving-tabindex model (the field matrix's grid, `field-matrix-toolbar-
+   * and-inline-editing`) can keep every inactive cell's controls out of the
+   * page's tab order. Left unset, both take the browser's own default. */
+  tabIndex?: number;
 }
 
 /**
@@ -28,7 +33,7 @@ interface Props {
  * writes `undefined` while a row is incomplete, and deriving the mode from that
  * would collapse the override to the checkbox mid-edit. See `overrideMode`.
  */
-export function BooleanOrExpressionInput({ label, value, flagKey, stepId, onChange }: Props) {
+export function BooleanOrExpressionInput({ label, value, flagKey, stepId, onChange, tabIndex }: Props) {
   const [chosen, setChosen] = useState<OverrideMode | undefined>(undefined);
   const mode = overrideMode(value, chosen);
 
@@ -38,6 +43,7 @@ export function BooleanOrExpressionInput({ label, value, flagKey, stepId, onChan
         {label}
         <select
           value={mode}
+          tabIndex={tabIndex}
           onChange={(e) => {
             const next = e.target.value as OverrideMode;
             setChosen(next);
@@ -55,6 +61,7 @@ export function BooleanOrExpressionInput({ label, value, flagKey, stepId, onChan
       {mode === "boolean" ? (
         <input
           type="checkbox"
+          tabIndex={tabIndex}
           checked={effectiveFlag(value, flagKey) === true}
           onChange={(e) => onChange(e.target.checked)}
         />

@@ -21,7 +21,7 @@ import { t } from "../catalog.js";
 import { getVersionBody } from "../api/client.js";
 import { describeCaughtError } from "../errors.js";
 import { diffJson, type DiffEntry } from "../screens/versionDiffLogic.js";
-import { FieldMatrixPanel } from "../panels/FieldMatrixPanel.js";
+import { FieldMatrixGrid } from "../panels/FieldMatrixGrid.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text.js";
 import type { Draft } from "../draft/types.js";
 import { pathRows, type PathRow } from "./pathRows.js";
@@ -92,7 +92,7 @@ export function EditorDock({ processId, token, draft, contentLocale, baseVersion
             <ChangesTab processId={processId} token={token} draft={draft} baseVersion={baseVersion} />
           </div>
           <div hidden={tab !== "matrix"}>
-            <FieldMatrixPanel />
+            <FieldMatrixGrid />
           </div>
           <div hidden={tab !== "paths"}>
             <PathsTab draft={draft} contentLocale={contentLocale} />

@@ -69,7 +69,7 @@ below belongs to the structure surface alone.
 | inspector panel | one section inside the inspector | `panels/StepsPanel.tsx` and what it nests |
 | checks rail | the validation issue list, grouped by check | `panels/ChecksRail.tsx` |
 | dock | the collapsible strip below the canvas columns | `dock/EditorDock.tsx` |
-| dock tab | one of the dock's three views: Changes, Field matrix, Paths | `dock/EditorDock.tsx`, `DOCK_TABS` |
+| dock tab | one of the dock's three views: Changes, Field matrix, Paths. The Field matrix tab mounts `FieldMatrixGrid`, the bare grid, with no toolbar | `dock/EditorDock.tsx`, `DOCK_TABS` |
 
 ### The panels screen
 
@@ -88,11 +88,16 @@ the checks rail.
 | field catalog | the open view that lists and edits the process's field definitions | `panels/FieldCatalogPanel.tsx` |
 | data sources | the open view that lists and edits the process's data source definitions | `panels/DataSourcesPanel.tsx` |
 | contract | the open view that edits the process's `ProcessContract`: input fields, output fields, outcomes | `panels/ContractPanel.tsx` |
-| field matrix | the open view with the grid of every field against every step; also a dock tab | `panels/FieldMatrixPanel.tsx` |
+| field matrix | the open view with the grid of every field against every step; also a dock tab | `panels/FieldMatrixPanel.tsx`, `panels/FieldMatrixGrid.tsx` |
 
 All four views stay mounted at once; `hidden` shows one and hides the other
 three. A view keeps its own edit state across a switch: a half-typed outcome
 name, a selected field. Unmounting on every switch would lose that state.
+
+The field matrix splits into two components: a bare grid and a wrapper. The
+bare grid, `FieldMatrixGrid`, holds the headers, the cells and the keyboard
+model. The wrapper, `FieldMatrixPanel`, adds the toolbar, the legend and the
+bulk badges. The canvas dock's Field matrix tab mounts the bare grid alone.
 
 ### The player
 

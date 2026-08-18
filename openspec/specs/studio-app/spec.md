@@ -557,9 +557,11 @@ the draft's own field tree SHALL keep whatever depth it declares.
 
 #### Scenario: Switching views keeps the field matrix's selected cell
 
-- **WHEN** the developer selects a live cell in the Field matrix view,
-  switches to Contract, then switches back
-- **THEN** the same cell is still selected, and its editor still shows
+- **WHEN** the developer moves roving focus to a live cell in the
+  Field matrix view and activates it
+- **AND** the developer switches to Contract, then switches back
+- **THEN** the same cell still holds roving focus, and it is still
+  activated
 
 #### Scenario: The screen offers no Save of its own
 
@@ -704,10 +706,11 @@ Each cell SHALL draw in one of three states:
   cell in that column SHALL draw hatched, regardless of the row.
 - **Blank**, where the step declares a `view` and that view's `fields`
   carries no entry referencing the row's field.
-- **Live**, where such an entry exists. A live cell SHALL show a
-  compact summary of that entry's `visible`, `required` and `readonly`
-  flags. That summary SHALL show whether any of the three carries a CEL
-  expression.
+- **Live**, where such an entry exists. A live cell SHALL show
+  independent `visible`, `required` and `readonly` controls. Each
+  control SHALL show that entry's own resolved value. Where a flag
+  carries a CEL expression instead, its control gives way to a CEL
+  stamp. That stamp SHALL show the expression's source.
 
 #### Scenario: The grid covers the whole catalog and the whole step list
 
@@ -739,61 +742,315 @@ Each cell SHALL draw in one of three states:
 - **WHEN** a workflow step's view carries an entry referencing a
   catalog field
 - **THEN** that cell draws live
-- **AND** its summary reflects the entry's resolved `visible`,
-  `required` and `readonly` values
+- **AND** it shows one control per flag, each at the entry's resolved
+  `visible`, `required` and `readonly` value
 
-### Requirement: Selecting a live cell opens one flag editor for that (step, field) pair
+### Requirement: A live cell edits its own view entry inline
 
-The field matrix SHALL offer no per-cell input controls. Selecting a
-live cell SHALL open one editor region below the grid. It SHALL appear
-once, and it SHALL target exactly the selected cell's view entry.
+Each live cell's `visible`, `required` and `readonly` controls SHALL
+each be a boolean-or-CEL control, matching `studio-form-editor`'s own
+strip. Each SHALL start from the entry's own resolved value: an absent
+key reads the engine's own default, not `false`. Changing a control
+SHALL write to that entry's key immediately, through the same `setFlag`
+primitive `studio-form-editor` already uses. It SHALL clear the key on
+a return to its default.
 
-The editor SHALL offer `visible`, `required` and `readonly` as
-independent boolean-or-CEL controls. Each SHALL start from the entry's
-own resolved value: an absent key reads the engine's own default, not
-false. Changing a control SHALL write to that entry's key on selection.
-It SHALL delete the key on a return to its default. That is the same
-write the `studio-form-editor` capability's strip already performs
-through `setFlag`.
+Where a live cell's own `visible` resolves to a literal `false`, that
+cell's `required` and `readonly` controls SHALL disable. That is the
+same gating the field matrix applied through its below-grid editor
+before this change.
 
-Where the selected cell's own `visible` is a literal `false`, the
-editor SHALL disable `required` and `readonly`, the same gating
-`studio-form-editor`'s strip already applies.
+#### Scenario: Changing a cell's control writes the same entry the form editor writes
 
-Selecting a hatched or a blank cell SHALL close the editor, or leave it
-closed. Neither state names a view entry to edit.
-
-#### Scenario: Selecting a live cell opens its editor
-
-- **WHEN** the developer selects a live cell
-- **THEN** the editor appears below the grid, showing that cell's
-  `visible`, `required` and `readonly` controls at their resolved
-  values
-
-#### Scenario: Editing a control writes the same entry the form editor writes
-
-- **WHEN** the developer changes one of the editor's three controls
+- **WHEN** the developer changes a live cell's `visible`, `required` or
+  `readonly` control
 - **THEN** the underlying step's view entry for that field updates
   immediately, in the in-browser draft, without a Save control
 
 #### Scenario: A control returning to its default clears the key
 
-- **WHEN** the developer sets a control back to the engine's own
-  default for that flag
+- **WHEN** the developer sets a live cell's control back to the
+  engine's own default for that flag
 - **THEN** the corresponding key is absent from the view entry. It does
   not carry the default value instead
 
 #### Scenario: Turning visible off disables the other two controls
 
-- **WHEN** the developer sets the selected cell's `visible` control to
+- **WHEN** the developer sets a live cell's `visible` control to
   literal `false`
-- **THEN** the `required` and `readonly` controls disable, and their
-  keys clear from the entry
+- **THEN** that cell's `required` and `readonly` controls disable, and
+  their keys clear from the entry
 
-#### Scenario: Selecting a hatched or blank cell shows no editor
+#### Scenario: A hatched or blank cell offers no control
 
-- **WHEN** the developer selects a hatched cell or a blank cell
-- **THEN** no flag editor appears for it
+- **WHEN** the developer inspects a hatched cell or a blank cell
+- **THEN** neither cell offers a `visible`, `required` or `readonly`
+  control
+
+### Requirement: Column headers name the step and flag steps with no view
+
+Each column header SHALL show the step's `key` alongside its resolved
+label. Where a step declares no `view` at all, its column header SHALL
+carry an explicit note stating so. That column also draws hatched.
+
+#### Scenario: A column header shows the step's key and label
+
+- **WHEN** the developer opens the field matrix
+- **THEN** every column header shows that step's `key` and its
+  resolved label
+
+#### Scenario: A step with no view carries a note in its own header
+
+- **WHEN** a workflow step declares no `view`
+- **THEN** that step's column header carries a note stating it
+  declares no view
+
+### Requirement: Row headers name the field and its type
+
+Each row header SHALL show the field's `key` alongside its `type`.
+
+#### Scenario: A row header shows the field's key and type
+
+- **WHEN** the developer opens the field matrix
+- **THEN** every row header shows that field's `key` and its `type`
+
+### Requirement: Column and row headers offer bulk flag toggles on the panels screen
+
+This requirement covers the panels screen's field matrix only. The
+canvas dock's Field matrix tab carries no bulk toggle badge. The
+requirement below, "The canvas dock's Field matrix tab carries no
+toolbar or bulk badges," states that half.
+
+Each column header and each row header SHALL offer `visible`,
+`required` and `readonly` toggle badges. This holds wherever that
+column or row carries at least one live cell. A badge SHALL flip
+every live, non-CEL cell in that column or row. A `required` or
+`readonly` badge
+SHALL skip any cell whose own `visible` resolves to `false`.
+
+Where every eligible cell already carries the flag's non-default
+value, the badge SHALL turn that flag off across those cells. It
+turns the flag on otherwise.
+
+A column or row with no live cell SHALL carry no bulk toggle badge.
+
+#### Scenario: A column's bulk badge sets every eligible cell in that step
+
+- **WHEN** the developer selects a column's `required` badge, on a
+  step where none of its live, non-CEL, non-gated cells carry
+  `required: true`
+- **THEN** every one of those cells' `required` value becomes `true`
+
+#### Scenario: A row's bulk badge clears every eligible cell for that field
+
+- **WHEN** every live, non-CEL, non-gated cell for one field already
+  carries `required: true`, across every step
+- **AND** the developer selects that field's `required` badge
+- **THEN** every one of those cells' `required` key clears
+
+#### Scenario: A bulk badge skips CEL and gated cells
+
+- **WHEN** the developer selects a column's or row's `required` or
+  `readonly` badge
+- **THEN** it does not change a cell whose relevant flag carries a CEL
+  expression
+- **AND** it does not change a cell whose `visible` resolves to
+  `false`
+
+#### Scenario: A column with no live cell carries no bulk badge
+
+- **WHEN** a workflow step declares no `view`
+- **THEN** that step's column header carries no bulk toggle badge
+
+### Requirement: The panels screen's field matrix toolbar filters inert columns and reports coverage
+
+This requirement covers the panels screen's field matrix only. See
+"The canvas dock's Field matrix tab carries no toolbar or bulk
+badges" below.
+
+The field matrix SHALL offer a toolbar above the grid. The toolbar
+SHALL carry a toggle that hides every step with no `view` at all from
+the grid, when engaged. The toggle SHALL affect only the grid's
+columns. It SHALL leave every row in place.
+
+The toolbar SHALL also report one live count line. That line SHALL
+state four numbers:
+
+- the number of declared view entries
+- the field count
+- the count of steps the grid currently draws
+- the number of cells among those steps that carry no entry
+
+#### Scenario: Hiding inert columns removes steps with no view
+
+- **WHEN** the developer engages the "Hide inert columns" toggle on a
+  draft where 3 of 13 steps declare no view
+- **THEN** the grid draws 10 columns, and none of them belongs to a
+  step with no view
+
+#### Scenario: The toggle leaves every row in place
+
+- **WHEN** the developer engages the "Hide inert columns" toggle
+- **THEN** the grid still draws every catalog field as a row
+
+#### Scenario: The count line reflects the currently drawn columns
+
+- **WHEN** a draft carries 54 view entries, 22 fields and 13 steps, of
+  which 3 declare no view
+- **AND** the developer engages the "Hide inert columns" toggle
+- **THEN** the count line reads 54 view entries, 22 fields, 10 steps,
+  and 166 cells the visible steps do not declare
+
+### Requirement: The panels screen's field matrix toolbar explains its marks with a legend
+
+This requirement covers the panels screen's field matrix only. See
+"The canvas dock's Field matrix tab carries no toolbar or bulk
+badges" below.
+
+The toolbar SHALL carry a legend. The legend SHALL explain five marks:
+
+- a bulk badge sets the whole column or row it sits on
+- a cell with no key written reads the engine's own default
+- what the CEL stamp marks
+- what a blank cell's dash means
+- what the flagged-cell marker means
+
+#### Scenario: The legend is visible without further interaction
+
+- **WHEN** the developer opens the field matrix
+- **THEN** the toolbar's legend is visible, with no click or hover
+  needed to reveal it
+
+### Requirement: The canvas dock's Field matrix tab carries no toolbar or bulk badges
+
+`FieldMatrixPanel` also mounts inside the canvas dock's Field matrix
+tab. `studio-canvas`'s "The dock offers three tabs, one active at a
+time" requirement already covers that mount. It already states the
+Field matrix tab offers no filter. It already states the dock never
+grows to fit its content. This requirement restates that boundary
+from the field matrix's own side, for this change's toolbar, legend
+and bulk badges specifically.
+
+The dock's Field matrix tab SHALL carry no toolbar. It SHALL carry no
+inert-column toggle, no count line, no legend, and no bulk row/column
+toggle badge. It SHALL draw the same grid the panels screen draws,
+with these matching:
+
+- the same live-cell controls
+- the same column and row header content
+- the same flagged-cell marker
+- the same keyboard model
+
+#### Scenario: The dock's Field matrix tab shows no toolbar
+
+- **WHEN** the developer opens the canvas dock's Field matrix tab
+- **THEN** it shows no toolbar, no inert-column toggle, no count line,
+  and no legend
+
+#### Scenario: The dock's Field matrix tab shows no bulk badges
+
+- **WHEN** the developer opens the canvas dock's Field matrix tab
+- **THEN** none of its column or row headers carry a bulk toggle badge
+
+#### Scenario: The dock's Field matrix tab still edits cells inline
+
+- **WHEN** the developer opens the canvas dock's Field matrix tab
+- **THEN** each live cell still shows its own `visible`, `required`
+  and `readonly` controls
+- **AND** editing one still writes through `setFlag`
+
+### Requirement: A live cell marks itself when it produces a view Checks finding
+
+A live cell whose resolved flags currently produce one of
+`checkViewFlags`'s findings SHALL carry a flagged marker. That marker
+stays separate from the cell's `visible`, `required` and `readonly`
+controls. `checkViewFlags` reports two findings, in the same order it
+checks them:
+
+1. `required` while `visible` resolves to `false`
+2. `required` together with `readonly`, where no other source in the
+   draft already writes that field. None of these SHALL write it:
+   - an action's `output`
+   - a subprocess's `outputMapping`
+   - a field's `columnMapping`
+   - a `contract.inputFields` entry
+
+A live cell whose own field is a group field SHALL carry no flagged
+marker, either way. The engine's own `checkViewFlags` function skips
+a group field first, before it checks either finding.
+
+A flag carrying a CEL expression resolves per instance. A cell with
+any CEL-driven flag SHALL therefore carry no flagged marker, whatever
+its other resolved values are.
+
+#### Scenario: A required-and-hidden cell carries the marker
+
+- **WHEN** a live cell's `required` resolves to `true` while its
+  `visible` resolves to `false`
+- **THEN** that cell carries the flagged marker
+
+#### Scenario: A required-and-readonly cell with nothing else writing it carries the marker
+
+- **WHEN** a live cell's `required` and `readonly` both resolve to
+  `true`
+- **AND** no other source in the draft writes that cell's field
+- **THEN** that cell carries the flagged marker
+
+#### Scenario: A required-and-readonly cell already written elsewhere carries no marker
+
+- **WHEN** a live cell's `required` and `readonly` both resolve to
+  `true`
+- **AND** one of these already writes that cell's field:
+  - an action output
+  - a subprocess output mapping
+  - a data source column mapping
+  - a contract input field entry
+- **THEN** that cell carries no flagged marker
+
+#### Scenario: A group field's cell carries no flagged marker
+
+- **WHEN** a live cell's own field is a group field
+- **THEN** that cell carries no flagged marker, regardless of its
+  resolved `visible`, `required` and `readonly` values
+
+#### Scenario: A cell with a CEL-driven flag carries no flagged marker
+
+- **WHEN** any of a live cell's `visible`, `required` or `readonly`
+  carries a CEL expression
+- **THEN** that cell carries no flagged marker
+
+### Requirement: The field matrix stays one tab stop; activating a cell reaches its controls
+
+The field matrix SHALL stay one stop in the page's tab order.
+`spa-accessibility`'s existing rule for this grid already requires
+that. Arrow-key navigation between cells SHALL continue to move focus
+exactly as it did before this change. It SHALL add no tab stop of its
+own.
+
+Enter or Space on a focused live cell SHALL activate it. An activated
+cell's `visible`, `required` and `readonly` controls SHALL become the
+grid's only reachable tab stops. They replace the grid's own stop
+until the cell deactivates. Escape SHALL deactivate the active cell.
+Moving focus away from an active cell by any other means SHALL also
+deactivate it. Deactivating SHALL hand the one tab stop back to the
+grid.
+
+#### Scenario: Arrow-key navigation alone adds no tab stop
+
+- **WHEN** the developer moves focus between cells with the arrow keys
+- **THEN** the field matrix stays one stop in the page's tab order
+
+#### Scenario: Activating a cell makes its controls reachable by Tab
+
+- **WHEN** the developer presses Enter or Space on a focused live cell
+- **THEN** that cell's `visible`, `required` and `readonly` controls
+  become the only tab stops inside the field matrix
+
+#### Scenario: Escape deactivates the cell and restores single-stop navigation
+
+- **WHEN** the developer presses Escape on an activated cell
+- **THEN** the field matrix returns to being one stop in the page's
+  tab order
 
 ### Requirement: The field matrix's rail entry counts view entries and view findings
 

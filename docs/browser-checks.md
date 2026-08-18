@@ -943,7 +943,7 @@ English, the same as every other engine-validator message the rail shows.
      own "issue" names the checks rail's EditorIssue concept, per the
      "View flags" walk just above it; an earlier canvas section's "defect"
      names an unrelated rendering bug the rule also conflates it with. -->
-### The field matrix (`studio-field-matrix`)
+### The field matrix (`field-matrix-toolbar-and-inline-editing`)
 
 Open Studio, `purchase-requisition`, the canvas rail's Process section.
 Pass: a fourth row, Field matrix, sits below Contract, reading 54 as its
@@ -952,44 +952,55 @@ count.
 Open the field matrix. Pass: 22 rows, `line_item` drawn as a group header
 over its four children, indented once. Pass: 13 columns, in the process's
 own step order. Pass: three columns hatch. They are `approval_routing`,
-`issue_po` and `receipt_check`, the three steps with no view at all.
+`issue_po` and `receipt_check`, the three steps with no view at all. Each
+column header shows the step's `key` beside its label; each row header
+shows the field's `key` beside its `type`.
 
-Select a live cell. Pass: an editor opens below the grid, showing that
-cell's Visible, Required and Read-only controls at their resolved values.
-Change Required. Pass: the same entry updates in the JSON surface, in
-place.
+Pass: a toolbar sits above the grid. It carries a "Hide inert columns"
+toggle, a count line reading "54 view entries · 22 fields × 13 steps ·
+232 cells the visible steps do not declare", and a five-line legend,
+visible with no click or hover.
 
-Turn the selected cell's Visible off. Pass: Required and Read-only
-disable, and both keys clear from the entry in the same write.
+Engage "Hide inert columns". Pass: the grid draws 10 columns, none of
+them `approval_routing`, `issue_po` or `receipt_check`. The count line
+now reads 10 steps and 166 cells. Every row still draws.
 
-Author a CEL expression for Visible through the cell editor. Pass: it
-round-trips through the JSON surface unmangled. The live cell's mark
-shows it carries an expression, not a resolved boolean.
+Select the "draft" column's `required` bulk badge. Pass: it presses, and
+every live, non-CEL, non-gated cell in that column reads `required`
+true. Select it again. Pass: every one of those cells clears its
+`required` key.
 
-Select a hatched cell, then a blank cell. Pass: neither opens an editor.
-Press Escape while a cell's editor is open. Pass: it closes. Click
-outside the grid and the editor while one is open. Pass: it closes.
+Click a live cell's Visible checkbox off. Pass: the Required and
+Read-only controls in that same cell disable at once, and both clear.
+Click it back on. Pass: both re-enable.
 
-Tab to the grid. Pass: focus lands on it once, not once per cell.
+Give a view entry `visible: false` and `required: true` through the
+JSON surface, then return to the field matrix. Pass: that cell carries a
+ring marker, the checks rail's Field matrix count reads 1, and the
+`view` group names the field, exactly as the form editor's own walk
+above already covers.
 
+Tab to the grid with no cell activated. Pass: exactly one control across
+the whole grid carries `tabindex="0"` — the grid's own roving cell.
 Press an arrow key. Pass: focus moves one cell in that direction, and
-the grid stays the page's one tab stop. Press Home and End. Pass: focus
-moves to the first and last cell in the current row.
+the grid stays the page's one tab stop. Press Home, End, Ctrl+Home and
+Ctrl+End. Pass: each moves focus as it did before this change.
 
-Press Ctrl+Home and Ctrl+End. Pass: focus moves to the grid's first and
-last cell. Press Enter or Space on a live cell. Pass: its editor opens,
-the same as a click.
+Press Enter or Space on a live cell. Pass: its own Visible, Required and
+Read-only controls become the grid's only reachable tab stops — six
+elements, a select and a checkbox each. Press Escape. Pass: focus
+returns to the cell, and the grid is again the page's one tab stop.
+Activate a cell, then click elsewhere on the page. Pass: the cell
+deactivates without focus jumping back to the grid.
 
 Switch the studio's content locale to German. Pass: no column clips or
 overflows at 1280px. No column width visibly derives from the English
 step label; a German label wraps inside its column instead.
 
-Open the panels screen's index rail. Pass: the Field matrix entry's
-issue count reflects only `checkViewFlags` findings. It excludes an
-unrelated per-step issue, a path's CEL issue say, on the same steps.
-Author a hidden-required or unwritable-required entry through the field
-matrix's own cell editor. Pass: the same `view` group entry the form
-editor's walk above already covers appears in the checks rail.
+Open the canvas dock's Field matrix tab. Pass: it shows no toolbar, no
+count line, no legend and no bulk badge. Its cells still take writes
+inline. The dock body holds its own 16rem cap; the grid's own scroll box
+fits inside it with no double scrollbar.
 
 ### Automatic canvas layout (`studio-canvas-auto-layout`)
 

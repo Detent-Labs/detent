@@ -1,10 +1,21 @@
 import { describe, expect, it } from "bun:test";
-import { matrixRows, cellState, cellEntry, liveCellSummary } from "../src/areas/studio/panels/fieldMatrixLogic.js";
-import { setFlag, gatedKeys } from "../src/areas/studio/draft/view-flags.js";
+import {
+  matrixRows,
+  cellState,
+  cellEntry,
+  filterInertSteps,
+  matrixCounts,
+  columnLiveTargets,
+  rowLiveTargets,
+  bulkBadgeOn,
+  applyBulkToggle,
+  isCellFlagged,
+} from "../src/areas/studio/panels/fieldMatrixLogic.js";
+import { setFlag, gatedKeys, writtenFieldIds } from "../src/areas/studio/draft/view-flags.js";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
 import type { DraftViewField } from "../src/areas/studio/draft/view-layout.js";
 import type { Step } from "workflow-engine/schema";
-import type { DraftOf } from "../src/areas/studio/draft/types.js";
+import type { Draft, DraftOf } from "../src/areas/studio/draft/types.js";
 
 type DraftStep = DraftOf<Step>;
 
@@ -76,23 +87,6 @@ describe("cellEntry", () => {
   });
 });
 
-describe("liveCellSummary", () => {
-  it("reads a departure from FLAG_DEFAULT as active, and a default value as not", () => {
-    const entry = vf({ ref: "field_vendor", required: true });
-    const summary = liveCellSummary(entry);
-    expect(summary.required).toEqual({ departsFromDefault: true, isExpression: false });
-    expect(summary.readonly).toEqual({ departsFromDefault: false, isExpression: false });
-    // visible defaults to true; absent here, so it resolves to the default.
-    expect(summary.visible).toEqual({ departsFromDefault: false, isExpression: false });
-  });
-
-  it("marks a CEL-holding flag as an expression, never as a departure", () => {
-    const entry = vf({ ref: "field_vendor", visible: { lang: "cel", src: "true" } });
-    const summary = liveCellSummary(entry);
-    expect(summary.visible).toEqual({ departsFromDefault: false, isExpression: true });
-  });
-});
-
 describe("the cell editor's writer", () => {
   it("writes through setFlag's delete-on-default behavior", () => {
     const entry = vf({ ref: "field_vendor", required: true });
@@ -103,5 +97,180 @@ describe("the cell editor's writer", () => {
   it("gates required/readonly the same way the form editor's strip does", () => {
     const entry = vf({ ref: "field_vendor", visible: false });
     expect(gatedKeys(entry)).toEqual(["required", "readonly"]);
+  });
+});
+
+describe("filterInertSteps", () => {
+  const steps: DraftStep[] = [
+    ds({ id: "step_a", view: { fields: [] } }),
+    ds({ id: "step_b" }), // no view — inert
+    ds({ id: "step_c", view: { fields: [] } }),
+  ];
+
+  it("draws every step, with its true index, when hideInert is off", () => {
+    expect(filterInertSteps(steps, false)).toEqual([
+      { step: steps[0], index: 0 },
+      { step: steps[1], index: 1 },
+      { step: steps[2], index: 2 },
+    ]);
+  });
+
+  it("drops a step with no view, keeping every other step's true index", () => {
+    expect(filterInertSteps(steps, true)).toEqual([
+      { step: steps[0], index: 0 },
+      { step: steps[2], index: 2 },
+    ]);
+  });
+});
+
+describe("matrixCounts", () => {
+  it("reflects the currently drawn steps", () => {
+    const rows = matrixRows(FIELDS); // 3 rows: field_group, field_qty, field_vendor
+    const drawnSteps: DraftStep[] = [
+      ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor" })] } }),
+      ds({ id: "step_b", view: { fields: [vf({ ref: "field_vendor" }), vf({ ref: "field_qty" })] } }),
+    ];
+    const counts = matrixCounts(rows, drawnSteps);
+    expect(counts).toEqual({ declaredEntries: 3, fieldCount: 3, stepCount: 2, undeclaredCells: 3 });
+  });
+});
+
+describe("bulk targets", () => {
+  const steps: DraftStep[] = [
+    ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor" })] } }),
+    ds({ id: "step_b" }), // inert — no view
+    ds({ id: "step_c", view: { fields: [vf({ ref: "field_vendor" }), vf({ ref: "field_qty" })] } }),
+  ];
+  const rows = matrixRows(FIELDS);
+
+  it("columnLiveTargets lists the live rows of one step, keyed by the step's own index", () => {
+    expect(columnLiveTargets(rows, steps[2]!, 2)).toEqual([
+      { stepIndex: 2, fieldId: "field_qty" },
+      { stepIndex: 2, fieldId: "field_vendor" },
+    ]);
+  });
+
+  it("rowLiveTargets lists the live steps for one field, across the full step list", () => {
+    expect(rowLiveTargets(steps, "field_vendor")).toEqual([
+      { stepIndex: 0, fieldId: "field_vendor" },
+      { stepIndex: 2, fieldId: "field_vendor" },
+    ]);
+  });
+});
+
+describe("bulkBadgeOn / applyBulkToggle", () => {
+  it("reads not-pressed and turns every eligible cell on, when none carry the non-default value", () => {
+    const steps: DraftStep[] = [
+      ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor" })] } }),
+      ds({ id: "step_b", view: { fields: [vf({ ref: "field_vendor" })] } }),
+    ];
+    const targets = [
+      { stepIndex: 0, fieldId: "field_vendor" },
+      { stepIndex: 1, fieldId: "field_vendor" },
+    ];
+    expect(bulkBadgeOn(steps, targets, "required")).toBe(false);
+    applyBulkToggle(steps, targets, "required");
+    expect(steps[0]!.view!.fields![0]!.required).toBe(true);
+    expect(steps[1]!.view!.fields![0]!.required).toBe(true);
+  });
+
+  it("clears every eligible cell's key, when every one already carries the non-default value", () => {
+    const steps: DraftStep[] = [
+      ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor", required: true })] } }),
+      ds({ id: "step_b", view: { fields: [vf({ ref: "field_vendor", required: true })] } }),
+    ];
+    const targets = [
+      { stepIndex: 0, fieldId: "field_vendor" },
+      { stepIndex: 1, fieldId: "field_vendor" },
+    ];
+    expect(bulkBadgeOn(steps, targets, "required")).toBe(true);
+    applyBulkToggle(steps, targets, "required");
+    expect("required" in steps[0]!.view!.fields![0]!).toBe(false);
+    expect("required" in steps[1]!.view!.fields![0]!).toBe(false);
+  });
+
+  it("skips a CEL-carrying cell and a gated cell — both excluded from eligible and from the write", () => {
+    const steps: DraftStep[] = [
+      ds({ id: "step_cel", view: { fields: [vf({ ref: "field_vendor", required: { lang: "cel", src: "true" } })] } }),
+      ds({ id: "step_gated", view: { fields: [vf({ ref: "field_vendor", visible: false })] } }),
+      ds({ id: "step_plain", view: { fields: [vf({ ref: "field_vendor" })] } }),
+    ];
+    const targets = [
+      { stepIndex: 0, fieldId: "field_vendor" },
+      { stepIndex: 1, fieldId: "field_vendor" },
+      { stepIndex: 2, fieldId: "field_vendor" },
+    ];
+    applyBulkToggle(steps, targets, "required");
+    expect(steps[0]!.view!.fields![0]!.required).toEqual({ lang: "cel", src: "true" });
+    expect("required" in steps[1]!.view!.fields![0]!).toBe(false);
+    expect(steps[2]!.view!.fields![0]!.required).toBe(true);
+  });
+
+  it("is a no-op when no target is eligible", () => {
+    const steps: DraftStep[] = [ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor", visible: false })] } })];
+    const targets = [{ stepIndex: 0, fieldId: "field_vendor" }];
+    expect(bulkBadgeOn(steps, targets, "required")).toBe(false);
+    applyBulkToggle(steps, targets, "required");
+    expect("required" in steps[0]!.view!.fields![0]!).toBe(false);
+  });
+});
+
+describe("writtenFieldIds", () => {
+  it("collects a field written by an action output, a subprocess output mapping, a column mapping, and contract.inputFields", () => {
+    const body: Draft = {
+      fields: [
+        df({ id: "field_a" }),
+        df({ id: "field_b" }),
+        df({ id: "field_c", columnMapping: { col1: "field_c" } }),
+        df({ id: "field_d" }),
+      ],
+      contract: { inputFields: ["field_d" as never] },
+      workflow: {
+        steps: [
+          ds({
+            id: "step_a",
+            onEntry: [{ output: { field_a: { lang: "cel", src: "result" } } }],
+            subprocess: { outputMapping: { field_b: { lang: "cel", src: "child.data.x" } } },
+          }),
+        ],
+      },
+    };
+    const written = writtenFieldIds(body);
+    expect(written.has("field_a")).toBe(true);
+    expect(written.has("field_b")).toBe(true);
+    expect(written.has("field_c")).toBe(true);
+    expect(written.has("field_d")).toBe(true);
+  });
+});
+
+describe("isCellFlagged", () => {
+  it("flags a cell that is required while hidden", () => {
+    const entry = vf({ ref: "field_vendor", visible: false, required: true });
+    expect(isCellFlagged(entry, "field_vendor", false, new Set())).toBe(true);
+  });
+
+  it("flags a required-and-readonly cell nothing else writes", () => {
+    const entry = vf({ ref: "field_vendor", required: true, readonly: true });
+    expect(isCellFlagged(entry, "field_vendor", false, new Set())).toBe(true);
+  });
+
+  it("does not flag a required-and-readonly cell some other source already writes", () => {
+    const entry = vf({ ref: "field_vendor", required: true, readonly: true });
+    expect(isCellFlagged(entry, "field_vendor", false, new Set(["field_vendor"]))).toBe(false);
+  });
+
+  it("does not flag a group field's own cell, whatever its values", () => {
+    const entry = vf({ ref: "field_group", visible: false, required: true });
+    expect(isCellFlagged(entry, "field_group", true, new Set())).toBe(false);
+  });
+
+  it("does not flag a cell carrying a CEL-driven flag", () => {
+    const entry = vf({ ref: "field_vendor", visible: { lang: "cel", src: "true" }, required: true });
+    expect(isCellFlagged(entry, "field_vendor", false, new Set())).toBe(false);
+  });
+
+  it("does not flag a cell at its defaults", () => {
+    const entry = vf({ ref: "field_vendor" });
+    expect(isCellFlagged(entry, "field_vendor", false, new Set())).toBe(false);
   });
 });

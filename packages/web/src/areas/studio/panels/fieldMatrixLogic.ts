@@ -2,9 +2,11 @@
  * The field matrix's row, column and cell derivation, kept out of React so it
  * can be tested (`studio-app`'s field-matrix requirements).
  *
- * Nothing here mutates. Every write the cell editor makes goes through
- * `setFlag` (`draft/view-flags.ts`), the same writer the form editor's strip
- * already uses.
+ * Nothing here mutates except `applyBulkToggle`, which mutates the `steps`
+ * array a caller passes it — always inside one `mutate()` recipe, never on
+ * its own (design.md decision 3, `field-matrix-toolbar-and-inline-editing`).
+ * Every write goes through `setFlag` (`draft/view-flags.ts`), the same
+ * writer the form editor's strip already uses.
  */
 import type { FieldId, Step } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
@@ -12,10 +14,18 @@ import type { DraftField } from "../draft/fields";
 import { flattenDraftFields } from "../draft/fields";
 import { flattenRailFields } from "../draft/panel-rail";
 import type { DraftViewField } from "../draft/view-layout";
-import { effectiveFlag, FLAG_DEFAULT, type FlagKey } from "../draft/view-flags";
+import { effectiveFlag, FLAG_DEFAULT, gatedKeys, setFlag, type FlagKey } from "../draft/view-flags";
+import type { BoolOrExpr } from "./shared/overrideMode";
 import { isExpression } from "./shared/overrideMode";
 
 type DraftStep = DraftOf<Step>;
+
+/** A field's `type` is either a literal type name or a `{ type, config }`
+ * plugin envelope. The row header shows the envelope's own `type`, and an
+ * empty string for a field whose type the author has not chosen yet. */
+function rowTypeLabel(type: DraftField["type"]): string {
+  return (typeof type === "string" ? type : type?.type) ?? "";
+}
 
 /** One row of the grid. `depth` caps at 1, matching `flattenRailFields`. A
  * group row draws no differently in state from any other row (design.md
@@ -25,19 +35,20 @@ export interface FieldMatrixRow {
   key: string;
   depth: 0 | 1;
   isGroup: boolean;
+  type: string;
 }
 
 /**
  * Rows in catalog order, `flattenRailFields`' own depth-first walk and depth
- * cap, with `isGroup` joined in from `flattenDraftFields`. No new traversal:
- * both walks already visit the catalog in the same order.
+ * cap, with `isGroup` and `type` joined in from `flattenDraftFields`. No new
+ * traversal: both walks already visit the catalog in the same order.
  */
 export function matrixRows(fields: DraftField[] | undefined): FieldMatrixRow[] {
   const byId = new Map(flattenDraftFields(fields).map((f) => [f.id, f]));
-  return flattenRailFields(fields).map((row) => ({
-    ...row,
-    isGroup: byId.get(row.id as FieldId)?.type === "group",
-  }));
+  return flattenRailFields(fields).map((row) => {
+    const field = byId.get(row.id as FieldId);
+    return { ...row, isGroup: field?.type === "group", type: rowTypeLabel(field?.type) };
+  });
 }
 
 export type CellState = "hatched" | "blank" | "live";
@@ -58,36 +69,132 @@ export function cellEntry(step: DraftStep, fieldId: string): { entry: DraftViewF
   return index === -1 ? undefined : { entry: fields[index]!, index };
 }
 
-/** One flag's compact summary: whether its resolved value departs from
- * `FLAG_DEFAULT`, and whether it carries a CEL expression. A departure and an
- * expression are mutually exclusive — an expression's resolved value is the
- * expression itself, not a boolean, so it never compares against the
- * default. */
-export interface FlagSummary {
-  departsFromDefault: boolean;
-  isExpression: boolean;
+/** A step with no `view` at all hides its whole column when `hideInert` is
+ * on; every other step draws. Rows are never filtered — the toolbar's toggle
+ * touches only columns (`studio-app`'s toolbar requirement). */
+export function filterInertSteps(steps: DraftStep[], hideInert: boolean): DrawnStep[] {
+  return steps.map((step, index) => ({ step, index })).filter(({ step }) => !hideInert || step.view !== undefined);
 }
 
-export interface LiveCellSummary {
-  visible: FlagSummary;
-  required: FlagSummary;
-  readonly: FlagSummary;
+/** One drawn column: the step, and its index in the FULL, unfiltered
+ * `workflow.steps` array — the index a write needs, independent of which
+ * columns `hideInert` currently hides. */
+export interface DrawnStep {
+  step: DraftStep;
+  index: number;
 }
 
-function summarizeFlag(entry: DraftViewField, key: FlagKey): FlagSummary {
-  const value = entry[key];
-  const expr = isExpression(value);
-  return { departsFromDefault: !expr && effectiveFlag(value, key) !== FLAG_DEFAULT[key], isExpression: expr };
+/** The toolbar's count line: declared view entries, the field count, the
+ * count of steps the grid currently draws, and the number of cells among
+ * those steps that carry no entry (`studio-app`'s toolbar requirement).
+ * `drawnSteps` is already `hideInert`-filtered; `declaredEntries` over it
+ * equals the total over every step, since a filtered-out step declares no
+ * view and so contributes no entries either way. */
+export interface MatrixCounts {
+  declaredEntries: number;
+  fieldCount: number;
+  stepCount: number;
+  undeclaredCells: number;
 }
 
-/** A live cell's summary, read straight from `effectiveFlag`/`isExpression`
- * (`draft/view-flags.ts`, `panels/shared/overrideMode.ts`). No independent
- * resolution logic: the cell editor and this summary must never disagree
- * about what a flag resolves to. */
-export function liveCellSummary(entry: DraftViewField): LiveCellSummary {
-  return {
-    visible: summarizeFlag(entry, "visible"),
-    required: summarizeFlag(entry, "required"),
-    readonly: summarizeFlag(entry, "readonly"),
-  };
+export function matrixCounts(rows: FieldMatrixRow[], drawnSteps: DraftStep[]): MatrixCounts {
+  const declaredEntries = drawnSteps.reduce((sum, step) => sum + (step.view?.fields?.length ?? 0), 0);
+  const fieldCount = rows.length;
+  const stepCount = drawnSteps.length;
+  return { declaredEntries, fieldCount, stepCount, undeclaredCells: fieldCount * stepCount - declaredEntries };
+}
+
+/** Whether a bulk badge may touch this cell's flag: live (the caller already
+ * filters to live cells), not carrying a CEL expression for this flag, and
+ * not gated off by its own `visible: false` (`studio-app`'s bulk-toggle
+ * requirement — "Eligible means live, non-CEL, not gated"). */
+function cellEligible(entry: DraftViewField, key: FlagKey): boolean {
+  return !isExpression(entry[key]) && !gatedKeys(entry).includes(key);
+}
+
+/** One (step, field) pair a bulk badge would touch, identified by the
+ * step's TRUE index in `workflow.steps` — independent of `hideInert`, so a
+ * write lands on the right step whether or not its column is currently
+ * drawn. */
+export interface BulkTarget {
+  stepIndex: number;
+  fieldId: string;
+}
+
+/** The targets a column's bulk badge touches: every row live in this one
+ * step. */
+export function columnLiveTargets(rows: FieldMatrixRow[], step: DraftStep, stepIndex: number): BulkTarget[] {
+  return rows.filter((r) => cellState(step, r.id) === "live").map((r) => ({ stepIndex, fieldId: r.id }));
+}
+
+/** The targets a row's bulk badge touches: every step live for this one
+ * field, across the FULL step list — a row is never filtered by
+ * `hideInert`, and an inert step can hold no live cell regardless. */
+export function rowLiveTargets(steps: DraftStep[], fieldId: string): BulkTarget[] {
+  return steps.reduce<BulkTarget[]>((out, step, stepIndex) => {
+    if (cellState(step, fieldId) === "live") out.push({ stepIndex, fieldId });
+    return out;
+  }, []);
+}
+
+function eligibleTargetEntries(
+  steps: DraftStep[],
+  targets: BulkTarget[],
+  key: FlagKey,
+): { target: BulkTarget; entry: DraftViewField }[] {
+  const out: { target: BulkTarget; entry: DraftViewField }[] = [];
+  for (const target of targets) {
+    const step = steps[target.stepIndex];
+    if (!step) continue;
+    const cell = cellEntry(step, target.fieldId);
+    if (cell && cellEligible(cell.entry, key)) out.push({ target, entry: cell.entry });
+  }
+  return out;
+}
+
+/** Whether a column's or row's bulk badge reads as pressed: every eligible
+ * cell it would touch already carries the flag's non-default value
+ * (`studio-app`'s bulk-toggle requirement). An empty eligible set reads as
+ * not pressed — there is nothing to reflect. */
+export function bulkBadgeOn(steps: DraftStep[], targets: BulkTarget[], key: FlagKey): boolean {
+  const eligible = eligibleTargetEntries(steps, targets, key);
+  return eligible.length > 0 && eligible.every(({ entry }) => effectiveFlag(entry[key], key) !== FLAG_DEFAULT[key]);
+}
+
+/**
+ * A bulk badge's click: flips every eligible target's flag to the opposite
+ * of the current "all agree" state, in place on `steps` — the caller's own
+ * `mutate()` recipe, per design.md decision 3. One pass over the eligible
+ * cells, not one `mutate()` per cell.
+ */
+export function applyBulkToggle(steps: DraftStep[], targets: BulkTarget[], key: FlagKey): void {
+  const eligible = eligibleTargetEntries(steps, targets, key);
+  if (eligible.length === 0) return;
+  const on = eligible.every(({ entry }) => effectiveFlag(entry[key], key) !== FLAG_DEFAULT[key]);
+  const next: BoolOrExpr = on ? FLAG_DEFAULT[key] : !FLAG_DEFAULT[key];
+  for (const { target } of eligible) {
+    const fields = steps[target.stepIndex]?.view?.fields;
+    if (!fields) continue;
+    const idx = fields.findIndex((f) => f.ref === target.fieldId);
+    if (idx === -1) continue;
+    fields[idx] = setFlag(fields[idx]!, key, next);
+  }
+}
+
+/**
+ * The flagged-cell marker: `checkViewFlags`'s exact three-part test
+ * (`draft/view-flags.ts`), applied to one live cell (design.md decision 5).
+ * Shares `writtenFieldIds`'s one expensive computation with that check
+ * instead of reimplementing it, so the two can never disagree about what
+ * "already written" means. A CEL-carrying flag skips the marker outright:
+ * it resolves only against an instance, so no literal comparison applies.
+ */
+export function isCellFlagged(entry: DraftViewField, fieldId: string, isGroupRow: boolean, writtenIds: Set<string>): boolean {
+  if (isGroupRow) return false;
+  if (isExpression(entry.visible) || isExpression(entry.required) || isExpression(entry.readonly)) return false;
+  const visible = effectiveFlag(entry.visible, "visible") as boolean;
+  const required = effectiveFlag(entry.required, "required") as boolean;
+  const readonly = effectiveFlag(entry.readonly, "readonly") as boolean;
+  if (required && !visible) return true;
+  return required && readonly && !writtenIds.has(fieldId);
 }

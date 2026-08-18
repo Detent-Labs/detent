@@ -71,22 +71,18 @@ function readerLabel(field: DraftField | undefined, ref: string): string {
 }
 
 /**
- * The studio's own findings over the whole draft, reported as `EditorIssue`s
- * with the `"view"` source. Both rules read a literal flag alone — an
- * expression resolves only against an instance, which the studio holds none
- * of — and both skip a view entry naming a group-container field, since the
- * engine forces `required`/`readonly` to false there (see design.md decision
- * 5a). Neither rule blocks a publish; see `studio-checks-rail`'s "Every
- * publish blocker is visible" requirement.
+ * Every field id some source in the body supplies a value for: a writable
+ * view entry elsewhere (visible, non-readonly — a participant can fill it
+ * in), an action's `output`, a step's `subprocess.outputMapping`, a field's
+ * `columnMapping`, or a `contract.inputFields` entry. Shared by
+ * `checkViewFlags`'s own finding and the field matrix's flagged-cell marker
+ * (`panels/fieldMatrixLogic.ts`), so neither can disagree about what
+ * "already written" means (design.md decision 5, `field-matrix-toolbar-and-
+ * inline-editing`).
  */
-export function checkViewFlags(body: Draft): EditorIssue[] {
-  const issues: EditorIssue[] = [];
+export function writtenFieldIds(body: Draft): Set<string> {
   const steps = body.workflow?.steps ?? [];
   const fieldsById = new Map(flattenDraftFields(body.fields).map((f) => [f.id, f]));
-
-  // The written-field set: every field id some other source in the body
-  // supplies a value for, outside the view entry under test. Five sources,
-  // two polarities (design.md decision 5).
   const written = new Set<string>();
 
   for (const step of steps) {
@@ -117,6 +113,24 @@ export function checkViewFlags(body: Draft): EditorIssue[] {
   for (const id of body.contract?.inputFields ?? []) {
     if (id) written.add(id);
   }
+
+  return written;
+}
+
+/**
+ * The studio's own findings over the whole draft, reported as `EditorIssue`s
+ * with the `"view"` source. Both rules read a literal flag alone — an
+ * expression resolves only against an instance, which the studio holds none
+ * of — and both skip a view entry naming a group-container field, since the
+ * engine forces `required`/`readonly` to false there (see design.md decision
+ * 5a). Neither rule blocks a publish; see `studio-checks-rail`'s "Every
+ * publish blocker is visible" requirement.
+ */
+export function checkViewFlags(body: Draft): EditorIssue[] {
+  const issues: EditorIssue[] = [];
+  const steps = body.workflow?.steps ?? [];
+  const fieldsById = new Map(flattenDraftFields(body.fields).map((f) => [f.id, f]));
+  const written = writtenFieldIds(body);
 
   for (const step of steps) {
     if (!step.id) continue;
