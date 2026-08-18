@@ -70,7 +70,6 @@ below belongs to the structure surface alone.
 | checks rail | the validation issue list, grouped by check | `panels/ChecksRail.tsx` |
 | dock | the collapsible strip below the canvas columns | `dock/EditorDock.tsx` |
 | dock tab | one of the dock's three views: Changes, Field matrix, Paths | `dock/EditorDock.tsx`, `DOCK_TABS` |
-| player | the step-form preview an author drives | `screens/PlayerScreen.tsx` |
 
 ### The panels screen
 
@@ -94,6 +93,25 @@ the checks rail.
 All four views stay mounted at once; `hidden` shows one and hides the other
 three. A view keeps its own edit state across a switch: a half-typed outcome
 name, a selected field. Unmounting on every switch would lose that state.
+
+### The player
+
+The player drives one real instance through the Runtime API Layer, the same
+one a participant's Task screen drives. What an author previews here is what
+a participant gets. Top to bottom: instance access, then a two-pane layout
+once an instance is open.
+
+| Term | Names | Lives in |
+|---|---|---|
+| player | the routed screen that drives one instance for preview | `screens/PlayerScreen.tsx` |
+| instance access | the `<fieldset>` above the panes: create a new instance, or open one by id | `PlayerScreen.tsx` |
+| form pane | the left pane: the status line, the step form, the claim controls, the path buttons | `.studio-player-form` |
+| step form | the field-by-field renderer both the player and the app area's Task screen mount | `FieldForm`, `packages/form-ui` |
+| path buttons | the manual-path submit controls below the step form | `PathButtons`, `packages/form-ui` |
+| record pane | the right pane: the open instance's merged transition/event history | `.studio-player-record` |
+
+The record pane shows the same merged record the admin area's instance
+detail shows, from one shared function: `describeRecordElement`.
 
 **rail** names a class of component, not one component. A rail is a
 fixed-width column beside a screen's main content, scrolled on its own. It
