@@ -15,6 +15,15 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   entry. Pre-existing gap, not introduced by `studio-formui-ridealong-cuts`'s
   removal of `FieldForm`'s `baseLocale` prop. Fixing it needs an `InstanceView`
   API change plus a `TaskScreen.tsx` wiring change.
+- Whether to mark a field as technical (never directly editable by a
+  participant) by inference or by a declared schema key. `ROADMAP.md` stage
+  44 carries the case in full: raised 2026-08-19 while verifying
+  `gate-required-readonly-conflict` against `loan_application`'s `result`
+  field, which only `check`'s `subprocess.outputMapping` ever writes.
+  Inferring it from `writtenFieldCounts` (`draft/view-flags.ts`) needs no
+  schema change. A declared `technical` key on `FieldDef` (`definition.ts`)
+  would let an author state that intent before any writer exists, at the
+  cost of a definition-contract change and full OpenSpec treatment.
 
 ## Decided, not yet built (each needs its own OpenSpec change)
 - **Process-scoped permissions: the filter, the draft scope, and the
