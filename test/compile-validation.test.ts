@@ -164,6 +164,17 @@ describe("compile: unknown-key rejection", () => {
     }
   });
 
+  // drop-view-renderer-unused-field: view.renderer was a declared, unread
+  // field. Deleting it from the schema turns an authored `view.renderer`
+  // into an unknown key, through the same generic mechanism the "view"
+  // case above already exercises for other unknown keys on this object.
+  it("rejects an authored view.renderer as an unknown key", () => {
+    const b = baseBody();
+    b.workflow.steps[0].view = { fields: [], renderer: { type: "custom", config: {} } };
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "workflow.steps[0].view.renderer" && i.value === "renderer")).toBe(true);
+  });
+
   // design.md's Risk section: this is the counterexample that rules out
   // "parse the whole body, then diff" as the detection mechanism. `assignment`
   // requires `strategy` (definition.ts), so a naive parse-then-diff approach

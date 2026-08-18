@@ -461,7 +461,6 @@ export type ViewField = z.infer<typeof viewField>;
 
 export const view = z.object({
   fields: z.array(viewField),
-  renderer: plugin.optional(),
   /** How many columns the step's form lays its root fields out in. Layout
    * only, like `ViewField.span`. Absent means 1, which is the single stacked
    * column every body written before this key parsed to, so no stored body

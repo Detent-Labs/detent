@@ -567,8 +567,7 @@ interface PluginTypeSite {
 }
 
 /** Every Plugin.type site: action.type (all five positions), dataSource.type,
- * view.renderer.type, assignment.strategy.type, and a plugin-typed field's
- * `type.type`. */
+ * assignment.strategy.type, and a plugin-typed field's `type.type`. */
 function collectPluginTypeSites(body: ProcessBody): PluginTypeSite[] {
   const sites: PluginTypeSite[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -580,7 +579,6 @@ function collectPluginTypeSites(body: ProcessBody): PluginTypeSite[] {
   (body.dataSources ?? []).forEach((d, i) => pushType(d, `dataSources[${i}]`));
   body.workflow.steps.forEach((s, si) => {
     const sloc = `steps[${si}]`;
-    if (s.view?.renderer) pushType(s.view.renderer, `${sloc}.view.renderer`);
     if (s.assignment?.strategy) pushType(s.assignment.strategy, `${sloc}.assignment.strategy`);
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
