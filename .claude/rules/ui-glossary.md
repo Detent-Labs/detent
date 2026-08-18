@@ -16,21 +16,77 @@ pairs that go wrong span both sections, so both live in one file.
 
 ## 1. Chrome: the parts of the screen
 
+"Chrome" is the general UI term for an application's fixed frame. It names
+the persistent controls around the content, not the content itself. A menu
+bar, a toolbar, a scrollbar are chrome; the document inside them is not.
+The term predates the Google Chrome browser. That browser took its name from
+this term, because it deliberately shows almost none of it. In this
+codebase, "chrome" names the one header every area shares.
+
+### The shell
+
+Every area's chrome is one component, `Chrome.tsx` in `src/shell/`. It wraps
+whichever area is open and renders the same header row around it every time.
+
+| Term | Names | Lives in |
+|---|---|---|
+| header | the one fixed row atop every area, holding the register tab, the area nav and the account group | `Chrome.tsx`, `.shell-header` |
+| register tab | the label naming the open area, at the header's left edge; full definition in `design-language.md` | `.shell-tab` |
+| area nav | the open area's own navigation buttons, right of the register tab | passed into `Chrome` as its `nav` prop |
+| account group | the identity span and the account menu trigger, right-aligned in the header | `.shell-account-group` |
+| account menu | the popover the account group opens: profile, language, area switch, logout | `.shell-menu` |
+
+The area switch lives inside the account menu, not as a persistent tab row.
+The switcher filters the current area out of the actor's permitted set. An
+actor permitted only one area gets an empty set from that filter. The
+switcher then renders nothing, so that actor sees no trace of the other
+three areas.
+
+### The edit screen
+
+A draft opens on this one screen, `EditScreen.tsx`. Top to bottom: the
+screen nav, the header bar, then either the structure surface or the JSON
+surface.
+
+| Term | Names | Lives in |
+|---|---|---|
+| screen nav | the row above the header bar: Back to processes, Versions, Player | `.studio-header-nav` |
+| header bar | the process-identity row: name, key, revision, dirty/saved state, the `⋮` menu | `panels/ProcessHeaderBar.tsx`, `.studio-header-bar` |
+| surface toggle | the Structure/JSON switch, inside the header bar | `.studio-surface-toggle` |
+| structure surface | the editing view: edit rail, canvas, inspector or checks rail, dock | `EditScreen.tsx`, `surface === "structure"` |
+| JSON surface | the raw definition view, the structure surface's one alternative | `panels/JsonView.tsx` |
+
+Both surfaces share the header bar and the surface toggle. Every other term
+below belongs to the structure surface alone.
+
 | Term | Names | Lives in |
 |---|---|---|
 | canvas | the graph surface an author draws a process on | `canvas/CanvasView.tsx` |
-| inspector | the `<aside>` beside the canvas | `EditScreen.tsx`, `.canvas-inspector` |
+| edit rail | the column left of the canvas, holding the palette and the process links | `canvas/EditRail.tsx`, `.studio-rail` |
+| palette | the edit rail's "Add to canvas" section: drag a Step, Subprocess or End onto the canvas | `.studio-palette-list` |
+| process links | the edit rail's "Process" section: one row per panels-screen view, each with a count | `.studio-rail-row` |
+| inspector | the `<aside>` beside the canvas, editing one selected step or path | `EditScreen.tsx`, `.canvas-inspector` |
 | inspector panel | one section inside the inspector | `panels/StepsPanel.tsx` and what it nests |
-| edit rail | the creation palette: add a step, a path, an outcome | `canvas/EditRail.tsx` |
-| checks rail | the validation issue list | `panels/ChecksRail.tsx` |
+| checks rail | the validation issue list, grouped by check | `panels/ChecksRail.tsx` |
 | dock | the collapsible strip below the canvas columns | `dock/EditorDock.tsx` |
+| dock tab | one of the dock's three views: Changes, Field matrix, Paths | `dock/EditorDock.tsx`, `DOCK_TABS` |
 | panels screen | the routed screen holding the four process-wide views | `screens/PanelsScreen.tsx` |
+| index rail | the panels screen's own left column: one entry per view, with a count and an issue badge | `screens/PanelsScreen.tsx`, `.studio-panels-rail` |
 | field matrix | the grid of every field against every step, on the panels screen and in the dock | `panels/FieldMatrixPanel.tsx` |
 | player | the step-form preview an author drives | `screens/PlayerScreen.tsx` |
-| JSON surface | the raw definition view | `panels/JsonView.tsx` |
 
-**rail** alone names nothing. Two rails exist and they sit on opposite sides of
-the canvas. Say *edit rail* or *checks rail*, every time.
+**rail** names a class of component, not one component. A rail is a
+fixed-width column beside a screen's main content, scrolled on its own. It
+holds a register list, or a validation list. Three rails exist.
+
+The edit rail sits left of the canvas. It holds the palette and the process
+links. The checks rail holds the validation issue list. It sits right of the
+canvas, or right of the open view on the panels screen. The index rail sits
+left of the open view on the panels screen. It holds the view list.
+
+**rail** alone names none of the three. Say *edit rail*, *checks rail* or
+*index rail*, every time. The edit rail's own two sections are the palette
+and process links, never "the process rail."
 
 **panel** alone names nothing either. The inspector holds inspector panels.
 `PanelsScreen` holds four views: the field catalog, data sources, the

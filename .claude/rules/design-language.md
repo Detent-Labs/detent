@@ -98,6 +98,12 @@ stamp, an identity, and a right-aligned quantity in the mono face, like a
 ledger's amount column. The row's identifying content is a real control. The
 row itself carries no click handler.
 
+Studio's index rail (`.studio-panels-rail-entry`, `.studio-panels-rail-field`)
+follows a plainer version of the same rule. A hairline sits between entries,
+content stays flush left, and the mono-faced count or type name sits
+right-aligned. It carries no stamp, so the rule holds without the first
+column.
+
 **The measuring rule** (`.rep-rule`). Reports' one chart form is a hairline
 with an accent fill whose length carries a quantity. The figure prints
 beside it in the mono face. The bar carries `aria-hidden`. The number is the
