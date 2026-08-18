@@ -70,10 +70,30 @@ below belongs to the structure surface alone.
 | checks rail | the validation issue list, grouped by check | `panels/ChecksRail.tsx` |
 | dock | the collapsible strip below the canvas columns | `dock/EditorDock.tsx` |
 | dock tab | one of the dock's three views: Changes, Field matrix, Paths | `dock/EditorDock.tsx`, `DOCK_TABS` |
-| panels screen | the routed screen holding the four process-wide views | `screens/PanelsScreen.tsx` |
-| index rail | the panels screen's own left column: one entry per view, with a count and an issue badge | `screens/PanelsScreen.tsx`, `.studio-panels-rail` |
-| field matrix | the grid of every field against every step, on the panels screen and in the dock | `panels/FieldMatrixPanel.tsx` |
 | player | the step-form preview an author drives | `screens/PlayerScreen.tsx` |
+
+### The panels screen
+
+The edit rail's process links route here, and so does a click on a field
+group in the checks rail. Top to bottom: the panels screen header, then a
+row of three columns. Those columns are the index rail, the open view, and
+the checks rail.
+
+| Term | Names | Lives in |
+|---|---|---|
+| panels screen | the routed screen holding the four process-wide views | `screens/PanelsScreen.tsx` |
+| panels screen header | the top bar: Back to canvas, the open view's name, a save-with-draft note | `.studio-panels-screen-header` |
+| index rail | the left column: one entry per view, with a count and an issue badge | `.studio-panels-rail` |
+| rail sublist | the index rail's own entry list, under the fields or data sources view alone: one row per entity | `.studio-panels-rail-sublist` |
+| open view | the center column: whichever of the four views is not `hidden` | `.studio-panels-screen-view` |
+| field catalog | the open view that lists and edits the process's field definitions | `panels/FieldCatalogPanel.tsx` |
+| data sources | the open view that lists and edits the process's data source definitions | `panels/DataSourcesPanel.tsx` |
+| contract | the open view that edits the process's `ProcessContract`: input fields, output fields, outcomes | `panels/ContractPanel.tsx` |
+| field matrix | the open view with the grid of every field against every step; also a dock tab | `panels/FieldMatrixPanel.tsx` |
+
+All four views stay mounted at once; `hidden` shows one and hides the other
+three. A view keeps its own edit state across a switch: a half-typed outcome
+name, a selected field. Unmounting on every switch would lose that state.
 
 **rail** names a class of component, not one component. A rail is a
 fixed-width column beside a screen's main content, scrolled on its own. It
