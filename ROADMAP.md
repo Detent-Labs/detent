@@ -206,6 +206,34 @@ Specs: `development-toolchain`, `devcontainer-preflight`.
     Specs: `authorization`, `permission-grant-administration`, `http-wrapper`,
     `studio-publish`, `admin-user-management`, `instance-query`.
 
+43. **Step-level validation overrides: ENGINE DONE, STUDIO UI NOT BUILT.**
+    Landed 2026-08-18 as `step-validation-overrides`. A catalog field's
+    `min`/`max`/`minLength`/`maxLength`/`pattern`/`rule` used to apply
+    unchanged to every step that showed the field. A CAPEX process needing a
+    `betrag` field capped at 10000 normally but 1000 on a "small request"
+    step had to fork the field into two catalog entries under two ids, which
+    split the value a report reads and a migration maps.
+
+    `ViewField` now carries an optional `validation`, the same shape the
+    catalog field's own carries, plus `validationMode`: `"merge"` (the
+    default) overlays the step's keys on the catalog's, `"replace"` drops
+    the catalog's whole. `validateSubmissionData`
+    (`src/runtime/api.ts::effectiveValidation`) resolves the two per field
+    per step, at the point of the submission check, not in `resolveFields`:
+    the override never reaches `ResolvedViewField`, so it never reaches
+    `GET /instances/:id`. Publish compiles a step-level `pattern` and
+    type-checks a step-level `rule` on the same terms the catalog's own
+    already faced.
+
+    No studio surface exposes it. An author writes the override through the
+    JSON view alone, the low-code escape hatch the no-code direction keeps
+    first-class. The form editor's per-step strip stops at
+    `visible`/`required`/`readonly`, and the field matrix draws no marker
+    for a step carrying one. Both are a later change's to make, once an
+    author asks for the control rather than the JSON.
+
+    Specs: `definition-contract`, `runtime-api`, `cel-expressions`.
+
 ## Done
 
 Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
