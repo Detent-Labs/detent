@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEve
 import { useDraft } from "../draft/store";
 import { t } from "../catalog.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text";
-import { effectiveFlag, gatedKeys, setFlag, writtenFieldIds, type FlagKey } from "../draft/view-flags";
+import { effectiveFlag, gatedKeys, setFlag, writtenFieldCounts, type FlagKey } from "../draft/view-flags";
 import type { BoolOrExpr } from "./shared/overrideMode";
 import { isExpression } from "./shared/overrideMode";
 import {
@@ -55,10 +55,12 @@ function CelStamp({ label, src }: { label: string; src: string }) {
 function BulkBadges({
   targets,
   allSteps,
+  written,
   onToggle,
 }: {
   targets: BulkTarget[];
   allSteps: Parameters<typeof bulkBadgeOn>[0];
+  written: Map<string, number>;
   onToggle: (key: FlagKey) => void;
 }) {
   return (
@@ -68,7 +70,7 @@ function BulkBadges({
           key={key}
           type="button"
           className="studio-matrix-flag-badge"
-          aria-pressed={bulkBadgeOn(allSteps, targets, key)}
+          aria-pressed={bulkBadgeOn(allSteps, targets, key, written)}
           aria-label={t(FLAG_LABEL_KEY[key])}
           title={t(FLAG_LABEL_KEY[key])}
           onClick={() => onToggle(key)}
@@ -115,7 +117,8 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
   const rows = useMemo(() => matrixRows(draft.fields), [draft.fields]);
   const allSteps = draft.workflow?.steps ?? [];
   const drawnSteps = filterInertSteps(allSteps, hideInert);
-  const written = useMemo(() => writtenFieldIds(draft), [draft]);
+  const written = useMemo(() => writtenFieldCounts(draft), [draft]);
+  const writtenIds = useMemo(() => new Set([...written].filter(([, count]) => count > 0).map(([id]) => id)), [written]);
 
   const [focus, setFocus] = useState<Focus>({ row: 0, col: 0 });
   const [activated, setActivated] = useState(false);
@@ -213,7 +216,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
   const applyBulk = (targets: BulkTarget[], key: FlagKey) => {
     mutate((d) => {
       const steps = d.workflow?.steps;
-      if (steps) applyBulkToggle(steps, targets, key);
+      if (steps) applyBulkToggle(steps, targets, key, written);
     });
   };
 
@@ -239,7 +242,12 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                   <span className="studio-matrix-col-key">{step.key}</span>
                   {inert && <span className="studio-matrix-col-note">{t("fieldMatrix.columnInertNote")}</span>}
                   {showBulkBadges && colTargets.length > 0 && (
-                    <BulkBadges targets={colTargets} allSteps={allSteps} onToggle={(key) => applyBulk(colTargets, key)} />
+                    <BulkBadges
+                      targets={colTargets}
+                      allSteps={allSteps}
+                      written={written}
+                      onToggle={(key) => applyBulk(colTargets, key)}
+                    />
                   )}
                 </th>
               );
@@ -260,7 +268,12 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                     {row.type}
                   </span>
                   {showBulkBadges && rowTargets.length > 0 && (
-                    <BulkBadges targets={rowTargets} allSteps={allSteps} onToggle={(key) => applyBulk(rowTargets, key)} />
+                    <BulkBadges
+                      targets={rowTargets}
+                      allSteps={allSteps}
+                      written={written}
+                      onToggle={(key) => applyBulk(rowTargets, key)}
+                    />
                   )}
                 </th>
                 {drawnSteps.map(({ step, index: stepIndex }, colIndex) => {
@@ -268,7 +281,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                   const entry = state === "live" ? cellEntry(step, row.id)?.entry : undefined;
                   const isFocusCell = focus.row === rowIndex && focus.col === colIndex;
                   const isActiveCell = activated && isFocusCell;
-                  const flagged = entry ? isCellFlagged(entry, row.id, row.isGroup, written) : false;
+                  const flagged = entry ? isCellFlagged(entry, row.id, row.isGroup, writtenIds) : false;
                   return (
                     <td
                       key={step.id ?? colIndex}
@@ -298,7 +311,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                             if (isExpression(raw)) {
                               return <CelStamp key={key} label={t(FLAG_LABEL_KEY[key])} src={raw.src ?? ""} />;
                             }
-                            const disabled = key !== "visible" && gatedKeys(entry).includes(key);
+                            const disabled = key !== "visible" && gatedKeys(entry, written).includes(key);
                             return (
                               <input
                                 key={key}

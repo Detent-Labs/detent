@@ -770,6 +770,22 @@ Where a live cell's own `visible` resolves to a literal `false`, that
 cell's `required` and `readonly` checkboxes SHALL disable. That is the
 same gating the field matrix applied before this change.
 
+Where no other source in the draft writes a live cell's field, its
+`required` and `readonly` checkboxes SHALL gate each other. Checking
+`required` SHALL disable `readonly`, while `readonly` does not already
+read `true`. Checking `readonly` SHALL disable `required`, while
+`required` does not already read `true`. "No other source" means none
+of these already write the field:
+
+- an action's `output`
+- a subprocess's `outputMapping`
+- a field's `columnMapping`
+- a `contract.inputFields` entry
+
+Where a cell already carries `required: true` and `readonly: true`
+before either gate engages, neither checkbox SHALL disable. The
+developer keeps a path to uncheck either one.
+
 Where a flag already carries a CEL expression, its checkbox SHALL give
 way entirely to the CEL stamp. That stamp sits in the same horizontal
 row as the cell's other controls. The matrix SHALL offer no control
@@ -834,6 +850,34 @@ possible only on the field's own strip.
 - **THEN** it announces that flag's own name, through the checkbox's
   `aria-label`
 
+#### Scenario: Checking required disables readonly on an unwritten field
+
+- **WHEN** the developer checks a live cell's `required` box
+- **AND** nothing else in the draft writes that field
+- **AND** that cell's `readonly` does not already read `true`
+- **THEN** that cell's `readonly` checkbox disables
+
+#### Scenario: Checking readonly disables required on an unwritten field
+
+- **WHEN** the developer checks a live cell's `readonly` box
+- **AND** nothing else in the draft writes that field
+- **AND** that cell's `required` does not already read `true`
+- **THEN** that cell's `required` checkbox disables
+
+#### Scenario: A field something else writes keeps both controls free
+
+- **WHEN** the developer checks a live cell's `required` box
+- **AND** an action output, a subprocess output mapping, a column
+  mapping, or a contract input field already writes that field
+- **THEN** that cell's `readonly` checkbox stays enabled
+
+#### Scenario: An entry already carrying both flags stays editable
+
+- **WHEN** a live cell already carries `required: true` and
+  `readonly: true`, on a field nothing else in the draft writes
+- **THEN** neither the `required` nor the `readonly` checkbox disables
+- **AND** the developer can uncheck either one
+
 ### Requirement: Column headers name the step and flag steps with no view
 
 Each column header SHALL show the step's `key` alongside its resolved
@@ -871,9 +915,13 @@ toolbar or bulk badges," states that half.
 Each column header and each row header SHALL offer `visible`,
 `required` and `readonly` toggle badges. This holds wherever that
 column or row carries at least one live cell. A badge SHALL flip
-every live, non-CEL cell in that column or row. A `required` or
-`readonly` badge
-SHALL skip any cell whose own `visible` resolves to `false`.
+every live, non-CEL cell in that column or row.
+
+A `required` or `readonly` badge SHALL skip any cell already gated for
+that flag. Gated means one of two things: the cell's own `visible`
+resolves to `false`, or the field's other flag among
+`required`/`readonly` already resolves to `true`. The second case
+applies only while nothing else in the draft writes that field.
 
 Where every eligible cell already carries the flag's non-default
 value, the badge SHALL turn that flag off across those cells. It
@@ -908,6 +956,13 @@ A column or row with no live cell SHALL carry no bulk toggle badge.
 
 - **WHEN** a workflow step declares no `view`
 - **THEN** that step's column header carries no bulk toggle badge
+
+#### Scenario: A bulk badge skips a cell gated by the required/readonly rule
+
+- **WHEN** the developer selects a column's or row's `readonly` badge
+- **AND** a targeted cell already carries `required: true`, on a field
+  nothing else in the draft writes
+- **THEN** the badge does not change that cell's `readonly` value
 
 ### Requirement: The panels screen's field matrix toolbar filters inert columns and reports coverage
 

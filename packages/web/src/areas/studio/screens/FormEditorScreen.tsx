@@ -1,4 +1,4 @@
-import { useEffect, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useState, type DragEvent } from "react";
 import type { FieldId, Step, View } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
@@ -19,7 +19,7 @@ import { PALETTE_FIELD_KINDS, mintCatalogField, type PaletteFieldKind } from "..
 import { seedLocalizedText } from "../draft/localized-text";
 import { BooleanOrExpressionInput } from "../panels/shared/BooleanOrExpressionInput";
 import { isExpression, type BoolOrExpr } from "../panels/shared/overrideMode";
-import { effectiveFlag, gatedKeys, setFlag, type FlagKey } from "../draft/view-flags";
+import { effectiveFlag, gatedKeys, setFlag, writtenFieldCounts, type FlagKey } from "../draft/view-flags";
 
 type DraftStep = DraftOf<Step>;
 type DraftView = DraftOf<View>;
@@ -112,7 +112,8 @@ interface Props {
  * stays the only thing that persists.
  */
 export function FormEditorScreen({ step, index, fields, onBack }: Props) {
-  const { mutate, contentLocale } = useDraft();
+  const { draft, mutate, contentLocale } = useDraft();
+  const written = useMemo(() => writtenFieldCounts(draft), [draft]);
   const [selected, setSelected] = useState<number | undefined>(undefined);
   const [dragging, setDragging] = useState<Dragging | undefined>(undefined);
 
@@ -400,7 +401,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
                 label={t("formEditor.required")}
                 stepId={step.id}
                 flagKey="required"
-                disabled={gatedKeys(selectedRow).includes("required")}
+                disabled={gatedKeys(selectedRow, written).includes("required")}
                 value={selectedRow.required}
                 onChange={(required) => setViewFlag(selected!, "required", required)}
               />
@@ -408,7 +409,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
                 label={t("formEditor.readonly")}
                 stepId={step.id}
                 flagKey="readonly"
-                disabled={gatedKeys(selectedRow).includes("readonly")}
+                disabled={gatedKeys(selectedRow, written).includes("readonly")}
                 value={selectedRow.readonly}
                 onChange={(readonly) => setViewFlag(selected!, "readonly", readonly)}
               />

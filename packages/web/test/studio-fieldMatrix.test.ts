@@ -11,7 +11,7 @@ import {
   applyBulkToggle,
   isCellFlagged,
 } from "../src/areas/studio/panels/fieldMatrixLogic.js";
-import { setFlag, gatedKeys, writtenFieldIds } from "../src/areas/studio/draft/view-flags.js";
+import { setFlag, gatedKeys, writtenFieldIds, writtenFieldCounts } from "../src/areas/studio/draft/view-flags.js";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
 import type { DraftViewField } from "../src/areas/studio/draft/view-layout.js";
 import type { Step } from "workflow-engine/schema";
@@ -96,7 +96,7 @@ describe("the cell editor's writer", () => {
 
   it("gates required/readonly the same way the form editor's strip does", () => {
     const entry = vf({ ref: "field_vendor", visible: false });
-    expect(gatedKeys(entry)).toEqual(["required", "readonly"]);
+    expect(gatedKeys(entry, new Map())).toEqual(["required", "readonly"]);
   });
 });
 
@@ -159,6 +159,8 @@ describe("bulk targets", () => {
 });
 
 describe("bulkBadgeOn / applyBulkToggle", () => {
+  const none = new Map<string, number>();
+
   it("reads not-pressed and turns every eligible cell on, when none carry the non-default value", () => {
     const steps: DraftStep[] = [
       ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor" })] } }),
@@ -168,8 +170,8 @@ describe("bulkBadgeOn / applyBulkToggle", () => {
       { stepIndex: 0, fieldId: "field_vendor" },
       { stepIndex: 1, fieldId: "field_vendor" },
     ];
-    expect(bulkBadgeOn(steps, targets, "required")).toBe(false);
-    applyBulkToggle(steps, targets, "required");
+    expect(bulkBadgeOn(steps, targets, "required", none)).toBe(false);
+    applyBulkToggle(steps, targets, "required", none);
     expect(steps[0]!.view!.fields![0]!.required).toBe(true);
     expect(steps[1]!.view!.fields![0]!.required).toBe(true);
   });
@@ -183,8 +185,8 @@ describe("bulkBadgeOn / applyBulkToggle", () => {
       { stepIndex: 0, fieldId: "field_vendor" },
       { stepIndex: 1, fieldId: "field_vendor" },
     ];
-    expect(bulkBadgeOn(steps, targets, "required")).toBe(true);
-    applyBulkToggle(steps, targets, "required");
+    expect(bulkBadgeOn(steps, targets, "required", none)).toBe(true);
+    applyBulkToggle(steps, targets, "required", none);
     expect("required" in steps[0]!.view!.fields![0]!).toBe(false);
     expect("required" in steps[1]!.view!.fields![0]!).toBe(false);
   });
@@ -200,7 +202,7 @@ describe("bulkBadgeOn / applyBulkToggle", () => {
       { stepIndex: 1, fieldId: "field_vendor" },
       { stepIndex: 2, fieldId: "field_vendor" },
     ];
-    applyBulkToggle(steps, targets, "required");
+    applyBulkToggle(steps, targets, "required", none);
     expect(steps[0]!.view!.fields![0]!.required).toEqual({ lang: "cel", src: "true" });
     expect("required" in steps[1]!.view!.fields![0]!).toBe(false);
     expect(steps[2]!.view!.fields![0]!.required).toBe(true);
@@ -209,9 +211,39 @@ describe("bulkBadgeOn / applyBulkToggle", () => {
   it("is a no-op when no target is eligible", () => {
     const steps: DraftStep[] = [ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor", visible: false })] } })];
     const targets = [{ stepIndex: 0, fieldId: "field_vendor" }];
-    expect(bulkBadgeOn(steps, targets, "required")).toBe(false);
-    applyBulkToggle(steps, targets, "required");
+    expect(bulkBadgeOn(steps, targets, "required", none)).toBe(false);
+    applyBulkToggle(steps, targets, "required", none);
     expect("required" in steps[0]!.view!.fields![0]!).toBe(false);
+  });
+
+  it("skips a cell already gated by the required/readonly mutual rule, on an unwritten field", () => {
+    const steps: DraftStep[] = [
+      ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor", required: true })] } }),
+    ];
+    const targets = [{ stepIndex: 0, fieldId: "field_vendor" }];
+    expect(bulkBadgeOn(steps, targets, "readonly", none)).toBe(false);
+    applyBulkToggle(steps, targets, "readonly", none);
+    expect("readonly" in steps[0]!.view!.fields![0]!).toBe(false);
+  });
+
+  it("treats a mutually gated cell as eligible once something else writes the field", () => {
+    const steps: DraftStep[] = [
+      ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor", required: true })] } }),
+    ];
+    const targets = [{ stepIndex: 0, fieldId: "field_vendor" }];
+    const written = new Map([["field_vendor", Infinity]]);
+    expect(bulkBadgeOn(steps, targets, "readonly", written)).toBe(false);
+    applyBulkToggle(steps, targets, "readonly", written);
+    expect(steps[0]!.view!.fields![0]!.readonly).toBe(true);
+  });
+
+  it("derives the self-exclusion correctly from a real draft via writtenFieldCounts", () => {
+    const steps: DraftStep[] = [ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor", required: true })] } })];
+    const written = writtenFieldCounts({ fields: [df({ id: "field_vendor" })], workflow: { steps } } as Draft);
+    const targets = [{ stepIndex: 0, fieldId: "field_vendor" }];
+    expect(bulkBadgeOn(steps, targets, "readonly", written)).toBe(false);
+    applyBulkToggle(steps, targets, "readonly", written);
+    expect("readonly" in steps[0]!.view!.fields![0]!).toBe(false);
   });
 });
 

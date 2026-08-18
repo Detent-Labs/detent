@@ -5,6 +5,7 @@ import {
   FLAG_DEFAULT,
   gatedKeys,
   setFlag,
+  writtenFieldCounts,
 } from "../src/areas/studio/draft/view-flags.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 import type { DraftViewField } from "../src/areas/studio/draft/view-layout.js";
@@ -67,16 +68,53 @@ describe("setFlag", () => {
 });
 
 describe("gatedKeys", () => {
+  const none = new Map<string, number>();
+
   it("returns required and readonly for a literal false visible", () => {
-    expect(gatedKeys(vf({ ref: "field_a", visible: false }))).toEqual(["required", "readonly"]);
+    expect(gatedKeys(vf({ ref: "field_a", visible: false }), none)).toEqual(["required", "readonly"]);
   });
 
   it("returns nothing for a CEL visible", () => {
-    expect(gatedKeys(vf({ ref: "field_a", visible: { lang: "cel", src: "true" } }))).toEqual([]);
+    expect(gatedKeys(vf({ ref: "field_a", visible: { lang: "cel", src: "true" } }), none)).toEqual([]);
   });
 
   it("returns nothing for an absent visible", () => {
-    expect(gatedKeys(vf({ ref: "field_a" }))).toEqual([]);
+    expect(gatedKeys(vf({ ref: "field_a" }), none)).toEqual([]);
+  });
+
+  it("gates readonly once required is true, on a field with no OTHER writer", () => {
+    // The entry itself is still visible and non-readonly, so it counts once
+    // toward its own field in `written` — the exact count `writtenByOther`
+    // must subtract back out, or this case could never gate (the bug task
+    // 5.1's manual check caught: a solo view entry always "writes" its own
+    // field until the very toggle being gated turns it readonly).
+    const written = new Map([["field_a", 1]]);
+    expect(gatedKeys(vf({ ref: "field_a", required: true }), written)).toEqual(["readonly"]);
+  });
+
+  it("gates required once readonly is true, on an unwritten field", () => {
+    expect(gatedKeys(vf({ ref: "field_a", readonly: true }), none)).toEqual(["required"]);
+  });
+
+  it("gates neither key once both required and readonly are already true", () => {
+    expect(gatedKeys(vf({ ref: "field_a", required: true, readonly: true }), none)).toEqual([]);
+  });
+
+  it("gates neither key when a structural source writes the field", () => {
+    const written = new Map([["field_a", Infinity]]);
+    expect(gatedKeys(vf({ ref: "field_a", required: true }), written)).toEqual([]);
+  });
+
+  it("gates neither key when another view entry, besides this one, also writes the field", () => {
+    // count 2: this entry's own contribution, plus one other entry elsewhere.
+    const written = new Map([["field_a", 2]]);
+    expect(gatedKeys(vf({ ref: "field_a", required: true }), written)).toEqual([]);
+  });
+
+  it("derives the self-exclusion correctly from a real draft via writtenFieldCounts", () => {
+    const body = withViewField(baseBody(), "step_a", { ref: "field_vendor", required: true });
+    const written = writtenFieldCounts(body);
+    expect(gatedKeys(body.workflow!.steps![0]!.view!.fields![0]!, written)).toEqual(["readonly"]);
   });
 });
 

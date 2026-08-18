@@ -58,12 +58,46 @@ export function setFlag(entry: DraftViewField, key: FlagKey, next: BoolOrExpr): 
   return out;
 }
 
-/** Which controls a literal `visible: false` disables — both other flags,
- * since the engine never resolves them for a hidden field. A `visible`
- * holding a CEL expression gates nothing: nobody can read its value without
- * an instance. */
-export function gatedKeys(entry: DraftViewField): FlagKey[] {
-  return entry.visible === false ? ["required", "readonly"] : [];
+/**
+ * Whether `entry`'s own field has a writer besides `entry` itself, per
+ * `written` (`writtenFieldCounts`). A structural source (action output,
+ * subprocess `outputMapping`, `columnMapping`, `contract.inputFields`) bumps
+ * its field's count by `Infinity`, so it always counts as "another" writer.
+ * A live, editable view entry (`visible !== false`, `readonly !== true`)
+ * bumps its field's count by one FOR EACH such entry in the draft,
+ * `entry` included when `entry` itself is currently editable — so `entry`'s
+ * own contribution has to come back out before comparing, or an entry would
+ * always read as its own writer the moment it stops being `readonly`, which
+ * is exactly the state `gatedKeys` needs to gate. */
+function writtenByOther(entry: DraftViewField, written: Map<string, number>): boolean {
+  if (!entry.ref) return false;
+  const total = written.get(entry.ref) ?? 0;
+  const selfWrites = entry.visible !== false && entry.readonly !== true;
+  return total - (selfWrites ? 1 : 0) > 0;
+}
+
+/** Which controls the entry's current state disables right now.
+ *
+ * A literal `visible: false` disables both other flags, since the engine
+ * never resolves them for a hidden field. A `visible` holding a CEL
+ * expression gates nothing: nobody can read its value without an instance.
+ *
+ * Where nothing besides `entry` itself already writes the entry's field
+ * (`writtenByOther`), `required` and `readonly` gate each other, but only
+ * one way: checking one disables the other only while the other does not
+ * already read `true`. An entry that already carries both stays fully
+ * editable, so an author can always uncheck out of that state (design.md
+ * decision 1, `gate-required-readonly-conflict`).
+ */
+export function gatedKeys(entry: DraftViewField, written: Map<string, number>): FlagKey[] {
+  if (entry.visible === false) return ["required", "readonly"];
+
+  const gated: FlagKey[] = [];
+  if (!writtenByOther(entry, written)) {
+    if (entry.required === true && entry.readonly !== true) gated.push("readonly");
+    if (entry.readonly === true && entry.required !== true) gated.push("required");
+  }
+  return gated;
 }
 
 function readerLabel(field: DraftField | undefined, ref: string): string {
@@ -71,25 +105,33 @@ function readerLabel(field: DraftField | undefined, ref: string): string {
 }
 
 /**
- * Every field id some source in the body supplies a value for: a writable
- * view entry elsewhere (visible, non-readonly — a participant can fill it
- * in), an action's `output`, a step's `subprocess.outputMapping`, a field's
- * `columnMapping`, or a `contract.inputFields` entry. Shared by
- * `checkViewFlags`'s own finding and the field matrix's flagged-cell marker
- * (`panels/fieldMatrixLogic.ts`), so neither can disagree about what
- * "already written" means (design.md decision 5, `field-matrix-toolbar-and-
- * inline-editing`).
+ * Every field id some source in the body supplies a value for, counted: a
+ * live, editable (`visible !== false`, `readonly !== true`) view entry adds
+ * one FOR EACH such entry the field has anywhere in the draft; an action's
+ * `output`, a step's `subprocess.outputMapping`, a field's `columnMapping`,
+ * or a `contract.inputFields` entry each add `Infinity`, since none of those
+ * four is ever the specific view entry a caller is asking about. `gatedKeys`
+ * (via `writtenByOther`) needs the count, not just presence, to tell "some
+ * OTHER source writes this field" apart from "this very entry, still
+ * editable, is the only reason the field reads as written" — a plain
+ * Set<string> can't make that distinction. Shared by `checkViewFlags`'s own
+ * finding, the field matrix's flagged-cell marker (`panels/
+ * fieldMatrixLogic.ts`), and `gatedKeys`, so none of the three can disagree
+ * about what "already written" means (design.md decision 5, `field-matrix-
+ * toolbar-and-inline-editing`; decision 2, `gate-required-readonly-
+ * conflict`).
  */
-export function writtenFieldIds(body: Draft): Set<string> {
+export function writtenFieldCounts(body: Draft): Map<string, number> {
   const steps = body.workflow?.steps ?? [];
   const fieldsById = new Map(flattenDraftFields(body.fields).map((f) => [f.id, f]));
-  const written = new Set<string>();
+  const counts = new Map<string, number>();
+  const bump = (id: string, by: number) => counts.set(id, (counts.get(id) ?? 0) + by);
 
   for (const step of steps) {
     for (const entry of step.view?.fields ?? []) {
       const field = entry.ref ? fieldsById.get(entry.ref) : undefined;
       if (isGroupField(field)) continue;
-      if (entry.visible !== false && entry.readonly !== true && entry.ref) written.add(entry.ref);
+      if (entry.visible !== false && entry.readonly !== true && entry.ref) bump(entry.ref, 1);
     }
     const actionLists = [
       step.onEntry,
@@ -100,20 +142,34 @@ export function writtenFieldIds(body: Draft): Set<string> {
     ];
     for (const list of actionLists) {
       for (const action of list ?? []) {
-        for (const key of Object.keys(action?.output ?? {})) written.add(key);
+        for (const key of Object.keys(action?.output ?? {})) bump(key, Infinity);
       }
     }
-    for (const key of Object.keys(step.subprocess?.outputMapping ?? {})) written.add(key);
+    for (const key of Object.keys(step.subprocess?.outputMapping ?? {})) bump(key, Infinity);
   }
   for (const field of fieldsById.values()) {
     for (const target of Object.values(field.columnMapping ?? {})) {
-      if (typeof target === "string") written.add(target);
+      if (typeof target === "string") bump(target, Infinity);
     }
   }
   for (const id of body.contract?.inputFields ?? []) {
-    if (id) written.add(id);
+    if (id) bump(id, Infinity);
   }
 
+  return counts;
+}
+
+/** `writtenFieldCounts`, collapsed to presence. Every consumer that only
+ * asks "is this field written at all" — `checkViewFlags`'s own finding, the
+ * field matrix's flagged-cell marker — reads this instead: neither examines
+ * one specific entry's own contribution the way `gatedKeys` does, so neither
+ * needs the count. */
+export function writtenFieldIds(body: Draft): Set<string> {
+  const counts = writtenFieldCounts(body);
+  const written = new Set<string>();
+  for (const [id, count] of counts) {
+    if (count > 0) written.add(id);
+  }
   return written;
 }
 

@@ -186,6 +186,23 @@ A `visible` of literal `false` SHALL disable the `required` and the
 CEL expression SHALL leave both controls alone. Nobody can read an
 expression's value without an instance.
 
+Where no other source in the draft writes a selected field, its
+`required` and `readonly` controls SHALL gate each other. That is the
+same rule the field matrix's live cell applies. Checking `required` SHALL disable
+`readonly`, while `readonly` does not already read `true`. Checking
+`readonly` SHALL disable `required`, while `required` does not already
+read `true`. "No other source" means none of these already write the
+field:
+
+- an action's `output`
+- a subprocess's `outputMapping`
+- a field's `columnMapping`
+- a `contract.inputFields` entry
+
+Where a selected field already carries `required: true` and
+`readonly: true` before either gate engages, neither control SHALL
+disable. The developer keeps a path to uncheck either one.
+
 #### Scenario: An absent visible key shows the field as visible
 
 - **WHEN** the developer selects a placed field whose view entry carries
@@ -241,6 +258,33 @@ expression's value without an instance.
 - **WHEN** the developer sets a selected field's `span` to `2` on a
   `columns: 2` view
 - **THEN** that field's card widens to span both columns on the canvas
+
+#### Scenario: Checking required disables readonly on an unwritten field
+
+- **WHEN** the developer checks `required` on a selected field nothing
+  else in the draft writes, and `readonly` does not already read `true`
+- **THEN** the strip's `readonly` control disables
+
+#### Scenario: Checking readonly disables required on an unwritten field
+
+- **WHEN** the developer checks `readonly` on a selected field nothing
+  else in the draft writes, and `required` does not already read `true`
+- **THEN** the strip's `required` control disables
+
+#### Scenario: A field something else writes keeps both controls free
+
+- **WHEN** the developer checks `required` on a selected field
+- **AND** an action output, a subprocess output mapping, a column
+  mapping, or a contract input field already writes that field
+- **THEN** the strip's `readonly` control stays enabled
+
+#### Scenario: An entry already carrying both flags stays editable
+
+- **WHEN** the developer selects a field whose entry already carries
+  `required: true` and `readonly: true`, on a field nothing else in
+  the draft writes
+- **THEN** neither the `required` nor the `readonly` control disables
+- **AND** the developer can uncheck either one
 
 ### Requirement: A field's position is reachable by keyboard, not drag alone
 
