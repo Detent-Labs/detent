@@ -15,14 +15,6 @@ interface VersionsScreenProps {
   token: string;
   navigate: (route: Route) => void;
   onUnauthorized: () => void;
-  /**
-   * Whether to offer the control leading to the migration screen. That screen
-   * is developer-only while this one admits an author too, so offering it
-   * unconditionally would walk an author into a refusal from a control the
-   * product handed them. `root.tsx` reads it from the same `ROUTE_ROLE` map
-   * the nav and the guard read.
-   */
-  mayPlanMigration: boolean;
 }
 
 /**
@@ -41,9 +33,17 @@ function downloadJson(filename: string, payload: unknown): void {
 }
 
 /** process-version-inspection spec: list published versions, diff any two (or a draft against its base_version). */
-export function VersionsScreen({ processId, token, navigate, onUnauthorized, mayPlanMigration }: VersionsScreenProps) {
+export function VersionsScreen({ processId, token, navigate, onUnauthorized }: VersionsScreenProps) {
   const [versions, setVersions] = useState<VersionSummary[]>([]);
   const [baseVersion, setBaseVersion] = useState<number | null>(null);
+  /**
+   * Whether to offer the control leading to the migration screen, from the
+   * loaded draft's own `canPlanMigration` (process-drafts spec) — the
+   * server's `can(actor, "migrate", processId, db)`, not a role read
+   * client-side. The migration screen itself now admits any author; this
+   * is what decides whether the actor can use it for this process.
+   */
+  const [canPlanMigration, setCanPlanMigration] = useState(false);
   const [selection, setSelection] = useState<VersionSelection>({});
   const [diff, setDiff] = useState<DiffEntry[] | undefined>(undefined);
   const [loading, setLoading] = useState(true);
@@ -68,6 +68,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized, may
         if (cancelled) return;
         setVersions(vs);
         setBaseVersion(draft?.baseVersion ?? null);
+        setCanPlanMigration(draft?.canPlanMigration ?? false);
       })
       .catch((e: unknown) => {
         if (cancelled) return;
@@ -215,7 +216,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized, may
             <button type="button" className="btn btn-secondary" disabled={!canDiff(selection)} onClick={() => void diffSelected()}>
               Diff selected
             </button>
-            {mayPlanMigration && canDiff(selection) && (
+            {canPlanMigration && canDiff(selection) && (
               <button
                 type="button"
                 className="btn btn-secondary"

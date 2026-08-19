@@ -93,10 +93,6 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
   );
 
   const required = ROUTE_ROLE[route.name];
-  // The migration screen is developer-only, so the versions screen must not
-  // offer a control that leads there for an author (design.md § "The author
-  // reaches the version list, not migration planning").
-  const mayPlanMigration = may(ROUTE_ROLE.migrate);
 
   return (
     <Chrome
@@ -130,7 +126,6 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
               token={session.token}
               navigate={navigate}
               onUnauthorized={onUnauthorized}
-              mayPlanMigration={mayPlanMigration}
             />
           )}
           {route.name === "migrate" && (

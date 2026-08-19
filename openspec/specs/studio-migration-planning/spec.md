@@ -20,14 +20,14 @@ not a developer one.
 ### Requirement: A migration plan can be authored and read over HTTP, gated to developers
 
 `PUT /migration-plans/:processId/:fromVersion/:toVersion` and
-`GET /migration-plans/:processId/:fromVersion/:toVersion` SHALL both require
-`system:developer` and SHALL wrap the existing `registerMigrationPlan` /
-`resolveMigrationPlan` unchanged — no new validation is added at the route
-layer beyond request-shape checking of the JSON body. `PUT` SHALL free-edit an
-unapplied plan and SHALL reject with the engine's existing "already applied
-and frozen" error once the plan has been applied (see the shared
-`MigrationPlanError` mapping below). `GET` SHALL answer 404 when no plan has
-ever been registered for that key.
+`GET /migration-plans/:processId/:fromVersion/:toVersion` SHALL both admit
+`system:developer` or a scoped `migrate` grant naming the process (see
+`authorization`). Each SHALL wrap the existing `registerMigrationPlan` /
+`resolveMigrationPlan` unchanged. The route layer SHALL add no new
+validation beyond checking the JSON body's shape. `PUT` SHALL free-edit an
+unapplied plan. `PUT` SHALL reject an applied plan with the engine's
+existing frozen-plan error (see the shared `MigrationPlanError` mapping
+below). `GET` SHALL answer 404 for a key that carries no registered plan.
 
 #### Scenario: Registering a plan against two published versions succeeds
 
@@ -57,17 +57,25 @@ ever been registered for that key.
 
 #### Scenario: An actor without system:developer is rejected
 
-- **WHEN** either route is called by an actor lacking `system:developer`
-- **THEN** the request is rejected regardless of any other role held
+- **WHEN** an actor lacking `system:developer`, and holding no scoped
+  `migrate` grant for the named process, calls either route
+- **THEN** the engine rejects the request
+
+#### Scenario: An actor holding a scoped grant succeeds without the role
+
+- **WHEN** an actor lacking `system:developer`, but holding a scoped
+  `migrate` grant for the named process, calls either route
+- **THEN** the engine accepts the request
 
 ### Requirement: A published version's orphan keys can be scanned read-only over HTTP
 
-`GET /processes/:processId/versions/:version/orphan-keys` SHALL require
-`system:developer` and SHALL wrap the existing `findOrphanKeys` unchanged —
-a read-only, keyset-paginated scan of instances currently pinned to that
-version against that version's own field catalog. This route is
-version-keyed, not plan-keyed: it takes no `toVersion`, since the scan is
-independent of any specific migration target.
+`GET /processes/:processId/versions/:version/orphan-keys` SHALL admit
+`system:developer` or a scoped `migrate` grant naming the process (see
+`authorization`). It SHALL wrap the existing `findOrphanKeys` unchanged.
+That function runs a read-only, keyset-paginated scan of instances pinned
+to that version against that version's own field catalog. This route is
+version-keyed, not plan-keyed. It takes no `toVersion`, since the scan does
+not depend on any specific migration target.
 
 #### Scenario: Scanning a version with orphan data returns the offending entries
 
@@ -87,6 +95,12 @@ independent of any specific migration target.
   process
 - **THEN** the request is rejected with the same error `findOrphanKeys`
   already raises for an unpublished version
+
+#### Scenario: An actor holding a scoped grant scans without the developer role
+
+- **WHEN** an actor lacking `system:developer`, but holding a scoped
+  `migrate` grant for the named process, calls the route
+- **THEN** the engine runs the scan and returns its result
 
 ### Requirement: MigrationPlanError is mapped to a stable HTTP status
 

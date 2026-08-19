@@ -37,8 +37,9 @@ Specs: `development-toolchain`, `devcontainer-preflight`.
 
 ## Open stages
 
-40. **Permission model rework: SEAM AND STORAGE DONE, FILTER AND DRAFT SCOPE
-    NOT BUILT.** Raised 2026-08-15 in conversation. A design pass ran the
+40. **Permission model rework: SEAM, STORAGE AND MIGRATION-PLAN VISIBILITY
+    DONE. FILTER AND DRAFT SCOPE NOT BUILT.** Raised 2026-08-15 in
+    conversation. A design pass ran the
     same day and took the decisions below. Nobody was blocked by the seam
     alone, and the storage half landed 2026-08-16 as
     `process-scoped-permission-grants`. A `permission_grants` table holds one
@@ -50,15 +51,31 @@ Specs: `development-toolchain`, `devcontainer-preflight`.
     day this landed; an installation that writes no grant row keeps every
     answer it had.
 
-    Three pieces stay open, and each is its own later change. The `scope=all`
-    filter and the reporting aggregates turn a gate into a query predicate,
-    which reaches `instance-query` rather than `authorization`. A
-    draft-scoped `"author"` permission would let a multi-team installation
-    limit who sees and edits which draft — today every author reaches every
-    draft. And the web areas read `actor.roles` directly, so a grant holder
-    reaches a permission over HTTP alone until the resource views carry
-    server-computed `permissions` booleans. `tmp/open-work-priority.md`
-    tracks these three.
+    Three pieces stayed open, and each was its own later change. The
+    `scope=all` filter and the reporting aggregates turn a gate into a query
+    predicate, which reaches `instance-query` rather than `authorization`.
+    That one stays open. A draft-scoped `"author"` permission would let a
+    multi-team installation limit who sees and edits which draft. Today
+    every author reaches every draft. That one stays open too.
+    `tmp/open-work-priority.md` tracks both.
+
+    The third piece closed 2026-08-19 as `scope-migration-plan-visibility`.
+    An audit of every client-side role check in `packages/web` found the
+    web-areas-read-`actor.roles`-directly gap real in exactly one place, not
+    the many the original framing implied. Publish and Cancel already
+    render unconditionally and let the server's 403 carry the real gate.
+    Area entry stays global-role-only, by decision: a grant narrows which
+    processes an already-admitted actor may act on, and never opens a new
+    area on its own. Only the Studio Versions screen's "Plan migration"
+    control read a static role instead of the scoped `migrate` grant.
+    `GET /drafts/:processId` now carries one added field,
+    `canPlanMigration`, computed via the seam's own `can(actor, "migrate",
+    processId, db)`. The Versions screen reads that field instead of
+    `ROUTE_ROLE`. `ROUTE_ROLE.migrate` itself widens from `system:developer`
+    alone to the same pair every other authoring screen admits; the actual
+    migration-plan call still enforces the grant server-side, unchanged.
+    No general `permissions`-booleans framework landed. The audit found no
+    second case that needed one.
 
     The seam shipped 2026-08-15 as `process-scoped-permission-seam`, ahead of
     that trigger, because it was the one piece carrying no storage question.
@@ -195,16 +212,18 @@ Specs: `development-toolchain`, `devcontainer-preflight`.
     the second group needs the set to build a filter, and a type that only
     answers per id would leave that half unbuildable. The studio, the operator
     area and the reporting area each read their own role today, so a change
-    to the shape reaches all three plus their i18n catalogs. And that same
-    reading means a grant holder reaches publish over HTTP alone: the studio
-    shows its publish control to a `system:publish` holder. The fix is
-    server-computed `permissions` booleans on the resource views, so a screen
-    asks the server what the caller may do rather than reading role strings.
-    That is its own change, and it is the one that stops a second client-side
-    gate from growing.
+    to the shape reaches all three plus their i18n catalogs. That same
+    reading was checked against every client-side role gate in
+    `packages/web` on 2026-08-19. Publish and Cancel already render their
+    controls unconditionally and let the server's 403 carry the gate, so
+    neither needed a fix. Only the Studio Versions screen's migration-plan
+    control read a role instead of the grant; `scope-migration-plan-visibility`
+    closed that one gap, over one field on one resource view, not a general
+    `permissions`-booleans framework.
 
     Specs: `authorization`, `permission-grant-administration`, `http-wrapper`,
-    `studio-publish`, `admin-user-management`, `instance-query`.
+    `studio-publish`, `admin-user-management`, `instance-query`,
+    `process-drafts`, `studio-app`, `studio-migration-planning`.
 
 43. **Step-level validation overrides: ENGINE DONE, STUDIO UI NOT BUILT.**
     Landed 2026-08-18 as `step-validation-overrides`. A catalog field's

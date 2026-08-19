@@ -105,12 +105,15 @@ the templates screen only. Every other studio screen SHALL refuse it and
 SHALL state which role the account lacks.
 
 An account holding `system:author` alone SHALL enter the area. It SHALL reach
-the process list, the editor, the versions screen and the player. The
-migration screen, the tools screen and the templates screen SHALL refuse it.
-Each SHALL state which role the account lacks.
+the process list, the editor, the versions screen, the migration screen and
+the player. The tools screen and the templates screen SHALL refuse it. Each
+SHALL state which role the account lacks.
 
 This client-side check only decides what the shell renders. Every studio route
-SHALL stay gated server-side whatever the browser decides.
+SHALL stay gated server-side whatever the browser decides. Whether an
+author's action on the migration screen succeeds for a given process is a
+`studio-migration-planning` question, not this requirement's. See that
+capability for the scoped `migrate` grant that governs it.
 
 #### Scenario: A participant account learns why studio is empty
 
@@ -129,7 +132,13 @@ SHALL stay gated server-side whatever the browser decides.
 
 - **WHEN** an actor holding only `system:author` logs in to studio
 - **THEN** the process list renders
-- **AND** the migration screen refuses and names the missing role
+
+#### Scenario: An author reaches the migration screen for any process
+
+- **WHEN** an actor holding only `system:author` opens a process's
+  migration screen
+- **THEN** the migration screen renders, whether or not a `migrate` grant
+  admits that process
 
 #### Scenario: The frontend check is not the control
 

@@ -18,7 +18,7 @@
  */
 import type { SQL } from "bun";
 import { withTransaction } from "../engine/store.js";
-import { getDraft, saveDraft, listDrafts, deleteDraft, markDraftPublished } from "../engine/drafts.js";
+import { getDraft, saveDraft, listDrafts, deleteDraft, markDraftPublished, type Draft } from "../engine/drafts.js";
 import { getTemplate, listTemplates, saveTemplate, deleteTemplate } from "../engine/templates.js";
 import { publishBody, createDefinitionStore } from "../engine/definitions.js";
 import { registerMigrationPlan, resolveMigrationPlan, findOrphanKeys } from "../engine/migration.js";
@@ -33,7 +33,7 @@ import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies
 import { describeConfigSchema, type ConfigFieldDescriptor } from "../engine/config-descriptor.js";
 import type { ZodTypeAny } from "zod";
 import type { ActorResolver } from "../auth/resolve.js";
-import { requireRole, requirePermission, AuthorizationError, DEVELOPER_ROLE, TEMPLATES_ROLE, AUTHOR_ROLE } from "../auth/authorize.js";
+import { requireRole, requirePermission, can, AuthorizationError, DEVELOPER_ROLE, TEMPLATES_ROLE, AUTHOR_ROLE } from "../auth/authorize.js";
 import { notFound, type HttpResult } from "./errors.js";
 import { route, readJson, parseVersion } from "./routes.js";
 import type { ProcessId, ProcessBody, MigrationSpec } from "../schema/definition.js";
@@ -75,10 +75,12 @@ export async function handleListDrafts(req: Request, resolver: ActorResolver, db
 }
 
 export async function handleGetDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
-  return route(req, resolver, db, requireAuthoring, async () => {
+  return route(req, resolver, db, requireAuthoring, async (actor) => {
     const draft = await getDraft(processId as ProcessId, db);
     if (!draft) return notFound(`no draft: ${processId}`);
-    return { status: 200, body: draft };
+    const canPlanMigration = await can(actor, "migrate", processId as ProcessId, db);
+    const body: Draft & { canPlanMigration: boolean } = { ...draft, canPlanMigration };
+    return { status: 200, body };
   });
 }
 
@@ -175,9 +177,10 @@ export async function handleGetVersionBody(processId: string, versionRaw: string
  * Reads a registered migration plan. 404 when no plan has ever been registered
  * for the key.
  *
- * `DEVELOPER_ROLE` alone, deliberately: this route and its two siblings below
- * rewrite the state of every running instance on a version, which is not part
- * of the no-code authoring subset `AUTHOR_ROLE` grants.
+ * `system:developer` or a scoped `migrate` grant naming the process: this
+ * route and its two siblings below rewrite the state of every running
+ * instance on a version, so a bare authoring role admits neither — see
+ * `can`/`requirePermission` in `src/auth/authorize.ts`.
  */
 export async function handleGetMigrationPlan(
   processId: string,
@@ -215,7 +218,7 @@ export async function handlePutMigrationPlan(
   });
 }
 
-/** Read-only orphan-key dry run, wrapping `findOrphanKeys` unchanged. Version-keyed, not plan-keyed — the scan is independent of any specific migration target. `DEVELOPER_ROLE` alone, for the reason `handleGetMigrationPlan` states. */
+/** Read-only orphan-key dry run, wrapping `findOrphanKeys` unchanged. Version-keyed, not plan-keyed — the scan is independent of any specific migration target. `system:developer` or a scoped `migrate` grant, for the reason `handleGetMigrationPlan` states. */
 export async function handleGetOrphanKeys(processId: string, versionRaw: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return route(req, resolver, db, (actor) => requirePermission(actor, "migrate", processId as ProcessId, db), async () => {
     const version = parseVersion(versionRaw, "version");

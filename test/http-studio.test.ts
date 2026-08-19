@@ -42,6 +42,11 @@ const grantPublish = async (role: string, processId: string): Promise<void> => {
   await sql`INSERT INTO permission_grants (role, permission, scope) VALUES (${role}, ${"publish"}, ${{ type: "process", config: { processId } }})`;
 };
 
+/** Same as `grantPublish`, for `"migrate"`. */
+const grantMigrate = async (role: string, processId: string): Promise<void> => {
+  await sql`INSERT INTO permission_grants (role, permission, scope) VALUES (${role}, ${"migrate"}, ${{ type: "process", config: { processId } }})`;
+};
+
 let n = 0;
 const pid = () => `proc_http_studio_${++n}`;
 
@@ -130,6 +135,34 @@ test.skipIf(!DB)("a developer reads and writes a draft", async () => {
   expect(body.body.label.en).toBe("v1");
   expect(body.revision).toBe(0);
   expect(body.updatedBy).toBe(developer.id);
+});
+
+test.skipIf(!DB)("a developer's draft response reports canPlanMigration true", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: authoredBody("v1"), layout: {}, revision: 0 }));
+
+  const res = await fetch(authedReq(`http://x/drafts/${processId}`, "GET", developer));
+  const body = (await res.json()) as { canPlanMigration: boolean };
+  expect(body.canPlanMigration).toBe(true);
+});
+
+test.skipIf(!DB)("an author with no matching grant sees canPlanMigration false", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", author, { body: authoredBody("v1"), layout: {}, revision: 0 }));
+
+  const res = await fetch(authedReq(`http://x/drafts/${processId}`, "GET", author));
+  const body = (await res.json()) as { canPlanMigration: boolean };
+  expect(body.canPlanMigration).toBe(false);
+});
+
+test.skipIf(!DB)("an author with a matching grant sees canPlanMigration true", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", financeAuthor, { body: authoredBody("v1"), layout: {}, revision: 0 }));
+  await grantMigrate("finance-authors", processId);
+
+  const res = await fetch(authedReq(`http://x/drafts/${processId}`, "GET", financeAuthor));
+  const body = (await res.json()) as { canPlanMigration: boolean };
+  expect(body.canPlanMigration).toBe(true);
 });
 
 // ============================================================
@@ -389,6 +422,21 @@ test.skipIf(!DB)("register-then-read round trip; re-registering an unapplied pla
   expect(putRes2.status).toBe(200);
 });
 
+test.skipIf(!DB)("an author holding a scoped migrate grant registers and reads a plan without system:developer", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher)); // -> version 1
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v2"), layout: {}, revision: 0 }));
+  await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher)); // -> version 2
+  await grantMigrate("finance-authors", processId);
+
+  const putRes = await fetch(authedReq(`http://x/migration-plans/${processId}/1/2`, "PUT", financeAuthor, {}));
+  expect(putRes.status).toBe(200);
+
+  const getRes = await fetch(authedReq(`http://x/migration-plans/${processId}/1/2`, "GET", financeAuthor));
+  expect(getRes.status).toBe(200);
+});
+
 test.skipIf(!DB)("registering a plan with fromVersion equal to toVersion maps to 409 migration-plan", async () => {
   const processId = pid();
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
@@ -442,6 +490,16 @@ test.skipIf(!DB)("GET .../orphan-keys for a clean published version returns an e
   const body = (await res.json()) as { orphans: unknown[]; unreadable: string[] };
   expect(body.orphans).toEqual([]);
   expect(body.unreadable).toEqual([]);
+});
+
+test.skipIf(!DB)("an author holding a scoped migrate grant scans orphan keys without system:developer", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
+  await grantMigrate("finance-authors", processId);
+
+  const res = await fetch(authedReq(`http://x/processes/${processId}/versions/1/orphan-keys`, "GET", financeAuthor));
+  expect(res.status).toBe(200);
 });
 
 test.skipIf(!DB)("GET .../orphan-keys reports an instance's data keys absent from the version's field catalog", async () => {

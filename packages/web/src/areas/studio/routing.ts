@@ -89,12 +89,11 @@ export function routePath(route: Route): string {
  * entry admits any of three (see `shell/areas.ts`), so this is the second,
  * narrower gate: an actor holding only `system:templates` reaches the
  * templates screen and nothing else, and an actor holding only
- * `system:author` reaches the four authoring screens but neither migration
- * planning nor Tools.
+ * `system:author` reaches the five authoring screens but not Tools.
  *
  * A set per screen, unlike the admin area's one string per screen. Admin's two
  * roles partition its screens cleanly; the two authoring roles here do not,
- * since both reach the same four screens.
+ * since both reach the same five screens.
  *
  * Homed here rather than in `root.tsx` so it stays readable without React —
  * `root.tsx` pulls in every screen and the area stylesheet. The same placement
@@ -107,10 +106,14 @@ export const ROUTE_ROLE: Record<Route["name"], readonly string[]> = {
   processes: AUTHORING,
   edit: AUTHORING,
   versions: AUTHORING,
+  // Reaching this route no longer implies permission to plan a migration for
+  // the process in view: `can(actor, "migrate", processId, db)` (see
+  // `authorization`) decides that, both server-side and, via the draft's
+  // `canPlanMigration`, in what the Versions screen offers.
+  migrate: AUTHORING,
   play: AUTHORING,
-  // Developer-only: migration planning rewrites the state of every running
-  // instance on a version, and Tools reads the running deployment's registry.
-  migrate: ["system:developer"],
+  // Developer-only: Tools reads the running deployment's registry, a global
+  // operation no scoped grant names a process for.
   tools: ["system:developer"],
   templates: ["system:templates"],
 };

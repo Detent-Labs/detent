@@ -15,7 +15,12 @@ export interface ProcessSummary {
   baseLocale: LocaleCode;
 }
 
-/** Mirrors src/engine/drafts.ts::Draft. `body`/`layout` are opaque — never parsed against ProcessBody client-side either. */
+/**
+ * Mirrors src/engine/drafts.ts::Draft. `body`/`layout` are opaque — never
+ * parsed against ProcessBody client-side either. `canPlanMigration` is not
+ * part of `Draft`: it is computed per request from `can(actor, "migrate",
+ * processId, db)`, beside the stored fields, by `handleGetDraft`.
+ */
 export interface DraftRecord {
   processId: string;
   body: unknown;
@@ -24,6 +29,7 @@ export interface DraftRecord {
   baseVersion: number | null;
   updatedBy: string;
   updatedAt: string;
+  canPlanMigration: boolean;
 }
 
 /** Mirrors src/engine/drafts.ts::DraftSummary — no body. */

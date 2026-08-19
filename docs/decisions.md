@@ -38,7 +38,8 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   the day storage landed: an installation that writes no grant row keeps
   every answer it had.
 
-  Three pieces stay open, each its own later OpenSpec change.
+  Three pieces stayed open, each its own later OpenSpec change. Two still
+  are.
 
   The `scope=all` filter and the reporting aggregates turn a gate into a
   query predicate. That reaches `instance-query`, not `authorization`.
@@ -48,10 +49,16 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   table's own key, named from `PUT /drafts/:processId`'s first save — but
   every author reaches every draft today.
 
-  The web areas read `actor.roles` directly, so a grant holder reaches a
-  permission over HTTP alone until the resource views carry server-computed
-  `permissions` booleans. That is the change that stops a second client-side
-  gate from growing.
+  The third piece closed 2026-08-19 as `scope-migration-plan-visibility`.
+  The web areas reading `actor.roles` directly was framed as a gap across
+  "the resource views," plural. An audit of every client-side role check in
+  `packages/web` found it real in one place: the Studio Versions screen's
+  "Plan migration" control. Publish and Cancel already rendered
+  unconditionally and let the server's 403 carry the gate. `GET
+  /drafts/:processId` now carries a `canPlanMigration` field, computed from
+  the seam's own `can()`; the Versions screen reads it instead of a role.
+  No general `permissions`-booleans framework landed — the audit found no
+  second case that needed one.
 
   A directory group name is a principal, not a permission, and that decision
   is built, not pending: the identity provider is the authority on who

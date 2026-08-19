@@ -6,10 +6,10 @@ const DEVELOPER_ROLE = "system:developer";
 const AUTHOR_ROLE = "system:author";
 const TEMPLATES_ROLE = "system:templates";
 
-/** The four screens both authoring roles reach. */
-const AUTHORING_ROUTES = ["processes", "edit", "versions", "play"] as const;
-/** The two the map keeps behind the developer role alone. */
-const DEVELOPER_ONLY_ROUTES = ["migrate", "tools"] as const;
+/** The five screens both authoring roles reach. */
+const AUTHORING_ROUTES = ["processes", "edit", "versions", "migrate", "play"] as const;
+/** The one the map keeps behind the developer role alone. */
+const DEVELOPER_ONLY_ROUTES = ["tools"] as const;
 
 const reaches = (name: Route["name"], roles: string[]) => ROUTE_ROLE[name].some((role) => roles.includes(role));
 
@@ -97,14 +97,14 @@ describe("the studio area's per-screen role gate", () => {
     for (const route of EVERY_ROUTE) expect(ROUTE_ROLE[route.name].length).toBeGreaterThan(0);
   });
 
-  it("admits both authoring roles to the four authoring screens", () => {
+  it("admits both authoring roles to the five authoring screens", () => {
     for (const name of AUTHORING_ROUTES) {
       expect(reaches(name, [DEVELOPER_ROLE])).toBe(true);
       expect(reaches(name, [AUTHOR_ROLE])).toBe(true);
     }
   });
 
-  it("keeps migration planning and Tools behind the developer role alone", () => {
+  it("keeps Tools behind the developer role alone", () => {
     for (const name of DEVELOPER_ONLY_ROUTES) {
       expect(ROUTE_ROLE[name]).toEqual([DEVELOPER_ROLE]);
     }
@@ -127,8 +127,9 @@ describe("the studio area's per-screen role gate", () => {
     expect(reaches("templates", [DEVELOPER_ROLE])).toBe(false);
   });
 
-  // The gate this change exists for: an author authors, and does not migrate.
-  it("reaches neither migration planning nor Tools for an actor holding only the author role", () => {
+  // A scoped `migrate` grant, not this map, decides whether an author's
+  // actual migration-plan call succeeds for a given process (authorization).
+  it("reaches no Tools screen for an actor holding only the author role", () => {
     for (const name of DEVELOPER_ONLY_ROUTES) {
       expect(reaches(name, [AUTHOR_ROLE])).toBe(false);
     }
