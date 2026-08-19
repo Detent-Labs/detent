@@ -31,6 +31,7 @@ the cost of finding one. Run the review to the end before `/openspec-apply-chang
 | "One Critical sends it back anyway" | The user works in all findings in one pass. Find them all. |
 | "The design reads well" | Prose quality is not a check. Walk the checklist. |
 | "This part is fine without a check" | Then the check costs one line. Run it. |
+| "The symbol is there, so the claim holds" | Existence is not wiring. Trace who reads it. |
 
 ## Steps
 
@@ -49,6 +50,24 @@ the cost of finding one. Run the review to the end before `/openspec-apply-chang
    functions, tables, routes and roles. Confirm each one exists. Use the
    knowledge graph (`search_graph`, `get_code_snippet`, `trace_path`) or Read.
    A claim you did not check is not a finding.
+
+   A claim reading "already exists", "already has a home", or "the contract
+   already carries it" states two things, not one. The symbol exists, and
+   something reads it. Existence is a grep.
+
+   The second half needs
+   `trace_path(<symbol>, mode="data_flow")`. A manual walk answers it too.
+   Walk to the point the artifact claims the value reaches: the participant's
+   screen, the stored row, the guard's context. Confirm both halves before the
+   claim counts as checked.
+
+   `field-catalog-redesign` measured that gap. `FieldDef.default` parses in
+   `definition.ts` and type-checks in `compile.ts` and `cel/check.ts`. No
+   runtime code reads it. `resolveFields` fills a field's value from
+   `instance.data` alone. `ResolvedViewField` declares no `default` key, and
+   `startInstance` creates an instance with `data: {}`. The proposal's "the
+   contract carries `default` … already has a home" passed an existence check.
+   It would have shipped an editor whose output no participant ever sees.
 5. **Trace the blast radius.** Run `trace_path(<symbol>, mode="calls")` for
    every symbol the change modifies. List the consumers. Compare that list
    against the files the tasks touch.
