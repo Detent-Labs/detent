@@ -171,3 +171,24 @@ shape SHALL follow the same pattern rather than inventing a second one.
 - **WHEN** a keyboard user tabs to the grid's scrolling region directly
 - **THEN** it is focusable, carries an accessible name, and scrolls with
   the keyboard
+
+### Requirement: A tab set matches the area's tab pattern
+
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: "surface" above names a studio authoring surface. "render" here is the tab panel's own display verb, an unrelated concept, not a rotated synonym. -->
+A tab set SHALL group its tabs in a `tablist`. Each tab SHALL be a
+button carrying `role="tab"`. The active tab SHALL carry
+`aria-selected`. Each tab SHALL be its own stop in the tab order, the
+way a button is. Enter or Space SHALL activate the focused tab. The
+active tab's panel SHALL render, and the others SHALL hide.
+
+#### Scenario: A tab activates with Enter
+
+- **WHEN** a keyboard user focuses a tab and presses Enter
+- **THEN** that tab becomes active, and its panel renders
+
+#### Scenario: The active tab states its state
+
+- **WHEN** a screen reader reaches the tab set
+- **THEN** the active tab reports `aria-selected`, and the hidden
+  panels leave the accessibility tree

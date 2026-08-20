@@ -6,7 +6,9 @@ import { useDraft } from "../draft/store";
 import { t, type CatalogKey } from "../catalog.js";
 import { mintId } from "../draft/ids";
 import { addToDraftArray } from "../draft/draft-array-crud";
-import { seedLocalizedText } from "../draft/localized-text";
+import { resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
+import { flattenDraftFields } from "../draft/fields";
+import { FIELD_TYPE_LABELS } from "../draft/field-type-labels";
 import {
   flattenRailFields,
   issueCountForEntityId,
@@ -48,6 +50,9 @@ interface Props {
   openView: PanelView;
   onBack: () => void;
   onOpenView: (view: PanelView) => void;
+  /** "Show on the canvas" (task 6.3): navigates back to the canvas with the
+   * named step preselected, through the `edit` route's step target. */
+  onShowStep: (stepId: string) => void;
   token: string;
 }
 
@@ -74,10 +79,12 @@ interface Props {
  * thing that persists. The note beside Back states that, so leaving never
  * reads as a cancel.
  */
-export function PanelsScreen({ openView, onBack, onOpenView, token }: Props) {
+export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token }: Props) {
   const { draft, mutate, validation, contentLocale } = useDraft();
 
   const railFields = flattenRailFields(draft.fields);
+  const fieldsById = new Map(flattenDraftFields(draft.fields).map((f) => [f.id as string | undefined, f]));
+  const baseLocale = draft.baseLocale ?? "en";
   const dataSources = draft.dataSources ?? [];
   const entityCount = panelEntityCounts(draft);
 
@@ -132,15 +139,19 @@ export function PanelsScreen({ openView, onBack, onOpenView, token }: Props) {
     setSelectedDataSourceId(neighbor?.id);
   };
 
-  // Layout read, so it runs on click rather than during render.
-  const scrollToField = (fieldId: string) => {
-    document.getElementById(`field-row-${fieldId}`)?.scrollIntoView({ block: "start" });
-  };
+  // The deepest row a rail click named — a top-level field's own id, or a
+  // group child's. `FieldCatalogPanel` owns the scroll: a child's anchor
+  // sits inside the Field tab alone (task 3.4), which stays `hidden` when a
+  // group's own editor is already open on Values or Rules (no field.id
+  // change, so no remount resets the tab). Scrolling here, before that tab
+  // switch commits, would target a hidden, zero-height element and land
+  // nowhere visible.
+  const [focusFieldId, setFocusFieldId] = useState<string | undefined>(undefined);
 
   const selectField = (rootId: string, deepestId: string) => {
     onOpenView("fields");
     setSelectedFieldId(rootId);
-    scrollToField(deepestId);
+    setFocusFieldId(deepestId);
   };
 
   return (
@@ -189,6 +200,9 @@ export function PanelsScreen({ openView, onBack, onOpenView, token }: Props) {
                     <ul className="studio-panels-rail-sublist">
                       {railFields.map((row) => {
                         const rowIssues = issueCountForEntityId(validation.issues, row.id);
+                        const field = fieldsById.get(row.id);
+                        const label = field ? resolveDraftLocalizedText(field.label, contentLocale, baseLocale) : undefined;
+                        const typeLabel = field && typeof field.type === "string" ? FIELD_TYPE_LABELS[field.type].name : undefined;
                         return (
                           <li key={row.id}>
                             <button
@@ -198,9 +212,11 @@ export function PanelsScreen({ openView, onBack, onOpenView, token }: Props) {
                               aria-current={selectedFieldId === row.rootId ? "true" : undefined}
                               onClick={() => selectField(row.rootId, row.id)}
                             >
-                              <span className="studio-panels-rail-name">
-                                {row.key === "" ? t("panelsScreen.unnamedField") : row.key}
+                              <span className="studio-panels-rail-field-text">
+                                <span className="studio-panels-rail-name">{label || t("panelsScreen.unnamedField")}</span>
+                                {row.key !== "" && <span className="studio-panels-rail-key studio-mono">{row.key}</span>}
                               </span>
+                              {typeLabel && <span className="studio-panels-rail-type studio-mono">{typeLabel}</span>}
                               {rowIssues > 0 && (
                                 <span
                                   className="studio-panels-rail-issues"
@@ -264,7 +280,14 @@ export function PanelsScreen({ openView, onBack, onOpenView, token }: Props) {
         <main className="studio-panels-screen-view">
           {/* All four mount; `hidden` shows one. See the component note. */}
           <div hidden={openView !== "fields"}>
-            <FieldCatalogPanel token={token} selectedId={selectedFieldId} onAdd={addField} onRemove={removeField} />
+            <FieldCatalogPanel
+              token={token}
+              selectedId={selectedFieldId}
+              focusFieldId={focusFieldId}
+              onAdd={addField}
+              onRemove={removeField}
+              onShowStep={onShowStep}
+            />
           </div>
           <div hidden={openView !== "dataSources"}>
             <DataSourcesPanel

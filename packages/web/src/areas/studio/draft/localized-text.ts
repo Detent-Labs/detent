@@ -122,6 +122,31 @@ export function resolveAddLocaleAttempt(candidate: string): AddLocaleAttempt {
   return localeCode.safeParse(candidate).success ? { ok: true, locale: candidate } : { ok: false };
 }
 
+/** How many of `field`'s OWN `LocalizedText` entries — its `label`, its
+ * `description`, and each `options[].label` — carry the Draft's base locale
+ * but not `locale`. The field catalog's per-field translation-status list
+ * (design.md decision 4). Applies `localeGapCount`'s own two rules: an entry
+ * with no base-locale value does not count (`runValidation` already reports
+ * it), and the base locale never counts against itself.
+ *
+ * Does NOT recurse into `field.fields`: a group's children carry their own
+ * rail entry and their own translation-status list (`flattenRailFields`
+ * already gives each of them a row of its own), and recursing here would
+ * count a child's gap twice — once on the child's own row, once folded into
+ * the parent's. */
+export function fieldLocaleGaps(field: DraftField, locale: string, baseLocale: string): number {
+  if (locale === baseLocale) return 0;
+
+  let count = 0;
+  const check = (entry: DraftLocalizedText) => {
+    if (entry?.[baseLocale] && !entry?.[locale]) count++;
+  };
+  check(field.label);
+  check(field.description);
+  for (const option of field.options ?? []) check(option.label);
+  return count;
+}
+
 /** Draft field seed for a freshly-created step/field/option: an empty
  * LocalizedText entry under the currently selected content locale, not a
  * bare string — a new entity must satisfy the base-locale invariant as soon

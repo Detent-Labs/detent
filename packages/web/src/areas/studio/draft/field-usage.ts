@@ -1,0 +1,105 @@
+import type { Expression } from "workflow-engine/schema";
+import type { Draft } from "./types";
+import type { DraftOf } from "./types";
+import { resolveDraftLocalizedText } from "./localized-text";
+import type { FlagKey } from "./view-flags";
+import { isExpression, type BoolOrExpr } from "../panels/shared/overrideMode";
+
+/** One step whose view references the field, and which of `visible` /
+ * `required` / `readonly` that step's view entry carries — regardless of
+ * whether the value is a literal or an expression. `stepLabel` is the
+ * step's resolved label in the caller's locale, falling back to `""` (the
+ * key or an empty string) the same way `flattenRailFields`'s own `key`
+ * does — the caller applies the unnamed-step catalog fallback, exactly as
+ * `PanelsScreen` already does for an unnamed field's rail row. */
+export interface FieldUsageRow {
+  stepId: string;
+  stepLabel: string;
+  modes: FlagKey[];
+}
+
+const FLAG_KEYS: FlagKey[] = ["visible", "required", "readonly"];
+
+/** Every step whose view references `fieldId`, and the flags that reference
+ * sets. Shared by "Used in" (task 3.7) and `fieldVisibleOverrides` below —
+ * both walks read the same view entries, so the two cannot disagree about
+ * which steps reference the field (design.md decision 6). */
+export function fieldUsage(draft: Draft, fieldId: string, locale: string, baseLocale: string): FieldUsageRow[] {
+  const rows: FieldUsageRow[] = [];
+  for (const step of draft.workflow?.steps ?? []) {
+    if (step.id === undefined) continue;
+    for (const entry of step.view?.fields ?? []) {
+      if (entry.ref !== fieldId) continue;
+      rows.push({
+        stepId: step.id,
+        stepLabel: resolveDraftLocalizedText(step.label, locale, baseLocale) ?? step.key ?? "",
+        modes: FLAG_KEYS.filter((k) => k in entry),
+      });
+    }
+  }
+  return rows;
+}
+
+/** The field catalog's "Only ask this when" row (design.md decision 3) reads
+ * a field's cross-step `visible` state as one of three shapes. `"none"`: no
+ * step view references the field, so there is nothing to read or write.
+ * `"uniform"`: every referencing view's `visible` is the same expression (or
+ * every one is absent) — `value` is that shared value, `undefined` for
+ * "absent everywhere". `"divergent"`: the sources differ, or at least one
+ * view holds a literal boolean (a literal always counts as a disagreement,
+ * even against an otherwise-uniform set of absences: replacing a deliberate
+ * `visible: false` without naming it would lose it). `literalStepIds` names
+ * the steps a write would silently overwrite. */
+export type FieldVisibleState =
+  | { kind: "none" }
+  | { kind: "uniform"; stepIds: string[]; value: DraftOf<Expression> | undefined }
+  | { kind: "divergent"; stepIds: string[]; literalStepIds: string[] };
+
+export function fieldVisibleOverrides(draft: Draft, fieldId: string): FieldVisibleState {
+  const entries: { stepId: string; visible: BoolOrExpr }[] = [];
+  for (const step of draft.workflow?.steps ?? []) {
+    if (step.id === undefined) continue;
+    for (const entry of step.view?.fields ?? []) {
+      if (entry.ref !== fieldId) continue;
+      entries.push({ stepId: step.id, visible: entry.visible });
+    }
+  }
+
+  if (entries.length === 0) return { kind: "none" };
+  const stepIds = entries.map((e) => e.stepId);
+
+  const literalStepIds = entries.filter((e) => typeof e.visible === "boolean").map((e) => e.stepId);
+  if (literalStepIds.length > 0) return { kind: "divergent", stepIds, literalStepIds };
+
+  // Every entry is now an expression or absent (`undefined`). Absent counts
+  // as one shared source: several referencing views that have never carried
+  // an override agree just as much as several sharing one written expression.
+  const sources = new Set(entries.map((e) => (isExpression(e.visible) ? e.visible.src : undefined)));
+  if (sources.size > 1) return { kind: "divergent", stepIds, literalStepIds: [] };
+
+  return { kind: "uniform", stepIds, value: entries[0]!.visible as DraftOf<Expression> | undefined };
+}
+
+/**
+ * The condition row's writer (design.md decision 3): a pure mutating recipe
+ * of the shape `mutate` (`draft/store.tsx`) takes, not a function that
+ * returns a patch — `applyVisibleOverride(draft, id, expr)` IS the recipe
+ * body a caller passes straight to `mutate`. Walks every step's view and,
+ * for each entry referencing `fieldId`, writes `visible` (adding the key
+ * where it was absent, replacing an existing expression or literal) or
+ * deletes it for `undefined` — never writes the key holding `undefined`
+ * itself, which would show up as a stray key on the JSON surface.
+ *
+ * `visible` only ever takes an expression here: the row speaks CEL alone, so
+ * this never overwrites `required`/`readonly` the way a literal `false`
+ * write does elsewhere (`setFlag`, `view-flags.ts`).
+ */
+export function applyVisibleOverride(draft: Draft, fieldId: string, visible: DraftOf<Expression> | undefined): void {
+  for (const step of draft.workflow?.steps ?? []) {
+    for (const entry of step.view?.fields ?? []) {
+      if (entry.ref !== fieldId) continue;
+      if (visible === undefined) delete entry.visible;
+      else entry.visible = visible;
+    }
+  }
+}

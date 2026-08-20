@@ -193,3 +193,21 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   entry leaves the section when that change archives; the decisions that
   outlive it are the Player rejection, the two deferred tabs and the
   no-persistence rule.
+- **No "Long text" field type.** `field-catalog-redesign`'s type picker lists
+  the ten `baseFieldType` values under friendly names and stops there. The
+  contract has no multiline string variant, and `tmp/Field Catalog
+  Redesign/`, the Claude Design template that change realizes, is direction
+  rather than a contract proposal — it shows a "Long text" entry the
+  definition contract cannot back. A future multiline type is a separate
+  definition-contract change, gated on a real need: rendered behavior (a
+  `<textarea>` versus a single-line `<input>`) that a `string` field cannot
+  already express through the existing renderer.
+- **No default-value editor for `FieldDef.default`.** The key parses and
+  type-checks (`Literal | Expression`) in `src/schema/definition.ts`, but no
+  runtime code applies it. `resolveFields` (`src/runtime/api.ts`) fills a
+  field's value from `instance.data` alone; no `ResolvedViewField` carries a
+  `default` key, and `createProcessInstance` starts an instance's `data` from
+  `opts.data ?? {}`. `field-catalog-redesign` therefore ships no editor for
+  it: building one before the engine reads the value would ship UI with no
+  visible effect. The trigger is a `runtime-api` change that makes an
+  instance's initial `data` read the field catalog's defaults.

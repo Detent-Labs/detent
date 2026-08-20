@@ -86,6 +86,7 @@ the checks rail.
 | rail sublist | the index rail's own entry list, under the fields or data sources view alone: one row per entity | `.studio-panels-rail-sublist` |
 | open view | the center column: whichever of the four views is not `hidden` | `.studio-panels-screen-view` |
 | field catalog | the open view that lists and edits the process's field definitions | `panels/FieldCatalogPanel.tsx` |
+| field tabs | the Field / Values / Rules tab set inside the field catalog's editor, for the one selected top-level field | `panels/FieldCatalogPanel.tsx`, `FieldEditor` |
 | data sources | the open view that lists and edits the process's data source definitions | `panels/DataSourcesPanel.tsx` |
 | contract | the open view that edits the process's `ProcessContract`: input fields, output fields, outcomes | `panels/ContractPanel.tsx` |
 | field matrix | the open view with the grid of every field against every step; also a dock tab | `panels/FieldMatrixPanel.tsx`, `panels/FieldMatrixGrid.tsx` |
@@ -93,6 +94,19 @@ the checks rail.
 All four views stay mounted at once; `hidden` shows one and hides the other
 three. A view keeps its own edit state across a switch: a half-typed outcome
 name, a selected field. Unmounting on every switch would lose that state.
+
+**field tabs** names one thing only: the Field / Values / Rules set inside
+the field catalog's own editor. It stands apart from the register tab, the
+shell's own header label. It stands apart from the dock tab, one of the
+canvas dock's three views. It stands apart from the surface toggle, the
+Structure/JSON switch. All four are tab patterns. Each keeps its own name.
+
+**inert** carries two readings here, both HTML terms used for their literal
+meaning, not a rotated synonym for either. The field matrix stamps a step
+column `data-inert` when that step declares no view: a state fact about the
+column. The field catalog's preview container carries the `inert` HTML
+attribute: a behavior. It and its sample controls take no keyboard or
+pointer interaction, and a screen reader skips them.
 
 The field matrix splits into two components: a bare grid and a wrapper. The
 bare grid, `FieldMatrixGrid`, holds the headers, the cells and the keyboard

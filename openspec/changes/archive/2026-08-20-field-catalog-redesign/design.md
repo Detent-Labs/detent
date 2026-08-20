@@ -144,9 +144,15 @@ One `tablist` exists per open editor, never one per nested field.
 A group field's children stay inside the Field tab, recursively, under
 the design's "Fields inside this group", through that flat row. The
 rail's existing "Open" behavior stays the way into a child. It selects
-the parent group and scrolls the child into view, landing on a section
-that is always rendered — never a tab the click would also have to
-switch to.
+the parent group and scrolls the child into view.
+
+The child's own row sits inside the Field tab alone, not a section
+rendered outside every tab. Where a click names a child of the group
+already open, and the author sits on Values or Rules, the selection
+itself does not change — so nothing else would reset the active tab.
+The rail's navigation therefore also switches the editor to the Field
+tab before it scrolls, the one case where a rail click both selects
+and switches.
 
 ### 2. Friendly type names over the ten contract types
 

@@ -39,8 +39,19 @@ export const LOGIN_PATH = "/login";
 /** Names no area, and differs from every API route path — the engine matches its route table before it falls through to static serving. */
 export const PROFILE_PATH = "/profile";
 
+/** Navigation options every `go`/`navigate` call takes. `replace` swaps
+ * `history.pushState` for `history.replaceState`, for a route that consumes a
+ * one-shot target and clears it from its own address (`unified-shell`'s
+ * navigation requirement): pushing there would leave the target's URL as a
+ * live history entry, so a later Back would return to it, re-trigger
+ * whatever consumed the target, and push the cleared address again — Back
+ * could then never reach the screen the navigation came from. */
+export interface NavigateOptions {
+  replace?: boolean;
+}
+
 /** Small hand-written History-API hook — one copy now, where there were four. */
-export function useLocation(): { pathname: string; go: (href: string) => void } {
+export function useLocation(): { pathname: string; go: (href: string, opts?: NavigateOptions) => void } {
   const [pathname, setPathname] = useState(() => (typeof location === "undefined" ? "/" : location.pathname));
 
   useEffect(() => {
@@ -49,8 +60,11 @@ export function useLocation(): { pathname: string; go: (href: string) => void } 
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  const go = useCallback((href: string) => {
-    if (href !== location.pathname) history.pushState(null, "", href);
+  const go = useCallback((href: string, opts?: NavigateOptions) => {
+    if (href !== location.pathname) {
+      if (opts?.replace) history.replaceState(null, "", href);
+      else history.pushState(null, "", href);
+    }
     setPathname(href);
   }, []);
 
@@ -67,8 +81,8 @@ export function useAreaRoute<R>(
   localPath: string,
   match: (path: string) => R,
   toPath: (route: R) => string,
-  go: (href: string) => void,
-): { route: R; navigate: (route: R) => void } {
-  const navigate = useCallback((route: R) => go(areaHref(area, toPath(route))), [area, toPath, go]);
+  go: (href: string, opts?: NavigateOptions) => void,
+): { route: R; navigate: (route: R, opts?: NavigateOptions) => void } {
+  const navigate = useCallback((route: R, opts?: NavigateOptions) => go(areaHref(area, toPath(route)), opts), [area, toPath, go]);
   return { route: match(localPath), navigate };
 }

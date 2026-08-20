@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   collectUsedLocales,
+  fieldLocaleGaps,
   localeGapCount,
   missingTranslationWarning,
   resolveAddLocaleAttempt,
@@ -152,6 +153,36 @@ describe("localeGapCount", () => {
 
     expect(localeGapCount(draft, "de")).toBe(5);
     expect(localeGapCount(draft, "en")).toBe(0);
+  });
+});
+
+describe("fieldLocaleGaps", () => {
+  it("counts a translated label alongside an untranslated option label", () => {
+    // field_choice: label {en, de} (no gap), option a {en} only (1 gap),
+    // option b {de} only — lacks the base locale, so it does not count.
+    expect(fieldLocaleGaps(gapDraft().fields![2]!, "de", "en")).toBe(1);
+  });
+
+  it("counts nothing for a fully translated field", () => {
+    // field_group: label {en, de}, no description, no options.
+    expect(fieldLocaleGaps(gapDraft().fields![1]!, "de", "en")).toBe(0);
+  });
+
+  it("does not count an option lacking the base-locale value", () => {
+    const draft = gapDraft();
+    (draft.fields![2]!.options![1]! as { label: Record<string, string> }).label = {};
+    expect(fieldLocaleGaps(draft.fields![2]!, "de", "en")).toBe(1);
+  });
+
+  it("returns 0 while the base locale is the one being edited", () => {
+    expect(fieldLocaleGaps(gapDraft().fields![0]!, "en", "en")).toBe(0);
+  });
+
+  it("excludes a group field's own children from its count", () => {
+    const draft = gapDraft();
+    // field_nested (field_group's child) carries {en} alone — a gap on its
+    // own row, which the group's own count must not also carry.
+    expect(fieldLocaleGaps(draft.fields![1]!, "de", "en")).toBe(0);
   });
 });
 

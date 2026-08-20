@@ -28,17 +28,22 @@ import { EditorDock, type DockTab } from "../dock/EditorDock.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
 import { FormEditorScreen } from "./FormEditorScreen.js";
+import type { NavigateOptions } from "../../../shell/routing.js";
 
 interface EditScreenProps {
   processId: string;
-  /** The `edit` route's two optional sub-states. Either one renders in place
-   * of the canvas and inspector: `formStepId` the form editor for that step,
-   * `panel` the panels screen at that view. The form editor wins when both
-   * arrive, which `routePath` already encodes. */
+  /** The `edit` route's optional sub-states. `formStepId` and `panel` each
+   * render in place of the canvas and inspector: the form editor for a step,
+   * or the panels screen at a view. The form editor wins when both arrive,
+   * which `routePath` already encodes. `stepId` is a one-shot canvas target
+   * ("Show on the canvas") — it never replaces the canvas, and `EditorArea`
+   * clears it from the address once read (task 6.2, `unified-shell`'s
+   * navigation requirement). */
   formStepId?: string;
   panel?: PanelView;
+  stepId?: string;
   token: string;
-  navigate: (route: Route) => void;
+  navigate: (route: Route, opts?: NavigateOptions) => void;
   onUnauthorized: () => void;
 }
 
@@ -46,6 +51,7 @@ interface EditorAreaProps {
   processId: string;
   formStepId?: string;
   panel?: PanelView;
+  stepId?: string;
   token: string;
   initialRevision: number;
   initialLayout: Record<string, unknown>;
@@ -56,7 +62,7 @@ interface EditorAreaProps {
    * so a publish moves the real base version without moving this prop.
    * `EditorArea` folds `publishResult.version` over it instead. */
   loadedBaseVersion: number | null;
-  navigate: (route: Route) => void;
+  navigate: (route: Route, opts?: NavigateOptions) => void;
   onUnauthorized: () => void;
 }
 
@@ -66,7 +72,7 @@ interface EditorAreaProps {
  * remaining direct consumer of `DraftToolbarProps`; `DraftToolbar` itself no
  * longer mounts here (design.md: "DraftToolbar keeps its logic.
  * ProcessHeaderBar renders the buttons."). */
-function EditorArea({ processId, formStepId, panel, token, initialRevision, initialLayout, loadedBaseVersion, navigate, onUnauthorized }: EditorAreaProps) {
+function EditorArea({ processId, formStepId, panel, stepId, token, initialRevision, initialLayout, loadedBaseVersion, navigate, onUnauthorized }: EditorAreaProps) {
   const { draft, mutate, validation, replace, contentLocale } = useDraft();
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
   // The canvas selection is a set (design.md). A set of one drives the
@@ -196,6 +202,23 @@ function EditorArea({ processId, formStepId, panel, token, initialRevision, init
     setSelectedStepIds(stepId ? [stepId] : []);
     setSelectedPathId(pathId);
   };
+
+  // The route's one-shot step target ("Show on the canvas", task 6.2). Keyed
+  // on `stepId` alone, not on mount: `EditorArea` stays mounted across a trip
+  // to the panels screen and back (the same routing decision
+  // `panels-list-and-detail` made), so a mount-only read would never fire on
+  // this navigation. An unknown id selects nothing, the same rule an unknown
+  // view already follows. The effect then replaces the address with the
+  // plain `edit` route — a push here would leave `/edit/step/:stepId` as a
+  // live history entry that re-selects the step, and re-pushes itself, on
+  // every Back, so Back could never reach the panels screen the navigation
+  // came from (unified-shell's navigation requirement).
+  useEffect(() => {
+    if (stepId === undefined) return;
+    onSelectStep(steps.some((s) => s.id === stepId) ? stepId : undefined);
+    navigate({ name: "edit", processId }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepId]);
 
   // The whole set at once: a shift-click's toggle and a marquee's release. A
   // path belongs to one step, so a set write drops any selected path.
@@ -383,6 +406,7 @@ function EditorArea({ processId, formStepId, panel, token, initialRevision, init
               openView={panel}
               onBack={() => navigate({ name: "edit", processId })}
               onOpenView={(view) => navigate({ name: "edit", processId, panel: view })}
+              onShowStep={(targetStepId) => navigate({ name: "edit", processId, stepId: targetStepId })}
               token={token}
             />
           ) : formStepId !== undefined ? (
@@ -548,7 +572,7 @@ type EditLoadState =
   | { kind: "error"; message: string }
   | { kind: "loaded"; record: DraftRecord };
 
-export function EditScreen({ processId, formStepId, panel, token, navigate, onUnauthorized }: EditScreenProps) {
+export function EditScreen({ processId, formStepId, panel, stepId, token, navigate, onUnauthorized }: EditScreenProps) {
   const [state, setState] = useState<EditLoadState>({ kind: "loading" });
   const fail = useFail(onUnauthorized, (e) => setState({ kind: "error", message: describeCaughtError(e) }));
 
@@ -607,6 +631,7 @@ export function EditScreen({ processId, formStepId, panel, token, navigate, onUn
         processId={processId}
         formStepId={formStepId}
         panel={panel}
+        stepId={stepId}
         token={token}
         initialRevision={state.record.revision}
         initialLayout={state.record.layout}

@@ -18,6 +18,7 @@ const EVERY_ROUTE: Route[] = [
   { name: "edit", processId: "proc_1" },
   { name: "edit", processId: "proc_1", formStepId: "step_1" },
   { name: "edit", processId: "proc_1", panel: "fields" },
+  { name: "edit", processId: "proc_1", stepId: "step_1" },
   { name: "versions", processId: "proc_1" },
   { name: "migrate", processId: "proc_1", from: "1", to: "2" },
   { name: "tools" },
@@ -89,6 +90,33 @@ describe("the panels screen's panel sub-state of the edit route", () => {
   it("prefers the form path when both fields are set, so one path is emitted", () => {
     const route: Route = { name: "edit", processId: "proc_1", formStepId: "step_1", panel: "fields" };
     expect(routePath(route)).toBe("/processes/proc_1/edit/form/step_1");
+  });
+});
+
+describe("the step target's sub-state of the edit route", () => {
+  it("round-trips /processes/:id/edit/step/:stepId", () => {
+    const route: Route = { name: "edit", processId: "proc_1", stepId: "step_1" };
+    expect(routePath(route)).toBe("/processes/proc_1/edit/step/step_1");
+    expect(matchRoute(routePath(route))).toEqual(route);
+  });
+
+  it("falls back to the plain edit route rather than half-matching, with no id", () => {
+    expect(matchRoute("/processes/proc_1/edit/step")).toEqual({ name: "edit", processId: "proc_1" });
+  });
+
+  it("falls back to the plain edit route rather than half-matching, with a deeper path", () => {
+    expect(matchRoute("/processes/proc_1/edit/step/a/b")).toEqual({ name: "edit", processId: "proc_1" });
+  });
+
+  it("stays distinct from the form-editor and panels sub-states, with no collision between the three", () => {
+    const plain = matchRoute("/processes/proc_1/edit");
+    const withForm = matchRoute("/processes/proc_1/edit/form/step_1");
+    const withPanel = matchRoute("/processes/proc_1/edit/panels/fields");
+    const withStep = matchRoute("/processes/proc_1/edit/step/step_1");
+    expect(withStep).toEqual({ name: "edit", processId: "proc_1", stepId: "step_1" });
+    expect(withStep).not.toEqual(plain);
+    expect(withStep).not.toEqual(withForm);
+    expect(withStep).not.toEqual(withPanel);
   });
 });
 

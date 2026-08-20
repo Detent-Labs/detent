@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { matchShell, useLocation, areaHref, LOGIN_PATH, PROFILE_PATH } from "./routing.js";
+import { matchShell, useLocation, areaHref, LOGIN_PATH, PROFILE_PATH, type NavigateOptions } from "./routing.js";
 import {
   loadSession,
   persistSession,
@@ -38,7 +38,7 @@ export interface AreaRootProps {
   locale: UiLocale;
   /** The path with the area prefix already stripped, so the area matcher never sees it. */
   localPath: string;
-  go: (href: string) => void;
+  go: (href: string, opts?: NavigateOptions) => void;
   onUnauthorized: () => void;
   onLocaleChange: (locale: UiLocale) => void;
   onLogout: () => void;

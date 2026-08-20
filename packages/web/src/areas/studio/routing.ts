@@ -9,7 +9,7 @@ const isPanelView = (v: string): v is PanelView => (PANEL_VIEWS as string[]).inc
 
 export type Route =
   | { name: "processes" }
-  | { name: "edit"; processId: string; formStepId?: string; panel?: PanelView }
+  | { name: "edit"; processId: string; formStepId?: string; panel?: PanelView; stepId?: string }
   | { name: "versions"; processId: string }
   | { name: "migrate"; processId: string; from: string; to: string }
   | { name: "tools" }
@@ -49,6 +49,18 @@ export function matchRoute(path: string): Route {
     };
   }
   if (editPanelMatch) return { name: "edit", processId: decodeURIComponent(editPanelMatch[1]!) };
+  // The step target (`unified-shell`'s replace-mode navigation): a third
+  // sub-state of `edit`, at its own path segment ranked after the two above.
+  // A malformed tail — no id, or more than one segment — falls back to the
+  // plain edit route rather than half-matching or falling through to the
+  // process list, the same leniency `editPanelMatch` already gives an
+  // unrecognized `:view`.
+  const editStepPrefix = /^\/processes\/([^/]+)\/edit\/step(\/.*)?$/.exec(path);
+  if (editStepPrefix) {
+    const tail = /^\/([^/]+)$/.exec(editStepPrefix[2] ?? "");
+    if (tail) return { name: "edit", processId: decodeURIComponent(editStepPrefix[1]!), stepId: decodeURIComponent(tail[1]!) };
+    return { name: "edit", processId: decodeURIComponent(editStepPrefix[1]!) };
+  }
   const editMatch = /^\/processes\/([^/]+)\/edit$/.exec(path);
   if (editMatch) return { name: "edit", processId: decodeURIComponent(editMatch[1]!) };
   const versionsMatch = /^\/processes\/([^/]+)\/versions$/.exec(path);
@@ -70,6 +82,7 @@ export function routePath(route: Route): string {
         return `/processes/${encodeURIComponent(route.processId)}/edit/form/${encodeURIComponent(route.formStepId)}`;
       // `panel` needs no encoding: it is one of four literals, not user input.
       if (route.panel) return `/processes/${encodeURIComponent(route.processId)}/edit/panels/${route.panel}`;
+      if (route.stepId) return `/processes/${encodeURIComponent(route.processId)}/edit/step/${encodeURIComponent(route.stepId)}`;
       return `/processes/${encodeURIComponent(route.processId)}/edit`;
     case "versions":
       return `/processes/${encodeURIComponent(route.processId)}/versions`;
