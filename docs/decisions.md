@@ -24,6 +24,14 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   schema change. A declared `technical` key on `FieldDef` (`definition.ts`)
   would let an author state that intent before any writer exists, at the
   cost of a definition-contract change and full OpenSpec treatment.
+- `checkUnknownKeys` (`src/schema/compile.ts`) needs the raw authored body,
+  and the studio holds only the Zod-stripped result of
+  `authoredProcessBody.safeParse(draft).data`, so the studio's checks rail
+  holds that check back for a draft's whole session (`unknownKeysHeldBack`,
+  `validation-sequence-module`). A tolerant walk over the raw draft — one
+  that survives an unknown key rather than stripping it before the walk ever
+  runs — would close that gap and let the studio run the check live. No
+  follow-up change tracks this yet.
 
 ## Decided, not yet built (each needs its own OpenSpec change)
 - **Process-scoped permissions: the filter, the draft scope, and the

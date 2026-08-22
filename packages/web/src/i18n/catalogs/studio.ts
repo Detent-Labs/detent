@@ -281,6 +281,8 @@ export const en = {
   "checksRail.heldBack": "Held back until earlier checks pass.",
   "checksRail.groupClear": "No open issues in this group.",
   "checksRail.allClear": "No open issues. This draft is ready to publish.",
+  "checksRail.configHeldBack": "Plugin config check held back — verified at publish.",
+  "checksRail.unknownKeysHeldBack": "Unknown-key check held back — verified at publish.",
 
   "jsonView.label": "Draft body (JSON)",
   "jsonView.apply": "Apply",

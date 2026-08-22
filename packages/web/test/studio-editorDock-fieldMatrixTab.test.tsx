@@ -32,7 +32,7 @@ const DRAFT: Draft = {
 describe("EditorDock's Field matrix tab", () => {
   it("mounts the bare grid, with no toolbar", () => {
     const html = renderToStaticMarkup(
-      <DraftProvider initial={DRAFT}>
+      <DraftProvider initial={DRAFT} token="token">
         <EditorDock
           processId="proc_a"
           token="token"

@@ -1,4 +1,5 @@
 import type { Action, Expression, FieldId } from "workflow-engine/schema";
+import { PROCESS_START_ACTION_TYPE } from "workflow-engine/engine/registry";
 import type { DraftOf } from "../draft/types";
 import { mintId } from "../draft/ids";
 import { removeAt, updateAt } from "../draft/list-ops";
@@ -87,6 +88,15 @@ function ActionRow({
 
   const setOutput = (next: Partial<Record<FieldId, DraftOf<Expression>>>) => onChange({ output: next });
 
+  // Narrowed to the held-back config-validation half (design.md's "Config
+  // validation stays on the server, and the rail says so" decision): an
+  // action whose type does not resolve gets its own registry issue from the
+  // type-resolution half instead, via IssueList below — showing this badge
+  // too would duplicate that signal for the same reason.
+  const hasRegistryIssue = validation.issues.some((i) => i.source === "registry" && i.entityId === action.id);
+  const isChainingSite = action.type === PROCESS_START_ACTION_TYPE;
+  const chainingChecked = action.id !== undefined && validation.chainingSiteStatus[action.id] === "checked";
+
   return (
     <div className="action-row">
       <PluginEnvelopeEditor
@@ -108,7 +118,8 @@ function ActionRow({
         onChange={setOutput}
       />
 
-      {!validation.registryChecked && <NotCheckedBadge label="registry" />}
+      {!hasRegistryIssue && <NotCheckedBadge label="registry config" />}
+      {isChainingSite && !chainingChecked && <NotCheckedBadge label="chaining target" />}
       <IssueList entityId={action.id} />
 
       <button type="button" className="btn btn-secondary" onClick={onRemove}>

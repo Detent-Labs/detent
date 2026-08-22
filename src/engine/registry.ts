@@ -95,6 +95,31 @@ export function createRegistry(): Registry {
 }
 
 /**
+ * The three type-name arrays every dimension's type-resolution half checks
+ * against — the same `[...registry.keys()]` shape `GET /registry` already
+ * builds (`src/http/studio-routes.ts`). The studio's `useRegistry` response
+ * satisfies this structurally: its `RegistryInfo` is a six-field superset
+ * carrying these same three arrays plus three schema-description records, so
+ * the studio passes its own fetched response wherever a `RegistryDescription`
+ * is expected, with no shared type tying the two declarations together.
+ */
+export interface RegistryDescription {
+  actionTypes: string[];
+  assignmentStrategyTypes: string[];
+  dataSourceTypes: string[];
+}
+
+/**
+ * Derive one type-name array from one live registry. Building a full
+ * `RegistryDescription` takes three calls to this function, one per registry
+ * (action, assignment, data source), not one call deriving the whole shape
+ * from a single registry.
+ */
+export function describeTypeNames(registry: Registry | AssignmentRegistry | DataSourceRegistry): string[] {
+  return [...registry.keys()];
+}
+
+/**
  * The strategy type an author gets by default, and the only entry the built-in
  * `createDefaultAssignmentRegistry` below registers. It resolves through the
  * `AssignmentRegistry` like any other type — no engine code branches on this

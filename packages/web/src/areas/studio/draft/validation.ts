@@ -1,11 +1,10 @@
-import { authoredProcessBody, type ProcessBody } from "workflow-engine/schema";
-import { compileProcessBody, validateDurations, DurationValidationError, CompileValidationError } from "workflow-engine/schema/compile";
-import { validateProcessBody, checkSubprocessChildRefs } from "workflow-engine/cel/check";
-import { checkActionRegistry } from "workflow-engine/engine/registry-check";
-import type { Registry } from "workflow-engine/engine/registry";
+import type { ActionId, ProcessBody } from "workflow-engine/schema";
+import { validateStructure, validateReferences } from "workflow-engine/validate";
+import { collect } from "workflow-engine/engine/registry-check";
+import { PROCESS_START_ACTION_TYPE, type RegistryDescription } from "workflow-engine/engine/registry";
 import type { Draft } from "./types";
 import { resolveLoc, type EditorIssue, type IssueSource } from "./issues";
-import { checkViewFlags } from "./view-flags";
+import { checkViewFlags, checkUnwrittenTechnicalFields } from "./view-flags";
 
 function pushIssues(
   issues: EditorIssue[],
@@ -18,148 +17,160 @@ function pushIssues(
   }
 }
 
+/** Every dimension `validateStructure`/`validateReferences` report, merged
+ * into one record. `zod` always reads "ran" — the safeParse call runs
+ * unconditionally. */
+export type Dimension =
+  | "zod"
+  | "duration"
+  | "structural"
+  | "actionType"
+  | "assignmentType"
+  | "dataSourceType"
+  | "registryConfig"
+  | "cel";
+
 export interface ValidationResult {
   zodValid: boolean;
   issues: EditorIssue[];
-  /** false = no Registry loaded; every action's registry dimension is "not checked" (never a false pass). */
-  registryChecked: boolean;
+  dimensions: Record<Dimension, "ran" | "not-run">;
   /** Per subprocess-type step (keyed by its entity id): whether a child body is loaded to check cross-process refs against. */
   subprocessStepStatus: Record<string, "checked" | "not-checked">;
-  /** True iff `compileProcessBody` produced a compiled body (`compiled !==
-   * undefined`). False on a Zod-invalid draft, on a duration failure, and on
-   * a structural (`CompileValidationError`) failure alike. */
-  structurallyValid: boolean;
-  /** True iff the six structural checks (`compile.ts::structuralIssues`) ran
-   * at all — distinct from `structurallyValid`, which also reads false when
-   * they never ran. False on a Zod-invalid draft (nothing past Zod ran) and
-   * on a duration failure (`compileProcessBody` raises before reaching
-   * `structuralIssues`). True on a `CompileValidationError` (they ran and
-   * reported real issues) and when compilation raises nothing (they ran and
-   * passed). See design.md's "structural group needs its own 'did it run'
-   * flag" decision. */
-  structuralChecked: boolean;
+  /** Per `process.start` action site (keyed by the action's own id): whether
+   * its chaining target body is loaded to check its inputMapping against. A
+   * site absent from this record, or reading "not-checked", never counts as
+   * a clear pass in the CEL group. */
+  chainingSiteStatus: Record<ActionId, "checked" | "not-checked">;
 }
+
+const EMPTY_REGISTRY_DESCRIPTION: RegistryDescription = { actionTypes: [], assignmentStrategyTypes: [], dataSourceTypes: [] };
 
 /**
  * Runs the engine's own, unmodified publish-time validators against the
- * Draft, plus one studio-owned pass, `checkViewFlags`. An entry from the
- * five engine sources (zod, structural, cel, registry, duration) blocks a
- * publish; an entry from `view` does not — it reports a view-flag state the
- * engine publishes without complaint (see `studio-checks-rail`'s "Every
- * publish blocker is visible" requirement). Zod gates
- * everything else: `validateProcessBody`/`checkActionRegistry`/
- * `validateDurations` are written against a structurally-complete
- * `ProcessBody` (they walk `body.workflow.steps` etc. unconditionally), so
- * running them against a still-incomplete Draft would throw a TypeError,
- * not produce a located issue. A Zod-invalid Draft only ever shows its Zod
- * issues; the CEL/registry/duration/cross-process/view dimensions all report
- * "not checked" (via an empty result) until the Draft parses.
+ * Draft, via the two-phase module both this function and `publishBody`
+ * (`src/engine/definitions.ts`) share (`validateStructure`/
+ * `validateReferences`, `src/validate.ts`), plus two studio-owned passes,
+ * `checkViewFlags` and `checkUnwrittenTechnicalFields`.
  *
- * Runs registry/CEL checks against the *compiled* body (mirroring
- * `publishBody`'s own ordering) so a check sees exactly what publish would
- * — including the injected cancel-sink step, per design.md decision 2's
- * reason for exporting `./schema/compile`. The sink is appended at the end
- * of `steps`, so every authored step's index is unchanged and `resolveLoc`
- * is always called against the pre-compile `body` (which has no sink) —
- * safe because the sink carries no CEL/actions, so no issue can ever be
- * rooted there.
+ * `validateStructure` runs unconditionally: it owns the Zod gate, duration
+ * and the seven structural checks, in that fixed order, and produces the
+ * compiled body every check below needs. `checkViewFlags`/
+ * `checkUnwrittenTechnicalFields` run once the draft is Zod-valid — never
+ * gated on a compiled body existing, so they still report when duration or
+ * structural compilation fails.
  *
- * KNOWN GAP (harden-publish-validation): `compileProcessBody`'s unknown-key
- * check (`checkUnknownKeys`) can never fire from THIS function. It runs here
- * against `authoredProcessBody.safeParse(draft).data` — already Zod-parsed,
- * which strips undeclared keys before `compileProcessBody` ever sees them —
- * whereas `publishBody` (src/engine/definitions.ts) calls `compileProcessBody`
- * on the raw, un-parsed authored body, which is the only place an unknown key
- * is actually visible. So an unknown key is silently absent from Studio's
- * live validation and surfaces only at the real publish call. The other five
- * structural checks (reserved prefix, pattern, id resolution, field-key
- * format, length bounds) are unaffected — they inspect DECLARED values,
- * which survive the Zod parse intact.
+ * `validateReferences` runs once a compiled body exists, independent of
+ * whether `registry` has resolved: the CEL group (the single-body check,
+ * subprocess child refs, and process-chaining targets) needs no registry at
+ * all. Only the three registry type-resolution issue arrays are gated on
+ * `registry` being defined — while it is `undefined` (still loading, or
+ * resolved to nothing after a failed fetch), those three dimensions report
+ * "not-run" and nothing from that half reaches `issues`, even though
+ * `validateReferences` itself still ran (against an empty placeholder
+ * description) to produce the CEL results. The studio never holds a live
+ * plugin registry, so the config-validation half always reads "not-run".
  */
 export function runValidation(
   draft: Draft,
-  registry: Registry | undefined,
+  registry: RegistryDescription | undefined,
   loadedChildren: Record<string, ProcessBody>,
+  loadedChainingTargets: Record<ActionId, ProcessBody>,
 ): ValidationResult {
-  const parsed = authoredProcessBody.safeParse(draft);
-
-  if (!parsed.success) {
-    return {
-      zodValid: false,
-      issues: parsed.error.issues.map((issue) => ({
-        // Zod v4 widened an issue path to `PropertyKey[]`. A JSON body carries
-        // no symbol key, so a symbol segment addresses nothing here.
-        ...resolveLoc(
-          draft,
-          issue.path.filter((seg): seg is string | number => typeof seg !== "symbol"),
-        ),
-        message: issue.message,
-        source: "zod",
-      })),
-      registryChecked: false,
-      subprocessStepStatus: {},
-      // Nothing past Zod ran for this load; the checks rail's structural,
-      // CEL, registry and duration groups all read as held back.
-      structurallyValid: false,
-      structuralChecked: false,
-    };
-  }
-
-  const body = parsed.data;
+  const structure = validateStructure(draft);
+  const zodValid = structure.zodIssues.length === 0;
   const issues: EditorIssue[] = [];
 
-  pushIssues(issues, body, validateDurations(body), "duration");
-  issues.push(...checkViewFlags(body));
-
-  let compiled: ProcessBody | undefined;
-  let structuralChecked = true;
-  try {
-    compiled = compileProcessBody(body);
-  } catch (e) {
-    if (e instanceof DurationValidationError) {
-      compiled = undefined; // already reported via the direct validateDurations call above
-      // compileProcessBody raises here before it ever calls structuralIssues
-      // (design.md): the structural checks did not run for this load.
-      structuralChecked = false;
-    } else if (e instanceof CompileValidationError) {
-      // harden-publish-validation: the six write-path structural checks
-      // (unknown keys, reserved action prefix, pattern compile/length,
-      // outputMapping/contract id resolution, field-key format, length
-      // bounds) — reported the same way duration issues are, and for the
-      // same reason: a structurally invalid body has no compiled form to run
-      // the registry/CEL checks below against.
-      pushIssues(issues, body, e.issues, "structural");
-      compiled = undefined;
-    } else {
-      throw e;
-    }
+  for (const issue of structure.zodIssues) {
+    issues.push({
+      // Zod v4 widened an issue path to `PropertyKey[]`. A JSON body carries
+      // no symbol key, so a symbol segment addresses nothing here.
+      ...resolveLoc(
+        draft,
+        issue.path.filter((seg): seg is string | number => typeof seg !== "symbol"),
+      ),
+      message: issue.message,
+      source: "zod",
+    });
   }
 
-  const registryChecked = registry !== undefined;
+  if (structure.issues.length > 0) {
+    // compileProcessBody throws exactly one of DurationValidationError or
+    // CompileValidationError, never both — `structure.dimensions.structural`
+    // reading "ran" alongside a non-empty issues array is what tells the two
+    // apart (structural is only reached once duration has already passed).
+    const source: IssueSource = structure.dimensions.structural === "ran" ? "structural" : "duration";
+    pushIssues(issues, draft, structure.issues, source);
+  }
 
-  if (compiled) {
-    if (registry) pushIssues(issues, body, checkActionRegistry(compiled, registry), "registry");
-    pushIssues(issues, body, validateProcessBody(compiled), "cel");
+  if (zodValid) {
+    issues.push(...checkViewFlags(draft));
+    issues.push(...checkUnwrittenTechnicalFields(draft));
   }
 
   const subprocessStepStatus: Record<string, "checked" | "not-checked"> = {};
-  body.workflow.steps.forEach((step, stepIndex) => {
-    if (step.type !== "subprocess") return;
-    const childBody = loadedChildren[step.id];
-    if (!childBody) {
-      subprocessStepStatus[step.id] = "not-checked";
-      return;
+  const chainingSiteStatus: Record<ActionId, "checked" | "not-checked"> = {};
+
+  let dimensions: Record<Dimension, "ran" | "not-run"> = {
+    zod: "ran",
+    duration: structure.dimensions.duration,
+    structural: structure.dimensions.structural,
+    actionType: "not-run",
+    assignmentType: "not-run",
+    dataSourceType: "not-run",
+    registryConfig: "not-run",
+    cel: "not-run",
+  };
+
+  if (structure.compiled) {
+    const body = structure.compiled;
+
+    const targetsByLoc: Record<string, ProcessBody> = {};
+    for (const site of collect(body).filter((s) => s.action.type === PROCESS_START_ACTION_TYPE)) {
+      const target = loadedChainingTargets[site.action.id as ActionId];
+      if (target) {
+        targetsByLoc[site.loc] = target;
+        chainingSiteStatus[site.action.id as ActionId] = "checked";
+      } else {
+        chainingSiteStatus[site.action.id as ActionId] = "not-checked";
+      }
     }
-    subprocessStepStatus[step.id] = "checked";
-    pushIssues(issues, body, checkSubprocessChildRefs(body, stepIndex, childBody), "cel");
-  });
+
+    const refs = validateReferences(body, {
+      registryDescription: registry ?? EMPTY_REGISTRY_DESCRIPTION,
+      loadedChildren,
+      targetsByLoc,
+    });
+
+    dimensions = {
+      ...dimensions,
+      actionType: registry ? refs.dimensions.actionType : "not-run",
+      assignmentType: registry ? refs.dimensions.assignmentType : "not-run",
+      dataSourceType: registry ? refs.dimensions.dataSourceType : "not-run",
+      registryConfig: refs.dimensions.registryConfig,
+      cel: refs.dimensions.cel,
+    };
+
+    if (registry) {
+      pushIssues(issues, draft, refs.actionTypeIssues, "registry");
+      pushIssues(issues, draft, refs.assignmentTypeIssues, "registry");
+      pushIssues(issues, draft, refs.dataSourceTypeIssues, "registry");
+      pushIssues(issues, draft, refs.actionConfigIssues, "registry");
+      pushIssues(issues, draft, refs.assignmentConfigIssues, "registry");
+      pushIssues(issues, draft, refs.dataSourceConfigIssues, "registry");
+    }
+    pushIssues(issues, draft, refs.celIssues, "cel");
+
+    body.workflow.steps.forEach((step) => {
+      if (step.type !== "subprocess") return;
+      subprocessStepStatus[step.id] = loadedChildren[step.id] ? "checked" : "not-checked";
+    });
+  }
 
   return {
-    zodValid: true,
+    zodValid,
     issues,
-    registryChecked,
+    dimensions,
     subprocessStepStatus,
-    structurallyValid: compiled !== undefined,
-    structuralChecked,
+    chainingSiteStatus,
   };
 }

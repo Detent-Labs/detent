@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { runValidation } from "../src/areas/studio/draft/validation.js";
+import { groupChecksBySource } from "../src/areas/studio/draft/checksRail.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
 // harden-publish-validation: compileProcessBody now also throws
@@ -35,14 +36,14 @@ describe("runValidation: structural (compile-pass) issues", () => {
   it("does not throw on a body carrying an unknown key", () => {
     const body = cleanBody() as unknown as Record<string, unknown>;
     body.uiMeta = { editor: "v1" };
-    expect(() => runValidation(body as Draft, undefined, {})).not.toThrow();
+    expect(() => runValidation(body as Draft, undefined, {}, {})).not.toThrow();
   });
 
   it("reports a non-identifier field key as a 'structural' issue, not an unhandled throw", () => {
     const body = cleanBody();
     (body.fields![0] as { key: string }).key = "my-field";
 
-    const result = runValidation(body, undefined, {});
+    const result = runValidation(body, undefined, {}, {});
     expect(result.zodValid).toBe(true);
     const issue = result.issues.find((i) => i.source === "structural");
     expect(issue).toBeDefined();
@@ -53,70 +54,77 @@ describe("runValidation: structural (compile-pass) issues", () => {
     const body = cleanBody();
     (body.fields![0] as { validation?: unknown }).validation = { pattern: "(" };
 
-    const result = runValidation(body, undefined, {});
+    const result = runValidation(body, undefined, {}, {});
     const issue = result.issues.find((i) => i.source === "structural");
     expect(issue).toBeDefined();
     expect(issue!.message).toContain("does not compile");
   });
 
   it("a clean draft raises no structural issue", () => {
-    const result = runValidation(cleanBody(), undefined, {});
+    const result = runValidation(cleanBody(), undefined, {}, {});
     expect(result.issues.some((i) => i.source === "structural")).toBe(false);
   });
 
-  // KNOWN GAP, documented on runValidation itself (src/draft/validation.ts):
-  // an unknown key is stripped by the leading authoredProcessBody.safeParse
-  // before compileProcessBody ever runs, so it can never surface as a live
-  // "structural" issue here — only the real POST /processes publish call
-  // (which runs compileProcessBody on the RAW body) catches it. This pins
-  // that as an intentional, known boundary rather than a silent regression.
-  it("an unknown key does not surface as a live structural issue (known gap; caught at real publish instead)", () => {
+  // validation-sequence-module: validateStructure (src/validate.ts) now runs
+  // compileProcessBody on the SAME raw `authored` value it received, shared
+  // identically between publishBody and runValidation, so checkUnknownKeys
+  // CAN now fire against a raw studio Draft when the offending key happens
+  // to survive to that call. The rail no longer promises it never will:
+  // CheckGroup.unknownKeysHeldBack (checksRail.ts) is unconditionally `true`
+  // on the structural group regardless, so the rail never claims a clean
+  // pass on this dimension either way — this test pins that promise, not
+  // the old "never fires" boundary. See design.md's "The unknown-key check
+  // stays held back in the studio" decision.
+  it("unknownKeysHeldBack stays true on the structural group regardless of whether an unknown key happens to surface", () => {
     const body = cleanBody() as unknown as Record<string, unknown>;
     body.uiMeta = { editor: "v1" };
-    const result = runValidation(body as Draft, undefined, {});
-    expect(result.issues.some((i) => i.source === "structural")).toBe(false);
+    const result = runValidation(body as Draft, undefined, {}, {});
+    const groups = groupChecksBySource(result);
+    expect(groups.find((g) => g.source === "structural")!.unknownKeysHeldBack).toBe(true);
   });
 });
 
-// studio-canvas-first-structure-editor task 4.0: `structurallyValid` and
-// `structuralChecked` disambiguate "compiled" from "the structural checks
-// ran at all" — a Zod-valid, duration-failing draft never reaches
-// structuralIssues, so it must NOT read the same as a draft with no
-// structural issue.
-describe("runValidation: structurallyValid / structuralChecked", () => {
-  it("a Zod-invalid draft reports both false", () => {
-    const result = runValidation({} as Draft, undefined, {});
+// validation-sequence-module task 4.6: ValidationResult's per-dimension
+// record replaces structurallyValid/structuralChecked. "ran with no issue"
+// (old structurallyValid) is dimensions.structural === "ran" with no
+// structural-source issue; "ran at all" (old structuralChecked) is
+// dimensions.structural === "ran" on its own, regardless of issues — a
+// Zod-valid, duration-failing draft never reaches structuralIssues, so it
+// must NOT read the same as a draft with no structural issue.
+describe("runValidation: dimensions.duration / dimensions.structural", () => {
+  it("a Zod-invalid draft reports both not-run", () => {
+    const result = runValidation({} as Draft, undefined, {}, {});
     expect(result.zodValid).toBe(false);
-    expect(result.structurallyValid).toBe(false);
-    expect(result.structuralChecked).toBe(false);
+    expect(result.dimensions.duration).toBe("not-run");
+    expect(result.dimensions.structural).toBe("not-run");
   });
 
-  it("a duration-only failure leaves structuralChecked false (structural checks never ran)", () => {
+  it("a duration-only failure leaves structural not-run (structural checks never ran)", () => {
     const body = cleanBody();
     (body.workflow!.steps![0] as { timers?: unknown[] }).timers = [
       { id: "timer_x", duration: "P99999Y", onFire: {} },
     ];
-    const result = runValidation(body, undefined, {});
+    const result = runValidation(body, undefined, {}, {});
     expect(result.zodValid).toBe(true);
     expect(result.issues.some((i) => i.source === "duration")).toBe(true);
-    expect(result.structuralChecked).toBe(false);
-    expect(result.structurallyValid).toBe(false);
+    expect(result.dimensions.duration).toBe("ran");
+    expect(result.dimensions.structural).toBe("not-run");
   });
 
-  it("a structural-only failure reports structuralChecked true, structurallyValid false", () => {
+  it("a structural-only failure reports structural ran, with an open structural issue", () => {
     const body = cleanBody();
     (body.fields![0] as { key: string }).key = "my-field";
-    const result = runValidation(body, undefined, {});
+    const result = runValidation(body, undefined, {}, {});
     expect(result.zodValid).toBe(true);
     expect(result.issues.some((i) => i.source === "structural")).toBe(true);
-    expect(result.structuralChecked).toBe(true);
-    expect(result.structurallyValid).toBe(false);
+    expect(result.dimensions.structural).toBe("ran");
   });
 
-  it("a clean, compilable draft reports both true", () => {
-    const result = runValidation(cleanBody(), undefined, {});
-    expect(result.structuralChecked).toBe(true);
-    expect(result.structurallyValid).toBe(true);
+  it("a clean, compilable draft reports both ran with no issue", () => {
+    const result = runValidation(cleanBody(), undefined, {}, {});
+    expect(result.dimensions.duration).toBe("ran");
+    expect(result.dimensions.structural).toBe("ran");
+    expect(result.issues.some((i) => i.source === "structural" || i.source === "duration")).toBe(false);
   });
 });
 
@@ -152,7 +160,7 @@ describe("runValidation: an assignment-less step", () => {
       },
     } as unknown as Draft;
 
-    const result = runValidation(body, undefined, {});
+    const result = runValidation(body, undefined, {}, {});
     expect(result.zodValid).toBe(true);
     expect(result.issues).toHaveLength(0);
   });

@@ -17,7 +17,7 @@
 
 import { z } from "zod";
 import type { Action, ProcessBody } from "../schema/definition.js";
-import { type Registry, type AssignmentRegistry, type DataSourceRegistry } from "./registry.js";
+import { type Registry, type AssignmentRegistry, type DataSourceRegistry, describeTypeNames } from "./registry.js";
 
 export interface RegistryIssue {
   loc: string;
@@ -38,36 +38,63 @@ function mapConfigIssues(loc: string, type: string, zodIssues: z.ZodIssue[]): Re
   });
 }
 
-interface TypedSite {
+export interface TypedSite {
   loc: string;
   type: string;
   config: unknown;
 }
 
 /**
- * Shared resolve -> not-registered -> configSchema-safeParse-and-map loop used
- * by checkActionRegistry, checkAssignmentRegistry and checkDataSourceRegistry:
- * only the resolve function and the "not registered" entity label differ
- * between them.
+ * The shared not-registered check every dimension's type-resolution half
+ * calls. Reports a `TypedSite` whose `type` is absent from `typeNames`; emits
+ * nothing else. `validateReferences` (`src/validate.ts`) calls this directly
+ * against a caller-supplied `RegistryDescription`, needing no live registry.
  */
-function checkTypedConfig(
+export function resolveType(sites: TypedSite[], typeNames: readonly string[], entityLabel: string): RegistryIssue[] {
+  const known = new Set(typeNames);
+  const issues: RegistryIssue[] = [];
+  for (const { loc, type } of sites) {
+    if (!known.has(type)) issues.push({ loc, type, message: `${entityLabel} type '${type}' is not registered` });
+  }
+  return issues;
+}
+
+/**
+ * The shared config-only check: validates a site's `config` against its
+ * resolved type's `configSchema`, needing a live registry's resolver.
+ * Skips a site whose type does not resolve, with no issue of its own —
+ * `resolveType` already reports that site, and this emits only
+ * `mapConfigIssues` output, which carries no entity label and no
+ * "not registered" message.
+ */
+export function checkConfigOnly(
   sites: TypedSite[],
   resolveFn: (type: string) => { configSchema?: z.ZodTypeAny } | undefined,
-  entityLabel: string,
 ): RegistryIssue[] {
   const issues: RegistryIssue[] = [];
   for (const { loc, type, config } of sites) {
     const def = resolveFn(type);
-    if (!def) {
-      issues.push({ loc, type, message: `${entityLabel} type '${type}' is not registered` });
-      continue;
-    }
-    if (def.configSchema) {
-      const result = def.configSchema.safeParse(config);
-      if (!result.success) issues.push(...mapConfigIssues(loc, type, result.error.issues));
-    }
+    if (!def || !def.configSchema) continue;
+    const result = def.configSchema.safeParse(config);
+    if (!result.success) issues.push(...mapConfigIssues(loc, type, result.error.issues));
   }
   return issues;
+}
+
+/**
+ * Shared resolve -> not-registered -> configSchema-safeParse-and-map loop used
+ * by checkActionRegistry, checkAssignmentRegistry and checkDataSourceRegistry:
+ * composes `resolveType` and `checkConfigOnly` rather than reimplementing
+ * either half inline. `checkConfigOnly` already skips a site `resolveType`
+ * rejected, so the concatenation needs no separate filtering step.
+ */
+function checkTypedConfig(
+  sites: TypedSite[],
+  typeNames: readonly string[],
+  resolveFn: (type: string) => { configSchema?: z.ZodTypeAny } | undefined,
+  entityLabel: string,
+): RegistryIssue[] {
+  return [...resolveType(sites, typeNames, entityLabel), ...checkConfigOnly(sites, resolveFn)];
 }
 
 /**
@@ -115,8 +142,19 @@ export function collect(body: ProcessBody): Site[] {
  * that reason.
  */
 export function checkActionRegistry(body: ProcessBody, registry: Registry): RegistryIssue[] {
-  const sites = collect(body).map(({ action, loc }) => ({ loc, type: action.type, config: action.config }));
-  return checkTypedConfig(sites, (type) => registry.get(type), "action");
+  const sites = collectTypedActionSites(body);
+  return checkTypedConfig(sites, describeTypeNames(registry), (type) => registry.get(type), "action");
+}
+
+/**
+ * Every action site in `body`, as `TypedSite[]`: `collect()`'s own `Site[]`
+ * mapped down to `{loc, type, config}`. Named `collectTypedActionSites`, not
+ * `collectActionSites` — `src/schema/compile.ts` already has an unexported,
+ * differently-shaped `collectActionSites(body: any): ActionSite[]` used by
+ * `checkReservedActionPrefix`, in a different file.
+ */
+export function collectTypedActionSites(body: ProcessBody): TypedSite[] {
+  return collect(body).map(({ action, loc }) => ({ loc, type: action.type, config: action.config }));
 }
 
 /**
@@ -128,11 +166,17 @@ export function checkActionRegistry(body: ProcessBody, registry: Registry): Regi
  * an assignment strategy, so a `core.` type is an unknown type like any other.
  */
 export function checkAssignmentRegistry(body: ProcessBody, assignmentRegistry: AssignmentRegistry): RegistryIssue[] {
+  const sites = collectAssignmentSites(body);
+  return checkTypedConfig(sites, describeTypeNames(assignmentRegistry), (type) => assignmentRegistry.get(type), "assignment strategy");
+}
+
+/** Every step's `assignment.strategy` in `body` carrying one, as `TypedSite[]`. */
+export function collectAssignmentSites(body: ProcessBody): TypedSite[] {
   const sites: TypedSite[] = [];
   body.workflow.steps.forEach((s, si) => {
     if (s.assignment) sites.push({ loc: `steps[${si}].assignment`, type: s.assignment.strategy.type, config: s.assignment.strategy.config });
   });
-  return checkTypedConfig(sites, (type) => assignmentRegistry.get(type), "assignment strategy");
+  return sites;
 }
 
 /**
@@ -142,10 +186,15 @@ export function checkAssignmentRegistry(body: ProcessBody, assignmentRegistry: A
  * (`body.dataSources`), not several action positions to visit.
  */
 export function checkDataSourceRegistry(body: ProcessBody, dataSourceRegistry: DataSourceRegistry): RegistryIssue[] {
-  const sites: TypedSite[] = (body.dataSources ?? []).map((dataSource, i) => ({
+  const sites = collectDataSourceSites(body);
+  return checkTypedConfig(sites, describeTypeNames(dataSourceRegistry), (type) => dataSourceRegistry.get(type), "data source");
+}
+
+/** Every data source in `body`, as `TypedSite[]`. */
+export function collectDataSourceSites(body: ProcessBody): TypedSite[] {
+  return (body.dataSources ?? []).map((dataSource, i) => ({
     loc: `dataSources[${i}]`,
     type: dataSource.type,
     config: dataSource.config,
   }));
-  return checkTypedConfig(sites, (type) => dataSourceRegistry.get(type), "data source");
 }

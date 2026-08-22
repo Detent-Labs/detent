@@ -150,15 +150,25 @@ Stage-by-stage status is in `ROADMAP.md`.
   could also reach.
 
   `packages/web/src/areas/studio/draft/validation.ts::runValidation` catches
-  `CompileValidationError` alongside the pre-existing `DurationValidationError`.
-  It renders the caught issues under a new `"structural"` `IssueSource`.
-  Without that catch, the error would propagate uncaught and crash Studio's
-  live-validation panel. Known gap, documented on `runValidation` itself: the
-  unknown-key check can never fire from Studio's live validation.
-  `runValidation` first runs `authoredProcessBody.safeParse`. That Zod parse
-  strips undeclared keys before `compileProcessBody` ever sees them. Only the
-  real `POST /processes` publish call catches an unknown key, since it runs
-  `compileProcessBody` on the raw, un-parsed body.
+  `CompileValidationError` alongside the pre-existing `DurationValidationError`,
+  via the shared `validateStructure` call (`src/validate.ts`, see
+  `validation-sequence-module` below). It renders the caught issues under a
+  new `"structural"` `IssueSource`. Without that catch, the error would
+  propagate uncaught and crash Studio's live-validation panel.
+
+  `runValidation` passes `validateStructure` the raw Draft, not a pre-parsed
+  one. `checkUnknownKeys` therefore runs against the same unstripped input
+  the engine's publish path sees. It can genuinely report an unknown key
+  from Studio's live validation now.
+
+  `CheckGroup.unknownKeysHeldBack` (`draft/checksRail.ts`) still reads `true`
+  unconditionally on the structural group. That holds regardless of whether
+  the check happened to fire for a given draft. The studio's raw Draft
+  carries no guarantee of the full shape a published body would carry. An
+  absent finding here is never proof that the real publish-time check would
+  also find nothing. See
+  `openspec/changes/validation-sequence-module/design.md`'s "The unknown-key
+  check stays held back in the studio" decision.
 
   `draft/view-flags.ts` (stage 41's first half, `studio-view-flags-module`)
   holds the view-flag primitives the form editor and a later field matrix
@@ -175,6 +185,72 @@ Stage-by-stage status is in `ROADMAP.md`.
   earn it. A required field can sit hidden by `visible: false`. A required,
   read-only field can sit unwritten. `runValidation` calls it beside
   `validateDurations`.
+- Publish validation consolidation (`validation-sequence-module`): a new
+  top-level module, `src/validate.ts`, exported as `./validate`. It owns the
+  publish-time stage order. `publishBody` (`src/engine/definitions.ts`) and
+  the studio's `draft/validation.ts::runValidation` now share it, instead of
+  each restating the order on its own.
+
+  <!-- antislop: allow synonym-rotation -->
+  <!-- "build"/"create" both name this file's existing, larger split usage of the concept; this passage keeps "build" consistently within itself. -->
+  Two exported functions form the seam. `validateStructure(authored)` runs
+  the Zod gate, duration and the seven structural checks, in that order. It
+  builds the compiled body the second function needs. It is the only
+  sanctioned way to build one from an authored input.
+
+  `validateReferences(compiled, inputs)` runs the three registry
+  type-resolution checks against a supplied `RegistryDescription`. It also
+  runs the single-body CEL check. It also runs the two synchronous cross-body
+  comparison halves, `checkSubprocessChildRefs` and
+  `checkProcessChainingTarget`, against whatever referenced-process bodies
+  the caller has loaded. A caller-supplied live registry set additionally
+  runs the three config-validation checks. Both functions report each
+  dimension they own as `"ran"` or `"not-run"`, never silently absent.
+
+  `publishBody` calls `validateStructure` first. It hashes and no-ops on a
+  hit. It then calls `validateReferences` with its own live registries
+  attached. It still calls `validateCrossProcess`/`validateProcessChaining`
+  directly after that. Both of those stay async and DB-resolving, outside the
+  module, in their existing position.
+
+  `src/engine/registry.ts` gained `RegistryDescription` and
+  `describeTypeNames(registry)`. `RegistryDescription` carries the three
+  type-name arrays `GET /registry` already returns.
+  <!-- antislop: allow sentence-length run-ons -->
+  <!-- Known linter miscount: sentence splitting merges across the period before a lowercase-starting code span; each sentence here reads under 20 words split at its own period. -->
+  `src/engine/registry-check.ts` gained the shared `resolveType`/
+  `checkConfigOnly` pair `checkTypedConfig` now composes, and three
+  `TypedSite` collectors: `collectTypedActionSites`, `collectAssignmentSites`,
+  `collectDataSourceSites`. `checkActionRegistry`, `checkAssignmentRegistry`
+  and `checkDataSourceRegistry` keep their existing public signatures, but
+  `publishBody` no longer calls them directly.
+
+  `src/cel/check.ts` gained `checkProcessChainingTarget(body, targetsByLoc)`,
+  a plain field-membership comparison. It parses no CEL. It reuses
+  `CelIssue[]` for rail-grouping parity with `checkSubprocessChildRefs`.
+  `validateProcessChaining` (`definitions.ts`) now resolves every
+  `process.start` site's target first, then delegates to it. It collects
+  every site's issues, instead of throwing at the first.
+
+  The studio side: `draft/store.tsx`'s `DraftProvider` takes a new `token`
+  prop. It fetches the registry description via `useRegistry`, and
+  auto-resolves every `process.start` action's chaining target body into
+  `loadedChainingTargets`. That record keys by the action's own id, never by
+  site `loc`. A change ahead of a site in the same action array can shift a
+  `loc`. The fetch-dedup logic that drives it lives in a separate, plain
+  module, `draft/chainingFetch.ts`. That module carries no React dependency
+  of its own, so a test can exercise it without rendering.
+
+  `ValidationResult` replaced its three boolean fields
+  (`registryChecked`/`structurallyValid`/`structuralChecked`) with one
+  `dimensions` record, plus a new `chainingSiteStatus` field mirroring
+  `subprocessStepStatus`. `CheckGroup` (`draft/checksRail.ts`) gained
+  `registryConfigHeldBack`/`unknownKeysHeldBack`, each independent of the
+  group's own `heldBack`. The registry group's type-resolution half now
+  reaches a real clear or issue-carrying state once the registry description
+  resolves. Its config-validation half stays held back for the whole
+  session. The structural group's unknown-key check stays reported held
+  back too, regardless of whether it happens to fire.
 - Subprocess execution (`src/engine/subprocess.ts`, `test/subprocess.test.ts`):
   makes a `subprocess` step live via two engine-internal outbox handlers. The
   compile pass rejects the reserved `core.` type prefix at publish; see the
@@ -825,10 +901,11 @@ Stage-by-stage status is in `ROADMAP.md`.
   a new structural invariant in `definition.ts` (`FieldDef.dataSource` must
   resolve to an id in `body.dataSources`, including fields nested inside
   `group` fields) plus `checkDataSourceRegistry` (`registry-check.ts`,
-  `DataSourceRegistryValidationError`), wired into `publishBody` in the same
-  in-process slot `checkActionRegistry`/`checkAssignmentRegistry` occupy —
-  after the hash-hit no-op return, so an identical re-publish of a body that
-  predates a registered/tightened type stays a no-op. `resolveFields`
+  `DataSourceRegistryValidationError`), reached indirectly through
+  `validateReferences` (`src/validate.ts`, see `validation-sequence-module`
+  below), which `publishBody` calls after the hash-hit no-op return — so an
+  identical re-publish of a body that predates a registered/tightened type
+  stays a no-op. `resolveFields`
   (`src/runtime/api.ts`) is now async and takes a `registry: DataSourceRegistry`
   parameter: a `dataSource`-bound field's options are resolved via the
   registry, once per view field with no cross-field memoization (fields on
@@ -3831,8 +3908,9 @@ meets `scope=started` should infer no new permission tier from it.
   source type declares columns. Hiding the editor never deletes what the field
   carries, so switching a type back restores the rows.
 
-  It validates nothing else. `draft/validation.ts` runs `compileProcessBody`,
-  so all seven rules already reach the checks rail. A duplicate target reaches
+  It validates nothing else. `draft/validation.ts` calls `validateStructure`
+  (`src/validate.ts`), which internally calls `compileProcessBody`, so all
+  seven rules already reach the checks rail. A duplicate target reaches
   the rail rather than a disabled control, since an author passes through that
   state mid-edit. The target picker omits a group field and the mapping field
   itself, which is shape rather than validation.

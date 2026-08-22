@@ -1,13 +1,10 @@
-<!-- antislop: allow-file passive-voice sentence-length em-dash -->
-<!-- This file's four "is rejected"/"is mapped"/"is accepted" scenario titles
-     reproduce this same file's own frozen scenario titles verbatim, since
-     openspec validate --strict requires a MODIFIED requirement to carry
-     every scenario the base spec's same-named requirement carries, title
-     included. The wording is not an authored voice choice; sentence length
-     and the em-dash follow this file's own pre-existing Gherkin-adjacent
-     requirement style, matching the sibling delta spec's own directive for
-     this same merged prose. -->
-# registry-config-check-consolidation
+<!-- antislop: allow-file passive-voice -->
+<!-- This file's four "is rejected"/"is mapped"/"is accepted" scenario titles below
+     reproduce openspec/specs/registry-config-check-consolidation/spec.md's own
+     scenario titles verbatim. openspec validate --strict requires a MODIFIED
+     requirement to carry every scenario the base spec's same-named requirement
+     carries, title included, or archive refuses to drop them. The wording is not
+     an authored voice choice here; it is the base spec's frozen title text. -->
 
 ## Purpose
 
@@ -23,7 +20,7 @@ regressing as more registry-validation checks are added. The mechanism-level
 counterpart to `registry-error-consolidation` and
 `field-expression-map-consolidation`.
 
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Resolve-and-validate-config loop shares one implementation
 
@@ -65,6 +62,9 @@ NOT call `checkTypedConfig` for this purpose: `checkTypedConfig` also runs
 caller's own type-resolution call already produced. The config-validation
 check therefore also has exactly one implementation, whether reached through
 `checkTypedConfig`'s own composition or called directly.
+
+<!-- antislop: allow passive-voice -->
+<!-- The quoted strings below are the literal runtime messages checkTypedConfig/resolveType emit, e.g. "action type '<type>' is not registered". That "is not registered" is message text, not an authored voice choice, and changing it would misstate the actual string the code produces. -->
 
 #### Scenario: An action of an unregistered type is rejected through the shared helper
 

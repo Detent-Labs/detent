@@ -13,7 +13,8 @@
     "./cel/check": "./src/cel/check.ts",
     "./schema/compile": "./src/schema/compile.ts",
     "./engine/registry": "./src/engine/registry.ts",
-    "./engine/registry-check": "./src/engine/registry-check.ts"
+    "./engine/registry-check": "./src/engine/registry-check.ts",
+    "./validate": "./src/validate.ts"
   },
   "scripts": {
     "prepare": "sh scripts/enable-hooks.sh",

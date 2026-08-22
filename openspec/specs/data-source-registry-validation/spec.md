@@ -1,3 +1,11 @@
+<!-- antislop: allow-file passive-voice sentence-length em-dash synonym-rotation -->
+<!-- Passive voice and the "error class" vs. "issue" distinction match the
+     sibling delta spec's own directive for this same merged prose (see
+     validation-sequence-module's
+     specs/data-source-registry-validation/spec.md); "error class" names a
+     TypeScript class (DataSourceRegistryValidationError), never a synonym
+     for the located RegistryIssue records. Sentence length and the em-dash
+     follow this file's own pre-existing Gherkin-adjacent requirement style. -->
 # data-source-registry-validation
 
 ## Purpose
@@ -69,12 +77,24 @@ behavior.
 
 ### Requirement: An unresolved or schema-violating data source is a publish error, never a runtime one
 
-`publishBody` SHALL invoke `checkDataSourceRegistry` in the same
-in-process validation slot `checkActionRegistry`/`checkAssignmentRegistry`
-already occupy — before CEL and cross-process validation, on the compiled
-body, after the hash-hit no-op return. A body with any unresolved-type or
-schema-violating data source SHALL throw `DataSourceRegistryValidationError`
-carrying every located issue, and SHALL NOT be persisted as a new version.
+`publishBody` SHALL reach the data-source resolve-then-parse verdict in the
+same in-process validation slot the action-type and assignment-type
+dimensions occupy — before CEL and cross-process validation, on the compiled
+body, after the hash-hit no-op return — by calling `validateReferences`
+(`src/validate.ts`), not by calling `checkDataSourceRegistry` directly.
+`validateReferences`'s data-source-type dimension SHALL call `resolveType`
+against a `RegistryDescription` built from the injected `DataSourceRegistry`,
+then SHALL call `checkConfigOnly` against that same live registry. Those two
+functions are the same resolve-then-parse primitives `checkDataSourceRegistry`
+itself composes internally. The split moved the call path, not the check. A
+body with any unresolved-type or schema-violating data source SHALL throw
+`DataSourceRegistryValidationError` carrying every located issue, and SHALL
+NOT be persisted as a new version.
+
+`checkDataSourceRegistry` SHALL keep existing as a combined entry point,
+composing the same `resolveType`/`checkConfigOnly` pair for a caller that
+wants a single call over both halves at once. It is no longer `publishBody`'s
+own call path.
 
 #### Scenario: Publishing a body with an unregistered data source type throws
 - **WHEN** `publishBody` is called with a compiled body containing a data
@@ -92,8 +112,9 @@ carrying every located issue, and SHALL NOT be persisted as a new version.
 - **WHEN** `publishBody` is called with a body whose hash matches an
   already-published version
 - **THEN** it returns the existing version without re-running
-  `checkDataSourceRegistry`, matching the existing hash-hit no-op behavior
-  for CEL and other publish-time checks
+  `validateReferences`'s data-source-type resolution or config-validation
+  halves, matching the existing hash-hit no-op behavior for CEL and other
+  publish-time checks
 
 ### Requirement: Every located issue is reported, not only the first
 

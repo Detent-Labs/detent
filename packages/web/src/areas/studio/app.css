@@ -2311,6 +2311,20 @@ tr[data-group="true"] .studio-matrix-row-header {
   border-top: none;
 }
 
+/* A group that otherwise shows real content (issues or clear) but carries
+   one sub-check that stays held back all session (registry config, unknown
+   keys) — the ledger hairline separates it from the content above, same
+   muted weight as .studio-checks-group-clear, never the refusal-toned
+   .studio-checks-group-held-back: this is not a failure, and it does not
+   replace the group's own content the way a full held-back state does. */
+.studio-checks-group-note {
+  margin: 0;
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
 /* The docked, collapsed presentation: a one-line button standing in for the
    full rail, per studio-checks-rail's collapsed-summary requirement. The 2px
    top rule is the structural, major-section-boundary weight, separating the

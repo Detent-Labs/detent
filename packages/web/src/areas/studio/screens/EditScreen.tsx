@@ -626,7 +626,7 @@ export function EditScreen({ processId, formStepId, panel, stepId, token, naviga
   }
 
   return (
-    <DraftProvider initial={state.record.body as Draft}>
+    <DraftProvider initial={state.record.body as Draft} token={token}>
       <EditorArea
         processId={processId}
         formStepId={formStepId}

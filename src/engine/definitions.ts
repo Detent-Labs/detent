@@ -3,11 +3,12 @@
  * body from its {processId, version} pin. This is the production backing for the
  * resolution/timer workers' injected `resolveBody`.
  *
- * Publish is immutable and idempotent-on-identical: compile -> hash -> if a
- * version with that hash exists for the processId return it (no-op), else
- * validate (action registry, then expressions, then cross-process wiring),
- * assign the next monotonic version and insert. The (process_id, version) PK
- * forbids a body overwrite.
+ * Publish is immutable and idempotent-on-identical: validate the structure
+ * (`validateStructure`, `src/validate.ts`) -> hash -> if a version with that
+ * hash exists for the processId return it (no-op), else validate the
+ * references (`validateReferences`, same module) and the cross-process/
+ * chaining wiring below, assign the next monotonic version and insert. The
+ * (process_id, version) PK forbids a body overwrite.
  *
  * Publish is the enforcement point for every check that may tighten over time.
  * `definition.ts` is also the deserializer every read goes through, so a check
@@ -18,26 +19,29 @@
 import { SQL } from "bun";
 import {
   processBody,
-  collectFieldsDeep,
   type ProcessBody,
   type ProcessId,
   type ProcessVersion,
   type LocalizedText,
   type LocaleCode,
 } from "../schema/definition.js";
-import { compileProcessBody } from "../schema/compile.js";
+import { DurationValidationError, CompileValidationError } from "../schema/compile.js";
 import { definitionHash, contractHash } from "../schema/hash.js";
-import { validateProcessBody, checkSubprocessChildRefs, type CelIssue } from "../cel/check.js";
-import { checkActionRegistry, checkAssignmentRegistry, checkDataSourceRegistry, collect, type RegistryIssue } from "./registry-check.js";
+import { checkSubprocessChildRefs, checkProcessChainingTarget, type CelIssue } from "../cel/check.js";
+import { collect, type RegistryIssue } from "./registry-check.js";
 import { sql } from "./store.js";
 import type { ResolveBody } from "./resolution.js";
 import {
   createDefaultAssignmentRegistry,
+  describeTypeNames,
   PROCESS_START_ACTION_TYPE,
   type Registry,
   type DataSourceRegistry,
   type AssignmentRegistry,
+  type RegistryDescription,
 } from "./registry.js";
+import { validateStructure, validateReferences } from "../validate.js";
+import { ZodError } from "zod";
 
 /** Resolve the newest child version whose contract signature equals `contractRef`. */
 export type ResolveLatestByContract = (
@@ -179,26 +183,33 @@ async function validateCrossProcess(
  * chain target declares none — and the walk covers all five action
  * positions `collect` visits, not one step-level field, since `process.start`
  * is an ordinary action an author may place anywhere.
+ *
+ * Resolves every site's target first, building `targetsByLoc`, then delegates
+ * the field-membership comparison to `checkProcessChainingTarget`
+ * (`src/cel/check.ts`) over all of them at once — collecting issues from
+ * every site rather than stopping at the first. The thrown message still
+ * names only the first collected issue, in `collect()` order, matching
+ * today's single-violation reporting.
  */
 async function validateProcessChaining(body: ProcessBody, resolvers: { resolveLatest: ResolveLatest }): Promise<void> {
   const sites = collect(body).filter((s) => s.action.type === PROCESS_START_ACTION_TYPE);
 
+  const targetsByLoc: Record<string, ProcessBody> = {};
   for (const { action, loc } of sites) {
-    const config = action.config as { processId?: string; inputMapping?: Record<string, unknown> };
+    const config = action.config as { processId?: string };
     const target = config.processId ? await resolvers.resolveLatest(config.processId as ProcessId) : undefined;
     if (!target) {
       throw new CrossProcessValidationError(
         `process.start action at '${loc}' references process '${config.processId}' which is not published`,
       );
     }
-    const fields = new Set(collectFieldsDeep(target.body.fields).map((f) => f.id as string));
-    for (const key of Object.keys(config.inputMapping ?? {})) {
-      if (!fields.has(key)) {
-        throw new CrossProcessValidationError(
-          `process.start action at '${loc}' maps into field '${key}', not declared on process '${config.processId}'`,
-        );
-      }
-    }
+    targetsByLoc[loc] = target.body;
+  }
+
+  const issues = checkProcessChainingTarget(body, targetsByLoc);
+  if (issues.length > 0) {
+    const first = issues[0];
+    throw new CrossProcessValidationError(`process.start action at '${first.loc}': ${first.message}`);
   }
 }
 
@@ -228,7 +239,24 @@ export async function publishBody(
   db: SQL = sql,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<ProcessVersion> {
-  const body = compileProcessBody(authoredBody);
+  // Structure first: the Zod gate, duration and the seven structural checks,
+  // via the module both this function and the studio's live validation
+  // share (src/validate.ts). Reconstructed from the result rather than
+  // re-running compileProcessBody, at the same precedence it has today:
+  // duration beats structural beats a bare ZodError. The fourth branch is
+  // the one reachable state the first three leave uncovered — a caught,
+  // discarded exception unrelated to any Zod-detectable shape problem,
+  // against a body that is otherwise Zod-valid.
+  const structure = validateStructure(authoredBody);
+  if (!structure.compiled) {
+    if (structure.issues.length > 0) {
+      if (structure.dimensions.structural === "ran") throw new CompileValidationError(structure.issues);
+      throw new DurationValidationError(structure.issues);
+    }
+    if (structure.zodIssues.length > 0) throw new ZodError(structure.zodIssues);
+    throw structure.discardedError;
+  }
+  const body = structure.compiled;
   const hash = definitionHash(body);
 
   const existing = (await db`SELECT version, definition_hash, status, published_at, body
@@ -246,32 +274,49 @@ export async function publishBody(
     };
   }
 
-  // New version about to be inserted. All three remaining checks run on the
-  // COMPILED body, so a step the compile pass injected is held to the same rule
-  // as an authored one, and all three sit AFTER the hash-hit return above: a
-  // re-publish of a body that predates a tightening of any of them stays a
-  // no-op rather than becoming an error for a version instances are already
-  // pinned to. (Duration validation cannot take this position — it lives inside
-  // the compile pass the hash itself derives from.)
+  // New version about to be inserted. Every remaining check runs on the
+  // COMPILED body, so a step the compile pass injected is held to the same
+  // rule as an authored one, and all of them sit AFTER the hash-hit return
+  // above: a re-publish of a body that predates a tightening of any of them
+  // stays a no-op rather than becoming an error for a version instances are
+  // already pinned to. (Duration and structural validation cannot take this
+  // position — they live inside validateStructure, ahead of the hash.)
   //
+  // The three registry checks and the single-body CEL check run through
+  // validateReferences, the stages src/validate.ts owns for every caller.
+  // publishBody supplies no loaded child/chaining bodies here: its own
+  // cross-process and chaining verdict comes from the separate,
+  // DB-resolving step below, which runs checkSubprocessChildRefs/
+  // checkProcessChainingTarget directly on what it resolves.
+  const registryDescription: RegistryDescription = {
+    actionTypes: describeTypeNames(registry),
+    assignmentStrategyTypes: describeTypeNames(assignmentRegistry),
+    dataSourceTypes: describeTypeNames(dataSourceRegistry),
+  };
+  const refs = validateReferences(body, {
+    registryDescription,
+    loadedChildren: {},
+    targetsByLoc: {},
+    registries: { registry, assignmentRegistry, dataSourceRegistry },
+  });
+
   // Registry first: an unresolvable action type or an invalid config is a more
   // fundamental defect than a bad guard, and the check is in-process (no DB
   // round-trip, unlike cross-process validation below).
-  const registryIssues = checkActionRegistry(body, registry);
+  const registryIssues = [...refs.actionTypeIssues, ...refs.actionConfigIssues];
   if (registryIssues.length > 0) throw new RegistryValidationError(registryIssues);
 
   // Same placement as the action registry check, immediately alongside it.
-  const assignmentIssues = checkAssignmentRegistry(body, assignmentRegistry);
+  const assignmentIssues = [...refs.assignmentTypeIssues, ...refs.assignmentConfigIssues];
   if (assignmentIssues.length > 0) throw new AssignmentRegistryValidationError(assignmentIssues);
 
   // Same placement again: in-process, no DB round-trip.
-  const dataSourceIssues = checkDataSourceRegistry(body, dataSourceRegistry);
+  const dataSourceIssues = [...refs.dataSourceTypeIssues, ...refs.dataSourceConfigIssues];
   if (dataSourceIssues.length > 0) throw new DataSourceRegistryValidationError(dataSourceIssues);
 
   // Then expressions: also checked in-process, and the issues an author can fix
   // without inspecting another process.
-  const celIssues = validateProcessBody(body);
-  if (celIssues.length > 0) throw new CelValidationError(celIssues);
+  if (refs.celIssues.length > 0) throw new CelValidationError(refs.celIssues);
 
   // Then subprocess wiring and process-chaining targets, against the
   // (immutable, already-validated) published processes they reference.

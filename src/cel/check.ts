@@ -12,12 +12,23 @@
  * type-checking needs each field declared as a named variable. Keys and the
  * expressions that reference them live in the same immutable ProcessBody, so a
  * key rename is a same-artifact rewrite — internally consistent per version.
+ *
+ * `checkProcessChainingTarget` below is the one deliberate exception to "no
+ * dependency but the CEL library and definition.ts": it needs `collect`
+ * (aliased `collectFullActionSites`) from `../engine/registry-check.js` and
+ * `PROCESS_START_ACTION_TYPE` from `../engine/registry.js` to find every
+ * `process.start` action site, and `collectFieldsDeep` from
+ * `../schema/definition.js` to build a target's accepted field-id set. None
+ * of `registry-check.ts`, `registry.ts` or `schema/definition.ts` imports
+ * back from this file.
  */
 
 import { Environment, parse, serialize } from "@marcbachmann/cel-js";
 import type { ASTNode } from "@marcbachmann/cel-js";
-import { leafFields } from "../schema/definition.js";
+import { leafFields, collectFieldsDeep } from "../schema/definition.js";
 import type { ProcessBody, FieldDef, BaseFieldType, Expression, MigrationSpec } from "../schema/definition.js";
+import { collect as collectFullActionSites } from "../engine/registry-check.js";
+import { PROCESS_START_ACTION_TYPE } from "../engine/registry.js";
 
 // The formal expression context. instance/actor shapes are pinned here.
 // ponytail: minimal shapes, widen when a real guard needs more.
@@ -338,6 +349,43 @@ export function checkSubprocessChildRefs(body: ProcessBody, stepIndex: number, c
     if (issue) issues.push(issue);
   });
 
+  return issues;
+}
+
+/**
+ * Publish-time process-chaining comparison half: for every `process.start`
+ * action site with an entry in `targetsByLoc`, checks that site's
+ * `inputMapping` keys all lie within the target's field catalog. This
+ * function parses no CEL and type-checks no expression, despite this file
+ * and its `CelIssue[]` return type — a plain field-membership check, reusing
+ * that shape for rail-grouping parity with `checkSubprocessChildRefs`, the
+ * sibling this function's callers pair it with.
+ *
+ * Skips a site with no entry in `targetsByLoc`: the caller (an unresolved
+ * target in `validateProcessChaining`, or an unloaded target in the studio)
+ * reports that site as not-checked, the same way an unloaded subprocess
+ * child already reads. Uses `collectFieldsDeep`, never `leafFields`: a
+ * mapping into a group-container field id is engine-accepted today, and
+ * `leafFields` would silently narrow the accepted set to leaves only.
+ */
+export function checkProcessChainingTarget(body: ProcessBody, targetsByLoc: Record<string, ProcessBody>): CelIssue[] {
+  const issues: CelIssue[] = [];
+  const sites = collectFullActionSites(body).filter((s) => s.action.type === PROCESS_START_ACTION_TYPE);
+  for (const { action, loc } of sites) {
+    const target = targetsByLoc[loc];
+    if (!target) continue;
+    const config = action.config as { processId?: string; inputMapping?: Record<string, unknown> };
+    const fields = new Set(collectFieldsDeep(target.fields).map((f) => f.id as string));
+    for (const key of Object.keys(config.inputMapping ?? {})) {
+      if (!fields.has(key)) {
+        issues.push({
+          loc: `${loc}.config.inputMapping.${key}`,
+          src: key,
+          message: `maps into field '${key}', not declared on process '${config.processId}'`,
+        });
+      }
+    }
+  }
   return issues;
 }
 

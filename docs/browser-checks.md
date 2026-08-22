@@ -1375,3 +1375,38 @@ position and intercepted the trigger's own click. The fix moves
 `display: flex` and the rest of the flex layout onto a
 `.shell-menu:popover-open` rule. The UA's `none` now stays in force while
 closed.
+
+### The widened registry group and the chaining-target fetch (`validation-sequence-module`)
+
+Source: `validation-sequence-module` task 7.3.
+
+Open a draft naming an action type the server does not register. Open the
+checks rail. Pass: the registry group shows a real issue naming the
+unregistered type, not a held-back state. It still shows
+`registryConfigHeldBack`'s own note below that issue, since the
+config-validation half stays held back regardless.
+
+Add a `process.start` action mapped into a field its target process does not
+declare. Pass: the checks rail's CEL group names that field. `ActionListEditor`'s
+row for that action carries no "chaining target" badge, since the target
+loaded successfully.
+
+Add a second `process.start` action targeting a process that is not
+published. Pass: that action's own row carries the "chaining target" badge.
+The CEL group shows no entry for that site. A not-checked site never reads
+as a clear pass.
+
+With a draft already holding a resolved chaining target, edit an unrelated
+field elsewhere in the draft. Watch the network panel. Pass: no repeated `GET
+/processes` or `GET /processes/:id/versions/:v` request fires for that
+already-resolved target.
+
+Separately, build a draft carrying two `process.start` action sites that
+target the same `processId`. Pass: only one `GET /processes/:id/versions/:v`
+request fires for that shared target, and both sites' rows read checked.
+
+`test/validate-sequence.test.ts` and
+`packages/web/test/studio-draftProvider-chainingFetch.test.ts` already assert
+the underlying dedup guard and the rail's data-layer state as pure logic.
+This entry confirms the same behavior through a real fetch sequence a
+browser drives, which those two files cannot observe.

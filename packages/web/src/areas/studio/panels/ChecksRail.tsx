@@ -62,16 +62,26 @@ export function ChecksRail({ validation, collapsed = false }: Props) {
                 <h3 className="studio-checks-group-heading">{group.source}</h3>
                 {group.heldBack ? (
                   <p className="studio-checks-group-held-back">{t("checksRail.heldBack")}</p>
-                ) : group.issues.length === 0 ? (
-                  <p className="studio-checks-group-clear">{t("checksRail.groupClear")}</p>
                 ) : (
-                  <ul className="studio-checks-group-list">
-                    {group.issues.map((issue, i) => (
-                      <li key={i} className="studio-checks-group-issue">
-                        {issue.message}
-                      </li>
-                    ))}
-                  </ul>
+                  <>
+                    {group.issues.length === 0 ? (
+                      <p className="studio-checks-group-clear">{t("checksRail.groupClear")}</p>
+                    ) : (
+                      <ul className="studio-checks-group-list">
+                        {group.issues.map((issue, i) => (
+                          <li key={i} className="studio-checks-group-issue">
+                            {issue.message}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {group.registryConfigHeldBack && (
+                      <p className="studio-checks-group-note">{t("checksRail.configHeldBack")}</p>
+                    )}
+                    {group.unknownKeysHeldBack && (
+                      <p className="studio-checks-group-note">{t("checksRail.unknownKeysHeldBack")}</p>
+                    )}
+                  </>
                 )}
               </section>
             ))}

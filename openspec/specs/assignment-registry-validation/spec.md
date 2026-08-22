@@ -1,4 +1,10 @@
-<!-- antislop: allow-file passive-voice -->
+<!-- antislop: allow-file passive-voice sentence-length em-dash -->
+<!-- The "invoked at publish" requirement's Gherkin-adjacent style and its
+     dense chain of code-span references (resolveType, checkConfigOnly,
+     RegistryDescription) run the sentence-length and em-dash rules over
+     limit; this matches the sibling delta spec's own allow-file directive
+     for the same merged prose (see validation-sequence-module's
+     specs/assignment-registry-validation/spec.md). -->
 # assignment-registry-validation
 
 ## Purpose
@@ -82,29 +88,39 @@ matches the opt-in strictness an action handler already has.
 
 ### Requirement: checkAssignmentRegistry is invoked at publish, alongside checkActionRegistry
 
-`publishBody` SHALL invoke `checkAssignmentRegistry(body, assignmentRegistry)`
-at the same placement as every other publish-time check. That placement is
-after the hash-hit no-op return, on the compiled body, alongside
-`checkActionRegistry`, and before CEL and cross-process validation. A violation
-SHALL throw
-`AssignmentRegistryValidationError` carrying every located issue, collected
-rather than failing on the first found. This matches `RegistryValidationError`.
+`publishBody` SHALL reach the assignment-strategy resolve-then-parse verdict
+at the same placement as every other publish-time check — after the
+hash-hit no-op return, on the compiled body, before CEL and cross-process
+validation — by calling `validateReferences` (`src/validate.ts`), not by
+calling `checkAssignmentRegistry` directly. `validateReferences`'s
+assignment-type dimension SHALL call `resolveType` against a
+`RegistryDescription` built from the injected `AssignmentRegistry`, then
+SHALL call `checkConfigOnly` against that same live registry. Those two
+functions are the same resolve-then-parse primitives `checkAssignmentRegistry`
+itself composes internally. The split moved the call path, not the check.
+
+A violation SHALL throw `AssignmentRegistryValidationError` carrying every
+located issue, collected rather than failing on the first found. This
+matches `RegistryValidationError`.
 
 `publishBody` SHALL take the process's `AssignmentRegistry` as a further
-argument, beside the action `Registry` and the `DataSourceRegistry` it already
-takes. The check resolves against that argument. It never compares against a
-literal.
+argument, beside the action `Registry` and the `DataSourceRegistry` it
+already takes, and SHALL derive the `RegistryDescription` that
+`validateReferences` resolves against from that argument. The check never
+compares against a literal.
 
-The check SHALL reuse the shared resolve-then-parse loop that
-`checkActionRegistry` and `checkDataSourceRegistry` already share. Only the
-resolve function and the entity label differ.
+`checkAssignmentRegistry` SHALL keep existing as a combined entry point,
+composing the same `resolveType`/`checkConfigOnly` pair for a caller that
+wants a single call over both halves at once. It is no longer
+`publishBody`'s own call path.
 
 #### Scenario: An identical re-publish of an already-stored body stays a no-op
 
 - **WHEN** `publishBody` is called with a body whose hash matches an
   already-published version, which may predate this check
 - **THEN** the call returns the existing version without invoking
-  `checkAssignmentRegistry`
+  `validateReferences`'s assignment-type resolution or config-validation
+  halves
 
 #### Scenario: A publish with an unregistered assignment type throws with every located issue
 

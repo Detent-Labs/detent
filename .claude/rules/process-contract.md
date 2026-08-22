@@ -127,31 +127,38 @@ multi-tenancy a handle bound when the registry was built would resolve every
 tenant's manager against one directory. The same rule holds for a handler
 (`HandlerContext.db`) and a data source (`DataSourceContext.db`). The
 registry maps `type -> { config schema }` (`registry.ts`,
-`HandlerDef.configSchema`) and is validated at PUBLISH time:
-`checkActionRegistry` (`src/engine/registry-check.ts`) resolves every action's
-`type` against the injected `Registry` and, when the handler declares a
-`configSchema`, parses the action's `config` against it — an unknown type or a
-schema-violating config is a publish error (`RegistryValidationError`, carrying
-every located issue), never a runtime one. Every action position is covered —
-`onEntry`, `onExit`, `onCancel`, each path's `onPath`, each timer's
-`onFire.actions` — the same five positions the CEL check visits. `publishBody`
-now takes the process's `Registry` as a required argument; it is invoked
-**before** CEL and cross-process validation, on the compiled body, after the
-hash-hit no-op return — same placement rule as the other publish-time checks,
-so a body published before a handler was registered (or before its
-`configSchema` tightened) is not retroactively rejected on identical
-re-publish. A handler with no declared `configSchema` accepts any `config`
-(opt-in strictness). The reserved `core.` prefix (`SPAWN_ACTION_TYPE`/
-`RETURN_ACTION_TYPE`) is exempt from the registry-resolution check — those
-types are dispatched internally by `subprocess.ts`, never through this
-author-facing registry, and are separately rejected in *authored* bodies by
-the existing Zod refinement in `authoredProcessBody`. That exemption does not
-extend to an assignment strategy: no internal dispatch reaches one, so a
-`core.` type there is an unknown type like any other.
-`checkAssignmentRegistry` and `checkDataSourceRegistry` run the same
-resolve-then-parse loop at the same placement, against their own registries,
-and throw `AssignmentRegistryValidationError` / `DataSourceRegistryValidationError`.
-Data sources are never
+`HandlerDef.configSchema`) and is validated at PUBLISH time: `publishBody`
+calls `validateReferences` (`src/validate.ts`), which resolves every action's
+`type` against a supplied `RegistryDescription` via `resolveType`, and, when
+the caller supplies a live registry (only `publishBody` does), parses the
+action's `config` against the handler's declared `configSchema` via
+`checkConfigOnly` (both in `src/engine/registry-check.ts`) — an unknown type
+or a schema-violating config is a publish error (`RegistryValidationError`,
+carrying every located issue), never a runtime one. Every action position is
+covered — `onEntry`, `onExit`, `onCancel`, each path's `onPath`, each timer's
+`onFire.actions` — the same five positions the CEL check visits.
+`validateReferences` is invoked **before** CEL and cross-process validation,
+on the compiled body, after the hash-hit no-op return — same placement rule
+as the other publish-time checks, so a body published before a handler was
+registered (or before its `configSchema` tightened) is not retroactively
+rejected on identical re-publish. `checkActionRegistry` still exists,
+exported with its existing `(body, registry)` signature, as the combined
+wrapper over both halves for a caller wanting one call — `publishBody` no
+longer calls it directly. A handler with no declared `configSchema` accepts
+any `config` (opt-in strictness). The reserved `core.` prefix
+(`SPAWN_ACTION_TYPE`/`RETURN_ACTION_TYPE`) is exempt from the
+registry-resolution check — those types are dispatched internally by
+`subprocess.ts`, never through this author-facing registry, and are
+separately rejected in *authored* bodies by the existing Zod refinement in
+`authoredProcessBody`. That exemption does not extend to an assignment
+strategy: no internal dispatch reaches one, so a `core.` type there is an
+unknown type like any other. `checkAssignmentRegistry` and
+`checkDataSourceRegistry` are the matching combined wrappers, each still
+exported with its own existing signature; `publishBody` reaches the same
+verdicts indirectly, through `validateReferences`'s own `resolveType`/
+`checkConfigOnly` calls against each dimension's own registry, at the same
+placement, throwing `AssignmentRegistryValidationError` /
+`DataSourceRegistryValidationError`. Data sources are never
 inlined; fields bind to them by id and options resolve at runtime.
 
 **Runtime record (the audit backbone).** The instance carries assignment/claim

@@ -1,21 +1,36 @@
-import { createContext, useContext, useMemo, useReducer, useState, type ReactNode } from "react";
-import type { ProcessBody } from "workflow-engine/schema";
+import { createContext, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
+import type { ActionId, ProcessBody } from "workflow-engine/schema";
 import type { Draft } from "./types";
 import { runValidation, type ValidationResult } from "./validation";
 import { collectUsedLocales } from "./localized-text";
+import { listProcesses, getVersionBody } from "../api/client.js";
+import { useRegistry } from "../panels/shared/useRegistry.js";
+import type { RegistryInfo } from "../api/types.js";
+import { collectChainingActionSites, resolveChainingTargets, syncLoadedTargets } from "./chainingFetch";
 
 const EMPTY_DRAFT: Draft = {};
 
 export type Mutate = (recipe: (draft: Draft) => void) => void;
 
-interface DraftContextValue {
+export interface DraftContextValue {
   draft: Draft;
   mutate: Mutate;
   replace: (next: Draft) => void;
   validation: ValidationResult;
   loadedChildren: Record<string, ProcessBody>;
   setChildForStep: (stepId: string, childBody: ProcessBody | undefined) => void;
-  /** Which locale of the *authored process content* (label/description
+  /** The running server's registered plugin type names, fetched once per
+   * mount via `useRegistry`. `undefined` until it resolves, and after a
+   * failed fetch — `runValidation` treats that the same as any other
+   * caller-supplied-input absence: the registry group's type-resolution half
+   * reads not-run rather than a false pass. */
+  registry: RegistryInfo | undefined;
+  /** Loaded `process.start` chaining target bodies, keyed by the triggering
+   * action's own id — never by site `loc`, which an edit ahead of a site in
+   * the same action array can shift (design.md's "loadedChainingTargets and
+   * chainingSiteStatus key by the action's own id" decision). */
+  loadedChainingTargets: Record<ActionId, ProcessBody>;
+  /** Which of the *authored process content* (label/description
    * text) is currently shown/edited — independent of the app's own
    * fixed-English UI-chrome text. Ephemeral editor
    * state, not persisted with the Draft. */
@@ -29,7 +44,13 @@ interface DraftContextValue {
   loadGeneration: number;
 }
 
-const DraftContext = createContext<DraftContextValue | null>(null);
+// Exported so a test can supply a synthetic DraftContextValue directly
+// (<DraftContext.Provider value={...}>), bypassing DraftProvider's own
+// registry/chaining-fetch effects entirely — never `mock.module`, whose
+// module-registry replacement outlives the test file that registers it for
+// the rest of a `bun test` process (confirmed: `mock.restore()` does not
+// undo it), corrupting every later file's own `useDraft` calls.
+export const DraftContext = createContext<DraftContextValue | null>(null);
 
 type Action = { kind: "mutate"; recipe: (draft: Draft) => void } | { kind: "replace"; next: Draft };
 
@@ -55,7 +76,7 @@ function reducer(state: ReducerState, action: Action): ReducerState {
   }
 }
 
-export function DraftProvider({ children, initial }: { children: ReactNode; initial?: Draft }) {
+export function DraftProvider({ children, initial, token }: { children: ReactNode; initial?: Draft; token: string }) {
   const [{ draft, loadGeneration }, dispatch] = useReducer(reducer, { draft: initial ?? EMPTY_DRAFT, loadGeneration: 0 });
   const [loadedChildren, setLoadedChildren] = useState<Record<string, ProcessBody>>({});
   // Seeded from the initially-loaded Draft's own baseLocale (falling back to
@@ -64,14 +85,44 @@ export function DraftProvider({ children, initial }: { children: ReactNode; init
   // locale, not one that may not even exist in it yet.
   const [contentLocale, setContentLocale] = useState<string>(() => initial?.baseLocale ?? "en");
 
+  const registry = useRegistry(token);
+
+  // Resolved process.start chaining target bodies, keyed by the triggering
+  // action's own id. `chainingFetchState` dedupes the listProcesses +
+  // getVersionBody pair per distinct target processId (never per site) —
+  // outside React state, so updating it triggers no render of its own.
+  // `chainingBodyCache` holds each resolved processId's body so a second
+  // site targeting an already-"done" processId can read it with no fetch.
+  const [loadedChainingTargets, setLoadedChainingTargets] = useState<Record<ActionId, ProcessBody>>({});
+  const chainingFetchState = useRef<Map<string, "pending" | "done">>(new Map());
+  const chainingBodyCache = useRef<Map<string, ProcessBody>>(new Map());
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+
+  useEffect(() => {
+    const sites = collectChainingActionSites(draft);
+    resolveChainingTargets(sites, token, chainingFetchState.current, chainingBodyCache.current, { listProcesses, getVersionBody }, () => {
+      const currentSites = collectChainingActionSites(draftRef.current);
+      setLoadedChainingTargets(syncLoadedTargets(currentSites, chainingBodyCache.current));
+    });
+    setLoadedChainingTargets(syncLoadedTargets(sites, chainingBodyCache.current));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, token]);
+
   const usedLocales = useMemo(() => collectUsedLocales(draft), [draft]);
 
-  // A plain, synchronous recompute on every Draft/children change — no
-  // setTimeout debounce. Validating a document this size (dozens of entities,
-  // not thousands) runs in low single-digit milliseconds, well under a frame;
-  // debouncing would trade correctness (a stale result briefly shown) for a
-  // performance problem that doesn't exist yet at this scale.
-  const validation = useMemo(() => runValidation(draft, undefined, loadedChildren), [draft, loadedChildren]);
+  // A plain, synchronous recompute on every Draft/children/registry/chaining
+  // change — no setTimeout debounce. Validating a document this size (dozens
+  // of entities, not thousands) runs in low single-digit milliseconds, well
+  // under a frame; debouncing would trade correctness (a stale result
+  // briefly shown) for a performance problem that doesn't exist yet at this
+  // scale. `registry` and `loadedChainingTargets` are both async state that
+  // resolves after mount, so the memoized result must recompute once each
+  // fetch resolves, not only when `draft`/`loadedChildren` change.
+  const validation = useMemo(
+    () => runValidation(draft, registry, loadedChildren, loadedChainingTargets),
+    [draft, loadedChildren, registry, loadedChainingTargets],
+  );
 
   const setChildForStep = (stepId: string, childBody: ProcessBody | undefined) => {
     setLoadedChildren((prev) => {
@@ -91,12 +142,14 @@ export function DraftProvider({ children, initial }: { children: ReactNode; init
       validation,
       loadedChildren,
       setChildForStep,
+      registry,
+      loadedChainingTargets,
       contentLocale,
       setContentLocale,
       usedLocales,
       loadGeneration,
     }),
-    [draft, validation, loadedChildren, contentLocale, usedLocales, loadGeneration],
+    [draft, validation, loadedChildren, registry, loadedChainingTargets, contentLocale, usedLocales, loadGeneration],
   );
 
   return <DraftContext.Provider value={value}>{children}</DraftContext.Provider>;
