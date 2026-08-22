@@ -44,10 +44,12 @@ export const en = {
   "fieldCatalog.tabValues": "Values",
   "fieldCatalog.tabRules": "Rules",
   "fieldCatalog.groupChildrenHeading": "Fields inside this group",
-  "fieldCatalog.translationStatusHeading": "Translation status",
   "fieldCatalog.baseLocaleMark": "base locale",
   "fieldCatalog.translationComplete": "translated",
   "fieldCatalog.translationGap": "{count} missing",
+  "fieldCatalog.technicalLabel": "Technical",
+  "fieldCatalog.technicalClearConfirm":
+    "Checking Technical will clear {count} required/readonly key(s) across this draft's steps. Continue?",
   "fieldCatalog.previewHeading": "How it will look",
   "fieldCatalog.previewResolvesAtRuntime":
     "This field's choices come from a data source. They resolve when a participant reaches this step, not here.",
@@ -59,8 +61,21 @@ export const en = {
   "fieldCatalog.conditionScopeNote": "Writes to: {steps}.",
   "fieldCatalog.conditionDivergentNote": "These steps currently disagree: {steps}.",
   "fieldCatalog.conditionLiteralNote": "This replaces a literal condition on: {steps}.",
+  "fieldCatalog.whereValuesHeading": "Where values come from",
+  "fieldCatalog.validationHeading": "Validation",
 
-  "fieldValidation.legend": "validation",
+  "defaultValue.heading": "Default value",
+  "defaultValue.literalLabel": "value",
+  "defaultValue.celLabel": "CEL expression",
+  "defaultValue.editAsCel": "Edit as CEL",
+  "defaultValue.useValue": "Use a value",
+  "defaultValue.clear": "Clear default",
+  "defaultValue.unparseable": "This does not parse as CEL.",
+  "defaultValue.groupDisabledNote": "A group's own default is never read. Set defaults on its children instead.",
+  "defaultValue.typeDisabledNote": "This type accepts no default here.",
+  "defaultValue.dataSourceNoOptions":
+    "This field's choices come from a data source. They resolve at runtime, so there is nothing to pick a default from here. Use CEL instead.",
+
   "fieldValidation.notEvaluated": "not evaluated for this field type",
 
   "dataSources.heading": "Data sources",
@@ -237,9 +252,11 @@ export const en = {
   "fieldMatrix.legendCel": "CEL marks an expression, not a fixed value.",
   "fieldMatrix.legendBlank": "A dash marks a field this step does not declare.",
   "fieldMatrix.legendFlagged": "A flagged cell already produces a Checks finding.",
+  "fieldMatrix.legendTechnical": "The technical marker means the engine, not a participant, writes this field.",
   "fieldMatrix.columnInertNote": "No view — inert",
   "fieldMatrix.rowTypeLabel": "Type",
   "fieldMatrix.flaggedCellMark": "Flagged in Checks",
+  "fieldMatrix.technicalRowMark": "Technical",
 
   "stepSections.identity": "Identity",
   "stepSections.assignment": "Assignment",

@@ -25,7 +25,8 @@
     "test:tz": "TZ=Europe/Zurich bun test packages/web/test/reporting-reportingLogic.test.ts",
     "check": "bun run typecheck && bun run build && bun test && bun run test:tz",
     "serve": "bun run src/http/server.ts",
-    "seed": "bun run scripts/seed.ts"
+    "seed": "bun run scripts/seed.ts",
+    "openspec:review-check": "bun run scripts/openspec-review-check.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.3.14",

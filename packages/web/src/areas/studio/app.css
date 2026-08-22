@@ -1152,23 +1152,6 @@
   overflow-wrap: anywhere;
 }
 
-/* The Fields rail row's label-over-key stack (field-catalog-redesign): the
-   resolved label is the primary text now, the key a secondary mono line
-   beneath it — the engine still matches the key exactly, so it keeps the
-   mono face even off the primary line. */
-.studio-panels-rail-field-text {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-}
-
-.studio-panels-rail-key {
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-  overflow-wrap: anywhere;
-}
-
 .studio-panels-rail-type {
   font-size: 0.8rem;
   color: var(--color-text-muted);
@@ -1273,17 +1256,24 @@
   color: var(--color-text);
 }
 
-.field-tab-panel {
+/* An author-origin `display` beats the UA stylesheet's `[hidden] { display:
+   none }` regardless of specificity (the same cascade bug `.shell-menu` hit,
+   per browser-checks.md's Chrome.tsx account menu entry): an unguarded
+   `display: flex` here would keep every inactive tab panel laid out and
+   visible despite its own `hidden` attribute. */
+.field-tab-panel:not([hidden]) {
   display: flex;
+}
+
+.field-tab-panel {
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-2);
   width: 100%;
 }
 
-/* The translation status list, the usage list: hairline-divided register
-   rows, flush left, the same rule the panels rail's own rows already take. */
-.field-translation-status ul,
+/* The usage list: hairline-divided register rows, flush left, the same rule
+   the panels rail's own rows already take. */
 .field-usage ul {
   list-style: none;
   margin: 0;
@@ -1291,7 +1281,6 @@
   width: 100%;
 }
 
-.field-translation-status li,
 .field-usage li {
   display: flex;
   align-items: baseline;
@@ -1304,11 +1293,18 @@
   flex: 1;
 }
 
-.field-translation-status-heading,
-.field-preview-heading,
-.field-usage-heading,
-.field-condition-heading {
-  margin: 0;
+/* The preview and the usage list are native `<details>` now (field-catalog-
+   editor-rework design.md decision 1): the browser tracks open/closed as DOM
+   state, so no component state exists for either. Closed by default via the
+   markup's own absent `open` attribute. */
+.field-preview,
+.field-usage {
+  width: 100%;
+}
+
+.field-preview > summary,
+.field-usage > summary {
+  cursor: pointer;
   font-size: 0.9rem;
   font-weight: 800;
 }
@@ -1321,10 +1317,94 @@
   border: 1px solid var(--color-border);
   padding: var(--space-3);
   width: 100%;
+  margin-top: var(--space-2);
 }
 
-.field-condition {
+/* --- Field tab: the translation badge, zones, and Remove field's reduced
+   emphasis (field-catalog-editor-rework) -------------------------------- */
+
+.field-label-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
   width: 100%;
+}
+
+.field-label-row-label {
+  flex: 1;
+}
+
+/* Not a stamp: the design language's five stamp tones name instance/step
+   state, and a sixth would be a design change, not a screen decision. Prose
+   ("2 missing", "translated"), so the body face, not mono. */
+.field-translation-badge {
+  flex: none;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  padding: 2px var(--space-2);
+}
+
+/* A zone is a heading plus content; a 2px structural rule separates it from
+   the zone before it — the same weight `.field-catalog-panel > h3` already
+   uses for "between major sections." No rule renders above the first zone,
+   and none renders after a zone that does not mount (design.md decision 2). */
+.field-zone {
+  width: 100%;
+}
+
+.field-zone + .field-zone {
+  border-top: 2px solid var(--color-divider);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+}
+
+.field-zone-heading {
+  margin: 0 0 var(--space-2);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+/* Remove field: below the same structural rule, de-emphasized (`.btn-ghost`)
+   rather than one more `.btn-secondary` in the stack above it — it reads as
+   the tab's least frequent action, not an ordinary item in the list. */
+.field-tab-remove {
+  width: 100%;
+  border-top: 2px solid var(--color-divider);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+}
+
+/* --- The Default-value editor (field-catalog-editor-rework) ------------- */
+
+.default-value-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.default-value-disabled .studio-note {
+  margin: 0;
+}
+
+.default-value-checkbox {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.default-value-multiselect {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.default-value-footer {
+  display: flex;
+  gap: var(--space-3);
 }
 
 /* The field matrix: a register table, not a spreadsheet. Sticky header row

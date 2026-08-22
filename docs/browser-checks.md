@@ -1002,6 +1002,50 @@ count line, no legend and no bulk badge. Its cells still take writes
 inline. The dock body holds its own 16rem cap; the grid's own scroll box
 fits inside it with no double scrollbar.
 
+### Technical fields (`technical-field-marker`)
+
+Open Studio, `subprocess-loan-parent` (`examples/subprocess-loan-parent.json`,
+`key: "loan_application"`). `field_l_result` (`key: "result"`) is written by
+the `check` step's `subprocess.outputMapping` alone; the body declares no
+`view` on any step yet.
+
+Open the field catalog and select `result`. Through the JSON surface,
+place `result` on the `submit` step's form with `required: true`. This is
+the stale-key case the proposal's Why describes.
+
+Back in the field catalog, check Technical on `result`. Pass: a
+confirmation names one key it will delete before the check takes effect.
+Confirm it. Pass: the field catalog's Technical checkbox now reads
+checked, and the JSON surface shows no `required` key left on `submit`'s
+view entry for `result`.
+
+Open the form editor's per-step strip for `submit`, `result` selected.
+Pass: the strip offers Visible, Group and Span. It offers no Required or
+Read-only control. Note how the strip's layout reads with the two
+controls gone — this is the browser-check judgment design.md's Open
+Questions leaves to implementation time.
+
+Open the field matrix. Pass: `result`'s row header carries a
+technical-field marker, visually distinct from the flagged-cell ring
+marker. Note its exact visual form — the matrix's own open judgment.
+No other row carries the marker. `result`'s cell on `submit` shows its
+Required and Read-only checkboxes disabled; its row header offers no
+Required or Read-only bulk badge, but still offers the Visible one.
+
+Select a `type: "group"` field in the field catalog. Pass: its Technical
+checkbox is disabled. Select one of its children instead. Pass: that
+child's own Technical checkbox is enabled.
+
+Publish the draft. Pass: it succeeds — the stale key is gone, and a
+technical field's view entry now declares neither `required` nor
+`readonly`.
+
+Return to the field catalog and remove `check`'s `subprocess.outputMapping`
+entry for `result` (through the JSON surface). Pass: the checks rail
+reports `result` as an unwritten technical field, under the Fields view's
+own badge — not the field matrix's, since the finding anchors on the
+field rather than any one cell.
+
 ### Automatic canvas layout (`studio-canvas-auto-layout`)
 
 Open Studio, `purchase-requisition`, the canvas. Pass: the toolbar
@@ -1145,9 +1189,10 @@ Source: `panels-list-and-detail` tasks 6.5-6.6.
 Open a draft with many fields (`purchase_requisition`, 22 fields, one data
 source) and go to `/edit/panels/fields`.
 
-Pass: the rail lists all 22 field keys under Fields, indenting `line_item`'s
-four children once. The main view renders one field's editor, the first
-(`cost_center`), not all 22 stacked. That row alone carries `aria-current`.
+Pass: the rail lists all 22 field labels under Fields, indenting
+`line_item`'s four children once. No row prints a key. The main view renders
+one field's editor, the first (`cost_center`), not all 22 stacked. That row
+alone carries `aria-current`.
 
 Click a top-level field (`line_item`, a group). Pass: the view switches to
 that field's editor and the rail marks it current.
@@ -1375,6 +1420,47 @@ position and intercepted the trigger's own click. The fix moves
 `display: flex` and the rest of the flex layout onto a
 `.shell-menu:popover-open` rule. The UA's `none` now stays in force while
 closed.
+
+### The Field tab's disclosures, the rail row, and the Default-value editor (`field-catalog-editor-rework`)
+
+Source: `field-catalog-editor-rework` task 6.5.
+
+Open a draft with several fields (`purchase_requisition`) and go to
+`/edit/panels/fields`.
+
+Pass: the rail lists each field by its resolved label and friendly type
+alone. No row prints a key.
+
+Select a field. Pass: the Field tab shows key, label, description, type
+and the Technical checkbox without opening anything. A badge beside the
+label reads "base locale". "How it will look" and "Used in" both start
+closed.
+
+Open "How it will look". Pass: it expands in place. Switch to the Rules
+tab, then back to Field. Pass: the preview is still open, and the Field
+tab's own content is the only content on screen. Values and Rules render
+nothing while another tab is active.
+
+Switch to the Values tab on a `select` field with static options. Pass:
+three ruled zones show in order: "Where values come from", "Default
+value", "Column mapping". The third shows only when the field's data
+source is mappable. Choose an option in the Default value zone's own
+`value` control, then switch to the JSON surface. Pass: the field's
+`default` key carries that option's value.
+
+Click "Edit as CEL" in the Default value zone and type an expression.
+Pass: no parse error shows, and the JSON surface's `default` key now
+carries `{ lang: "cel", src: "<the typed text>" }`.
+
+A CSS bug surfaced during this walk. It is the same defect class as the
+`.shell-menu` one above. `.field-tab-panel` carried an unconditional
+`display: flex`. That outranked the UA stylesheet's own `[hidden]` rule.
+All three tab panels stayed laid out and visible at once, stacked
+vertically. That held regardless of which tab the tablist marked
+selected.
+
+The fix moves `display: flex` onto a `.field-tab-panel:not([hidden])`
+rule. The UA's `none` now stays in force for an inactive tab.
 
 ### The widened registry group and the chaining-target fetch (`validation-sequence-module`)
 

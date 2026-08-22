@@ -178,13 +178,23 @@ Stage-by-stage status is in `ROADMAP.md`.
   `effectiveFlag` resolves an absent value to that default.
   `setFlag` writes a departure from the default. It deletes the key on a
   return, and deletes `required`/`readonly` too when `visible` goes to
-  literal `false`. `gatedKeys` names which controls that gate disables.
+  literal `false`. `gatedKeys` names which controls that gate disables. A
+  technical field's entry (`technical-field-marker`) gates `required` and
+  `readonly` unconditionally, on top of the `visible: false` and
+  required/readonly-mutual cases it already covered.
 
   `checkViewFlags`, in the same file, is the studio's own validation pass.
   It reports under a sixth, non-blocking `IssueSource`: `"view"`. Two states
   earn it. A required field can sit hidden by `visible: false`. A required,
   read-only field can sit unwritten. `runValidation` calls it beside
   `validateDurations`.
+
+  `checkUnwrittenTechnicalFields`, a sibling function in the same file
+  (`technical-field-marker`), reports a third state under that same `"view"`
+  source. It fires for a technical field no structural source writes. It
+  anchors on the field itself (`entityType: "field"`), not a step, since
+  `technical` is a catalog-level declaration. `runValidation` calls it
+  beside `checkViewFlags`.
 - Publish validation consolidation (`validation-sequence-module`): a new
   top-level module, `src/validate.ts`, exported as `./validate`. It owns the
   publish-time stage order. `publishBody` (`src/engine/definitions.ts`) and
@@ -421,9 +431,21 @@ Stage-by-stage status is in `ROADMAP.md`.
   function takes an explicit `actor: Actor`, trusted as given), no
   assignment/claim enforcement (`AssignmentState` is declared in the schema
   but unenforced everywhere, matching engine behavior). `createProcessInstance`
-  validates seed `data` (skipping the required check — requiredness is a
-  transition-time gate) then runs `store.ts::createInstance` + the
-  create-then-run-to-rest cascade. `getInstanceView` resolves a step's `view`
+  first seeds the field catalog's own `default` values into any slot `opts.data`
+  left open, in catalog order: a `Literal` writes directly, an `Expression`
+  evaluates through `src/cel/eval.ts::evalFieldMap` against the same stub
+  `Instance` the seed builds, so a later field's default can read an earlier
+  field's already-resolved value. A raise leaves that field's slot unset rather
+  than failing creation. It then validates the merged seed `data` (skipping the
+  required check — requiredness is a transition-time gate), threading the set
+  of field ids the defaulting step filled into `validateSubmissionData` as
+  `defaultedIds`: a member with no `ResolvedViewField` at all skips the
+  `unknown-field` rejection and checks against the catalog field's own
+  type/options/validation directly, and a member resolving readonly (including
+  `technical: true`) skips only the `readonly-field` rejection and otherwise
+  takes the same checks an editable field on that step gets. Neither exemption
+  extends to a value `opts.data` supplies directly. It then runs
+  `store.ts::createInstance` + the create-then-run-to-rest cascade. `getInstanceView` resolves a step's `view`
   against the field catalog and current data into `ResolvedViewField[]` (a
   group-container's own field id is never a valid `data` key, so it is
   reported but excluded from required/readonly resolution) plus
@@ -3857,6 +3879,12 @@ meets `scope=started` should infer no new permission tier from it.
   `checkViewFlags` finding carries `entityType: "step"`, the type every
   other per-step issue carries too. `panel-rail.ts`'s
   `issueCountForSource` filters by `source` instead.
+
+  Since `technical-field-marker`, that count over-reports by one per
+  unwritten technical field. `checkUnwrittenTechnicalFields`' finding
+  shares the `"view"` source. It carries `entityType: "field"`, not
+  `"step"`. That is an accepted trade-off: the field catalog's own
+  `issueCountForEntityType` badge surfaces that finding correctly.
 
 - Process Studio, the panels screen's Fields and Data sources views
   (`packages/web/src/areas/studio/screens/PanelsScreen.tsx`,

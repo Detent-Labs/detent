@@ -15,15 +15,6 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   entry. Pre-existing gap, not introduced by `studio-formui-ridealong-cuts`'s
   removal of `FieldForm`'s `baseLocale` prop. Fixing it needs an `InstanceView`
   API change plus a `TaskScreen.tsx` wiring change.
-- Whether to mark a field as technical (never directly editable by a
-  participant) by inference or by a declared schema key. `ROADMAP.md` stage
-  44 carries the case in full: raised 2026-08-19 while verifying
-  `gate-required-readonly-conflict` against `loan_application`'s `result`
-  field, which only `check`'s `subprocess.outputMapping` ever writes.
-  Inferring it from `writtenFieldCounts` (`draft/view-flags.ts`) needs no
-  schema change. A declared `technical` key on `FieldDef` (`definition.ts`)
-  would let an author state that intent before any writer exists, at the
-  cost of a definition-contract change and full OpenSpec treatment.
 - `checkUnknownKeys` (`src/schema/compile.ts`) needs the raw authored body,
   and the studio holds only the Zod-stripped result of
   `authoredProcessBody.safeParse(draft).data`, so the studio's checks rail
@@ -32,6 +23,38 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   that survives an unknown key rather than stripping it before the walk ever
   runs — would close that gap and let the studio run the check live. No
   follow-up change tracks this yet.
+- No NDJSON/JSONL export exists for the instance history and event audit
+  trail, and none is built. `HistoryEntry` and `InstanceEvent` rows
+  (`process-contract.md`'s "audit backbone") are already flat, independent
+  per-instance records, one row per entry in the `history_entries` table —
+  the shape NDJSON is built for, unlike the process definition itself, which
+  stays one JCS-hashed document nested by `id` and never becomes NDJSON.
+  `historyByInstance` and `selectInRange` (`src/engine/reporting.ts:108` and
+  `:98`) fully materialize a date range into memory today before returning a
+  JSON array. Worth building when stage 27's reporting-app (cycle time,
+  bottlenecks, SLA) needs a downloadable or streamable export, or when a
+  `selectInRange` result set gets large enough that the in-memory buffering
+  is a measured problem, not speculatively before either happens. Needs its
+  own `reporting-app` spec delta when it lands.
+
+  The same buffer-then-return shape holds for `listOutbox`
+  (`src/engine/admin-queries.ts:83`), an append-only delivery log the same
+  way the history table is: one row per delivery attempt, no nested
+  structure. An admin "download the outbox" debugging export is the same
+  NDJSON shape as the history export above and would land in
+  `admin-operations-api` when built, on the same trigger: a concrete
+  downloadable-export ask, not a speculative one.
+
+  `migrateInstances` (`src/engine/migration.ts:547`) is the weaker case.
+  It already keyset-paginates instances and buffers outcomes into one
+  in-memory `MigrationResult` (`migrated`/`skipped`/`conflicted`/`failed`
+  id arrays), not a per-instance record stream, and nothing today asks for
+  a per-instance migration report. If an admin-facing "why did instance X
+  land in `failed`" report is ever requested, that reason string does not
+  exist yet either: `migrateOne`'s catch block in `migrateInstances`
+  classifies failures into the four buckets by id only, and a
+  per-instance NDJSON report would need it to carry a reason alongside
+  each id. Do not build this ahead of that ask.
 
 ## Decided, not yet built (each needs its own OpenSpec change)
 - **Process-scoped permissions: the filter, the draft scope, and the
@@ -210,12 +233,15 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   definition-contract change, gated on a real need: rendered behavior (a
   `<textarea>` versus a single-line `<input>`) that a `string` field cannot
   already express through the existing renderer.
-- **No default-value editor for `FieldDef.default`.** The key parses and
-  type-checks (`Literal | Expression`) in `src/schema/definition.ts`, but no
-  runtime code applies it. `resolveFields` (`src/runtime/api.ts`) fills a
-  field's value from `instance.data` alone; no `ResolvedViewField` carries a
-  `default` key, and `createProcessInstance` starts an instance's `data` from
-  `opts.data ?? {}`. `field-catalog-redesign` therefore ships no editor for
-  it: building one before the engine reads the value would ship UI with no
-  visible effect. The trigger is a `runtime-api` change that makes an
-  instance's initial `data` read the field catalog's defaults.
+- **`FieldDef.default` now seeds an instance's initial data.**
+  `field-catalog-redesign` shipped no editor for it and no runtime reader,
+  since building one before the engine read the value would have shipped UI
+  with no visible effect. `field-catalog-editor-rework` landed both:
+  `createProcessInstance` (`src/runtime/api.ts`) fills a field's still-open
+  slot from its catalog `default` — a `Literal` directly, an `Expression`
+  through `src/cel/eval.ts::evalFieldMap` over the same stub `Instance` the
+  seeding-in-progress `data` builds — before `validateSubmissionData` runs.
+  The Values tab's Default-value zone writes the key. `submitAndTransition`
+  never applies or re-checks a default; it seeds a fresh instance's data
+  once, at creation, same as any other explicitly submitted value from that
+  point on.

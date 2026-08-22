@@ -73,6 +73,10 @@ Each step carries a flat `view` that references catalog fields and overrides
 per-step presentation (visible / required / readonly / order / group). The
 instance payload is a flat object keyed by `fieldId`, stable across the whole
 lifecycle. Requiredness lives only in the view, never in the catalog.
+`FieldDef.technical` refines that rule rather than breaching it: it is a
+catalog-level fact that forces `required: false, readonly: true` on every
+step, and a view entry naming a technical field may declare neither key at
+all. Ordinary, per-step requiredness stays exactly where it was.
 
 **Actions and triggers.** Actions are declarative handler references
 (`{ type, config }`), never inline code. Triggers are ordered: onExit(source),
