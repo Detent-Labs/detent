@@ -1,5 +1,6 @@
 ## Context
 
+<!-- antislop: allow synonym-rotation -->
 This change extracts the requirement-matching helpers from
 `scripts/openspec-review-check.ts`. The function `normalizeHeading`
 trims and collapses whitespace in a heading. The function
@@ -44,12 +45,14 @@ See proposal.md - Why for the motivation.
 **Extract, don't duplicate.** `openspec-archive-change` step 4 needs the
 same header-matching logic `openspec-review-check.ts` already has. Two
 independent implementations of "does this MODIFIED header match a base
-title" can drift and disagree. That drift is the exact failure this
-change exists to close. The shared module owns every drift-prone part of
-that match — heading normalization, requirement and title extraction,
-and the Levenshtein distance — so the two scripts reach one answer. Each
-`main` keeps only its own consumer-specific branching: the review-check
-turns a non-match into a Critical finding, the CLI turns it into an
+title" can drift and disagree. That drift is the exact error this
+change exists to close.
+
+The shared module owns every drift-prone part of that match: heading
+normalization, requirement and title extraction, and the Levenshtein
+distance. That is why the two scripts reach one answer. Each `main`
+keeps only its own consumer-specific branching. The review-check turns a
+non-match into a Critical finding; the CLI turns it into an
 `(unmatched)` line.
 
 **`import.meta.main` gates the CLI, not a separate file.** Bun sets
@@ -72,24 +75,31 @@ handles this today, in its `baseTitles === null` branch. The CLI mirrors
 that branch's rule, then prints each requirement as ADDED with no match
 check.
 
-**Exit code: 0 on success, 2 only on a usage error.** This CLI is a
+**Exit code: 0 on success, 2 only on a usage error**. This CLI is a
 diff printer for archive time, not a gate. An unmatched MODIFIED or
-REMOVED header is data the archive skill reads, not a failure to signal
-through the exit code. Only a missing or unknown change name exits 2,
-matching `openspec-review-check.ts`'s convention.
+REMOVED header is data the archive skill reads.
+
+It is not an error to signal through the exit code. Only a missing or
+unknown change name exits 2, matching `openspec-review-check.ts`'s
+convention.
 
 ## Risks / Trade-offs
 
 - **Risk**: the refactor could break `openspec-review-check.ts`'s test.
-  **Mitigation**: tasks.md reruns that test suite unchanged — once
-  before the extraction (task 1.1) and once after (task 3.1).
+
+  **Mitigation**: tasks.md reruns that test suite unchanged, once before
+  the extraction (task 1.1) and once after (task 3.1).
+
 - **Risk**: a second entry point could confuse a future reader.
+
   **Mitigation**: each script's own comment names its purpose. Both
   scripts follow the same pattern.
-- **Risk**: the CLI resolves `openspec/` from `process.cwd()`, so the
+
+- **Risk**: the CLI resolves `openspec/` from `process.cwd()`. The
   archive skill's `--store` flag does not relocate its scan.
+
   **Mitigation**: step 4 keeps its store-aware `existingOutputPaths`
-  gate; the cwd-relative scan matches `openspec-review-check.ts`, which
+  gate. The cwd-relative scan matches `openspec-review-check.ts`, which
   is already cwd-relative.
 
 ## Migration Plan
@@ -112,4 +122,4 @@ the `allowed-tools` line entirely, so the skill inherits full session
 permissions. Task 6.2 here widens the line instead of dropping it. If
 `openspec-task-status-tool` lands first and the line is already gone,
 task 6.2 needs no action. Treat "the line is absent" as satisfying 6.2,
-not as a precondition failure.
+not as a reason to block it.

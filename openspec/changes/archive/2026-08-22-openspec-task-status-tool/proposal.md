@@ -16,9 +16,9 @@ read them again once the archive swallowed them."
   the same "browser, a manual UI walkthrough, or `playwright-cli`"
   language the skill already uses. It prints one small JSON summary.
 - Change `openspec-archive-change/SKILL.md` step 3 to call this script
-  instead of counting checkboxes by reading the file, and drop its
-  `allowed-tools: Bash(openspec:*)` frontmatter line so the skill may run
-  `bun`.
+  instead of counting checkboxes by reading the file. Drop its
+  `allowed-tools: Bash(openspec:*)` frontmatter line too, so the skill may
+  run `bun`.
 
 ## Capabilities
 
