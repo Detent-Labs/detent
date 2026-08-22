@@ -1444,6 +1444,42 @@
   color: var(--color-text-muted);
 }
 
+/* The legend's color entry: one swatch per FlagKey, reading the same token
+   the grid's checkboxes read (field-matrix-checkbox-colors). A swatch is
+   decoration beside the flag name text, so it carries aria-hidden and no
+   accessible role of its own. */
+.studio-matrix-legend-swatches {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: var(--space-1);
+}
+
+.studio-matrix-legend-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.studio-matrix-legend-swatch-color {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--color-border);
+}
+
+.studio-matrix-legend-swatch-visible {
+  background: var(--color-flag-visible);
+}
+
+.studio-matrix-legend-swatch-required {
+  background: var(--color-flag-required);
+}
+
+.studio-matrix-legend-swatch-readonly {
+  background: var(--color-flag-readonly);
+}
+
 .studio-matrix-scroll {
   overflow: auto;
   overscroll-behavior: contain;
@@ -1455,6 +1491,7 @@
   border-collapse: separate;
   border-spacing: 0;
   font-size: 0.9rem;
+  --matrix-flag-col: 1.75rem;
 }
 
 .studio-matrix-corner,
@@ -1558,9 +1595,11 @@ tr[data-group="true"] .studio-matrix-row-header {
 }
 
 .studio-matrix-cell-flags {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, var(--matrix-flag-col));
+  column-gap: 0;
+  justify-items: center;
   align-items: center;
-  gap: var(--space-2);
 }
 
 .studio-matrix-cell:focus-visible {
@@ -1600,8 +1639,26 @@ tr[data-group="true"] .studio-matrix-row-header {
   color: var(--color-neutral-500);
 }
 
-.studio-matrix-cell input:disabled {
+/* aria-disabled, not :disabled — the native disabled attribute would
+   suppress accent-color's paint entirely (design.md's accent-color
+   decision, field-matrix-checkbox-colors). */
+.studio-matrix-cell input[aria-disabled="true"] {
   opacity: 0.45;
+}
+
+/* One hue per FlagKey, applied to the checked/indeterminate state only —
+   accent-color never paints an unchecked native checkbox, in every
+   evergreen browser (design.md's Non-Goals, field-matrix-checkbox-colors). */
+.studio-matrix-flag-visible {
+  accent-color: var(--color-flag-visible);
+}
+
+.studio-matrix-flag-required {
+  accent-color: var(--color-flag-required);
+}
+
+.studio-matrix-flag-readonly {
+  accent-color: var(--color-flag-readonly);
 }
 
 /* An expression resolves only against an instance, so no control can show
@@ -1641,8 +1698,10 @@ tr[data-group="true"] .studio-matrix-row-header {
    takes the accent stamp, same as any other pressed control in this
    register (design-language.md's "Actions" rule). */
 .studio-matrix-flags {
-  display: flex;
-  gap: var(--space-1);
+  display: grid;
+  grid-template-columns: repeat(3, var(--matrix-flag-col));
+  column-gap: 0;
+  justify-items: center;
   margin-top: var(--space-2);
 }
 
@@ -1668,6 +1727,18 @@ tr[data-group="true"] .studio-matrix-row-header {
   color: var(--color-accent-contrast);
   background: var(--color-accent);
   border-color: var(--color-accent);
+}
+
+/* The grid slot an ineligible flag key leaves behind, so a badge one
+   column over never shifts out of alignment with the checkbox column
+   below it (`studio-app`'s bulk-toggle column-alignment requirement). A
+   truly empty span has no line box, so its height is set explicitly
+   rather than left to font-size/line-height/padding: 10px * 1.6 line
+   height + 1px border top and bottom = 18px, matching
+   `.studio-matrix-flag-badge`'s own border-box height. */
+.studio-matrix-flag-empty {
+  height: 1.125rem;
+  visibility: hidden;
 }
 
 /* The section index: the same register form as the rail, one scale down. */

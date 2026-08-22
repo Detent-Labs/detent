@@ -115,15 +115,16 @@ printed, not that you ran it.
 - `bun run typecheck`, then `bun run build`, then the **full** `bun test` with
   `DATABASE_URL` set. Both rules under Conventions apply. A green without the
   variable is not evidence. A single-file rerun is not the signal.
-- The antislop linter, on every Markdown file the change touched. The push gate
-  runs it too, over the changed Markdown: `scripts/gates/prose.sh`.
-- `git diff --check`, for trailing whitespace and blank-at-eof. It does NOT
-  report CRLF here. `.gitattributes` sets `* text=auto eol=lf`, so git
-  normalizes a CRLF worktree file on `git add`. To find CRLF in the worktree,
-  run `git ls-files --eol` and read the `w/` column. Do NOT use
-  `grep -lI $'\r'`: MSYS grep opens the file in text mode and strips the CR, so
-  it reports nothing in Git Bash. The push gate runs the `--eol` check over the
-  pushed range: `scripts/gates/whitespace.sh`.
+- The antislop linter, on every Markdown file the change touched. Run the same
+  check the push gate runs, over the same range: `sh scripts/gates/prose.sh <
+  /dev/null` (no stdin defaults to `origin/main..HEAD`).
+- Trailing whitespace, blank-at-eof, and CRLF. Run
+  `sh scripts/gates/whitespace.sh < /dev/null` rather than reconstructing its
+  two probes by hand: `git diff --check` alone misses CRLF here, since
+  `.gitattributes` sets `* text=auto eol=lf` and git normalizes a CRLF
+  worktree file on `git add`, and `grep -lI $'\r'` finds nothing in Git Bash,
+  since MSYS grep opens a file in text mode and strips the CR before matching.
+  The gate script already covers both traps with `git ls-files --eol`.
 - A real browser, for any UI change. Green tests do not see an error dialog
   rendered behind a modal, a stale result row, or an `/admin/*` route
   collision. All three shipped past a green suite here. `docs/browser-checks.md`
@@ -239,7 +240,15 @@ packages/form-ui/          shared step-form renderer (source-only, no build step
 - `.claude/rules/authoring-invariants.md` — what the validation layer enforces.
 - `.claude/rules/ui-glossary.md` — the one word for each part of the UI, and the
   domain term each rendering word maps to.
-- `docs/current-state.md` — per-subsystem descriptive counterpart to this file.
+- `docs/current-state.md` — per-subsystem descriptive counterpart to this
+  file. It names exported symbols by hand, in prose, so a rename elsewhere
+  leaves a passage silently wrong. Before editing a passage that names a
+  specific symbol, confirm it still exists: `search_graph` for the symbol,
+  or `detect_changes` scoped to the file, rather than trusting the prose.
+  This is a manual habit, not a gate — a grep-based staleness detector was
+  tried here and rejected for a 76-of-786 false-positive rate (see the
+  "Four defect classes" passage below), and the graph query above stays
+  advisory for the same reason.
 - `docs/decisions.md` — open questions, and what is decided but not yet built.
 - `docs/authoring-guide.md` — teaches the definition contract to process authors.
 - `ROADMAP.md` — stage-by-stage status (DONE / NOT STARTED). Open stages in
@@ -328,7 +337,12 @@ after a substantial change lands.
   `test.skipIf(!DB)` and make up most of the suite. Without the variable
   they skip *silently* and report a green that proves almost nothing. Check the
   skip count, not just the pass count. Outside the devcontainer, point it at a
-  Postgres 16 with the compose credentials.
+  Postgres 16 with the compose credentials. Don't just remember to check by
+  eye: `scripts/gates/silent-green.sh` already reads exactly this, from any
+  captured test output, not only a pushed `bun run check` log. Pipe a run
+  through it to get the same DATABASE_URL-unset and skip-floor checks the push
+  gate runs, before pushing instead of at push time:
+  `bun test 2>&1 | tee /tmp/t.log; sh scripts/gates/silent-green.sh /tmp/t.log`.
 - **A full-suite run is the reliable signal; a single-file rerun is not.** The DB
   suites share one database and truncate in `beforeEach`, so back-to-back runs of
   one file contend and fail spuriously. Read a verdict off a *named* test

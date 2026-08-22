@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEve
 import { useDraft } from "../draft/store";
 import { t } from "../catalog.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text";
-import { effectiveFlag, gatedKeys, setFlag, writtenFieldCounts, type FlagKey } from "../draft/view-flags";
+import { effectiveFlag, isFlagGated, setFlag, writtenFieldCounts, type FlagKey } from "../draft/view-flags";
 import { technicalFieldIds } from "../draft/fields";
 import type { BoolOrExpr } from "./shared/overrideMode";
 import { isExpression } from "./shared/overrideMode";
@@ -21,9 +21,9 @@ import {
   type BulkTarget,
 } from "./fieldMatrixLogic";
 
-const FLAG_KEYS: FlagKey[] = ["visible", "required", "readonly"];
+export const FLAG_KEYS: FlagKey[] = ["visible", "required", "readonly"];
 const FLAG_LETTER: Record<FlagKey, string> = { visible: "VIS", required: "REQ", readonly: "RO" };
-const FLAG_LABEL_KEY = {
+export const FLAG_LABEL_KEY = {
   visible: "formEditor.visible",
   required: "formEditor.required",
   readonly: "formEditor.readonly",
@@ -69,25 +69,32 @@ function BulkBadges({
 }) {
   // A key whose eligible target set is empty (e.g. required/readonly on a
   // technical field's row) gets no badge at all — a button that answers no
-  // click reads as broken, per studio-app's bulk-toggle requirement.
-  const eligibleKeys = FLAG_KEYS.filter(
+  // click reads as broken, per studio-app's bulk-toggle requirement. Its
+  // grid slot stays, as an empty placeholder, so the remaining badges never
+  // shift out of alignment with the checkbox columns below them
+  // (studio-app's bulk-toggle column-alignment requirement).
+  const eligible = FLAG_KEYS.filter(
     (key) => eligibleTargetEntries(allSteps, targets, key, written, technicalFieldIds).length > 0,
   );
   return (
     <span className="studio-matrix-flags">
-      {eligibleKeys.map((key) => (
-        <button
-          key={key}
-          type="button"
-          className="studio-matrix-flag-badge"
-          aria-pressed={bulkBadgeOn(allSteps, targets, key, written, technicalFieldIds)}
-          aria-label={t(FLAG_LABEL_KEY[key])}
-          title={t(FLAG_LABEL_KEY[key])}
-          onClick={() => onToggle(key)}
-        >
-          {FLAG_LETTER[key]}
-        </button>
-      ))}
+      {FLAG_KEYS.map((key) =>
+        eligible.includes(key) ? (
+          <button
+            key={key}
+            type="button"
+            className="studio-matrix-flag-badge"
+            aria-pressed={bulkBadgeOn(allSteps, targets, key, written, technicalFieldIds)}
+            aria-label={t(FLAG_LABEL_KEY[key])}
+            title={t(FLAG_LABEL_KEY[key])}
+            onClick={() => onToggle(key)}
+          >
+            {FLAG_LETTER[key]}
+          </button>
+        ) : (
+          <span key={key} aria-hidden="true" className="studio-matrix-flag-empty" />
+        ),
+      )}
     </span>
   );
 }
@@ -329,16 +336,20 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                             if (isExpression(raw)) {
                               return <CelStamp key={key} label={t(FLAG_LABEL_KEY[key])} src={raw.src ?? ""} />;
                             }
-                            const disabled = key !== "visible" && gatedKeys(entry, written, technicalIds).includes(key);
+                            const gated = key !== "visible" && isFlagGated(entry, written, technicalIds, key);
                             return (
                               <input
                                 key={key}
                                 type="checkbox"
+                                className={`studio-matrix-flag-${key}`}
                                 aria-label={t(FLAG_LABEL_KEY[key])}
-                                tabIndex={isActiveCell ? undefined : -1}
+                                aria-disabled={gated || undefined}
+                                tabIndex={gated || !isActiveCell ? -1 : undefined}
                                 checked={effectiveFlag(raw, key) === true}
-                                disabled={disabled}
-                                onChange={(e) => writeFlag(stepIndex, row.id, key, e.target.checked)}
+                                onChange={(e) => {
+                                  if (gated) return;
+                                  writeFlag(stepIndex, row.id, key, e.target.checked);
+                                }}
                               />
                             );
                           })}

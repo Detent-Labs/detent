@@ -25,6 +25,16 @@
      passes at 5.26:1 and is untouched. */
   --stamp-600: #d42b11;
   --refusal-700: #ae1800;
+  /* Field-matrix checkbox colors: one hue per FlagKey, distinct from the
+     accent/refusal red family and from each other. No separate semantic
+     alias — each token has exactly one consumer (design.md's Decisions,
+     field-matrix-checkbox-colors). Each pair clears 4.5:1 against both
+     --color-surface values below (checked with a contrast calculator,
+     task 1.3), well past the 3:1 non-text floor an accent-color fill and
+     a decorative legend swatch actually need. */
+  --color-flag-visible: #1450b8;
+  --color-flag-required: #7a4d00;
+  --color-flag-readonly: #6b2fa0;
 
   /* Tonal ramps — generated in OKLCH on one shared lightness scale, so the
      same step of any role matches the others in visual value. Dark-mode
@@ -88,6 +98,9 @@
     --hairline-300: #444141;
     --stamp-600: #ff563c;
     --refusal-700: #ff9783;
+    --color-flag-visible: #6fa8ff;
+    --color-flag-required: #d4a017;
+    --color-flag-readonly: #b98aff;
   }
 }
 

@@ -5,6 +5,7 @@ import {
   effectiveFlag,
   FLAG_DEFAULT,
   gatedKeys,
+  isFlagGated,
   setFlag,
   writtenFieldCounts,
 } from "../src/areas/studio/draft/view-flags.js";
@@ -122,6 +123,15 @@ describe("gatedKeys", () => {
   it("gates both keys unconditionally for a technical field, even when both already read true", () => {
     const technical = new Set(["field_a"]);
     expect(gatedKeys(vf({ ref: "field_a", required: true, readonly: true }), none, technical)).toEqual(["required", "readonly"]);
+  });
+});
+
+describe("isFlagGated", () => {
+  it("wraps gatedKeys: true for a gated flag, with no simulated DOM click", () => {
+    const written = new Map([["field_a", 1]]);
+    const entry = vf({ ref: "field_a", required: true });
+    expect(isFlagGated(entry, written, new Set(), "readonly")).toBe(true);
+    expect(isFlagGated(entry, written, new Set(), "required")).toBe(false);
   });
 });
 

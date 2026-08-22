@@ -253,6 +253,7 @@ export const en = {
   "fieldMatrix.legendBlank": "A dash marks a field this step does not declare.",
   "fieldMatrix.legendFlagged": "A flagged cell already produces a Checks finding.",
   "fieldMatrix.legendTechnical": "The technical marker means the engine, not a participant, writes this field.",
+  "fieldMatrix.legendColors": "Each checkbox's color names its own flag:",
   "fieldMatrix.columnInertNote": "No view — inert",
   "fieldMatrix.rowTypeLabel": "Type",
   "fieldMatrix.flaggedCellMark": "Flagged in Checks",

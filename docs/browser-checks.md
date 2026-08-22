@@ -958,7 +958,7 @@ shows the field's `key` beside its `type`.
 
 Pass: a toolbar sits above the grid. It carries a "Hide inert columns"
 toggle, a count line reading "54 view entries · 22 fields × 13 steps ·
-232 cells the visible steps do not declare", and a five-line legend,
+232 cells the visible steps do not declare", and a seven-line legend,
 visible with no click or hover.
 
 Engage "Hide inert columns". Pass: the grid draws 10 columns, none of
@@ -1001,6 +1001,20 @@ Open the canvas dock's Field matrix tab. Pass: it shows no toolbar, no
 count line, no legend and no bulk badge. Its cells still take writes
 inline. The dock body holds its own 16rem cap; the grid's own scroll box
 fits inside it with no double scrollbar.
+
+Open `subprocess-loan-parent` for one more check: badge-to-checkbox
+alignment (`field-matrix-badge-alignment`). Mark `result`
+(`field_l_result`) Technical and place it on `submit`'s form, exactly as
+the Technical fields check below does. `submit`'s column now has one
+live cell, and `visible` is its only eligible flag. Through the JSON
+surface, add one more view entry to the `check` step: `amount`, with no
+`required` or `readonly` override. `check`'s column now has all three
+flags eligible. Neither edit needs to survive past this check. Pass:
+`submit`'s column shows one badge, `visible`, sitting directly above its
+own checkbox column with no drift. Pass: `check`'s column shows all
+three badges, each sitting directly above its own checkbox column with
+no drift, and the two ineligible slots in `submit`'s column leave the
+`visible` badge's position unchanged rather than centering it.
 
 ### Technical fields (`technical-field-marker`)
 
@@ -1496,3 +1510,42 @@ request fires for that shared target, and both sites' rows read checked.
 the underlying dedup guard and the rail's data-layer state as pure logic.
 This entry confirms the same behavior through a real fetch sequence a
 browser drives, which those two files cannot observe.
+
+### The field matrix's checkbox colors (`field-matrix-checkbox-colors`)
+
+Open `purchase_requisition`'s draft, the panels screen's Field matrix view.
+Pass: the legend's seventh line reads "Each checkbox's color names its own
+flag:" followed by three swatches, one per `visible`/`required`/`readonly`.
+
+Pass: every live cell's checked `visible` checkbox renders the same blue.
+Every checked `required` checkbox renders the same gold-brown, and every
+checked `readonly` checkbox the same violet. Each swatch's color matches
+the grid's own. Reopen the same process on the canvas dock's Field matrix
+tab. Pass: the same three colors render there, with no toolbar and no
+legend.
+
+Through the JSON surface, give a view entry `required: true` and
+`visible: false` directly. This bypasses the checkbox's own gating, which
+would otherwise clear `required` the moment `visible` goes false. Pass:
+back on the grid, that cell's `required` checkbox reads checked. It shows
+its own gold color, at reduced opacity, not neutral gray.
+
+Click that checkbox with the mouse. Pass: the click has no effect. The
+checkbox stays checked. The underlying view entry keeps both its
+`required` and `visible` keys exactly as set. `aria-disabled` guards the
+write here. It refuses the click itself, the same job the old native
+`disabled` attribute did.
+
+A technical field's row never carries the readonly color at all
+(`checkUnwrittenTechnicalFields`'s own walk above names one, `result`).
+Its `readonly` checkbox renders unchecked, dimmed, and uncolored.
+`FLAG_DEFAULT.readonly` reads `false` for an absent key. That holds
+regardless of the engine's own forced `true` for that field.
+`design.md`'s Non-Goals section names this as a pre-existing gap, out of
+scope here.
+
+This walk checked dark mode by reading the parsed `@media
+(prefers-color-scheme: dark)` rule from the live stylesheet. It did not
+toggle the OS theme. Each token's dark value matched `tokens.css`
+exactly. Task 1.3 already ran the contrast math: every light/dark pair
+clears 4.5:1 against both `--color-surface` values.

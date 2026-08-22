@@ -1230,6 +1230,20 @@ one horizontal row. That row keeps `visible`/`required`/`readonly`
 order, the same order the column and row bulk-toggle badges already
 use.
 
+Each checked checkbox SHALL also carry its own color, one of three
+fixed colors keyed on which flag it controls. The `visible` checkbox
+SHALL use one color, `required` a second, and `readonly` a third, once
+each one reads checked. An unchecked checkbox keeps the platform's own
+default appearance. The native `accent-color` mechanism this requirement
+relies on tints only a checked or indeterminate control, in every
+evergreen browser.
+
+Every checked live cell in the field matrix SHALL use the same three
+colors, in the same `visible`/`required`/`readonly` assignment. This
+holds identically on the panels screen's grid and the canvas dock's
+Field matrix tab. The color adds to the checkbox's `aria-label` and its
+row position; neither of those changes.
+
 Each checkbox SHALL start from the entry's own resolved value: an
 absent key reads the engine's own default, not `false`. Changing a
 checkbox SHALL write to that entry's key immediately, through the same
@@ -1270,6 +1284,16 @@ there, boolean or otherwise. It SHALL offer no way to switch that flag
 back to a boolean from inside the matrix. Editing that flag stays
 possible on the field's own strip. For `visible` alone it is also
 possible on the field catalog's Rules tab condition row.
+
+A disabled checkbox that reads checked SHALL keep its flag's own
+color. The same opacity rule every other disabled control in the
+studio area uses dims it. A checked, gated checkbox does not lose its
+color to a neutral shade. It stays identifiable by color, only
+fainter.
+
+A disabled checkbox that reads unchecked keeps the platform's own
+default unchecked appearance, per this requirement's earlier rule.
+That same reduced opacity still applies to it.
 
 #### Scenario: Changing a cell's control writes the same entry the form editor writes
 
@@ -1362,6 +1386,34 @@ possible on the field catalog's Rules tab condition row.
 - **THEN** that cell's `required` and `readonly` checkboxes disable
 - **AND** its `visible` checkbox stays enabled
 
+#### Scenario: Every checked checkbox for one flag shares one color
+
+- **WHEN** the developer opens the field matrix on a draft with
+  multiple live cells carrying a checked `visible` checkbox
+- **THEN** every one of those checked `visible` checkboxes renders in
+  the same color
+- **AND** that color differs from the color every checked `required`
+  checkbox and every checked `readonly` checkbox renders in
+
+#### Scenario: A disabled, checked checkbox stays identifiable by color
+
+- **WHEN** a live cell's `required` or `readonly` checkbox reads
+  checked and then disables, through any of this requirement's gating
+  rules
+- **THEN** that checkbox still renders in its own flag's color
+- **AND** it renders at the reduced opacity every disabled control in
+  the studio area already uses
+
+#### Scenario: A disabled, unchecked checkbox keeps the default appearance
+
+- **WHEN** a live cell's `required` or `readonly` checkbox reads
+  unchecked and then disables, through any of this requirement's
+  gating rules
+- **THEN** that checkbox keeps the platform's own default unchecked
+  appearance, carrying no color
+- **AND** it renders at the reduced opacity every disabled control in
+  the studio area already uses
+
 ### Requirement: Column headers name the step and flag steps with no view
 
 Each column header SHALL show the step's `key` alongside its resolved
@@ -1449,6 +1501,13 @@ mechanism. `visible` keeps a non-empty eligible set there. That badge
 stays, and the other two go. The rule also removes a badge from a row
 whose cells the studio gates for any other reason.
 
+A column header's `visible`/`required`/`readonly` badges SHALL sit in
+three fixed positions, one per flag, in that order. Those positions
+SHALL match the fixed positions the same three flags hold in the
+column's own cells below. A badge can be absent because its eligible
+set is empty. Its position SHALL stay empty then, rather than let the
+remaining badges shift into it.
+
 #### Scenario: A column's bulk badge sets every eligible cell in that step
 
 - **WHEN** the developer selects a column's `required` badge, on a
@@ -1506,6 +1565,17 @@ whose cells the studio gates for any other reason.
 - **AND** no cell's field declares `technical: true`
 - **THEN** that row header offers no `required` toggle badge
 
+#### Scenario: A column header with only one eligible badge still aligns with its column's checkboxes
+
+- **WHEN** every one of a column's live cells is a technical field
+- **AND** `visible` stays eligible there, while `required` and
+  `readonly` have no eligible cell
+- **THEN** that column header shows only the `visible` badge
+- **AND** the `visible` badge sits in the same fixed position a
+  `visible` checkbox holds in that column's cells
+- **AND** the badge does not shift toward where `required` or
+  `readonly` would otherwise sit
+
 ### Requirement: The panels screen's field matrix toolbar filters inert columns and reports coverage
 
 This requirement covers the panels screen's field matrix only. See
@@ -1551,7 +1621,7 @@ This requirement covers the panels screen's field matrix only. See
 "The canvas dock's Field matrix tab carries no toolbar or bulk
 badges" below.
 
-The toolbar SHALL carry a legend. The legend SHALL explain six marks:
+The toolbar SHALL carry a legend. The legend SHALL explain seven marks:
 
 - a bulk badge sets the whole column or row it sits on
 - a cell with no key written reads the engine's own default
@@ -1559,12 +1629,26 @@ The toolbar SHALL carry a legend. The legend SHALL explain six marks:
 - what a blank cell's dash means
 - what the flagged-cell marker means
 - what the technical-field row-header marker means
+- which color maps to `visible`, which to `required`, and which to
+  `readonly`
+
+The seventh entry SHALL show a swatch in each of the three checkbox
+colors beside that color's flag name. A swatch SHALL use the exact
+color the live cells' checkboxes use for that flag. The legend defines
+no separate color of its own.
 
 #### Scenario: The legend is visible without further interaction
 
 - **WHEN** the developer opens the field matrix
 - **THEN** the toolbar's legend is visible, with no click or hover
   needed to reveal it
+
+#### Scenario: The legend's color entry matches the grid's own colors
+
+- **WHEN** the developer compares the legend's `visible`/`required`/
+  `readonly` swatches against a live cell's checkboxes
+- **THEN** each swatch's color equals that flag's checkbox color in
+  the grid
 
 ### Requirement: The canvas dock's Field matrix tab carries no toolbar or bulk badges
 

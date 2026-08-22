@@ -52,4 +52,31 @@ describe("EditorDock's Field matrix tab", () => {
     expect(html).not.toContain("studio-matrix-flag-badge");
     expect(html).not.toContain("studio-matrix-count");
   });
+
+  it("keys each live cell's checkbox class on its own flag, and gates readonly with aria-disabled", () => {
+    const html = renderToStaticMarkup(
+      <DraftProvider initial={DRAFT} token="token">
+        <EditorDock
+          processId="proc_a"
+          token="token"
+          draft={DRAFT}
+          contentLocale="en"
+          baseVersion={null}
+          open={true}
+          onOpenChange={() => {}}
+          tab="matrix"
+          onTabChange={() => {}}
+        />
+      </DraftProvider>,
+    );
+
+    // field_vendor's only view entry carries required: true and no other
+    // writer, so gatedKeys disables readonly (draft/view-flags.ts).
+    expect(html).toContain('class="studio-matrix-flag-visible"');
+    expect(html).toContain('class="studio-matrix-flag-required"');
+    const readonlyInput = html.match(/<input[^>]*class="studio-matrix-flag-readonly"[^>]*>/)?.[0];
+    expect(readonlyInput).toBeDefined();
+    expect(readonlyInput).toContain('aria-disabled="true"');
+    expect(readonlyInput).not.toContain(" disabled");
+  });
 });

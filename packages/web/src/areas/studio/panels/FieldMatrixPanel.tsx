@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useDraft } from "../draft/store";
 import { t } from "../catalog.js";
 import { matrixRows, matrixCounts, filterInertSteps } from "./fieldMatrixLogic";
-import { FieldMatrixGrid } from "./FieldMatrixGrid";
+import { FieldMatrixGrid, FLAG_KEYS, FLAG_LABEL_KEY } from "./FieldMatrixGrid";
 
 const LEGEND_KEYS = [
   "fieldMatrix.legendBulk",
@@ -11,6 +11,7 @@ const LEGEND_KEYS = [
   "fieldMatrix.legendBlank",
   "fieldMatrix.legendFlagged",
   "fieldMatrix.legendTechnical",
+  "fieldMatrix.legendColors",
 ] as const;
 
 function countLine(declared: number, fields: number, steps: number, cells: number): string {
@@ -55,7 +56,22 @@ export function FieldMatrixPanel() {
         </span>
         <div className="studio-matrix-legend">
           {LEGEND_KEYS.map((key) => (
-            <span key={key}>{t(key)}</span>
+            <span key={key} data-legend-entry>
+              {t(key)}
+              {key === "fieldMatrix.legendColors" && (
+                <span className="studio-matrix-legend-swatches">
+                  {FLAG_KEYS.map((flagKey) => (
+                    <span key={flagKey} className="studio-matrix-legend-swatch">
+                      <span
+                        className={`studio-matrix-legend-swatch-color studio-matrix-legend-swatch-${flagKey}`}
+                        aria-hidden="true"
+                      />
+                      {t(FLAG_LABEL_KEY[flagKey])}
+                    </span>
+                  ))}
+                </span>
+              )}
+            </span>
           ))}
         </div>
       </div>

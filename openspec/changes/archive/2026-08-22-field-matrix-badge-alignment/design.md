@@ -32,7 +32,9 @@ repeat(3, var(--matrix-flag-col));` plus `justify-items: center`. A grid
 gives each of the three flags (`visible`,
 `required`, `readonly`) an explicit, equal-width track. A flex row sizes
 each item by its own content instead. Column position no longer depends
-on how wide a badge's text happens to be.
+on how wide a badge's text happens to be. `.studio-matrix-flags`' existing
+`margin-top: var(--space-2)` carries over unchanged; only `display` and
+`gap` change.
 
 **One local custom property, not a new design token.** Both rules read
 `var(--matrix-flag-col)`, declared once on `.studio-matrix-table`, not in
@@ -51,6 +53,27 @@ existing 10px mono, uppercase, tracked style. That includes its
 native checkbox is narrower. It centers inside the same track with room
 to spare. The three columns total `5.25rem`. The header `th` already
 fixes the column width at `11rem`, so nothing reflows.
+
+**The CEL stamp does not fit the same track.** The class
+`.studio-matrix-cel-stamp` renders the "CEL" mark. A cell shows that mark
+instead of a checkbox, when a flag carries a CEL expression. The mark
+uses a 2px border on each side, not the badge's 1px. It also keeps the
+same `space-1` padding and a wider 0.06em letter-spacing. Its natural box
+runs about 30-31px.
+
+That is 2-3px past the `1.75rem` (28px) track. A CSS grid does not clip
+an item wider than its track by default. The stamp would render
+centered and bleed slightly into the neighboring track, not get cut off.
+
+**Decision: let it overflow, do not widen the track.** The stamp keeps
+its current CSS unchanged. A 2-3px bleed on a rare CEL-flagged cell is a
+minor visual detail, not a broken layout. The "CEL" text stays fully
+readable.
+
+The stamp's `title` tooltip already carries the full expression. The
+overflow drops no information. Widening the shared track to fit the
+stamp would waste space on every ordinary checkbox column. That column
+only ever needs to fit a checkbox.
 
 **`BulkBadges` renders three slots, not `eligibleKeys.length` slots.** It
 maps over `FLAG_KEYS`, always three, instead of filtering to

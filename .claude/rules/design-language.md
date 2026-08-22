@@ -32,6 +32,11 @@ One accent sits on a light ground. Roles, such as `Unclaimed` and `Booked`,
 form the semantic layer that components reference. The ramp steps behind them
 are primitives. A component must never touch a primitive directly.
 
+The field matrix's `--color-flag-visible`/`-required`/`-readonly` tokens are
+a scoped exception. Each is a single token with no ramp behind it, read
+directly by a component. No other component reads any of the three
+(`field-matrix-checkbox-colors`).
+
 ## Type
 
 Two faces, one rule each:

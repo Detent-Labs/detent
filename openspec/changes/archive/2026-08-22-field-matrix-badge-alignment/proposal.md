@@ -53,4 +53,6 @@ broken alignment on a grid built for column-by-column scanning.
 - `packages/web/src/areas/studio/app.css`: `.studio-matrix-flags` and
   `.studio-matrix-cell-flags`, plus related rules, move from independent
   flex rows to a shared fixed-column grid.
+- `docs/browser-checks.md`: adds a manual browser-check step under "The
+  field matrix" section for column-badge/checkbox alignment.
 - No API, schema, or engine changes.

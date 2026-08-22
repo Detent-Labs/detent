@@ -108,6 +108,16 @@ export function gatedKeys(entry: DraftViewField, written: Map<string, number>, t
   return gated;
 }
 
+/** Whether `key` is one of `entry`'s gated flags right now — the same
+ * question `gatedKeys(...).includes(key)` answers, wrapped so the field
+ * matrix's `onChange` guard (which carries the native `disabled` attribute's
+ * old job, now that a gated checkbox stays enabled for `accent-color`'s sake
+ * — design.md's accent-color decision, field-matrix-checkbox-colors) reads
+ * as one call instead of re-deriving the array on every keystroke. */
+export function isFlagGated(entry: DraftViewField, written: Map<string, number>, technicalFieldIds: Set<string>, key: FlagKey): boolean {
+  return gatedKeys(entry, written, technicalFieldIds).includes(key);
+}
+
 function readerLabel(field: DraftField | undefined, ref: string): string {
   return field?.key || ref;
 }
