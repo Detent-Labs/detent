@@ -426,34 +426,44 @@ Stage-by-stage status is in `ROADMAP.md`.
   `transitionSeq` OCC predicate, so the durable record and the thrown
   `AutomaticCascadeLoop` always agree on why the instance is parked.
 - Runtime API Layer (`src/runtime/api.ts`, `test/runtime-api.test.ts`): the
-  first library boundary a UI can call without touching engine internals —
-  three operations, no HTTP transport, no auth/actor resolution (every
-  function takes an explicit `actor: Actor`, trusted as given), no
-  assignment/claim enforcement (`AssignmentState` is declared in the schema
-  but unenforced everywhere, matching engine behavior). `createProcessInstance`
-  first seeds the field catalog's own `default` values into any slot `opts.data`
-  left open, in catalog order: a `Literal` writes directly, an `Expression`
-  evaluates through `src/cel/eval.ts::evalFieldMap` against the same stub
-  `Instance` the seed builds, so a later field's default can read an earlier
-  field's already-resolved value. A raise leaves that field's slot unset rather
-  than failing creation. It then validates the merged seed `data` (skipping the
-  required check — requiredness is a transition-time gate), threading the set
-  of field ids the defaulting step filled into `validateSubmissionData` as
-  `defaultedIds`: a member with no `ResolvedViewField` at all skips the
-  `unknown-field` rejection and checks against the catalog field's own
-  type/options/validation directly, and a member resolving readonly (including
-  `technical: true`) skips only the `readonly-field` rejection and otherwise
-  takes the same checks an editable field on that step gets. Neither exemption
-  extends to a value `opts.data` supplies directly. It then runs
-  `store.ts::createInstance` + the create-then-run-to-rest cascade. `getInstanceView` resolves a step's `view`
-  against the field catalog and current data into `ResolvedViewField[]` (a
-  group-container's own field id is never a valid `data` key, so it is
-  reported but excluded from required/readonly resolution) plus
-  `availablePaths` (manual paths whose guard currently holds) plus
-  `assignment` (the instance's claim state, in `InstanceSummary`'s shape;
-  absent when the current step declares none, and reported for every status
-  unlike `availablePaths`, since a caller cannot otherwise tell a claimable
-  step from one with no assignment). `submitAndTransition`
+  first library boundary a UI can call without touching engine internals.
+  It has three operations, and no HTTP transport. It has no auth/actor
+  resolution either, since every function takes an explicit `actor: Actor`,
+  trusted as given. It has no assignment/claim enforcement, since
+  `AssignmentState` is declared in the schema but unenforced everywhere,
+  matching engine behavior.
+
+  `createProcessInstance` first seeds the field catalog's own `default`
+  values into any slot `opts.data` left open, in catalog order. A `Literal`
+  writes directly. An `Expression` evaluates through
+  `src/cel/eval.ts::evalFieldMap` against the same stub `Instance` the seed
+  builds, so a later field's default can read an earlier field's
+  already-resolved value. A raise leaves that field's slot unset rather
+  than failing creation.
+
+  That defaulting step's own field ids thread into `validateSubmissionData`
+  as `defaultedIds`. A member with no `ResolvedViewField` at all skips the
+  `unknown-field` rejection there, and checks against the catalog field's
+  own type/options/validation directly. A member resolving readonly
+  (including `technical: true`) skips only the `readonly-field` rejection.
+  It otherwise takes the same checks an editable field on that step gets.
+  Neither exemption extends to a value `opts.data` supplies directly.
+
+  It then validates seed `data`, skipping the required check
+  (requiredness is a transition-time gate), then runs
+  `store.ts::createInstance` and the create-then-run-to-rest cascade.
+
+  Next, `getInstanceView` resolves a step's `view` against the field
+  catalog and current data into `ResolvedViewField[]`. A group-container's
+  own field id is never a valid `data` key, so it is reported but excluded
+  from required/readonly resolution. The same call also resolves
+  `availablePaths` (manual paths whose guard currently holds), and
+  `assignment` (the instance's claim state, in `InstanceSummary`'s shape).
+  That last one is absent when the current step declares none, and
+  reported for every status unlike `availablePaths`, since a caller cannot
+  otherwise tell a claimable step from one with no assignment.
+
+  Finally, `submitAndTransition`
   is the only write path for arbitrary user-submitted `data` anywhere in the
   system: it row-locks the instance (`SELECT ... FOR UPDATE`) for exactly one
   commit — guarding against a concurrent `Action.output` writeback being
