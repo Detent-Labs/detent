@@ -19,38 +19,163 @@ are explicitly out of scope for this capability.
 ## Requirements
 ### Requirement: Create a process instance through the runtime API
 
-`createProcessInstance(processId, actor, registry, opts?, db?)` SHALL create
-a new instance of the newest published version of `processId` (or the
-version given in `opts.version`), optionally seeded with `opts.data`, and
-SHALL run it to rest (create-then-`resolveAutomatic`) before returning it.
-`opts.data` SHALL be validated against the initial step's resolved view
-before creation — field-set boundary, type, option membership (against
-resolved `options`, covering both static and `dataSource`-bound fields, per
-the `data-source-resolution` capability), constraints, and
-`validation.rule`, the same rules `submitAndTransition` applies to a
-submission — evaluated against a stub `Instance` (minted id, `transitionSeq:
-0`, `currentStepId` the initial step, `status` derived the same way
-`store.ts::createInstance` derives it) that is then passed as the
-actually-created instance's id, so the instance created is exactly the one
-that was validated. `createProcessInstance` SHALL take a required
-`registry: DataSourceRegistry` parameter, threaded into the `resolveFields`
-call that resolves the initial step's view for this validation.
+`createProcessInstance(processId, actor, registry, opts?, db?)` SHALL
+create a new instance of the newest published version of `processId`.
+It SHALL instead use the version given in `opts.version`, when one is
+given. It MAY seed the instance with `opts.data`. It SHALL run the
+instance to rest (create-then-`resolveAutomatic`) before returning it.
 
-The required check SHALL NOT run at creation, regardless of whether
-`opts.data` is given: requiredness is a transition-time gate, enforced by
-`submitAndTransition` whenever a step is left via a manual path, not an
-existence-time gate on being created at or resting on one. An instance MAY
-be created at a step whose view marks fields required and left with those
-fields unfilled, to be supplied later via `submitAndTransition` — the
-ordinary "create an empty instance, then fill in the initial step's form"
-flow that `examples/expense-approval.json`'s "capture" step (itself the
-initial step, with required fields) depends on.
+Before it evaluates any default, `createProcessInstance` SHALL mint
+the instance id. It SHALL establish a stub `Instance`, the same one
+described below. That stub sets `currentStepId` to the initial step,
+`transitionSeq` to `0`, and `status` derived the way
+`store.ts::createInstance` derives it.
+
+`createProcessInstance` SHALL initialize a working data object as a
+copy of `opts.data`, or an empty object when no `opts.data` is given.
+It SHALL then walk leaf fields one at a time, in catalog order. It
+SHALL seed each field's slot in that working object from the field
+catalog's `default` values. A `Literal` default SHALL write its value
+directly into that field's slot. It SHALL do this only when the slot
+is still absent. That happens when `opts.data` never set it, or when
+an earlier field's default has not already filled it.
+
+An `Expression` default SHALL evaluate through
+`src/cel/eval.ts::buildGuardContext(body, stub, actor)`, the same
+builder every other guard evaluation reuses. The stub's `.data` SHALL
+be set to the working object as filled so far.
+
+That evaluation SHALL run through `src/cel/eval.ts::evalFieldMap`, a
+single-entry map holding just that field. `evalFieldMap` SHALL pass
+the evaluated value through `coerceJson` before it fills that field's
+slot. That is the same coercion `evalMapTotal` already runs, inside
+`evalFieldMap`, before a CEL result lands in `data`. `evalTransforms`
+(migrations) and `evalOutput` (`Action.output`) both run it too.
+`cel-js` models a CEL `int` as a JS `bigint`. Skipping this step would
+leave a bigint in a `number` field's slot for even a plain
+integer-literal default. That fails `typeMatches` on the next check
+this requirement runs.
+
+That call SHALL supply `instance: { id, status, transitionSeq,
+currentStepId }`, matching `INSTANCE_SCHEMA` exactly. That is the same
+scope `src/cel/check.ts` already type-checks a `default` Expression
+against, at publish time. It SHALL also re-key `data` from field id to
+field `key`, the same remap every other guard context gets.
+
+CEL stays total here, the same as everywhere else it evaluates a
+guard. An Expression default that raises, or whose evaluated value
+`coerceJson` cannot make JSON-safe, SHALL leave its field's slot
+unfilled. It SHALL NOT fail the creation. A `group` field's own
+`default` SHALL NOT be read: a group carries no slot of its own in the
+flat data payload. `createProcessInstance` SHALL still walk its
+children.
+
+This seeding step SHALL run only inside `createProcessInstance`
+itself. It SHALL NOT run for an instance
+`src/engine/seeded-create.ts::createSeededInstance` creates: a
+subprocess spawn's child instance, or a `process.start` chain's
+started instance. Neither of those two calls
+`createProcessInstance`. Each already seeds its new instance from its
+own author-declared `inputMapping`. This requirement's default-seeding
+does not extend there for this change.
+
+The working object SHALL then carry every value `opts.data` set and
+every default that filled a slot `opts.data` left open. An explicitly
+submitted value SHALL win over a default on the same field, every
+time. The seeding step above never overwrites a slot `opts.data`
+already filled. That object becomes what this requirement's existing
+rules call `opts.data` below, and what carries forward into
+`submitted`.
+
+`createProcessInstance` SHALL validate `opts.data` against the initial
+step's resolved view before creation. That check covers the field-set
+boundary, type, option membership, constraints, and
+`validation.rule`. Option membership checks against resolved `options`,
+covering both static and `dataSource`-bound fields, per the
+`data-source-resolution` capability. These are the same rules
+`submitAndTransition` applies to a submission.
+
+The check runs against the same stub `Instance` the defaulting step
+above already built and fed `data` into, not a second one. That stub
+carries a minted id, a `transitionSeq` of `0`, and `currentStepId` set
+to the initial step. Its `status` derives the same way
+`store.ts::createInstance` derives it. `createProcessInstance` then
+passes that same minted id to the actually-created instance. The
+instance created is exactly the one that was validated.
+
+This validation SHALL cover a merged-in default the same way it covers
+a submitted value, with two exemptions, one per case below. This
+validation otherwise enforces a field-set boundary. That boundary
+rejects a key absent from the initial step's resolved view as
+`unknown-field`. It rejects a key resolved readonly as
+`readonly-field`.
+
+`createProcessInstance` SHALL record the set of field ids the
+defaulting step above filled. It SHALL keep that set distinct from the
+ids `opts.data` supplied directly. It SHALL thread that set into this
+validation.
+
+For a member of that set absent from the initial step's resolved
+view — `resolveFields` returns no `ResolvedViewField` for it —
+validation SHALL skip the `unknown-field` rejection that field would
+otherwise draw. It SHALL check the value against the field's own
+declared `type`, its own static `options`, its own `validation`
+constraints, and its own effective `validation.rule`. It SHALL NOT
+check the value against the initial step's resolved view: a field
+outside that view has no `ResolvedViewField` entry to check against,
+and no step context to resolve a `dataSource`-bound field's options
+against. When that field is `dataSource`-bound, its
+option-membership check SHALL be skipped instead, the same treatment a
+field carrying an empty options list already gets. A default that
+fails one of the remaining checks SHALL throw
+`SubmissionValidationError`, the same as a bad `opts.data` value does.
+
+For a member of that set that DOES resolve a `ResolvedViewField`, and
+that view resolves it readonly — through a step-level `readonly`
+override, or through `FieldDef.technical: true` — validation SHALL
+skip the `readonly-field` rejection that field would otherwise draw.
+It SHALL otherwise check the value the same way it checks an editable
+field on that step: against the field's own declared `type`, the
+view-resolved `options`, and the step's own effective validation (the
+sibling requirement's ordered checks 1-4 below, including
+`validation.rule`). A default that fails one of those checks SHALL
+throw `SubmissionValidationError`, the same as a bad `opts.data` value
+does.
+
+Neither exemption SHALL extend to a value `opts.data` supplies
+directly. An explicitly submitted value for a field outside the
+initial step's view SHALL still throw `unknown-field`. An explicitly
+submitted value for a field the view resolves readonly SHALL still
+throw `readonly-field`. Both exactly as they do today.
+
+`createProcessInstance` SHALL take a required `registry:
+DataSourceRegistry` argument. It SHALL thread that registry into the
+`resolveFields` call that resolves the initial step's view for this
+validation.
+
+The required check SHALL NOT run at creation, whether or not the
+caller passes `opts.data`. Requiredness is a transition-time gate. It
+is not an existence-time gate on being created at or resting on a
+step. The transition function `submitAndTransition` enforces it,
+whenever a step is left via a manual path.
+
+An instance MAY be created at a step whose view marks fields required,
+left with those fields unfilled. Those fields can be supplied later,
+via `submitAndTransition`. That is the ordinary "create an empty
+instance, then fill in the initial step's form" flow.
+`examples/expense-approval.json`'s "capture" step depends on it: that
+step is itself the initial step, and it declares required fields.
+
+`opts.data` SHALL NOT carry a key naming a `FieldDef` declaring
+`technical: true`. The initial step's resolved view always reports such
+a field `readonly: true`. The field-set boundary therefore rejects the
+key as `readonly-field`, the way it rejects a submission.
 
 #### Scenario: Creating an instance with no data seed
 - **WHEN** `createProcessInstance` is called for a process with no `opts.data`,
   even when the initial step's view marks fields required
 - **THEN** an instance is created pinned to the resolved version, run to
-  rest, and returned — the required check does not block creation
+  rest, and returned. The required check does not block creation
 
 #### Scenario: Creating an instance pins to an explicit version
 - **WHEN** `createProcessInstance` is called with `opts.version` set to a
@@ -72,10 +197,136 @@ initial step, with required fields) depends on.
 
 #### Scenario: A dataSource-bound field's seed data is validated against its resolved options
 - **WHEN** `createProcessInstance` is called with `opts.data` carrying a
-  value for a `dataSource`-bound field on the initial step that does not
-  equal any of that data source's resolved options
+  value for a `dataSource`-bound field on the initial step
+- **AND** that value does not equal any of the data source's resolved
+  options
 - **THEN** it throws `SubmissionValidationError` with an `invalid-option`
   issue for that field, and no instance is created
+
+#### Scenario: A seeded technical field is rejected
+- **WHEN** `createProcessInstance` is called with `opts.data` carrying a
+  key for a `FieldDef` declaring `technical: true`
+- **AND** the step whose view resolves it marks it visible
+- **THEN** it throws `SubmissionValidationError` with a `readonly-field`
+  issue for that key, and no instance is created
+
+#### Scenario: A literal default seeds a field with no submitted value
+- **WHEN** `createProcessInstance` is called with `opts.data` that carries
+  no value for a field whose catalog entry declares a `Literal` default
+- **THEN** the created instance's data carries that literal value for the
+  field
+
+#### Scenario: An explicitly submitted value wins over a default
+- **WHEN** `createProcessInstance` is called with `opts.data` carrying a
+  value for a field that also declares a default
+- **THEN** the created instance's data carries the submitted value, not
+  the default
+
+#### Scenario: A CEL default evaluates against the seed in progress
+- **WHEN** a field's `Expression` default reads `data.subtotal`, and an
+  earlier field in catalog order defaults `subtotal` to a literal value
+- **THEN** the later field's default evaluates using that earlier
+  field's resolved value
+- **AND** `data` is re-keyed from field id to field `key` the same way
+  any guard context is
+
+#### Scenario: A CEL default evaluates against an earlier submitted value
+- **WHEN** a field's `Expression` default reads `data.subtotal`, and
+  `opts.data` carries an explicitly submitted value for an earlier
+  field in catalog order, `subtotal`
+- **THEN** the later field's default evaluates using that submitted
+  value
+- **AND** this is the same visibility an earlier field's resolved
+  default would get
+
+#### Scenario: An earlier field's default cannot read a later field's value
+- **WHEN** an earlier-in-catalog-order field's `Expression` default
+  reads `data.<key>` of a later field
+- **THEN** it raises for the missing key, and that earlier field's
+  slot stays unfilled
+- **AND** creation still succeeds
+
+#### Scenario: A default reads the instance's own state
+- **WHEN** a field's `Expression` default reads `instance.status` or
+  `instance.currentStepId`
+- **THEN** the default evaluates against the stub `Instance`'s derived
+  `status` and its `currentStepId` set to the initial step
+- **AND** it does not raise for a missing key
+
+#### Scenario: A raising expression default leaves its field unset
+- **WHEN** a field's `Expression` default raises during evaluation, and
+  `opts.data` carries no value for that field
+- **THEN** the created instance's data carries no value for that field,
+  and creation still succeeds
+
+#### Scenario: An expression default evaluating to a CEL int seeds a JSON-safe number
+- **WHEN** a `number` field's `Expression` default evaluates to a CEL
+  `int`
+- **AND** the expression is the bare integer literal `"5"`, or the
+  arithmetic expression `"data.qty * data.price"` over two int fields
+- **AND** `opts.data` carries no value for that field
+- **THEN** the created instance's data carries a JSON-safe `number` for
+  that field, not a bigint
+- **AND** creation does not throw
+
+#### Scenario: A group field's own default is never read
+- **WHEN** a `group` field's catalog entry declares a `default`, and its
+  children each declare their own default too
+- **THEN** the created instance's data carries no slot for the group
+  itself
+- **AND** each child's default seeds that child's own slot
+
+#### Scenario: A default that fails validation blocks creation
+- **WHEN** a field's `Literal` default does not match the field's
+  declared type, and `opts.data` carries no value for that field
+- **THEN** it throws `SubmissionValidationError` for that field, the
+  same as an invalid submitted value would, and no instance is created
+
+#### Scenario: A default seeds a field the initial step's view does not reference
+- **WHEN** a field's default fills a field id absent from the initial
+  step's resolved view
+- **AND** `booking_status` in `examples/expense-approval.json` is one
+  such field, referenced only by the `book` step, never by the initial
+  `capture` step
+- **THEN** creation succeeds, and that field's slot carries the
+  defaulted value
+- **AND** the engine validates that value against the field's own
+  declared type, options, constraints, and `validation.rule`, rather
+  than rejecting it as `unknown-field`
+
+#### Scenario: An off-view default failing its own validation.rule is rejected
+- **WHEN** a field's default fills a field id absent from the initial
+  step's resolved view
+- **AND** the field's own effective `validation.rule` evaluates false
+  against that value
+- **THEN** it throws `SubmissionValidationError` with a `rule-failed`
+  issue for that field, and no instance is created
+
+#### Scenario: An off-view dataSource-bound default skips option-membership validation
+- **WHEN** a `dataSource`-bound field's default fills a field id absent
+  from the initial step's resolved view
+- **THEN** creation succeeds regardless of the default's value, since
+  there is no step context to resolve the data source's options
+  against
+- **AND** the engine still checks that value against the field's own
+  declared type and its own `validation` constraints
+
+#### Scenario: A default on an on-view readonly field is judged by the step's own override
+- **WHEN** a field's default fills a field id the initial step's
+  resolved view marks readonly through a step-level `readonly`
+  override
+- **AND** the initial step's view field also overrides that field's
+  `validation`
+- **THEN** creation succeeds, and the engine validates the defaulted
+  value against the step's own overridden validation, not the
+  catalog's
+
+#### Scenario: A default on a technical field still seeds, without a readonly-field rejection
+- **WHEN** a `FieldDef` declaring `technical: true` also declares a
+  `Literal` default, and `opts.data` carries no value for that field
+- **THEN** creation succeeds, and the created instance's data carries
+  that literal value for the field
+- **AND** creation raises no `readonly-field` issue for it
 
 ### Requirement: Resolve a display-ready view of an instance
 
@@ -125,6 +376,22 @@ regardless of the view's own declaration. It is never part of the
 visible-and-required set the required check enforces, nor of the
 visible-and-editable set `submitAndTransition` accepts.
 
+A `ViewField` may resolve to a `FieldDef` declaring `technical: true`.
+Such a `ViewField` SHALL always resolve `required` as `false` and
+`readonly` as `true`, regardless of the view entry's declaration. The
+definition contract already forbids a technical field's view entry from
+declaring either key. This rule therefore only restates what the
+resolved body already means.
+
+Where a body declares `technical: true` on a `type: "group"` field, the
+group rule wins: both flags resolve `false`. The compile pass rejects
+that pair, so only an uncompiled body reaches it. Type alone keeps a
+group ref out of the editable set, whatever `readonly` resolves to.
+
+Such a `ViewField` is never part of the visible-and-required set. It is
+also never part of the visible-and-editable set `submitAndTransition`
+accepts.
+
 `availablePaths` SHALL contain exactly the manual paths on the current
 step whose guard currently holds against `buildGuardContext(body,
 instance, actor)`. Paths that don't match are omitted, not flagged. A
@@ -160,6 +427,13 @@ caller can distinguish these cases.
   and marks it `required: true`
 - **THEN** the resolved field's `required` is `false` and its `value`
   is `undefined`, regardless of the view's declaration
+
+#### Scenario: A technical field never reports as editable
+
+- **WHEN** `getInstanceView` resolves a step's view entry naming a
+  `FieldDef` declaring `technical: true`
+- **THEN** the resolved field's `required` is `false` and its
+  `readonly` is `true`
 
 #### Scenario: A guarded manual path that fails its guard is omitted
 
@@ -294,6 +568,11 @@ group-container ref, resolved the same way `getInstanceView` resolves
 `fields`, against the pre-submission committed data). A key outside that set
 SHALL be rejected as `unknown-field` (not present in the resolved view) or
 `readonly-field` (present but not editable) without touching the instance.
+`submitAndTransition` SHALL reject a key naming a `technical` field the
+current step's view resolves visible as `readonly-field`, since that
+resolution always reports it `readonly: true`. A technical field the
+current step's view does not resolve at all falls under the
+`unknown-field` rule above, unchanged.
 
 All located validation issues SHALL be collected into one thrown
 `SubmissionValidationError` rather than failing on the first found. Only
@@ -327,6 +606,12 @@ left `faulted`.
   one the current step's view marks visible
 - **THEN** it throws `SubmissionValidationError` with an `unknown-field`
   issue for that key
+
+#### Scenario: A technical field is never an accepted submission key
+- **WHEN** `data` includes a key for a `FieldDef` declaring
+  `technical: true`, even on a step whose view marks it visible
+- **THEN** it throws `SubmissionValidationError` with a `readonly-field`
+  issue for that key, and the instance is uncommitted
 
 #### Scenario: Multiple validation issues are all reported together
 - **WHEN** a submission violates more than one validation rule at once (for
@@ -584,8 +869,10 @@ any group-container field), `submitAndTransition` — but not
 visible-and-required set has a defined value. Requiredness is a
 transition-time gate: it is checked whenever a step is left via a manual
 path, not whenever an instance is created at or rests on one. A declared
-`FieldDef.default` does not satisfy this check: nothing in the engine
-applies `default` anywhere today, and this change does not add that.
+`FieldDef.default` does not satisfy this check. `createProcessInstance`
+applies `default` once, at creation (see the sibling requirement above).
+`submitAndTransition` never re-applies or re-checks it at a later
+transition.
 
 #### Scenario: A type mismatch is rejected
 - **WHEN** a submitted value does not match its field's declared type
@@ -674,12 +961,13 @@ applies `default` anywhere today, and this change does not add that.
 - **WHEN** a visible-and-required field declares a `FieldDef.default` and has
   no defined value in the merged data at a `submitAndTransition` call
 - **THEN** the result still carries a `required-missing` issue for that
-  field, because nothing applies `default`
+  field. `submitAndTransition` never applies `default`; only
+  `createProcessInstance` does, once, at creation
 
 #### Scenario: createProcessInstance never enforces the required check
 - **WHEN** `createProcessInstance` is called with `opts.data` omitting a
   field the initial step's view marks required
-- **THEN** creation succeeds — the required check runs only on
+- **THEN** creation succeeds. The required check runs only on
   `submitAndTransition`, never on creation
 
 ### Requirement: The initial step's overrides govern a seeded creation
@@ -994,10 +1282,18 @@ A mapped target SHALL take the mapped value even when the request also carries
 a value for that target. The list owns a mapped field, and one deterministic
 rule beats a merge order nobody can predict.
 
-The engine SHALL write a mapped target whatever its view says. A readonly
-target still takes the value, and so does one the view never shows. The mapping
-is authored, not participant input. The view's rules for what a participant may
-edit therefore do not govern it.
+The engine SHALL write a mapped target whatever its view says, and
+whatever its catalog entry says. A readonly target still takes the
+value. So does one the view never shows. So does one declaring
+`technical: true`. An author writes the mapping; a participant does
+not. The view's rules for what a participant may edit therefore do not
+govern it, and neither does `technical`.
+
+A `technical` target changes one thing. The engine rejects a request
+that also carries a value for that target as `readonly-field`, before
+the mapping runs. The mapped-value-wins rule above therefore never
+engages for it. The mapped value still lands from the picker's own
+write.
 
 The engine SHALL walk the step's view order, which is the order
 `ResolvedViewField[]` already carries. It SHALL NOT walk the request's own key
@@ -1053,6 +1349,19 @@ included.
   field, and the creation data names an option
 - **THEN** the mapped targets hold the option's attributes on the created
   instance
+
+#### Scenario: A technical mapped target still takes the mapped value
+
+- **WHEN** a submission writes a picker field whose `columnMapping`
+  targets a field declaring `technical: true`
+- **THEN** the mapped attribute lands in `data` for that target
+
+#### Scenario: A request writing a technical mapped target directly is rejected
+
+- **WHEN** a submission carries a value for a `technical` field that is
+  also a `columnMapping` target
+- **THEN** it throws `SubmissionValidationError` with a `readonly-field`
+  issue for that key, and the mapping does not run
 
 ### Requirement: A type-mismatching attribute is dropped and recorded
 

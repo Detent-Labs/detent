@@ -10,6 +10,7 @@ const LEGEND_KEYS = [
   "fieldMatrix.legendCel",
   "fieldMatrix.legendBlank",
   "fieldMatrix.legendFlagged",
+  "fieldMatrix.legendTechnical",
 ] as const;
 
 function countLine(declared: number, fields: number, steps: number, cells: number): string {

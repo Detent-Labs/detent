@@ -109,8 +109,8 @@ export function matrixCounts(rows: FieldMatrixRow[], drawnSteps: DraftStep[]): M
  * not gated off by its own `visible: false` or the `required`/`readonly`
  * mutual gate (`studio-app`'s bulk-toggle requirement — "Eligible means
  * live, non-CEL, not gated"). */
-function cellEligible(entry: DraftViewField, key: FlagKey, written: Map<string, number>): boolean {
-  return !isExpression(entry[key]) && !gatedKeys(entry, written).includes(key);
+function cellEligible(entry: DraftViewField, key: FlagKey, written: Map<string, number>, technicalFieldIds: Set<string>): boolean {
+  return !isExpression(entry[key]) && !gatedKeys(entry, written, technicalFieldIds).includes(key);
 }
 
 /** One (step, field) pair a bulk badge would touch, identified by the
@@ -138,18 +138,19 @@ export function rowLiveTargets(steps: DraftStep[], fieldId: string): BulkTarget[
   }, []);
 }
 
-function eligibleTargetEntries(
+export function eligibleTargetEntries(
   steps: DraftStep[],
   targets: BulkTarget[],
   key: FlagKey,
   written: Map<string, number>,
+  technicalFieldIds: Set<string>,
 ): { target: BulkTarget; entry: DraftViewField }[] {
   const out: { target: BulkTarget; entry: DraftViewField }[] = [];
   for (const target of targets) {
     const step = steps[target.stepIndex];
     if (!step) continue;
     const cell = cellEntry(step, target.fieldId);
-    if (cell && cellEligible(cell.entry, key, written)) out.push({ target, entry: cell.entry });
+    if (cell && cellEligible(cell.entry, key, written, technicalFieldIds)) out.push({ target, entry: cell.entry });
   }
   return out;
 }
@@ -158,8 +159,14 @@ function eligibleTargetEntries(
  * cell it would touch already carries the flag's non-default value
  * (`studio-app`'s bulk-toggle requirement). An empty eligible set reads as
  * not pressed — there is nothing to reflect. */
-export function bulkBadgeOn(steps: DraftStep[], targets: BulkTarget[], key: FlagKey, written: Map<string, number>): boolean {
-  const eligible = eligibleTargetEntries(steps, targets, key, written);
+export function bulkBadgeOn(
+  steps: DraftStep[],
+  targets: BulkTarget[],
+  key: FlagKey,
+  written: Map<string, number>,
+  technicalFieldIds: Set<string>,
+): boolean {
+  const eligible = eligibleTargetEntries(steps, targets, key, written, technicalFieldIds);
   return eligible.length > 0 && eligible.every(({ entry }) => effectiveFlag(entry[key], key) !== FLAG_DEFAULT[key]);
 }
 
@@ -169,8 +176,14 @@ export function bulkBadgeOn(steps: DraftStep[], targets: BulkTarget[], key: Flag
  * `mutate()` recipe, per design.md decision 3. One pass over the eligible
  * cells, not one `mutate()` per cell.
  */
-export function applyBulkToggle(steps: DraftStep[], targets: BulkTarget[], key: FlagKey, written: Map<string, number>): void {
-  const eligible = eligibleTargetEntries(steps, targets, key, written);
+export function applyBulkToggle(
+  steps: DraftStep[],
+  targets: BulkTarget[],
+  key: FlagKey,
+  written: Map<string, number>,
+  technicalFieldIds: Set<string>,
+): void {
+  const eligible = eligibleTargetEntries(steps, targets, key, written, technicalFieldIds);
   if (eligible.length === 0) return;
   const on = eligible.every(({ entry }) => effectiveFlag(entry[key], key) !== FLAG_DEFAULT[key]);
   const next: BoolOrExpr = on ? FLAG_DEFAULT[key] : !FLAG_DEFAULT[key];

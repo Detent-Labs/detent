@@ -46,9 +46,10 @@ export function FieldValidationEditor({ field, validation, onChange }: Props) {
 
   return (
     <details className="field-validation" open={initiallyOpen}>
-      <summary>
-        {t("fieldValidation.legend")} ({carried.length})
-      </summary>
+      {/* The Rules tab's own zone heading already says "Validation" (design.md
+          decision 2); this summary carries only the count, so no redundant
+          second label renders beneath it. */}
+      <summary>({carried.length})</summary>
       {keys.map((key) => {
         const notEvaluated = !offered.includes(key);
         return (

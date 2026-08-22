@@ -251,7 +251,9 @@ export const fieldOption = z.object({
 });
 export type FieldOption = z.infer<typeof fieldOption>;
 
-/** Catalog-level validation. Requiredness is per-step and lives in the view. */
+/** Catalog-level validation. Requiredness is per-step and lives in the view,
+ * except for a `technical` field, which the engine forces `required: false`
+ * on every step regardless (see `FieldDef.technical`). */
 export const fieldValidation = z.object({
   min: z.number().optional(),
   max: z.number().optional(),
@@ -282,6 +284,17 @@ export type FieldDef = {
   validation?: FieldValidation;
   default?: Literal | Expression;
   fields?: FieldDef[];
+  /**
+   * Marks the field as never directly editable by a participant: the engine
+   * resolves it `required: false, readonly: true` on every step regardless
+   * of the view entry. A `technical` field must not be `type: "group"`, and
+   * a view entry naming one must declare neither `required` nor `readonly`.
+   * Both rules are write-path checks (`compile.ts::checkTechnicalFields`),
+   * never a refinement here: `definition.ts` also deserializes stored
+   * immutable bodies, and a refinement would make an already-published body
+   * throw on READ.
+   */
+  technical?: boolean;
 };
 export const fieldDef: z.ZodType<FieldDef, unknown> = z.lazy(() =>
   z
@@ -297,6 +310,7 @@ export const fieldDef: z.ZodType<FieldDef, unknown> = z.lazy(() =>
       validation: fieldValidation.optional(),
       default: z.union([expression, literal]).optional(),
       fields: z.array(fieldDef).optional(),
+      technical: z.boolean().optional(),
     })
     .refine((f) => !(f.options && f.dataSource), {
       message: "options and dataSource are mutually exclusive",

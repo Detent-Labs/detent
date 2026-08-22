@@ -9,6 +9,7 @@ import {
   rowLiveTargets,
   bulkBadgeOn,
   applyBulkToggle,
+  eligibleTargetEntries,
   isCellFlagged,
 } from "../src/areas/studio/panels/fieldMatrixLogic.js";
 import { setFlag, gatedKeys, writtenFieldIds, writtenFieldCounts } from "../src/areas/studio/draft/view-flags.js";
@@ -96,7 +97,12 @@ describe("the cell editor's writer", () => {
 
   it("gates required/readonly the same way the form editor's strip does", () => {
     const entry = vf({ ref: "field_vendor", visible: false });
-    expect(gatedKeys(entry, new Map())).toEqual(["required", "readonly"]);
+    expect(gatedKeys(entry, new Map(), new Set())).toEqual(["required", "readonly"]);
+  });
+
+  it("gates required/readonly unconditionally for a technical field", () => {
+    const entry = vf({ ref: "field_vendor" });
+    expect(gatedKeys(entry, new Map(), new Set(["field_vendor"]))).toEqual(["required", "readonly"]);
   });
 });
 
@@ -160,6 +166,7 @@ describe("bulk targets", () => {
 
 describe("bulkBadgeOn / applyBulkToggle", () => {
   const none = new Map<string, number>();
+  const noTechnical = new Set<string>();
 
   it("reads not-pressed and turns every eligible cell on, when none carry the non-default value", () => {
     const steps: DraftStep[] = [
@@ -170,8 +177,8 @@ describe("bulkBadgeOn / applyBulkToggle", () => {
       { stepIndex: 0, fieldId: "field_vendor" },
       { stepIndex: 1, fieldId: "field_vendor" },
     ];
-    expect(bulkBadgeOn(steps, targets, "required", none)).toBe(false);
-    applyBulkToggle(steps, targets, "required", none);
+    expect(bulkBadgeOn(steps, targets, "required", none, noTechnical)).toBe(false);
+    applyBulkToggle(steps, targets, "required", none, noTechnical);
     expect(steps[0]!.view!.fields![0]!.required).toBe(true);
     expect(steps[1]!.view!.fields![0]!.required).toBe(true);
   });
@@ -185,8 +192,8 @@ describe("bulkBadgeOn / applyBulkToggle", () => {
       { stepIndex: 0, fieldId: "field_vendor" },
       { stepIndex: 1, fieldId: "field_vendor" },
     ];
-    expect(bulkBadgeOn(steps, targets, "required", none)).toBe(true);
-    applyBulkToggle(steps, targets, "required", none);
+    expect(bulkBadgeOn(steps, targets, "required", none, noTechnical)).toBe(true);
+    applyBulkToggle(steps, targets, "required", none, noTechnical);
     expect("required" in steps[0]!.view!.fields![0]!).toBe(false);
     expect("required" in steps[1]!.view!.fields![0]!).toBe(false);
   });
@@ -202,7 +209,7 @@ describe("bulkBadgeOn / applyBulkToggle", () => {
       { stepIndex: 1, fieldId: "field_vendor" },
       { stepIndex: 2, fieldId: "field_vendor" },
     ];
-    applyBulkToggle(steps, targets, "required", none);
+    applyBulkToggle(steps, targets, "required", none, noTechnical);
     expect(steps[0]!.view!.fields![0]!.required).toEqual({ lang: "cel", src: "true" });
     expect("required" in steps[1]!.view!.fields![0]!).toBe(false);
     expect(steps[2]!.view!.fields![0]!.required).toBe(true);
@@ -211,8 +218,8 @@ describe("bulkBadgeOn / applyBulkToggle", () => {
   it("is a no-op when no target is eligible", () => {
     const steps: DraftStep[] = [ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor", visible: false })] } })];
     const targets = [{ stepIndex: 0, fieldId: "field_vendor" }];
-    expect(bulkBadgeOn(steps, targets, "required", none)).toBe(false);
-    applyBulkToggle(steps, targets, "required", none);
+    expect(bulkBadgeOn(steps, targets, "required", none, noTechnical)).toBe(false);
+    applyBulkToggle(steps, targets, "required", none, noTechnical);
     expect("required" in steps[0]!.view!.fields![0]!).toBe(false);
   });
 
@@ -221,8 +228,8 @@ describe("bulkBadgeOn / applyBulkToggle", () => {
       ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor", required: true })] } }),
     ];
     const targets = [{ stepIndex: 0, fieldId: "field_vendor" }];
-    expect(bulkBadgeOn(steps, targets, "readonly", none)).toBe(false);
-    applyBulkToggle(steps, targets, "readonly", none);
+    expect(bulkBadgeOn(steps, targets, "readonly", none, noTechnical)).toBe(false);
+    applyBulkToggle(steps, targets, "readonly", none, noTechnical);
     expect("readonly" in steps[0]!.view!.fields![0]!).toBe(false);
   });
 
@@ -232,8 +239,8 @@ describe("bulkBadgeOn / applyBulkToggle", () => {
     ];
     const targets = [{ stepIndex: 0, fieldId: "field_vendor" }];
     const written = new Map([["field_vendor", Infinity]]);
-    expect(bulkBadgeOn(steps, targets, "readonly", written)).toBe(false);
-    applyBulkToggle(steps, targets, "readonly", written);
+    expect(bulkBadgeOn(steps, targets, "readonly", written, noTechnical)).toBe(false);
+    applyBulkToggle(steps, targets, "readonly", written, noTechnical);
     expect(steps[0]!.view!.fields![0]!.readonly).toBe(true);
   });
 
@@ -241,9 +248,30 @@ describe("bulkBadgeOn / applyBulkToggle", () => {
     const steps: DraftStep[] = [ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor", required: true })] } })];
     const written = writtenFieldCounts({ fields: [df({ id: "field_vendor" })], workflow: { steps } } as Draft);
     const targets = [{ stepIndex: 0, fieldId: "field_vendor" }];
-    expect(bulkBadgeOn(steps, targets, "readonly", written)).toBe(false);
-    applyBulkToggle(steps, targets, "readonly", written);
+    expect(bulkBadgeOn(steps, targets, "readonly", written, noTechnical)).toBe(false);
+    applyBulkToggle(steps, targets, "readonly", written, noTechnical);
     expect("readonly" in steps[0]!.view!.fields![0]!).toBe(false);
+  });
+
+  it("treats a technical field's cell as gated for required/readonly even when nothing else writes it", () => {
+    const steps: DraftStep[] = [ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor" })] } })];
+    const targets = [{ stepIndex: 0, fieldId: "field_vendor" }];
+    const technical = new Set(["field_vendor"]);
+    expect(bulkBadgeOn(steps, targets, "required", none, technical)).toBe(false);
+    applyBulkToggle(steps, targets, "required", none, technical);
+    expect("required" in steps[0]!.view!.fields![0]!).toBe(false);
+    expect(bulkBadgeOn(steps, targets, "readonly", none, technical)).toBe(false);
+    applyBulkToggle(steps, targets, "readonly", none, technical);
+    expect("readonly" in steps[0]!.view!.fields![0]!).toBe(false);
+  });
+
+  it("still offers the visible badge for a technical field's row", () => {
+    const steps: DraftStep[] = [ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor" })] } })];
+    const targets = [{ stepIndex: 0, fieldId: "field_vendor" }];
+    const technical = new Set(["field_vendor"]);
+    expect(eligibleTargetEntries(steps, targets, "visible", none, technical)).toHaveLength(1);
+    expect(eligibleTargetEntries(steps, targets, "required", none, technical)).toHaveLength(0);
+    expect(eligibleTargetEntries(steps, targets, "readonly", none, technical)).toHaveLength(0);
   });
 });
 

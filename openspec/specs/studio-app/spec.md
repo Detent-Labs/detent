@@ -574,13 +574,16 @@ indent once. A field nested deeper SHALL take its own top-level rail
 entry rather than a deeper indent. This is a rail-rendering rule only:
 the draft's own field tree SHALL keep whatever depth it declares.
 
-The Fields rail entry SHALL name a field by its resolved label, with
-the key on a secondary mono line. It SHALL carry the field's friendly
-type beside the issue mark. The rail SHALL keep the fallback name it
-shows today, triggered by an EMPTY RESOLVED LABEL rather than an empty
-key — the label is the row's primary text now, so a field carrying a
-key but no label needs the fallback exactly as an empty-key field did
-before.
+The Fields rail entry SHALL name a field by its resolved label alone, on
+one line. The field's friendly type and the issue mark SHALL sit beside
+it. The row SHALL NOT print the field's key. The key stays in the Field
+tab once an author selects that field. The engine's own exact-match
+value already lives there.
+
+The rail SHALL keep the fallback name it shows today. It SHALL trigger
+on an EMPTY RESOLVED LABEL rather than an empty key. The label is the
+row's primary text now. A field carrying a key but no label needs the
+fallback exactly as an empty-key field did before.
 
 #### Scenario: Leaving the screen keeps every change
 
@@ -711,6 +714,14 @@ before.
 - **THEN** the screen's Fields view shows the missing-translation
   warning next to that field's label input
 
+#### Scenario: The Fields rail row shows no key
+
+- **WHEN** the developer opens the Fields view on a draft whose fields
+  each carry a `key`
+- **THEN** every rail row shows the resolved label, the friendly type
+  and any issue mark
+- **AND** no row prints a `key`
+
 ### Requirement: The Fields and Data sources views take the area's field rule
 
 Both views SHALL render their editors under the design language's field
@@ -732,12 +743,71 @@ their own. Nesting a tab set inside a tab set would let an issue on a
 child hide behind a tab. That is exactly what a field's own
 unconsolidated checks did before this change.
 
-The Field tab SHALL hold the key, the label, the description, the
-type picker and the translation status. It SHALL also hold a group
-field's children, the developer view, the preview and the usage list.
-The Values tab SHALL hold the options, the data source and the column
-mapping. The Rules tab SHALL hold the condition and the field's
-validation rules.
+The Field tab SHALL show the key, the label, the description and the
+type picker without a click. It SHALL also hold the Technical control,
+always visible outside either disclosure, directly below the type
+picker.
+
+Translation status SHALL show as a badge beside the label input. The
+badge SHALL name the current locale's missing count. The field SHALL
+carry no separate translation-status list. Adding a language SHALL
+stay draft-scoped in the content-locale switcher. The preview ("How
+it will look") and the usage list ("Used in") SHALL each sit inside a
+collapsed `<details>` disclosure. Both SHALL start closed.
+
+A group field's children SHALL stay outside any disclosure, inside the
+Field tab's always-visible content. The developer view SHALL keep its
+own existing, separate `<details>` disclosure, untouched by this
+change. Remove field SHALL sit below a rule at the tab's end. It SHALL
+read as the tab's least frequent action, not one more item in the stack
+above it.
+
+The Values tab SHALL divide into zones, each under its own heading. A
+rule SHALL separate each zone from its neighbour. "Where values come
+from" (the data source and the options) and "Default value" SHALL
+always show.
+
+"Column mapping" SHALL show as a third zone only when the field's data
+source is mappable, per the existing `showsColumnMapping` rule. It is
+not a fourth control stacked beside the other two. Its absence draws
+no rule of its own.
+
+The Rules tab SHALL divide into two zones under the same rule. The
+zones are "Only ask this when" (the condition) and "Validation" (the
+field's validation rules).
+
+The Default value zone SHALL offer a literal input matching the
+field's base type. For a `select` field that input SHALL be a
+`<select>` bound to the field's own static `options`. For a
+`multiselect` field it SHALL be the multi-value equivalent.
+
+Either control SHALL offer no option when the field is
+`dataSource`-bound, since the draft carries no resolved rows for one.
+That is the same carve-out named below for the preview. The CEL toggle
+SHALL still work there.
+
+For a `reference` or `file` field the whole Default value zone SHALL
+show disabled. It SHALL state that the type accepts no default here.
+This mirrors "Only ask this when" 's own disabled state for a field no
+step view references.
+
+For a `group` field the whole Default value zone SHALL also show
+disabled. It SHALL state that a group's own default is never read. A
+group carries no slot of its own in the flat data payload. A literal
+or CEL default written there would silently never apply. That is the
+same issue this change exists to close for `FieldDef.default` in
+general.
+
+Every other type gets a link-styled toggle. It SHALL switch the zone
+to a raw CEL text input for an expression default. This mirrors the
+toggle affordance the Rules tab's condition row already uses. The zone
+SHALL NOT mount the guard-shaped condition-builder component. A
+default is a value, not a boolean. It needs no comparison-row builder.
+
+Writing through the literal input SHALL set the field's `default` key
+to that literal value. Writing through the CEL input SHALL set it to `{
+lang: "cel", src }`. Clearing either input SHALL remove the `default`
+key.
 
 All three tab panels SHALL stay mounted while a field stays selected.
 Switching a tab SHALL reveal and hide them, rather than mount them.
@@ -746,18 +816,19 @@ the same reason. The developer view holds a half-typed config in
 component state. Each builder holds an incomplete row the draft does
 not carry.
 
+A disclosure inside the Field tab SHALL keep its own open/closed state,
+independent of the active tab. Switching away from Field and back SHALL
+NOT reset an open disclosure to closed.
+
 The type picker SHALL list the ten base field types under friendly
 names, each with a short note. It SHALL write the raw `baseFieldType`
-value to the draft. It SHALL offer no type the contract does not
-carry, and SHALL keep the custom plugin envelope.
-
-Each field SHALL list its translation status: the base locale marked,
-every other used locale with its missing count. Adding a language
-SHALL stay draft-scoped in the content-locale switcher.
+value to the draft. It SHALL offer no type the contract does not carry.
+It SHALL keep the custom plugin envelope.
 
 "How it will look" SHALL preview the field through the shared form
-component, read-only. Every previewed entry's `readonly` SHALL read
-`true`, and the preview's container SHALL carry `inert`.
+component, read-only, inside its disclosure. Every previewed entry's
+`readonly` SHALL read `true`, and the preview's container SHALL carry
+`inert`.
 
 The preview runs over a synthesized single-field view. For a group
 field it synthesizes the group's own entry, plus one entry per
@@ -774,9 +845,10 @@ draft carries no resolved rows for one. The row stating so SHALL name
 that the field resolves at runtime. An author previews what a
 participant gets.
 
-"Used in" SHALL list every step whose view references the field, with
-the modes those references set. A "Show on the canvas" control on a
-row SHALL return to the canvas with that step preselected.
+"Used in" SHALL list, inside its disclosure, every step whose view
+references the field, with the modes those references set. A "Show on
+the canvas" control on a row SHALL return to the canvas with that step
+preselected.
 
 "Only ask this when" is a third condition-builder site, alongside the
 path guard and the view-override sites `studio-condition-builder`
@@ -818,6 +890,113 @@ condition.
 - **WHEN** the developer chooses "Choice" in the type picker
 - **THEN** the draft's field type reads `select`, and the definition
   serializes unchanged
+
+#### Scenario: The Field tab shows identity without a click
+
+- **WHEN** the developer opens the Fields view on any field
+- **THEN** the key, the label, the description and the type picker show
+  without opening any disclosure
+- **AND** the preview and the usage list each start closed
+
+#### Scenario: The Technical checkbox shows without opening either disclosure
+
+- **WHEN** the developer opens the Fields view on any non-group field
+- **THEN** the Technical checkbox shows below the type picker, with
+  neither the preview nor the usage list disclosure open
+
+#### Scenario: Translation status shows as a badge
+
+- **WHEN** the studio's `contentLocale` is `de`, and a field's label
+  carries a base-locale value but no `de` value
+- **THEN** a badge beside the label input names its missing count for
+  the active content locale
+- **AND** no separate translation-status list renders
+- **AND** the badge names no locale of its own. The content-locale
+  switcher already names `de` once, in the toolbar
+
+#### Scenario: A disclosure survives a tab switch
+
+- **WHEN** the developer opens the preview disclosure on the Field tab,
+  switches to the Rules tab, then switches back
+- **THEN** the preview disclosure is still open
+
+#### Scenario: Remove field sits below a rule
+
+- **WHEN** the developer opens the Fields view on any field
+- **THEN** Remove field is the tab's last control, below a rule that
+  separates it from every other control
+
+#### Scenario: The Values tab always shows its first two zones, ruled apart
+
+- **WHEN** the developer opens the Values tab on any field
+- **THEN** "Where values come from" and "Default value" each show
+  under their own heading, with a rule between them
+
+#### Scenario: The Values tab shows a third ruled zone only for a mappable field
+
+- **WHEN** the developer opens the Values tab on a field whose data
+  source is mappable
+- **THEN** "Column mapping" also shows, as a third zone ruled apart
+  from "Default value"
+
+#### Scenario: An unmappable field shows no Column mapping zone
+
+- **WHEN** the developer opens the Values tab on a field whose data
+  source is not mappable
+- **THEN** no "Column mapping" heading renders, and "Default value"
+  draws no rule below it for a zone that isn't there
+
+#### Scenario: The Rules tab shows two ruled zones
+
+- **WHEN** the developer opens the Rules tab on any field
+- **THEN** "Only ask this when" and "Validation" each show under their
+  own heading, with a rule between them
+
+#### Scenario: A literal default writes the field's raw value
+
+- **WHEN** the developer types `100` into a Number field's Default
+  value input, with the CEL toggle off
+- **THEN** the draft's field carries `default: 100`
+
+#### Scenario: A CEL default writes an expression
+
+- **WHEN** the developer switches the Default value zone to CEL and
+  types `data.subtotal * 1.1`
+- **THEN** the draft's field carries `default: { lang: "cel", src:
+  "data.subtotal * 1.1" }`
+
+#### Scenario: Clearing the default drops the key
+
+- **WHEN** the developer clears a field's Default value input, whether
+  literal or CEL
+- **THEN** the draft's field carries no `default` key
+
+#### Scenario: A literal default on a Choice field uses its own options
+
+- **WHEN** the developer chooses one of a `select` field's own
+  `options` in its Default value zone, with the CEL toggle off
+- **THEN** the draft's field carries `default` set to that option's
+  value
+
+#### Scenario: A dataSource-bound field's default offers no option list
+
+- **WHEN** the developer opens the Default value zone on a
+  `dataSource`-bound `select` field
+- **THEN** the literal control offers no option, and the CEL toggle
+  still lets the developer write an expression default
+
+#### Scenario: The Default value zone disables for a reference or file field
+
+- **WHEN** the developer opens the Values tab on a `reference` or a
+  `file` field
+- **THEN** the Default value zone shows disabled, and states that the
+  type accepts no default here
+
+#### Scenario: The Default value zone disables for a group field
+
+- **WHEN** the developer opens the Values tab on a `group` field
+- **THEN** the Default value zone shows disabled, and states that a
+  group's own default is never read
 
 #### Scenario: The preview shows one field, read-only
 
@@ -887,6 +1066,96 @@ condition.
   view references
 - **THEN** the row shows disabled and states that no step asks for
   the field yet
+
+### Requirement: The field catalog's Field tab offers a Technical control
+
+The field catalog's Field tab SHALL offer a Technical checkbox for the
+selected field. It SHALL offer one for each of a group's children in the
+same tab. Checking it SHALL write `technical: true`. Unchecking it SHALL delete
+the `technical` key. Every other view-flag control in the studio already
+follows that same convention for its own default value.
+
+A group's child holds a value of its own, and a structural source can
+write it. The compile rule and the rail's own finding both read the
+flattened catalog. A control on the top-level field alone would leave
+one gap. A nested field would state `technical` through the JSON view
+alone.
+
+Checking it SHALL also delete every `required` and `readonly` key that
+any step's `view.fields[]` entry carries for that field. That deletion
+SHALL happen in the same draft mutation. The definition contract rejects
+those keys on a technical field's entry.
+
+Every builder control that could clear one also goes away as the
+developer checks the box. The strip omits them, the matrix cell disables
+them, the row offers no bulk badge. Without the clearing pass, a stale
+key would block the publish. The JSON view would be the only route back
+to it. The pass SHALL walk every step, not only the steps the field
+matrix currently draws.
+
+Unchecking SHALL write no `required` or `readonly` key back. The pass
+records no prior state, so an uncheck cannot restore an authored
+`required: true` or `readonly: true` the check deleted. Restoring a
+default-valued key instead would move `definitionHash` under a change
+that alters no behaviour. Restoring an authored one is not possible.
+
+Checking Technical SHALL need a confirmation before the clearing
+pass runs. The confirmation SHALL name the count of `required` and
+`readonly` keys the pass will delete. Declining it SHALL leave the
+draft as it stands, with no `technical` key written. Checking
+Technical on a field carrying no such key SHALL run no confirmation.
+
+A field of `type: "group"` SHALL disable the control, at any nesting
+depth. The definition contract rejects `technical: true` on a group
+field. Offering the control there would only invite a rejected publish.
+
+#### Scenario: Checking Technical writes the key
+
+- **WHEN** the developer checks Technical on a non-group field in the
+  field catalog
+- **THEN** that field's `technical` key becomes `true`
+
+#### Scenario: Checking Technical clears the field's stale flag keys
+
+- **WHEN** one step's view entry for a field carries `required: true`
+- **AND** another step's entry for it carries `readonly: false`
+- **AND** the developer checks Technical on that field
+- **THEN** neither entry carries a `required` or a `readonly` key
+- **AND** the draft publishes
+
+#### Scenario: Unchecking Technical deletes the key
+
+- **WHEN** the developer unchecks Technical on a field already carrying
+  `technical: true`
+- **THEN** that field carries no `technical` key
+- **AND** no view entry regains a `required` or `readonly` key
+
+#### Scenario: A group's child offers the control
+
+- **WHEN** the field catalog's Field tab draws the recursive field row
+  for a field nested inside the selected `type: "group"` field
+- **THEN** that row offers the Technical checkbox
+
+#### Scenario: A group field disables the Technical control
+
+- **WHEN** the developer selects a field of `type: "group"` in the field
+  catalog
+- **THEN** the field catalog disables the Technical checkbox
+
+#### Scenario: Checking Technical confirms the keys it will delete
+
+- **WHEN** the developer checks Technical on a field whose view entries
+  carry three `required` or `readonly` keys across the draft's steps
+- **THEN** the field catalog asks for a confirmation naming that count
+  of keys
+- **AND** declining it leaves every one of those keys in place, and
+  writes no `technical` key
+
+#### Scenario: A field with no stale key confirms nothing
+
+- **WHEN** the developer checks Technical on a field no view entry
+  carries a `required` or `readonly` key for
+- **THEN** the field catalog asks for no confirmation
 
 ### Requirement: The field matrix lists every catalog field against every workflow step
 
@@ -987,6 +1256,13 @@ Where a cell already carries `required: true` and `readonly: true`
 before either gate engages, neither checkbox SHALL disable. The
 developer keeps a path to uncheck either one.
 
+Where a live cell's field declares `technical: true`, that cell's
+`required` and `readonly` checkboxes SHALL disable, whatever the two
+keys already hold. This case overrides the both-flags escape above.
+The definition contract rejects either key on a technical field's view
+entry. No path to set one may stay open. The field catalog's Technical
+checkbox clears any key already there.
+
 Where a flag already carries a CEL expression, its checkbox SHALL give
 way entirely to the CEL stamp. That stamp sits in the same horizontal
 row as the cell's other controls. The matrix SHALL offer no control
@@ -1080,6 +1356,12 @@ possible on the field catalog's Rules tab condition row.
 - **THEN** neither the `required` nor the `readonly` checkbox disables
 - **AND** the developer can uncheck either one
 
+#### Scenario: A technical field's cell disables required and readonly
+
+- **WHEN** a live cell's field declares `technical: true`
+- **THEN** that cell's `required` and `readonly` checkboxes disable
+- **AND** its `visible` checkbox stays enabled
+
 ### Requirement: Column headers name the step and flag steps with no view
 
 Each column header SHALL show the step's `key` alongside its resolved
@@ -1107,6 +1389,25 @@ Each row header SHALL show the field's `key` alongside its `type`.
 - **WHEN** the developer opens the field matrix
 - **THEN** every row header shows that field's `key` and its `type`
 
+### Requirement: The field matrix marks a technical field's row header
+
+Each row header in the field matrix SHALL carry a marker when its field
+declares `technical: true`. The marker stays separate from a cell's own
+`visible`, `required`, `readonly` and flagged-cell markers. It names a
+fact about the field, not about any one cell.
+
+#### Scenario: A technical field's row carries the marker
+
+- **WHEN** the field matrix draws a row for a field declaring
+  `technical: true`
+- **THEN** that row header carries the technical-field marker
+
+#### Scenario: A non-technical field's row carries no marker
+
+- **WHEN** the field matrix draws a row for a field declaring no
+  `technical` key
+- **THEN** that row header carries no technical-field marker
+
 ### Requirement: Column and row headers offer bulk flag toggles on the panels screen
 
 This requirement covers the panels screen's field matrix only. The
@@ -1125,11 +1426,28 @@ resolves to `false`, or the field's other flag among
 `required`/`readonly` already resolves to `true`. The second case
 applies only while nothing else in the draft writes that field.
 
+Every `required` and `readonly` bulk badge SHALL treat a technical
+field's cell as gated, unconditionally. This holds on a column header
+and on a row header alike. This matches a cell that already carries
+the flag's opposite. The definition contract rejects either key on a
+technical field's view entry. A bulk badge SHALL NOT write one there,
+even where the column's other, non-technical rows are eligible.
+
 Where every eligible cell already carries the flag's non-default
 value, the badge SHALL turn that flag off across those cells. It
 turns the flag on otherwise.
 
 A column or row with no live cell SHALL carry no bulk toggle badge.
+
+The matrix SHALL NOT show a single badge whose own eligible cell set is
+empty. Gating a cell only stops the write. It leaves the button in
+place. A button that answers no click reads as a broken control.
+
+This rule widens the live-cell rule above, from the whole badge group to
+one badge. It covers a technical field's row with no second exclusion
+mechanism. `visible` keeps a non-empty eligible set there. That badge
+stays, and the other two go. The rule also removes a badge from a row
+whose cells the studio gates for any other reason.
 
 #### Scenario: A column's bulk badge sets every eligible cell in that step
 
@@ -1165,6 +1483,28 @@ A column or row with no live cell SHALL carry no bulk toggle badge.
 - **AND** a targeted cell already carries `required: true`, on a field
   nothing else in the draft writes
 - **THEN** the badge does not change that cell's `readonly` value
+
+#### Scenario: A technical field's row never receives a bulk required or readonly toggle
+
+- **WHEN** the developer selects a column's `required` or `readonly`
+  badge for a step where a technical field's cell is otherwise live
+- **THEN** the badge does not change that cell's `required` or
+  `readonly` value
+
+#### Scenario: A technical field's row offers no required or readonly bulk badge of its own
+
+- **WHEN** the field matrix draws the row header for a technical field
+  with at least one live cell
+- **THEN** that row header offers no `required` or `readonly` toggle
+  badge
+- **AND** it still offers the `visible` toggle badge
+
+#### Scenario: A row already gated on every cell offers no bulk badge either
+
+- **WHEN** every live cell for one field already carries `required:
+  true`, on a field nothing else in the draft writes
+- **AND** no cell's field declares `technical: true`
+- **THEN** that row header offers no `required` toggle badge
 
 ### Requirement: The panels screen's field matrix toolbar filters inert columns and reports coverage
 
@@ -1211,13 +1551,14 @@ This requirement covers the panels screen's field matrix only. See
 "The canvas dock's Field matrix tab carries no toolbar or bulk
 badges" below.
 
-The toolbar SHALL carry a legend. The legend SHALL explain five marks:
+The toolbar SHALL carry a legend. The legend SHALL explain six marks:
 
 - a bulk badge sets the whole column or row it sits on
 - a cell with no key written reads the engine's own default
 - what the CEL stamp marks
 - what a blank cell's dash means
 - what the flagged-cell marker means
+- what the technical-field row-header marker means
 
 #### Scenario: The legend is visible without further interaction
 
@@ -1366,11 +1707,17 @@ This is the matrix's analogue of two other counts. The Fields view
 counts catalog rows. The Contract view counts outcomes.
 
 The field matrix's issue count SHALL equal the number of open findings
-`checkViewFlags` reports over the whole draft. Those are the
-`view`-sourced findings the `studio-checks-rail` capability's rail
-already groups under that name. The count SHALL NOT come from the step
-entity type. A `checkViewFlags` finding shares that entity type with
-every other per-step issue in the draft.
+carrying the `view` source over the whole draft. Those are the findings
+the `studio-checks-rail` capability's rail groups under that name.
+Since this change, that set holds one finding anchored on a field
+rather than a cell: an unwritten technical field. The count therefore
+over-reports by one per such field, with nothing to find in the grid.
+The field catalog's own badge, which counts by entity type, surfaces
+that finding correctly.
+
+The count SHALL NOT come from the step entity type. A per-step view
+finding shares that entity type with every other per-step issue in the
+draft.
 
 #### Scenario: The entity count matches the live-cell total
 
@@ -1384,6 +1731,12 @@ every other per-step issue in the draft.
   unrelated issues on the same steps, from other sources
 - **THEN** the rail's Field matrix entry shows an issue count of 1, not
   a count including the unrelated issues
+
+#### Scenario: An unwritten technical field raises the matrix issue count
+
+- **WHEN** the draft carries one unwritten-technical-field finding and
+  no other `view`-source finding
+- **THEN** the rail's Field matrix entry shows an issue count of 1
 
 ### Requirement: The process header declares the process's base locale
 

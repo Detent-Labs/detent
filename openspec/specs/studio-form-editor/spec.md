@@ -167,6 +167,12 @@ expression. Choosing the expression option SHALL reveal an input for
 that field's expression. The strip SHALL also offer `group` and
 `span`.
 
+Where the selected field's `FieldDef` declares `technical: true`, the
+strip SHALL NOT offer the `required` or `readonly` controls at all. The
+definition contract rejects either key on that field's view entry. A
+control the author could set there would only invite a rejected publish.
+`visible`, `group` and `span` stay offered unchanged.
+
 Each control SHALL start at the value the engine resolves for an absent
 key. That value is true for `visible`. It is false for `required` and for
 `readonly`. `resolveFlag` (`src/runtime/api.ts`) sets those three. The
@@ -285,6 +291,13 @@ disable. The developer keeps a path to uncheck either one.
   the draft writes
 - **THEN** neither the `required` nor the `readonly` control disables
 - **AND** the developer can uncheck either one
+
+#### Scenario: A technical field's strip omits required and readonly
+
+- **WHEN** the developer selects a placed field whose `FieldDef` declares
+  `technical: true`
+- **THEN** the strip shows `visible`, `group` and `span`
+- **AND** the strip shows no `required` or `readonly` control
 
 ### Requirement: A field's position is reachable by keyboard, not drag alone
 

@@ -85,7 +85,14 @@ export function issueCountForEntityType(issues: readonly EditorIssue[], entityTy
 /** The field matrix's own issue count, filtered by `source` rather than
  * `entityType`: `checkViewFlags` issues carry `entityType: "step"`, the same
  * type every other per-step issue (a path's CEL issue, an action's registry
- * issue) already carries, so `issueCountForEntityType` cannot isolate them. */
+ * issue) already carries, so `issueCountForEntityType` cannot isolate them.
+ *
+ * Since technical-field-marker, the `view` source also holds
+ * `checkUnwrittenTechnicalFields`' finding, which anchors on the field
+ * (`entityType: "field"`) rather than a step. This count therefore
+ * over-reports by one per such field, with nothing in the grid to point at —
+ * an accepted trade-off (design.md Risks). The field catalog's own
+ * `issueCountForEntityType` badge surfaces that finding correctly. */
 export function issueCountForSource(issues: readonly EditorIssue[], source: IssueSource): number {
   return issues.filter((i) => i.source === source).length;
 }

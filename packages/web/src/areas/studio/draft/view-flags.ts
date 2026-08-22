@@ -78,6 +78,13 @@ function writtenByOther(entry: DraftViewField, written: Map<string, number>): bo
 
 /** Which controls the entry's current state disables right now.
  *
+ * A technical field's entry gates both `required` and `readonly`
+ * unconditionally: the definition contract rejects either key on a
+ * technical field's view entry, so no builder control may leave a path to
+ * set one (technical-field-marker design.md). This overrides the
+ * both-flags escape below — a technical field stays gated even where its
+ * entry already carries both flags.
+ *
  * A literal `visible: false` disables both other flags, since the engine
  * never resolves them for a hidden field. A `visible` holding a CEL
  * expression gates nothing: nobody can read its value without an instance.
@@ -89,7 +96,8 @@ function writtenByOther(entry: DraftViewField, written: Map<string, number>): bo
  * editable, so an author can always uncheck out of that state (design.md
  * decision 1, `gate-required-readonly-conflict`).
  */
-export function gatedKeys(entry: DraftViewField, written: Map<string, number>): FlagKey[] {
+export function gatedKeys(entry: DraftViewField, written: Map<string, number>, technicalFieldIds: Set<string>): FlagKey[] {
+  if (entry.ref !== undefined && technicalFieldIds.has(entry.ref)) return ["required", "readonly"];
   if (entry.visible === false) return ["required", "readonly"];
 
   const gated: FlagKey[] = [];
@@ -120,6 +128,26 @@ function readerLabel(field: DraftField | undefined, ref: string): string {
  * about what "already written" means (design.md decision 5, `field-matrix-
  * toolbar-and-inline-editing`; decision 2, `gate-required-readonly-
  * conflict`).
+ *
+ * `checkUnwrittenTechnicalFields` (technical-field-marker) reads this count
+ * for a fourth reason, and this doc comment's headline sentence — "every
+ * field id some source in the body supplies a value for" — stops holding for
+ * the case that finding exists to catch. A technical field's view entry can
+ * carry no `readonly` key (the compile pass forbids it), so every step that
+ * places the field visibly bumps this count by one, same as any other
+ * editable entry — while supplying the field no value at all, since a
+ * technical field always resolves `readonly: true` regardless of the view.
+ * One entry bump is therefore not proof of a writer for a technical field,
+ * the way it is for an ordinary one. `checkUnwrittenTechnicalFields` reads
+ * finiteness rather than presence for exactly this reason: a finite count
+ * means no STRUCTURAL source writes the field, whatever a view entry's own
+ * bump contributes. `writtenFieldIds` collapses finite-vs-infinite to
+ * presence and so cannot serve it — every placed technical field would read
+ * as written. The other two consumers stay unaffected: `isCellFlagged`
+ * needs `required && readonly` together, which a technical entry can never
+ * carry (its `readonly` always resolves true, forcing `required` false), and
+ * `gatedKeys` gates a technical entry's `required`/`readonly` before it ever
+ * reads this map.
  */
 export function writtenFieldCounts(body: Draft): Map<string, number> {
   const steps = body.workflow?.steps ?? [];
@@ -214,6 +242,43 @@ export function checkViewFlags(body: Draft): EditorIssue[] {
         });
       }
     }
+  }
+
+  return issues;
+}
+
+/**
+ * The inverse of the publish-blocking rule the compile pass enforces
+ * (`compile.ts::checkTechnicalFields`): a field declaring `technical: true`
+ * that no structural source writes. Reports under the `"view"` source, like
+ * `checkViewFlags`, but anchors on the FIELD itself (`entityType: "field"`)
+ * rather than a step — `technical` is a catalog-level declaration, not a
+ * per-step one, and the two `checkViewFlags` findings above both anchor on a
+ * step for that reason. This finding is never blocking; the compile pass's
+ * own rejection of a technical field's wired-editable view entry is the
+ * publish-blocking half of this pair (design.md).
+ *
+ * Reads `writtenFieldCounts`, not `writtenFieldIds`: see that function's own
+ * doc comment for why presence cannot serve this rule. `FieldDef.default`
+ * exempts nothing — nothing in the engine applies a `default` to
+ * `instance.data`, so a technical field whose only "writer" is a `default`
+ * still never holds a value, which is exactly the case this finding exists
+ * to report (design.md Risks).
+ */
+export function checkUnwrittenTechnicalFields(body: Draft): EditorIssue[] {
+  const issues: EditorIssue[] = [];
+  const fieldsById = new Map(flattenDraftFields(body.fields).map((f) => [f.id, f]));
+  const counts = writtenFieldCounts(body);
+
+  for (const field of fieldsById.values()) {
+    if (field.technical !== true || field.id === undefined) continue;
+    if (!Number.isFinite(counts.get(field.id) ?? 0)) continue; // Infinity => a structural writer
+    issues.push({
+      entityType: "field",
+      entityId: field.id,
+      source: "view",
+      message: `Field "${readerLabel(field, field.id)}" is technical, and no structural source writes it: it can never hold a value.`,
+    });
   }
 
   return issues;

@@ -554,3 +554,18 @@ test.skipIf(!DB)("listVersions of an unpublished process is an empty list, not a
   const versions = await listVersions("proc_never_published" as ProcessId);
   expect(versions).toEqual([]);
 });
+
+// technical-field-marker: definitionHash reproducibility for the new
+// FieldDef.technical key. Pure over compileProcessBody/definitionHash, no DB.
+test("a body declaring no field's technical hashes as before this change", () => {
+  const body = waitBody("sayYes");
+  expect(definitionHash(compileProcessBody(body))).toBe(definitionHash(compileProcessBody(structuredClone(body))));
+});
+
+test("a field declaring technical: false hashes differently from the same body with the key omitted", () => {
+  const withKey = waitBody("sayYes");
+  (withKey.fields[0] as unknown as { technical: boolean }).technical = false;
+  const withoutKey = waitBody("sayYes");
+
+  expect(definitionHash(compileProcessBody(withKey))).not.toBe(definitionHash(compileProcessBody(withoutKey)));
+});

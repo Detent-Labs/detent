@@ -1,5 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { applyVisibleOverride, fieldUsage, fieldVisibleOverrides } from "../src/areas/studio/draft/field-usage.js";
+import {
+  applyVisibleOverride,
+  applyTechnicalMarker,
+  countTechnicalClearKeys,
+  fieldUsage,
+  fieldVisibleOverrides,
+  needsTechnicalToggleConfirm,
+} from "../src/areas/studio/draft/field-usage.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
 /** A draft with two steps referencing `field_vendor`, one referencing
@@ -136,5 +143,72 @@ describe("applyVisibleOverride", () => {
     applyVisibleOverride(d, "field_vendor", undefined);
     expect("visible" in d.workflow!.steps![0]!.view!.fields![0]!).toBe(false);
     expect("visible" in d.workflow!.steps![1]!.view!.fields![0]!).toBe(false);
+  });
+});
+
+describe("countTechnicalClearKeys", () => {
+  it("counts required and readonly keys across every step referencing the field", () => {
+    // field_vendor: step_a carries required, step_b carries readonly -> 2.
+    expect(countTechnicalClearKeys(draft(), "field_vendor")).toBe(2);
+  });
+
+  it("counts zero for a field no view entry carries required or readonly for", () => {
+    expect(countTechnicalClearKeys(draft(), "field_qty")).toBe(0);
+  });
+
+  it("counts zero for a field no step references", () => {
+    expect(countTechnicalClearKeys(draft(), "field_group")).toBe(0);
+  });
+});
+
+describe("applyTechnicalMarker", () => {
+  it("checking Technical writes the key on the top-level field found by id", () => {
+    const d = draft();
+    applyTechnicalMarker(d, "field_vendor", true);
+    expect((d.fields![0] as Record<string, unknown>).technical).toBe(true);
+  });
+
+  it("checking Technical writes the key on a group's nested child", () => {
+    const d = draft();
+    applyTechnicalMarker(d, "field_qty", true);
+    const group = d.fields![1] as unknown as { fields: Record<string, unknown>[] };
+    expect(group.fields[0]!.technical).toBe(true);
+  });
+
+  it("checking Technical clears every required/readonly key across every step", () => {
+    const d = draft();
+    applyTechnicalMarker(d, "field_vendor", true);
+    expect("required" in d.workflow!.steps![0]!.view!.fields![0]!).toBe(false);
+    expect("readonly" in d.workflow!.steps![1]!.view!.fields![0]!).toBe(false);
+  });
+
+  it("unchecking Technical deletes the key and writes back no required or readonly key", () => {
+    const d = draft();
+    applyTechnicalMarker(d, "field_vendor", true);
+    applyTechnicalMarker(d, "field_vendor", false);
+    expect("technical" in (d.fields![0] as Record<string, unknown>)).toBe(false);
+    expect("required" in d.workflow!.steps![0]!.view!.fields![0]!).toBe(false);
+    expect("readonly" in d.workflow!.steps![1]!.view!.fields![0]!).toBe(false);
+  });
+
+  it("checking Technical on a field with no stale key leaves nothing to clear, and no-ops safely on an unmatched id", () => {
+    const d = draft();
+    applyTechnicalMarker(d, "field_qty", true);
+    expect(countTechnicalClearKeys(d, "field_qty")).toBe(0);
+    expect(() => applyTechnicalMarker(d, "field_does_not_exist", true)).not.toThrow();
+  });
+});
+
+describe("needsTechnicalToggleConfirm", () => {
+  it("needs confirmation when checking a field with stale required/readonly keys (task 3.7)", () => {
+    expect(needsTechnicalToggleConfirm(true, countTechnicalClearKeys(draft(), "field_vendor"))).toBe(true);
+  });
+
+  it("needs no confirmation when checking a field with nothing to clear (task 3.8)", () => {
+    expect(needsTechnicalToggleConfirm(true, countTechnicalClearKeys(draft(), "field_qty"))).toBe(false);
+  });
+
+  it("needs no confirmation when unchecking, whatever the count", () => {
+    expect(needsTechnicalToggleConfirm(false, countTechnicalClearKeys(draft(), "field_vendor"))).toBe(false);
   });
 });

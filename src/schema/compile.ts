@@ -722,17 +722,70 @@ function checkLengthBounds(body: ProcessBody): CompileIssue[] {
   return issues;
 }
 
+// ============================================================
+// 7. Technical field marker (task 1.2): reject `technical: true` on a group
+// field, and reject a view entry naming a technical field that declares
+// `required` or `readonly` at all. Both rules test `technical === true`
+// alone, never truthiness. Neither nests inside checkFieldTree or
+// checkViewFieldPatterns: a technical group field with no view entry must
+// still reach the group check. Operates on duck-typed input, like
+// checkReservedActionPrefix and checkUnknownKeys: it runs before any Zod
+// parse of the authored body, on both compile branches.
+// ============================================================
+
+function checkTechnicalFields(body: ProcessBody): CompileIssue[] {
+  const issues: CompileIssue[] = [];
+  const technicalIds = new Set<string>();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  walkFieldsIndexed(body.fields as any, "fields", (f) => {
+    if (f?.technical !== true) return;
+    if (typeof f?.id !== "string") return;
+    technicalIds.add(f.id);
+    if (f.type === "group") {
+      issues.push({
+        loc: `fields.${f.id}.technical`,
+        value: String(f.type),
+        message: "a group field must not declare technical: true",
+      });
+    }
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (body.workflow?.steps ?? []).forEach((s: any, si: number) => {
+    (s?.view?.fields ?? []).forEach((vf: any, vi: number) => {
+      if (typeof vf?.ref !== "string" || !technicalIds.has(vf.ref)) return;
+      if ("required" in vf) {
+        issues.push({
+          loc: `steps[${si}].view.fields[${vi}].required`,
+          value: JSON.stringify(vf.required),
+          message: "a technical field's view entry must not declare required",
+        });
+      }
+      if ("readonly" in vf) {
+        issues.push({
+          loc: `steps[${si}].view.fields[${vi}].readonly`,
+          value: JSON.stringify(vf.readonly),
+          message: "a technical field's view entry must not declare readonly",
+        });
+      }
+    });
+  });
+
+  return issues;
+}
+
 /**
  * Every structural write-path check, run together and reported as one batch
  * of located issues (task 1.1/1.2). Called from
  * `compileProcessBody` on the raw body, before either compile branch, so
  * neither the authored-input branch nor the already-compiled early return can
- * skip it. `checkReservedActionPrefix` and `checkUnknownKeys` operate on the
- * body duck-typed (it has not yet been Zod-parsed at this point); the
- * remaining four operate on the `ProcessBody`-typed parameter, which is a
- * lie at this exact call site for the same reason — the type is honest again
- * only after `authoredProcessBody.parse`/the early return's `safeParse`
- * succeed.
+ * skip it. `checkReservedActionPrefix`, `checkUnknownKeys` and
+ * `checkTechnicalFields` operate on the body duck-typed (it has not yet been
+ * Zod-parsed at this point); the remaining four operate on the
+ * `ProcessBody`-typed parameter, which is a lie at this exact call site for
+ * the same reason — the type is honest again only after
+ * `authoredProcessBody.parse`/the early return's `safeParse` succeed.
  */
 function structuralIssues(body: ProcessBody): CompileIssue[] {
   return [
@@ -742,6 +795,7 @@ function structuralIssues(body: ProcessBody): CompileIssue[] {
     ...checkViewFieldPatterns(body),
     ...checkIdResolution(body),
     ...checkLengthBounds(body),
+    ...checkTechnicalFields(body),
   ];
 }
 

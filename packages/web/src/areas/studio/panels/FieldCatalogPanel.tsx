@@ -2,7 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import type { BaseFieldType, DataSourceDef, Expression, FieldDef, FieldOption } from "workflow-engine/schema";
 import { FieldForm } from "form-ui";
 import type { DraftOf } from "../draft/types";
-import { useDraft } from "../draft/store";
+import { useDraft, type Mutate } from "../draft/store";
 import { t, type CatalogKey } from "../catalog.js";
 import { mintId } from "../draft/ids";
 import { removeAt, updateAt } from "../draft/list-ops";
@@ -14,9 +14,18 @@ import type { StudioDataList } from "../api/types.js";
 import { IssueList } from "./shared/IssueList";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { FieldValidationEditor } from "./shared/FieldValidationEditor";
+import { DefaultValueEditor } from "./shared/DefaultValueEditor";
 import { fieldLocaleGaps, missingTranslationWarning, seedLocalizedText } from "../draft/localized-text";
 import { FIELD_TYPE_LABELS } from "../draft/field-type-labels";
-import { applyVisibleOverride, fieldUsage, fieldVisibleOverrides, type FieldUsageRow } from "../draft/field-usage";
+import {
+  applyTechnicalMarker,
+  applyVisibleOverride,
+  countTechnicalClearKeys,
+  fieldUsage,
+  fieldVisibleOverrides,
+  type FieldUsageRow,
+  needsTechnicalToggleConfirm,
+} from "../draft/field-usage";
 import { previewViewFields } from "../draft/field-preview";
 import { ConditionInput } from "./shared/ConditionInput";
 
@@ -38,6 +47,10 @@ interface SubFieldRowProps {
   dataSources: DraftDataSource[];
   /** `undefined` until the fetch resolves, and after a failed one. */
   lists: StudioDataList[] | undefined;
+  /** Threaded from the caller's own `useDraft()`, for the Technical checkbox's
+   * `mutate`-recipe write — `onChange`'s `Object.assign` patch cannot delete a
+   * key (`view-flags.ts:34-41`). */
+  mutate: Mutate;
   onChange: (patch: Partial<DraftField>) => void;
   onRemove: () => void;
 }
@@ -49,12 +62,21 @@ interface SubFieldRowProps {
  * (below) is recursive-into-flat, not recursive-into-tabbed, so nesting a
  * child inside a tabbed parent never nests a `tablist` inside a `tablist`.
  */
-function SubFieldRow({ field, dataSources, lists, onChange, onRemove }: SubFieldRowProps) {
+function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: SubFieldRowProps) {
   const { draft, contentLocale } = useDraft();
   const custom = isCustomType(field.type);
   const typeSelectValue = typeof field.type === "object" && field.type !== null ? "__custom__" : (field.type ?? "string");
   const hasOptions = (field.options?.length ?? 0) > 0;
   const hasDataSource = field.dataSource !== undefined;
+  const isGroup = field.type === "group";
+  const fieldId = field.id;
+  const technicalChecked = field.technical === true;
+  const toggleTechnical = (next: boolean) => {
+    if (fieldId === undefined) return;
+    const clearCount = countTechnicalClearKeys(draft, fieldId);
+    if (needsTechnicalToggleConfirm(next, clearCount) && !confirm(t("fieldCatalog.technicalClearConfirm").replace("{count}", String(clearCount)))) return;
+    mutate((d) => applyTechnicalMarker(d, fieldId, next));
+  };
 
   const setOptions = (options: DraftOption[]) => onChange({ options, dataSource: options.length > 0 ? undefined : field.dataSource });
 
@@ -152,6 +174,15 @@ function SubFieldRow({ field, dataSources, lists, onChange, onRemove }: SubField
           ))}
           <option value="__custom__">{t("fieldCatalog.customTypeOption")}</option>
         </select>
+      </label>
+      <label className="studio-field-technical">
+        {t("fieldCatalog.technicalLabel")}
+        <input
+          type="checkbox"
+          checked={technicalChecked}
+          disabled={isGroup}
+          onChange={(e) => toggleTechnical(e.target.checked)}
+        />
       </label>
 
       {custom && (
@@ -283,6 +314,7 @@ function SubFieldRow({ field, dataSources, lists, onChange, onRemove }: SubField
               field={sub}
               dataSources={dataSources}
               lists={lists}
+              mutate={mutate}
               onChange={(patch) => updateSubField(i, patch)}
               onRemove={() => removeSubField(i)}
             />
@@ -343,7 +375,7 @@ interface FieldEditorProps {
  * so one `tablist` exists per open editor, never one per nested field.
  */
 function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemove, onShowStep }: FieldEditorProps) {
-  const { draft, mutate, contentLocale, usedLocales } = useDraft();
+  const { draft, mutate, contentLocale } = useDraft();
   const [activeTab, setActiveTab] = useState<FieldTab>("field");
 
   // A rail click on a group's child (`focusFieldId !== field.id`) needs the
@@ -420,6 +452,15 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
     mutate((d) => applyVisibleOverride(d, fieldId, next));
   };
 
+  const isGroup = field.type === "group";
+  const technicalChecked = field.technical === true;
+  const toggleTechnical = (next: boolean) => {
+    if (fieldId === undefined) return;
+    const clearCount = countTechnicalClearKeys(draft, fieldId);
+    if (needsTechnicalToggleConfirm(next, clearCount) && !confirm(t("fieldCatalog.technicalClearConfirm").replace("{count}", String(clearCount)))) return;
+    mutate((d) => applyTechnicalMarker(d, fieldId, next));
+  };
+
   return (
     <div className="field-row" id={field.id === undefined ? undefined : `field-row-${field.id}`}>
       <IssueList entityId={field.id} />
@@ -448,10 +489,23 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
             onChange={(e) => onChange({ key: e.target.value })}
           />
         </label>
-        <label>
-          label
-          <LocalizedTextInput value={field.label} onChange={(label) => onChange({ label })} />
-        </label>
+        <div className="field-label-row">
+          <label className="field-label-row-label">
+            label
+            <LocalizedTextInput value={field.label} onChange={(label) => onChange({ label })} />
+          </label>
+          {/* Replaces the shipped per-locale translation-status list
+              (design.md decision 1): names only the active contentLocale's
+              own gap, since the content-locale switcher now carries the
+              draft-wide per-locale count. */}
+          <span className="field-translation-badge">
+            {contentLocale === baseLocale
+              ? t("fieldCatalog.baseLocaleMark")
+              : fieldLocaleGaps(field, contentLocale, baseLocale) === 0
+                ? t("fieldCatalog.translationComplete")
+                : t("fieldCatalog.translationGap").replace("{count}", String(fieldLocaleGaps(field, contentLocale, baseLocale)))}
+          </span>
+        </div>
         {missingTranslationWarning(field.label, contentLocale, draft.baseLocale) && (
           <p className="studio-warning">{missingTranslationWarning(field.label, contentLocale, draft.baseLocale)}</p>
         )}
@@ -483,6 +537,15 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
           </select>
         </label>
         {typeof field.type === "string" && <p className="studio-note">{FIELD_TYPE_LABELS[field.type].note}</p>}
+        <label className="studio-field-technical">
+          {t("fieldCatalog.technicalLabel")}
+          <input
+            type="checkbox"
+            checked={technicalChecked}
+            disabled={isGroup}
+            onChange={(e) => toggleTechnical(e.target.checked)}
+          />
+        </label>
 
         {custom && (
           <details className="studio-devview">
@@ -495,29 +558,6 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
           </details>
         )}
 
-        <div className="field-translation-status">
-          <p className="field-translation-status-heading">{t("fieldCatalog.translationStatusHeading")}</p>
-          <ul>
-            {usedLocales.map((locale) => (
-              <li key={locale}>
-                <span className="studio-mono">{locale}</span>
-                {locale === baseLocale ? (
-                  <span>{t("fieldCatalog.baseLocaleMark")}</span>
-                ) : (
-                  (() => {
-                    const gaps = fieldLocaleGaps(field, locale, baseLocale);
-                    return (
-                      <span>
-                        {gaps === 0 ? t("fieldCatalog.translationComplete") : t("fieldCatalog.translationGap").replace("{count}", String(gaps))}
-                      </span>
-                    );
-                  })()
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-
         {field.type === "group" && (
           <fieldset>
             <legend>{t("fieldCatalog.groupChildrenHeading")}</legend>
@@ -527,6 +567,7 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
                 field={sub}
                 dataSources={dataSources}
                 lists={lists}
+                mutate={mutate}
                 onChange={(patch) => updateSubField(i, patch)}
                 onRemove={() => removeSubField(i)}
               />
@@ -538,8 +579,8 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
         )}
 
         {preview && (
-          <div className="field-preview">
-            <p className="field-preview-heading">{t("fieldCatalog.previewHeading")}</p>
+          <details className="field-preview">
+            <summary>{t("fieldCatalog.previewHeading")}</summary>
             {field.dataSource !== undefined && <p className="studio-note">{t("fieldCatalog.previewResolvesAtRuntime")}</p>}
             {/* Sample controls take no keyboard or pointer interaction — every
                 synthesized entry is already forced `readonly`, and `inert`
@@ -549,11 +590,11 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
             <div className="field-preview-body" inert>
               <FieldForm fields={preview.fields} values={preview.values} onChange={() => {}} locale={contentLocale} />
             </div>
-          </div>
+          </details>
         )}
 
-        <div className="field-usage">
-          <p className="field-usage-heading">{t("fieldCatalog.usedInHeading")}</p>
+        <details className="field-usage">
+          <summary>{t("fieldCatalog.usedInHeading")}</summary>
           {usage.length === 0 ? (
             <p className="studio-note">{t("fieldCatalog.usedInEmpty")}</p>
           ) : (
@@ -569,116 +610,125 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
               ))}
             </ul>
           )}
-        </div>
+        </details>
 
-        <button type="button" className="btn btn-secondary" onClick={onRemove}>
-          {t("fieldCatalog.removeField")}
-        </button>
+        <div className="field-tab-remove">
+          <button type="button" className="btn btn-ghost" onClick={onRemove}>
+            {t("fieldCatalog.removeField")}
+          </button>
+        </div>
       </div>
 
       <div hidden={activeTab !== "values"} className="field-tab-panel">
-        <fieldset>
-          <legend>{t("fieldCatalog.optionsLegend")}</legend>
-          <label>
-            dataSource
-            <select
-              value={field.dataSource ?? ""}
-              disabled={hasOptions}
-              onChange={(e) => onChange({ dataSource: e.target.value === "" ? undefined : (e.target.value as DraftField["dataSource"]) })}
-            >
-              <option value="">{t("fieldCatalog.noneOption")}</option>
-              {dataSources.map((ds) => (
-                <option key={ds.id} value={ds.id}>
-                  {ds.key ?? ds.id}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="options-editor">
-            {(field.options ?? []).map((opt, i) => {
-              const optionWarning = missingTranslationWarning(opt.label, contentLocale, draft.baseLocale);
-              return (
-                <Fragment key={i}>
-                  <div className="option-row">
-                    <input
-                      type="text"
-                      placeholder={t("fieldCatalog.optionValuePlaceholder")}
-                      disabled={hasDataSource}
-                      value={opt.value ?? ""}
-                      onChange={(e) => updateOption(i, { value: e.target.value })}
-                    />
-                    <LocalizedTextInput
-                      placeholder={t("fieldCatalog.optionLabelPlaceholder")}
-                      disabled={hasDataSource}
-                      value={opt.label}
-                      onChange={(label) => updateOption(i, { label })}
-                    />
-                    <button type="button" className="btn btn-secondary" onClick={() => removeOption(i)}>
-                      {t("fieldCatalog.removeOption")}
-                    </button>
-                  </div>
-                  {optionWarning && <p className="studio-warning">{optionWarning}</p>}
-                </Fragment>
-              );
-            })}
-            <button type="button" className="btn btn-secondary" onClick={addOption} disabled={hasDataSource}>
-              {t("fieldCatalog.addOption")}
-            </button>
-          </div>
-
-          {showsColumnMapping(field, dataSources) && (
-            <div className="studio-column-mapping">
-              <p className="studio-column-mapping-heading">{t("columnMapping.heading")}</p>
-              {columns.length === 0 ? (
-                <p className="studio-note">{t("columnMapping.noColumns")}</p>
-              ) : (
-                <>
-                  {mappingRows.map((row) => (
-                    <div className="studio-column-mapping-row" key={row.column}>
-                      <select
-                        aria-label={t("columnMapping.columnAria")}
-                        value={row.column}
-                        onChange={(e) => renameMapping(row.column, e.target.value)}
-                      >
-                        {row.stale && <option value={row.column}>{row.column}</option>}
-                        {columns.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                      <span aria-hidden="true">-&gt;</span>
-                      <select
-                        aria-label={t("columnMapping.targetAria")}
-                        value={row.target}
-                        onChange={(e) => setMapping(row.column, e.target.value)}
-                      >
-                        <option value="">{t("fieldCatalog.noneOption")}</option>
-                        {targets.map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.key === "" || f.key === undefined ? f.id : f.key}
-                          </option>
-                        ))}
-                      </select>
-                      <button type="button" className="btn btn-secondary" onClick={() => removeMapping(row.column)}>
-                        {t("columnMapping.removeRow")}
+        <div className="field-zone">
+          <h4 className="field-zone-heading">{t("fieldCatalog.whereValuesHeading")}</h4>
+          <fieldset>
+            <label>
+              dataSource
+              <select
+                value={field.dataSource ?? ""}
+                disabled={hasOptions}
+                onChange={(e) => onChange({ dataSource: e.target.value === "" ? undefined : (e.target.value as DraftField["dataSource"]) })}
+              >
+                <option value="">{t("fieldCatalog.noneOption")}</option>
+                {dataSources.map((ds) => (
+                  <option key={ds.id} value={ds.id}>
+                    {ds.key ?? ds.id}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="options-editor">
+              {(field.options ?? []).map((opt, i) => {
+                const optionWarning = missingTranslationWarning(opt.label, contentLocale, draft.baseLocale);
+                return (
+                  <Fragment key={i}>
+                    <div className="option-row">
+                      <input
+                        type="text"
+                        placeholder={t("fieldCatalog.optionValuePlaceholder")}
+                        disabled={hasDataSource}
+                        value={opt.value ?? ""}
+                        onChange={(e) => updateOption(i, { value: e.target.value })}
+                      />
+                      <LocalizedTextInput
+                        placeholder={t("fieldCatalog.optionLabelPlaceholder")}
+                        disabled={hasDataSource}
+                        value={opt.label}
+                        onChange={(label) => updateOption(i, { label })}
+                      />
+                      <button type="button" className="btn btn-secondary" onClick={() => removeOption(i)}>
+                        {t("fieldCatalog.removeOption")}
                       </button>
-                      {row.stale && <p className="studio-warning">{t("columnMapping.staleColumn")}</p>}
                     </div>
-                  ))}
-                  <button type="button" className="btn btn-secondary" onClick={addMapping} disabled={unmapped === undefined}>
-                    {t("columnMapping.addRow")}
-                  </button>
-                </>
-              )}
+                    {optionWarning && <p className="studio-warning">{optionWarning}</p>}
+                  </Fragment>
+                );
+              })}
+              <button type="button" className="btn btn-secondary" onClick={addOption} disabled={hasDataSource}>
+                {t("fieldCatalog.addOption")}
+              </button>
             </div>
-          )}
-        </fieldset>
+          </fieldset>
+        </div>
+
+        <div className="field-zone">
+          <h4 className="field-zone-heading">{t("defaultValue.heading")}</h4>
+          <DefaultValueEditor field={field} onChange={(next) => onChange({ default: next })} />
+        </div>
+
+        {showsColumnMapping(field, dataSources) && (
+          <div className="field-zone">
+            <h4 className="field-zone-heading">{t("columnMapping.heading")}</h4>
+            {columns.length === 0 ? (
+              <p className="studio-note">{t("columnMapping.noColumns")}</p>
+            ) : (
+              <>
+                {mappingRows.map((row) => (
+                  <div className="studio-column-mapping-row" key={row.column}>
+                    <select
+                      aria-label={t("columnMapping.columnAria")}
+                      value={row.column}
+                      onChange={(e) => renameMapping(row.column, e.target.value)}
+                    >
+                      {row.stale && <option value={row.column}>{row.column}</option>}
+                      {columns.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                    <span aria-hidden="true">-&gt;</span>
+                    <select
+                      aria-label={t("columnMapping.targetAria")}
+                      value={row.target}
+                      onChange={(e) => setMapping(row.column, e.target.value)}
+                    >
+                      <option value="">{t("fieldCatalog.noneOption")}</option>
+                      {targets.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.key === "" || f.key === undefined ? f.id : f.key}
+                        </option>
+                      ))}
+                    </select>
+                    <button type="button" className="btn btn-secondary" onClick={() => removeMapping(row.column)}>
+                      {t("columnMapping.removeRow")}
+                    </button>
+                    {row.stale && <p className="studio-warning">{t("columnMapping.staleColumn")}</p>}
+                  </div>
+                ))}
+                <button type="button" className="btn btn-secondary" onClick={addMapping} disabled={unmapped === undefined}>
+                  {t("columnMapping.addRow")}
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div hidden={activeTab !== "rules"} className="field-tab-panel">
-        <div className="field-condition">
-          <p className="field-condition-heading">{t("fieldCatalog.onlyAskWhenHeading")}</p>
+        <div className="field-zone">
+          <h4 className="field-zone-heading">{t("fieldCatalog.onlyAskWhenHeading")}</h4>
           {visibleState.kind === "none" ? (
             <p className="studio-note">{t("fieldCatalog.conditionNoSteps")}</p>
           ) : (
@@ -714,7 +764,10 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
           )}
         </div>
 
-        <FieldValidationEditor field={field} validation={field.validation} onChange={(validation) => onChange({ validation })} />
+        <div className="field-zone">
+          <h4 className="field-zone-heading">{t("fieldCatalog.validationHeading")}</h4>
+          <FieldValidationEditor field={field} validation={field.validation} onChange={(validation) => onChange({ validation })} />
+        </div>
       </div>
     </div>
   );

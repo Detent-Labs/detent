@@ -9,8 +9,8 @@ import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
-import { createProcessInstance, submitAndTransition, getInstanceView } from "../src/runtime/api.js";
-import type { ProcessBody, ProcessId, PathId, StepId, Instance, InstanceEvent, FieldOption } from "../src/schema/definition.js";
+import { createProcessInstance, submitAndTransition, getInstanceView, SubmissionValidationError } from "../src/runtime/api.js";
+import type { ProcessBody, ProcessId, PathId, StepId, Instance, InstanceEvent, FieldOption, FieldId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
 const DB = !!process.env.DATABASE_URL;
@@ -189,6 +189,16 @@ test.skipIf(!DB)("creation applies the mapping too", async () => {
   expect(view.fields.find((f) => f.field.id === "field_price")!.value).toBe(12.5);
 });
 
+test.skipIf(!DB)("a field that is both a columnMapping target and carries its own default has that default overwritten by the mapping's write", async () => {
+  const dsReg = optionRegistry(PRODUCTS);
+  const body = structuredClone(mappingBody()) as ProcessBody;
+  (body.fields[1] as unknown as { default: unknown }).default = 999; // field_price's own default
+  const pid = await publish(body, dsReg);
+  const created = await createProcessInstance(pid, actor, dsReg, { data: { field_product: "widget" } as unknown as Instance["data"] }, sql);
+  // applyColumnMapping runs after the defaulting loop and overwrites unconditionally.
+  expect((created.data as Record<string, unknown>).field_price).toBe(12.5);
+});
+
 // ---- The drop ----
 
 test.skipIf(!DB)("a mistyped attribute is dropped, the submission succeeds, and the drop is recorded", async () => {
@@ -274,4 +284,81 @@ test.skipIf(!DB)("an attribute does not widen option membership", async () => {
   await expect(
     submitAndTransition(created.instanceId, "path_ab" as PathId, { field_product: "A-1140" } as unknown as Instance["data"], actor, dsReg, sql),
   ).rejects.toThrow();
+});
+
+// ---- technical-field-marker: a technical field can still be a columnMapping
+// target. The engine writes it (the author wired the mapping; a participant
+// never edits it), but a submission naming the target directly is rejected
+// before the mapping runs. field_price sits on step_a's view with no
+// required/readonly key (the definition contract forbids declaring either on
+// a technical field's entry, task 1.2) so it stays visible, and a
+// directly-submitted value resolves to the readonly-field issue rather than
+// unknown-field (runtime-api spec: "A technical field the current step's
+// view does not resolve at all falls under the unknown-field rule above,
+// unchanged"). ----
+
+const technicalMappingBody = (): ProcessBody =>
+  ({
+    key: "technical_mapping_body",
+    label: { en: "Technical Mapping" },
+    baseLocale: "en",
+    fields: [
+      {
+        id: "field_product",
+        key: "product",
+        label: { en: "Product" },
+        type: "select",
+        dataSource: "ds_products",
+        columnMapping: { price: "field_price" },
+      },
+      { id: "field_price", key: "price", label: { en: "Price" }, type: "number", technical: true },
+    ],
+    dataSources: [{ id: "ds_products", key: "products", type: "test.options", config: {} }],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          view: { fields: [{ ref: "field_product" }, { ref: "field_price" }] },
+          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+test.skipIf(!DB)("a technical mapped target still takes the mapped value", async () => {
+  const dsReg = optionRegistry(PRODUCTS);
+  const pid = await publish(technicalMappingBody(), dsReg);
+  const created = await createProcessInstance(pid, actor, dsReg, {}, sql);
+  const after = await submitAndTransition(created.instanceId, "path_ab" as PathId, { field_product: "widget" } as unknown as Instance["data"], actor, dsReg, sql);
+  expect((after.data as Record<string, unknown>).field_price).toBe(12.5);
+});
+
+test.skipIf(!DB)("a request writing a technical mapped target directly is rejected, and the mapping does not run", async () => {
+  const dsReg = optionRegistry(PRODUCTS);
+  const pid = await publish(technicalMappingBody(), dsReg);
+  const created = await createProcessInstance(pid, actor, dsReg, {}, sql);
+
+  let raised: unknown;
+  try {
+    await submitAndTransition(
+      created.instanceId,
+      "path_ab" as PathId,
+      { field_product: "widget", field_price: 999 } as unknown as Instance["data"],
+      actor,
+      dsReg,
+      sql,
+    );
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(SubmissionValidationError);
+  expect((raised as SubmissionValidationError).issues).toEqual([{ kind: "readonly-field", fieldId: "field_price" as FieldId }]);
+
+  const view = await getInstanceView(created.instanceId, actor, dsReg, sql);
+  expect(view.fields.find((f) => f.field.id === "field_price")?.value).toBeUndefined();
 });

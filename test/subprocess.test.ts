@@ -59,6 +59,33 @@ const childBody = (): ProcessBody =>
     },
   }) as unknown as ProcessBody;
 
+// Same shape as childBody, plus field_c_untouched: a Literal default with no
+// inputMapping entry writing it. Task 1.11 / design.md Decision 5's
+// regression fixture: default-seeding runs only inside
+// createProcessInstance, never for an instance createSeededInstance
+// creates (a subprocess spawn's child, or a process.start chain's started
+// instance) — neither of those two calls createProcessInstance.
+const childBodyWithDefault = (): ProcessBody =>
+  ({
+    key: "child_with_default", baseLocale: "en", label: { en: "Child With Default" },
+    contract: { inputFields: ["field_c_amount"], outputFields: ["field_c_amount"], outcomes: ["approved", "rejected"] },
+    fields: [
+      { id: "field_c_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      { id: "field_c_untouched", key: "untouched", label: { en: "Untouched" }, type: "string", default: "should-never-apply" },
+    ],
+    workflow: {
+      initialStep: "step_c_auto",
+      steps: [
+        { id: "step_c_auto", key: "c_auto", label: { en: "Auto" }, type: "task", paths: [
+          autoPath("path_c_rej", "step_c_rejected", 1, "data.amount > 1000.0"),
+          autoPath("path_c_app", "step_c_approved", 2),
+        ] },
+        { id: "step_c_approved", key: "c_approved", label: { en: "Approved" }, type: "task", terminal: true, outcome: "approved" },
+        { id: "step_c_rejected", key: "c_rejected", label: { en: "Rejected" }, type: "task", terminal: true, outcome: "rejected" },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
 // A child whose INITIAL step carries an assignment, so a spawn exercises
 // creation-time candidate resolution. Wait-state (manual paths only), so the
 // spawn does not immediately cascade off the step under test.
@@ -1431,6 +1458,43 @@ test.skipIf(!DB)("a matched outcome records no unmatched event", async () => {
 // --- DB: creation at a subprocess initial step -------------------------------
 
 const SI_PID = "proc_parent_sub_initial" as Instance["processId"];
+
+test.skipIf(!DB)("a subprocess spawn's child does not seed a catalog default the child process declares", async () => {
+  const { registry } = engineRegistry();
+  const childPidWithDefault = "proc_child_with_default" as Instance["processId"];
+  const parentPidWithDefault = "proc_parent_with_default" as Instance["processId"];
+  const cv = await publishBody(childPidWithDefault, childBodyWithDefault(), emptyRegistry, dataSourceReg);
+  const parentBodyWithDefault: ProcessBody = {
+    key: "parent_with_default", baseLocale: "en", label: { en: "Parent With Default" },
+    fields: [{ id: "field_p_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
+    workflow: {
+      initialStep: "step_p_sub",
+      steps: [
+        { id: "step_p_sub", key: "p_sub", label: { en: "Sub" }, type: "subprocess",
+          subprocess: {
+            processId: childPidWithDefault, versionBinding: "pinned", pinnedVersion: cv.version,
+            inputMapping: { field_c_amount: cel("data.amount") },
+            outputMapping: {},
+          },
+          paths: [
+            autoPath("path_p_app", "step_p_approved", 1, 'child.outcome == "approved"'),
+            autoPath("path_p_rej", "step_p_rejected", 2, 'child.outcome == "rejected"'),
+          ] },
+        { id: "step_p_approved", key: "p_approved", label: { en: "PApproved" }, type: "task", terminal: true },
+        { id: "step_p_rejected", key: "p_rejected", label: { en: "PRejected" }, type: "task", terminal: true },
+      ],
+    },
+  } as unknown as ProcessBody;
+  const pv = await publishBody(parentPidWithDefault, parentBodyWithDefault, emptyRegistry, dataSourceReg);
+  const parent = await startInstance(pv.definition, { processId: parentPidWithDefault, version: pv.version }, actor);
+  await seedField(parent.instanceId, "field_p_amount", 500);
+
+  await drainOutbox(sql, registry);
+  const child = await loadInstance(subprocessChildId(parent.instanceId, 0, "step_p_sub"));
+  expect(child).toBeDefined();
+  expect(dataField(child, "field_c_amount")).toBe(500); // seeded from inputMapping
+  expect(dataField(child, "field_c_untouched")).toBeUndefined(); // catalog default never applied
+});
 
 test.skipIf(!DB)("creating an instance on a subprocess initial step spawns a linked child", async () => {
   const { registry } = engineRegistry();

@@ -56,6 +56,28 @@ const targetBodyV2 = (): ProcessBody =>
     },
   }) as unknown as ProcessBody;
 
+// Target variant with an extra field carrying a Literal default, and no
+// inputMapping entry writing it. Task 1.11 / design.md Decision 5's
+// regression fixture: default-seeding runs only inside
+// createProcessInstance, never for the instance a process.start chain
+// creates via createSeededInstance.
+const targetBodyWithDefault = (): ProcessBody =>
+  ({
+    key: "target_with_default", baseLocale: "en", label: { en: "Target With Default" },
+    fields: [
+      { id: "field_t_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      { id: "field_t_untouched", key: "untouched", label: { en: "Untouched" }, type: "string", default: "should-never-apply" },
+    ],
+    workflow: {
+      initialStep: "step_t_entry",
+      steps: [
+        { id: "step_t_entry", key: "t_entry", label: { en: "Entry" }, type: "task",
+          paths: [{ id: "path_t_done", key: "t_done", to: "step_t_done", trigger: "automatic", priority: 1 }] },
+        { id: "step_t_done", key: "t_done", label: { en: "Done" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
 // Actor: manual path from entry to a terminal step whose onEntry carries the
 // process.start action, mapping the actor's own amount into the target.
 const actorBody = (targetPid: string, mapping: Record<string, unknown> = { field_t_amount: cel("data.amount") }): ProcessBody =>
@@ -156,6 +178,22 @@ test.skipIf(!DB)("a terminal step's onEntry action.start creates one instance wi
     return ((typeof a === "string" ? JSON.parse(a) : a) as { type: string }).type;
   });
   expect(actionTypes).not.toContain(RETURN_ACTION_TYPE);
+});
+
+test.skipIf(!DB)("a process.start chain's started instance does not seed a catalog default the target process declares", async () => {
+  const { registry } = chainRegistry();
+  const tv = await publishBody("proc_pc_target_default" as Instance["processId"], targetBodyWithDefault(), registry, dataSourceReg);
+  const av = await publishBody("proc_pc_actor_default" as Instance["processId"], actorBody(tv.processId), registry, dataSourceReg);
+  const started = await startInstance(av.definition, { processId: av.processId, version: av.version }, actor);
+  const done = await commitManualTransition(started, "path_a_done", av.definition, actor, sql, { field_a_amount: 500 } as unknown as Instance["data"]);
+
+  await drainAll(registry);
+
+  const expectedId = `inst_${idempotencyKey(done.instanceId, done.transitionSeq, "action_chain")}`;
+  const target = await loadInstance(expectedId);
+  expect(target).toBeDefined();
+  expect(dataField(target, "field_t_amount")).toBe(500); // seeded from inputMapping
+  expect(dataField(target, "field_t_untouched")).toBeUndefined(); // catalog default never applied
 });
 
 test.skipIf(!DB)("the started instance runs the newest published version of the target", async () => {

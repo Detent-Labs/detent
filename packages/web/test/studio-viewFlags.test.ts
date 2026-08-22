@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   checkViewFlags,
+  checkUnwrittenTechnicalFields,
   effectiveFlag,
   FLAG_DEFAULT,
   gatedKeys,
@@ -69,17 +70,18 @@ describe("setFlag", () => {
 
 describe("gatedKeys", () => {
   const none = new Map<string, number>();
+  const noTechnical = new Set<string>();
 
   it("returns required and readonly for a literal false visible", () => {
-    expect(gatedKeys(vf({ ref: "field_a", visible: false }), none)).toEqual(["required", "readonly"]);
+    expect(gatedKeys(vf({ ref: "field_a", visible: false }), none, noTechnical)).toEqual(["required", "readonly"]);
   });
 
   it("returns nothing for a CEL visible", () => {
-    expect(gatedKeys(vf({ ref: "field_a", visible: { lang: "cel", src: "true" } }), none)).toEqual([]);
+    expect(gatedKeys(vf({ ref: "field_a", visible: { lang: "cel", src: "true" } }), none, noTechnical)).toEqual([]);
   });
 
   it("returns nothing for an absent visible", () => {
-    expect(gatedKeys(vf({ ref: "field_a" }), none)).toEqual([]);
+    expect(gatedKeys(vf({ ref: "field_a" }), none, noTechnical)).toEqual([]);
   });
 
   it("gates readonly once required is true, on a field with no OTHER writer", () => {
@@ -89,32 +91,37 @@ describe("gatedKeys", () => {
     // 5.1's manual check caught: a solo view entry always "writes" its own
     // field until the very toggle being gated turns it readonly).
     const written = new Map([["field_a", 1]]);
-    expect(gatedKeys(vf({ ref: "field_a", required: true }), written)).toEqual(["readonly"]);
+    expect(gatedKeys(vf({ ref: "field_a", required: true }), written, noTechnical)).toEqual(["readonly"]);
   });
 
   it("gates required once readonly is true, on an unwritten field", () => {
-    expect(gatedKeys(vf({ ref: "field_a", readonly: true }), none)).toEqual(["required"]);
+    expect(gatedKeys(vf({ ref: "field_a", readonly: true }), none, noTechnical)).toEqual(["required"]);
   });
 
   it("gates neither key once both required and readonly are already true", () => {
-    expect(gatedKeys(vf({ ref: "field_a", required: true, readonly: true }), none)).toEqual([]);
+    expect(gatedKeys(vf({ ref: "field_a", required: true, readonly: true }), none, noTechnical)).toEqual([]);
   });
 
   it("gates neither key when a structural source writes the field", () => {
     const written = new Map([["field_a", Infinity]]);
-    expect(gatedKeys(vf({ ref: "field_a", required: true }), written)).toEqual([]);
+    expect(gatedKeys(vf({ ref: "field_a", required: true }), written, noTechnical)).toEqual([]);
   });
 
   it("gates neither key when another view entry, besides this one, also writes the field", () => {
     // count 2: this entry's own contribution, plus one other entry elsewhere.
     const written = new Map([["field_a", 2]]);
-    expect(gatedKeys(vf({ ref: "field_a", required: true }), written)).toEqual([]);
+    expect(gatedKeys(vf({ ref: "field_a", required: true }), written, noTechnical)).toEqual([]);
   });
 
   it("derives the self-exclusion correctly from a real draft via writtenFieldCounts", () => {
     const body = withViewField(baseBody(), "step_a", { ref: "field_vendor", required: true });
     const written = writtenFieldCounts(body);
-    expect(gatedKeys(body.workflow!.steps![0]!.view!.fields![0]!, written)).toEqual(["readonly"]);
+    expect(gatedKeys(body.workflow!.steps![0]!.view!.fields![0]!, written, noTechnical)).toEqual(["readonly"]);
+  });
+
+  it("gates both keys unconditionally for a technical field, even when both already read true", () => {
+    const technical = new Set(["field_a"]);
+    expect(gatedKeys(vf({ ref: "field_a", required: true, readonly: true }), none, technical)).toEqual(["required", "readonly"]);
   });
 });
 
@@ -293,5 +300,93 @@ describe("checkViewFlags: unwritable required field", () => {
   it("raises nothing on a group-container ref", () => {
     const body = withViewField(baseBody(), "step_a", { ref: "field_group", readonly: true, required: true });
     expect(checkViewFlags(body)).toHaveLength(0);
+  });
+});
+
+// technical-field-marker: the inverse finding. field_vendor is baseBody's
+// plain top-level field, placed by default on step_a's view with no flags.
+describe("checkUnwrittenTechnicalFields", () => {
+  const withTechnical = (mutate?: (b: any) => void): Draft => {
+    const b = structuredClone(baseBody()) as any;
+    b.fields[0].technical = true; // field_vendor
+    mutate?.(b);
+    return b as Draft;
+  };
+
+  it("fires for a technical field no step's view places and no structural source writes", () => {
+    const b = withTechnical((body) => {
+      body.workflow.steps[0].view = undefined;
+    });
+    const issues = checkUnwrittenTechnicalFields(b);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ entityType: "field", entityId: "field_vendor", source: "view" });
+  });
+
+  it("fires for a technical field placed visibly on a step that no structural source writes", () => {
+    // baseBody already places field_vendor visibly on step_a with no flags.
+    const issues = checkUnwrittenTechnicalFields(withTechnical());
+    expect(issues).toHaveLength(1);
+    expect(issues[0].entityId).toBe("field_vendor");
+  });
+
+  it("a default does not exempt an unwritten technical field", () => {
+    const b = withTechnical((body) => {
+      body.workflow.steps[0].view = undefined;
+      body.fields[0].default = "x";
+    });
+    expect(checkUnwrittenTechnicalFields(b)).toHaveLength(1);
+  });
+
+  it("does not fire for a technical field an action list targets", () => {
+    const b = withTechnical((body) => {
+      body.workflow.steps[0].view = undefined;
+      body.workflow.steps[0].onEntry = [
+        { id: "action_1", type: "core.noop", output: { field_vendor: { lang: "cel", src: "result" } } },
+      ];
+    });
+    expect(checkUnwrittenTechnicalFields(b)).toHaveLength(0);
+  });
+
+  it("does not fire for a technical field a subprocess.outputMapping targets", () => {
+    const b = withTechnical((body) => {
+      body.workflow.steps[0].view = undefined;
+      body.workflow.steps[0].type = "subprocess";
+      body.workflow.steps[0].subprocess = {
+        processId: "proc_child",
+        versionBinding: "latest-at-spawn",
+        inputMapping: {},
+        outputMapping: { field_vendor: { lang: "cel", src: "child.data.x" } },
+      };
+    });
+    expect(checkUnwrittenTechnicalFields(b)).toHaveLength(0);
+  });
+
+  it("does not fire for a technical field a columnMapping targets", () => {
+    const b = withTechnical((body) => {
+      body.workflow.steps[0].view = undefined;
+      body.fields[1].fields[0].columnMapping = { some_column: "field_vendor" };
+    });
+    expect(checkUnwrittenTechnicalFields(b)).toHaveLength(0);
+  });
+
+  it("does not fire for a technical field contract.inputFields names", () => {
+    const b = withTechnical((body) => {
+      body.workflow.steps[0].view = undefined;
+      body.contract = { inputFields: ["field_vendor"] };
+    });
+    expect(checkUnwrittenTechnicalFields(b)).toHaveLength(0);
+  });
+
+  it("does not fire for a non-technical field nothing writes", () => {
+    const b = structuredClone(baseBody()) as any;
+    b.workflow.steps[0].view = undefined;
+    expect(checkUnwrittenTechnicalFields(b as Draft)).toHaveLength(0);
+  });
+
+  it("a field declaring technical: false with no structural writer raises no finding", () => {
+    const b = structuredClone(baseBody()) as any;
+    b.fields[0].technical = false;
+    b.workflow.steps[0].view = undefined;
+    expect(checkUnwrittenTechnicalFields(b as Draft)).toHaveLength(0);
   });
 });

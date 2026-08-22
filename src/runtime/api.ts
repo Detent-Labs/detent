@@ -29,13 +29,13 @@ import {
   UnknownDelegateError,
   isEligibleCandidate,
 } from "../engine/transition.js";
-import { buildGuardContext, evalGuard, type Actor } from "../cel/eval.js";
+import { buildGuardContext, evalGuard, evalFieldMap, type Actor } from "../cel/eval.js";
 import { requireRole, can, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE, AuthorizationError } from "../auth/authorize.js";
 import { knownUserIds } from "../auth/users.js";
 import { definitionHash } from "../schema/hash.js";
 import { NotFoundError, InstanceNotRunningError } from "../errors.js";
 import { encodeCursor, decodeCursor } from "../pagination.js";
-import { instance as instanceSchema, historyEntry as historyEntrySchema, instanceEvent as instanceEventSchema, collectFieldsDeep, typeMatches, expectedTypeLabel } from "../schema/definition.js";
+import { instance as instanceSchema, historyEntry as historyEntrySchema, instanceEvent as instanceEventSchema, collectFieldsDeep, leafFields, typeMatches, expectedTypeLabel } from "../schema/definition.js";
 import {
   createDefaultAssignmentRegistry,
   resolveStepAssignment,
@@ -60,6 +60,7 @@ import type {
   FieldDef,
   FieldOption,
   FieldValidation,
+  Expression,
   ViewField,
   DataSourceDef,
   HistoryEntry,
@@ -464,6 +465,13 @@ function resolveDataSourceOptions(def: DataSourceDef, heldValues: string[], regi
  * `required`/`readonly` are always reported `false` regardless of the view's
  * own declaration — it is never part of the required or editable sets.
  *
+ * A `FieldDef.technical: true` field resolves `required: false, readonly:
+ * true` the same way, whatever its view entry says (the compile pass already
+ * forbids one from declaring either key). Where a body declares both
+ * `type: "group"` and `technical: true` on one field — a shape the compile
+ * pass also rejects, but `resolveFields` also runs against an uncompiled
+ * body — the group rule wins: both flags resolve `false`.
+ *
  * `options` is populated from static `FieldDef.options` unchanged, or —
  * for a `dataSource`-bound field — resolved at runtime via `registry`. This
  * is the single place downstream code (submission validation, view
@@ -480,8 +488,9 @@ async function resolveFields(body: ProcessBody, step: Step, instance: Instance, 
     if (!field) continue; // publish-time invariant guarantees resolution; defensive only
     if (!resolveFlag(vf.visible, ctx, true)) continue;
     const group = isGroupField(field);
-    const required = group ? false : resolveFlag(vf.required, ctx, false);
-    const readonly = group ? false : resolveFlag(vf.readonly, ctx, false);
+    const technical = !group && field.technical === true;
+    const required = group || technical ? false : resolveFlag(vf.required, ctx, false);
+    const readonly = group ? false : technical ? true : resolveFlag(vf.readonly, ctx, false);
     const value = group ? undefined : (instance.data[field.id] as Literal | undefined);
     let options: FieldOption[] | undefined = field.options;
     if (field.dataSource) {
@@ -595,6 +604,46 @@ function droppedAttributeEvents(
   }));
 }
 
+const asExpression = (v: Literal | Expression | undefined): Expression | undefined =>
+  v !== undefined && v !== null && typeof v === "object" && !Array.isArray(v) && (v as { lang?: unknown }).lang === "cel"
+    ? (v as Expression)
+    : undefined;
+
+/**
+ * Seed `stub.data`'s open slots from the field catalog's own `default`
+ * values, walking `leafFields(body.fields)` in catalog order. Mutates
+ * `stub.data` in place, so a later field's `Expression` default sees an
+ * earlier field's already-resolved value through the same guard context
+ * every other guard evaluation builds (`buildGuardContext`). A `group`
+ * field's own `default` is never read: `leafFields` already excludes it.
+ *
+ * Returns the set of field ids this filled, distinct from ids the caller's
+ * own `opts.data` supplied directly — `validateSubmissionData` judges each
+ * set by a different rule (design.md Decision 3).
+ */
+function applyFieldDefaults(body: ProcessBody, stub: Instance, actor: Actor): Set<string> {
+  const working = stub.data as Record<string, Literal>;
+  const filled = new Set<string>();
+  for (const field of leafFields(body.fields)) {
+    if (field.default === undefined) continue;
+    const fieldId = field.id as string;
+    if (working[fieldId] !== undefined) continue;
+    const expr = asExpression(field.default);
+    if (!expr) {
+      working[fieldId] = field.default as Literal;
+      filled.add(fieldId);
+      continue;
+    }
+    const ctx = buildGuardContext(body, stub, actor);
+    const { patch } = evalFieldMap({ [fieldId]: expr }, ctx);
+    if (fieldId in patch) {
+      working[fieldId] = patch[fieldId] as Literal;
+      filled.add(fieldId);
+    }
+  }
+  return filled;
+}
+
 function optionValuesValid(options: FieldOption[] | undefined, value: Literal): boolean {
   if (!options || options.length === 0) return true;
   const allowed = new Set(options.map((o) => o.value));
@@ -693,10 +742,12 @@ async function validateSubmissionData(
   data: Record<string, Literal>,
   registry: DataSourceRegistry,
   db: SQL,
-  opts: { checkRequired: boolean } = { checkRequired: true },
+  opts: { checkRequired: boolean; defaultedIds?: Set<string> } = { checkRequired: true },
 ): Promise<ResolvedViewField[]> {
+  const defaultedIds = opts.defaultedIds ?? new Set<string>();
   const resolved = await resolveFields(body, step, instance, actor, registry, db);
   const fieldsById = new Map(resolved.map((r) => [r.field.id as string, r]));
+  const catalogById = new Map(leafFields(body.fields).map((f) => [f.id as string, f]));
   const viewFieldsByRef = new Map((step.view?.fields ?? []).map((vf) => [vf.ref as string, vf]));
   const editable = editableFieldIds(resolved);
   const required = requiredFieldIds(resolved);
@@ -707,15 +758,47 @@ async function validateSubmissionData(
 
   for (const fieldId of Object.keys(data)) {
     const rf = fieldsById.get(fieldId);
-    if (!rf || isGroupField(rf.field) || !editable.has(fieldId)) {
-      if (rf && !isGroupField(rf.field) && rf.readonly) {
+    const value = data[fieldId] as Literal;
+
+    // Off-view default (design.md Decision 3): no ResolvedViewField exists to
+    // check against, so validate directly against the catalog entry's own
+    // declared type/options/validation instead of the unknown-field rejection
+    // an explicitly submitted value for the same field id still draws.
+    if (defaultedIds.has(fieldId) && !rf) {
+      const field = catalogById.get(fieldId);
+      if (!field) {
+        issues.push({ kind: "unknown-field", fieldId: fieldId as FieldId });
+        continue;
+      }
+      if (!typeMatches(field.type, value)) {
+        issues.push({ kind: "type-mismatch", fieldId: fieldId as FieldId, expected: expectedTypeLabel(field.type) });
+        continue;
+      }
+      if (!field.dataSource && !optionValuesValid(field.options, value)) {
+        issues.push({ kind: "invalid-option", fieldId: fieldId as FieldId });
+      }
+      for (const constraint of checkConstraints(body, field.validation, value)) {
+        issues.push({ kind: "constraint", fieldId: fieldId as FieldId, constraint });
+      }
+      if (field.validation?.rule && !evalGuard(field.validation.rule, guardCtx)) {
+        issues.push({ kind: "rule-failed", fieldId: fieldId as FieldId });
+      }
+      continue;
+    }
+
+    // On-view, readonly default (including `technical: true`): skip only the
+    // readonly-field rejection. An explicitly submitted value for the same
+    // field id still draws it — `defaultedIds` never contains a field id
+    // `opts.data` supplied directly.
+    const readonlyExempt = defaultedIds.has(fieldId) && !!rf && !isGroupField(rf.field) && rf.readonly;
+    if (!rf || isGroupField(rf.field) || (!editable.has(fieldId) && !readonlyExempt)) {
+      if (rf && !isGroupField(rf.field) && rf.readonly && !readonlyExempt) {
         issues.push({ kind: "readonly-field", fieldId: fieldId as FieldId });
       } else {
         issues.push({ kind: "unknown-field", fieldId: fieldId as FieldId });
       }
       continue;
     }
-    const value = data[fieldId] as Literal;
     if (!typeMatches(rf.field.type, value)) {
       issues.push({ kind: "type-mismatch", fieldId: fieldId as FieldId, expected: expectedTypeLabel(rf.field.type) });
       continue; // skip further checks on a value of the wrong shape
@@ -812,7 +895,13 @@ export async function createProcessInstance(
     startedAt: new Date().toISOString(),
   };
 
-  const resolvedInitial = await validateSubmissionData(body, initial, stub, actor, submitted, registry, db, { checkRequired: false });
+  // Seeds the catalog's own `default` values into any slot `opts.data` left
+  // open, before validation runs. `stub.data` and `submitted` are the same
+  // object, so this mutates `submitted` in place — an explicitly submitted
+  // value already there is never overwritten.
+  const defaultedIds = applyFieldDefaults(body, stub, actor);
+
+  const resolvedInitial = await validateSubmissionData(body, initial, stub, actor, submitted, registry, db, { checkRequired: false, defaultedIds });
 
   // The write-back lands before the assignment resolves, so a strategy on the
   // initial step reads the final seed data, mapped values included. `submitted`

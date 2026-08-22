@@ -4,6 +4,7 @@ import type { DraftOf } from "./types";
 import { resolveDraftLocalizedText } from "./localized-text";
 import type { FlagKey } from "./view-flags";
 import { isExpression, type BoolOrExpr } from "../panels/shared/overrideMode";
+import { draftFields } from "./fields";
 
 /** One step whose view references the field, and which of `visible` /
  * `required` / `readonly` that step's view entry carries — regardless of
@@ -101,5 +102,68 @@ export function applyVisibleOverride(draft: Draft, fieldId: string, visible: Dra
       if (visible === undefined) delete entry.visible;
       else entry.visible = visible;
     }
+  }
+}
+
+/** Every `view.fields[]` entry across every step that names `fieldId` and
+ * carries a `required` or `readonly` key — the set the Technical checkbox's
+ * clearing pass deletes. Counted separately from `applyTechnicalMarker` so
+ * the field catalog can name the count in its confirmation before the pass
+ * runs (design.md: "Checking Technical clears the field's required/readonly
+ * view keys"). */
+export function countTechnicalClearKeys(draft: Draft, fieldId: string): number {
+  let n = 0;
+  for (const step of draft.workflow?.steps ?? []) {
+    for (const entry of step.view?.fields ?? []) {
+      if (entry.ref !== fieldId) continue;
+      if ("required" in entry) n++;
+      if ("readonly" in entry) n++;
+    }
+  }
+  return n;
+}
+
+/**
+ * Whether the Technical checkbox needs to raise its confirm dialog before
+ * running the clearing pass. `SubFieldRow` and `FieldEditor` both call this
+ * with `next` and `countTechnicalClearKeys`'s own result, and skip
+ * `confirm()` entirely when it reads `false`: unchecking the box (task 3.6)
+ * needs no confirmation, and neither does checking a field with nothing to
+ * clear (task 3.8). Pulled out so the decision itself is unit-testable —
+ * this codebase has no DOM harness to click the checkbox and mock
+ * `confirm()` itself, so that wiring stays verified by the manual browser
+ * check (task 8.6), the same way `DraftToolbar`'s own `confirm()`-gated
+ * `discard()` is.
+ */
+export function needsTechnicalToggleConfirm(next: boolean, clearCount: number): boolean {
+  return next && clearCount > 0;
+}
+
+/**
+ * The Technical checkbox's writer: a `mutate` recipe body (`applyVisibleOverride`
+ * above's shape), not a function returning a patch. `next: true` writes
+ * `field.technical = true` on the field found by id anywhere in the catalog
+ * (top-level or nested inside a group), then walks EVERY step's
+ * `view.fields[]` — not only the steps the field matrix currently draws,
+ * since this panel holds no step filter of its own — and deletes `required`
+ * and `readonly` off every entry naming that field. `next: false` deletes the
+ * `technical` key and writes no flag key back: the pass records no prior
+ * state, so an uncheck cannot restore an authored `required`/`readonly`
+ * value the check deleted (design.md).
+ */
+export function applyTechnicalMarker(draft: Draft, fieldId: string, next: boolean): void {
+  const field = draftFields(draft).find((f) => f.id === fieldId);
+  if (!field) return;
+  if (next) {
+    field.technical = true;
+    for (const step of draft.workflow?.steps ?? []) {
+      for (const entry of step.view?.fields ?? []) {
+        if (entry.ref !== fieldId) continue;
+        delete entry.required;
+        delete entry.readonly;
+      }
+    }
+  } else {
+    delete field.technical;
   }
 }

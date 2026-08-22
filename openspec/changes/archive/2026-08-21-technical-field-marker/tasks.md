@@ -1,6 +1,6 @@
 ## 1. Definition contract
 
-- [ ] 1.1 Add `technical?: boolean` to the `FieldDef` TS type and the
+- [x] 1.1 Add `technical?: boolean` to the `FieldDef` TS type and the
       `fieldDef` Zod schema in `src/schema/definition.ts`. Carry a doc
       comment on the new member in the shape `columnMapping`'s already
       has three keys above: name `compile.ts::checkTechnicalFields` as
@@ -13,7 +13,7 @@
       same object, so "reject technical on a group" has a working
       refinement right there to copy. Add NO refinement to `fieldDef` or
       `viewField`.
-- [ ] 1.2 Add one `checkTechnicalFields` function to `src/schema/compile.ts`,
+- [x] 1.2 Add one `checkTechnicalFields` function to `src/schema/compile.ts`,
       covering both rules: reject `technical: true` on a `type: "group"`
       field, and reject a `view.fields[]` entry naming a technical field
       that declares `required` or `readonly` at all (literal `true`,
@@ -55,7 +55,7 @@
       `fields` array, a non-array `fields`, a non-string `type`, or a
       `view.fields` entry with no `ref` yields zero issues, never a
       throw.
-- [ ] 1.3 Add `checkTechnicalFields` as its own entry in
+- [x] 1.3 Add `checkTechnicalFields` as its own entry in
       `structuralIssues`'s array (`compile.ts:737-745`), the one call
       site every structural write-path check already funnels through.
       That array holds SIX entries today, so the five `compile.ts`
@@ -80,70 +80,70 @@
       other five structural checks" and enumerates them too; it moves to
       six and gains the name as well, since the new check inspects
       DECLARED values, which survive the studio's Zod parse intact.
-- [ ] 1.4 Test: publish rejects `technical: true` on a group field.
-- [ ] 1.5 Test: publish rejects `required: true`, `readonly: true`,
+- [x] 1.4 Test: publish rejects `technical: true` on a group field.
+- [x] 1.5 Test: publish rejects `required: true`, `readonly: true`,
       `readonly: false`, and CEL in either key, on a technical field's
       view entry.
-- [ ] 1.6 Test: publish accepts a technical field's view entry declaring
+- [x] 1.6 Test: publish accepts a technical field's view entry declaring
       only a display-only key (`order`).
-- [ ] 1.7 Test: `technical: false` gates nothing: it publishes on a
+- [x] 1.7 Test: `technical: false` gates nothing: it publishes on a
       `type: "group"` field, and it publishes on a field whose view
       entry carries `required: true`. Both compile checks read
       `=== true`, never truthiness.
-- [ ] 1.8 Test: a malformed body (no `fields` array, or a `view.fields`
+- [x] 1.8 Test: a malformed body (no `fields` array, or a `view.fields`
       entry with no `ref`) reaches the Zod error rather than a
       `TypeError` raised inside `checkTechnicalFields`.
-- [ ] 1.9 Test: a body declaring no field's `technical` hashes
+- [x] 1.9 Test: a body declaring no field's `technical` hashes
       identically before and after this change.
-- [ ] 1.9a Test: a field declaring `technical: false` hashes
+- [x] 1.9a Test: a field declaring `technical: false` hashes
       differently from the same body with the key omitted. JCS
       serializes a declared key, `false` included; only an absent key
       drops out.
-- [ ] 1.10 Test: the studio's `runValidation` anchors each new issue on
+- [x] 1.10 Test: the studio's `runValidation` anchors each new issue on
       the right entity — the view rule on its step, the group rule on
       its field — not on the process root.
 
 ## 2. Engine resolution
 
-- [ ] 2.1 In `resolveFields` (`src/runtime/api.ts`), force
+- [x] 2.1 In `resolveFields` (`src/runtime/api.ts`), force
       `required: false, readonly: true` for a `ViewField` resolving to a
       `technical: true` field, the same two lines that already force
       `false, false` for a group field. A group wins where a body
       declares both: `required: false, readonly: false`. Compile rejects
       that pair, but `resolveFields` also runs on a body nobody compiled
       — task 2.3 builds one.
-- [ ] 2.2 Test: `getInstanceView` reports `required: false, readonly:
+- [x] 2.2 Test: `getInstanceView` reports `required: false, readonly:
       true` for a technical field, regardless of the view entry's own
       declaration (construct the `ProcessBody` directly, not via
       compile, since compile now refuses a body violating task 1.2's
       rule).
-- [ ] 2.3 Test: a `ViewField` whose `FieldDef` is `type: "group"` AND
+- [x] 2.3 Test: a `ViewField` whose `FieldDef` is `type: "group"` AND
       declares `technical: true` resolves `required: false, readonly:
       false` — the group branch, not the technical one. Construct the
       `ProcessBody` directly; the compile rule rejects this pair.
       `api.ts:482-484` is two ternaries, and the new arm's position
       inside them is otherwise untested.
-- [ ] 2.4 Test: `submitAndTransition` rejects a submitted key naming a
+- [x] 2.4 Test: `submitAndTransition` rejects a submitted key naming a
       technical field with the existing `readonly-field` issue, and
       `createProcessInstance` rejects a seeded key naming one the same
       way. Both reach the editable set through `validateSubmissionData`
       (`api.ts:815`, `:979`), so the second follows from task 2.1 with
       no further code.
-- [ ] 2.5 Test: a submission writing a picker whose `columnMapping`
+- [x] 2.5 Test: a submission writing a picker whose `columnMapping`
       targets a `technical: true` field still lands the mapped
       attribute in `data`. `applyColumnMapping` SHALL NOT filter by the
       resolved editable set, which task 2.1 now forces `readonly: true`
       for every technical target.
-- [ ] 2.6 Test: a submission carrying a value for a `technical` field
+- [x] 2.6 Test: a submission carrying a value for a `technical` field
       that is also a `columnMapping` target is rejected with
       `readonly-field`, and the mapping does not run.
-- [ ] 2.7 Test: `getInstanceView` resolves a field declaring
+- [x] 2.7 Test: `getInstanceView` resolves a field declaring
       `technical: false` from its view entry's own `required`/
       `readonly`, identically to a field declaring no `technical` key.
 
 ## 3. Field catalog
 
-- [ ] 3.1 Add `applyTechnicalMarker(draft, fieldId, next: boolean)` to
+- [x] 3.1 Add `applyTechnicalMarker(draft, fieldId, next: boolean)` to
       `packages/web/src/areas/studio/draft/field-usage.ts`, modelled on
       `applyVisibleOverride` (`:97`) — a `mutate` recipe body, not a
       patch. It sets `field.technical = true` or deletes the key on the
@@ -154,7 +154,7 @@
       full: the pass runs in `FieldCatalogPanel`, which holds no step
       filter of its own, so nothing narrows the set for it — and nothing
       may.
-- [ ] 3.2 Add a Technical checkbox to the field catalog's Field tab
+- [x] 3.2 Add a Technical checkbox to the field catalog's Field tab
       (`packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx`),
       following the existing convention: write `technical: true` on
       check, delete the key on uncheck. The checkbox calls
@@ -176,9 +176,9 @@
       from `.claude/rules/design-language.md` (checkbox states, class
       naming) and run `/frontend-design:frontend-design` before
       implementing, per CLAUDE.md's Conventions.
-- [ ] 3.3 Disable the control for a field of `type: "group"`, at any
+- [x] 3.3 Disable the control for a field of `type: "group"`, at any
       nesting depth.
-- [ ] 3.4 Add `fieldCatalog.technicalLabel`,
+- [x] 3.4 Add `fieldCatalog.technicalLabel`,
       `fieldMatrix.technicalRowMark`, `fieldMatrix.legendTechnical` and
       `fieldCatalog.technicalClearConfirm` (a count-interpolated
       string, `"Checking Technical will clear {count} required/readonly
@@ -194,16 +194,16 @@
       entry. The rail finding itself needs no catalog key:
       `checkViewFlags` builds its messages as hardcoded English template
       literals (`view-flags.ts:186-206`).
-- [ ] 3.4a Test: the field matrix's legend renders one entry per
+- [x] 3.4a Test: the field matrix's legend renders one entry per
       `LEGEND_KEYS` member, six once `legendTechnical` is added.
-- [ ] 3.5 Test: checking Technical on a field whose entry on one step
+- [x] 3.5 Test: checking Technical on a field whose entry on one step
       carries `required: true` and whose entry on another carries
       `readonly: false` leaves neither key, and the draft then compiles.
-- [ ] 3.6 Test: unchecking Technical deletes the key. `"technical" in
+- [x] 3.6 Test: unchecking Technical deletes the key. `"technical" in
       field` reads false afterwards, not `technical: false`, and no
       `required` or `readonly` key comes back. The two shapes differ by
       a moved `definitionHash`.
-- [ ] 3.7 Confirm before the clearing pass runs, using the existing
+- [x] 3.7 Confirm before the clearing pass runs, using the existing
       `t()`-backed `confirm()` convention (`panels/DraftToolbar.tsx:118`,
       `:144` — not `screens/ProcessesScreen.tsx:310`'s inline template
       string, the same mechanism but a different, uncataloged message):
@@ -216,15 +216,15 @@
       `technical` unset and clear no key — mirror `discard()`'s
       `if (!confirm(...)) return`. Skip the confirm where the count is
       zero.
-- [ ] 3.8 Test: checking Technical on a field carrying no `required` or
+- [x] 3.8 Test: checking Technical on a field carrying no `required` or
       `readonly` key runs no confirmation.
-- [ ] 3.9 Test: declining the confirmation leaves every `required` or
+- [x] 3.9 Test: declining the confirmation leaves every `required` or
       `readonly` key in place across every step, and writes no
       `technical` key.
 
 ## 4. Form editor
 
-- [ ] 4.1 In the per-step strip, stop offering `required`/`readonly`
+- [x] 4.1 In the per-step strip, stop offering `required`/`readonly`
       controls when the selected field's `FieldDef` declares
       `technical: true`; keep `visible`, `group`, `span` offered.
       Compute a technical-field-id `Set<string>` once in
@@ -234,7 +234,7 @@
       file rather than computing it twice. Choose the exact visual
       treatment with `/frontend-design:frontend-design` (design.md
       Open Questions).
-- [ ] 4.2 Test: `renderToStaticMarkup` of the form editor's strip for a
+- [x] 4.2 Test: `renderToStaticMarkup` of the form editor's strip for a
       field declaring `technical: true` emits no `required` and no
       `readonly` control, and still emits `visible`, `group` and `span`.
       Follow `packages/web/test/studio-editorDock-fieldMatrixTab.test.tsx`:
@@ -242,11 +242,11 @@
 
 ## 5. Field matrix
 
-- [ ] 5.1 Add a technical-field row-header marker to `FieldMatrixGrid`/
+- [x] 5.1 Add a technical-field row-header marker to `FieldMatrixGrid`/
       `fieldMatrixLogic.ts`, visually distinct from the flagged-cell
       marker. Choose the exact visual treatment with
       `/frontend-design:frontend-design` (design.md Open Questions).
-- [ ] 5.2 Give `gatedKeys` (`draft/view-flags.ts`) a technical-field
+- [x] 5.2 Give `gatedKeys` (`draft/view-flags.ts`) a technical-field
       signal, so it gates `required` and `readonly` unconditionally for
       a technical field's entry, the same way it already gates both when
       `visible` is `false`. Pass the signal as a `Set<string>` of
@@ -280,7 +280,7 @@
       `visible` bulk badge shares those, and it stays offered for a
       technical field. Widening `gatedKeys` alone only makes the toggle
       a no-op; it leaves the button rendered. Task 5.3 removes it.
-- [ ] 5.3 Give `BulkBadges` (`FieldMatrixGrid.tsx:55`) a per-key
+- [x] 5.3 Give `BulkBadges` (`FieldMatrixGrid.tsx:55`) a per-key
       suppression: skip a `FLAG_KEYS` entry whose eligible target set is
       empty for that key, computed from the same `eligibleTargetEntries`
       the toggle calls. Export `eligibleTargetEntries`, which is module
@@ -290,18 +290,18 @@
       `:259`) and then maps all three keys unconditionally, so a gated
       technical row keeps three live-looking buttons, two of which
       answer no click.
-- [ ] 5.4 Test: a technical field's individual matrix cell shows its
+- [x] 5.4 Test: a technical field's individual matrix cell shows its
       `required`/`readonly` checkboxes disabled, its row header offers
       no `required`/`readonly` bulk badge but still offers `visible`, a
       column's bulk badge does not change a technical field's cell, and
       the row's `visible` bulk badge still works.
-- [ ] 5.5 Test: a non-technical row the studio gates for `required` on
+- [x] 5.5 Test: a non-technical row the studio gates for `required` on
       every live cell offers no `required` badge either. The suppression
       is the general empty-eligible rule, not a technical-field case.
 
 ## 6. Checks rail
 
-- [ ] 6.1 Add the inverse finding as a new exported function in
+- [x] 6.1 Add the inverse finding as a new exported function in
       `view-flags.ts`, beside `checkViewFlags` and never inside it: a
       field declaring `technical: true` with no structural writer
       reports under the `view` source, anchored on the field
@@ -335,59 +335,59 @@
       `isCellFlagged` needs `required && readonly`, which a technical
       entry can never carry, and `gatedKeys` gates a technical entry
       before it reads the map.
-- [ ] 6.2 Wire the finding into the rail. The sibling needs its own
+- [x] 6.2 Wire the finding into the rail. The sibling needs its own
       `issues.push(...)` line in `runValidation`
       (`draft/validation.ts:112`), beside `checkViewFlags` and ahead of
       the `compileProcessBody` try-block.
-- [ ] 6.3 Change the three comments that state every `view`-source issue
+- [x] 6.3 Change the three comments that state every `view`-source issue
       carries `entityType: "step"`: `draft/panel-rail.ts:86`,
       `PanelsScreen.tsx:40`, and `PanelsScreen.tsx:177-179`, the one
       directly above the matrix badge's own `issueCountForSource` call.
       The new finding is field-anchored, which is why the Fields view's
       `issueCountForEntityType` badge surfaces it and the matrix's
       `issueCountForSource` badge over-counts it (design.md Risks).
-- [ ] 6.3a Test: `issueCountForSource` (`draft/panel-rail.ts`) counts
+- [x] 6.3a Test: `issueCountForSource` (`draft/panel-rail.ts`) counts
       the unwritten-technical-field finding toward the field matrix's
       badge, and `issueCountForEntityType` surfaces it under the
       Fields view. The over-count is the accepted trade-off (design.md
       Risks), not a defect to filter away later.
-- [ ] 6.4 Test: the finding fires for a technical field no step's view
+- [x] 6.4 Test: the finding fires for a technical field no step's view
       places and no structural source writes — the case a missing `?? 0`
       silences.
-- [ ] 6.5 Test: the finding fires for a technical field placed visibly
+- [x] 6.5 Test: the finding fires for a technical field placed visibly
       on a step that no structural source writes — the case the presence
       test would miss.
-- [ ] 6.6 Test: the finding fires for a technical field carrying a
+- [x] 6.6 Test: the finding fires for a technical field carrying a
       `default` that no structural source writes.
-- [ ] 6.7 Test: the finding does not fire for a technical field an
+- [x] 6.7 Test: the finding does not fire for a technical field an
       action list targets. `writtenFieldCounts` gathers its four
       structural sources in three separate loops (`view-flags.ts:124-152`),
       so one case cannot stand for all four: a loop the test never
       enters contributes nothing to the assertion. Tasks 6.8-6.10 cover
       the other three sources.
-- [ ] 6.8 Test: the finding does not fire for a technical field a
+- [x] 6.8 Test: the finding does not fire for a technical field a
       `subprocess.outputMapping` targets — the same per-step loop the
       action lists run in.
-- [ ] 6.9 Test: the finding does not fire for a technical field a
+- [x] 6.9 Test: the finding does not fire for a technical field a
       `columnMapping` targets, which runs in its own loop over
       `fieldsById.values()`.
-- [ ] 6.10 Test: the finding does not fire for a technical field
+- [x] 6.10 Test: the finding does not fire for a technical field
       `contract.inputFields` names, which runs in a third loop over
       `body.contract`.
-- [ ] 6.11 Test: the finding does not fire for a non-technical field
+- [x] 6.11 Test: the finding does not fire for a non-technical field
       nothing writes.
-- [ ] 6.12 Test: a field declaring `technical: false` with no
+- [x] 6.12 Test: a field declaring `technical: false` with no
       structural writer raises no finding from the sibling function —
       reads `=== true`, never truthiness, mirroring task 1.7's
       compile-side test.
-- [ ] 6.13 Confirm the new finding holds back with the view group: it
+- [x] 6.13 Confirm the new finding holds back with the view group: it
       reads the Zod-parsed body directly, never a compiled one, so it
       runs under exactly the `validation.zodValid` condition
       `checkViewFlags` already runs under.
 
 ## 7. Documentation
 
-- [ ] 7.1 Add `technical` to `docs/authoring-guide.md`, and change the
+- [x] 7.1 Add `technical` to `docs/authoring-guide.md`, and change the
       three passages it affects. Line 183, on `columnMapping`: keep
       `readonly` in the view as the per-step shape and ADD `technical`
       as the stronger catalog-level one — an addition, never a
@@ -405,10 +405,10 @@
       `src/schema/definition.ts:254` — `fieldValidation`'s doc comment,
       "Catalog-level validation. Requiredness is per-step and lives in
       the view."
-- [ ] 7.2 Add a sentence to `.claude/rules/process-contract.md`'s "Data
+- [x] 7.2 Add a sentence to `.claude/rules/process-contract.md`'s "Data
       vs presentation" section, noting `technical` refines rather than
       breaches the "requiredness lives only in the view" rule.
-- [ ] 7.3 Add one bullet to `.claude/rules/authoring-invariants.md`'s
+- [x] 7.3 Add one bullet to `.claude/rules/authoring-invariants.md`'s
       compile-pass list, beside the `checkIdResolution` entry: a
       `technical` field is never `type: "group"`, and a `ViewField`
       naming a technical field declares neither `required` nor
@@ -418,14 +418,14 @@
       siblings carry: `definition.ts` also deserializes stored immutable
       bodies. The file states no total count, so nothing else there
       changes.
-- [ ] 7.4 Rewrite ROADMAP.md stage 44 from "NOT STARTED, no decision
+- [x] 7.4 Rewrite ROADMAP.md stage 44 from "NOT STARTED, no decision
       made" to reflect the decisions in this change: declared boolean
       marker, runtime and publish enforcement, the inverse checks-rail
       finding, and inference explicitly deferred.
-- [ ] 7.5 Delete the technical-field open question from
+- [x] 7.5 Delete the technical-field open question from
       `docs/decisions.md` (lines 18-26), which still asks "inference or
       a declared schema key" after this change settles it.
-- [ ] 7.6 Add a `### Technical fields (technical-field-marker)` entry to
+- [x] 7.6 Add a `### Technical fields (technical-field-marker)` entry to
       `docs/browser-checks.md`, beside `### The field matrix
       (field-matrix-toolbar-and-inline-editing)` (`:946`). It carries
       the two visual judgments this change makes: the
@@ -434,7 +434,7 @@
       controls.
       `openspec/specs/development-toolchain/spec.md:776-781` makes a
       visual judgment an entry in that file.
-- [ ] 7.7 Change `docs/current-state.md` in three places. `:173-177`
+- [x] 7.7 Change `docs/current-state.md` in three places. `:173-177`
       says "Two states earn it". That count stays two — the new check
       is a sibling function, not a third branch inside `checkViewFlags`
       (task 6.1). Add a sentence after it naming the sibling as a
@@ -447,16 +447,16 @@
 
 ## 8. Verification
 
-- [ ] 8.1 Run `bun run typecheck`.
-- [ ] 8.2 Run `bun run build`.
-- [ ] 8.3 Run the full `bun test` suite with `DATABASE_URL` set; confirm
+- [x] 8.1 Run `bun run typecheck`.
+- [x] 8.2 Run `bun run build`.
+- [x] 8.3 Run the full `bun test` suite with `DATABASE_URL` set; confirm
       the skip count, not only the pass count.
-- [ ] 8.4 Run the antislop linter over every Markdown file this change
+- [x] 8.4 Run the antislop linter over every Markdown file this change
       touched.
-- [ ] 8.5 Run `git diff --check` for trailing whitespace and blank lines
+- [x] 8.5 Run `git diff --check` for trailing whitespace and blank lines
       at EOF, then `git ls-files --eol` and read the `w/` column:
       `git diff --check` does not report CRLF here.
-- [ ] 8.6 Browser check, which needs task 8.2's build: the engine
+- [x] 8.6 Browser check, which needs task 8.2's build: the engine
       answers every navigation with a JSON 404 while
       `packages/web/dist` is absent. Start from
       `examples/subprocess-loan-parent.json` (`key: "loan_application"`),

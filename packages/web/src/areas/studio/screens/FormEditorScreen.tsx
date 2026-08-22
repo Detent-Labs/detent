@@ -89,6 +89,104 @@ function OverrideField({
   );
 }
 
+export interface FormEditorStripProps {
+  row: DraftViewField;
+  label: string;
+  stepId: DraftStep["id"];
+  written: Map<string, number>;
+  technicalFieldIds: Set<string>;
+  isGroup: boolean;
+  groupKeys: string[];
+  onChangeFlag: (key: FlagKey, next: BoolOrExpr) => void;
+  onChangeSpan: (span: 1 | 2) => void;
+  onChangeGroup: (group: string | undefined) => void;
+}
+
+/**
+ * The selected field's overrides — pulled out of `FormEditorScreen` so a
+ * server render can exercise it directly with an arbitrary `row`, without
+ * simulating the click that selects one (`renderToStaticMarkup` fires no DOM
+ * events). Purely presentational: every write goes back through the two
+ * callback props, `FormEditorScreen`'s own `setViewFlag`/`updateRow`.
+ */
+export function FormEditorStrip({
+  row,
+  label,
+  stepId,
+  written,
+  technicalFieldIds,
+  isGroup,
+  groupKeys,
+  onChangeFlag,
+  onChangeSpan,
+  onChangeGroup,
+}: FormEditorStripProps) {
+  // A technical field's view entry may declare neither key at all (the
+  // definition contract rejects both) — the strip removes the `required`/
+  // `readonly` controls entirely rather than disabling them, since a
+  // settable-but-doomed control would only invite the rejected publish this
+  // change exists to prevent (design.md). `visible`, `span` and `group` stay
+  // offered unchanged.
+  const isTechnical = row.ref !== undefined && technicalFieldIds.has(row.ref);
+  return (
+    <section className="studio-form-strip" aria-label={t("formEditor.stripLabel")}>
+      <h3 className="studio-form-strip-heading">{label}</h3>
+      <OverrideField
+        label={t("formEditor.visible")}
+        stepId={stepId}
+        flagKey="visible"
+        value={row.visible}
+        onChange={(visible) => onChangeFlag("visible", visible)}
+      />
+      {!isTechnical && (
+        <OverrideField
+          label={t("formEditor.required")}
+          stepId={stepId}
+          flagKey="required"
+          disabled={gatedKeys(row, written, technicalFieldIds).includes("required")}
+          value={row.required}
+          onChange={(required) => onChangeFlag("required", required)}
+        />
+      )}
+      {!isTechnical && (
+        <OverrideField
+          label={t("formEditor.readonly")}
+          stepId={stepId}
+          flagKey="readonly"
+          disabled={gatedKeys(row, written, technicalFieldIds).includes("readonly")}
+          value={row.readonly}
+          onChange={(readonly) => onChangeFlag("readonly", readonly)}
+        />
+      )}
+      {/* No span control on a group: it draws at the form's full width and
+          `form-ui` reads no span on it, so the control would write a value
+          nothing renders. */}
+      {!isGroup && (
+        <label className="studio-form-strip-field">
+          {t("formEditor.span")}
+          <select value={String(row.span ?? 1)} onChange={(e) => onChangeSpan(Number(e.target.value) as 1 | 2)}>
+            <option value="1">1</option>
+            <option value="2">2</option>
+          </select>
+        </label>
+      )}
+      {/* Move-to-group, the third keyboard move command. A group is named by
+          its key, which is what `ViewField.group` carries. */}
+      <label className="studio-form-strip-field">
+        {t("formEditor.group")}
+        <select value={row.group ?? ""} onChange={(e) => onChangeGroup(e.target.value === "" ? undefined : e.target.value)}>
+          <option value="">{t("formEditor.noGroup")}</option>
+          {groupKeys.map((k) => (
+            <option key={k} value={k}>
+              {k}
+            </option>
+          ))}
+        </select>
+      </label>
+    </section>
+  );
+}
+
 interface Props {
   /** The step whose view this page builds, and its index in
    * `workflow.steps` — the same pair `FormEditorDialog`'s `open` carried,
@@ -114,6 +212,13 @@ interface Props {
 export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   const { draft, mutate, contentLocale } = useDraft();
   const written = useMemo(() => writtenFieldCounts(draft), [draft]);
+  // Threaded into both gatedKeys calls below (task 5.2) and this screen's own
+  // control-omission logic (task 4.1) — computed once, from the already-flat
+  // catalog this screen receives, rather than twice.
+  const technicalIds = useMemo(
+    () => new Set(fields.filter((f) => f.technical === true && f.id !== undefined).map((f) => f.id!)),
+    [fields],
+  );
   const [selected, setSelected] = useState<number | undefined>(undefined);
   const [dragging, setDragging] = useState<Dragging | undefined>(undefined);
 
@@ -388,63 +493,18 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
           </ol>
 
           {selectedRow ? (
-            <section className="studio-form-strip" aria-label={t("formEditor.stripLabel")}>
-              <h3 className="studio-form-strip-heading">{labelFor(selectedRow.ref)}</h3>
-              <OverrideField
-                label={t("formEditor.visible")}
-                stepId={step.id}
-                flagKey="visible"
-                value={selectedRow.visible}
-                onChange={(visible) => setViewFlag(selected!, "visible", visible)}
-              />
-              <OverrideField
-                label={t("formEditor.required")}
-                stepId={step.id}
-                flagKey="required"
-                disabled={gatedKeys(selectedRow, written).includes("required")}
-                value={selectedRow.required}
-                onChange={(required) => setViewFlag(selected!, "required", required)}
-              />
-              <OverrideField
-                label={t("formEditor.readonly")}
-                stepId={step.id}
-                flagKey="readonly"
-                disabled={gatedKeys(selectedRow, written).includes("readonly")}
-                value={selectedRow.readonly}
-                onChange={(readonly) => setViewFlag(selected!, "readonly", readonly)}
-              />
-              {/* No span control on a group: it draws at the form's full width
-                  and `form-ui` reads no span on it, so the control would write
-                  a value nothing renders. */}
-              {!isGroupRow(selectedRow) && (
-                <label className="studio-form-strip-field">
-                  {t("formEditor.span")}
-                  <select
-                    value={String(selectedRow.span ?? 1)}
-                    onChange={(e) => updateRow(selected!, { span: Number(e.target.value) as 1 | 2 })}
-                  >
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                  </select>
-                </label>
-              )}
-              {/* Move-to-group, the third keyboard move command. A group is
-                  named by its key, which is what `ViewField.group` carries. */}
-              <label className="studio-form-strip-field">
-                {t("formEditor.group")}
-                <select
-                  value={selectedRow.group ?? ""}
-                  onChange={(e) => updateRow(selected!, { group: e.target.value === "" ? undefined : e.target.value })}
-                >
-                  <option value="">{t("formEditor.noGroup")}</option>
-                  {groupKeys.map((k) => (
-                    <option key={k} value={k}>
-                      {k}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </section>
+            <FormEditorStrip
+              row={selectedRow}
+              label={labelFor(selectedRow.ref)}
+              stepId={step.id}
+              written={written}
+              technicalFieldIds={technicalIds}
+              isGroup={isGroupRow(selectedRow)}
+              groupKeys={groupKeys}
+              onChangeFlag={(key, next) => setViewFlag(selected!, key, next)}
+              onChangeSpan={(span) => updateRow(selected!, { span })}
+              onChangeGroup={(group) => updateRow(selected!, { group })}
+            />
           ) : (
             <p className="studio-form-strip-empty">{t("formEditor.selectAField")}</p>
           )}

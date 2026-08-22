@@ -8,11 +8,12 @@
  */
 import { readFileSync } from "node:fs";
 import { test, expect, beforeAll, beforeEach } from "bun:test";
-import { sql, initSchema, withTransaction, appendInstanceEvent, newInstanceEventId } from "../src/engine/store.js";
+import { sql, initSchema, withTransaction, appendInstanceEvent, newInstanceEventId, createInstance } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
-import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
+import { createRegistry, createDataSourceRegistry, createAssignmentRegistry } from "../src/engine/registry.js";
 import { executeManualTransition, cancelInstance, fireTimer, ConcurrencyConflict, GuardRefused, AutomaticCascadeLoop } from "../src/engine/transition.js";
 import { compileProcessBody } from "../src/schema/compile.js";
+import { definitionHash } from "../src/schema/hash.js";
 import {
   createProcessInstance,
   getInstanceView,
@@ -480,6 +481,528 @@ test.skipIf(!DB)("submitting a group-container field's own id is rejected as unk
   expect(raised).toBeInstanceOf(SubmissionValidationError);
   expect((raised as SubmissionValidationError).issues).toEqual([{ kind: "unknown-field", fieldId: "field_group" as FieldId }]);
 });
+
+// technical-field-marker: resolveFields forces required:false, readonly:true
+// for a technical field regardless of the view entry's own declaration. These
+// bodies violate compile.ts::checkTechnicalFields on purpose (a view entry
+// naming a technical field with required/readonly declared, task 1.2's own
+// rule), so they are inserted directly into `definitions` — bypassing
+// publishBody's compileProcessBody call — to prove resolveFields is a
+// defensive layer independent of the publish-time check, not merely
+// downstream of it.
+test.skipIf(!DB)("getInstanceView reports a technical field as required:false, readonly:true regardless of its view entry", async () => {
+  const PID = pid("proc_technical_view");
+  const body: ProcessBody = {
+    key: "technical_body", label: { en: "Technical Body" }, baseLocale: "en",
+    fields: [{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number", technical: true }],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a", key: "a", label: { en: "A" }, type: "task",
+          view: { fields: [{ ref: "field_amount", required: true, readonly: false }] },
+          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  } as unknown as ProcessBody;
+  await sql`INSERT INTO definitions (process_id, version, definition_hash, status, body)
+    VALUES (${PID}, 1, ${definitionHash(body)}, 'published', ${body})`;
+  const created = await createInstance(body, { processId: PID, version: 1, startedBy: actor.id });
+
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
+  const field = view.fields.find((f) => f.field.key === "amount")!;
+  expect(field.required).toBe(false);
+  expect(field.readonly).toBe(true);
+});
+
+test.skipIf(!DB)("a field declaring both type: group and technical: true resolves via the group branch, not the technical one", async () => {
+  const PID = pid("proc_technical_group");
+  const body: ProcessBody = {
+    key: "technical_group_body", label: { en: "Technical Group Body" }, baseLocale: "en",
+    fields: [{ id: "field_g", key: "g", label: { en: "G" }, type: "group", technical: true, fields: [] }],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a", key: "a", label: { en: "A" }, type: "task",
+          view: { fields: [{ ref: "field_g" }] },
+          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  } as unknown as ProcessBody;
+  await sql`INSERT INTO definitions (process_id, version, definition_hash, status, body)
+    VALUES (${PID}, 1, ${definitionHash(body)}, 'published', ${body})`;
+  const created = await createInstance(body, { processId: PID, version: 1, startedBy: actor.id });
+
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
+  const field = view.fields.find((f) => f.field.key === "g")!;
+  expect(field.required).toBe(false);
+  expect(field.readonly).toBe(false); // group wins over technical: neither flag forces readonly:true here
+  expect(field.value).toBeUndefined();
+});
+
+test.skipIf(!DB)("getInstanceView resolves a technical: false field from its own view entry, identically to no technical key", async () => {
+  const PID = pid("proc_technical_false");
+  await publishBody(PID, viewBody(), reg, dataSourceReg); // viewBody's fields declare no `technical` key at all
+  const withKey = structuredClone(viewBody());
+  (withKey.fields[0] as unknown as { technical: boolean }).technical = false; // field_amount, required:true on step_a's view
+  await publishBody(pid("proc_technical_false_2"), withKey, reg, dataSourceReg);
+
+  const createdBaseline = await createProcessInstance(PID, actor, dataSourceReg, {
+    data: { field_amount: 1, field_name: "Bob", field_category: "a" } as unknown as Instance["data"],
+  });
+  const createdFalse = await createProcessInstance(pid("proc_technical_false_2"), actor, dataSourceReg, {
+    data: { field_amount: 1, field_name: "Bob", field_category: "a" } as unknown as Instance["data"],
+  });
+
+  const baselineView = await getInstanceView(createdBaseline.instanceId, actor, dataSourceReg);
+  const falseView = await getInstanceView(createdFalse.instanceId, actor, dataSourceReg);
+  const baselineField = baselineView.fields.find((f) => f.field.key === "amount")!;
+  const falseField = falseView.fields.find((f) => f.field.key === "amount")!;
+  expect(falseField.required).toBe(baselineField.required);
+  expect(falseField.readonly).toBe(baselineField.readonly);
+});
+
+/** step_a: field_amount required; field_secret is technical, placed visibly with no required/readonly key. */
+const technicalDirectBody = (): ProcessBody =>
+  ({
+    key: "technical_direct_body",
+    label: { en: "Technical Direct Body" },
+    baseLocale: "en",
+    fields: [
+      { id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      { id: "field_secret", key: "secret", label: { en: "Secret" }, type: "string", technical: true },
+    ],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          view: { fields: [{ ref: "field_amount", required: true }, { ref: "field_secret" }] },
+          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+test.skipIf(!DB)("submitAndTransition rejects a submitted key naming a technical field with readonly-field", async () => {
+  const PID = pid("proc_technical_submit");
+  await publishBody(PID, technicalDirectBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, { data: { field_amount: 1 } as unknown as Instance["data"] });
+
+  let raised: unknown;
+  try {
+    await submitAndTransition(
+      created.instanceId,
+      "path_ab" as PathId,
+      { field_amount: 2, field_secret: "leak" } as unknown as Instance["data"],
+      actor,
+      dataSourceReg,
+    );
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(SubmissionValidationError);
+  expect((raised as SubmissionValidationError).issues).toEqual([{ kind: "readonly-field", fieldId: "field_secret" as FieldId }]);
+});
+
+test.skipIf(!DB)("createProcessInstance rejects a seeded key naming a technical field with readonly-field", async () => {
+  const PID = pid("proc_technical_seed");
+  await publishBody(PID, technicalDirectBody(), reg, dataSourceReg);
+
+  let raised: unknown;
+  try {
+    await createProcessInstance(PID, actor, dataSourceReg, { data: { field_amount: 1, field_secret: "leak" } as unknown as Instance["data"] });
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(SubmissionValidationError);
+  expect((raised as SubmissionValidationError).issues).toEqual([{ kind: "readonly-field", fieldId: "field_secret" as FieldId }]);
+});
+
+/** step_a: field_amount required; field_secret is technical but no step's view references it at all. */
+const technicalUnplacedBody = (): ProcessBody =>
+  ({
+    key: "technical_unplaced_body",
+    label: { en: "Technical Unplaced Body" },
+    baseLocale: "en",
+    fields: [
+      { id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      { id: "field_secret", key: "secret", label: { en: "Secret" }, type: "string", technical: true },
+    ],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          view: { fields: [{ ref: "field_amount", required: true }] },
+          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+test.skipIf(!DB)(
+  "submitAndTransition rejects a submitted key naming a technical field the current step's view does not resolve at all, with unknown-field",
+  async () => {
+    const PID = pid("proc_technical_unplaced");
+    await publishBody(PID, technicalUnplacedBody(), reg, dataSourceReg);
+    const created = await createProcessInstance(PID, actor, dataSourceReg, { data: { field_amount: 1 } as unknown as Instance["data"] });
+
+    let raised: unknown;
+    try {
+      await submitAndTransition(
+        created.instanceId,
+        "path_ab" as PathId,
+        { field_amount: 2, field_secret: "leak" } as unknown as Instance["data"],
+        actor,
+        dataSourceReg,
+      );
+    } catch (e) {
+      raised = e;
+    }
+    expect(raised).toBeInstanceOf(SubmissionValidationError);
+    expect((raised as SubmissionValidationError).issues).toEqual([{ kind: "unknown-field", fieldId: "field_secret" as FieldId }]);
+  },
+);
+
+// ============================================================
+// createProcessInstance: FieldDef.default seeding
+// ============================================================
+
+/**
+ * step_a: field_alpha (string) carries `alphaDefault`; field_beta (number)
+ * carries `betaDefault`. Both sit on step_a's view, so the ordinary
+ * (non-exempt) validation path covers them. field_group is a group
+ * container whose own child (field_child) carries `childDefault`.
+ * step_a --(path_ab, manual, guardless)--> step_b (terminal).
+ */
+const defaultsBody = (
+  betaDefault: unknown,
+  alphaDefault: unknown = "seeded",
+  childDefault: unknown = undefined,
+): ProcessBody =>
+  ({
+    key: "defaults_body",
+    label: { en: "Defaults Body" },
+    baseLocale: "en",
+    fields: [
+      { id: "field_alpha", key: "alpha", label: { en: "Alpha" }, type: "string", default: alphaDefault },
+      { id: "field_beta", key: "beta", label: { en: "Beta" }, type: "number", default: betaDefault },
+      {
+        id: "field_group",
+        key: "grp",
+        label: { en: "Group" },
+        type: "group",
+        default: "group-default-never-read",
+        fields: [{ id: "field_child", key: "child", label: { en: "Child" }, type: "string", default: childDefault }],
+      },
+    ],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a", key: "a", label: { en: "A" }, type: "task",
+          view: { fields: [{ ref: "field_alpha" }, { ref: "field_beta" }, { ref: "field_group" }] },
+          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+test.skipIf(!DB)("a field carrying only a default is visible to the initial step's assignment strategy resolver", async () => {
+  const PID = pid("proc_defaults_assignment");
+  const body = structuredClone(defaultsBody(5)) as ProcessBody;
+  (body.workflow.steps[0] as unknown as { assignment: unknown }).assignment = {
+    strategy: { type: "spy", config: {} },
+  };
+
+  const calls: { instance: { data: Instance["data"] } }[] = [];
+  const assignReg = createAssignmentRegistry();
+  assignReg.set("spy", {
+    resolve: async (ctx) => {
+      calls.push(ctx);
+      return ["user_1"];
+    },
+  });
+  await publishBody(PID, body, reg, dataSourceReg, sql, assignReg);
+
+  const created = await createProcessInstance(PID, actor, dataSourceReg, {}, sql, assignReg);
+  expect(calls.length).toBe(1);
+  expect(calls[0]!.instance.data).toMatchObject({ field_alpha: "seeded", field_beta: 5 });
+  expect(created.assignment?.candidates).toEqual(["user_1"]);
+});
+
+test.skipIf(!DB)("a Literal default seeds a field opts.data leaves unset", async () => {
+  const PID = pid("proc_defaults_literal");
+  await publishBody(PID, defaultsBody(5), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  expect(created.data["field_alpha" as FieldId]).toBe("seeded");
+  expect(created.data["field_beta" as FieldId]).toBe(5);
+});
+
+test.skipIf(!DB)("an explicitly submitted value wins over a default on the same field", async () => {
+  const PID = pid("proc_defaults_precedence");
+  await publishBody(PID, defaultsBody(5), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, { data: { field_alpha: "explicit" } as unknown as Instance["data"] });
+  expect(created.data["field_alpha" as FieldId]).toBe("explicit");
+  expect(created.data["field_beta" as FieldId]).toBe(5);
+});
+
+test.skipIf(!DB)("a later field's Expression default reads an earlier field's already-resolved value", async () => {
+  const PID = pid("proc_defaults_read_earlier");
+  // field_beta's default reads data.alpha (re-keyed to field_alpha's own key).
+  await publishBody(PID, defaultsBody(cel("data.alpha == 'seeded' ? 1 : 0")), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  expect(created.data["field_beta" as FieldId]).toBe(1);
+
+  const PID2 = pid("proc_defaults_read_earlier_submitted");
+  await publishBody(PID2, defaultsBody(cel("data.alpha == 'explicit' ? 1 : 0")), reg, dataSourceReg);
+  const created2 = await createProcessInstance(PID2, actor, dataSourceReg, { data: { field_alpha: "explicit" } as unknown as Instance["data"] });
+  expect(created2.data["field_beta" as FieldId]).toBe(1);
+});
+
+test.skipIf(!DB)("an earlier field's default cannot read a later field's value", async () => {
+  const PID = pid("proc_defaults_read_later");
+  // field_alpha (earlier) defaults by reading data.beta (later) — raises for the missing key.
+  const body = defaultsBody(5, cel("string(data.beta)"));
+  await publishBody(PID, body, reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  expect(created.data["field_alpha" as FieldId]).toBeUndefined();
+  expect(created.data["field_beta" as FieldId]).toBe(5);
+});
+
+test.skipIf(!DB)("a raising Expression default leaves its field unset, and creation still succeeds", async () => {
+  const PID = pid("proc_defaults_raising");
+  await publishBody(PID, defaultsBody(cel("1 / 0")), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  expect(created.data["field_beta" as FieldId]).toBeUndefined();
+  expect(created.data["field_alpha" as FieldId]).toBe("seeded");
+});
+
+test.skipIf(!DB)("a group field's own default is never read; its children's defaults still seed", async () => {
+  const PID = pid("proc_defaults_group");
+  await publishBody(PID, defaultsBody(5, "seeded", "child-default"), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  expect(created.data["field_group" as FieldId]).toBeUndefined();
+  expect(created.data["field_child" as FieldId]).toBe("child-default");
+});
+
+test.skipIf(!DB)("a default resolving to a value failing type/option/constraint throws, like a bad opts.data value", async () => {
+  const PID = pid("proc_defaults_bad_type");
+  await publishBody(PID, defaultsBody("not-a-number" as unknown), reg, dataSourceReg);
+  let raised: unknown;
+  try {
+    await createProcessInstance(PID, actor, dataSourceReg);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(SubmissionValidationError);
+  expect((raised as SubmissionValidationError).issues).toEqual([
+    { kind: "type-mismatch", fieldId: "field_beta" as FieldId, expected: "number" },
+  ]);
+});
+
+test.skipIf(!DB)("a declared default does not satisfy a missing required field at submitAndTransition", async () => {
+  const PID = pid("proc_defaults_required_missing");
+  // field_beta's default raises (divide by zero), so it never seeds — the
+  // required check at submitAndTransition must still catch its absence,
+  // proving `default` is never read there, only at creation.
+  const body = structuredClone(defaultsBody(cel("1 / 0"))) as ProcessBody;
+  (body.workflow.steps[0].view!.fields[1] as unknown as { required: boolean }).required = true;
+  await publishBody(PID, body, reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  expect(created.data["field_beta" as FieldId]).toBeUndefined(); // the raising default left it unset
+
+  let raised: unknown;
+  try {
+    await submitAndTransition(created.instanceId, "path_ab" as PathId, { field_alpha: "resubmitted" } as unknown as Instance["data"], actor, dataSourceReg);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(SubmissionValidationError);
+  expect((raised as SubmissionValidationError).issues).toEqual([{ kind: "required-missing", fieldId: "field_beta" as FieldId }]);
+});
+
+test.skipIf(!DB)("a default on a step-level readonly-overridden field is judged by the step's own overridden validation", async () => {
+  const PID = pid("proc_defaults_readonly_override");
+  const body = structuredClone(defaultsBody(500)) as ProcessBody;
+  (body.fields[1] as unknown as { validation: unknown }).validation = { max: 10 };
+  (body.workflow.steps[0].view!.fields[1] as unknown as { readonly: boolean; validation: unknown }).readonly = true;
+  (body.workflow.steps[0].view!.fields[1] as unknown as { readonly: boolean; validation: unknown }).validation = { max: 1000 };
+  await publishBody(PID, body, reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  expect(created.data["field_beta" as FieldId]).toBe(500); // exceeds catalog's max:10, allowed by the step's own override of max:1000
+});
+
+test.skipIf(!DB)("a technical field's Literal default seeds with no readonly-field rejection", async () => {
+  const PID = pid("proc_defaults_technical");
+  const body = structuredClone(defaultsBody(5)) as ProcessBody;
+  (body.fields[1] as unknown as { technical: boolean }).technical = true;
+  await publishBody(PID, body, reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  expect(created.data["field_beta" as FieldId]).toBe(5);
+});
+
+test.skipIf(!DB)("an off-view dataSource-bound field's Literal default seeds regardless of its value", async () => {
+  const PID = pid("proc_defaults_offview_datasource");
+  const body: ProcessBody = {
+    key: "defaults_offview_ds", label: { en: "Defaults Offview DS" }, baseLocale: "en",
+    dataSources: [{ id: "ds_1", key: "ds1", type: "test.defaults-offview-options", config: {} }],
+    fields: [
+      { id: "field_visible", key: "visible", label: { en: "Visible" }, type: "string" },
+      { id: "field_offview", key: "offview", label: { en: "Offview" }, type: "select", dataSource: "ds_1", default: "not-a-listed-option" },
+    ],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a", key: "a", label: { en: "A" }, type: "task",
+          view: { fields: [{ ref: "field_visible" }] },
+          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  } as unknown as ProcessBody;
+  const dsReg = createDataSourceRegistry();
+  dsReg.set("test.defaults-offview-options", { resolve: async () => [{ value: "a", label: { en: "A" } }] });
+  await publishBody(PID, body, reg, dsReg);
+  const created = await createProcessInstance(PID, actor, dsReg);
+  expect(created.data["field_offview" as FieldId]).toBe("not-a-listed-option");
+});
+
+test.skipIf(!DB)("a default expression reading instance.status or instance.currentStepId does not raise", async () => {
+  const PID = pid("proc_defaults_instance_state");
+  await publishBody(PID, defaultsBody(cel("instance.status == 'running' && instance.currentStepId == 'step_a' ? 1 : 0")), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  expect(created.data["field_beta" as FieldId]).toBe(1);
+});
+
+test.skipIf(!DB)("an Expression default evaluating to a CEL int seeds a JSON-safe number, not a bigint", async () => {
+  const PID = pid("proc_defaults_int_literal");
+  await publishBody(PID, defaultsBody(cel("5")), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  expect(created.data["field_beta" as FieldId]).toBe(5);
+  expect(typeof created.data["field_beta" as FieldId]).toBe("number");
+
+  const PID2 = pid("proc_defaults_int_arithmetic");
+  const body2: ProcessBody = {
+    key: "defaults_arith", label: { en: "Defaults Arith" }, baseLocale: "en",
+    fields: [
+      { id: "field_qty", key: "qty", label: { en: "Qty" }, type: "number", default: cel("3") },
+      { id: "field_price", key: "price", label: { en: "Price" }, type: "number", default: cel("4") },
+      { id: "field_total", key: "total", label: { en: "Total" }, type: "number", default: cel("data.qty * data.price") },
+    ],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a", key: "a", label: { en: "A" }, type: "task",
+          view: { fields: [{ ref: "field_qty" }, { ref: "field_price" }, { ref: "field_total" }] },
+          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  } as unknown as ProcessBody;
+  await publishBody(PID2, body2, reg, dataSourceReg);
+  const created2 = await createProcessInstance(PID2, actor, dataSourceReg);
+  expect(created2.data["field_total" as FieldId]).toBe(12);
+  expect(typeof created2.data["field_total" as FieldId]).toBe("number");
+});
+
+test.skipIf(!DB)("a default seeds a field the initial step's view does not reference, using expense-approval.json's booking_status", async () => {
+  const raw = JSON.parse(readFileSync(new URL("../examples/expense-approval.json", import.meta.url), "utf8"));
+  const authored = raw.definition as ProcessBody;
+  const expenseReg = createRegistry();
+  expenseReg.set("http.request", { handler: async () => ({ body: { status: "pending" } }) });
+  expenseReg.set("notification.email", { handler: async () => ({}) });
+  const PID = pid("proc_defaults_offview_booking_status");
+  await publishBody(PID, authored, expenseReg, dataSourceReg);
+  const bookingStatusField = "field_1a2b3c4d-0004-4a1c-8e2f-000000000004" as FieldId;
+
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  expect(created.data[bookingStatusField]).toBe("pending");
+});
+
+test.skipIf(!DB)("an off-view default failing its own validation.rule throws with rule-failed", async () => {
+  const raw = JSON.parse(readFileSync(new URL("../examples/expense-approval.json", import.meta.url), "utf8"));
+  const authored = structuredClone(raw.definition) as ProcessBody;
+  const bookingStatusField = "field_1a2b3c4d-0004-4a1c-8e2f-000000000004" as FieldId;
+  const bookingStatusDef = authored.fields.find((f) => (f.id as string) === (bookingStatusField as string))!;
+  (bookingStatusDef as unknown as { validation: unknown }).validation = { rule: cel("data.booking_status != 'pending'") };
+  const expenseReg = createRegistry();
+  expenseReg.set("http.request", { handler: async () => ({ body: { status: "pending" } }) });
+  expenseReg.set("notification.email", { handler: async () => ({}) });
+  const PID = pid("proc_defaults_offview_rule_failed");
+  await publishBody(PID, authored, expenseReg, dataSourceReg);
+
+  let raised: unknown;
+  try {
+    await createProcessInstance(PID, actor, dataSourceReg);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(SubmissionValidationError);
+  expect((raised as SubmissionValidationError).issues).toEqual([{ kind: "rule-failed", fieldId: bookingStatusField }]);
+});
+
+test.skipIf(!DB)(
+  "creating a fresh expense-approval.json instance seeds booking_status to pending, and 'book' still parks as a wait-state",
+  async () => {
+    const raw = JSON.parse(readFileSync(new URL("../examples/expense-approval.json", import.meta.url), "utf8"));
+    const authored = raw.definition as ProcessBody;
+    const expenseReg = createRegistry();
+    expenseReg.set("http.request", { handler: async () => ({ body: { status: "pending" } }) });
+    expenseReg.set("notification.email", { handler: async () => ({}) });
+    const PID = pid("proc_defaults_expense_pending");
+    await publishBody(PID, authored, expenseReg, dataSourceReg);
+
+    const amountField = "field_1a2b3c4d-0001-4a1c-8e2f-000000000001" as FieldId;
+    const reasonField = "field_1a2b3c4d-0002-4a1c-8e2f-000000000002" as FieldId;
+    const reviewNoteField = "field_1a2b3c4d-0003-4a1c-8e2f-000000000003" as FieldId;
+    const bookingStatusField = "field_1a2b3c4d-0004-4a1c-8e2f-000000000004" as FieldId;
+    const submitPath = "path_bbbb2222-0001-4a1c-8e2f-000000000001" as PathId;
+    const approvePath = "path_bbbb2222-0002-4a1c-8e2f-000000000002" as PathId;
+    const demoActor: Actor = { id: "user_demo", roles: ["employee", "finance-approver"] };
+
+    const created = await createProcessInstance(PID, demoActor, dataSourceReg);
+    expect(created.data[bookingStatusField]).toBe("pending");
+
+    await claimStep(created.instanceId, demoActor);
+    const afterCapture = await submitAndTransition(
+      created.instanceId,
+      submitPath,
+      { [amountField]: 42, [reasonField]: "Taxi" } as unknown as Instance["data"],
+      demoActor, dataSourceReg,
+    );
+
+    await claimStep(afterCapture.instanceId, demoActor);
+    const afterReview = await submitAndTransition(
+      afterCapture.instanceId,
+      approvePath,
+      { [reviewNoteField]: "Looks fine" } as unknown as Instance["data"],
+      demoActor, dataSourceReg,
+    );
+    // "pending" matches neither the booked nor the failed guard, so book parks.
+    expect(afterReview.currentStepId as string).toBe("step_aaaa1111-0003-4a1c-8e2f-000000000003");
+    expect(afterReview.status).toBe("running");
+  },
+);
 
 test.skipIf(!DB)("getInstanceView on a completed instance still resolves, with no available paths", async () => {
   const PID = pid("proc_view_completed");

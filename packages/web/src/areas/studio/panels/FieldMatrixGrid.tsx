@@ -3,6 +3,7 @@ import { useDraft } from "../draft/store";
 import { t } from "../catalog.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text";
 import { effectiveFlag, gatedKeys, setFlag, writtenFieldCounts, type FlagKey } from "../draft/view-flags";
+import { technicalFieldIds } from "../draft/fields";
 import type { BoolOrExpr } from "./shared/overrideMode";
 import { isExpression } from "./shared/overrideMode";
 import {
@@ -14,6 +15,7 @@ import {
   rowLiveTargets,
   bulkBadgeOn,
   applyBulkToggle,
+  eligibleTargetEntries,
   isCellFlagged,
   type CellState,
   type BulkTarget,
@@ -56,21 +58,29 @@ function BulkBadges({
   targets,
   allSteps,
   written,
+  technicalFieldIds,
   onToggle,
 }: {
   targets: BulkTarget[];
   allSteps: Parameters<typeof bulkBadgeOn>[0];
   written: Map<string, number>;
+  technicalFieldIds: Set<string>;
   onToggle: (key: FlagKey) => void;
 }) {
+  // A key whose eligible target set is empty (e.g. required/readonly on a
+  // technical field's row) gets no badge at all — a button that answers no
+  // click reads as broken, per studio-app's bulk-toggle requirement.
+  const eligibleKeys = FLAG_KEYS.filter(
+    (key) => eligibleTargetEntries(allSteps, targets, key, written, technicalFieldIds).length > 0,
+  );
   return (
     <span className="studio-matrix-flags">
-      {FLAG_KEYS.map((key) => (
+      {eligibleKeys.map((key) => (
         <button
           key={key}
           type="button"
           className="studio-matrix-flag-badge"
-          aria-pressed={bulkBadgeOn(allSteps, targets, key, written)}
+          aria-pressed={bulkBadgeOn(allSteps, targets, key, written, technicalFieldIds)}
           aria-label={t(FLAG_LABEL_KEY[key])}
           title={t(FLAG_LABEL_KEY[key])}
           onClick={() => onToggle(key)}
@@ -119,6 +129,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
   const drawnSteps = filterInertSteps(allSteps, hideInert);
   const written = useMemo(() => writtenFieldCounts(draft), [draft]);
   const writtenIds = useMemo(() => new Set([...written].filter(([, count]) => count > 0).map(([id]) => id)), [written]);
+  const technicalIds = useMemo(() => technicalFieldIds(draft.fields), [draft.fields]);
 
   const [focus, setFocus] = useState<Focus>({ row: 0, col: 0 });
   const [activated, setActivated] = useState(false);
@@ -216,7 +227,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
   const applyBulk = (targets: BulkTarget[], key: FlagKey) => {
     mutate((d) => {
       const steps = d.workflow?.steps;
-      if (steps) applyBulkToggle(steps, targets, key, written);
+      if (steps) applyBulkToggle(steps, targets, key, written, technicalIds);
     });
   };
 
@@ -246,6 +257,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                       targets={colTargets}
                       allSteps={allSteps}
                       written={written}
+                      technicalFieldIds={technicalIds}
                       onToggle={(key) => applyBulk(colTargets, key)}
                     />
                   )}
@@ -259,7 +271,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
             const rowTargets = showBulkBadges ? rowLiveTargets(allSteps, row.id) : [];
             return (
               <tr key={row.id} data-group={row.isGroup || undefined}>
-                <th scope="row" className="studio-matrix-row-header" data-depth={row.depth}>
+                <th scope="row" className="studio-matrix-row-header" data-depth={row.depth} data-technical={technicalIds.has(row.id) || undefined}>
                   <span className="studio-matrix-field-key">{row.key === "" ? t("panelsScreen.unnamedField") : row.key}</span>
                   <span
                     className="studio-matrix-field-type"
@@ -267,11 +279,17 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                   >
                     {row.type}
                   </span>
+                  {technicalIds.has(row.id) && (
+                    <span className="studio-matrix-row-technical" title={t("fieldMatrix.legendTechnical")}>
+                      {t("fieldMatrix.technicalRowMark")}
+                    </span>
+                  )}
                   {showBulkBadges && rowTargets.length > 0 && (
                     <BulkBadges
                       targets={rowTargets}
                       allSteps={allSteps}
                       written={written}
+                      technicalFieldIds={technicalIds}
                       onToggle={(key) => applyBulk(rowTargets, key)}
                     />
                   )}
@@ -311,7 +329,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                             if (isExpression(raw)) {
                               return <CelStamp key={key} label={t(FLAG_LABEL_KEY[key])} src={raw.src ?? ""} />;
                             }
-                            const disabled = key !== "visible" && gatedKeys(entry, written).includes(key);
+                            const disabled = key !== "visible" && gatedKeys(entry, written, technicalIds).includes(key);
                             return (
                               <input
                                 key={key}

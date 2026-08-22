@@ -71,6 +71,34 @@ The example declares four fields. `amount` is a number, `reason` is a string,
 A field key must match `/^[a-z_][a-z0-9_]*$/`, because a guard reads it as
 `data.<key>`.
 
+### Default value
+
+A field can declare `default`, a literal value or a CEL expression. Creating
+an instance seeds an open slot from it. `booking_status`'s own `"pending"`
+default is one such literal. An explicitly submitted value always wins over
+a default on the same field.
+
+A literal writes directly. An expression evaluates over the seed already in
+progress. A later field's default can therefore read an earlier field's
+resolved value, through `data.<key>`. That only works when the catalog
+lists the earlier field first. A default cannot read a field listed later
+in the catalog. That read raises for the missing key, the same total-CEL
+rule a guard follows everywhere else.
+
+A raising default leaves its own field unset. It does not fail the
+creation.
+
+This seeding runs once, only inside instance creation. It runs only for a
+top-level instance created directly. A subprocess spawn seeds its own new
+instance from the parent's own mapping instead. A `process.start` chain
+seeds its own new instance from the caller's own mapping instead. Neither
+one reads the started process's own catalog defaults.
+`submitAndTransition` never applies a default at a later transition. It
+never re-checks one already seeded at creation.
+
+A `group` field's own default is never read. A group carries no slot of
+its own in the flat data payload. Only its children's defaults seed.
+
 ### Validation
 
 A field can declare `min`, `max`, `minLength`, `maxLength`, `pattern` or
@@ -183,6 +211,14 @@ a mapped target. The list's value is the one that lands.
 The natural shape marks the target readonly in the view. A participant then
 reads what the pick produced, rather than typing over it.
 
+A catalog-level `technical` marker is the stronger form of the same intent.
+`readonly` on one step leaves the target editable on another. A submission
+there can still carry a value for the target. The engine writes the mapped
+value and discards the submission's own value without complaint. The
+`technical` key forbids the target on every step at once. The same
+submission then fails as a `readonly-field` rejection before the mapping
+runs. The "mapped value wins" rule never engages for it.
+
 The engine drops an entry whose type does not match its target field, and the
 submission still succeeds. The instance record names the drop. That mismatch
 comes from operator data, and the participant can do nothing about it.
@@ -213,6 +249,13 @@ presents each one: visible, required, readonly, its span, its order, its group.
 
 Requiredness lives in the view, never in the catalog. One step can demand a
 field that the next step only displays.
+
+A catalog field can carry one fact of its own: `technical`. It marks a field
+the engine writes and a participant never edits, on every step at once. The
+engine resolves such a field `required: false` and `readonly: true`
+regardless of what any step's view says. A view entry naming it may not
+declare `required` or `readonly` at all. That refines the rule above; it does
+not break it. Ordinary requiredness still lives only in the view.
 
 A step can also override a field's validation, in one of two modes. The
 default mode is `merge`. It keeps every catalog bound the step does not name,
@@ -459,7 +502,11 @@ off the canvas and its field returns to the palette.
 
 A toggle above the canvas sets the form to one column or two. Select a card
 and the strip sets that field's visible, required, readonly, span and group.
-Each of the first three takes `true`, `false`, or a CEL expression.
+Each of the first three takes `true`, `false`, or a CEL expression. For a
+field marked `technical` in the field catalog, the strip omits the required
+and readonly controls. The definition contract forbids declaring either on
+that field's view entry. The strip therefore offers no path to a rejected
+publish.
 
 The editor writes into the draft as you work. It has no Save button of its
 own: the screen's Save, Discard and Publish still govern what persists.

@@ -15,12 +15,12 @@ function findFieldById(fields: DraftField[] | undefined, id: string): DraftField
   return undefined;
 }
 
-// "structural" covers src/schema/compile.ts's CompileValidationError — the six
-// harden-publish-validation write-path checks (unknown keys, the reserved
-// action prefix, uncompilable/over-long patterns, unresolved
+// "structural" covers src/schema/compile.ts's CompileValidationError — the
+// seven harden-publish-validation write-path checks (unknown keys, the
+// reserved action prefix, uncompilable/over-long patterns, unresolved
 // outputMapping/contract field ids, non-identifier field keys, over-long
-// authored strings), all reported in the same {loc, value, message} shape as
-// "duration".
+// authored strings, technical-field misuse), all reported in the same
+// {loc, value, message} shape as "duration".
 // "view" covers checkViewFlags (draft/view-flags.ts) — the studio's own
 // findings over view.fields[], not an engine validator. It never blocks a
 // publish; see studio-checks-rail's "Every publish blocker is visible"

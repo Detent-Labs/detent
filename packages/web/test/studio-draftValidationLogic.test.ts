@@ -165,3 +165,60 @@ describe("runValidation: an assignment-less step", () => {
     expect(result.issues).toHaveLength(0);
   });
 });
+
+// technical-field-marker: compile.ts::checkTechnicalFields' two rules anchor
+// through resolveLoc's dotted-loc conventions — the view rule on its step,
+// the group rule on its field — never on the process root.
+describe("runValidation: technical-field structural issues anchor on the right entity", () => {
+  it("a technical field's view entry violation anchors on its step", () => {
+    const body = cleanBody();
+    (body.fields![0] as { technical?: boolean }).technical = true;
+    (body.workflow!.steps![0] as unknown as { view?: unknown }).view = {
+      fields: [{ ref: "field_amount", required: true }],
+    };
+
+    const result = runValidation(body, undefined, {}, {});
+    const issue = result.issues.find((i) => i.source === "structural" && i.message.includes("required"));
+    expect(issue).toBeDefined();
+    expect(issue!.entityType).toBe("step");
+    expect(issue!.entityId).toBe("step_a");
+  });
+
+  it("a technical group field anchors on the field", () => {
+    const body = cleanBody();
+    (body.fields as unknown[]).push({ id: "field_g", key: "g", label: { en: "G" }, type: "group", technical: true, fields: [] });
+
+    const result = runValidation(body, undefined, {}, {});
+    const issue = result.issues.find((i) => i.source === "structural" && i.message.includes("group"));
+    expect(issue).toBeDefined();
+    expect(issue!.entityType).toBe("field");
+    expect(issue!.entityId).toBe("field_g");
+  });
+});
+
+// technical-field-marker: checkUnwrittenTechnicalFields is a sibling of
+// checkViewFlags, wired into runValidation under the "view" source. This pins
+// that wiring end to end, not just the sibling function in isolation.
+describe("runValidation: an unwritten technical field surfaces under the view source", () => {
+  it("reports a field-anchored 'view' issue for a technical field no structural source writes", () => {
+    const body = cleanBody();
+    (body.fields![0] as { technical?: boolean }).technical = true;
+
+    const result = runValidation(body, undefined, {}, {});
+    expect(result.zodValid).toBe(true);
+    const issue = result.issues.find((i) => i.source === "view" && i.entityId === "field_amount");
+    expect(issue).toBeDefined();
+    expect(issue!.entityType).toBe("field");
+  });
+
+  it("raises no 'view' issue for a technical field an action output writes", () => {
+    const body = cleanBody();
+    (body.fields![0] as { technical?: boolean }).technical = true;
+    (body.workflow!.steps![0] as unknown as { onEntry?: unknown[] }).onEntry = [
+      { id: "action_x", type: "core.noop", output: { field_amount: { lang: "cel", src: "result" } } },
+    ];
+
+    const result = runValidation(body, undefined, {}, {});
+    expect(result.issues.some((i) => i.source === "view" && i.entityId === "field_amount")).toBe(false);
+  });
+});

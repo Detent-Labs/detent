@@ -39,12 +39,53 @@ const VIEW_LABEL: Record<PanelView, CatalogKey> = {
  * this view under. Contract issues all land on the single `"contract"` id.
  * Matrix carries no entry: `checkViewFlags` issues share `entityType: "step"`
  * with every other per-step issue, so its rail badge counts by `source`
- * instead (`issueCountForSource`, below). */
+ * instead (`issueCountForSource`, below). Since technical-field-marker, that
+ * `view`-source count also includes `checkUnwrittenTechnicalFields`'
+ * field-anchored finding, which the Fields view's own `issueCountForEntityType`
+ * badge surfaces correctly (design.md Risks). */
 const VIEW_ENTITY_TYPE: Record<Exclude<PanelView, "matrix">, EntityType> = {
   fields: "field",
   dataSources: "dataSource",
   contract: "contract",
 };
+
+interface PanelsRailFieldRowProps {
+  /** The resolved label, or the "unnamed field" fallback already applied. */
+  label: string;
+  typeLabel: string | undefined;
+  depth: 0 | 1;
+  issues: number;
+  selected: boolean;
+  onClick: () => void;
+}
+
+/**
+ * A Fields rail row: the resolved label, the friendly type, the issue mark —
+ * one line (field-catalog-editor-rework). The row prints no `key`; the key
+ * stays visible in the Field tab once an author selects that field, where
+ * the engine's exact-match value already lives. Pulled out of the render
+ * loop so it can be exercised directly, the same reason `FormEditorStrip`
+ * sits beside `FormEditorScreen`.
+ */
+export function PanelsRailFieldRow({ label, typeLabel, depth, issues, selected, onClick }: PanelsRailFieldRowProps) {
+  return (
+    <button
+      type="button"
+      className="studio-panels-rail-field"
+      data-depth={depth}
+      aria-current={selected ? "true" : undefined}
+      onClick={onClick}
+    >
+      <span className="studio-panels-rail-name">{label}</span>
+      {typeLabel && <span className="studio-panels-rail-type studio-mono">{typeLabel}</span>}
+      {issues > 0 && (
+        <span className="studio-panels-rail-issues" aria-label={`${issues} ${t("panelsScreen.issueMark")}`}>
+          {issues}
+        </span>
+      )}
+    </button>
+  );
+}
 
 interface Props {
   openView: PanelView;
@@ -176,7 +217,11 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token }
             {PANEL_VIEWS.map((view) => {
               // The matrix's badge counts `source: "view"` findings instead: its
               // issues share `entityType: "step"` with every other per-step
-              // issue, so `VIEW_ENTITY_TYPE` carries no entry for it.
+              // issue, so `VIEW_ENTITY_TYPE` carries no entry for it. That count
+              // over-reports by one per unwritten technical field, since
+              // `checkUnwrittenTechnicalFields`' finding is field-anchored, not
+              // step-anchored (design.md Risks) — the Fields view's own badge,
+              // below, surfaces it correctly instead.
               const issues =
                 view === "matrix"
                   ? issueCountForSource(validation.issues, "view")
@@ -205,27 +250,14 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token }
                         const typeLabel = field && typeof field.type === "string" ? FIELD_TYPE_LABELS[field.type].name : undefined;
                         return (
                           <li key={row.id}>
-                            <button
-                              type="button"
-                              className="studio-panels-rail-field"
-                              data-depth={row.depth}
-                              aria-current={selectedFieldId === row.rootId ? "true" : undefined}
+                            <PanelsRailFieldRow
+                              label={label || t("panelsScreen.unnamedField")}
+                              typeLabel={typeLabel}
+                              depth={row.depth}
+                              issues={rowIssues}
+                              selected={selectedFieldId === row.rootId}
                               onClick={() => selectField(row.rootId, row.id)}
-                            >
-                              <span className="studio-panels-rail-field-text">
-                                <span className="studio-panels-rail-name">{label || t("panelsScreen.unnamedField")}</span>
-                                {row.key !== "" && <span className="studio-panels-rail-key studio-mono">{row.key}</span>}
-                              </span>
-                              {typeLabel && <span className="studio-panels-rail-type studio-mono">{typeLabel}</span>}
-                              {rowIssues > 0 && (
-                                <span
-                                  className="studio-panels-rail-issues"
-                                  aria-label={`${rowIssues} ${t("panelsScreen.issueMark")}`}
-                                >
-                                  {rowIssues}
-                                </span>
-                              )}
-                            </button>
+                            />
                           </li>
                         );
                       })}

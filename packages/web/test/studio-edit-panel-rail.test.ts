@@ -85,6 +85,11 @@ describe("issueCountForEntityType", () => {
   it("reads zero for a view with no issue", () => {
     expect(issueCountForEntityType([issue("field", LEAF)], "contract")).toBe(0);
   });
+
+  it("surfaces a field-anchored view finding under the Fields view, technical-field-marker's finding included", () => {
+    const issues = [issue("field", LEAF, "view")];
+    expect(issueCountForEntityType(issues, "field")).toBe(1);
+  });
 });
 
 const step = {
@@ -152,6 +157,11 @@ describe("issueCountForSource", () => {
 
   it("reads zero for a draft with no issue of that source", () => {
     expect(issueCountForSource([issue("step", STEP, "cel")], "view")).toBe(0);
+  });
+
+  it("counts a field-anchored view finding toward the field matrix's badge, technical-field-marker's unwritten-technical-field finding included", () => {
+    const issues = [issue("field", LEAF, "view"), issue("step", STEP, "cel")];
+    expect(issueCountForSource(issues, "view")).toBe(1);
   });
 });
 

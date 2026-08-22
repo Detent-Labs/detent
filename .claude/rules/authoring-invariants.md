@@ -88,6 +88,12 @@ only the cancel-sink count.
   `Action.output` check in the `processBody` superRefine. That would tighten
   the read schema and could strand an already-published body's running
   instances.
+- A `technical` field is never `type: "group"`, and a `ViewField` naming a
+  technical field declares neither `required` nor `readonly`, literal or
+  CEL. The compile pass checks both (`compile.ts::checkTechnicalFields`), not
+  a Zod refinement on `fieldDef` or `viewField`, for the same read-path
+  reason its siblings carry: `definition.ts` also deserializes stored
+  immutable bodies.
 - `FieldDef.key` matches `/^[a-z_][a-z0-9_]*$/` — the CEL identifier grammar
   `data.<key>` requires. The compile pass checks this
   (`compile.ts::checkFieldKeyFormat`). `Step.key`/`Path.key` stay

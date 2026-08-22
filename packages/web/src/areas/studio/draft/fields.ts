@@ -25,3 +25,15 @@ export function flattenDraftFields(fields: DraftField[] | undefined): DraftField
 export function draftFields(draft: Draft): DraftField[] {
   return flattenDraftFields(draft.fields);
 }
+
+/** Every field id, at any catalog depth, declaring `technical: true`. Shared
+ * by the form editor's strip (control omission) and the field matrix
+ * (`gatedKeys`'s technical-field signal), so neither can disagree about
+ * which fields are technical. */
+export function technicalFieldIds(fields: DraftField[] | undefined): Set<string> {
+  const ids = new Set<string>();
+  for (const f of flattenDraftFields(fields)) {
+    if (f.technical === true && f.id !== undefined) ids.add(f.id);
+  }
+  return ids;
+}

@@ -37,8 +37,34 @@ the cost of finding one. Run the review to the end before `/openspec-apply-chang
 
 1. **Resolve the change.** Take the name from the user. Otherwise run
    `openspec list --json`. More than one candidate: ask. Never guess.
-2. **Run `openspec validate <name> --strict`.** Quote each reported fault verbatim
-   as a Critical finding. Then keep going. The strict pass covers structure alone.
+2. **Run `bun run scripts/openspec-review-check.ts <name>` (inside the
+   devcontainer).** It runs `openspec validate <name> --strict` itself. It
+   folds every fault in at the severity the CLI gave it. `ERROR` becomes
+   Critical. `WARNING` becomes Warning. It also runs four checks `--strict`
+   does not run.
+
+   <!-- antislop: allow sentence-length -->
+   <!-- Known linter miscount: the quoted code spans merge this paragraph's sentences into one count; each sentence reads under 20 words split at its own period. -->
+   A MODIFIED or REMOVED requirement header must match a base spec header
+   character for character. `--strict` only checks scenario completeness
+   when a header happens to match a base one. A reworded header pairs with
+   nothing and draws no complaint. It then archives as an added requirement,
+   not a modified one.
+
+   <!-- antislop: allow sentence-length -->
+   <!-- Known linter miscount: the quoted code spans merge this paragraph's sentences into one count; each sentence reads under 20 words split at its own period. -->
+   An ADDED requirement must not duplicate a base header verbatim.
+   `proposal.md`'s New/Modified Capabilities bullets must match the
+   capabilities `specs/` holds, in both directions. `design.md` must carry
+   its required Migration Plan and Open Questions sections.
+
+   Carry every line the script prints into the report at the severity it
+   printed. This step is text-matching, not judgment. A clean run clears
+   none of steps 3 through 8.
+
+   If the script cannot run at all, fall back to `openspec validate <name>
+   --strict` by hand for that one piece. Keep going: the rest of this
+   step's checks still need the manual read below.
 3. **Read all of it.** `proposal.md`, every `specs/**/spec.md`, `design.md` and
    `tasks.md`. Read `openspec/specs/<capability>/spec.md` for each capability
    the change marks MODIFIED or REMOVED. Read

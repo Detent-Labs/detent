@@ -570,3 +570,83 @@ describe("compile: columnMapping bounds", () => {
     expect(serialized).not.toContain("columnMapping");
   });
 });
+
+// technical-field-marker: the seventh structural check. Neither rule is a Zod
+// refinement — `definition.ts` also deserializes stored immutable bodies.
+describe("compile: technical field marker", () => {
+  it("rejects technical: true on a group field", () => {
+    const b = baseBody();
+    b.fields.push({ id: "field_g", key: "g", label: { en: "G" }, type: "group", technical: true, fields: [] });
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "fields.field_g.technical")).toBe(true);
+  });
+
+  it("rejects a group field nested at any depth", () => {
+    const b = baseBody();
+    b.fields.push({
+      id: "field_outer",
+      key: "outer",
+      label: { en: "Outer" },
+      type: "group",
+      fields: [{ id: "field_inner", key: "inner", label: { en: "Inner" }, type: "group", technical: true, fields: [] }],
+    });
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "fields.field_inner.technical")).toBe(true);
+  });
+
+  it("publishes a technical field of a non-group type", () => {
+    const b = baseBody();
+    b.fields[0].technical = true;
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  for (const [label, mutate] of [
+    ["required: true", (vf: any) => (vf.required = true)],
+    ["readonly: true", (vf: any) => (vf.readonly = true)],
+    ["readonly: false", (vf: any) => (vf.readonly = false)],
+    ["required as CEL", (vf: any) => (vf.required = cel("true"))],
+    ["readonly as CEL", (vf: any) => (vf.readonly = cel("true"))],
+  ] as const) {
+    it(`rejects a technical field's view entry declaring ${label}`, () => {
+      const b = baseBody();
+      b.fields[0].technical = true;
+      b.workflow.steps[0].view = { fields: [{ ref: "field_amount" }] };
+      mutate(b.workflow.steps[0].view.fields[0]);
+      const err = rejects(b);
+      const suffix = label.startsWith("required") ? "required" : "readonly";
+      expect(err.issues.some((i) => i.loc === `steps[0].view.fields[0].${suffix}`)).toBe(true);
+    });
+  }
+
+  it("accepts a technical field's view entry declaring only a display-only key", () => {
+    const b = baseBody();
+    b.fields[0].technical = true;
+    b.workflow.steps[0].view = { fields: [{ ref: "field_amount", span: 2 }] };
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("technical: false gates nothing: publishes on a group field", () => {
+    const b = baseBody();
+    b.fields.push({ id: "field_g", key: "g", label: { en: "G" }, type: "group", technical: false, fields: [] });
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("technical: false gates nothing: publishes with required: true on the view entry", () => {
+    const b = baseBody();
+    b.fields[0].technical = false;
+    b.workflow.steps[0].view = { fields: [{ ref: "field_amount", required: true }] };
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("a malformed body with no fields array reaches the Zod error, not a TypeError", () => {
+    const b = baseBody();
+    delete b.fields;
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow(TypeError);
+  });
+
+  it("a malformed view.fields entry with no ref reaches the Zod error, not a TypeError", () => {
+    const b = baseBody();
+    b.workflow.steps[0].view = { fields: [{ required: true }] };
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow(TypeError);
+  });
+});
