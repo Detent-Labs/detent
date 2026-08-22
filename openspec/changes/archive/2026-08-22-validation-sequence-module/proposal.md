@@ -203,14 +203,15 @@ The `draft/validation.ts` passage is the third. It states that file calls
 `validateStructure` instead, which calls `compileProcessBody` internally.
 That same file's engine section gains a note on the new two-phase seam.
 The note names `validateStructure` then `validateReferences`.
+
 `docs/browser-checks.md` gains a check for the widened rail.
-`.claude/rules/process-contract.md`'s Extensibility paragraph is rewritten to
-name `resolveType`/`checkConfigOnly` (via `validateReferences`) as what
-`publishBody` invokes at publish time, replacing the direct
-`checkActionRegistry`/`checkAssignmentRegistry`/`checkDataSourceRegistry`
-description, per task 7.4. `docs/decisions.md` gains an Open Questions bullet
-recording that `checkUnknownKeys` stays held back in the studio pending a
-tolerant walk (task 7.5).
+`.claude/rules/process-contract.md`'s Extensibility paragraph is rewritten,
+per task 7.4. It now credits `validateReferences` (via `resolveType` and
+`checkConfigOnly`) as what `publishBody` invokes at publish time. That
+replaces the direct `checkActionRegistry`/`checkAssignmentRegistry`/
+`checkDataSourceRegistry` description. `docs/decisions.md` gains an Open
+Questions bullet. It records that `checkUnknownKeys` stays held back in the
+studio pending a tolerant walk (task 7.5).
 
 Not in scope: unifying `CompileIssue`, `DurationIssue`, `CelIssue` and
 `RegistryIssue`. Their three `loc` conventions stay as they are. That work
