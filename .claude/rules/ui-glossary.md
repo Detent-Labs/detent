@@ -187,6 +187,11 @@ into a version, and a version never changes again. The definition is the
 serialized JSON body itself, which both a draft and a version carry. Never use
 one term for another.
 
+The `instance-form-drafts` capability introduces an unrelated concept: a
+participant's saved, unsubmitted step-form input on a running instance. Its
+full, exclusive term is **form draft** (or **instance form draft**), never
+bare "draft". Bare "draft" always means the studio's process draft above.
+
 ## 3. Defined elsewhere
 
 This file links. It does not repeat. A term defined twice drifts.
