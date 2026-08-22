@@ -1,3 +1,5 @@
+<!-- antislop: allow-file passive-voice -- SHALL requirements act on the request and draft as subjects, so the passive register is correct here -->
+
 # http-wrapper
 
 ## ADDED Requirements
@@ -5,11 +7,11 @@
 ### Requirement: Save an instance form draft over HTTP
 
 `PUT /instances/:instanceId/draft` SHALL resolve the actor via the injected
-`ActorResolver`, accept a JSON body `{ data }`, call
-`saveInstanceDraft(instanceId, data, actor)`, and on success return `200 OK`
-with the saved draft's `{ updatedBy, updatedAt }` as the JSON body, with no
-response envelope. An absent `data` field SHALL default to `{}`, the same
-default the submit route's body schema applies. The route SHALL map the
+`ActorResolver`. It SHALL accept a JSON body `{ data }` and call
+`saveInstanceDraft(instanceId, data, actor)`. On success it SHALL return
+`200 OK` with the saved draft's `{ updatedBy, updatedAt }` as the JSON body,
+with no response envelope. An absent `data` field SHALL default to `{}`, the
+same default the submit route's body schema applies. The route SHALL map the
 runtime operation's errors the same way the submit route maps its own.
 
 #### Scenario: A claimant's draft saves

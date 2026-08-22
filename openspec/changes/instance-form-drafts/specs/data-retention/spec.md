@@ -1,3 +1,5 @@
+<!-- antislop: allow-file passive-voice -- SHALL requirements act on the instance as subject -->
+
 # data-retention
 
 ## REMOVED Requirements
@@ -30,8 +32,8 @@ instance.
 ### Requirement: redactInstance is idempotent
 
 A second `redactInstance` call against an already-redacted instance SHALL be
-a no-op. It SHALL NOT throw, and it SHALL NOT re-run the comment, attachment,
-or draft deletes.
+a no-op. It SHALL NOT throw. It SHALL NOT re-run the comment, attachment, or
+draft deletes.
 
 #### Scenario: Redacting twice changes nothing on the second call
 
@@ -55,9 +57,8 @@ Neither carries a field value, so neither needs redaction.
 
 #### Scenario: Redacting a completed instance clears data and deletes rows
 
-- **WHEN** `redactInstance` is called for a `completed` instance that holds
-  submitted field data, one or more comments, one or more attachments, and a
-  saved form draft
+- **WHEN** `redactInstance` is called for a `completed` instance holding field
+  data, comments, attachments, and a form draft
 - **THEN** the instance's `data` becomes `{}`, `redacted_at` is set, and every
   `instance_comments`/`instance_attachments`/`instance_drafts` row for that
   instance is deleted

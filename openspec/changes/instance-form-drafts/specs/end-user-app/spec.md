@@ -1,12 +1,14 @@
+<!-- antislop: allow-file passive-voice -- SHALL requirements act on the screen and draft as subjects, so the passive register is correct here -->
+
 # end-user-app
 
 ## ADDED Requirements
 
 ### Requirement: The task screen offers a Save control for unfinished input
 
-The task screen SHALL render a **Save** control beside the claim and submit
-actions under the same claim-gated condition that enables path-submit.
-Clicking Save SHALL send the participant's editable field values to
+The task screen SHALL show a **Save** control beside the claim and submit
+actions. The same claim-gated condition that enables path-submit SHALL govern
+it. Clicking Save SHALL send the participant's editable field values to
 `PUT /instances/:instanceId/draft` without submitting and without advancing
 the step. On success the screen SHALL show a saved confirmation that names the
 save time.
@@ -25,11 +27,11 @@ save time.
 
 ### Requirement: The task screen restores a saved form draft on open
 
-When the task screen loads an instance view that carries a `draft`, the screen
-SHALL seed the editable fields from the draft's data rather than from the
-instance's committed values, and SHALL show a notice that a form draft was
-restored, naming its save time. Readonly fields SHALL keep their committed
-values.
+On open, the task screen SHALL seed editable fields from the draft's data when
+the view carries a `draft`. Otherwise the screen SHALL seed them from the
+instance's committed values. The screen SHALL also show a notice that a form
+draft was restored, naming its save time. Readonly fields SHALL keep their
+committed values.
 
 #### Scenario: A saved form draft pre-fills the form
 

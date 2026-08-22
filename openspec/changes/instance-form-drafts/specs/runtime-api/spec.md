@@ -1,3 +1,5 @@
+<!-- antislop: allow-file passive-voice -- SHALL requirements act on the draft and actor as subjects, so the passive register is correct here -->
+
 # runtime-api
 
 ## ADDED Requirements
@@ -7,12 +9,12 @@
 `saveInstanceDraft(instanceId, data, actor, db?)` SHALL persist the
 participant's unfinished form input for a running instance, into the
 `instance-form-drafts` capability's per-instance draft. It SHALL authorize the
-actor by the same relationship rule `submitAndTransition` enforces: on a step
-with an assignment, the current claimant alone; on a step without one, the
-instance starter or a holder of `ADMIN_ROLE`. It SHALL reject a non-running
-instance with `InstanceNotRunningError`. It SHALL store the data leniently,
-with no field validation, and record the instance's current step as the
-draft's step.
+actor by the same relationship rule `submitAndTransition` enforces. On a step
+with an assignment, the current claimant alone may save. On a step without
+one, the instance starter or an `ADMIN_ROLE` holder may save. It SHALL reject
+a non-running instance with `InstanceNotRunningError`. It SHALL store the data
+leniently, with no field validation, and record the instance's current step as
+the draft's step.
 
 #### Scenario: The claimant saves a draft
 
@@ -42,10 +44,10 @@ draft's step.
 
 ### Requirement: The instance view carries the participant's saved form draft
 
-`getInstanceView` SHALL include a `draft` field in the returned `InstanceView`
-when the instance holds a form draft whose recorded step matches the
-instance's current step. The field SHALL carry the draft's data, step, saving
-actor, and save time. It SHALL be absent when no matching draft exists.
+`getInstanceView` SHALL include a `draft` field in the `InstanceView` it
+returns. It SHALL add the field when a stored draft's recorded step matches
+the current step. The field SHALL carry the draft's data, step, saving actor,
+and save time. It SHALL be absent when no matching draft exists.
 
 #### Scenario: A matching draft is returned
 

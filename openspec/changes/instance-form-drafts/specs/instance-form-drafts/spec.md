@@ -1,19 +1,21 @@
+<!-- antislop: allow-file passive-voice -- SHALL requirements act on the draft and instance as subjects, so the passive register is correct here -->
+
 # instance-form-drafts
 
 ## Purpose
 
-Lets a participant save an unfinished form on a running instance and resume
-it later, without submitting or advancing the step.
+A participant can save an unfinished form on a running instance and resume
+it later. Saving never submits or advances the step.
 
 ## ADDED Requirements
 
 ### Requirement: One mutable form draft per instance
 
 The engine SHALL persist a participant's unfinished form input in a dedicated
-`instance_drafts` table, keyed by `instance_id`, so an instance holds at most
-one draft. The table SHALL carry the draft's data, the step id it was saved
-on, the actor who saved it, and the save time. The engine SHALL expose get,
-save, and delete operations over that table.
+`instance_drafts` table, keyed by `instance_id`. An instance holds at most one
+draft. The table SHALL carry the draft's data and the step id where it was
+saved. It SHALL also carry the saving actor and the save time. The engine
+SHALL expose get, save, and delete operations over that table.
 
 #### Scenario: A second save for the same instance replaces the first
 
@@ -30,10 +32,10 @@ save, and delete operations over that table.
 ### Requirement: A form draft stores the input exactly as entered
 
 The draft store SHALL store the field-to-value map exactly as the participant
-entered it. It SHALL validate only that the map is a plain JSON object and
-that it stays within the existing `MAX_DRAFT_ENVELOPE_BYTES` size bound. It
-SHALL run no type, option, constraint, rule, or required check. Submission
-stays the only path that validates the input.
+entered it. It SHALL validate only two things: the map is a plain JSON object,
+and its size stays within `MAX_DRAFT_ENVELOPE_BYTES`. It SHALL run no type,
+option, constraint, rule, or required check. Submission stays the only path
+that validates the input.
 
 #### Scenario: An incomplete or wrong-typed draft is stored
 
@@ -60,11 +62,9 @@ current step.
 
 ### Requirement: A form draft is cleared when the instance moves, ends, or is redacted
 
-The engine SHALL delete the instance's draft when the instance transitions to
-another step, when a version migration migrates the instance, when the
-instance is cancelled, and when the instance is redacted. A participant who
-returns to a step after the instance moved away therefore starts with no
-draft.
+The engine SHALL delete the instance's draft on a step transition, a version
+migration, a cancel, and a redaction. A participant who returns to a step
+after the instance moved away therefore starts with no draft.
 
 #### Scenario: A submit clears the draft
 
