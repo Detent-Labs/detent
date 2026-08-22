@@ -6,7 +6,8 @@ Levenshtein nearest-match hint for a reworded header.
 
 The `openspec-archive-change` skill's step 4 asks the model to redo the
 same comparison by eye. Its own words are: "compare each delta spec with
-its corresponding main spec... determine what changes apply."
+its corresponding main spec... determine what changes would be applied
+(adds, modifications, removals, renames)".
 
 The review script's own comment names the exact bug this causes. A
 reworded MODIFIED header pairs with nothing. It silently archives as an
@@ -15,11 +16,12 @@ from scratch, with no script backing it.
 
 ## What Changes
 
-- Extract `extractRequirements`, `extractBaseTitles`, `closest`
-  (Levenshtein match), and `normalizeHeading` out of the
-  `openspec-review-check.ts` script into a new shared module,
-  `scripts/openspec-spec-diff.ts`. This step is behavior-preserving:
-  what `openspec-review-check.ts` reports does not change.
+- Extract `extractRequirements`, `extractBaseTitles`, `closest`,
+  `normalizeHeading`, and the `levenshtein` helper (plus the
+  `RequirementEntry` interface) out of the `openspec-review-check.ts`
+  script into a new shared module, `scripts/openspec-spec-diff.ts`.
+  This step is behavior-preserving: what `openspec-review-check.ts`
+  reports does not change.
 - Add a CLI entry to `scripts/openspec-spec-diff.ts`. It takes a change
   name and prints each delta spec's requirements as ADDED, MODIFIED, or
   REMOVED. Each requirement carries a matched or unmatched mark against
@@ -40,6 +42,7 @@ definition-contract requirement changes.)
 ## Impact
 
 - New file: `scripts/openspec-spec-diff.ts`.
+- New file: `test/openspec-spec-diff.test.ts`.
 - Edited file: `scripts/openspec-review-check.ts`. It imports the
   extracted functions instead of defining them. Its own output stays
   the same.

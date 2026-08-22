@@ -28,6 +28,7 @@
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { extractRequirements, extractBaseTitles, closest } from "./openspec-spec-diff";
 
 type Severity = "Critical" | "Warning" | "Suggestion";
 
@@ -41,34 +42,6 @@ const REPO_ROOT = process.cwd();
 
 function readIfExists(path: string): string | null {
   return existsSync(path) ? readFileSync(path, "utf8") : null;
-}
-
-function normalizeHeading(title: string): string {
-  return title.trim().replace(/\s+/g, " ");
-}
-
-function levenshtein(a: string, b: string): number {
-  const dp: number[] = Array.from({ length: b.length + 1 }, (_, i) => i);
-  for (let i = 1; i <= a.length; i++) {
-    let prev = dp[0];
-    dp[0] = i;
-    for (let j = 1; j <= b.length; j++) {
-      const tmp = dp[j];
-      dp[j] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[j], dp[j - 1]);
-      prev = tmp;
-    }
-  }
-  return dp[b.length];
-}
-
-function closest(title: string, candidates: string[]): string | null {
-  let best: string | null = null;
-  let bestDist = Infinity;
-  for (const c of candidates) {
-    const d = levenshtein(title, c);
-    if (d < bestDist) { bestDist = d; best = c; }
-  }
-  return best;
 }
 
 // --- Capability coverage (proposal.md bullets vs specs/ delta files) ------
@@ -85,37 +58,6 @@ function extractCapabilityBullets(proposalText: string): Map<string, "New" | "Mo
     if (bulletMatch) result.set(bulletMatch[1], section);
   }
   return result;
-}
-
-// --- Requirement headers (delta spec ADDED/MODIFIED/REMOVED sections) ----
-
-interface RequirementEntry {
-  kind: "ADDED" | "MODIFIED" | "REMOVED";
-  title: string;
-  line: number;
-}
-
-function extractRequirements(specText: string): RequirementEntry[] {
-  const entries: RequirementEntry[] = [];
-  let kind: RequirementEntry["kind"] | null = null;
-  const lines = specText.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const kindMatch = lines[i].match(/^## (ADDED|MODIFIED|REMOVED) Requirements\s*$/);
-    if (kindMatch) { kind = kindMatch[1] as RequirementEntry["kind"]; continue; }
-    if (/^## /.test(lines[i]) && !kindMatch) kind = null;
-    const reqMatch = lines[i].match(/^### Requirement: (.+)$/);
-    if (reqMatch && kind) entries.push({ kind, title: normalizeHeading(reqMatch[1]), line: i + 1 });
-  }
-  return entries;
-}
-
-function extractBaseTitles(specText: string): string[] {
-  const titles: string[] = [];
-  for (const line of specText.split("\n")) {
-    const m = line.match(/^### Requirement: (.+)$/);
-    if (m) titles.push(normalizeHeading(m[1]));
-  }
-  return titles;
 }
 
 // --- tasks.md hygiene -----------------------------------------------------

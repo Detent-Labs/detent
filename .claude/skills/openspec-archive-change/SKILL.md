@@ -1,7 +1,6 @@
 ---
 name: openspec-archive-change
 description: Archive a completed change in the experimental workflow. Use when the user wants to finalize and archive a change after implementation is complete.
-allowed-tools: Bash(openspec:*)
 license: MIT
 compatibility: Requires openspec CLI.
 metadata:
@@ -43,21 +42,22 @@ Archive a completed change in the experimental workflow.
 
 3. **Check task completion status**
 
-   Read the tasks file (typically `tasks.md`) to check for incomplete tasks.
+   Run `bun run scripts/openspec-task-status.ts <name>` and parse its JSON
+   output instead of reading `tasks.md` by eye. It reports
+   `{ total, done, incomplete, browserTasks }`, where each `browserTasks`
+   entry is an incomplete task naming a browser check.
 
-   Count tasks marked with `- [ ]` (incomplete) vs `- [x]` (complete).
-
-   **If incomplete tasks found:**
+   **If `incomplete` > 0:**
    - Display warning showing count of incomplete tasks
    - Use **AskUserQuestion tool** to confirm user wants to proceed
    - Proceed if user confirms
 
-   **If no tasks file exists:** Proceed without task-related warning.
+   **If `total` is 0 (no tasks file exists):** Proceed without task-related
+   warning.
 
-   **Browser tasks are stricter.** Check each incomplete task's text for a
-   browser check. It names a browser, a manual UI walkthrough, or
-   `playwright-cli`. Do not offer the ordinary confirm-and-proceed path for
-   one of those.
+   **A non-empty `browserTasks` is stricter.** Each entry names a browser, a
+   manual UI walkthrough, or `playwright-cli`. Do not offer the ordinary
+   confirm-and-proceed path for one of those.
 
    Refuse the archive until its content moves into `docs/browser-checks.md`
    as a checklist entry, or the task closes some other way. The archive
@@ -70,8 +70,9 @@ Archive a completed change in the experimental workflow.
    Use `artifactPaths.specs.existingOutputPaths` from status JSON to check for delta specs. If none exist, proceed without sync prompt.
 
    **If delta specs exist:**
-   - Compare each delta spec with its corresponding main spec at `openspec/specs/<capability>/spec.md`
-   - Determine what changes would be applied (adds, modifications, removals, renames)
+   - Run `bun run scripts/openspec-spec-diff.ts <name>` instead of comparing delta and base specs by eye
+   - Read its output. It classifies each delta requirement as ADDED, MODIFIED, or REMOVED, matched or unmatched against the base spec
+   - An unmatched MODIFIED or REMOVED entry with a `closest` hint is the "renames" category below
    - Show a combined summary before prompting
 
    **Prompt options:**

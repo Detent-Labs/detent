@@ -23,9 +23,9 @@ See proposal.md - Why for the motivation.
 - Count complete vs. incomplete tasks in a change's `tasks.md`. Match
   exactly what `openspec-archive-change` step 3 currently counts by eye.
 - Flag which incomplete tasks name a browser check. Use the same
-  detection the skill already describes in prose. A task block counts if
-  its text contains "browser", "manual UI walkthrough", or
-  "playwright-cli" (case-insensitive).
+  detection the skill already describes in prose. An incomplete task
+  block counts if its text contains "browser", "manual UI walkthrough",
+  or "playwright-cli" (case-insensitive).
 - Print one JSON object to stdout. The calling skill parses it instead of
   re-reading the file.
 
@@ -38,8 +38,15 @@ See proposal.md - Why for the motivation.
   skill keeps its existing refusal path for that case.
 - A shared module with `openspec-review-check.ts`. A separate change,
   `openspec-spec-diff-tool`, covers extracting that script's
-  requirement-matching functions. This change does not depend on it and
-  does not touch that file.
+  requirement-matching functions only. The block-flushing logic this
+  change mirrors stays duplicated, by the deliberate cost decision in
+  Decisions. This change does not depend on it and does not touch that
+  file.
+- `openspec-bulk-archive-change/SKILL.md`. Its own by-eye browser-task
+  check spans several changes at once. It carries the same failure this
+  change fixes, for the single-change case. Wiring the new script into
+  bulk archiving is a separate, deliberate follow-up change. So is giving
+  that skill its own stricter browser refusal.
 
 ## Decisions
 
@@ -62,12 +69,27 @@ step.
 **Exit code carries no meaning; JSON does.** Unlike the push gates, this
 script has no pass/fail verdict. The calling skill reads
 the numbers and applies its own policy: confirm, refuse, or proceed. The
-script exits 0 whenever it produces valid JSON. A genuine error, a
-missing file or an unreadable path, is the only case that exits
-non-zero, reported on stderr.
+script exits 0 whenever it produces valid JSON, including the
+no-`tasks.md` case, which is an empty-but-valid result. It exits 2 with a
+message on stderr only when it cannot produce valid JSON. That covers an
+unknown change name, and a `tasks.md` it cannot read, for example when the
+path is a directory.
+
+**Drop the skill's `allowed-tools` restriction.** Step 3 must run
+`bun run scripts/openspec-task-status.ts`, but the skill declares an
+`allowed-tools` restriction. It currently reads `Bash(openspec:*)`, plus
+whatever `openspec-spec-diff-tool` adds if that change lands first. The
+repo's own `openspec-review-change` skill runs a Bun script and carries no
+such line. Dropping the line matches that precedent and lets the archive
+skill inherit session tool permissions. Its step 5 already assumes those
+permissions, by instructing `mkdir` and `mv`.
 
 ## Risks / Trade-offs
 
+- **Risk**: `openspec-spec-diff-tool` also edits this same file's step 4
+  and its `allowed-tools` line, concurrently. **Mitigation**: the two
+  edits don't overlap in content. Either application order leaves the
+  intended end state: no `allowed-tools` restriction.
 - **Risk**: the regex misses a browser-check task phrased differently
   than the three matched words. The count then understates the real
   total. **Mitigation**: the current by-eye check already carries this

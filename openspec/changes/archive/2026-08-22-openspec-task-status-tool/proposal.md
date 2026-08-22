@@ -16,7 +16,9 @@ read them again once the archive swallowed them."
   the same "browser, a manual UI walkthrough, or `playwright-cli`"
   language the skill already uses. It prints one small JSON summary.
 - Change `openspec-archive-change/SKILL.md` step 3 to call this script
-  instead of counting checkboxes by reading the file.
+  instead of counting checkboxes by reading the file, and drop its
+  `allowed-tools: Bash(openspec:*)` frontmatter line so the skill may run
+  `bun`.
 
 ## Capabilities
 
@@ -30,6 +32,7 @@ or definition-contract requirement changes.)
 ## Impact
 
 - New file: `scripts/openspec-task-status.ts`.
+- New file: `test/openspec-task-status.test.ts`.
 - Edited file: `.claude/skills/openspec-archive-change/SKILL.md` (step 3
-  only).
+  and the `allowed-tools` frontmatter line).
 - No engine, schema, or UI code touched.
