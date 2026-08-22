@@ -1016,6 +1016,12 @@ three badges, each sitting directly above its own checkbox column with
 no drift, and the two ineligible slots in `submit`'s column leave the
 `visible` badge's position unchanged rather than centering it.
 
+On `check`'s three-badge column, confirm equal badge width
+(`field-matrix-badge-equal-width`). Pass: the `readonly` (`RO`) badge
+renders exactly as wide as `visible` (`VIS`) and `required` (`REQ`) — no
+narrower, no wider — while each badge still sits above its own checkbox
+column.
+
 ### Technical fields (`technical-field-marker`)
 
 Open Studio, `subprocess-loan-parent` (`examples/subprocess-loan-parent.json`,

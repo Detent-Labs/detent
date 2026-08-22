@@ -1711,6 +1711,10 @@ tr[data-group="true"] .studio-matrix-row-header {
   line-height: 1.6;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  /* One width for all three badges, so the two-letter "RO" reads as a
+     member of the group instead of a narrower chip. */
+  width: var(--matrix-flag-col);
+  text-align: center;
   color: var(--color-text-muted);
   background: none;
   border: 1px solid var(--color-border);
