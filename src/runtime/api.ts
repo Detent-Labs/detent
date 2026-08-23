@@ -34,6 +34,7 @@ import { requireRole, can, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, AUTHOR_R
 import { knownUserIds } from "../auth/users.js";
 import { definitionHash } from "../schema/hash.js";
 import { NotFoundError, InstanceNotRunningError } from "../errors.js";
+import { saveInstanceDraft as engineSaveInstanceDraft, getInstanceDraft, type InstanceDraft } from "../engine/instance-drafts.js";
 import { encodeCursor, decodeCursor } from "../pagination.js";
 import { instance as instanceSchema, historyEntry as historyEntrySchema, instanceEvent as instanceEventSchema, collectFieldsDeep, leafFields, typeMatches, expectedTypeLabel } from "../schema/definition.js";
 import {
@@ -81,6 +82,7 @@ export {
   NotFoundError,
   InstanceNotRunningError,
 };
+export type { InstanceDraft };
 
 // ============================================================
 // Public types
@@ -123,6 +125,10 @@ export type InstanceView = {
   // Absent unless redactInstance has run. The admin area's instance detail
   // screen uses this to show/disable the redact action and its badge.
   redactedAt?: string;
+  // The participant's saved form draft, present only when a stored draft's
+  // recorded step matches the current step — see
+  // instance-form-drafts's "step_id gating" decision.
+  draft?: { stepId: StepId; data: Record<string, unknown>; updatedBy: string; updatedAt: string };
 };
 
 export type SubmissionIssue =
@@ -990,6 +996,7 @@ async function loadInstanceForActor(instanceId: InstanceId, actor: Actor, db: SQ
 export async function getInstanceView(instanceId: InstanceId, actor: Actor, registry: DataSourceRegistry, db: SQL = sql): Promise<InstanceView> {
   const { instance, body } = await loadInstanceForActor(instanceId, actor, db);
   const step = findStep(body, instance.currentStepId as string);
+  const storedDraft = await getInstanceDraft(instanceId, db);
   return {
     instanceId: instance.instanceId,
     processId: instance.processId,
@@ -1001,7 +1008,27 @@ export async function getInstanceView(instanceId: InstanceId, actor: Actor, regi
     availablePaths: instance.status === "running" ? resolveAvailablePaths(body, step, instance, actor) : [],
     assignment: instance.assignment,
     redactedAt: instance.redactedAt,
+    ...(storedDraft && storedDraft.stepId === step.id
+      ? { draft: { stepId: storedDraft.stepId, data: storedDraft.data, updatedBy: storedDraft.updatedBy, updatedAt: storedDraft.updatedAt } }
+      : {}),
   };
+}
+
+/**
+ * Shared submit-authorization predicate, extracted so `submitAndTransition`
+ * and `saveInstanceDraft` cannot drift. On a step with an assignment, only
+ * the current claimant may act. On a step without one, the instance starter
+ * or an `ADMIN_ROLE` holder may act. Throws `InstanceNotRunningError` first,
+ * ahead of either authorization branch.
+ */
+function requireSubmitAuthority(instance: Instance, actor: Actor, instanceId: InstanceId): void {
+  if (instance.status !== "running") throw new InstanceNotRunningError(instance.instanceId, instance.status);
+  if (instance.assignment) {
+    if (instance.assignment.claimedBy === undefined) throw new NotClaimedError(instanceId);
+    if (instance.assignment.claimedBy !== actor.id) throw new NotClaimantError(instanceId, actor.id);
+  } else if (instance.startedBy !== actor.id && !actor.roles.includes(ADMIN_ROLE)) {
+    throw new AuthorizationError(`actor '${actor.id}' may not submit instance '${instanceId}'`);
+  }
 }
 
 /**
@@ -1054,16 +1081,7 @@ export async function submitAndTransition(
 
     const step = findStep(body, instance.currentStepId as string);
 
-    // Claimant-only enforcement: before any submission validation. A step
-    // with no declared assignment is not thereby open to every authenticated
-    // actor — the floor is starter or ADMIN_ROLE, the only relationships an
-    // assignment-less step defines.
-    if (instance.assignment) {
-      if (instance.assignment.claimedBy === undefined) throw new NotClaimedError(instanceId);
-      if (instance.assignment.claimedBy !== actor.id) throw new NotClaimantError(instanceId, actor.id);
-    } else if (instance.startedBy !== actor.id && !actor.roles.includes(ADMIN_ROLE)) {
-      throw new AuthorizationError(`actor '${actor.id}' may not submit instance '${instanceId}'`);
-    }
+    requireSubmitAuthority(instance, actor, instanceId);
 
     const resolved = await validateSubmissionData(body, step, instance, actor, submitted, registry, tx);
 
@@ -1083,6 +1101,23 @@ export async function submitAndTransition(
   const body = await store.resolveBody(committed.processId, committed.version);
   if (!body) throw new NotFoundError(`no published body for process ${committed.processId} version ${committed.version}`);
   return resolveAutomatic(committed, body, actor, db, assignmentRegistry);
+}
+
+/**
+ * Save a participant's unfinished form input for a running instance, apart
+ * from `instance.data`. Reads the instance unlocked — no `FOR UPDATE`, unlike
+ * `submitAndTransition` — since the draft is a single-writer scratchpad with
+ * no OCC token of its own (see design.md's accepted concurrent-transition
+ * race). Shares `requireSubmitAuthority` with `submitAndTransition`, so the
+ * two predicates cannot drift. `step_id` is derived from the instance's
+ * current step, never accepted from the caller.
+ */
+export async function saveInstanceDraft(instanceId: InstanceId, data: unknown, actor: Actor, db: SQL = sql): Promise<InstanceDraft> {
+  const rows = (await db`SELECT body FROM instances WHERE instance_id = ${instanceId}`) as { body: unknown }[];
+  if (rows.length === 0) throw new NotFoundError(`instance not found: ${instanceId}`);
+  const instance = parseInstance(rows[0].body);
+  requireSubmitAuthority(instance, actor, instanceId);
+  return engineSaveInstanceDraft(instanceId, instance.currentStepId, data, actor.id, db);
 }
 
 /**

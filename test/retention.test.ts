@@ -11,6 +11,7 @@ import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { findOrphanKeys } from "../src/engine/migration.js";
 import { redactInstance, sweepRetention } from "../src/engine/retention.js";
+import { saveInstanceDraft as engineSaveInstanceDraft, getInstanceDraft } from "../src/engine/instance-drafts.js";
 import { NotFoundError, InstanceRunningError } from "../src/errors.js";
 import type { ProcessBody, Instance, InstanceId } from "../src/schema/definition.js";
 
@@ -38,7 +39,7 @@ beforeAll(async () => {
   if (DB) await initSchema();
 });
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_comments, instance_attachments`;
+  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_comments, instance_attachments, instance_drafts`;
 });
 
 const mk = async (data: Record<string, unknown> = { field_x: "value" }): Promise<Instance> =>
@@ -66,13 +67,15 @@ const addAttachment = (id: string) =>
   sql`INSERT INTO instance_attachments (id, instance_id, actor_id, filename, content_type, size_bytes, data)
     VALUES (${`attachment_${id}`}, ${id}, 'user_1', 'file.txt', 'text/plain', 4, ${Buffer.from("data")})`;
 
-test.skipIf(!DB)("redactInstance clears data, stamps redacted_at, and deletes comment/attachment rows", async () => {
+test.skipIf(!DB)("redactInstance clears data, stamps redacted_at, and deletes comment/attachment/draft rows", async () => {
   const i = await mk();
   await setStatus(i.instanceId, "completed");
   await addComment(i.instanceId);
   await addAttachment(i.instanceId);
+  await engineSaveInstanceDraft(i.instanceId, i.currentStepId, { note: "wip" }, "user_1", sql);
   expect(await commentCount(i.instanceId)).toBe(1);
   expect(await attachmentCount(i.instanceId)).toBe(1);
+  expect(await getInstanceDraft(i.instanceId, sql)).toBeDefined();
 
   const redacted = await redactInstance(i.instanceId, sql);
   expect(redacted.data).toEqual({});
@@ -81,6 +84,7 @@ test.skipIf(!DB)("redactInstance clears data, stamps redacted_at, and deletes co
   expect(await rowRedactedAt(i.instanceId)).not.toBeNull();
   expect(await commentCount(i.instanceId)).toBe(0);
   expect(await attachmentCount(i.instanceId)).toBe(0);
+  expect(await getInstanceDraft(i.instanceId, sql)).toBeUndefined();
 });
 
 test.skipIf(!DB)("redactInstance leaves history_entries and instance_events untouched", async () => {
@@ -96,14 +100,16 @@ test.skipIf(!DB)("redactInstance leaves history_entries and instance_events unto
   expect(evts).toHaveLength(0);
 });
 
-test.skipIf(!DB)("redactInstance refuses a running instance", async () => {
+test.skipIf(!DB)("redactInstance refuses a running instance, and its form draft survives", async () => {
   const i = await mk();
+  await engineSaveInstanceDraft(i.instanceId, i.currentStepId, { note: "wip" }, "user_1", sql);
   await expect(redactInstance(i.instanceId, sql)).rejects.toBeInstanceOf(InstanceRunningError);
   expect(await rowRedactedAt(i.instanceId)).toBeNull();
   expect(await rowData(i.instanceId)).toEqual({ field_x: "value" });
+  expect(await getInstanceDraft(i.instanceId, sql)).toBeDefined();
 });
 
-test.skipIf(!DB)("redactInstance is idempotent: a second call is a no-op", async () => {
+test.skipIf(!DB)("redactInstance is idempotent: a second call is a no-op, and re-runs no draft delete against an already-clear row", async () => {
   const i = await mk();
   await setStatus(i.instanceId, "completed");
   await redactInstance(i.instanceId, sql);
@@ -114,6 +120,7 @@ test.skipIf(!DB)("redactInstance is idempotent: a second call is a no-op", async
   expect(second.data).toEqual({});
   expect(await rowRedactedAt(i.instanceId)).toBe(firstRedactedAt);
   expect(await commentCount(i.instanceId)).toBe(1);
+  expect(await getInstanceDraft(i.instanceId, sql)).toBeUndefined();
 });
 
 test.skipIf(!DB)("redactInstance throws NotFoundError for an unknown instance", async () => {

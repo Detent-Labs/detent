@@ -1,16 +1,18 @@
 /**
  * Data retention and erasure (roadmap #20). `redactInstance` clears a
  * non-running instance's personal data — `instances.body.data`,
- * `instance_comments`, `instance_attachments` — in one transaction, and is
- * the shared mechanism behind both the manual admin route and the automatic
- * sweep below. Neither `history_entries` nor `instance_events` is touched;
- * both already carry structural facts only, never a field value.
+ * `instance_comments`, `instance_attachments`, `instance_drafts` — in one
+ * transaction, and is the shared mechanism behind both the manual admin
+ * route and the automatic sweep below. Neither `history_entries` nor
+ * `instance_events` is touched; both already carry structural facts only,
+ * never a field value.
  */
 import type { SQL } from "bun";
 import { sql, withTransaction } from "./store.js";
 import { instance as instanceSchema, type Instance, type InstanceId } from "../schema/definition.js";
 import { NotFoundError, InstanceRunningError } from "../errors.js";
 import { logSkippedItem } from "./poll.js";
+import { deleteInstanceDraft } from "./instance-drafts.js";
 
 const BATCH = 500;
 
@@ -37,6 +39,7 @@ export async function redactInstance(instanceId: InstanceId, db: SQL = sql): Pro
       WHERE instance_id = ${instanceId}`;
     await tx`DELETE FROM instance_comments WHERE instance_id = ${instanceId}`;
     await tx`DELETE FROM instance_attachments WHERE instance_id = ${instanceId}`;
+    await deleteInstanceDraft(instanceId, tx);
 
     return { ...inst, data: {}, redactedAt: at };
   });

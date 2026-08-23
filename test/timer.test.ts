@@ -8,6 +8,7 @@ import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { cancelInstance, executeManualTransition, fireTimer, resolveAutomatic, startInstance } from "../src/engine/transition.js";
 import { drainTimers } from "../src/engine/timers.js";
+import { saveInstanceDraft as engineSaveInstanceDraft, getInstanceDraft } from "../src/engine/instance-drafts.js";
 import { CANCEL_SINK_STEP_ID } from "../src/schema/definition.js";
 import type { ProcessBody, Instance, Action } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
@@ -66,7 +67,7 @@ const eventsOf = async (id: string): Promise<any[]> => {
 };
 
 beforeAll(async () => { if (DB) await initSchema(); });
-beforeEach(async () => { if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events`; });
+beforeEach(async () => { if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_drafts`; });
 
 // --- 6.1 arm on entry ---------------------------------------------------------
 
@@ -135,6 +136,17 @@ test.skipIf(!DB)("a transition timer forces its target path despite a false guar
   expect(row.status).toBe("completed");
   expect(await historyCauses(inst.instanceId)).toContain("timer");
   expect(await outboxActionIds(inst.instanceId)).toContain("action_esc"); // onFire action enqueued
+});
+
+test.skipIf(!DB)("a transition timer's forced hop clears the parked step's form draft", async () => {
+  const body = waitTimerBody(transitionTimer);
+  const inst = await createFrom(body);
+  const parked = await executeManualTransition(inst, "path_ab", body, actor);
+  await engineSaveInstanceDraft(parked.instanceId, parked.currentStepId, { go: "wip" }, "user_1", sql);
+
+  await fireTimer(parked, "timer_t1", body);
+
+  expect(await getInstanceDraft(parked.instanceId, sql)).toBeUndefined();
 });
 
 // --- 6.3 reminder timer: side effect only, fire-once --------------------------

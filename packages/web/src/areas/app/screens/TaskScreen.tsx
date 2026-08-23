@@ -12,6 +12,7 @@ import {
   listComments,
   postComment,
   release,
+  saveInstanceDraft,
   submitPath,
   uploadAttachment,
 } from "../api/client.js";
@@ -60,13 +61,16 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
   const [comments, setComments] = useState<InstanceComment[]>([]);
   const [commentText, setCommentText] = useState("");
   const [attachments, setAttachments] = useState<InstanceAttachment[]>([]);
+  const [draftRestoredAt, setDraftRestoredAt] = useState<string | undefined>(undefined);
+  const [savedAt, setSavedAt] = useState<string | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const applyView = useCallback((next: InstanceView) => {
     setView(next);
     const seeded: Record<string, unknown> = {};
-    for (const f of next.fields) seeded[f.field.id] = f.value;
+    for (const f of next.fields) seeded[f.field.id] = next.draft?.data[f.field.id] ?? f.value;
     setFormValues(seeded);
+    setDraftRestoredAt(next.draft?.updatedAt);
   }, []);
 
   const withErrorHandling = useCallback(
@@ -179,6 +183,13 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
       navigate({ name: "tasks" });
     });
 
+  const doSave = () =>
+    withErrorHandling(async () => {
+      if (!view) return;
+      const saved = await saveInstanceDraft(instanceId, filterToEditable(formValues, view.fields), token);
+      setSavedAt(saved.updatedAt);
+    });
+
   const doDiscard = () =>
     withErrorHandling(async () => {
       await cancelInstance(instanceId, token);
@@ -261,6 +272,12 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
         </div>
       )}
 
+      {view && draftRestoredAt && (
+        <p className="app-task-draft-notice">
+          {t(locale, "task.formDraftRestored")} <span className="app-task-timestamp">{new Date(draftRestoredAt).toLocaleString()}</span>
+        </p>
+      )}
+
       {view && (
         <>
           <FieldForm
@@ -317,10 +334,21 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
                 </button>
               </span>
             )}
+            {maySubmit(claimControls) && view.status === "running" && (
+              <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => void doSave()}>
+                {t(locale, "task.save")}
+              </button>
+            )}
             <button type="button" className="btn btn-secondary btn-destructive" disabled={loading} onClick={() => void doDiscard()}>
               {t(locale, "task.discardCase")}
             </button>
           </div>
+
+          {savedAt && (
+            <p className="app-task-save-note">
+              {t(locale, "task.formDraftSaved")} <span className="app-task-timestamp">{new Date(savedAt).toLocaleString()}</span>
+            </p>
+          )}
 
           {maySubmit(claimControls) && <PathButtons paths={view.availablePaths} onSubmit={(pathId) => void doSubmit(pathId)} loading={loading} />}
 

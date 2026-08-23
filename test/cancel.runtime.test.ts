@@ -10,6 +10,7 @@
 import { test, expect, beforeAll } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { cancelInstance, executeManualTransition, ConcurrencyConflict } from "../src/engine/transition.js";
+import { saveInstanceDraft as engineSaveInstanceDraft, getInstanceDraft } from "../src/engine/instance-drafts.js";
 import { CANCEL_SINK_STEP_ID } from "../src/schema/definition.js";
 import type { ProcessBody, Instance, Step, HistoryEntry, Action } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
@@ -89,6 +90,16 @@ test.skipIf(!DB)("cancel records one HistoryEntry: cause cancel, pathId null, to
   expect(String(e.toStepId)).toBe(CANCEL_SINK_STEP_ID);
   expect(e.transitionSeq).toBe(1);
   expect(e.actorId).toBe("user_1");
+});
+
+test.skipIf(!DB)("cancel clears the instance's form draft", async () => {
+  const body = cancelBody();
+  const i = await createInstance(body, { processId: pid, version: 1 });
+  await engineSaveInstanceDraft(i.instanceId, i.currentStepId, { note: "wip" }, "user_1", sql);
+
+  await cancelInstance(i, body, actor);
+
+  expect(await getInstanceDraft(i.instanceId, sql)).toBeUndefined();
 });
 
 test("cancelling a non-running instance is a no-op for every non-running status", async () => {

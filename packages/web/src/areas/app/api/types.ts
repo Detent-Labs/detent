@@ -38,6 +38,9 @@ export interface InstanceView {
   columns?: 1 | 2;
   availablePaths: AvailablePath[];
   assignment?: { candidates: string[]; claimedBy?: string; claimedAt?: string } | null;
+  // The participant's saved form draft, present only when it matches the
+  // current step — see the instance-form-drafts capability.
+  draft?: { stepId: string; data: Record<string, unknown>; updatedBy: string; updatedAt: string };
 }
 
 // Not `Comment` — that name collides with the DOM's own `Comment` node

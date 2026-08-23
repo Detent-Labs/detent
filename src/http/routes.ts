@@ -11,6 +11,7 @@ import {
   createProcessInstance,
   getInstanceView,
   submitAndTransition,
+  saveInstanceDraft,
   claimStep,
   releaseClaim,
   delegateClaim,
@@ -106,6 +107,9 @@ const attachmentBodySchema = z.object({
 });
 const submitBodySchema = z.object({
   pathId: z.string(),
+  data: z.record(z.string(), z.unknown()).default({}),
+});
+const instanceDraftBodySchema = z.object({
   data: z.record(z.string(), z.unknown()).default({}),
 });
 
@@ -275,6 +279,15 @@ export async function handleSubmit(
     }
     return mapError(err, errorContext(req));
   }
+}
+
+export async function handleSaveInstanceDraft(instanceId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver, db);
+    const body = await parseJsonBody(req, instanceDraftBodySchema);
+    const saved = await saveInstanceDraft(instanceId as InstanceId, body.data, actor, db);
+    return { status: 200, body: { updatedBy: saved.updatedBy, updatedAt: saved.updatedAt } };
+  });
 }
 
 export async function handleClaim(instanceId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {

@@ -22,6 +22,7 @@ import {
   type StepEntryOpts,
 } from "../src/engine/transition.js";
 import { idempotencyKey, subprocessChildId } from "../src/engine/idempotency.js";
+import { saveInstanceDraft as engineSaveInstanceDraft, getInstanceDraft } from "../src/engine/instance-drafts.js";
 import type { ProcessBody, Instance, Step, HistoryEntry, InstanceEvent, Action, TimerState } from "../src/schema/definition.js";
 
 const DB = !!process.env.DATABASE_URL;
@@ -69,7 +70,7 @@ beforeAll(async () => {
   if (DB) await initSchema();
 });
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events`;
+  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_drafts`;
 });
 
 // --- 5.4: status derivation (pure) ---------------------------------------------
@@ -509,6 +510,19 @@ test.skipIf(!DB)("a manual transition is ignored on a faulted instance", async (
 // object, not just the patch, so unrelated fields survive the commit; (b) be
 // visible to the manual path's own guard; (c) be visible to target-step timer
 // arming and to the returned in-memory Instance, not just to the persisted row.
+
+test.skipIf(!DB)("commitManualTransition (submit) clears the instance's form draft", async () => {
+  const body = mkBody([
+    step("step_a", { paths: [manualPath("path_ab", "step_b")] }),
+    step("step_b", { terminal: true }),
+  ]);
+  const created = await createInstance(body, { processId: pid, version: 1 });
+  await engineSaveInstanceDraft(created.instanceId, created.currentStepId, { field_due: "wip" }, "user_1", sql);
+
+  await commitManualTransition(created, "path_ab", body, actor as never, sql);
+
+  expect(await getInstanceDraft(created.instanceId, sql)).toBeUndefined();
+});
 
 test.skipIf(!DB)("commitManualTransition merges a dataPatch and preserves unrelated fields", async () => {
   const body = mkBody([

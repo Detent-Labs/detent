@@ -1555,3 +1555,26 @@ This walk checked dark mode by reading the parsed `@media
 toggle the OS theme. Each token's dark value matched `tokens.css`
 exactly. Task 1.3 already ran the contrast math: every light/dark pair
 clears 4.5:1 against both `--color-surface` values.
+
+### Task screen: save a form draft, navigate away, and restore it
+
+Source: `instance-form-drafts` task 5.6.
+
+Log in as a participant and open a running task. Edit a field, then click
+Save. Pass: the screen stays on the task, and a confirmation naming the
+save time appears. It never navigates away.
+
+Leave the task for My tasks, then reopen it. Pass: the edited field shows
+the saved value. A notice reports the restored form draft and names the
+save time.
+
+Submit the task down a path. Pass: the instance moves on. Route the case
+back to the same step through the admin area, or start a fresh case that
+reaches it. Pass: the field shows its committed value, not the earlier form
+draft. A submit clears the form draft, and the `step_id` gate holds even if
+it did not.
+
+`test/instance-drafts.test.ts` and `test/http.test.ts` already assert the
+save, restore and clear mechanics against the API. This entry confirms
+`TaskScreen.tsx` renders the Save control, the two notices, and the
+seed-from-draft behavior, which those files cannot observe.

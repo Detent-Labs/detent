@@ -37,6 +37,7 @@ import { armStepTimers, type TimerDrop } from "./duration.js";
 import type { ResolveBody } from "./resolution.js";
 import { sql, newInstanceEventId, appendInstanceEvent, withTransaction } from "./store.js";
 import { CLAIM_LEASE_MS } from "./outbox.js";
+import { deleteInstanceDraft } from "./instance-drafts.js";
 import { log } from "../log.js";
 
 /** A migration plan is invalid, unresolvable, or already frozen. */
@@ -524,6 +525,10 @@ async function migrateOne(
     // migration's cascade deferral (rather than nesting commits) falls out of
     // that general rule and needs no separate flag here.
     await applyStepEntry(tx, plan, { version: toVersion, definitionHash: definitionHash(toBody), data });
+    // Every migration clears the draft, relocation or not: a fieldMap-only
+    // migration leaves currentStepId unchanged, so the step_id gate alone
+    // would not catch a draft whose field ids the remap made stale.
+    await deleteInstanceDraft(inst.instanceId, tx);
 
     // No child-link repoint: a relocation off a subprocess step with a live child was
     // already deferred by the 5.7b gate, and a settled child's parent.stepId is inert

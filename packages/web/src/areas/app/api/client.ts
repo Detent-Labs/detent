@@ -76,6 +76,15 @@ export async function cancelInstance(instanceId: string, token: string): Promise
   await request(`/instances/${encodeURIComponent(instanceId)}/cancel`, token, { method: "POST" });
 }
 
+export async function saveInstanceDraft(instanceId: string, data: Record<string, unknown>, token: string): Promise<{ updatedBy: string; updatedAt: string }> {
+  const res = await request(`/instances/${encodeURIComponent(instanceId)}/draft`, token, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ data }),
+  });
+  return (await res.json()) as { updatedBy: string; updatedAt: string };
+}
+
 export function listProcesses(token: string): Promise<ProcessSummary[]> {
   return getJson("/processes", token);
 }

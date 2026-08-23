@@ -32,6 +32,7 @@ import {
   type AssignmentRegistry,
 } from "./registry.js";
 import { armStepTimers, minFireAt, type TimerDrop } from "./duration.js";
+import { deleteInstanceDraft } from "./instance-drafts.js";
 import { buildGuardContext, evalGuard, SYSTEM_ACTOR, type Actor } from "../cel/eval.js";
 import { CANCEL_SINK_STEP_ID, instance as instanceSchema } from "../schema/definition.js";
 import type { ProcessBody, Instance, HistoryEntry, InstanceEvent, Action, Step, Path, AssignmentState } from "../schema/definition.js";
@@ -463,7 +464,11 @@ async function commitTransition(
       ]
     : overrides?.events;
   const plan = planStepEntry(instance, target, body, { pathId, cause, actorId, actions, assignment, ...overrides, ...(events ? { events } : {}) });
-  return withTransaction(db, (tx) => applyStepEntry(tx, plan, extraFields));
+  return withTransaction(db, async (tx) => {
+    const next = await applyStepEntry(tx, plan, extraFields);
+    await deleteInstanceDraft(instance.instanceId, tx);
+    return next;
+  });
 }
 
 /**

@@ -177,6 +177,20 @@
   align-items: center;
 }
 
+/* Save-time notes: a confirmation after a form draft save, or a notice that
+   one was restored on open. Muted ink, never the refusal tone — neither is
+   an error. The timestamp itself is a machine value, so it takes the mono
+   face, same role as .app-started-date. */
+.app-task-save-note,
+.app-task-draft-notice {
+  font-size: 0.85em;
+  color: var(--color-text-muted);
+}
+
+.app-task-timestamp {
+  font-family: var(--font-mono);
+}
+
 .app-task-comments {
   margin-top: var(--space-4);
 }

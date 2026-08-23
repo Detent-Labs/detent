@@ -15,6 +15,7 @@ import { drainOutbox } from "../src/engine/outbox.js";
 import { registerSubprocessHandlers } from "../src/engine/subprocess.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { subprocessChildId } from "../src/engine/idempotency.js";
+import { saveInstanceDraft as engineSaveInstanceDraft, getInstanceDraft } from "../src/engine/instance-drafts.js";
 import {
   registerMigrationPlan,
   resolveMigrationPlan,
@@ -175,7 +176,7 @@ beforeAll(async () => {
   if (DB) await initSchema();
 });
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, migration_plans`;
+  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_drafts, definitions, migration_plans`;
 });
 
 // =============================================================================
@@ -368,6 +369,43 @@ test.skipIf(!DB)("6.x an identity migration records one entry and advances the s
   expect(hist[0].pathId).toBeNull();
   expect(hist[0].version).toBe(2);
   expect(hist[0].fromStepId).toBe(hist[0].toStepId); // identity
+});
+
+test.skipIf(!DB)("6.x an identity (fieldMap-only) migration deletes the instance's form draft", async () => {
+  const p = pid();
+  const b = waitBody({ key: "a", fields: [f("x", "string")] });
+  await twoVersions(p, b, b, {} as MigrationSpec);
+  const inst = await mkInstance(p, 1, { field_x: "hi" });
+  await engineSaveInstanceDraft(inst.instanceId, inst.currentStepId, { field_x: "wip" }, "user_1", sql);
+
+  await migrateInstances(p as Instance["processId"], 1, 2, sql);
+
+  expect(await getInstanceDraft(inst.instanceId, sql)).toBeUndefined();
+});
+
+test.skipIf(!DB)("6.x a relocating (route-to-step) migration deletes the instance's form draft", async () => {
+  const p = pid();
+  const v1 = waitBody({ key: "a", fields: [f("x", "string")] });
+  const v2: ProcessBody = {
+    key: "a", label: { en: "a" }, baseLocale: "en", fields: [f("x", "string")],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [manualPath("path_ad", "step_done")] },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
+      ],
+    },
+  } as unknown as ProcessBody;
+  await twoVersions(p, v1, v2, { onUnmappable: "route-to-step", unmappableStep: "step_a" } as unknown as MigrationSpec);
+  const inst = await mkInstance(p, 1, { field_x: "v" });
+  await engineSaveInstanceDraft(inst.instanceId, inst.currentStepId, { field_x: "wip" }, "user_1", sql);
+
+  const res = await migrateInstances(p as Instance["processId"], 1, 2, sql);
+
+  expect(res.migrated).toEqual([inst.instanceId]);
+  const after = await loadInstance(inst.instanceId);
+  expect(after!.currentStepId as string).toBe("step_a"); // relocated
+  expect(await getInstanceDraft(inst.instanceId, sql)).toBeUndefined();
 });
 
 // A one-wait-state body whose wait step declares a static assignment, for the

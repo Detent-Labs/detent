@@ -35,7 +35,7 @@ const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
 beforeAll(initDb);
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_comments, instance_attachments, definitions, permission_grants`;
+  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_comments, instance_attachments, instance_drafts, definitions, permission_grants`;
 });
 
 // ============================================================
@@ -299,6 +299,92 @@ test.skipIf(!DB)("POST /instances/:instanceId/submit commits a transition and re
   const body = (await res.json()) as { currentStepId: string; status: string };
   expect(body.currentStepId).toBe("step_b");
   expect(body.status).toBe("completed");
+});
+
+// ============================================================
+// PUT /instances/:instanceId/draft
+// ============================================================
+
+test.skipIf(!DB)("PUT /instances/:instanceId/draft saves for the current claimant and returns 200 with updatedBy/updatedAt", async () => {
+  const PID = pid("proc_http_draft_ok");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/draft`, "PUT", user1, { data: { field_amount: 3 } }));
+  expect(res.status).toBe(200);
+  const saved = (await res.json()) as { updatedBy: string; updatedAt: string };
+  expect(saved.updatedBy).toBe(user1.id);
+  expect(saved.updatedAt).toBeDefined();
+
+  const view = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", user1))).json()) as {
+    draft?: { data: Record<string, unknown> };
+  };
+  expect(view.draft?.data).toEqual({ field_amount: 3 });
+});
+
+test.skipIf(!DB)("PUT /instances/:instanceId/draft with a non-object data body is 400, and stores nothing", async () => {
+  const PID = pid("proc_http_draft_400");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/draft`, "PUT", user1, { data: "not-an-object" }));
+  expect(res.status).toBe(400);
+
+  const view = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", user1))).json()) as { draft?: unknown };
+  expect(view.draft).toBeUndefined();
+});
+
+test.skipIf(!DB)("PUT /instances/:instanceId/draft with no data field saves an empty draft", async () => {
+  const PID = pid("proc_http_draft_default");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/draft`, "PUT", user1, {}));
+  expect(res.status).toBe(200);
+
+  const view = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", user1))).json()) as {
+    draft?: { data: Record<string, unknown> };
+  };
+  expect(view.draft?.data).toEqual({});
+});
+
+test.skipIf(!DB)("PUT /instances/:instanceId/draft with no resolvable credential short-circuits with 401, before saving", async () => {
+  const PID = pid("proc_http_draft_401");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(
+    new Request(`http://x/instances/${created.instanceId}/draft`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ data: {} }) }),
+  );
+  expect(res.status).toBe(401);
+});
+
+test.skipIf(!DB)("PUT /instances/:instanceId/draft for a non-starter, non-admin actor on an assignment-less step is 403", async () => {
+  const PID = pid("proc_http_draft_403");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/draft`, "PUT", bystander, { data: {} }));
+  expect(res.status).toBe(403);
+});
+
+test.skipIf(!DB)("PUT /instances/:instanceId/draft on a non-running instance is 409, InstanceNotRunningError", async () => {
+  const PID = pid("proc_http_draft_409");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, { pathId: "path_ab", data: { field_amount: 10 } }));
+
+  const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/draft`, "PUT", user1, { data: {} }));
+  expect(res.status).toBe(409);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("instance-not-running");
+});
+
+test.skipIf(!DB)("PUT /instances/:instanceId/draft on an unknown instance maps to 500, not 404", async () => {
+  const res = await fetch(jsonReq("http://x/instances/inst_does_not_exist/draft", "PUT", user1, { data: {} }));
+  expect(res.status).toBe(500);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("internal");
 });
 
 test.skipIf(!DB)("GET /instances/:instanceId on a non-running (completed) instance still resolves, with no available paths", async () => {

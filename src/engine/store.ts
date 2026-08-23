@@ -330,6 +330,18 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     updated_by   text NOT NULL,
     updated_at   timestamptz NOT NULL DEFAULT now()
   )`;
+  // A participant's unfinished form input on a running instance, kept apart
+  // from `instances.body.data` so a save can never leak into guards, data
+  // sources, the admin record, or reporting before submit validates it. One
+  // row per instance; `step_id` is the step the draft was saved on, and the
+  // engine offers the draft only when it still matches the current step.
+  await db`CREATE TABLE IF NOT EXISTS instance_drafts (
+    instance_id text PRIMARY KEY,
+    step_id     text NOT NULL,
+    data        jsonb NOT NULL,
+    updated_by  text NOT NULL,
+    updated_at  timestamptz NOT NULL DEFAULT now()
+  )`;
   // Data lists: the option values of a `"db.list"` data source, held outside the
   // process body so an operator changes them with no publish and no migration.
   // `label` here is the operator-facing name of the list itself, plain text; the
