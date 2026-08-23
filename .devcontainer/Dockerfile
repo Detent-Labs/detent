@@ -15,3 +15,9 @@ RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash -s "bun-v${B
 # global typescript is needed here. Pinned for reproducibility; bump deliberately.
 ENV TS_LANGUAGE_SERVER_VERSION=5.3.0
 RUN npm install -g "typescript-language-server@${TS_LANGUAGE_SERVER_VERSION}"
+
+# openspec CLI backs `openspec validate --strict`, which
+# scripts/openspec-review-check.ts shells out to. Pinned for reproducibility;
+# bump deliberately.
+ENV OPENSPEC_VERSION=1.9.0
+RUN npm install -g "@fission-ai/openspec@${OPENSPEC_VERSION}"
