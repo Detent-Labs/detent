@@ -296,6 +296,33 @@ Specs: `development-toolchain`, `devcontainer-preflight`.
     Specs: `definition-contract`, `runtime-api`, `studio-app`,
     `studio-form-editor`, `studio-checks-rail`.
 
+45. **Auto-derive `key` from `label` in the studio: NOT STARTED.** Raised
+    2026-08-23 in conversation. Today an author types `key` by hand at every
+    site it sits beside `label`: the process itself, a step, a path, a
+    catalog field. The direction: derive `key` from `label` as the author
+    types it, so no-code authoring (stage 27) needs no manual slug entry
+    there either. The derived value stays an ordinary editable text input;
+    a manual edit stops auto-derivation for that one entity from then on, so
+    an author who wants a different key never fights the field back to keep
+    it. The JSON view stays the escape hatch for either value, unchanged.
+
+    Two of the four sites carry a real constraint the slug must satisfy, two
+    do not. `FieldDef.key` matches `/^[a-z_][a-z0-9_]*$/`, the CEL identifier
+    grammar `data.<key>` requires (`compile.ts::checkFieldKeyFormat`); a
+    label-derived slug there must land in that shape, not an arbitrary
+    kebab-case one. `Step.key` and `Path.key` are unconstrained — "nothing
+    reads them as identifiers" (`.claude/rules/authoring-invariants.md`) — so
+    any readable slug fits. Whether `ProcessBody.key` carries its own
+    constraint needs checking before this reaches that surface.
+
+    Uniqueness is a second open question. The definition contract requires no
+    unique `key` per kind today — only `id` is the reference anchor — so a
+    naive derivation can collide the moment two fields share a label, or a
+    rename produces a duplicate. Whether the studio dedupes automatically
+    (`amount`, `amount_2`) or only flags the collision is undecided.
+
+    No OpenSpec change opened yet.
+
 ## Done
 
 Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
