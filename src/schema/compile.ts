@@ -1,7 +1,7 @@
 /**
  * Publish-time compile pass.
  *
- * Validates every duration-typed value (see `validateDurations`) and the seven
+ * Validates every duration-typed value (see `validateDurations`) and the eight
  * structural write-path checks below (see `structuralIssues`), then injects
  * the engine-owned cancel-sink — and, for a contracted process, the
  * reserved "cancelled" outcome bound to it — into a ProcessBody. This runs
@@ -19,7 +19,7 @@
  * cover keys that no read reproduces, and the resulting pin would never
  * rehydrate.
  *
- * Every check in this module — durations and the seven structural checks alike —
+ * Every check in this module — durations and the eight structural checks alike —
  * runs on BOTH compile branches, ahead of the `publishedProcessBody`-valid
  * early return: that placement is what makes a check unbypassable by a
  * hand-written body that merely satisfies `publishedProcessBody` (which
@@ -108,26 +108,26 @@ export function validateDurations(body: ProcessBody): DurationIssue[] {
 }
 
 // ============================================================
-// Structural write-path checks (harden-publish-validation). Seven checks, one
-// placement: called from compileProcessBody immediately after
-// validateDurations, so every one of them runs on a body BEFORE it takes
-// either compile branch. Modelled on DurationIssue/DurationValidationError —
-// same {loc, value, message} shape — because a second, structurally
-// identical pair would only be a naming difference; issues are reported
-// against `Error#issues`, never thrown one at a time, so one rejection is
-// fixable in one pass.
+// Structural write-path checks. Eight checks, one placement: called from
+// compileProcessBody immediately after validateDurations, so every one of
+// them runs on a body BEFORE it takes either compile branch. Modelled on
+// DurationIssue/DurationValidationError — same {loc, value, message} shape —
+// because a second, structurally identical pair would only be a naming
+// difference; issues are reported against `Error#issues`, never thrown one
+// at a time, so one rejection is fixable in one pass.
 // ============================================================
 
 /** A structural authoring-time defect located in the body (unknown key, reserved
  * prefix, uncompilable pattern, unresolved id, an out-of-bounds columnMapping,
- * malformed field key, or an over-long authored string). */
+ * malformed field key, an over-long authored string, or an unsatisfiable
+ * required+readonly view entry). */
 export interface CompileIssue {
   loc: string;
   value: string;
   message: string;
 }
 
-/** A body about to be published violates one of the seven structural write-path checks. */
+/** A body about to be published violates one of the eight structural write-path checks. */
 export class CompileValidationError extends Error {
   constructor(readonly issues: CompileIssue[]) {
     super(issues.map((i) => `${i.loc}: ${i.message} (${JSON.stringify(i.value)})`).join("; "));
@@ -774,17 +774,182 @@ function checkTechnicalFields(body: ProcessBody): CompileIssue[] {
   return issues;
 }
 
+// ============================================================
+// 8. Unsatisfiable required+readonly pair: reject a view entry declaring
+// literal required: true and literal readonly: true on a step carrying a
+// manual path, when no source in the body writes the field it names. The
+// participant cannot type into a readonly field, and the required check
+// then refuses to advance the step, so nothing can clear the result.
+//
+// Counterpart to the studio's `writtenFieldCounts`
+// (packages/web/src/areas/studio/draft/view-flags.ts), duplicated here
+// rather than imported — the dependency direction forbids the import, and
+// the studio walks a Draft (every key optional) while this walks a
+// ProcessBody. Two documented divergences from the studio's version: the
+// post-gate exclusion (an action on the entry's own step at
+// onExit/onPath/onCancel fires only after the submission gate it cannot
+// help, so its output does not count, and likewise a columnMapping target
+// whose mapping field is editable only on the entry's own step) and the
+// literal-default source (a literal catalog default lands via
+// `applyFieldDefaults` at instance creation, which the studio does not
+// count). See design.md § Decisions for the full reasoning.
+//
+// Operates on duck-typed input, like checkReservedActionPrefix,
+// checkUnknownKeys and checkTechnicalFields: it runs before any Zod parse
+// of the authored body, on both compile branches.
+// ============================================================
+
+/** A `FieldDef.default` counts as a writer only when literal — mirrors
+ * `applyFieldDefaults`' own `asExpression` (src/runtime/api.ts): an
+ * Expression-shaped object (`{lang: "cel", ...}`) may raise at creation and
+ * leave the field unwritten, so only a non-CEL value counts. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function isLiteralDefault(v: any): boolean {
+  return !(v && typeof v === "object" && !Array.isArray(v) && v.lang === "cel");
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function stepHasManualPath(s: any): boolean {
+  return (s?.paths ?? []).some((p: any) => p?.trigger === "manual");
+}
+
+/**
+ * Every field id some source in the body writes, relative to the step under
+ * check (`ownStepIndex`): the post-gate exclusion and the columnMapping
+ * editable-elsewhere rule are both relative to that step, so this cannot be
+ * one body-wide set the way most of this module's other collectors are.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function computeWriterSet(body: any, ownStepIndex: number): Set<string> {
+  const written = new Set<string>();
+  const steps = body?.workflow?.steps ?? [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fields = collectFieldsDeep((body?.fields ?? []) as any);
+  const fieldsById = new Map(fields.map((f) => [f.id as string, f]));
+
+  // Action output (1.2): onEntry always counts; onExit/onPath/onCancel count
+  // only off the entry's own step, since on that step they fire after the
+  // submission gate they cannot help. onFire always counts — a reminder
+  // timer's write-back precedes the participant's resubmission, and a
+  // targetPath timer's forced exit runs no required check at all.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  steps.forEach((s: any, si: number) => {
+    const own = si === ownStepIndex;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const addOutputs = (actions: any[] | undefined) => {
+      (actions ?? []).forEach((a) => Object.keys(a?.output ?? {}).forEach((fid) => written.add(fid)));
+    };
+    addOutputs(s?.onEntry);
+    if (!own) {
+      addOutputs(s?.onExit);
+      addOutputs(s?.onCancel);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (s?.paths ?? []).forEach((p: any) => addOutputs(p?.onPath));
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (s?.timers ?? []).forEach((t: any) => addOutputs(t?.onFire?.actions));
+
+    // subprocess.outputMapping (1.3), body-wide.
+    Object.keys(s?.subprocess?.outputMapping ?? {}).forEach((fid) => written.add(fid));
+  });
+
+  // Editable view entries (1.6): visible !== false, readonly !== true, not a
+  // group field, carries a ref. Body-wide — the entry under check always
+  // declares readonly: true, so it never counts itself. Also tracks, per
+  // field, which step indices carry such an entry, for the columnMapping
+  // rule below.
+  const editableSteps = new Map<string, Set<number>>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  steps.forEach((s: any, si: number) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (s?.view?.fields ?? []).forEach((vf: any) => {
+      if (typeof vf?.ref !== "string") return;
+      if (fieldsById.get(vf.ref)?.type === "group") return;
+      if (vf.visible === false || vf.readonly === true) return;
+      written.add(vf.ref);
+      if (!editableSteps.has(vf.ref)) editableSteps.set(vf.ref, new Set());
+      editableSteps.get(vf.ref)!.add(si);
+    });
+  });
+
+  // contract.inputFields (1.4), body-wide.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (body?.contract?.inputFields ?? []).forEach((fid: any) => {
+    if (typeof fid === "string") written.add(fid);
+  });
+
+  // columnMapping targets (1.4): count only where some step OTHER than
+  // ownStepIndex carries the mapping field in an editable view entry — the
+  // write-back (applyColumnMapping) runs after the submission gate, so a
+  // mapping field editable only on the entry's own step, or on no step at
+  // all, can never satisfy that gate.
+  fields.forEach((f) => {
+    const mapping = f.columnMapping;
+    if (!isPlainObject(mapping)) return;
+    const editSteps = editableSteps.get(f.id as string) ?? new Set<number>();
+    if (![...editSteps].some((si) => si !== ownStepIndex)) return;
+    Object.values(mapping).forEach((target) => {
+      if (typeof target === "string") written.add(target);
+    });
+  });
+
+  // Literal catalog defaults (1.5), body-wide: applyFieldDefaults seeds one
+  // into instance.data at creation.
+  fields.forEach((f) => {
+    if (f.default === undefined) return;
+    if (isLiteralDefault(f.default)) written.add(f.id as string);
+  });
+
+  return written;
+}
+
+function checkUnsatisfiableRequiredReadonly(body: ProcessBody): CompileIssue[] {
+  const issues: CompileIssue[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anyBody = body as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fields = collectFieldsDeep((anyBody.fields ?? []) as any);
+  const fieldsById = new Map(fields.map((f) => [f.id as string, f]));
+  const technicalIds = new Set<string>();
+  fields.forEach((f) => {
+    if (f.technical === true && typeof f.id === "string") technicalIds.add(f.id);
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (anyBody.workflow?.steps ?? []).forEach((s: any, si: number) => {
+    if (!stepHasManualPath(s)) return;
+    const writerSet = computeWriterSet(anyBody, si);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (s?.view?.fields ?? []).forEach((vf: any, vi: number) => {
+      if (typeof vf?.ref !== "string") return;
+      if (vf.required !== true || vf.readonly !== true) return;
+      if (vf.visible === false) return;
+      if (fieldsById.get(vf.ref)?.type === "group") return;
+      if (technicalIds.has(vf.ref)) return;
+      if (writerSet.has(vf.ref)) return;
+      issues.push({
+        loc: `steps[${si}].view.fields[${vi}]`,
+        value: vf.ref,
+        message: `field '${vf.ref}' is required and readonly here, and no source in the body writes it: every submission will fail`,
+      });
+    });
+  });
+
+  return issues;
+}
+
 /**
  * Every structural write-path check, run together and reported as one batch
  * of located issues (task 1.1/1.2). Called from
  * `compileProcessBody` on the raw body, before either compile branch, so
  * neither the authored-input branch nor the already-compiled early return can
- * skip it. `checkReservedActionPrefix`, `checkUnknownKeys` and
- * `checkTechnicalFields` operate on the body duck-typed (it has not yet been
- * Zod-parsed at this point); the remaining four operate on the
- * `ProcessBody`-typed parameter, which is a lie at this exact call site for
- * the same reason — the type is honest again only after
- * `authoredProcessBody.parse`/the early return's `safeParse` succeed.
+ * skip it. `checkReservedActionPrefix`, `checkUnknownKeys`,
+ * `checkTechnicalFields` and `checkUnsatisfiableRequiredReadonly` operate on
+ * the body duck-typed (it has not yet been Zod-parsed at this point); the
+ * remaining four operate on the `ProcessBody`-typed parameter, which is a lie
+ * at this exact call site for the same reason — the type is honest again
+ * only after `authoredProcessBody.parse`/the early return's `safeParse`
+ * succeed.
  */
 function structuralIssues(body: ProcessBody): CompileIssue[] {
   return [
@@ -795,6 +960,7 @@ function structuralIssues(body: ProcessBody): CompileIssue[] {
     ...checkIdResolution(body),
     ...checkLengthBounds(body),
     ...checkTechnicalFields(body),
+    ...checkUnsatisfiableRequiredReadonly(body),
   ];
 }
 
@@ -804,11 +970,10 @@ export function compileProcessBody(body: ProcessBody): ProcessBody {
   const durations = validateDurations(body);
   if (durations.length > 0) throw new DurationValidationError(durations);
 
-  // The seven structural checks (harden-publish-validation), same placement as
-  // validateDurations and for the same reason: ahead of the
-  // publishedProcessBody-valid early return below, so a hand-written body
-  // that merely satisfies that schema (which checks only the cancel-sink
-  // count) cannot skip any of them.
+  // The eight structural checks, same placement as validateDurations and for
+  // the same reason: ahead of the publishedProcessBody-valid early return
+  // below, so a hand-written body that merely satisfies that schema (which
+  // checks only the cancel-sink count) cannot skip any of them.
   const structural = structuralIssues(body);
   if (structural.length > 0) throw new CompileValidationError(structural);
 

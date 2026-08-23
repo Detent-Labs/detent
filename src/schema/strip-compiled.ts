@@ -4,7 +4,7 @@
  * (compiled) body back into the authored shape.
  *
  * Beside `compile.ts` rather than in the studio, so the injection and its
- * inverse sit together — a seventh compile-pass addition is only safe if
+ * inverse sit together — an eighth compile-pass addition is only safe if
  * whoever writes it sees this. `test/strip-compiled.test.ts` asserts the round
  * trip over every definition in `examples/` and fails if the two drift. In the
  * package's `exports` map because the studio is the caller: it seeds a draft

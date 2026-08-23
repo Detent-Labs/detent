@@ -11,7 +11,7 @@
  */
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "bun:test";
-import { processVersion, processBody, type ProcessBody } from "../src/schema/definition.js";
+import { processVersion, processBody, publishedProcessBody, type ProcessBody } from "../src/schema/definition.js";
 import {
   compileProcessBody,
   CompileValidationError,
@@ -473,9 +473,15 @@ describe("compile: a body violating a new check still reads (no new Zod refineme
     b.workflow.steps[0].paths[0].priority = 1;
     expect(processBody.safeParse(b).success).toBe(true);
   });
+
+  it("an unwritten required+readonly pair parses on read", () => {
+    const b: any = baseBody();
+    b.workflow.steps[0].view = { fields: [{ ref: "field_amount", required: true, readonly: true }] };
+    expect(processBody.safeParse(b).success).toBe(true);
+  });
 });
 
-// table-shaped-data-sources: the seventh structural check. `columnMapping`
+// table-shaped-data-sources: a structural check. `columnMapping`
 // bounds live here, not as a Zod refinement. An unbypassable check is the
 // reason; see `definition-contract`.
 describe("compile: columnMapping bounds", () => {
@@ -646,6 +652,233 @@ describe("compile: technical field marker", () => {
   it("a malformed view.fields entry with no ref reaches the Zod error, not a TypeError", () => {
     const b = baseBody();
     b.workflow.steps[0].view = { fields: [{ required: true }] };
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow(TypeError);
+  });
+});
+
+// reject-unsatisfiable-required-readonly: the eighth structural check. A view
+// entry declaring literal required: true and literal readonly: true strands
+// an instance unless some source in the body writes the field. See
+// design.md's writer-set decisions for the reasoning behind each case below.
+describe("compile: unsatisfiable required+readonly pair", () => {
+  const unwrittenPair = (): any => {
+    const b = baseBody();
+    b.workflow.steps[0].view = { fields: [{ ref: "field_amount", required: true, readonly: true }] };
+    return b;
+  };
+
+  it("rejects a required+readonly pair no source in the body writes", () => {
+    const err = rejects(unwrittenPair());
+    expect(err.issues.some((i) => i.loc === "steps[0].view.fields[0]" && i.value === "field_amount")).toBe(true);
+  });
+
+  it("publishes a pair an action output writes on another step", () => {
+    const b = unwrittenPair();
+    b.workflow.steps[1].onEntry = [{ id: "action_x", type: "t", config: {}, output: { field_amount: cel("result.x") } }];
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("publishes a pair the entry's own step's onEntry output writes", () => {
+    const b = unwrittenPair();
+    b.workflow.steps[0].onEntry = [{ id: "action_x", type: "t", config: {}, output: { field_amount: cel("result.x") } }];
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("rejects a pair whose only writer is the entry's own step's onExit output", () => {
+    const b = unwrittenPair();
+    b.workflow.steps[0].onExit = [{ id: "action_x", type: "t", config: {}, output: { field_amount: cel("result.x") } }];
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.value === "field_amount")).toBe(true);
+  });
+
+  it("rejects a pair whose only writer is the entry's own step's onPath output", () => {
+    const b = unwrittenPair();
+    b.workflow.steps[0].paths[0].onPath = [{ id: "action_x", type: "t", config: {}, output: { field_amount: cel("result.x") } }];
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.value === "field_amount")).toBe(true);
+  });
+
+  it("rejects a pair whose only writer is the entry's own step's onCancel output", () => {
+    const b = unwrittenPair();
+    b.workflow.steps[0].onCancel = [{ id: "action_x", type: "t", config: {}, output: { field_amount: cel("result.x") } }];
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.value === "field_amount")).toBe(true);
+  });
+
+  it("publishes a pair the entry's own step's targetPath timer onFire writes", () => {
+    const b = unwrittenPair();
+    b.workflow.steps[0].timers = [
+      { id: "timer_x", duration: "PT1H", onFire: { targetPath: "path_ab", actions: [{ id: "action_x", type: "t", config: {}, output: { field_amount: cel("result.x") } }] } },
+    ];
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("publishes a pair the entry's own step's reminder timer onFire writes", () => {
+    const b = unwrittenPair();
+    b.workflow.steps[0].timers = [
+      { id: "timer_x", duration: "PT1H", onFire: { actions: [{ id: "action_x", type: "t", config: {}, output: { field_amount: cel("result.x") } }] } },
+    ];
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("publishes a pair a subprocess outputMapping writes", () => {
+    const b = unwrittenPair();
+    b.workflow.steps.push({
+      id: "step_c",
+      key: "c",
+      label: { en: "C" },
+      type: "subprocess",
+      subprocess: {
+        processId: "proc_child",
+        versionBinding: "pinned",
+        pinnedVersion: 1,
+        inputMapping: {},
+        outputMapping: { field_amount: cel("result.x") },
+      },
+      paths: [{ id: "path_cb", key: "cb", to: "step_b", trigger: "automatic" }],
+    });
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  const columnMappingPairBody = (): any => {
+    const b = unwrittenPair();
+    b.dataSources = [{ id: "ds_products", key: "products", type: "db.list", config: { listKey: "products" } }];
+    b.fields.push({
+      id: "field_picker",
+      key: "picker",
+      label: { en: "Picker" },
+      type: "select",
+      dataSource: "ds_products",
+      columnMapping: { price: "field_amount" },
+    });
+    return b;
+  };
+
+  it("publishes a pair a columnMapping target writes when the mapping field is editable on another step", () => {
+    const b = columnMappingPairBody();
+    b.workflow.steps[1].view = { fields: [{ ref: "field_picker" }] };
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("rejects a pair whose only writer is a columnMapping target placed editable only on the entry's own step", () => {
+    const b = columnMappingPairBody();
+    b.workflow.steps[0].view.fields.push({ ref: "field_picker" });
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.value === "field_amount")).toBe(true);
+  });
+
+  it("publishes a pair a contract.inputFields entry writes", () => {
+    const b = unwrittenPair();
+    b.contract = { inputFields: ["field_amount"], outcomes: ["done"] };
+    b.workflow.steps[1].outcome = "done";
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("publishes a pair an editable view entry on another step writes", () => {
+    const b = unwrittenPair();
+    b.workflow.steps[1].view = { fields: [{ ref: "field_amount" }] };
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("publishes a pair whose field carries a literal catalog default", () => {
+    const b = unwrittenPair();
+    b.fields[0].default = 5;
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("rejects a pair whose only writer is a CEL catalog default", () => {
+    const b = unwrittenPair();
+    b.fields[0].default = cel("42");
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.value === "field_amount")).toBe(true);
+  });
+
+  it("publishes a CEL readonly with literal required", () => {
+    const b = baseBody();
+    b.workflow.steps[0].view = { fields: [{ ref: "field_amount", required: true, readonly: cel("true") }] };
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("publishes a CEL required with literal readonly", () => {
+    const b = baseBody();
+    b.workflow.steps[0].view = { fields: [{ ref: "field_amount", required: cel("true"), readonly: true }] };
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("publishes an entry declaring visible: false", () => {
+    const b = baseBody();
+    b.workflow.steps[0].view = { fields: [{ ref: "field_amount", required: true, readonly: true, visible: false }] };
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("rejects an unwritten pair whose entry carries visible as a CEL expression", () => {
+    const b = baseBody();
+    b.workflow.steps[0].view = { fields: [{ ref: "field_amount", required: true, readonly: true, visible: cel("true") }] };
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.value === "field_amount")).toBe(true);
+  });
+
+  const EXAMPLE_FILES = [
+    "expense-approval.json",
+    "subprocess-credit-check-child.json",
+    "subprocess-loan-parent.json",
+    "purchase-requisition.json",
+  ];
+
+  it("publishes each example definition unchanged", () => {
+    for (const name of EXAMPLE_FILES) {
+      const raw = JSON.parse(readFileSync(new URL(`../examples/${name}`, import.meta.url), "utf8"));
+      const body = (raw.definition ?? raw) as ProcessBody;
+      expect(() => compileProcessBody(body)).not.toThrow();
+    }
+  });
+
+  it("rejects an unwritten pair even on a body that already satisfies publishedProcessBody", () => {
+    const compiled: any = compileProcessBody(baseBody() as ProcessBody);
+    compiled.workflow.steps[0].view = { fields: [{ ref: "field_amount", required: true, readonly: true }] };
+    expect(publishedProcessBody.safeParse(compiled).success).toBe(true);
+    expect(() => compileProcessBody(compiled)).toThrow(CompileValidationError);
+  });
+
+  it("publishes an unwritten pair on an all-automatic step", () => {
+    const b = unwrittenPair();
+    b.workflow.steps[0].paths[0].trigger = "automatic";
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("publishes an unwritten pair on a terminal step", () => {
+    const b = baseBody();
+    b.workflow.steps[1].view = { fields: [{ ref: "field_amount", required: true, readonly: true }] };
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("publishes an unwritten pair on an all-automatic step whose only exit is a targetPath timer", () => {
+    const b = unwrittenPair();
+    b.workflow.steps[0].paths[0].trigger = "automatic";
+    b.workflow.steps[0].paths[0].guard = cel("false");
+    b.workflow.steps[0].timers = [{ id: "timer_x", duration: "PT1H", onFire: { targetPath: "path_ab" } }];
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("publishes a group field's view entry declaring required and readonly with no writer", () => {
+    const b = baseBody();
+    b.fields.push({ id: "field_g", key: "g", label: { en: "G" }, type: "group", fields: [] });
+    b.workflow.steps[0].view = { fields: [{ ref: "field_g", required: true, readonly: true }] };
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("a technical field's view entry carrying required and readonly reports only the technical-field issue", () => {
+    const b = unwrittenPair();
+    b.fields[0].technical = true;
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "steps[0].view.fields[0].required")).toBe(true);
+    expect(err.issues.some((i) => i.loc === "steps[0].view.fields[0].readonly")).toBe(true);
+    expect(err.issues.some((i) => i.loc === "steps[0].view.fields[0]")).toBe(false);
+  });
+
+  it("a view entry with required and readonly but no ref reports no pair issue and does not throw a TypeError", () => {
+    const b = baseBody();
+    b.workflow.steps[0].view = { fields: [{ required: true, readonly: true }] };
     expect(() => compileProcessBody(b as ProcessBody)).not.toThrow(TypeError);
   });
 });

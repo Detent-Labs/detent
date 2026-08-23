@@ -257,6 +257,20 @@ regardless of what any step's view says. A view entry naming it may not
 declare `required` or `readonly` at all. That refines the rule above; it does
 not break it. Ordinary requiredness still lives only in the view.
 
+A view entry that declares `required: true` and `readonly: true` together
+locks a field a participant can never fill. Publishing rejects that pair
+unless some other source in the body writes the field first. That source
+can be an action's output, a subprocess `outputMapping`, or a
+`columnMapping` target. It can also be a `contract` input field, a literal
+catalog `default`, or an editable entry on another step.
+
+Publishing also lets the pair through on a step whose paths are all
+automatic, or on a terminal step. The required check never runs there, so
+the field can never strand anyone. A CEL `required` or `readonly` publishes
+too. Only a literal `true` on both flags trips the rule. A hidden entry
+(`visible: false`) publishes as well, since the engine never resolves
+`required` or `readonly` for a field nobody sees.
+
 A step can also override a field's validation, in one of two modes. The
 default mode is `merge`. It keeps every catalog bound the step does not name,
 and replaces only the ones it does. The `replace` mode drops the catalog's

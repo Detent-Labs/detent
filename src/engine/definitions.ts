@@ -238,7 +238,7 @@ export async function publishBody(
   db: SQL = sql,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<ProcessVersion> {
-  // Structure first: the Zod gate, duration and the seven structural checks,
+  // Structure first: the Zod gate, duration and the eight structural checks,
   // via the module both this function and the studio's live validation
   // share (src/validate.ts). Reconstructed from the result rather than
   // re-running compileProcessBody, at the same precedence it has today:

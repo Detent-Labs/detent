@@ -1,7 +1,7 @@
 /**
  * src/schema/strip-compiled.ts: the inverse of compileProcessBody's cancel-sink
  * injection. The round trip over `examples/` is the guard that keeps the two in
- * step — a seventh compile-pass addition fails these, which is the point.
+ * step — an eighth compile-pass addition fails these, which is the point.
  * Pure schema work; no DB, so nothing skips.
  */
 import { test, expect, describe } from "bun:test";

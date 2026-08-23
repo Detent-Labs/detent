@@ -91,7 +91,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   only the cascade resumes. A first call that omitted `resolveBody` therefore
   leaves a `pending` sweep a later call can finish.
 - Publish-time structural checks (`src/schema/compile.ts`, harden-publish-validation;
-  `test/compile-validation.test.ts`, `test/cancel.test.ts`). Six write-path checks
+  `test/compile-validation.test.ts`, `test/cancel.test.ts`). Eight write-path checks
   run inside `compileProcessBody`. They run right after `validateDurations`.
   They run **before** the `publishedProcessBody`-valid idempotent early return.
   That placement makes a check unbypassable. A hand-written body cannot skip it
@@ -100,7 +100,7 @@ Stage-by-stage status is in `ROADMAP.md`.
 
   Each check returns a located `CompileIssue[]` (`{loc, value, message}`, the
   `DurationIssue` shape). `compileProcessBody` collects every issue and throws
-  one `CompileValidationError` (mapped to 422 in `http/errors.ts`). The six:
+  one `CompileValidationError` (mapped to 422 in `http/errors.ts`). The harden-publish-validation six:
   - The reserved `core.` action-prefix ban, now checked on both compile
     branches. It moved out of `authoredProcessBody`: a compiled body injects
     no action of this type, so the ban is safe to apply to every body. The
@@ -204,7 +204,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   <!-- antislop: allow synonym-rotation -->
   <!-- "build"/"create" both name this file's existing, larger split usage of the concept; this passage keeps "build" consistently within itself. -->
   Two exported functions form the seam. `validateStructure(authored)` runs
-  the Zod gate, duration and the seven structural checks, in that order. It
+  the Zod gate, duration and the eight structural checks, in that order. It
   builds the compiled body the second function needs. It is the only
   sanctioned way to build one from an authored input.
 
@@ -2757,8 +2757,8 @@ Stage-by-stage status is in `ROADMAP.md`.
   It is raw text for one written through an explicit cast.
 
   `FieldDef` gains an optional `columnMapping`, column key to target `FieldId`.
-  `compile.ts::checkColumnMapping` is the seventh structural write-path check.
-  It requires a `dataSource` and a `select` type. It holds each key to the slug
+  `compile.ts::checkColumnMapping` runs inside `checkFieldTree`, the third
+  structural write-path check. It requires a `dataSource` and a `select` type. It holds each key to the slug
   grammar and the length bound. It resolves every target in the recursive field
   set. It refuses a self-target, a group target, and two keys naming one
   target.

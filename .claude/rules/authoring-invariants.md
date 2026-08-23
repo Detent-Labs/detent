@@ -103,3 +103,12 @@ only the cancel-sink count.
   under a declared length bound — every authored string that reaches an
   interpreter or a registry lookup. Checked in `compile.ts::checkLengthBounds`,
   plus the pattern bound in `checkPatterns`.
+- A `view.fields[]` entry declaring literal `required: true` and literal
+  `readonly: true` names a field some source in the body writes (an action
+  `output`, a `subprocess.outputMapping`, a `columnMapping` target, a
+  `contract.inputFields` entry, a literal catalog `default`, or an editable
+  entry elsewhere in the body), except on a step carrying no manual path, on a
+  group or technical field, on a ref-less entry, or on an entry declaring
+  `visible: false`. The compile pass checks this
+  (`compile.ts::checkUnsatisfiableRequiredReadonly`), not a Zod refinement on
+  `viewField` — see `definition-contract`'s placement rule.
