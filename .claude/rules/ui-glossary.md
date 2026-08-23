@@ -66,7 +66,9 @@ below belongs to the structure surface alone.
 | palette | the edit rail's "Add to canvas" section: drag a Step, Subprocess or End onto the canvas | `.studio-palette-list` |
 | process links | the edit rail's "Process" section: one row per panels-screen view, each with a count | `.studio-rail-row` |
 | inspector | the `<aside>` beside the canvas, editing one selected step or path | `EditScreen.tsx`, `.canvas-inspector` |
-| inspector panel | one section inside the inspector | `panels/StepsPanel.tsx` and what it nests |
+| identity zone | the inspector's always-visible top zone: key, label, description, performed-by, and the view button | `panels/StepsPanel.tsx`, `.step-identity-zone` |
+| behavior zone | the inspector's tab row: Assignment, Paths, Actions, Timers, and Subprocess when it applies | `panels/StepsPanel.tsx`, `.step-behavior-tabs` |
+| diagnostics drawer | the inspector's bottom zone: the issue count, the "View raw JSON" toggle, and the docked checks rail | `panels/StepsPanel.tsx`, `.step-diagnostics` |
 | checks rail | the validation issue list, grouped by check | `panels/ChecksRail.tsx` |
 | dock | the collapsible strip below the canvas columns | `dock/EditorDock.tsx` |
 | dock tab | one of the dock's three views: Changes, Field matrix, Paths. The Field matrix tab mounts `FieldMatrixGrid`, the bare grid, with no toolbar | `dock/EditorDock.tsx`, `DOCK_TABS` |
@@ -98,8 +100,12 @@ name, a selected field. Unmounting on every switch would lose that state.
 **field tabs** names one thing only: the Field / Values / Rules set inside
 the field catalog's own editor. It stands apart from the register tab, the
 shell's own header label. It stands apart from the dock tab, one of the
-canvas dock's three views. It stands apart from the surface toggle, the
-Structure/JSON switch. All four are tab patterns. Each keeps its own name.
+canvas dock's three views.
+
+It also stands apart from the surface toggle, the Structure/JSON switch.
+It stands apart from the behavior zone's tab row too, the inspector's
+Assignment/Paths/Actions/Timers/Subprocess set. All five are tab patterns.
+Each keeps its own name.
 
 **inert** carries two readings here, both HTML terms used for their literal
 meaning, not a rotated synonym for either. The field matrix stamps a step

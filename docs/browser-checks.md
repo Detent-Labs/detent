@@ -147,12 +147,15 @@ added:
   list beneath must match the standalone rail's own states above. It
   draws no border or padding of its own, so it never doubles the
   inspector's box.
-- **Selection-driven inspector**: a selected step's sections, including
-  its "Developer view" disclosure (expanded and collapsed). A selected
-  path's sections too, including its own "Developer view" disclosure (raw
-  CEL, expanded and collapsed). The no-selection state is the checks rail
-  beside the canvas, covered above: the inspector itself never renders
-  with nothing selected (`studio-edit-header-cleanup`).
+- **Selection-driven inspector**: a selected step's identity zone and
+  behavior tabs. Its diagnostics drawer too, including the "View raw
+  JSON" toggle (expanded and collapsed). A selected path's own inspector
+  too, including its own path-guard "Developer view" toggle (raw CEL,
+  expanded and collapsed). That path-guard toggle is a distinct,
+  out-of-scope control from the step's "View raw JSON" toggle. The
+  no-selection state is the checks rail beside the canvas, covered above:
+  the inspector itself never renders with nothing selected
+  (`studio-edit-header-cleanup`).
 - **Canvas-edge guard label**: a plain-English summary and a raw-CEL
   fallback.
 - **Process-identity header bar**: clean, dirty, and just-published states.
@@ -1294,20 +1297,19 @@ session. `studio-draftToolbarState.test.ts` pins that exact bug at the unit
 level. Here the real save/conflict/reload sequence drives it in a browser
 instead.
 
-### Selecting a path opens the inspector's paths section with the row highlighted
+### Selecting a path switches the inspector to the source step's Paths tab with the row highlighted
 
-Source: `ponytail-studio-small-cuts` task 5.3.
+Source: `redesign-step-inspector`.
 
 On the canvas, select a step. Then click one of its outgoing path edges. A
 guard label works as a click target.
 
-Pass: the inspector switches to the path's source step. The Paths section
-opens, marked current. The selected path's own row shows a highlight
-border, distinct from the section's other rows.
+Pass: the inspector switches to the path's source step. The Paths tab
+shows, marked current in the behavior tab row. The selected path's own row
+shows a highlight border, distinct from the tab's other rows.
 
-This exercises task 2.1's inlined `openSectionForSelection` ternary. It now
-reads as a plain `selectedPathId ? "paths" : undefined`, inline in
-`StepsPanel.tsx`'s selection effect.
+This exercises `defaultTabFor`'s `selectedPathId ? "paths" : "assignment"`
+ternary, called from `StepsPanel.tsx`'s selection effect.
 
 ### The no-assignment warning renders on a non-terminal step and not on a terminal one
 
@@ -1315,8 +1317,8 @@ Source: `ponytail-studio-small-cuts` task 5.4.
 
 On the canvas, select a non-terminal step with no `assignment` set. Use
 `approval_routing` on the `purchase_requisition` draft. Open its Assignment
-section. Then select a terminal step with no `assignment`, `closed`, and
-open its Assignment section too.
+tab. Then select a terminal step with no `assignment`, `closed`, and open
+its Assignment tab too.
 
 Pass: the non-terminal step shows "This step has no assignment. Only the
 starter or an admin can act on it, and it stays out of everyone's My-tasks

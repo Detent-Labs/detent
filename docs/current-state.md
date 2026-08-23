@@ -1493,12 +1493,12 @@ Stage-by-stage status is in `ROADMAP.md`.
   a graph-editing library (the interaction surface — drag a node, drag from a
   handle — is small and fixed, and the domain graph has no parallelism to
   support). `StepsPanel` is mounted unconditionally as a fixed-width inspector
-  beside the canvas — its `expanded` accordion state, previously internal
+  beside the canvas — its `activeTab` behavior-zone state, previously internal
   `useState`, is now an optional controlled prop (`selectedStepId`/
   `onSelectStep`, uncontrolled when `onSelectStep` is omitted) so canvas
-  selection can drive it without ever hiding the panel's own list or
+  selection can drive it without ever hiding the panel's own identity zone or
   "+ Add step" action; selecting a path edge resolves to its *source* step
-  and expands that step's row (no standalone `PathsPanel` mount — it is
+  and shows that step's Paths tab (no standalone `PathsPanel` mount — it is
   already nested there). `src/schema/definition.ts` gained
   `checkPathTriggerConsistency`, extracted from the step `superRefine`'s
   inline all-manual-or-all-automatic / unique-automatic-priority check (same
@@ -1942,10 +1942,10 @@ Stage-by-stage status is in `ROADMAP.md`.
   inspector. Both sit inside the same mounted `DraftProvider`.
 
   A navigation away and back shows the same draft state a re-opened
-  modal would have. The Draft never unmounts. `StepsPanel`'s view entry
-  navigates there now. It no longer opens local dialog state. It carries
-  no `aria-haspopup` any more. It is a navigation target now, not a
-  disclosure or a dialog trigger.
+  modal would have. The Draft never unmounts. `StepsPanel`'s identity-zone
+  view button navigates there now. It no longer opens local dialog state.
+  It carries no `aria-haspopup` any more. It is a navigation target now,
+  not a disclosure or a dialog trigger.
 
   The palette gained a second section: "add a field to the process," by
   type. `draft/mintField.ts`'s `PALETTE_FIELD_KINDS` names five: text,

@@ -1,13 +1,13 @@
 ## 1. State groundwork
 
-- [ ] 1.1 Add the `BehaviorTab` type (`"assignment" | "paths" | "timers" |
+- [x] 1.1 Add the `BehaviorTab` type (`"assignment" | "paths" | "timers" |
       "actions" | "subprocess"`) and add `activeTab: BehaviorTab` state to
       `StepsPanel`, alongside the existing `openSection` state for now.
-- [ ] 1.2 Add `defaultTabFor(selection)`: returns `"paths"` when
+- [x] 1.2 Add `defaultTabFor(selection)`: returns `"paths"` when
       `selectedPathId` is set, `"assignment"` otherwise. Call it from the
       existing `useEffect` keyed on `[selectedStepId, selectedPathId]` that
       resets `openSection` today, so the same effect also sets `activeTab`.
-- [ ] 1.3 Add a second `useEffect`, keyed on `step?.type`, that moves
+- [x] 1.3 Add a second `useEffect`, keyed on `step?.type`, that moves
       `activeTab` to `"assignment"` when it reads `"subprocess"` and the
       step's type is no longer `"subprocess"`. Use a functional state
       update — `setActiveTab((prev) => prev === "subprocess" &&
@@ -16,44 +16,44 @@
       `"paths"` value task 1.2's effect set in the same commit (both
       effects can fire together when a path-edge click also changes
       `step?.type`).
-- [ ] 1.4 Add a `chooseTab(tab: BehaviorTab)` setter.
+- [x] 1.4 Add a `chooseTab(tab: BehaviorTab)` setter.
 
 ## 2. Identity zone
 
-- [ ] 2.1 Show key, label, description, the performed-by segmented
+- [x] 2.1 Show key, label, description, the performed-by segmented
       control, the conditional outcome field, and the initial-step
       control unconditionally, outside any tab or disclosure. Reuse the
       existing field markup and mutation calls (`updateStep`,
       `LocalizedTextInput`, `missingTranslationWarning`) unchanged.
-- [ ] 2.2 Move the view button (today's "view" section-index entry) into
+- [x] 2.2 Move the view button (today's "view" section-index entry) into
       the identity zone as a plain `<button>` that calls `navigate(step.id)`
       directly. Reuse `stepSections.viewFieldsConfigured` and
       `stepSections.viewBuildForm` catalog keys for its label.
-- [ ] 2.3 Wrap the identity zone in `.step-identity-zone`.
+- [x] 2.3 Wrap the identity zone in `.step-identity-zone`.
 
 ## 3. Behavior tab row
 
-- [ ] 3.1 Show the tab row as `role="tablist"` with one
+- [x] 3.1 Show the tab row as `role="tablist"` with one
       `<button role="tab" aria-selected={...}>` per entry: Assignment,
       Paths, Actions, Timers, and Subprocess when `step.type ===
       "subprocess"`. Wire `onClick` to `chooseTab`. Set
       `aria-label={t(...)}` on the tablist using the new "Behavior" zone
       catalog key task 3.6 adds.
-- [ ] 3.2 Mount `PathsPanel`, `TimersPanel`, the three `ActionListEditor`
+- [x] 3.2 Mount `PathsPanel`, `TimersPanel`, the three `ActionListEditor`
       instances, `PluginEnvelopeEditor` (assignment), and
       `SubprocessSpecEditor` conditionally on `activeTab`, one at a time,
       with their existing props unchanged.
-- [ ] 3.3 On the Paths tab, show an empty state ("Terminal steps have no
+- [x] 3.3 On the Paths tab, show an empty state ("Terminal steps have no
       outgoing paths") instead of `PathsPanel` when `step.terminal` is
       true.
-- [ ] 3.4 On the Assignment tab, suppress `assignmentWarningText` when
+- [x] 3.4 On the Assignment tab, suppress `assignmentWarningText` when
       `step.terminal` is true (extend the existing
       `step.terminal === true || step.assignment !== undefined` check,
       which already covers this case for the warning's presence, not its
       tab).
-- [ ] 3.5 Keep the cross-process check fieldset inside the Subprocess tab,
+- [x] 3.5 Keep the cross-process check fieldset inside the Subprocess tab,
       beside `SubprocessSpecEditor`.
-- [ ] 3.6 Add new catalog keys to `i18n/catalogs/studio.ts` for the
+- [x] 3.6 Add new catalog keys to `i18n/catalogs/studio.ts` for the
       "Behavior" zone label and the terminal-empty-paths copy; retire
       `stepSections.identity` and `stepSections.view`, the two keys that
       named only the old accordion shape. Update
@@ -63,7 +63,7 @@
 
 ## 4. Diagnostics drawer
 
-- [ ] 4.1 Wrap the per-step issue count, a "View raw JSON" toggle
+- [x] 4.1 Wrap the per-step issue count, a "View raw JSON" toggle
       (replacing the old `developerView` disclosure entry, same
       `JSON.stringify(step, null, 2)` content), `IssueList`, and the
       docked `<ChecksRail collapsed />` in a `.step-diagnostics` element
@@ -71,7 +71,7 @@
     - Wire the toggle as a `<button type="button">` with `aria-expanded`
       for its own state and `aria-controls` naming the JSON region it
       discloses.
-- [ ] 4.2 Keep the "Remove step" button inside the diagnostics drawer.
+- [x] 4.2 Keep the "Remove step" button inside the diagnostics drawer.
 
 The MODIFIED "A step node on the canvas offers an inline rename"
 requirement needs no task of its own here. Its only change is spec
@@ -80,18 +80,18 @@ changes, so no task in this change implements it directly.
 
 ## 5. Styling and cleanup
 
-- [ ] 5.1 Add `.step-identity-zone`, `.step-behavior-tabs`,
+- [x] 5.1 Add `.step-identity-zone`, `.step-behavior-tabs`,
       `.step-behavior-tab`, and `.step-diagnostics` rules to `app.css`,
       following `.studio-dock-tabs`'s existing tab button styling.
-- [ ] 5.2 Remove `.step-section-index` and `.step-section-entry` rules
+- [x] 5.2 Remove `.step-section-index` and `.step-section-entry` rules
       once `StepsPanel` no longer mounts them.
-- [ ] 5.3 Grep the repo for `.step-section-entry` and `step-section-`
+- [x] 5.3 Grep the repo for `.step-section-entry` and `step-section-`
       outside `app.css` and `StepsPanel.tsx` (tests, browser-check
       scripts, docs). Update or remove every match.
-- [ ] 5.4 Remove `openSection`, `chooseSection`, `shows`, `sectionRefs`,
+- [x] 5.4 Remove `openSection`, `chooseSection`, `shows`, `sectionRefs`,
       `pendingScrollSection`, and the `sections`/`StepSection` list now
       that no JSX references them.
-- [ ] 5.5 Rewrite the three `docs/browser-checks.md` passages that
+- [x] 5.5 Rewrite the three `docs/browser-checks.md` passages that
       describe the retired accordion in prose, not selectors, so the
       grep in 5.3 misses them: the "Developer view" disclosure passage
       (around line 150-155), the "Paths section... marked current"
@@ -110,7 +110,7 @@ changes, so no task in this change implements it directly.
       line 1495-1497 and 1945-1947) also names the old `StepsPanel`
       expanded-accordion state and its "no aria-haspopup" navigation
       shape; update it in the same pass if convenient.
-- [ ] 5.6 Change `.claude/rules/ui-glossary.md` for the retired accordion.
+- [x] 5.6 Change `.claude/rules/ui-glossary.md` for the retired accordion.
       In the edit-screen table, replace the "inspector panel" row ("one
       section inside the inspector") with three rows: identity zone,
       behavior zone (the tab row), and diagnostics drawer. In the "field
@@ -120,11 +120,11 @@ changes, so no task in this change implements it directly.
 
 ## 6. Verification
 
-- [ ] 6.1 Run `bun run typecheck` and confirm it prints no errors.
-- [ ] 6.2 Run the full `bun test` suite with `DATABASE_URL` set (never a
+- [x] 6.1 Run `bun run typecheck` and confirm it prints no errors.
+- [x] 6.2 Run the full `bun test` suite with `DATABASE_URL` set (never a
       single-file rerun) and confirm the suite reports 0 failures, with
       the DB-backed suites not silently skipped.
-- [ ] 6.3 In a real browser, select a step, a terminal step, a
+- [x] 6.3 In a real browser, select a step, a terminal step, a
       subprocess step, and a path edge; confirm the identity zone,
       behavior tabs, and diagnostics drawer match the requirements in
       `specs/studio-canvas/spec.md`. Also tab to a behavior tab and
