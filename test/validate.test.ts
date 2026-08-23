@@ -602,10 +602,10 @@ describe("definition-contract: Action.output targets resolve to a real field, fr
 
 // A duration is armed inside the transition commit, on the TARGET step, so an
 // unvalidated one does not fail a single instance: it makes the step unreachable
-// for every instance of the definition. It is checked on the WRITE path — see
-// `validateDurations` — because `processVersion` is also the deserializer for
-// stored immutable bodies. These assert both halves: the check bites at compile,
-// and parse stays permissive so an already-published body still reads.
+// for every instance of the definition. Arming totality places the check on the
+// WRITE path — see `validateDurations`; `definition-contract` states the general
+// placement rule. These assert both halves: the check bites at compile, and
+// parse stays permissive so an already-published body still reads.
 describe("timer duration", () => {
   // The review step's reminder timer, the only duration timer in the example.
   const loc = "steps[1].timers[0].duration";
@@ -673,14 +673,12 @@ describe("timer duration", () => {
     });
   }
 
-  // THE LAYERING ASSERTION. The check lives on the WRITE path only: `processVersion`
-  // is also the deserializer for stored immutable bodies (`processBody.parse` on
-  // every resolveBody cache miss), so a Zod refinement would make a definition
-  // published before this check existed throw on READ — and its pinned instances
-  // permanently unrehydratable, versions being immutable and migration not built.
-  // In timers.ts the resolveBody call sits outside the per-instance try, so one
-  // such body would starve every other due instance. Both halves belong in one
-  // test: proving only the rejection would let the read-path regression back in.
+  // THE LAYERING ASSERTION. The check lives on the WRITE path only, on arming
+  // totality (`definition-contract` states the general placement rule): a
+  // duration's `fireAt` is computed inside the transition commit, so an
+  // unvalidated one makes the target step unreachable for every instance of the
+  // definition, not just one. Both halves belong in one test: proving only the
+  // rejection would let a read-path regression back in unnoticed.
   it("parses an invalid duration on the read path while rejecting it on the publish path", () => {
     // "" is absent from this set on purpose: it is falsy, so the pre-existing
     // duration-XOR-deadline refinement reads the timer as having neither and

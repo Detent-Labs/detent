@@ -205,9 +205,9 @@ test.skipIf(!DB)("a rejected publish consumes no version number", async () => {
 });
 
 // The check runs AFTER the hash-hit lookup, so a version stored before the check
-// existed (or before it tightened) still re-publishes as a no-op. Instances are
-// pinned to that version; making a re-publish throw would strand them. Inserted
-// directly here because publishBody itself would now refuse to create it.
+// existed (or before it tightened) still re-publishes as a no-op. This is the
+// publish-path placement `definition-contract` argues for an unbypassable check.
+// Inserted directly here because publishBody itself would now refuse to create it.
 test.skipIf(!DB)("re-publishing an already-stored body is a no-op, not re-validated", async () => {
   const legacy = compileProcessBody(bodyWithGuard('data.nope == "x"'));
   const hash = definitionHash(legacy);
@@ -222,9 +222,8 @@ test.skipIf(!DB)("re-publishing an already-stored body is a no-op, not re-valida
 
 // The load-bearing consequence of putting the check on the WRITE path: a version
 // stored before the check existed still READS, and its pinned instances still
-// rehydrate. The same check placed in definition.ts — which is also the
-// deserializer every read goes through — would break exactly this, turning a
-// tightening into an outage for every instance already pinned to that version.
+// rehydrate. `definition-contract` states the general placement rule this test
+// exercises for `publishBody`'s checks.
 test.skipIf(!DB)("a body stored before the check still reads and its instances rehydrate", async () => {
   const legacy = compileProcessBody(bodyWithGuard('data.nope == "x"'));
   const hash = definitionHash(legacy);

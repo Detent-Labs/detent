@@ -296,6 +296,47 @@ runtime.
   top-level field
 
 
+### Requirement: An authoring invariant argues its own placement
+
+An authoring invariant SHALL live either in the `definition.ts` schema or on the
+publish path in `compile.ts`. Neither placement is the default. A change that
+adds an invariant SHALL state the placement it takes and the reason.
+
+The read path SHALL NOT settle that question on its own. `definition.ts`
+deserializes stored bodies. A tightened refinement there makes a body published
+before it fail to parse. That outcome parks the instances pinned to that body.
+
+It stops no worker. Every body-resolving worker resolves a body inside its own
+per-item error boundary. One unparseable body therefore never ends a pass. The
+read-path cost stays small. It is a cost to weigh, never a veto.
+
+Two criteria SHALL decide the placement:
+
+- An invariant that a hand-written body must not bypass SHALL live on the
+  publish path. `publishedProcessBody` checks only the cancel-sink count. A
+  schema refinement alone therefore lets a body of that shape through.
+- An invariant whose violation cannot exist in an already-published body MAY
+  live in the schema. A key introduced together with its invariant has no such
+  body behind it.
+
+#### Scenario: A tightened schema refinement parks only its own instances
+
+- **WHEN** a refinement in `definition.ts` tightens, and a body published
+  earlier no longer parses
+- **THEN** each worker resolving that body skips the affected instance, and
+  every other instance in the same pass proceeds
+
+#### Scenario: A publish-path check rejects a body the published schema accepts
+
+- **WHEN** a hand-written body satisfies `publishedProcessBody` and breaks an
+  invariant placed on the publish path
+- **THEN** publishing rejects it with a located error
+
+#### Scenario: A change states the placement it takes
+
+- **WHEN** a change adds an authoring invariant
+- **THEN** its spec names the placement and the criterion that decided it
+
 ### Requirement: Write-path structural checks run in the compile pass, ahead of its idempotent return
 
 Every authoring-time check that is not expressible as a Zod refinement on the
@@ -605,8 +646,8 @@ what it is. The read path SHALL keep parsing a stored body unchanged.
 column key and whose value is a `FieldId`.
 
 The compile pass SHALL enforce every rule below, and SHALL reject a body that
-breaks one. These are write-path checks, not read-path refinements. A stored
-immutable body has to keep deserializing whatever a later rule tightens.
+breaks one. These are publish-path checks. An unbypassable check is the reason,
+per the placement requirement above.
 
 - A field declaring `columnMapping` SHALL declare `dataSource`. A mapping over
   inline options names a column no list declares.
@@ -716,9 +757,8 @@ and deletes the key on uncheck.
 The compile pass SHALL reject a `view.fields[]` entry whose `ref` names a
 `technical` field, when that entry declares `required` or `readonly` at
 all. This holds for a literal `true`, a literal `false`, and a CEL
-expression alike. This is a write-path check, not a read-path refinement.
-A stored immutable body has to keep deserializing whatever a later rule
-tightens.
+expression alike. This is a publish-path check. An unbypassable check is
+the reason, per the placement requirement above.
 
 The rule follows the shape the definition contract already applies to
 `options`/`dataSource` and to `duration`/`deadline`. Two facts cannot both

@@ -10,10 +10,9 @@
  * chaining wiring below, assign the next monotonic version and insert. The
  * (process_id, version) PK forbids a body overwrite.
  *
- * Publish is the enforcement point for every check that may tighten over time.
- * `definition.ts` is also the deserializer every read goes through, so a check
- * placed there would make an already-published definition throw on READ and its
- * pinned instances unrehydratable.
+ * Publish is the enforcement point for every check an unbypassable-check
+ * criterion places here rather than in `definition.ts` — see
+ * `definition-contract`'s placement requirement.
  */
 
 import { SQL } from "bun";

@@ -10,11 +10,13 @@ commit that records the entry, so it survives restart and does not drift — tim
 enters the engine here and nowhere else (CEL has no `now()`). A timer declares
 either a fixed `duration` or a CEL `deadline`, never both. Arming is total: a
 deadline that cannot be resolved to an instant omits that timer rather than failing
-the step entry, and the omission is recorded as a `timer.unarmed` event. A
-`duration`, by contrast, is validated on the **publish** path — grammar and
-magnitude both — because `definition.ts` is also the deserializer for stored
-immutable bodies, so a tightened read-path refinement would make an
-already-published definition unreadable and its pinned instances unrehydratable.
+the step entry, and the omission is recorded as a `timer.unarmed` event.
+
+A `duration`, by contrast, is validated on the **publish** path, for grammar and
+magnitude both. Arming totality is the reason. A duration timer's `fireAt`
+computes inside the transition commit. An unvalidated duration therefore makes
+the target step unreachable for every instance of the definition, not just one.
+See `definition-contract` for the general placement rule this follows.
 
 Firing is at-most-once per armed timer, enforced by the same optimistic-concurrency
 token transitions use. A timer whose `onFire` names a `targetPath` forces a
@@ -430,23 +432,25 @@ supports — weeks, days, hours, minutes and seconds, no calendar units, at leas
 component — when a definition is published. A value outside that grammar is a publish
 error, naming the offending field.
 
-This validation MUST NOT run when a stored definition is read back. The contract
-module is also the deserializer for published bodies, and published versions are
-immutable while instances pin `{processId, version, definitionHash}`. A check that
-tightens over time and runs on the read path would make an already-published
-definition fail to parse, leaving its pinned instances unrehydratable with no repair
-path, and — because the workers resolve a body outside their per-instance error
-handling — would starve every other instance in the same pass. Validation that may
-tighten belongs on the write path, alongside expression checking and plugin-config
-validation.
+Arming totality is the reason for that placement. Arming computes a duration timer's
+`fireAt` while entering the **target** step, inside the transition commit. An
+unvalidated duration that raises there does not fail one instance. It makes the step
+unreachable for every instance of the definition, and it makes the definition
+uninstantiable when that step is the initial step. Reached through the scheduler the
+same raise is swallowed and retried on every poll indefinitely.
 
-Enforcing it at publish is also what makes arming total for the duration branch.
-Arming computes a duration timer's `fireAt` while entering the **target** step, inside
-the transition commit, so an unvalidated duration that raises there does not fail one
-instance: it makes the step unreachable for every instance of the definition, and
-makes the definition uninstantiable when that step is the initial step. Reached
-through the scheduler the same raise is swallowed and retried on every poll
-indefinitely.
+This validation MUST NOT run when a stored definition is read back. The contract
+module also deserializes published bodies, and published versions are immutable while
+instances pin `{processId, version, definitionHash}`. A check that tightens over time
+and runs on the read path would make an already-published definition fail to parse,
+leaving its pinned instances unrehydratable with no repair path.
+
+That read-path cost stays small, and it does not decide this placement on its own. The
+poison-instance requirement below puts the row body parse and the body resolution
+inside each instance's own error boundary. One unparseable body therefore skips its
+own instance and never aborts a pass. `definition-contract` states the general rule.
+Placement weighs the read-path cost. The read path never vetoes a schema refinement
+by itself.
 
 The grammar applies to every duration-typed field. The magnitude bound below applies
 only to `Timer.duration`.

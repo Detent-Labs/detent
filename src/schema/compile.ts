@@ -65,11 +65,10 @@ const OUT_OF_RANGE = `timer duration exceeds the ${MAX_TIMER_DURATION_MS} ms bou
 
 /**
  * Publish-time duration check, returning located issues ([] when the body is
- * clean). Lives here, not as a Zod refinement, because `definition.ts` is also
- * the deserializer for stored immutable bodies: tightening a refinement would
- * make an already-published definition throw on READ, and its pinned instances
- * unrehydratable. Validation that may tighten over time belongs on the write
- * path — the same placement CEL checking and plugin-config validation take.
+ * clean). Lives here, not as a Zod refinement, on arming totality: a duration
+ * timer's `fireAt` computes inside the transition commit, so an unvalidated
+ * duration makes its target step unreachable for every instance of the
+ * definition, not just one — see `definition-contract`'s placement rule.
  *
  * The grammar applies to every duration-typed field. The magnitude bound
  * applies to `Timer.duration` alone: it exists to keep `entryInstant + duration`
@@ -456,9 +455,9 @@ function checkIdResolution(body: ProcessBody): CompileIssue[] {
 }
 
 /**
- * `FieldDef.columnMapping` bounds. Seven rules, all write-path: a refinement
- * on `fieldDef` would make an already-published body throw on READ, and this
- * check may tighten later.
+ * `FieldDef.columnMapping` bounds. Seven rules, all write-path: a hand-written
+ * body could satisfy `publishedProcessBody` while breaking one, so
+ * `definition-contract`'s unbypassable-check criterion places them here.
  *
  * It does NOT check a key against any data list. `db-data-source-type` keeps
  * publishing independent of the state of the data, so a key naming no declared

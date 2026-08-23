@@ -145,13 +145,10 @@ export function parseIsoDuration(d: string): number | null {
 }
 
 /**
- * ISO 8601 duration, e.g. "P7D", "PT30S". Deliberately a bare string: this
- * schema is also the deserializer for stored, immutable bodies
- * (`processBody.parse` on every `resolveBody` cache miss), so a refinement here
- * would retroactively make an already-published definition unreadable — and its
- * pinned instances unrehydratable, migration not being built. The grammar and
- * the magnitude bound are enforced on the write path instead, by
- * `validateDurations` in src/schema/compile.ts.
+ * ISO 8601 duration, e.g. "P7D", "PT30S". Deliberately a bare string: the
+ * grammar and the magnitude bound are enforced on the write path instead, by
+ * `validateDurations` in src/schema/compile.ts, on arming totality — see
+ * `definition-contract`'s placement requirement.
  */
 export const duration = z.string();
 export type Duration = z.infer<typeof duration>;
@@ -277,8 +274,8 @@ export type FieldDef = {
    * Column key -> the catalog field the engine writes that column into when a
    * participant picks a row. The engine resolves the picked option, checks the
    * attribute against the target's declared type, and writes a match. The
-   * bounds live in `compile.ts::checkColumnMapping`, not here: a refinement on
-   * this read schema would make an already-published body throw on READ.
+   * bounds live in `compile.ts::checkColumnMapping`, not here:
+   * `definition-contract`'s unbypassable-check criterion is the reason.
    */
   columnMapping?: Record<string, FieldId>;
   validation?: FieldValidation;
@@ -290,9 +287,8 @@ export type FieldDef = {
    * of the view entry. A `technical` field must not be `type: "group"`, and
    * a view entry naming one must declare neither `required` nor `readonly`.
    * Both rules are write-path checks (`compile.ts::checkTechnicalFields`),
-   * never a refinement here: `definition.ts` also deserializes stored
-   * immutable bodies, and a refinement would make an already-published body
-   * throw on READ.
+   * never a refinement here: `definition-contract`'s unbypassable-check
+   * criterion is the reason.
    */
   technical?: boolean;
 };

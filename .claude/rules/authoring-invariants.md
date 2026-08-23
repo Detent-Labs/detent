@@ -19,9 +19,16 @@ below lives in `definition.ts`.
 Several run instead as write-path checks inside `compileProcessBody`
 (`src/schema/compile.ts`). They run right after `validateDurations`. They run
 **before** the `publishedProcessBody`-valid idempotent early return. That is
-`validateDurations`' own placement. The reason is the same one:
-`definition.ts` is also the deserializer for stored immutable bodies. A Zod
-refinement there would make an already-published body throw on READ.
+`validateDurations`' own placement.
+
+Placement is a judgment call, not a default; `definition-contract` states two
+criteria. An invariant a hand-written body must not bypass belongs on the
+publish path. An invariant whose violation cannot exist in an
+already-published body may live in the schema. The read path never settles
+placement on its own: `definition.ts` also deserializes stored bodies, and a
+tightened refinement there parks only the instances pinned to the body it
+strands, since every body-resolving worker holds its own per-instance error
+boundary.
 
 The compile-pass placement also makes a check unbypassable. A hand-written
 body cannot skip it by merely satisfying `publishedProcessBody`, which checks
@@ -37,11 +44,8 @@ only the cancel-sink count.
 - `duration` values are ISO-8601 W/D/H/M/S (no calendar units, at least one
   component), and a `Timer.duration` is additionally bounded so `entryInstant +
   duration` stays in the four-digit-year window. Enforced at PUBLISH
-  (`compile.ts::validateDurations`), never as a Zod refinement: `definition.ts` is
-  also the deserializer for stored immutable bodies, so a tightened refinement would
-  make an already-published definition throw on READ and its pinned instances
-  unrehydratable. Validation that may tighten over time belongs on the write path —
-  the same placement CEL checking and plugin-config validation take.
+  (`compile.ts::validateDurations`), on arming totality — see
+  `definition-contract`'s placement rule.
 - `pinnedVersion` present iff `versionBinding === "pinned"`; `contractRef`
   present for a latest-at-spawn subprocess reference.
 - A process referenced as a subprocess has a `contract`. In a contracted
@@ -74,8 +78,7 @@ only the cancel-sink count.
   (`compile.ts::checkPatterns`) at two call sites: once over the field
   catalog, once over every `ViewField.validation.pattern`
   (`checkViewFieldPatterns`), since a step's own validation override carries
-  the same risk. An uncompilable pattern would otherwise brick a step for the
-  life of an immutable published version.
+  the same risk — see `definition-contract`'s placement rule.
 - A `ViewField` declaring `validationMode` without `validation`, or a
   `validation` with no key set, fails to parse. Both are a Zod refinement on
   `viewField` itself, not a compile-pass check: neither shape can exist in a
@@ -85,15 +88,13 @@ only the cancel-sink count.
 - `SubprocessSpec.outputMapping` keys and `ProcessContract.inputFields`/
   `outputFields` resolve against the process's own recursive field set. The
   compile pass checks this (`compile.ts::checkIdResolution`), not the sibling
-  `Action.output` check in the `processBody` superRefine. That would tighten
-  the read schema and could strand an already-published body's running
-  instances.
+  `Action.output` check in the `processBody` superRefine — see
+  `definition-contract`'s placement rule.
 - A `technical` field is never `type: "group"`, and a `ViewField` naming a
   technical field declares neither `required` nor `readonly`, literal or
   CEL. The compile pass checks both (`compile.ts::checkTechnicalFields`), not
-  a Zod refinement on `fieldDef` or `viewField`, for the same read-path
-  reason its siblings carry: `definition.ts` also deserializes stored
-  immutable bodies.
+  a Zod refinement on `fieldDef` or `viewField` — see `definition-contract`'s
+  placement rule.
 - `FieldDef.key` matches `/^[a-z_][a-z0-9_]*$/` — the CEL identifier grammar
   `data.<key>` requires. The compile pass checks this
   (`compile.ts::checkFieldKeyFormat`). `Step.key`/`Path.key` stay

@@ -26,10 +26,11 @@ context: |
   type-prefixed, immutable `id` (the sole reference anchor); `key` is a mutable
   slug that references nothing; `label` is display text. All conditions are CEL
   ({ lang: "cel", src }): pure, total, no now(). Authoring-time invariants are Zod
-  refinements or write-path checks in src/schema/compile.ts — a rule that may
-  tighten over time belongs on the write path, since definition.ts also
-  deserializes stored immutable bodies. Each ships with a test that rejects a
-  violating definition.
+  refinements or write-path checks in src/schema/compile.ts — placement follows
+  two criteria: an invariant a hand-written body must not bypass belongs on the
+  write path, and one whose violation cannot exist in an already-published body
+  may live in the schema. Each ships with a test that rejects a violating
+  definition.
   Change the schema deliberately, never as a side effect of another task.
 
   Stack: TypeScript strict, ESM. Bun is the runtime, package manager (`bun

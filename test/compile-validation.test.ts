@@ -476,9 +476,8 @@ describe("compile: a body violating a new check still reads (no new Zod refineme
 });
 
 // table-shaped-data-sources: the seventh structural check. `columnMapping`
-// bounds live here, not as a Zod refinement — `definition.ts` also
-// deserializes stored immutable bodies, and a refinement there would make an
-// already-published body throw on READ.
+// bounds live here, not as a Zod refinement. An unbypassable check is the
+// reason; see `definition-contract`.
 describe("compile: columnMapping bounds", () => {
   /** A body whose one select field binds a data source and maps `price` onto a number field. */
   const mappingBody = (over: Record<string, unknown> = {}): any => {
@@ -572,7 +571,7 @@ describe("compile: columnMapping bounds", () => {
 });
 
 // technical-field-marker: the seventh structural check. Neither rule is a Zod
-// refinement — `definition.ts` also deserializes stored immutable bodies.
+// refinement. An unbypassable check is the reason; see `definition-contract`.
 describe("compile: technical field marker", () => {
   it("rejects technical: true on a group field", () => {
     const b = baseBody();

@@ -3,10 +3,11 @@
 See proposal.md, "Why", for the motivation and the worker evidence.
 
 One fact from the survey shapes everything below.
-`openspec/specs/timers/spec.md` already contradicts itself. Line 437 justifies
-the duration placement by a claim about the workers. It says they resolve a body
-outside their per-instance error handling. Line 528 opens a requirement demanding
-the opposite, and it names the same two operations:
+`openspec/specs/timers/spec.md` already contradicts itself. Lines 436 to 439
+justify the duration placement by a claim about the workers. They say the
+workers resolve a body outside their per-instance error handling. Line 528
+opens a requirement demanding the opposite, and it names the same two
+operations:
 
 <!-- antislop: allow passive-voice -- a verbatim quote of an existing requirement -->
 > Each instance in a scheduler pass SHALL be processed inside its own error
@@ -97,7 +98,41 @@ change untouched.
   `archive/2026-07-30-add-health-readiness-endpoints` set. The prose this change
   writes needs no directive.
 
+- **Task 1.2 collides with a sibling change's task**. → Both touch the same
+  blocks in `test/compile-validation.test.ts`, for different reasons.
+  Task 1.2 rewrites the reasoning sentence around lines 478 to 481 and 574
+  to 575. That sentence carries the "definition.ts also deserializes stored
+  immutable bodies" framing. The sibling change's task 2.5, in
+  `reject-unsatisfiable-required-readonly`, rewrites only an ordinal word in
+  the same blocks. It changes "the seventh structural check" to "a
+  structural check", or leaves "seventh" as is.
+
+- Neither task's diff anticipates the other. Whichever change applies
+  second must re-read the file's current content. It must not reuse a
+  stale line-numbered diff, or it risks clobbering what the other change
+  wrote.
+
 ## Migration Plan
 
 None. No stored data changes, no schema key moves, and every `definitionHash`
 stays what it is. Rollback is a revert of the commit.
+
+## Open Questions
+
+Whether a future placement judgment call, deciding schema-refinement versus
+a `compile.ts` check, needs a required design.md line item per invariant. That
+would stop the kind of inconsistent citation this change itself corrects.
+
+Whether `reject-unsatisfiable-required-readonly` should instead export the
+engine's writer-set logic, mirroring the `./schema/strip-compiled` export
+precedent. That change's own design.md already considered and rejected the
+idea. A `Draft`-to-`ProcessBody` type-compatibility layer costs more than the
+roughly 25 duplicated lines, independent of this change's placement rule.
+Whether that rejection still holds stays open here.
+
+Whether the archive tooling supports a Purpose-section delta on an existing
+capability. `openspec/specs/timers/spec.md`'s Purpose section restates the
+withdrawn reasoning (proposal.md Impact, tasks § 4.2). This change's delta
+spec reaches only a `### Requirement:` body, not prose outside one. The fix
+there is a direct hand-edit at archive time, not a delta. Whether the
+tooling should instead gain Purpose-section delta support stays open too.

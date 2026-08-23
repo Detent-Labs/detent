@@ -116,12 +116,10 @@ are not.
   - a step's paths all-manual or all-automatic
   - contract-pinned subprocess binding
   - the `{ type, config }` plugin envelope
-- Does it touch `src/schema/definition.ts`? A tightened refinement there makes
-  an already published body throw on READ. Such a check belongs in
-  `src/schema/compile.ts`, unless the design argues why the read path stays
-  safe.
-- Does it add an authoring-time invariant? Then the change ships a test that
-  rejects a violating input. It also updates `docs/authoring-guide.md` when a
+- Does it add an authoring invariant? The change names its
+  `definition-contract` placement criterion (`definition.ts` or
+  `src/schema/compile.ts`) and argues that choice. It ships a test that
+  rejects a violating input. It updates `docs/authoring-guide.md` when a
   rule that guide states changed.
 
 **Fit and blast radius.** The change lands in a running system, and it lands
