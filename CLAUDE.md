@@ -39,6 +39,19 @@ expressed as TypeScript types. The word `contract` alone names something else
 here, the `ProcessContract` a subprocess declares. Write `definition contract`
 whenever the whole JSON definition is meant.
 
+### Stage: pre-1.0, with nothing deployed to preserve
+No deployment runs this engine. No stored instance pins a version somebody else
+depends on, and no definition under `examples/` is a customer's. A proposal is
+therefore never wrong merely because it conflicts with today's definition
+contract, Zod schema or invariant set. Changing one of those costs an OpenSpec
+change and a sweep of `examples/`, the tests and `docs/authoring-guide.md`.
+Where the right shape needs a contract change, propose the contract change.
+
+Two things this does not loosen. The runtime rules still hold at runtime: a
+published version stays immutable and an instance still pins
+`{processId, version, definitionHash}`, because the engine's own correctness
+rests on it. And the mechanical gates below stay non-negotiable.
+
 ### Hard v1 boundaries (do not cross without a deliberate decision)
 - Exactly one active step per instance (single FSM). No parallelism, no
   AND-split/join, no multi-instance steps.
@@ -370,6 +383,8 @@ after a substantial change lands.
 - Comments state facts, not process history. Concise and technically precise.
 - The definition contract is the foundation. Change the schema (definition.ts /
   the Zod source) deliberately, never as a casual side effect of another task.
+  Deliberately means its own OpenSpec change with the rule delta written down.
+  It does not mean never. See the stage note above.
 - An OpenSpec change that changes a rule `docs/authoring-guide.md` states must
   change the guide in the same commit.
 - Every invariant that lands ships with a test that rejects a violating input.
