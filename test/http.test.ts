@@ -1980,6 +1980,16 @@ test.skipIf(!DB)("POST /processes with an unregistered data source type maps to 
   expect(body.error.issues[0]!.loc).toContain("dataSources");
 });
 
+test.skipIf(!DB)("POST /processes with an allowedGroups entry naming no group maps to 422 and names the offending group id", async () => {
+  const body: ProcessBody = { ...simpleBody(), allowedGroups: ["group_ghost"] } as ProcessBody;
+  const res = await fetch(publishReq(admin, "proc_http_publish_422_group_scope", body));
+  expect(res.status).toBe(422);
+  const resBody = (await res.json()) as { error: { type: string; issues: { groupId: string; reason: string }[] } };
+  expect(resBody.error.type).toBe("group-scope-validation");
+  expect(resBody.error.issues.length).toBeGreaterThan(0);
+  expect(resBody.error.issues[0]!.groupId).toBe("group_ghost");
+});
+
 test.skipIf(!DB)("POST /processes without the system:publish role maps to 403 and persists nothing", async () => {
   const PID = "proc_http_publish_forbidden";
   const res = await fetch(publishReq(user1, PID, simpleBody()));

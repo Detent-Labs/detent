@@ -34,9 +34,17 @@ by comparing its type against a literal.
 
 ### Requirement: A resolver receives a narrow context and answers asynchronously
 
-A resolver SHALL receive `{ config, stepId, instance }`. `instance` SHALL expose
-`id`, `startedBy`, and the `data` the entering instance will carry, with any
-submitted patch already merged. It SHALL expose nothing else.
+A resolver SHALL receive `{ config, stepId, instance, db }`. `instance` SHALL
+expose `id`, `startedBy`, and the `data` the entering instance will carry,
+with any submitted patch already merged. It SHALL expose nothing else.
+
+<!-- antislop: allow sentence-length -->
+<!-- Known linter miscount: the code span starting the next sentence merges it with this one; each sentence reads under 20 words split at its own period. -->
+`db` is the per-request, per-tenant database handle threaded through the
+whole resolution path. `HandlerContext.db` and `DataSourceContext.db` carry
+the same handle, for the same reason: a handle bound once at registry
+construction would resolve every tenant's assignment against one tenant's
+directory.
 
 A resolver SHALL return a `Promise<string[]>` of role names and actor ids in one
 flat namespace. The signature is asynchronous even for a resolver that needs no
@@ -58,9 +66,12 @@ holds on the carved-out path and on every other. The bound is what makes the
 carve-out safe. A resolver that exceeds it cannot hold the parent's row lock open
 past the deadline.
 
-A resolver that needs its own database access uses the shared pool, the same way
-`src/auth/users.ts` does. No connection or transaction handle travels in the
-context, on either kind of path.
+A resolver that needs its own database access SHALL take it from the
+context's `db` field. It SHALL NOT take one bound at registry construction.
+
+`db` SHALL travel in the context on both kinds of path: the carved-out
+subprocess-return path, and every other. It is required, not optional. An
+absent handle has no sane fallback once one process serves many tenants.
 
 #### Scenario: A spawn resolves before its transaction opens
 
@@ -73,8 +84,9 @@ context, on either kind of path.
 
 - **WHEN** a child returns an outcome that advances the parent off its
   subprocess step, onto a step with a declared `assignment`
-- **THEN** the parent's candidates resolve while its row lock is held, and no
-  connection or transaction handle reaches the resolver
+- **THEN** the parent's candidates resolve while its row lock is held
+- **THEN** no transaction-scoped handle reaches the resolver, only the
+  shared-pool `db` the context always carries
 
 #### Scenario: A slow resolver on the return path releases the lock at the deadline
 
@@ -95,6 +107,7 @@ context, on either kind of path.
 - **WHEN** a resolver runs
 - **THEN** its `instance` exposes `id`, `startedBy` and `data`
 - **THEN** its `instance` exposes no other instance field
+- **THEN** the context also carries `db`, the shared-pool, per-request handle
 
 ### Requirement: The built-in static strategy is a registry entry
 

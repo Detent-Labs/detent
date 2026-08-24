@@ -43,7 +43,7 @@ export function describeError(error: ClientError): string {
       // this case generically (not the expected path) still gets a message.
       return t("error.requestShape");
     // The one place `message`/`issues` ARE shown. The caveat above holds for a
-    // participant-facing string; these six come from the publish chain's own
+    // participant-facing string; these seven come from the publish chain's own
     // validators, address a developer, and name the exact location in a body
     // that developer supplied. Reducing them to "the server hit an error"
     // leaves the only actionable detail on the floor.

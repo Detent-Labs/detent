@@ -60,8 +60,8 @@ const PASSTHROUGH = new Set<ClientError["type"]>([
   "cross-process-validation",
 ]);
 
-/** The server's six publish-time error classes collapse to one `ClientError` shape; five of the six (all but `cross-process-validation`, folded into `PASSTHROUGH` above) land here. */
-const PUBLISH_VALIDATION = new Set(["registry-validation", "cel-validation", "duration-validation", "compile-validation", "schema-validation"]);
+/** The server's seven publish-time error classes collapse to one `ClientError` shape; six of the seven (all but `cross-process-validation`, folded into `PASSTHROUGH` above) land here. */
+const PUBLISH_VALIDATION = new Set(["registry-validation", "cel-validation", "duration-validation", "compile-validation", "schema-validation", "group-scope-validation"]);
 
 export async function parseErrorBody(res: Response): Promise<ClientError> {
   let parsed: { error?: { type?: string; message?: string; issues?: unknown[] } } | undefined;

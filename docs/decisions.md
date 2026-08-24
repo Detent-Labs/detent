@@ -132,10 +132,11 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   stay open questions not worth deciding speculatively. A deadline would widen
   `DataSourceContext`, the same additive move `heldValues` already made, so
   this is a deferral rather than a door that closes.
-- **An assignment strategy whose resolution leaves the database.** Two
-  strategies now ship: `"static"` and `"org.manager-of-starter"`, the latter
-  reading `auth_users.manager_user_id` (see `docs/current-state.md`). Neither
-  leaves the engine's own Postgres, so neither exercises a network failure mode.
+- **An assignment strategy whose resolution leaves the database.** Three
+  strategies now ship: `"static"`, `"org.manager-of-starter"`, reading
+  `auth_users.manager_user_id`, and `"org.group-members"`, reading the
+  `groups` store (see `docs/current-state.md`). None leaves the engine's own
+  Postgres, so none exercises a network failure mode.
   The resolution deadline (`ASSIGNMENT_RESOLUTION_TIMEOUT_MS`, default 5000),
   the failure classification and the `assignment.unresolved` event all exist
   and already bound EVERY strategy. The first one reaching an outside

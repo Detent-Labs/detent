@@ -653,6 +653,11 @@ export const processBody = z
     contract: processContract.optional(),
     fields: z.array(fieldDef),
     dataSources: z.array(dataSourceDef).optional(),
+    // Group ids an org.group-members step may reference (group-based-assignment).
+    // .optional(), not .default([]): canonicalize() drops an undefined key, so a
+    // body predating this field keeps its definitionHash unchanged. Follows
+    // dataSources, the other array-typed top-level field with the same shape.
+    allowedGroups: z.array(z.string()).optional(),
     workflow,
   })
   .superRefine((b, ctx) => {

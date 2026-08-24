@@ -580,7 +580,7 @@ and a `config`. Pick the `type` from the picker, which lists the strategies
 your deployment registers. A `type` nobody registered is a publish error, not
 a surprise at run time.
 
-Two strategies ship.
+Three strategies ship.
 
 `static` is the one you get by default. The studio generates a form for it:
 one candidates field, `finance-approver` for example. The engine uses that
@@ -598,6 +598,18 @@ manager of whoever acted last.
 The list the strategy produces is frozen when the instance enters the step. A
 manager who changes afterwards does not change an instance already waiting.
 Use delegation for the one-off case.
+
+`org.group-members` resolves the current member list of one group, an
+operator administers on the admin Groups screen. Its config carries one key,
+`groupId`.
+
+Unlike the two strategies above, this list is NOT frozen at step entry. A
+membership change made after the instance enters the step still reaches it,
+with no republish.
+
+Declare the group's id in the process's own `allowedGroups` list too. A
+`groupId` a step references that is missing from `allowedGroups` fails at
+publish, naming the step and the group id.
 
 Whoever holds the claim delegates it. The target need not be a candidate.
 Delegation is the escape hatch from a frozen list. A rule tying it to that

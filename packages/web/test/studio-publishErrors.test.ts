@@ -3,7 +3,7 @@ import { describeError } from "../src/areas/studio/errors.js";
 import type { ClientError } from "../src/areas/studio/api/types.js";
 
 /**
- * The six publish-time rejections a developer meets when publishing a draft or
+ * The seven publish-time rejections a developer meets when publishing a draft or
  * importing a promoted version. Before `add-environment-promotion` every one of
  * them fell through `parseErrorBody`'s default into `internal`, and rendered as
  * "The server hit an error. Try again." — discarding the located detail that is
@@ -46,5 +46,14 @@ describe("a publish-time rejection keeps its located detail", () => {
     const rejection = describeError({ type: "publish-validation", kind: "compile-validation", issues: [{ loc: "uiMeta", message: "unknown key 'uiMeta'" }] });
     expect(rejection).not.toBe(generic);
     expect(rejection).toContain("uiMeta");
+  });
+
+  it("names a group-scope-validation rejection's offending group id", () => {
+    const text = describeError({
+      type: "publish-validation",
+      kind: "group-scope-validation",
+      issues: [{ loc: "", message: '{"groupId":"group_finance","reason":"not-found"}' }],
+    });
+    expect(text).toContain("group_finance");
   });
 });

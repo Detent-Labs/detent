@@ -40,6 +40,17 @@ import {
 } from "../engine/host.js";
 import { listUiStringOverrides, setUiStringOverride } from "../engine/ui-strings.js";
 import { listGrants, writeGrant, revokeGrant, grantSchema, type PermissionGrant } from "../auth/grants.js";
+import {
+  listGroups,
+  createGroup,
+  renameGroup,
+  setGroupMembers,
+  setGroupScope,
+  deleteGroup,
+  validateGroupName,
+  groupScope,
+  GROUP_NAME_MAX_LENGTH,
+} from "../auth/groups.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, ADMIN_ROLE, DATALISTS_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE } from "../auth/authorize.js";
@@ -338,6 +349,114 @@ export async function handleAdminRedactInstance(instanceId: string, req: Request
   return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
     const updated = await redactInstance(instanceId as InstanceId, db);
     return { status: 200, body: updated };
+  });
+}
+
+// ============================================================
+// Assignment-candidate groups (`/admin/groups*`), read live by the
+// `org.group-members` assignment strategy. Same shape, pagination and role
+// gate as `/admin/users*`.
+// ============================================================
+
+/** `{ ok: false }`'s two reasons both map to 400 — the route layer's own trim-and-reject-empty check, mirroring `handleAdminSetUserName`'s use of `validateDisplayName`. */
+function requireGroupName(raw: unknown): string {
+  if (typeof raw !== "string") throw new RequestShapeError("name must be a string");
+  const checked = validateGroupName(raw);
+  if (!checked.ok) {
+    throw new RequestShapeError(checked.reason === "empty" ? "name must not be empty" : `name is at most ${GROUP_NAME_MAX_LENGTH} characters`);
+  }
+  return checked.name;
+}
+
+/** Validates against the same two-shape discriminated union `createGroup`/`setGroupScope` accept. Raises `RequestShapeError` (400) for a `scope` matching neither shape. */
+function requireGroupScope(raw: unknown): ReturnType<typeof groupScope.parse> {
+  const parsed = groupScope.safeParse(raw);
+  if (!parsed.success) throw new RequestShapeError("scope must be { type: 'global' } or { type: 'processes', processIds: string[] }");
+  return parsed.data;
+}
+
+export async function handleAdminListGroups(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
+    const url = new URL(req.url);
+    const limit = parseLimit(url, MAX_LIST_LIMIT);
+    const cursor = url.searchParams.get("cursor") ?? undefined;
+    const page = await listGroups({ limit, cursor }, db);
+    return { status: 200, body: page };
+  });
+}
+
+export async function handleAdminCreateGroup(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
+    const body = (await readJson(req)) as { name?: unknown; scope?: unknown };
+    const name = requireGroupName(body.name);
+    const scope = requireGroupScope(body.scope);
+    const created = await createGroup(name, scope, db);
+    return { status: 201, body: created };
+  });
+}
+
+export async function handleAdminRenameGroup(groupId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
+    const body = (await readJson(req)) as { name?: unknown };
+    const name = requireGroupName(body.name);
+    const updated = await renameGroup(groupId, name, db);
+    if (!updated) return notFound(`no group: ${groupId}`);
+    return { status: 200, body: updated };
+  });
+}
+
+export async function handleAdminSetGroupMembers(groupId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
+    const body = (await readJson(req)) as { members?: unknown };
+    if (!Array.isArray(body.members) || !body.members.every((m) => typeof m === "string")) {
+      throw new RequestShapeError("members must be an array of strings");
+    }
+    const updated = await setGroupMembers(groupId, body.members, db);
+    if (!updated) return notFound(`no group: ${groupId}`);
+    return { status: 200, body: updated };
+  });
+}
+
+/**
+ * Narrowing a `"processes"`-scoped group's `processIds`, or switching from
+ * `"global"` to `"processes"`, succeeds at once with no reference check
+ * against any published process — even when a published process's
+ * `allowedGroups` already references the group and would no longer satisfy
+ * the narrowed scope (`group-administration`'s "Narrowing scope after
+ * publish succeeds" scenario). `group-scope-validation`'s check runs only at
+ * publish time, over the body being published.
+ */
+export async function handleAdminSetGroupScope(groupId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
+    const body = (await readJson(req)) as { scope?: unknown };
+    const scope = requireGroupScope(body.scope);
+    const updated = await setGroupScope(groupId, scope, db);
+    if (!updated) return notFound(`no group: ${groupId}`);
+    return { status: 200, body: updated };
+  });
+}
+
+/**
+ * Maps `deleteGroup`'s three outcomes: 404 for an unknown `groupId`; 409
+ * naming every blocking process id for a still-referenced group; 200 for a
+ * completed delete. The wire type stays the generic `"conflict"` several
+ * other 409s in this codebase already use, with a `processIds` array added —
+ * a field none of those other `"conflict"` bodies carry.
+ * `admin-groups-screen`'s client detects this case by shape-sniffing that
+ * combination, not by a dedicated wire type (design.md's "The group-delete
+ * 409's wire error.type stays the generic conflict" risk).
+ */
+export async function handleAdminDeleteGroup(groupId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
+    const result = await deleteGroup(groupId, db);
+    if (!result) return notFound(`no group: ${groupId}`);
+    if (!result.deleted) {
+      return {
+        status: 409,
+        body: { error: { type: "conflict", message: `group '${groupId}' is referenced by ${result.referencedBy.length} published process(es)`, processIds: result.referencedBy } },
+      };
+    }
+    return { status: 200, body: { groupId, deleted: true } };
   });
 }
 

@@ -12,6 +12,7 @@ import {
   managerOfStarterConfigSchema,
   managerOfStarterStrategyDef,
   MANAGER_OF_STARTER_STRATEGY_TYPE,
+  GROUP_MEMBERS_STRATEGY_TYPE,
 } from "../src/engine/assignment-strategies.js";
 import {
   createAssignmentRegistry,
@@ -126,9 +127,9 @@ test("the strategy's config schema is strict and empty", () => {
   expect(managerOfStarterConfigSchema.safeParse({ depth: 2 }).success).toBe(false);
 });
 
-test("the shipped registry holds both the static entry and the org one", () => {
+test("the shipped registry holds the static entry and both org entries", () => {
   const reg = createDefaultAssignmentRegistry();
-  expect([...reg.keys()]).toEqual(["static", MANAGER_OF_STARTER_STRATEGY_TYPE]);
+  expect([...reg.keys()]).toEqual(["static", MANAGER_OF_STARTER_STRATEGY_TYPE, GROUP_MEMBERS_STRATEGY_TYPE]);
 });
 
 // ============================================================
