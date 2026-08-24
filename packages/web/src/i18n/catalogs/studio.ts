@@ -12,6 +12,7 @@ export const en = {
   "app.title": "Process Studio",
   "app.draftIncomplete":
     "Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below).",
+  "app.leaveDraftConfirm": "Leave this draft? Unsaved edits will be lost.",
   "app.processLegend": "Process",
 
   "draftToolbar.save": "Save",

@@ -50,6 +50,10 @@ interface EditScreenProps {
   go: (href: string, opts?: NavigateOptions) => void;
   navigate: (route: Route, opts?: NavigateOptions) => void;
   onUnauthorized: () => void;
+  /** Reports the open draft's dirty state upward, so `root.tsx` can guard
+   * navigation away from it (design.md: "Report dirtiness upward through one
+   * callback prop into a ref"). */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 interface EditorAreaProps {
@@ -70,6 +74,7 @@ interface EditorAreaProps {
   loadedBaseVersion: number | null;
   navigate: (route: Route, opts?: NavigateOptions) => void;
   onUnauthorized: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 /** Rendered inside DraftProvider, so it can read/replace the Draft via
@@ -78,7 +83,7 @@ interface EditorAreaProps {
  * remaining direct consumer of `DraftToolbarProps`; `DraftToolbar` itself no
  * longer mounts here (design.md: "DraftToolbar keeps its logic.
  * ProcessHeaderBar renders the buttons."). */
-function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRevision, initialLayout, loadedBaseVersion, navigate, onUnauthorized }: EditorAreaProps) {
+function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRevision, initialLayout, loadedBaseVersion, navigate, onUnauthorized, onDirtyChange }: EditorAreaProps) {
   const { draft, mutate, validation, replace, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
@@ -120,6 +125,17 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
   // Client-only, set on every successful save (never on a reload) — new
   // state DraftToolbar tracks nowhere today.
   const [lastSavedAt, setLastSavedAt] = useState<Date | undefined>(undefined);
+
+  // Reports dirtiness upward for `root.tsx`'s navigation guard (design.md:
+  // "Report dirtiness upward through one callback prop into a ref"). The
+  // cleanup fires on unmount AND on every dependency change, so a route
+  // change away from `edit` can never leave a stale `true` behind.
+  const dirtyNow = isDirty(draft, savedBody);
+  useEffect(() => {
+    onDirtyChange?.(dirtyNow);
+    return () => onDirtyChange?.(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirtyNow]);
 
   // The canvas-wide edge style shares the `layout` blob with node positions.
   // No collision is possible: every step id carries a `step_` prefix, and
@@ -371,7 +387,10 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
     onSaved: () => setLastSavedAt(new Date()),
     publishResult,
     onPublishResult: setPublishResult,
-    onDiscarded: () => navigate({ name: "processes" }),
+    onDiscarded: () => {
+      onDirtyChange?.(false);
+      navigate({ name: "processes" });
+    },
     onUnauthorized,
   });
 
@@ -397,7 +416,7 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
           old Structure-only ProcessHeader did. */}
       <ProcessHeaderBar
         revision={saveState.revision}
-        isDirty={isDirty(draft, savedBody)}
+        isDirty={dirtyNow}
         lastSavedAt={lastSavedAt}
         publishResult={publishResult}
         conflict={saveState.conflict}
@@ -589,7 +608,7 @@ type EditLoadState =
   | { kind: "error"; message: string }
   | { kind: "loaded"; record: DraftRecord };
 
-export function EditScreen({ processId, formStepId, panel, stepId, token, go, navigate, onUnauthorized }: EditScreenProps) {
+export function EditScreen({ processId, formStepId, panel, stepId, token, go, navigate, onUnauthorized, onDirtyChange }: EditScreenProps) {
   const [state, setState] = useState<EditLoadState>({ kind: "loading" });
   const fail = useFail(onUnauthorized, (e) => setState({ kind: "error", message: describeCaughtError(e) }));
 
@@ -656,6 +675,7 @@ export function EditScreen({ processId, formStepId, panel, stepId, token, go, na
         loadedBaseVersion={state.record.baseVersion}
         navigate={navigate}
         onUnauthorized={onUnauthorized}
+        onDirtyChange={onDirtyChange}
       />
     </DraftProvider>
   );

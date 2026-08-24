@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Workflow, LayoutTemplate } from "lucide-react";
 import { matchRoute, routePath, ROUTE_ROLE, type Route } from "./routing.js";
-import { useAreaRoute, PROFILE_PATH } from "../../shell/routing.js";
+import { useAreaRoute, PROFILE_PATH, type NavigateOptions } from "../../shell/routing.js";
+import { t } from "./catalog.js";
 import { Chrome } from "../../shell/Chrome.js";
 import { ProcessesScreen } from "./screens/ProcessesScreen.js";
 import { EditScreen } from "./screens/EditScreen.js";
@@ -47,6 +48,25 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
   const { route, navigate } = useAreaRoute<Route>("studio", localPath, matchRoute, routePath, go);
   const may = (roles: readonly string[]) => roles.some((role) => session.roles.includes(role));
 
+  // Whether the open edit screen's draft carries unsaved changes, reported
+  // up from `EditorArea` via `EditScreen`'s `onDirtyChange` prop. A ref, not
+  // `useState`: nothing here renders differently based on dirtiness, it is
+  // read only inside a click handler (design.md: "Report dirtiness upward
+  // through one callback prop into a ref").
+  const dirtyRef = useRef(false);
+  useEffect(() => {
+    if (route.name !== "edit") dirtyRef.current = false;
+  }, [route.name]);
+
+  // Guards every navigation away from an open, unsaved draft behind one
+  // confirmation (design.md: "Guard `navigate` once, at the point `root.tsx`
+  // hands it downward"). `dest`, not `route`, so the parameter does not
+  // shadow the outer `route` above.
+  const guardedNavigate = (dest: Route, opts?: NavigateOptions) => {
+    if (dirtyRef.current && dest.name !== "edit" && !confirm(t("app.leaveDraftConfirm"))) return;
+    navigate(dest, opts);
+  };
+
   // `matchRoute` falls back to the process list, which a curator holding only
   // `system:templates` cannot read. Move them to the screen they can, rather
   // than landing them on an explanation of why their own area refuses them.
@@ -62,7 +82,7 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
           type="button"
           className="btn btn-secondary"
           aria-current={route.name === "processes" || route.name === "edit" ? "page" : undefined}
-          onClick={() => navigate({ name: "processes" })}
+          onClick={() => guardedNavigate({ name: "processes" })}
         >
           <Workflow size={18} strokeWidth={1.75} aria-hidden="true" />
           Processes
@@ -73,7 +93,7 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
           type="button"
           className="btn btn-secondary"
           aria-current={route.name === "tools" ? "page" : undefined}
-          onClick={() => navigate({ name: "tools" })}
+          onClick={() => guardedNavigate({ name: "tools" })}
         >
           Tools
         </button>
@@ -83,7 +103,7 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
           type="button"
           className="btn btn-secondary"
           aria-current={route.name === "templates" ? "page" : undefined}
-          onClick={() => navigate({ name: "templates" })}
+          onClick={() => guardedNavigate({ name: "templates" })}
         >
           <LayoutTemplate size={18} strokeWidth={1.75} aria-hidden="true" />
           Templates
@@ -118,8 +138,11 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
               stepId={route.stepId}
               token={session.token}
               go={go}
-              navigate={navigate}
+              navigate={guardedNavigate}
               onUnauthorized={onUnauthorized}
+              onDirtyChange={(d) => {
+                dirtyRef.current = d;
+              }}
             />
           )}
           {route.name === "versions" && (
