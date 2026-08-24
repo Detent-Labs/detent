@@ -46,9 +46,12 @@ export type Key = string;
 // ============================================================
 // LocaleCode / LocalizedText: authored display text (ProcessBody/Step/
 // FieldDef label+description, FieldOption.label) is locale-keyed, with a
-// per-process required base locale. Authoring-facing-only text (Path
-// label/description, Timer.description, Plugin.description) stays a plain
-// string — never rendered to a process participant, no localization need.
+// per-process required base locale. Timer.description and
+// Plugin.description stay a plain string, authoring-facing-only, no
+// localization need. Path.label/description stay a plain string too, but
+// Path.label IS rendered to a process participant — PathButtons.tsx uses it
+// as the submit-button text for a manual path — so it is a display string
+// that happens to be non-localized, not an authoring-only one.
 // ============================================================
 
 /** Open, extensible locale-tag format (e.g. "en", "de", "en-US") — not a
@@ -440,8 +443,8 @@ export type Timer = z.infer<typeof timer>;
 
 export const path = z.object({
   id: pathId,
-  key: z.string(),
-  label: z.string().optional(),
+  key: z.string().trim().min(1),
+  label: z.string().trim().min(1),
   description: z.string().optional(),
   to: stepId,
   trigger: pathTrigger,

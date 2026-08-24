@@ -125,7 +125,7 @@ const viewBody = (): ProcessBody =>
               { ref: "field_group", required: true },
             ],
           },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
@@ -163,7 +163,7 @@ const cascadeBody = (): ProcessBody =>
           label: { en: "A" },
           type: "task",
           view: { fields: [{ ref: "field_decision", required: true }] },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         {
           id: "step_b",
@@ -171,8 +171,8 @@ const cascadeBody = (): ProcessBody =>
           label: { en: "B" },
           type: "task",
           paths: [
-            { id: "path_approved", key: "approved", to: "step_approved", trigger: "automatic", priority: 1, guard: cel("data.decision == 'approve'") },
-            { id: "path_rejected", key: "rejected", to: "step_rejected", trigger: "automatic", priority: 2, guard: cel("data.decision == 'reject'") },
+            { id: "path_approved", key: "approved", label: "Approved", to: "step_approved", trigger: "automatic", priority: 1, guard: cel("data.decision == 'approve'") },
+            { id: "path_rejected", key: "rejected", label: "Rejected", to: "step_rejected", trigger: "automatic", priority: 2, guard: cel("data.decision == 'reject'") },
           ],
         },
         { id: "step_approved", key: "approved_step", label: { en: "Approved" }, type: "task", terminal: true },
@@ -203,8 +203,8 @@ const selfLoopBody = (): ProcessBody =>
           type: "task",
           view: { fields: [{ ref: "field_approved" }] },
           paths: [
-            { id: "path_self", key: "self", to: "step_x", trigger: "manual" },
-            { id: "path_done", key: "done", to: "step_done", trigger: "manual", guard: cel("data.approved == true") },
+            { id: "path_self", key: "self", label: "Self", to: "step_x", trigger: "manual" },
+            { id: "path_done", key: "done", label: "Done", to: "step_done", trigger: "manual", guard: cel("data.approved == true") },
           ],
         },
         { id: "step_done", key: "done_step", label: { en: "Done" }, type: "task", terminal: true },
@@ -228,8 +228,8 @@ const twoPathsBody = (): ProcessBody =>
           label: { en: "A" },
           type: "task",
           paths: [
-            { id: "path_x", key: "x", to: "step_x", trigger: "manual" },
-            { id: "path_y", key: "y", to: "step_y", trigger: "manual" },
+            { id: "path_x", key: "x", label: "X", to: "step_x", trigger: "manual" },
+            { id: "path_y", key: "y", label: "Y", to: "step_y", trigger: "manual" },
           ],
         },
         { id: "step_x", key: "x_step", label: { en: "X" }, type: "task", terminal: true },
@@ -267,7 +267,7 @@ const subprocessParentBody = (childProcessId: string, childVersion: number): Pro
           key: "p1",
           label: { en: "P1" },
           type: "task",
-          paths: [{ id: "path_p1_sub", key: "to_sub", to: "step_p_sub", trigger: "manual" }],
+          paths: [{ id: "path_p1_sub", key: "to_sub", label: "To Sub", to: "step_p_sub", trigger: "manual" }],
         },
         {
           id: "step_p_sub",
@@ -281,7 +281,7 @@ const subprocessParentBody = (childProcessId: string, childVersion: number): Pro
             inputMapping: {},
             outputMapping: {},
           },
-          paths: [{ id: "path_p_out", key: "out", to: "step_p_done", trigger: "automatic", guard: cel("child.outcome == 'done'") }],
+          paths: [{ id: "path_p_out", key: "out", label: "Out", to: "step_p_done", trigger: "automatic", guard: cel("child.outcome == 'done'") }],
         },
         { id: "step_p_done", key: "p_done", label: { en: "P Done" }, type: "task", terminal: true },
       ],
@@ -310,10 +310,10 @@ const cascadeLoopBody = (): ProcessBody =>
           label: { en: "A" },
           type: "task",
           view: { fields: [{ ref: "field_marker" }] },
-          paths: [{ id: "path_ag", key: "ag", to: "step_g", trigger: "manual" }],
+          paths: [{ id: "path_ag", key: "ag", label: "Ag", to: "step_g", trigger: "manual" }],
         },
-        { id: "step_g", key: "g", label: { en: "G" }, type: "task", paths: [{ id: "path_gh", key: "gh", to: "step_h", trigger: "automatic" }] },
-        { id: "step_h", key: "h", label: { en: "H" }, type: "task", paths: [{ id: "path_hg", key: "hg", to: "step_g", trigger: "automatic" }] },
+        { id: "step_g", key: "g", label: { en: "G" }, type: "task", paths: [{ id: "path_gh", key: "gh", label: "Gh", to: "step_h", trigger: "automatic" }] },
+        { id: "step_h", key: "h", label: { en: "H" }, type: "task", paths: [{ id: "path_hg", key: "hg", label: "Hg", to: "step_g", trigger: "automatic" }] },
       ],
     },
   }) as unknown as ProcessBody;
@@ -339,7 +339,7 @@ const assignedViewBody = (): ProcessBody =>
           label: { en: "A" },
           type: "task",
           assignment: { strategy: { type: "static", config: { candidates: ["approver", "user_id_candidate"] } } },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
@@ -397,7 +397,7 @@ test.skipIf(!DB)("createProcessInstance succeeds with a valid data seed, and get
   const byKey = new Map(view.fields.map((f) => [f.field.key, f]));
   expect(byKey.get("amount")!.value).toBe(100);
   expect(byKey.get("readonly_f")!.readonly).toBe(true);
-  expect(view.availablePaths).toEqual([{ id: "path_ab" as PathId, key: "ab", label: undefined }]);
+  expect(view.availablePaths).toEqual([{ id: "path_ab" as PathId, key: "ab", label: "Ab" }]);
   expect(view.columns).toBe(1); // step_a's view declares no columns
 });
 
@@ -417,7 +417,7 @@ const twoColumnViewBody = (): ProcessBody =>
           label: { en: "A" },
           type: "task",
           view: { columns: 2, fields: [{ ref: "field_amount", span: 2 }] },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
@@ -501,7 +501,7 @@ test.skipIf(!DB)("getInstanceView reports a technical field as required:false, r
         {
           id: "step_a", key: "a", label: { en: "A" }, type: "task",
           view: { fields: [{ ref: "field_amount", required: true, readonly: false }] },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
@@ -528,7 +528,7 @@ test.skipIf(!DB)("a field declaring both type: group and technical: true resolve
         {
           id: "step_a", key: "a", label: { en: "A" }, type: "task",
           view: { fields: [{ ref: "field_g" }] },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
@@ -586,7 +586,7 @@ const technicalDirectBody = (): ProcessBody =>
           label: { en: "A" },
           type: "task",
           view: { fields: [{ ref: "field_amount", required: true }, { ref: "field_secret" }] },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
@@ -647,7 +647,7 @@ const technicalUnplacedBody = (): ProcessBody =>
           label: { en: "A" },
           type: "task",
           view: { fields: [{ ref: "field_amount", required: true }] },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
@@ -716,7 +716,7 @@ const defaultsBody = (
         {
           id: "step_a", key: "a", label: { en: "A" }, type: "task",
           view: { fields: [{ ref: "field_alpha" }, { ref: "field_beta" }, { ref: "field_group" }] },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
@@ -872,7 +872,7 @@ test.skipIf(!DB)("an off-view dataSource-bound field's Literal default seeds reg
         {
           id: "step_a", key: "a", label: { en: "A" }, type: "task",
           view: { fields: [{ ref: "field_visible" }] },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
@@ -913,7 +913,7 @@ test.skipIf(!DB)("an Expression default evaluating to a CEL int seeds a JSON-saf
         {
           id: "step_a", key: "a", label: { en: "A" }, type: "task",
           view: { fields: [{ ref: "field_qty" }, { ref: "field_price" }, { ref: "field_total" }] },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
@@ -1322,7 +1322,7 @@ const overrideBody = (amountExtra: object, noteExtra: object = {}): ProcessBody 
           label: { en: "A" },
           type: "task",
           view: { fields: [{ ref: "field_amount", ...amountExtra }, { ref: "field_note", ...noteExtra }] },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
@@ -1455,12 +1455,12 @@ const twoStepOverrideBody = (): ProcessBody =>
         {
           id: "step_a", key: "a", label: { en: "A" }, type: "task",
           view: { fields: [{ ref: "field_amount", validation: { max: 500 } }] },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         {
           id: "step_b", key: "b", label: { en: "B" }, type: "task",
           view: { fields: [{ ref: "field_amount", validation: { max: 2000 } }] },
-          paths: [{ id: "path_bc", key: "bc", to: "step_c", trigger: "manual" }],
+          paths: [{ id: "path_bc", key: "bc", label: "Bc", to: "step_c", trigger: "manual" }],
         },
         { id: "step_c", key: "c", label: { en: "C" }, type: "task", terminal: true },
       ],
@@ -1932,7 +1932,7 @@ const assignedBody = (): ProcessBody =>
         {
           id: "step_a", key: "a", label: { en: "A" }, type: "task",
           assignment: { strategy: { type: "static", config: { candidates: ["approver", "user_1"] } } },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],

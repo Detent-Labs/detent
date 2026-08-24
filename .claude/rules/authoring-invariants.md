@@ -98,7 +98,14 @@ only the cancel-sink count.
 - `FieldDef.key` matches `/^[a-z_][a-z0-9_]*$/` — the CEL identifier grammar
   `data.<key>` requires. The compile pass checks this
   (`compile.ts::checkFieldKeyFormat`). `Step.key`/`Path.key` stay
-  unconstrained: nothing reads them as identifiers.
+  format-free: nothing reads them as identifiers.
+- `Path.key` is a non-empty string after trimming, and `Path.label` is
+  required and a non-empty string after trimming, for a path of either
+  trigger kind. Both are plain per-field Zod constraints on the shared
+  `path` object in `definition.ts` (not a `compile.ts` write-path check —
+  see `definition-contract`'s placement rule), so `.trim()` is applied at
+  parse time and a padded authored value normalizes before it reaches
+  `definitionHash`.
 - `key`, `Plugin.type`, every `duration`, `pattern` and `Expression.src` stay
   under a declared length bound — every authored string that reaches an
   interpreter or a registry lookup. Checked in `compile.ts::checkLengthBounds`,

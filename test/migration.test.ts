@@ -38,9 +38,9 @@ reg.set("noop", { handler: async () => ({}) });
 const dataSourceReg = createDataSourceRegistry();
 
 const cel = (src: string) => ({ lang: "cel", src });
-const manualPath = (id: string, to: string) => ({ id, key: id, to, trigger: "manual" });
+const manualPath = (id: string, to: string) => ({ id, key: id, label: `Path ${id}`, to, trigger: "manual" });
 const autoPath = (id: string, to: string, priority: number, guardSrc?: string) =>
-  ({ id, key: id, to, trigger: "automatic", priority, ...(guardSrc ? { guard: cel(guardSrc) } : {}) });
+  ({ id, key: id, label: `Path ${id}`, to, trigger: "automatic", priority, ...(guardSrc ? { guard: cel(guardSrc) } : {}) });
 
 // ---- body builders -----------------------------------------------------------
 

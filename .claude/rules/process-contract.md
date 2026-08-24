@@ -104,7 +104,13 @@ more automatic paths, `priority` is required and unique (lower evaluated first,
 first matching guard wins). A guardless automatic path is the default/else and
 must have the highest priority; a wait-state has no default (no match = wait,
 bounded by a timer). Gated side effects are modeled as a visible wait-state with
-result-driven automatic paths, not hidden transaction semantics.
+result-driven automatic paths, not hidden transaction semantics. `Path.key`
+must be non-empty after trimming, and `Path.label` is required and must be
+non-empty after trimming, for a path of either trigger kind. `Path.key` stays
+format-free, exempt from the CEL-identifier grammar `FieldDef.key` carries —
+nothing reads a path key as a CEL variable. `Path.label` is a plain,
+non-localized string, but it is rendered to a process participant:
+`PathButtons.tsx` uses it as a manual path's submit-button text.
 
 **Subprocesses.** Call-and-return via a `subprocess` step (a wait-state). A
 process used as a subprocess declares a `ProcessContract` (input fields, output

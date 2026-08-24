@@ -605,7 +605,16 @@ export function CanvasView({
       if (result.kind === "rejected") {
         showRejection(e, result.reason);
       } else if (result.kind === "connect-to-step") {
-        const path = newPath(result.targetStepId, result.trigger);
+        const targetStep = steps.find((s) => s.id === result.targetStepId);
+        const path = newPath(
+          sourceStep,
+          targetStep,
+          result.targetStepId,
+          result.trigger,
+          contentLocale,
+          baseLocale,
+          t("steps.unnamedStep"),
+        );
         updateInDraftArray(mutate, (d) => d.workflow?.steps?.[sourceIndex], { paths: [...existingPaths, path] });
       } else {
         // create-step-and-connect: the step first, then the path (design.md)
@@ -613,7 +622,7 @@ export function CanvasView({
         // leaves an orphan step behind, but ordering it this way keeps that
         // true even if a future change moves the check.
         const step = newStep("task", seedLocalizedText(contentLocale));
-        const path = newPath(step.id, result.trigger);
+        const path = newPath(sourceStep, step, step.id, result.trigger, contentLocale, baseLocale, t("steps.unnamedStep"));
         mutate((d) => {
           d.workflow ??= {};
           d.workflow.steps ??= [];

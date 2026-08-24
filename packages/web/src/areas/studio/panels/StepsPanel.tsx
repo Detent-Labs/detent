@@ -72,6 +72,7 @@ interface Props {
 export function StepsPanel({ fields, token, selectedStepId, onSelectStep, selectedPathId, navigate }: Props) {
   const { draft, mutate, validation, setChildForStep, contentLocale } = useDraft();
   const steps = draft.workflow?.steps ?? [];
+  const baseLocale = draft.baseLocale ?? "en";
   const registry = useRegistry(token);
   const [childLoadError, setChildLoadError] = useState<string | null>(null);
   const [rawJsonOpen, setRawJsonOpen] = useState(false);
@@ -288,6 +289,8 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
               registrySchemas={registry?.actionSchemas}
               selectedPathId={selectedPathId}
               terminal={step.terminal}
+              contentLocale={contentLocale}
+              baseLocale={baseLocale}
             />
           )}
         </section>

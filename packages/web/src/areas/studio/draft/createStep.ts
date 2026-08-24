@@ -3,7 +3,7 @@ import type { DraftOf } from "./types";
 import { mintId } from "./ids";
 import type { DraftLocalizedText } from "./localized-text";
 
-type DraftStep = DraftOf<Step>;
+export type DraftStep = DraftOf<Step>;
 
 /** The three kinds the palette (task 2.1) and `StepsPanel`'s own "+ Add
  * step" button (task 2.2) both create through this one function. `end` sets

@@ -98,6 +98,7 @@ export const en = {
 
   "paths.empty": "No paths.",
   "paths.addPath": "+ Add path",
+  "paths.newPathTargetLabel": "new path's target",
   "paths.removePath": "Remove path",
   "paths.selectTargetStep": "(select target step)",
   "paths.triggeredByLabel": "triggered by",

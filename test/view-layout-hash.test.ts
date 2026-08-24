@@ -10,28 +10,31 @@ import { canonicalize } from "../src/schema/canonical-json.js";
  * `ProcessBody` alone and a published version is immutable, so neither key may
  * move the hash of a body that declares neither.
  *
- * `subprocess-credit-check-child.json` and `subprocess-loan-parent.json` keep
- * their original provenance: their literals were computed against the schema
- * as it stood BEFORE both keys existed, from a `git archive HEAD` copy of the
- * tree, and neither file has changed since.
+ * `expense-approval.json`'s literal does not carry the original provenance
+ * (a `git archive HEAD` copy taken before this file's optional layout keys
+ * existed). `give-the-example-a-reachable-target` rewrote its three action
+ * bodies, which moves the hash, so this file's entry was a fresh measurement
+ * against the CURRENT schema, taken in the same run that confirmed the other
+ * two literals still pass. `dedup-runtime-pagination-webhook-sink` moved it
+ * again: its `book` and `escalated_review` steps' `http.request` targets
+ * changed from `webhook-sink:8080` to `localhost:8080`, so the literal below
+ * is a second fresh measurement, taken the same way —
+ * `definitionHash(processBody.parse(bodyOf("expense-approval.json")))`, run
+ * against the post-edit body and the current schema.
  *
- * `expense-approval.json`'s literal does not carry that provenance.
- * `give-the-example-a-reachable-target` rewrote its three action bodies, which
- * moves the hash, so this file's entry was a fresh measurement against the
- * CURRENT schema, taken in the same run that confirmed the other two literals
- * still pass. `dedup-runtime-pagination-webhook-sink` moved it again: its
- * `book` and `escalated_review` steps' `http.request` targets changed from
- * `webhook-sink:8080` to `localhost:8080`, so the literal below is a second
- * fresh measurement, taken the same way — `definitionHash(processBody.parse(
- * bodyOf("expense-approval.json")))`, run against the post-edit body and the
- * current schema. All three remain the regression guard from here on: a
- * schema change that alters what `processBody.parse` emits for any of these
- * bodies moves its hash and fails here.
+ * `require-path-key-label` moved `subprocess-credit-check-child.json` and
+ * `subprocess-loan-parent.json` too: both gained a non-empty `label` on
+ * every path that lacked one, once `Path.label` became required. Their two
+ * literals below are fresh measurements taken the same way, against the
+ * post-edit bodies and the current schema. All three files remain the
+ * regression guard from here on: a schema change that alters what
+ * `processBody.parse` emits for any of these bodies moves its hash and fails
+ * here.
  */
 const PRE_CHANGE_HASHES: Record<string, string> = {
   "expense-approval.json": "bb641c63033baf8178df99f9e6f330ff3bd0b811b13d3a85bad4fea5382c541f",
-  "subprocess-credit-check-child.json": "c585d1b2f94b0b8a8541144ab7fbf110344a245446dd25dd100ede94d63ad80a",
-  "subprocess-loan-parent.json": "7faa040f7cbb6d5e310bf6440802e53a043929318eee9f436fa85ad3b47d18c5",
+  "subprocess-credit-check-child.json": "aa07358556ff42fc66275e8c2908093a085d501075539768693bb7c01619e5b8",
+  "subprocess-loan-parent.json": "c3afcb3c7e5c3b95c63c443ebb054f5b90ab883a2fdc78c8c02f534ee838c208",
 };
 
 /** The example files come in two shapes: a versioned wrapper carrying the body
