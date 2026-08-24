@@ -295,6 +295,7 @@ export const en = {
   "headerBar.published": "Published",
   "headerBar.menuTrigger": "More actions",
   "headerBar.menuGroupDraft": "Process, saved with the draft",
+  "headerBar.manageGroups": "Manage assignment groups for this process",
 
   "checksRail.heading": "Checks",
   "checksRail.heldBack": "Held back until earlier checks pass.",

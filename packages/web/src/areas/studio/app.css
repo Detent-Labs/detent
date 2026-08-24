@@ -2402,6 +2402,19 @@ tr[data-group="true"] .studio-matrix-row-header {
   gap: var(--space-2);
 }
 
+/* The "Manage assignment groups for this process" link. Pure navigation, so
+   it follows AddLocaleControl's "own button" pattern rather than the
+   key/baseLocale label-row pattern — an action, not a field. Flush left,
+   full width, gap between icon and label (design-language.md: "Labels sit
+   flush left in any button wider than its text"). */
+.studio-header-bar-menu-link {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+}
+
 /* --- Checks rail (studio-checks-rail) ----------------------------------- */
 
 .studio-checks-rail {

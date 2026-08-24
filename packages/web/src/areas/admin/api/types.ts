@@ -118,6 +118,23 @@ export interface UserPage {
   cursor?: string;
 }
 
+/** Mirrors src/auth/groups.ts::GroupScope. Strict on write, lenient on read, the same as the engine's own copy. */
+export type GroupScope = { type: "global" } | { type: "processes"; processIds: string[] };
+
+/** Mirrors src/auth/groups.ts::GroupSummary. */
+export interface GroupSummary {
+  groupId: string;
+  name: string;
+  scope: GroupScope;
+  members: string[];
+}
+
+export interface GroupPage {
+  items: GroupSummary[];
+  /** Absent once the page is the last one, like `UserPage`. */
+  cursor?: string;
+}
+
 /** Mirrors src/engine/migration.ts::MigrationResult. */
 export interface MigrationResult {
   migrated: string[];

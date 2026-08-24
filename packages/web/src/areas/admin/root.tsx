@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { ListChecks, Send, Timer, Users, GitCompareArrows, Table2, Languages } from "lucide-react";
+import { ListChecks, Send, Timer, Users, GitCompareArrows, Users2, Table2, Languages } from "lucide-react";
 import { matchRoute, routePath, ROUTE_ROLE, type Route } from "./routing.js";
 import { useAreaRoute, PROFILE_PATH } from "../../shell/routing.js";
 import { Chrome } from "../../shell/Chrome.js";
@@ -9,6 +9,7 @@ import { OutboxScreen } from "./screens/OutboxScreen.js";
 import { TimersScreen } from "./screens/TimersScreen.js";
 import { UsersScreen } from "./screens/UsersScreen.js";
 import { MigrationsScreen } from "./screens/MigrationsScreen.js";
+import { GroupsScreen } from "./screens/GroupsScreen.js";
 import { DataListsScreen } from "./screens/DataListsScreen.js";
 import { DataListScreen } from "./screens/DataListScreen.js";
 import { UiStringsScreen } from "./screens/UiStringsScreen.js";
@@ -27,6 +28,7 @@ const TABS: { name: Route["name"]; labelKey: CatalogKey; role: string; Icon: typ
   { name: "timers", labelKey: "nav.timers", role: ADMIN_ROLE, Icon: Timer },
   { name: "users", labelKey: "nav.users", role: ADMIN_ROLE, Icon: Users },
   { name: "migrations", labelKey: "nav.migrations", role: ADMIN_ROLE, Icon: GitCompareArrows },
+  { name: "groups", labelKey: "nav.groups", role: ADMIN_ROLE, Icon: Users2 },
   { name: "dataLists", labelKey: "nav.dataLists", role: DATALISTS_ROLE, Icon: Table2 },
   { name: "uiStrings", labelKey: "nav.uiStrings", role: ADMIN_ROLE, Icon: Languages },
 ];
@@ -104,6 +106,9 @@ export function AdminArea({ session, locale, localPath, go, onUnauthorized, onLo
           {route.name === "timers" && <TimersScreen token={session.token} locale={locale} navigate={navigate} onUnauthorized={onUnauthorized} />}
           {route.name === "users" && <UsersScreen token={session.token} locale={locale} onUnauthorized={onUnauthorized} />}
           {route.name === "migrations" && <MigrationsScreen token={session.token} locale={locale} onUnauthorized={onUnauthorized} />}
+          {route.name === "groups" && (
+            <GroupsScreen token={session.token} locale={locale} initialProcessId={route.processId} onUnauthorized={onUnauthorized} />
+          )}
           {route.name === "dataLists" && <DataListsScreen token={session.token} locale={locale} navigate={navigate} onUnauthorized={onUnauthorized} />}
           {route.name === "uiStrings" && <UiStringsScreen token={session.token} locale={locale} onUnauthorized={onUnauthorized} />}
           {route.name === "dataList" && (

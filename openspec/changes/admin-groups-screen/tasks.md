@@ -1,10 +1,10 @@
 ## 1. Dependency gate
 
-- [ ] 1.1 Confirm `group-based-assignment` has reached implementation:
+- [x] 1.1 Confirm `group-based-assignment` has reached implementation:
       its `/admin/groups*` routes, the groups store, and the deletion
       guard exist and are reachable. Do not start task group 2 or later
       before this is true.
-- [ ] 1.2 Read the actual `/admin/groups*` route shapes
+- [x] 1.2 Read the actual `/admin/groups*` route shapes
       `group-based-assignment` shipped. Compare them against the paths
       design.md's "The route shapes this screen assumes" decision
       names. Note any difference to carry into tasks 2 and 5. The
@@ -37,25 +37,25 @@
 
 ## 2. Admin API client and routing
 
-- [ ] 2.1 Add group types (`GroupSummary`, `GroupScope`, and similar) to
+- [x] 2.1 Add group types (`GroupSummary`, `GroupScope`, and similar) to
       `packages/web/src/areas/admin/api/types.ts`, matching what
       `group-based-assignment`'s routes actually return.
-- [ ] 2.2 Add `listGroups`, `createGroup`, `renameGroup`, `setGroupMembers`,
+- [x] 2.2 Add `listGroups`, `createGroup`, `renameGroup`, `setGroupMembers`,
       `setGroupScope`, and `deleteGroup` to
       `packages/web/src/areas/admin/api/client.ts`, calling the routes
       confirmed in task 1.2. `listGroups` SHALL take the same
       `{ limit, cursor }` page parameters `listUsers` takes and return the
       same cursor-bearing page shape, since `GET /admin/groups` paginates
       like `GET /admin/users`.
-- [ ] 2.3 Add `{ name: "groups"; processId?: string }` to the admin
+- [x] 2.3 Add `{ name: "groups"; processId?: string }` to the admin
       `Route` union in `packages/web/src/areas/admin/routing.ts`. Extend
       `matchRoute` to parse an optional `processId` query parameter out of
       its own `path` string argument (never `location.search`, preserving
       `matchRoute`'s pure, DOM-free contract), per design.md's "A query
       parameter is new in this codebase" decision. Extend `routePath` to
       append that parameter only when set.
-- [ ] 2.4 Add `groups: "system:admin"` to `ROUTE_ROLE` in the same file.
-- [ ] 2.5 Add a Groups tab to `TABS` in
+- [x] 2.4 Add `groups: "system:admin"` to `ROUTE_ROLE` in the same file.
+- [x] 2.5 Add a Groups tab to `TABS` in
       `packages/web/src/areas/admin/root.tsx`. Import a `lucide-react`
       icon for the tab (e.g. `Users2` or `UsersRound`) and set it as the
       entry's `Icon`. Add the tab's label key, `nav.groups`, to the admin
@@ -66,26 +66,26 @@
       screen lands later, in task 3.4, once `GroupsScreen.tsx` exists;
       completing this task leaves `TABS` and the catalog keys in place
       with no dispatch clause yet, and the tree stays green.
-- [ ] 2.6 Extend `packages/web/test/admin-routing.test.ts`: add
+- [x] 2.6 Extend `packages/web/test/admin-routing.test.ts`: add
       `{ name: "groups" }` to its `ROUTES` array, add `"groups"` to
       the operator-reachable `reachable` array in "shows an operator the
       operations screens and no data list screen", and add `"groups"` to
       the hardcoded `operations` array (around line 43) the test "keeps
       the operations screens behind system:admin" iterates over, so all
       three existing assertions keep passing with the new route in place.
-- [ ] 2.7 Add a `bun:test` case in `admin-routing.test.ts` exercising
+- [x] 2.7 Add a `bun:test` case in `admin-routing.test.ts` exercising
       `matchRoute("/groups?processId=proc_123")`, asserting it returns
       `{ name: "groups", processId: "proc_123" }`, and a round-trip case
       confirming `matchRoute(routePath({ name: "groups", processId:
       "proc_123" }))` returns the same route.
-- [ ] 2.8 Add a `"group-referenced"` variant to the shared `ClientError`
+- [x] 2.8 Add a `"group-referenced"` variant to the shared `ClientError`
       union in `packages/web/src/api/types.ts`:
       `{ type: "group-referenced"; message: string; blockingProcessIds?:
       string[] }`. This mirrors the existing `self-role-strip` /
       `unknown-manager` / `email-in-use` precedent: a route needing
       structured 409 data gets its own dedicated variant rather than
       falling through the generic passthrough shape.
-- [ ] 2.9 Extend `parseErrorBody` in `packages/web/src/api/client.ts` to
+- [x] 2.9 Extend `parseErrorBody` in `packages/web/src/api/client.ts` to
       recognize the group-delete route's 409 by body shape, not by a
       fresh wire `type` token: per task 1.2, `group-based-assignment`
       reuses the generic `"conflict"` type for this 409, the same token
@@ -113,13 +113,13 @@
 
 ## 3. Groups screen
 
-- [ ] 3.1 Invoke the design skills before implementing `GroupsScreen`:
+- [x] 3.1 Invoke the design skills before implementing `GroupsScreen`:
       `/frontend-design:frontend-design` for visual direction, plus the
       installed Vercel skills (`web-design-guidelines`,
       `vercel-react-best-practices`, `vercel-composition-patterns`), per
       `CLAUDE.md`'s rule that UI work in `packages/web` goes through the
       design skills before implementing or reshaping any screen.
-- [ ] 3.2 Add `groupsLogic.ts` beside the screen, mirroring
+- [x] 3.2 Add `groupsLogic.ts` beside the screen, mirroring
       `usersLogic.ts` and `migrationsLogic.ts`: `scopeText(scope:
       GroupScope, locale: UiLocale): string`, a pure helper for scope
       display text, taking `locale` and returning already-translated
@@ -187,7 +187,7 @@
       touch it. An entry satisfying neither is refused, the same
       client-side, before-any-request refusal the plain email case
       already has.
-- [ ] 3.3 Add `admin-groupsLogic.test.ts` covering scope display text
+- [x] 3.3 Add `admin-groupsLogic.test.ts` covering scope display text
       (both locales), the process-filter predicate, the create-time
       scope pre-fill, member-token resolution (including the refusal
       case, asserting the refused token's value appears in
@@ -202,7 +202,7 @@
       blocking id absent from the loaded process list), and
       `scopeIsSavable` (including the empty-process-list refusal case),
       mirroring `admin-usersLogic.test.ts`'s shape.
-- [ ] 3.4 Create
+- [x] 3.4 Create
       `packages/web/src/areas/admin/screens/GroupsScreen.tsx` with the
       list view: columns for name, scope, and member count. The screen
       SHALL walk `listGroups`'s cursor to completion before it filters or
@@ -221,20 +221,20 @@
       prop on `GroupsScreen`, the same pass-through pattern `root.tsx`
       already uses for `InstanceScreen instanceId={route.instanceId}` and
       `DataListScreen listKey={route.listKey}`.
-- [ ] 3.5 Add the process-filter `<select>` above the list, populated
+- [x] 3.5 Add the process-filter `<select>` above the list, populated
       from the existing `listProcesses`, following
       `MigrationsScreen.tsx`'s picker exactly. Wire it to the narrowing
       predicate from task 3.2. Initialize the `<select>`'s selected value
       from `initialProcessId` (task 3.4) when present at mount; the
       operator can still change or clear it afterward, the same as any
       other selection on this control.
-- [ ] 3.6 Add group creation: a form (name, scope) with save/cancel,
+- [x] 3.6 Add group creation: a form (name, scope) with save/cancel,
       pre-filling scope from the active process filter per task 3.2's
       helper. On save, call `createGroup` and refresh. Add the
       creation-form's catalog keys (its field labels and its save/cancel
       control labels, where no shared key already covers them) to the
       admin catalog's EN and DE key sets.
-- [ ] 3.7 Add the rename inline editor per row, mirroring
+- [x] 3.7 Add the rename inline editor per row, mirroring
       `UsersScreen.tsx`'s roles editor for INTERACTION SHAPE only:
       autoFocus, Enter to save, Escape to cancel, save/cancel controls.
       NOT its class names: `.admin-role-input` takes the mono face
@@ -251,13 +251,13 @@
       styling. Wire it to `renameGroup` (`PATCH
       /admin/groups/:groupId/name`). Add the rename editor's catalog keys
       to the admin catalog's EN and DE key sets.
-- [ ] 3.8 Add the scope inline editor per row: a Global/Processes switch,
+- [x] 3.8 Add the scope inline editor per row: a Global/Processes switch,
       and a process picker that appears only for Processes. Refuse an
       empty process list client-side, via task 3.2's `scopeIsSavable`.
       Wire saving to `setGroupScope`. Add the scope editor's catalog
       keys, including the client-side refusal message for an empty
       process list, to the admin catalog's EN and DE key sets.
-- [ ] 3.9 Add the member inline editor per row: a comma-separated text
+- [x] 3.9 Add the member inline editor per row: a comma-separated text
       input, resolved against the full account directory (load it via
       the existing `listUsers` walk) using task 3.2's resolvers. Seed
       the editor's initial text with `memberDisplayText` over the row's
@@ -272,7 +272,7 @@
       the `tFill` template for the client-side refusal message that
       names a token matching neither a loaded email nor a pre-edit
       member id, to the admin catalog's EN and DE key sets.
-- [ ] 3.10 Add delete per row, behind a `window.confirm` naming the
+- [x] 3.10 Add delete per row, behind a `window.confirm` naming the
       group, calling `deleteGroup`. `describeCaughtError`
       (`packages/web/src/areas/admin/errors.ts`) cannot render this
       refusal: it delegates to `describeError`, a fixed switch keyed on
@@ -318,18 +318,18 @@
       `tFill` template naming blocking processes, and the fixed
       fallback string above — to the admin catalog's EN and DE key
       sets.
-- [ ] 3.11 Verify every inline editor's open state and pending text
+- [x] 3.11 Verify every inline editor's open state and pending text
       survive a `useRefresh`-triggered reload, the way `UsersScreen`'s
       editors already do.
 
 ## 4. Studio link
 
-- [ ] 4.1 Add `go: (href: string, opts?: NavigateOptions) => void` to the
+- [x] 4.1 Add `go: (href: string, opts?: NavigateOptions) => void` to the
       prop chain from `packages/web/src/areas/studio/root.tsx` through
       `EditScreen.tsx` to `EditorArea`, per design.md's "Threading `go`
       down to the link" decision.
-- [ ] 4.2 Pass `go` and `processId` into `ProcessHeaderBar`'s props.
-- [ ] 4.3 Invoke the design skills before adding the link: the new item
+- [x] 4.2 Pass `go` and `processId` into `ProcessHeaderBar`'s props.
+- [x] 4.3 Invoke the design skills before adding the link: the new item
       sits beside `AddLocaleControl`, which uses a visually different
       pattern (`.studio-header-bar-menu-add-locale` / `btn
       btn-secondary`) than the label-row pattern
@@ -340,7 +340,7 @@
       the draft" group, per `CLAUDE.md`'s rule that UI work in
       `packages/web` goes through the design skills before implementing
       or reshaping any screen or component.
-- [ ] 4.4 Add the "Manage assignment groups for this process" link to
+- [x] 4.4 Add the "Manage assignment groups for this process" link to
       the `⋮`
       menu's "Process, saved with the draft" group in
       `ProcessHeaderBar.tsx`, beside `AddLocaleControl`, per task 4.3's
@@ -352,14 +352,14 @@
       `go(href)` on click. Add the studio catalog key for the link's
       label to the studio catalog (English only, per that catalog's
       existing convention).
-- [ ] 4.5 Confirm the link renders regardless of `structureActive` and
+- [x] 4.5 Confirm the link renders regardless of `structureActive` and
       regardless of the signed-in actor's roles, per the studio-canvas
       spec delta's requirement text; it triggers no group-data request
       of its own.
 
 ## 5. Completeness sweep
 
-- [ ] 5.1 Confirm every catalog key task groups 2 through 4 added along
+- [x] 5.1 Confirm every catalog key task groups 2 through 4 added along
       the way — `nav.groups` (task 2.5); the Groups screen's title,
       column-header, scope-display, creation-form, rename, scope-editor,
       member-editor, and deletion-guard-template keys (tasks 3.4, 3.6,
@@ -370,7 +370,7 @@
       This is a final completeness sweep, not a place to introduce a new
       key; if the sweep finds nothing missing, mark it done as a
       no-op.
-- [ ] 5.2 Record the query-parameter routing precedent task 2.3
+- [x] 5.2 Record the query-parameter routing precedent task 2.3
       introduces. `docs/current-state.md`'s Unified shell passage
       (the "Routing is the load-bearing part" paragraph) already
       describes `matchRoute`/`routePath` per area; add one sentence
@@ -384,17 +384,17 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Run `bun run typecheck` and confirm it passes clean.
-- [ ] 6.2 Run `bun run build` and confirm it passes clean.
-- [ ] 6.3 Run the full `bun test` suite with `DATABASE_URL` set, not a
+- [x] 6.1 Run `bun run typecheck` and confirm it passes clean.
+- [x] 6.2 Run `bun run build` and confirm it passes clean.
+- [x] 6.3 Run the full `bun test` suite with `DATABASE_URL` set, not a
       single-file rerun. Confirm the reported skip count matches an
       expected full run (no silent skip from a missing `DATABASE_URL`),
       and confirm no named test fails.
-- [ ] 6.4 Run `sh scripts/gates/prose.sh < /dev/null` over this change's
+- [x] 6.4 Run `sh scripts/gates/prose.sh < /dev/null` over this change's
       touched Markdown and confirm no new antislop findings.
-- [ ] 6.5 Run `sh scripts/gates/whitespace.sh < /dev/null` and confirm it
+- [x] 6.5 Run `sh scripts/gates/whitespace.sh < /dev/null` and confirm it
       passes clean.
-- [ ] 6.6 Exercise the Groups screen and the Studio link in a real
+- [x] 6.6 Exercise the Groups screen and the Studio link in a real
       browser: list, filter, create (with and without an active filter),
       rename, scope edit both directions, member add and delete, a
       blocked delete showing the guard's process names, and the Studio
@@ -415,7 +415,7 @@
       `group-based-assignment`'s current plan, task 6.3's body always
       carrying a `processIds` array, so this pass does not exercise it;
       code review alone verifies that branch.
-- [ ] 6.7 Run `openspec validate admin-groups-screen --strict` and
+- [x] 6.7 Run `openspec validate admin-groups-screen --strict` and
       confirm it reports the change valid, before archiving. Re-run it
       if tasks 1 through 5 above touched proposal.md, a spec delta, or
       design.md after this task was first read.

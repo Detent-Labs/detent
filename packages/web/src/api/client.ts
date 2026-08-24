@@ -64,7 +64,7 @@ const PASSTHROUGH = new Set<ClientError["type"]>([
 const PUBLISH_VALIDATION = new Set(["registry-validation", "cel-validation", "duration-validation", "compile-validation", "schema-validation", "group-scope-validation"]);
 
 export async function parseErrorBody(res: Response): Promise<ClientError> {
-  let parsed: { error?: { type?: string; message?: string; issues?: unknown[] } } | undefined;
+  let parsed: { error?: { type?: string; message?: string; issues?: unknown[]; processIds?: unknown[] } } | undefined;
   try {
     parsed = (await res.json()) as typeof parsed;
   } catch {
@@ -73,6 +73,20 @@ export async function parseErrorBody(res: Response): Promise<ClientError> {
   const err = parsed?.error;
   const message = err?.message ?? `HTTP ${res.status}`;
   const type = err?.type;
+  // The group-delete 409 reuses the generic "conflict" wire type with a
+  // `processIds` array added, rather than minting a fresh discriminant
+  // (design.md's "The group-delete 409's wire error.type stays the generic
+  // conflict"). Detected by body shape, before PASSTHROUGH would otherwise
+  // consume it and drop `processIds`. Any other `"conflict"` 409 — including
+  // one this same route answers with no structured ids — carries no
+  // `processIds` array and falls through unchanged below.
+  if (type === "conflict" && Array.isArray(err?.processIds)) {
+    return {
+      type: "group-referenced",
+      message,
+      blockingProcessIds: err.processIds.filter((x): x is string => typeof x === "string"),
+    };
+  }
   if (type !== undefined && PASSTHROUGH.has(type as ClientError["type"])) {
     return { type, message } as ClientError;
   }

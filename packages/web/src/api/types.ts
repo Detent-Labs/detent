@@ -109,6 +109,13 @@ export type ClientError =
   // and not a concurrency one: the repair is a different address, so retrying
   // the same body changes nothing.
   | { type: "email-in-use"; message: string }
+  // `DELETE /admin/groups/:groupId` refused because a published process's
+  // `allowedGroups` still names the group. The wire reuses the generic
+  // `"conflict"` type with a `processIds` array added; `parseErrorBody`
+  // detects that shape and maps it here so the screen can resolve and name
+  // the blocking processes, which the generic `{ type, message }` shape has
+  // no field for.
+  | { type: "group-referenced"; message: string; blockingProcessIds?: string[] }
   // Publish-time rejections. The server maps six distinct error classes here
   // (registry, CEL, duration, compile, schema, cross-process); five carry
   // located `issues`, cross-process carries a message. All six reach a

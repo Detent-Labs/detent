@@ -43,6 +43,11 @@ interface EditScreenProps {
   panel?: PanelView;
   stepId?: string;
   token: string;
+  /** Cross-area navigation, threaded down to `ProcessHeaderBar`'s "Manage
+   * assignment groups for this process" link (design.md: "Threading `go`
+   * down to the link"). `token`, `navigate`, and `onUnauthorized` already
+   * take the same shape through this chain. */
+  go: (href: string, opts?: NavigateOptions) => void;
   navigate: (route: Route, opts?: NavigateOptions) => void;
   onUnauthorized: () => void;
 }
@@ -53,6 +58,7 @@ interface EditorAreaProps {
   panel?: PanelView;
   stepId?: string;
   token: string;
+  go: (href: string, opts?: NavigateOptions) => void;
   initialRevision: number;
   initialLayout: Record<string, unknown>;
   /** The published version this draft sits on, for the dock's Changes tab.
@@ -72,7 +78,7 @@ interface EditorAreaProps {
  * remaining direct consumer of `DraftToolbarProps`; `DraftToolbar` itself no
  * longer mounts here (design.md: "DraftToolbar keeps its logic.
  * ProcessHeaderBar renders the buttons."). */
-function EditorArea({ processId, formStepId, panel, stepId, token, initialRevision, initialLayout, loadedBaseVersion, navigate, onUnauthorized }: EditorAreaProps) {
+function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRevision, initialLayout, loadedBaseVersion, navigate, onUnauthorized }: EditorAreaProps) {
   const { draft, mutate, validation, replace, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
@@ -397,6 +403,8 @@ function EditorArea({ processId, formStepId, panel, stepId, token, initialRevisi
         conflict={saveState.conflict}
         actions={actions}
         structureActive={surface === "structure"}
+        processId={processId}
+        go={go}
         surfaceToggle={
           <div className="studio-surface-toggle" role="tablist">
             <button type="button" role="tab" aria-selected={surface === "structure"} onClick={() => setSurface("structure")}>
@@ -581,7 +589,7 @@ type EditLoadState =
   | { kind: "error"; message: string }
   | { kind: "loaded"; record: DraftRecord };
 
-export function EditScreen({ processId, formStepId, panel, stepId, token, navigate, onUnauthorized }: EditScreenProps) {
+export function EditScreen({ processId, formStepId, panel, stepId, token, go, navigate, onUnauthorized }: EditScreenProps) {
   const [state, setState] = useState<EditLoadState>({ kind: "loading" });
   const fail = useFail(onUnauthorized, (e) => setState({ kind: "error", message: describeCaughtError(e) }));
 
@@ -642,6 +650,7 @@ export function EditScreen({ processId, formStepId, panel, stepId, token, naviga
         panel={panel}
         stepId={stepId}
         token={token}
+        go={go}
         initialRevision={state.record.revision}
         initialLayout={state.record.layout}
         loadedBaseVersion={state.record.baseVersion}

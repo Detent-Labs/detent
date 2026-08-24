@@ -2673,7 +2673,10 @@ Stage-by-stage status is in `ROADMAP.md`.
   item 12 had assumed all four would be rewritten, and Studio's
   `/studio/processes/:processId/migrate/:from/:to` needed no attention at all.
   `useAreaRoute(area, localPath, match, toPath, go)` binds an area's pair to
-  the shell's one History-API hook.
+  the shell's one History-API hook. `admin/routing.ts`'s `groups` route is the
+  first `Route` variant carrying a query parameter. It parses that parameter
+  out of `matchRoute`'s own `path` argument, never from `location.search`,
+  keeping the function pure and DOM-free.
 
   `src/api/` holds `API_BASE`, `AppClientError`, `parseErrorBody`, `request`,
   `login` and `errorText`, plus `ClientError`, `LoginResponse`, `Actor` and

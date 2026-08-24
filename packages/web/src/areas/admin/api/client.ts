@@ -2,6 +2,9 @@ import type {
   DataListColumn,
   DataListDetail,
   DataListPage,
+  GroupPage,
+  GroupScope,
+  GroupSummary,
   InstancePage,
   InstanceView,
   MigrationResult,
@@ -150,6 +153,61 @@ export async function setUserManager(userId: string, managerUserId: string | nul
     body: JSON.stringify({ managerUserId }),
   });
   return (await res.json()) as UserSummary;
+}
+
+// ---- groups ------------------------------------------------------------
+// Assignment-candidate groups; the `org.group-members` assignment strategy
+// resolves candidates from these at runtime. Behind `system:admin`, the same
+// role every other Operations route carries.
+
+/** Same `{ limit, cursor }` shape `listUsers` takes, and the same cursor-bearing page shape. */
+export async function listGroups(token: string, opts: { limit?: number; cursor?: string } = {}): Promise<GroupPage> {
+  const query = new URLSearchParams();
+  if (opts.limit !== undefined) query.set("limit", String(opts.limit));
+  if (opts.cursor !== undefined) query.set("cursor", opts.cursor);
+  return getJson<GroupPage>(`/admin/groups?${query}`, token);
+}
+
+export async function createGroup(name: string, scope: GroupScope, token: string): Promise<GroupSummary> {
+  const res = await request("/admin/groups", token, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name, scope }),
+  });
+  return (await res.json()) as GroupSummary;
+}
+
+export async function renameGroup(groupId: string, name: string, token: string): Promise<GroupSummary> {
+  const res = await request(`/admin/groups/${encodeURIComponent(groupId)}/name`, token, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  return (await res.json()) as GroupSummary;
+}
+
+/** Replaces the whole member set: an id the array omits is a member removed. */
+export async function setGroupMembers(groupId: string, members: string[], token: string): Promise<GroupSummary> {
+  const res = await request(`/admin/groups/${encodeURIComponent(groupId)}/members`, token, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ members }),
+  });
+  return (await res.json()) as GroupSummary;
+}
+
+export async function setGroupScope(groupId: string, scope: GroupScope, token: string): Promise<GroupSummary> {
+  const res = await request(`/admin/groups/${encodeURIComponent(groupId)}/scope`, token, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ scope }),
+  });
+  return (await res.json()) as GroupSummary;
+}
+
+/** A 409 means a published process's `allowedGroups` still names this group; `parseErrorBody` maps that to the `group-referenced` `ClientError` variant. */
+export async function deleteGroup(groupId: string, token: string): Promise<void> {
+  await request(`/admin/groups/${encodeURIComponent(groupId)}`, token, { method: "DELETE" });
 }
 
 export async function runMigration(processId: string, fromVersion: number, toVersion: number, token: string): Promise<MigrationResult> {

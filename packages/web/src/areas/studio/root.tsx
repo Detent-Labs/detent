@@ -117,6 +117,7 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
               panel={route.panel}
               stepId={route.stepId}
               token={session.token}
+              go={go}
               navigate={navigate}
               onUnauthorized={onUnauthorized}
             />

@@ -21,6 +21,21 @@ describe("the admin area's data list routes", () => {
   });
 });
 
+describe("the admin area's groups route", () => {
+  it("parses the processId query parameter out of the path string", () => {
+    expect(matchRoute("/groups?processId=proc_123")).toEqual({ name: "groups", processId: "proc_123" });
+  });
+
+  it("matches the bare path with no filter", () => {
+    expect(matchRoute("/groups")).toEqual({ name: "groups" });
+  });
+
+  it("round-trips both the filtered and unfiltered route", () => {
+    const routes: Route[] = [{ name: "groups" }, { name: "groups", processId: "proc_123" }];
+    for (const route of routes) expect(matchRoute(routePath(route))).toEqual(route);
+  });
+});
+
 describe("the admin area's per-screen role gate", () => {
   const ROUTES: Route[] = [
     { name: "instances" },
@@ -29,6 +44,7 @@ describe("the admin area's per-screen role gate", () => {
     { name: "timers" },
     { name: "users" },
     { name: "migrations" },
+    { name: "groups" },
     { name: "dataLists" },
     { name: "dataList", listKey: "cost_centres" },
     { name: "uiStrings" },
@@ -40,7 +56,7 @@ describe("the admin area's per-screen role gate", () => {
   });
 
   it("keeps the operations screens behind system:admin", () => {
-    const operations = ["instances", "instance", "outbox", "timers", "users", "migrations"] as const;
+    const operations = ["instances", "instance", "outbox", "timers", "users", "migrations", "groups"] as const;
     for (const name of operations) expect(ROUTE_ROLE[name]).toBe("system:admin");
   });
 
@@ -66,6 +82,7 @@ describe("the admin area's per-screen role gate", () => {
       "timers",
       "users",
       "migrations",
+      "groups",
       "uiStrings",
     ]);
   });

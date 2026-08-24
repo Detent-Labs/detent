@@ -5,6 +5,7 @@ export type Route =
   | { name: "timers" }
   | { name: "users" }
   | { name: "migrations" }
+  | { name: "groups"; processId?: string }
   | { name: "dataLists" }
   | { name: "dataList"; listKey: string }
   | { name: "uiStrings" };
@@ -13,6 +14,11 @@ export type Route =
  * Pure — testable without a DOM, and prefix-unaware: the shell strips `/admin`
  * before calling this and prepends it to what `routePath` returns. An
  * unrecognized path falls back to the instances list rather than a dead end.
+ *
+ * `groups` is the one route carrying a query parameter (design.md's "A query
+ * parameter is new in this codebase"). It parses that parameter out of its
+ * own `path` string argument, never from `location.search`, so this function
+ * stays pure and DOM-free.
  */
 export function matchRoute(path: string): Route {
   if (path === "/outbox") return { name: "outbox" };
@@ -25,6 +31,11 @@ export function matchRoute(path: string): Route {
   if (dataListMatch) return { name: "dataList", listKey: decodeURIComponent(dataListMatch[1]!) };
   const instanceMatch = /^\/instances\/([^/]+)$/.exec(path);
   if (instanceMatch) return { name: "instance", instanceId: decodeURIComponent(instanceMatch[1]!) };
+  const [pathname, search] = path.split("?", 2);
+  if (pathname === "/groups") {
+    const processId = new URLSearchParams(search ?? "").get("processId");
+    return processId ? { name: "groups", processId } : { name: "groups" };
+  }
   return { name: "instances" };
 }
 
@@ -45,6 +56,7 @@ export const ROUTE_ROLE: Record<Route["name"], string> = {
   timers: "system:admin",
   users: "system:admin",
   migrations: "system:admin",
+  groups: "system:admin",
   dataLists: "system:datalists",
   dataList: "system:datalists",
   uiStrings: "system:admin",
@@ -64,6 +76,8 @@ export function routePath(route: Route): string {
       return "/users";
     case "migrations":
       return "/migrations";
+    case "groups":
+      return route.processId ? `/groups?processId=${encodeURIComponent(route.processId)}` : "/groups";
     case "dataLists":
       return "/data-lists";
     case "dataList":

@@ -267,6 +267,28 @@ input.admin-mono[type="number"] {
   max-width: 34rem;
 }
 
+/* A group's name is operator-authored prose, not an engine-matched
+   identifier, so its rename editor takes its own classes rather than
+   `.admin-role-input`'s mono face (design-language.md: "A value the engine
+   matches exactly uses the mono face. Prose never does."). Styled like
+   `.admin-field`'s text input, mirroring `DataListScreen.tsx`'s list-name
+   and description inputs. */
+.admin-name-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 18rem;
+}
+
+.admin-name-input {
+  width: 100%;
+  padding: 4px 6px;
+  border: 2px solid var(--color-accent);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+
 /* An editor for a value that owns no column — the password reset. It sits as
    its own row under the entry it belongs to, the way a ledger carries an
    annotation line, rather than displacing a cell whose heading would then

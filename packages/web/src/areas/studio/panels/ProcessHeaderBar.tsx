@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { MoreVertical } from "lucide-react";
+import { MoreVertical, Users2 } from "lucide-react";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
 import { resolveBaseLocaleChange } from "../screens/processHeaderLogic.js";
@@ -9,6 +9,7 @@ import { LocalizedTextInput } from "./shared/LocalizedTextInput.js";
 import { IssueList } from "./shared/IssueList.js";
 import type { DraftToolbarActions } from "./DraftToolbar.js";
 import type { PublishResult } from "../api/types.js";
+import { areaHref, type NavigateOptions } from "../../../shell/routing.js";
 
 interface Props {
   revision: number;
@@ -41,6 +42,13 @@ interface Props {
    * so that spec names them exempt and this component renders them
    * regardless of `structureActive`. */
   structureActive: boolean;
+  /** The open process's id, threaded down for the "Manage assignment groups
+   * for this process" link's `processId` query parameter (design.md:
+   * "Threading `go` down to the link"). */
+  processId: string;
+  /** Cross-area navigation. The link is the only user: it calls
+   * `go(href)` to reach the admin area's Groups screen — never a mutation. */
+  go: (href: string, opts?: NavigateOptions) => void;
 }
 
 /**
@@ -80,6 +88,8 @@ export function ProcessHeaderBar({
   actions,
   surfaceToggle,
   structureActive,
+  processId,
+  go,
 }: Props) {
   const { draft, mutate, contentLocale, setContentLocale } = useDraft();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -251,6 +261,22 @@ export function ProcessHeaderBar({
                 </>
               )}
               <AddLocaleControl />
+              {/* Pure navigation, never gated by `structureActive`: it
+                  mutates nothing the JSON surface itself edits, the same
+                  exemption Save/Discard/Publish and the content-locale
+                  switch already carry (studio-json-view). It renders for
+                  any signed-in actor regardless of role — following it
+                  without `system:admin` is the admin area's own
+                  `mayEnter`/`ROUTE_ROLE` gate to decide, not this link's
+                  concern (studio-canvas). */}
+              <button
+                type="button"
+                className="btn btn-secondary studio-header-bar-menu-link"
+                onClick={() => runMenuAction(() => go(`${areaHref("admin", "/groups")}?processId=${encodeURIComponent(processId)}`))}
+              >
+                <Users2 size={18} strokeWidth={1.75} aria-hidden="true" />
+                {t("headerBar.manageGroups")}
+              </button>
             </div>
           </div>
         )}
