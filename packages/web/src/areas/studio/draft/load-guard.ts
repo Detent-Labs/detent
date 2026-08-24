@@ -16,7 +16,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 /** The full top-level key set of AuthoredProcessBody (definition.ts's `processBody`). */
-const KNOWN_KEYS = new Set(["key", "label", "description", "baseLocale", "contract", "fields", "dataSources", "workflow"]);
+const KNOWN_KEYS = new Set(["key", "label", "description", "baseLocale", "contract", "fields", "dataSources", "allowedGroups", "workflow"]);
 
 export function checkDraftShape(value: unknown): LoadGuardIssue[] {
   const issues: LoadGuardIssue[] = [];
@@ -56,6 +56,7 @@ export function checkDraftShape(value: unknown): LoadGuardIssue[] {
   expectObject("contract");
   expectArray("fields");
   expectArray("dataSources");
+  expectArray("allowedGroups");
   expectObject("workflow");
 
   return issues;

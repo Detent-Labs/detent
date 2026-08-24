@@ -41,6 +41,7 @@ import {
 } from "./registry.js";
 import { validateStructure, validateReferences } from "../validate.js";
 import { ZodError } from "zod";
+import { getGroupScopes } from "../auth/groups.js";
 
 /** Resolve the newest child version whose contract signature equals `contractRef`. */
 export type ResolveLatestByContract = (
@@ -120,6 +121,48 @@ export class DataSourceRegistryValidationError extends RegistryValidationErrorBa
 
 function parseBody(raw: unknown): ProcessBody {
   return processBody.parse(typeof raw === "string" ? JSON.parse(raw) : raw);
+}
+
+/** One `allowedGroups` entry that does not exist in the groups store, or whose scope does not permit the publishing process. */
+export interface GroupScopeIssue {
+  groupId: string;
+  reason: "not-found" | "scope-mismatch";
+}
+
+/**
+ * A body about to be published carries an `allowedGroups` entry naming no
+ * group in the store, or a `"processes"`-scoped group that does not list this
+ * process. Every located issue is retained, matching the other publish-time
+ * validation errors' "every issue, not just the first" contract.
+ */
+export class GroupScopeValidationError extends Error {
+  constructor(readonly issues: GroupScopeIssue[]) {
+    super(issues.map((i) => `'${i.groupId}': ${i.reason}`).join("; "));
+    this.name = "GroupScopeValidationError";
+  }
+}
+
+/**
+ * Publish-time group-scope check (`group-scope-validation`): every entry in
+ * the compiled body's `allowedGroups` must name a group the store holds, whose
+ * scope permits `processId`. A third DB-resolving check, alongside
+ * `validateCrossProcess`/`validateProcessChaining`, at the same placement —
+ * after the hash-hit no-op return, using the same per-request `db`.
+ */
+async function validateGroupScope(body: ProcessBody, processId: ProcessId, db: SQL): Promise<void> {
+  const groupIds = body.allowedGroups ?? [];
+  if (groupIds.length === 0) return;
+  const scopes = await getGroupScopes(groupIds, db);
+  const issues: GroupScopeIssue[] = [];
+  for (const groupId of groupIds) {
+    const scope = scopes.get(groupId);
+    if (!scope) {
+      issues.push({ groupId, reason: "not-found" });
+    } else if (scope.type === "processes" && !scope.processIds.includes(processId)) {
+      issues.push({ groupId, reason: "scope-mismatch" });
+    }
+  }
+  if (issues.length > 0) throw new GroupScopeValidationError(issues);
 }
 
 /**
@@ -238,7 +281,7 @@ export async function publishBody(
   db: SQL = sql,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<ProcessVersion> {
-  // Structure first: the Zod gate, duration and the eight structural checks,
+  // Structure first: the Zod gate, duration and the nine structural checks,
   // via the module both this function and the studio's live validation
   // share (src/validate.ts). Reconstructed from the result rather than
   // re-running compileProcessBody, at the same precedence it has today:
@@ -325,6 +368,7 @@ export async function publishBody(
   const definitionStore = createDefinitionStore(db);
   await validateCrossProcess(body, definitionStore);
   await validateProcessChaining(body, definitionStore);
+  await validateGroupScope(body, processId, db);
 
   const max = (await db`SELECT COALESCE(MAX(version), 0) AS m FROM definitions
     WHERE process_id = ${processId}`) as { m: number }[];

@@ -112,3 +112,12 @@ only the cancel-sink count.
   `visible: false`. The compile pass checks this
   (`compile.ts::checkUnsatisfiableRequiredReadonly`), not a Zod refinement on
   `viewField` — see `definition-contract`'s placement rule.
+- A step whose `assignment.strategy.type === "org.group-members"` and whose
+  `config.groupId` is a string must name a group id already present in the
+  body's own `allowedGroups`. The compile pass checks this
+  (`compile.ts::checkGroupReference`), not a Zod refinement: an authored body
+  cannot state both lists consistently before publish decides whether the
+  strategy is even registered, so the write path is where the two lists can
+  first be compared — see `definition-contract`'s placement rule. A `groupId`
+  that is absent or non-string is left to the assignment-registry
+  config-schema check instead, so the two checks never both flag one step.

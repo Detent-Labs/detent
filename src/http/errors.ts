@@ -35,6 +35,7 @@ import {
   RegistryValidationError,
   AssignmentRegistryValidationError,
   DataSourceRegistryValidationError,
+  GroupScopeValidationError,
 } from "../engine/definitions.js";
 import { DurationValidationError, CompileValidationError } from "../schema/compile.js";
 import { DraftConflictError } from "../engine/drafts.js";
@@ -76,6 +77,7 @@ const ISSUES_ERRORS: IssuesMapping[] = [
   { ctor: RegistryValidationError, status: 422, type: "registry-validation" },
   { ctor: AssignmentRegistryValidationError, status: 422, type: "registry-validation" },
   { ctor: DataSourceRegistryValidationError, status: 422, type: "registry-validation" },
+  { ctor: GroupScopeValidationError, status: 422, type: "group-scope-validation" },
   { ctor: CelValidationError, status: 422, type: "cel-validation" },
   { ctor: DurationValidationError, status: 422, type: "duration-validation" },
   { ctor: CompileValidationError, status: 422, type: "compile-validation" },

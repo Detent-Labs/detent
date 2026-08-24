@@ -4,7 +4,7 @@
  * `runValidation` (`packages/web/src/areas/studio/draft/validation.ts`).
  *
  * `validateStructure` runs first: the Zod gate, the compile pass's duration
- * check and its eight structural checks. It produces the compiled body
+ * check and its nine structural checks. It produces the compiled body
  * `validateReferences` requires — the compiled body is the ordering
  * convention that stops a caller running the reference checks before the
  * structure checks. `validateReferences` runs second: the three registry
@@ -61,7 +61,7 @@ export interface StructureValidationResult {
 }
 
 /**
- * Runs duration validation, the eight structural checks, then the Zod gate,
+ * Runs duration validation, the nine structural checks, then the Zod gate,
  * in that order — `compileProcessBody`'s own order today, preserved exactly,
  * so a multi-violation body still raises the same precedence at publish. See
  * design.md's "Duration and structural checks keep running before the Zod
@@ -105,7 +105,7 @@ export function validateStructure(authored: unknown): StructureValidationResult 
         // handling needed here beyond falling through to Zod-only reporting.
       } else if (err instanceof TypeError) {
         // The documented onFire-shape hazard, or any other null/undefined-
-        // property access inside validateDurations or the eight structural
+        // property access inside validateDurations or the nine structural
         // checks. Logged so the fault leaves a server-side trace once
         // discarded; carried in the result so a caller can recover it.
         log.error("validateStructure: caught TypeError during duration/structural compile", {

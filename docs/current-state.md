@@ -204,7 +204,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   <!-- antislop: allow synonym-rotation -->
   <!-- "build"/"create" both name this file's existing, larger split usage of the concept; this passage keeps "build" consistently within itself. -->
   Two exported functions form the seam. `validateStructure(authored)` runs
-  the Zod gate, duration and the eight structural checks, in that order. It
+  the Zod gate, duration and the nine structural checks, in that order. It
   builds the compiled body the second function needs. It is the only
   sanctioned way to build one from an authored input.
 
@@ -639,13 +639,18 @@ Stage-by-stage status is in `ROADMAP.md`.
   declares a resolver (`(ctx) => Promise<string[]>`) and may declare a config
   schema. `"static"` (`registry.ts::STATIC_ASSIGNMENT_STRATEGY_TYPE`,
   registered by `createDefaultAssignmentRegistry`) is the entry an author gets
-  by default and the only one that ships; its schema is
-  `{ candidates: string[] }` and its resolver returns that list verbatim. A
-  second entry now ships beside it: `"org.manager-of-starter"`
+  by default; two more now ship beside it. `"org.manager-of-starter"`
   (`engine/assignment-strategies.ts::MANAGER_OF_STARTER_STRATEGY_TYPE`), whose
   config schema is a strict empty object. Its resolver returns the manager
   of `instance.startedBy` as the single candidate. ONE hop: never a chain, and
   never the manager of whoever acted last.
+
+  `"org.group-members"`
+  (`engine/assignment-strategies.ts::GROUP_MEMBERS_STRATEGY_TYPE`) takes one
+  config key, `{ groupId: string }`. Its resolver reads the named group's
+  CURRENT member list from the `groups` store (`src/auth/groups.ts`),
+  excluding a disabled or nonexistent account. It is the one strategy of the
+  three whose result is not frozen at step entry.
 
   It reads `auth_users.manager_user_id` through `auth/users.ts::getManagerOf`.
   That is why it lives in its own module rather than in leaf `registry.ts`:

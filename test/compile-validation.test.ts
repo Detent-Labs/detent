@@ -882,3 +882,34 @@ describe("compile: unsatisfiable required+readonly pair", () => {
     expect(() => compileProcessBody(b as ProcessBody)).not.toThrow(TypeError);
   });
 });
+
+// group-based-assignment: a step's org.group-members groupId must resolve
+// within allowedGroups. Pure structural comparison of two lists already in
+// the body — no assignment registry needed, per test/compile-validation.test.ts's
+// existing pattern.
+describe("compile: org.group-members groupId resolves within allowedGroups", () => {
+  const groupBody = (groupId: string, allowedGroups: string[]): any => {
+    const b = baseBody();
+    b.allowedGroups = allowedGroups;
+    b.workflow.steps[0].assignment = { strategy: { type: "org.group-members", config: { groupId } } };
+    return b;
+  };
+
+  it("publishes when the groupId is listed in allowedGroups", () => {
+    const b = groupBody("group_finance", ["group_finance"]);
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("rejects when the groupId is absent from allowedGroups, naming the step and the group id", () => {
+    const b = groupBody("group_finance", []);
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "workflow.steps[0].assignment.strategy.config.groupId" && i.value === "group_finance")).toBe(true);
+  });
+
+  it("rejects the violation even on a body that already satisfies publishedProcessBody", () => {
+    const compiled: any = compileProcessBody(groupBody("group_finance", ["group_finance"]) as ProcessBody);
+    compiled.allowedGroups = [];
+    expect(publishedProcessBody.safeParse(compiled).success).toBe(true);
+    expect(() => compileProcessBody(compiled)).toThrow(CompileValidationError);
+  });
+});

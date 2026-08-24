@@ -17,6 +17,7 @@
  */
 import { z } from "zod";
 import { getManagerOf } from "../auth/users.js";
+import { getGroupMembers } from "../auth/groups.js";
 import {
   type AssignmentRegistry,
   type AssignmentStrategyDef,
@@ -56,9 +57,32 @@ export const managerOfStarterStrategyDef: AssignmentStrategyDef = {
   },
 };
 
+export const GROUP_MEMBERS_STRATEGY_TYPE = "org.group-members";
+
+/** Strict, one key: the strategy reads only the group it resolves against. */
+export const groupMembersConfigSchema = z.object({ groupId: z.string() }).strict();
+
+/**
+ * Resolve the group named by `config.groupId`'s CURRENT member list, live, at
+ * every step entry (`group-based-assignment`). Homed here, not in leaf
+ * `registry.ts`, for the same reason `org.manager-of-starter` is: it reads
+ * the database (`getGroupMembers`).
+ *
+ * `getGroupMembers` already excludes a disabled account and resolves a
+ * `groupId` naming no group to `[]`, so this strategy raises nothing of its
+ * own.
+ */
+export const groupMembersStrategyDef: AssignmentStrategyDef = {
+  configSchema: groupMembersConfigSchema,
+  resolve: async (ctx) => {
+    const { groupId } = ctx.config as { groupId: string };
+    return getGroupMembers(groupId, ctx.db);
+  },
+};
+
 /**
  * The registry the engine ships: the built-in `static` entry plus
- * `org.manager-of-starter`.
+ * `org.manager-of-starter` and `org.group-members`.
  *
  * It takes no database. Each resolution reads `ctx.db`, so one registry serves
  * every tenant — a handle bound here would resolve every tenant's manager
@@ -67,5 +91,6 @@ export const managerOfStarterStrategyDef: AssignmentStrategyDef = {
 export function createDefaultAssignmentRegistry(): AssignmentRegistry {
   const reg = createStaticAssignmentRegistry();
   reg.set(MANAGER_OF_STARTER_STRATEGY_TYPE, managerOfStarterStrategyDef);
+  reg.set(GROUP_MEMBERS_STRATEGY_TYPE, groupMembersStrategyDef);
   return reg;
 }

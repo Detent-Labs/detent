@@ -1,7 +1,7 @@
 /**
  * Publish-time compile pass.
  *
- * Validates every duration-typed value (see `validateDurations`) and the eight
+ * Validates every duration-typed value (see `validateDurations`) and the nine
  * structural write-path checks below (see `structuralIssues`), then injects
  * the engine-owned cancel-sink — and, for a contracted process, the
  * reserved "cancelled" outcome bound to it — into a ProcessBody. This runs
@@ -19,7 +19,7 @@
  * cover keys that no read reproduces, and the resulting pin would never
  * rehydrate.
  *
- * Every check in this module — durations and the eight structural checks alike —
+ * Every check in this module — durations and the nine structural checks alike —
  * runs on BOTH compile branches, ahead of the `publishedProcessBody`-valid
  * early return: that placement is what makes a check unbypassable by a
  * hand-written body that merely satisfies `publishedProcessBody` (which
@@ -127,7 +127,7 @@ export interface CompileIssue {
   message: string;
 }
 
-/** A body about to be published violates one of the eight structural write-path checks. */
+/** A body about to be published violates one of the nine structural write-path checks. */
 export class CompileValidationError extends Error {
   constructor(readonly issues: CompileIssue[]) {
     super(issues.map((i) => `${i.loc}: ${i.message} (${JSON.stringify(i.value)})`).join("; "));
@@ -451,6 +451,35 @@ function checkIdResolution(body: ProcessBody): CompileIssue[] {
       }
     });
   }
+  return issues;
+}
+
+// ============================================================
+// 6. group-based-assignment: a step's org.group-members groupId must resolve
+// within allowedGroups (definition-contract's MODIFIED requirement). The
+// literal "org.group-members" mirrors GROUP_MEMBERS_STRATEGY_TYPE in
+// src/engine/assignment-strategies.ts — not imported, since compile.ts is a
+// schema-layer leaf and that module reaches the database.
+// ============================================================
+
+function checkGroupReference(body: ProcessBody): CompileIssue[] {
+  const issues: CompileIssue[] = [];
+  const allowedGroups = body.allowedGroups ?? [];
+
+  body.workflow.steps.forEach((s, si) => {
+    const strategy = s.assignment?.strategy;
+    if (strategy?.type !== "org.group-members") return;
+    const groupId = (strategy.config as { groupId?: unknown })?.groupId;
+    if (typeof groupId !== "string") return; // left to the registry config-schema check
+    if (!allowedGroups.includes(groupId)) {
+      issues.push({
+        loc: `workflow.steps[${si}].assignment.strategy.config.groupId`,
+        value: groupId,
+        message: `step '${s.key}' references group '${groupId}' via org.group-members, but it is not in allowedGroups`,
+      });
+    }
+  });
+
   return issues;
 }
 
@@ -961,6 +990,7 @@ function structuralIssues(body: ProcessBody): CompileIssue[] {
     ...checkLengthBounds(body),
     ...checkTechnicalFields(body),
     ...checkUnsatisfiableRequiredReadonly(body),
+    ...checkGroupReference(body),
   ];
 }
 
@@ -970,7 +1000,7 @@ export function compileProcessBody(body: ProcessBody): ProcessBody {
   const durations = validateDurations(body);
   if (durations.length > 0) throw new DurationValidationError(durations);
 
-  // The eight structural checks, same placement as validateDurations and for
+  // The nine structural checks, same placement as validateDurations and for
   // the same reason: ahead of the publishedProcessBody-valid early return
   // below, so a hand-written body that merely satisfies that schema (which
   // checks only the cancel-sink count) cannot skip any of them.

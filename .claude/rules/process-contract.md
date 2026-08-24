@@ -122,8 +122,8 @@ core validates only the envelope; each plugin ships its own JSON Schema.
 `Step.assignment.strategy.type` resolves through its own `AssignmentRegistry`
 (`registry.ts`), a third sibling beside the action `Registry` and the
 `DataSourceRegistry`; `"static"` is a registered entry there — the type an
-author gets by default, and the only one that ships — not a literal any engine
-code compares against. An entry declares a candidate resolver
+author gets by default; `org.manager-of-starter` and `org.group-members` also
+ship — not a literal any engine code compares against. An entry declares a candidate resolver
 (`(ctx) => Promise<string[]>`, async even for `static`, over the narrow context
 `{ config, stepId, instance: { id, startedBy, data }, db }`) and may declare a
 config schema. `db` is the instance's OWN database, and it is required: under
@@ -164,6 +164,16 @@ verdicts indirectly, through `validateReferences`'s own `resolveType`/
 placement, throwing `AssignmentRegistryValidationError` /
 `DataSourceRegistryValidationError`. Data sources are never
 inlined; fields bind to them by id and options resolve at runtime.
+
+`org.group-members`, one of the two org-aware assignment strategies, adds a
+fourth, DB-resolving publish-time check beside `validateCrossProcess` and
+`validateProcessChaining`: for every entry in the body's own `allowedGroups`,
+`publishBody` confirms a group with that id exists in the `groups` store
+(`src/auth/groups.ts`) and that its scope permits the publishing process,
+throwing `GroupScopeValidationError` on any violation. It runs at the same
+placement as the other two — after the hash-hit no-op return, so an
+already-published body's re-publish stays a no-op even after a referenced
+group's scope narrows underneath it (`group-scope-validation`).
 
 **Runtime record (the audit backbone).** The instance carries assignment/claim
 state and persisted timer firings. Each HistoryEntry is append-only and records

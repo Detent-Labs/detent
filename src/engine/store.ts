@@ -415,6 +415,16 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (area, locale, key)
   )`;
+  // Assignment-candidate groups (src/auth/groups.ts), read live by the
+  // org.group-members assignment strategy. `members` carries no foreign key,
+  // mirroring `auth_users.roles`: an operator may list a member id before that
+  // account exists or after it stops existing (group-based-assignment design.md).
+  await db`CREATE TABLE IF NOT EXISTS groups (
+    group_id text PRIMARY KEY,
+    name     text NOT NULL,
+    scope    jsonb NOT NULL,
+    members  text[] NOT NULL DEFAULT '{}'
+  )`;
 }
 
 // Exported (not merely loadInstance-private) because subprocess.ts's return
