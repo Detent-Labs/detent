@@ -17,7 +17,7 @@
         "label": { "en": "Submit" },
         "type": "task",
         "paths": [
-          { "id": "path_l_check", "key": "check", "to": "step_l_check", "trigger": "automatic" }
+          { "id": "path_l_check", "key": "check", "label": "Run credit check", "to": "step_l_check", "trigger": "automatic" }
         ]
       },
       {
@@ -36,8 +36,8 @@
           }
         },
         "paths": [
-          { "id": "path_l_approved", "key": "approved", "to": "step_l_approved", "trigger": "automatic", "priority": 1, "guard": { "lang": "cel", "src": "child.outcome == \"approved\"" } },
-          { "id": "path_l_rejected", "key": "rejected", "to": "step_l_rejected", "trigger": "automatic", "priority": 2, "guard": { "lang": "cel", "src": "child.outcome == \"rejected\"" } }
+          { "id": "path_l_approved", "key": "approved", "label": "Approved", "to": "step_l_approved", "trigger": "automatic", "priority": 1, "guard": { "lang": "cel", "src": "child.outcome == \"approved\"" } },
+          { "id": "path_l_rejected", "key": "rejected", "label": "Rejected", "to": "step_l_rejected", "trigger": "automatic", "priority": 2, "guard": { "lang": "cel", "src": "child.outcome == \"rejected\"" } }
         ]
       },
       { "id": "step_l_approved", "key": "approved", "label": { "en": "Approved" }, "type": "task", "terminal": true },

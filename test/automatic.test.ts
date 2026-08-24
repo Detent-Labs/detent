@@ -35,8 +35,8 @@ async function rejectsWith(p: Promise<unknown>, ctor: new (...a: never[]) => Err
 
 const cel = (src: string) => ({ lang: "cel", src });
 const autoPath = (id: string, to: string, priority?: number, guardSrc?: string) =>
-  ({ id, key: id, to, trigger: "automatic", ...(priority !== undefined ? { priority } : {}), ...(guardSrc ? { guard: cel(guardSrc) } : {}) });
-const manualPath = (id: string, to: string) => ({ id, key: id, to, trigger: "manual" });
+  ({ id, key: id, label: `Path ${id}`, to, trigger: "automatic", ...(priority !== undefined ? { priority } : {}), ...(guardSrc ? { guard: cel(guardSrc) } : {}) });
+const manualPath = (id: string, to: string) => ({ id, key: id, label: `Path ${id}`, to, trigger: "manual" });
 const step = (id: string, over: Record<string, unknown> = {}): Step =>
   ({ id, key: id, label: { en: id }, type: "task", ...over }) as unknown as Step;
 const mkBody = (steps: Step[], initialStep = "step_a"): ProcessBody =>

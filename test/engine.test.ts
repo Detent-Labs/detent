@@ -64,7 +64,7 @@ const bodyWith = (guardSrc?: string): ProcessBody =>
           paths: [
             {
               id: "path_ab",
-              key: "ab",
+              key: "ab", label: "Ab",
               to: "step_b",
               trigger: "manual",
               ...(guardSrc ? { guard: { lang: "cel", src: guardSrc } } : {}),
@@ -100,8 +100,8 @@ const chainBody = (): ProcessBody =>
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_am", key: "am", to: "step_m", trigger: "manual" }] },
-        { id: "step_m", key: "m", label: { en: "M" }, type: "task", paths: [{ id: "path_mt", key: "mt", to: "step_t", trigger: "manual" }] },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_am", key: "am", label: "Am", to: "step_m", trigger: "manual" }] },
+        { id: "step_m", key: "m", label: { en: "M" }, type: "task", paths: [{ id: "path_mt", key: "mt", label: "Mt", to: "step_t", trigger: "manual" }] },
         { id: "step_t", key: "t", label: { en: "T" }, type: "task", terminal: true },
       ],
     },

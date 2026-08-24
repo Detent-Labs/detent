@@ -51,7 +51,7 @@ const migrationWaitBody = (key: string): ProcessBody =>
     workflow: {
       initialStep: "step_wait",
       steps: [
-        { id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task", paths: [{ id: "path_done", key: "done", to: "step_done", trigger: "manual" }] },
+        { id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task", paths: [{ id: "path_done", key: "done", label: "Done", to: "step_done", trigger: "manual" }] },
         { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },

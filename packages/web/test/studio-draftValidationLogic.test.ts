@@ -147,7 +147,7 @@ describe("runValidation: an assignment-less step", () => {
             key: "a",
             label: { en: "A" },
             type: "task",
-            paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+            paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
           },
           {
             id: "step_b",

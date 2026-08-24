@@ -39,7 +39,7 @@ const baseBody = (): any => ({
         key: "a",
         label: { en: "A" },
         type: "task",
-        paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+        paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
       },
       { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
     ],
@@ -336,7 +336,7 @@ describe("compile: SubprocessSpec.outputMapping and ProcessContract field lists 
             inputMapping: {},
             outputMapping,
           },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "automatic", priority: 1 }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "automatic", priority: 1 }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
@@ -735,7 +735,7 @@ describe("compile: unsatisfiable required+readonly pair", () => {
         inputMapping: {},
         outputMapping: { field_amount: cel("result.x") },
       },
-      paths: [{ id: "path_cb", key: "cb", to: "step_b", trigger: "automatic" }],
+      paths: [{ id: "path_cb", key: "cb", label: "Cb", to: "step_b", trigger: "automatic" }],
     });
     expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
   });

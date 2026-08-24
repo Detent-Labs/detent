@@ -35,8 +35,8 @@ const PARENT_PID = "proc_parent" as Instance["processId"];
 
 const cel = (src: string) => ({ lang: "cel", src });
 const autoPath = (id: string, to: string, priority?: number, guardSrc?: string) =>
-  ({ id, key: id, to, trigger: "automatic", ...(priority !== undefined ? { priority } : {}), ...(guardSrc ? { guard: cel(guardSrc) } : {}) });
-const manualPath = (id: string, to: string) => ({ id, key: id, to, trigger: "manual" });
+  ({ id, key: id, label: `Path ${id}`, to, trigger: "automatic", ...(priority !== undefined ? { priority } : {}), ...(guardSrc ? { guard: cel(guardSrc) } : {}) });
+const manualPath = (id: string, to: string) => ({ id, key: id, label: `Path ${id}`, to, trigger: "manual" });
 
 // Child: contracted, all-automatic; terminates "rejected" if amount > 1000 else
 // "approved". amount is seeded from the parent's inputMapping, so child.data.amount

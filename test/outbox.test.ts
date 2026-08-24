@@ -84,7 +84,7 @@ const threeActionBody = (): ProcessBody =>
         {
           id: "step_a", key: "a", label: { en: "A" }, type: "task",
           onExit: [act("x1")],
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual", onPath: [act("p1")] }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual", onPath: [act("p1")] }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true, onEntry: [act("e1")] },
       ],
@@ -101,10 +101,10 @@ const outputBody = (terminal: boolean): ProcessBody =>
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
         terminal
           ? { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true, onEntry: [actOut("set", "setter", "field_val", "result.val")] }
-          : { id: "step_b", key: "b", label: { en: "B" }, type: "task", onEntry: [actOut("set", "setter", "field_val", "result.val")], paths: [{ id: "path_bc", key: "bc", to: "step_c", trigger: "manual" }] },
+          : { id: "step_b", key: "b", label: { en: "B" }, type: "task", onEntry: [actOut("set", "setter", "field_val", "result.val")], paths: [{ id: "path_bc", key: "bc", label: "Bc", to: "step_c", trigger: "manual" }] },
         ...(terminal ? [] : [{ id: "step_c", key: "c", label: { en: "C" }, type: "task", terminal: true }]),
       ],
     },
@@ -118,8 +118,8 @@ const ghostBody = (): ProcessBody =>
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }] },
-        { id: "step_b", key: "b", label: { en: "B" }, type: "task", onEntry: [actOut("g", "ghost", "field_val", "result.val")], paths: [{ id: "path_bc", key: "bc", to: "step_c", trigger: "manual" }] },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", onEntry: [actOut("g", "ghost", "field_val", "result.val")], paths: [{ id: "path_bc", key: "bc", label: "Bc", to: "step_c", trigger: "manual" }] },
         { id: "step_c", key: "c", label: { en: "C" }, type: "task", terminal: true },
       ],
     },
@@ -133,7 +133,7 @@ const retryActionBody = (retry: Action["retry"]): ProcessBody =>
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true, onEntry: [{ id: "action_r1", type: "r1", config: {}, retry } as unknown as Action] },
       ],
     },
@@ -153,9 +153,9 @@ const sharedSeqBody = (): ProcessBody =>
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_wait", trigger: "manual" }] },
         { id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task", onEntry: [act("e1")], timers: [reminder],
-          paths: [{ id: "path_wd", key: "wd", to: "step_done", trigger: "manual" }] },
+          paths: [{ id: "path_wd", key: "wd", label: "Wd", to: "step_done", trigger: "manual" }] },
         { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
@@ -171,7 +171,7 @@ const initialReminderBody = (): ProcessBody =>
       initialStep: "step_wait",
       steps: [
         { id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task", timers: [reminder],
-          paths: [{ id: "path_wd", key: "wd", to: "step_done", trigger: "manual" }] },
+          paths: [{ id: "path_wd", key: "wd", label: "Wd", to: "step_done", trigger: "manual" }] },
         { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
@@ -409,7 +409,7 @@ const httpActionBody = (url: string): ProcessBody =>
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
         {
           id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true,
           onEntry: [{ id: "action_egress", type: HTTP_ACTION_TYPE, config: { url, method: "POST" } } as unknown as Action],
@@ -751,7 +751,7 @@ test.skipIf(!DB)("a creation-time subprocess-spawn row is stamped with the insta
     workflow: { initialStep: "step_p_sub", steps: [
       { id: "step_p_sub", key: "p_sub", label: { en: "Sub" }, type: "subprocess",
         subprocess: { processId: childPid, versionBinding: "pinned", pinnedVersion: childVersion, inputMapping: {}, outputMapping: {} },
-        paths: [{ id: "path_done", key: "done", to: "step_done", trigger: "automatic", priority: 1 }] },
+        paths: [{ id: "path_done", key: "done", label: "Done", to: "step_done", trigger: "automatic", priority: 1 }] },
       { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
     ] },
   } as unknown as ProcessBody;
@@ -929,11 +929,11 @@ test.skipIf(!DB)("a handler value that doesn't match its target field's declared
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
         {
           id: "step_b", key: "b", label: { en: "B" }, type: "task", // non-terminal: stays 'running', isolating the drop from terminal suppression
           onEntry: [actOut("set_n", "setter", "field_n", "result.val")],
-          paths: [{ id: "path_bc", key: "bc", to: "step_c", trigger: "manual" }],
+          paths: [{ id: "path_bc", key: "bc", label: "Bc", to: "step_c", trigger: "manual" }],
         },
         { id: "step_c", key: "c", label: { en: "C" }, type: "task", terminal: true },
       ],
@@ -965,11 +965,11 @@ test.skipIf(!DB)("a mixed patch writes its conforming entries and drops only the
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
         {
           id: "step_b", key: "b", label: { en: "B" }, type: "task", // non-terminal: stays 'running' so the writeback is not suppressed
           onEntry: [{ id: "action_mix", type: "setter", config: {}, output: { field_n: { lang: "cel", src: "result.n" }, field_s: { lang: "cel", src: "result.s" } } } as unknown as Action],
-          paths: [{ id: "path_bc", key: "bc", to: "step_c", trigger: "manual" }],
+          paths: [{ id: "path_bc", key: "bc", label: "Bc", to: "step_c", trigger: "manual" }],
         },
         { id: "step_c", key: "c", label: { en: "C" }, type: "task", terminal: true },
       ],
@@ -1022,11 +1022,11 @@ const assignedBody = (): ProcessBody =>
         { id: "step_a", key: "a", label: { en: "A" }, type: "task",
           assignment: { strategy: { type: "static", config: { candidates: ["user_first"] } } },
           onExit: [act("x1")],
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }] },
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task",
           assignment: { strategy: { type: "static", config: { candidates: ["user_second", "user_third"] } } },
           onEntry: [act("e1")], timers: [reminder],
-          paths: [{ id: "path_bd", key: "bd", to: "step_done", trigger: "manual" }] },
+          paths: [{ id: "path_bd", key: "bd", label: "Bd", to: "step_done", trigger: "manual" }] },
         { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
@@ -1044,7 +1044,7 @@ const subprocessInitialBody = (): ProcessBody =>
       steps: [
         { id: "step_sub", key: "sub", label: { en: "Sub" }, type: "subprocess",
           subprocess: { processId: "proc_child", versionBinding: "pinned", pinnedVersion: 1, inputMapping: {}, outputMapping: {} },
-          paths: [{ id: "path_sd", key: "sd", to: "step_done", trigger: "manual" }] },
+          paths: [{ id: "path_sd", key: "sd", label: "Sd", to: "step_done", trigger: "manual" }] },
         { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },

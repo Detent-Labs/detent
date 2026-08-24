@@ -20,7 +20,7 @@ const actor: Actor = { id: "user_1", roles: [] };
 const pid = "proc_1" as Instance["processId"];
 
 const act = (m: string): Action => ({ id: `action_${m}`, type: m, config: {} }) as unknown as Action;
-const manualPath = (id: string, to: string) => ({ id, key: id, to, trigger: "manual" });
+const manualPath = (id: string, to: string) => ({ id, key: id, label: `Path ${id}`, to, trigger: "manual" });
 const step = (id: string, over: Record<string, unknown> = {}): Step =>
   ({ id, key: id, label: { en: id }, type: "task", ...over }) as unknown as Step;
 // The publish-injected cancel-sink; here added by hand — createInstance/rehydrate
