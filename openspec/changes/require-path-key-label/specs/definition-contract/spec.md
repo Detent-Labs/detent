@@ -5,10 +5,11 @@
 `Path.key` SHALL be a non-empty string after trimming leading and trailing
 whitespace. `Path.label` SHALL be present. It SHALL also be a non-empty
 string after trimming. Both rules apply to a path of either trigger kind,
-manual or automatic. Neither is a format constraint. `Path.key` stays
-exempt from the CEL-identifier grammar the base requirement `A field key is
-a CEL-referenceable identifier` states.
-Nothing reads a path key as a CEL variable.
+manual or automatic. Neither is a format constraint.
+
+`Path.key` stays exempt from the CEL-identifier grammar. The base
+requirement `A field key is a CEL-referenceable identifier` states that
+grammar. Nothing reads a path key as a CEL variable.
 
 #### Scenario: Publishing rejects an empty path key
 

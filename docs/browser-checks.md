@@ -1583,10 +1583,10 @@ seed-from-draft behavior, which those files cannot observe.
 
 ### Studio: path creation names
 
-Source: `require-path-key-label` task 5.6. No defect record exists for these
-behaviors, so `development-toolchain`'s split rule keeps them manual: each is
-a pointer gesture or a visual judgment, not something a `bun:test` assertion
-can observe.
+Source: `require-path-key-label` task 5.6. No defect record exists for
+these behaviors, so `development-toolchain`'s split rule keeps them manual.
+Each is a pointer gesture or a visual judgment. No `bun:test` assertion can
+observe it.
 
 Open a draft with at least two named steps on the canvas.
 
@@ -1595,16 +1595,17 @@ appears in the inspector's Paths tab with a derived `label` reading
 `"<source step> → <target step>"`, and a non-empty `key`.
 
 Drag a connect handle from a step to empty canvas. Pass: the gesture creates
-both a new step and a path to it, and the new path's label names the new
-step with the "unnamed step" placeholder on the target side (the new step
-carries no name yet).
+both a new step and a path to it. The new step carries no name yet. The new
+path's label names it with the "unnamed step" placeholder, on the target
+side.
 
 Drop a step from the edit rail's palette onto an existing path. Pass: the
-retargeted path keeps its own `key`/`label` unchanged, and the new path from
+retargeted path keeps its own `key`/`label` unchanged. The new path from
 the dropped step carries the "unnamed step" placeholder on its source side.
 
-Open a step's Paths tab and use "add path" without choosing a target first.
-Pass: "add path" stays disabled, and clicking it (if forced) creates no
-path. Choose a target in the new selector, then click "add path". Pass: a
-new path appears with a derived `key`/`label` matching the chosen source and
-target steps, and the target selector resets to no selection afterward.
+Open a step's Paths tab and use "add path" without choosing a target
+first. Pass: "add path" stays disabled, and clicking it creates no path
+even if forced. Choose a target in the new selector, then click "add path".
+Pass: a new path appears with a derived `key`/`label` matching the chosen
+source and target step. The target selector resets to no selection
+afterward.
