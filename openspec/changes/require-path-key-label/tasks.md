@@ -266,10 +266,10 @@ structural write-path checks `compileProcessBody` adds.
 - [x] 5.3 Run the full `bun test` suite with `DATABASE_URL` set, and
       confirm the skip count against `scripts/gates/silent-green.sh`.
       Never rely on a single-file rerun.
-- [ ] 5.4 Run `sh scripts/gates/prose.sh` over every Markdown file this
+- [x] 5.4 Run `sh scripts/gates/prose.sh` over every Markdown file this
       change touched.
-- [ ] 5.5 Run `sh scripts/gates/whitespace.sh` over the same range.
-- [ ] 5.6 Exercise every path-creation gesture in a real browser (the
+- [x] 5.5 Run `sh scripts/gates/whitespace.sh` over the same range.
+- [x] 5.6 Exercise every path-creation gesture in a real browser (the
       root CLAUDE.md verification gate for any UI change; see
       docs/browser-checks.md): drag-to-connect between two named steps
       (derived label visible in the Paths tab), drag to empty canvas and a
