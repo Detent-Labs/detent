@@ -20,7 +20,7 @@ const approve = { id: "step_approve", key: "approve", label: { en: "Approve" }, 
 describe("insertOnPath", () => {
   it("retargets the source step's path to the new step, and gives the new step one path to the old target", () => {
     const inserted = newStep("task", { en: "Review" });
-    const next = insertOnPath([submit, approve], "step_submit", "path_1", inserted);
+    const next = insertOnPath([submit, approve], "step_submit", "path_1", inserted, "en", "en", "(unnamed step)");
 
     const source = next.find((s) => s.id === "step_submit")!;
     expect(source.paths).toHaveLength(1);
@@ -47,7 +47,7 @@ describe("insertOnPath", () => {
       ],
     } as unknown as DraftStep;
     const inserted = newStep("task", { en: "Review" });
-    const next = insertOnPath([guarded, approve], "step_submit", "path_1", inserted);
+    const next = insertOnPath([guarded, approve], "step_submit", "path_1", inserted, "en", "en", "(unnamed step)");
 
     const source = next.find((s) => s.id === "step_submit")!;
     expect(String(source.paths![0].id)).toBe("path_1");
@@ -58,7 +58,7 @@ describe("insertOnPath", () => {
 
   it("the new path inherits the trigger alone: manual source path yields a manual new path with no guard/priority", () => {
     const inserted = newStep("task", { en: "Review" });
-    const next = insertOnPath([submit, approve], "step_submit", "path_1", inserted);
+    const next = insertOnPath([submit, approve], "step_submit", "path_1", inserted, "en", "en", "(unnamed step)");
 
     const newStepEntry = next.find((s) => s.id === inserted.id)!;
     expect(newStepEntry.paths![0].trigger).toBe("manual");
@@ -72,7 +72,7 @@ describe("insertOnPath", () => {
       paths: [{ id: "path_1", key: "", to: "step_approve", trigger: "automatic" as const, priority: 5 }],
     } as unknown as DraftStep;
     const inserted = newStep("task", { en: "Review" });
-    const next = insertOnPath([automatic, approve], "step_submit", "path_1", inserted);
+    const next = insertOnPath([automatic, approve], "step_submit", "path_1", inserted, "en", "en", "(unnamed step)");
 
     const source = next.find((s) => s.id === "step_submit")!;
     expect(source.paths![0].priority).toBe(5);
@@ -85,13 +85,26 @@ describe("insertOnPath", () => {
 
   it("mutates no input", () => {
     const before = JSON.stringify(submit);
-    insertOnPath([submit, approve], "step_submit", "path_1", newStep("task", { en: "Review" }));
+    insertOnPath([submit, approve], "step_submit", "path_1", newStep("task", { en: "Review" }), "en", "en", "(unnamed step)");
     expect(JSON.stringify(submit)).toBe(before);
   });
 
   it("is a no-op when the source step or path is not found", () => {
     const inserted = newStep("task", { en: "Review" });
-    const next = insertOnPath([submit, approve], "step_missing", "path_1", inserted);
+    const next = insertOnPath([submit, approve], "step_missing", "path_1", inserted, "en", "en", "(unnamed step)");
     expect(next).toEqual([submit, approve]);
+  });
+
+  it("falls back to the placeholder for the target side when the split path's target no longer exists", () => {
+    const dangling = {
+      ...submit,
+      paths: [{ id: "path_1", key: "dangling", to: "step_gone", trigger: "manual" as const, label: "Dangling" }],
+    } as unknown as DraftStep;
+    const inserted = newStep("task", { en: "Review" });
+    const next = insertOnPath([dangling], "step_submit", "path_1", inserted, "en", "en", "(unnamed step)");
+
+    const newStepEntry = next.find((s) => s.id === inserted.id)!;
+    expect(String(newStepEntry.paths![0].to)).toBe("step_gone");
+    expect(newStepEntry.paths![0].label).toContain("(unnamed step)");
   });
 });

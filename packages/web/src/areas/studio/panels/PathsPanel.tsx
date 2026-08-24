@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Path, PathTrigger, Step, StepId } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
@@ -30,6 +31,11 @@ interface Props {
    * always empty by contract; "add path" disables rather than letting an
    * author reach the invalid state the schema rejects at publish. */
   terminal?: boolean;
+  /** The studio's current content locale and the draft's base locale, both
+   * needed to resolve a step's `LocalizedText` label into the plain string
+   * "add path"'s derived default reads from (design.md). */
+  contentLocale: string;
+  baseLocale: string;
 }
 
 /**
@@ -47,10 +53,20 @@ export function PathsPanel({
   registrySchemas,
   selectedPathId,
   terminal,
+  contentLocale,
+  baseLocale,
 }: Props) {
   const list = paths ?? [];
+  const [newPathTarget, setNewPathTarget] = useState("");
 
-  const addPath = () => onChange([...list, newPath(steps[0]?.id, "manual")]);
+  const sourceStep = steps.find((s) => s.id === stepId);
+  const targetStep = steps.find((s) => s.id === newPathTarget);
+
+  const addPath = () => {
+    if (!sourceStep || !targetStep?.id) return;
+    onChange([...list, newPath(sourceStep, targetStep, targetStep.id, "manual", contentLocale, baseLocale, t("steps.unnamedStep"))]);
+    setNewPathTarget("");
+  };
 
   const removePath = (index: number) => onChange(removeAt(list, index));
   const updatePath = (index: number, patch: Partial<DraftPath>) => onChange(updateAt(list, index, patch));
@@ -153,7 +169,20 @@ export function PathsPanel({
           </button>
         </div>
       ))}
-      <button type="button" className="btn btn-secondary" onClick={addPath} disabled={steps.length === 0 || terminal}>
+      <label>
+        {t("paths.newPathTargetLabel")}
+        <select value={newPathTarget} onChange={(e) => setNewPathTarget(e.target.value)}>
+          <option value="" disabled>
+            {t("paths.selectTargetStep")}
+          </option>
+          {steps.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.key ?? s.id}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button type="button" className="btn btn-secondary" onClick={addPath} disabled={steps.length === 0 || terminal || !newPathTarget}>
         {t("paths.addPath")}
       </button>
     </div>

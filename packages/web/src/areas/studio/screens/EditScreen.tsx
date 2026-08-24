@@ -74,6 +74,7 @@ interface EditorAreaProps {
  * ProcessHeaderBar renders the buttons."). */
 function EditorArea({ processId, formStepId, panel, stepId, token, initialRevision, initialLayout, loadedBaseVersion, navigate, onUnauthorized }: EditorAreaProps) {
   const { draft, mutate, validation, replace, contentLocale } = useDraft();
+  const baseLocale = draft.baseLocale ?? "en";
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
   // The canvas selection is a set (design.md). A set of one drives the
   // inspector exactly as the single id did; a set of several drives the group
@@ -317,7 +318,15 @@ function EditorArea({ processId, formStepId, panel, stepId, token, initialRevisi
     if (dropTarget && created.id) {
       mutate((d) => {
         d.workflow ??= {};
-        d.workflow.steps = insertOnPath(d.workflow.steps ?? [], dropTarget.sourceStepId, dropTarget.pathId, created);
+        d.workflow.steps = insertOnPath(
+          d.workflow.steps ?? [],
+          dropTarget.sourceStepId,
+          dropTarget.pathId,
+          created,
+          contentLocale,
+          baseLocale,
+          t("steps.unnamedStep"),
+        );
       });
       onInsertLayoutWrite(created.id, point, dropTarget.pathId);
       onSelectStep(created.id);
