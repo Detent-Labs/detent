@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { resolveBaseLocaleChange } from "../src/areas/studio/screens/processHeaderLogic.js";
-import { seedLocalizedText, mergeLocalizedTextEntry } from "../src/areas/studio/draft/localized-text.js";
+import { seedLocalizedText, mergeLocalizedTextEntry, resolveDraftLocalizedText } from "../src/areas/studio/draft/localized-text.js";
+import { deriveKey, shouldAutoDeriveKey } from "../src/areas/studio/draft/deriveKey.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
 /**
@@ -85,5 +86,49 @@ describe("the base-locale control's wiring (processHeaderLogic.ts)", () => {
 
   it("re-declaring the locale already being edited is a no-op on the content locale", () => {
     expect(typeBaseLocale({ baseLocale: "de" }, "de", "de").contentLocale).toBe("de");
+  });
+});
+
+/**
+ * `ProcessHeaderBar` has no interactive DOM test environment either (see the
+ * doc above), so the process label's own `onChange` — which computes the
+ * lock check off `draft.label` BEFORE the mutation, then conditionally writes
+ * `draft.key` alongside `draft.label` — is driven here the same way: a
+ * test-local helper reproducing the exact sequence the wiring calls
+ * `deriveKey`/`shouldAutoDeriveKey`/`resolveDraftLocalizedText` in.
+ */
+function typeProcessLabel(draft: Draft, contentLocale: string, typed: string): Draft {
+  const baseLocale = draft.baseLocale ?? "en";
+  const next = mergeLocalizedTextEntry(draft.label, contentLocale, typed);
+  const priorDerivedKey = deriveKey(resolveDraftLocalizedText(draft.label, baseLocale, baseLocale) ?? "");
+  const deriveNextKey = shouldAutoDeriveKey(draft.key ?? "", priorDerivedKey);
+  return {
+    ...draft,
+    label: next,
+    key: deriveNextKey ? deriveKey(resolveDraftLocalizedText(next, baseLocale, baseLocale) ?? "") : draft.key,
+  };
+}
+
+describe("the process header's key auto-derivation (ProcessHeaderBar.tsx's label onChange)", () => {
+  it("a new draft's key follows its label as the developer types", () => {
+    const draft = typeProcessLabel({ baseLocale: "en" } as Draft, "en", "Expense Approval");
+
+    expect(draft.key).toBe("expense_approval");
+  });
+
+  it("a hand-edited key stops following the label", () => {
+    let draft = typeProcessLabel({ baseLocale: "en" } as Draft, "en", "Expense Approval");
+    draft = { ...draft, key: "expenses" };
+    draft = typeProcessLabel(draft, "en", "Expense Approval Flow");
+
+    expect(draft.key).toBe("expenses");
+  });
+
+  it("typing a translation into a non-base content locale leaves the key unchanged", () => {
+    let draft = typeProcessLabel({ baseLocale: "en" } as Draft, "en", "Expense Approval");
+    draft = typeProcessLabel(draft, "de", "Spesenabrechnung");
+
+    expect(draft.key).toBe("expense_approval");
+    expect(draft.label).toEqual({ en: "Expense Approval", de: "Spesenabrechnung" });
   });
 });

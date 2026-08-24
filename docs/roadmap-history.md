@@ -1581,3 +1581,56 @@ as it stands.
 
     Archived as `openspec/changes/archive/2026-08-17-panels-list-and-detail`.
     The delta landed in `studio-app`.
+
+45. **Auto-derive `key` from `label` in the studio: DONE.** Raised 2026-08-23
+    in conversation. Change: `auto-derive-key-from-label`. A shared
+    `deriveKey`/`dedupeKey`/`shouldAutoDeriveKey` triple
+    (`draft/deriveKey.ts`) turns a label into a slug matching `FieldDef.key`'s
+    identifier grammar (`/^[a-z_][a-z0-9_]*$/`) and dedupes it against a
+    caller-supplied set of keys already in scope. Three sites now auto-fill
+    from it as an author types: the process key
+    (`ProcessHeaderBar.tsx`'s label `onChange`), a step's key (the identity
+    zone's own label input and the canvas node's own inline rename, both
+    routed through a new `panels/stepsPanelLogic.ts::nextStepKey`, so the
+    two existing routes to `step.label` stay in agreement per
+    `inlineRename.ts`'s own "cannot drift" comment), and a field's key (the
+    field catalog, top-level and nested inside a `group`, routed through a
+    new `panels/fieldCatalogLogic.ts::nextFieldKey`, deduped across the
+    whole flattened catalog via `draftFields(draft)`). Each site applies for
+    a newly created entity (key starts empty) or any entity whose key still
+    reads as what live derivation would produce — the first manual edit to a
+    key field stops auto-derivation for that one entity for the rest of the
+    draft's life in the browser, with no new stored flag: the lock check
+    recomputes the prior derivation from the entity's own prior label on
+    every edit instead.
+
+    Derivation reads only the draft's base-locale entry of `label`, never
+    whichever content locale the author is currently viewing — `label` is
+    `LocalizedText`, and `LocalizedTextInput` fires `onChange` on every
+    keystroke into whichever locale is current, so reading the content
+    locale would let a translation typed into a secondary locale silently
+    overwrite an already-meaningful, English-derived key. The one accepted
+    gap this produces: a new entity created while the studio's content
+    locale differs from the draft's base locale never auto-fills its key,
+    since `seedLocalizedText` seeds the label under the current content
+    locale and derivation reads only the base-locale entry — silent-safe,
+    since the key field just stays empty rather than deriving from the
+    wrong text.
+
+    `Path.key`/`Path.label` are the deliberately deferred fourth site this
+    stage's opening paragraph named. `Path.key` stays format-free — "nothing
+    reads them as identifiers" (`.claude/rules/authoring-invariants.md`) —
+    so the CEL-identifier-collision risk motivating this change for fields
+    is absent, and a colliding `Path.key` is cosmetic, not a publish hazard.
+    `PathsPanel.tsx` still renders `path.key`/`path.label` as two
+    independent, un-re-derived text inputs; a newly created path still gets
+    its own one-time default from `createPath.ts::derivePathDefaults`,
+    unchanged. No change to `src/schema/definition.ts`, to `compile.ts`'s
+    publish-time checks, or to the JSON view, which stays the unchanged
+    escape hatch for any key.
+
+    Applied and verified 2026-08-24. Full suite: 3147 pass, 1 skip
+    (pre-existing, unrelated: a timezone-sensitive date-picker test), 0 fail.
+
+    The delta landed in `studio-canvas` (process key, step key) and
+    `studio-app` (field catalog key).

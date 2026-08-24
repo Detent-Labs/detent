@@ -16,6 +16,8 @@ import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { FieldValidationEditor } from "./shared/FieldValidationEditor";
 import { DefaultValueEditor } from "./shared/DefaultValueEditor";
 import { fieldLocaleGaps, missingTranslationWarning, seedLocalizedText } from "../draft/localized-text";
+import { draftFields } from "../draft/fields";
+import { nextFieldKey } from "./fieldCatalogLogic.js";
 import { FIELD_TYPE_LABELS } from "../draft/field-type-labels";
 import {
   applyTechnicalMarker,
@@ -64,6 +66,15 @@ interface SubFieldRowProps {
  */
 function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: SubFieldRowProps) {
   const { draft, contentLocale } = useDraft();
+  const baseLocale = draft.baseLocale ?? "en";
+  /** Deduped against the whole catalog, not just this group's own children
+   * (design.md: `FieldDef.key` is one flat CEL namespace regardless of
+   * nesting depth). */
+  const updateLabel = (label: DraftField["label"]) => {
+    const taken = new Set(draftFields(draft).filter((f) => f.id !== field.id).map((f) => f.key ?? ""));
+    const derivedKey = nextFieldKey(field.key ?? "", field.label, label, baseLocale, taken);
+    onChange(derivedKey === undefined ? { label } : { label, key: derivedKey });
+  };
   const custom = isCustomType(field.type);
   const typeSelectValue = typeof field.type === "object" && field.type !== null ? "__custom__" : (field.type ?? "string");
   const hasOptions = (field.options?.length ?? 0) > 0;
@@ -140,7 +151,7 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
       </label>
       <label>
         label
-        <LocalizedTextInput value={field.label} onChange={(label) => onChange({ label })} />
+        <LocalizedTextInput value={field.label} onChange={updateLabel} />
       </label>
       {/* Sibling of the label, never nested inside it: a <label> takes
           phrasing content, and the design language keeps a field's own
@@ -443,6 +454,13 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
 
   const baseLocale = draft.baseLocale ?? "en";
   const fieldId = field.id;
+  /** Deduped against the whole catalog, including every group's nested
+   * children (design.md: `FieldDef.key` is one flat CEL namespace). */
+  const updateLabel = (label: DraftField["label"]) => {
+    const taken = new Set(draftFields(draft).filter((f) => f.id !== field.id).map((f) => f.key ?? ""));
+    const derivedKey = nextFieldKey(field.key ?? "", field.label, label, baseLocale, taken);
+    onChange(derivedKey === undefined ? { label } : { label, key: derivedKey });
+  };
   const usage = fieldId ? fieldUsage(draft, fieldId, contentLocale, baseLocale) : [];
   const visibleState = fieldId ? fieldVisibleOverrides(draft, fieldId) : ({ kind: "none" } as const);
   const preview = previewViewFields(field, contentLocale, baseLocale);
@@ -492,7 +510,7 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
         <div className="field-label-row">
           <label className="field-label-row-label">
             label
-            <LocalizedTextInput value={field.label} onChange={(label) => onChange({ label })} />
+            <LocalizedTextInput value={field.label} onChange={updateLabel} />
           </label>
           {/* Replaces the shipped per-locale translation-status list
               (design.md decision 1): names only the active contentLocale's

@@ -18,6 +18,7 @@ import { ChecksRail } from "./ChecksRail.js";
 import { parseChildProcessJson } from "../draft/io";
 import { missingTranslationWarning } from "../draft/localized-text";
 import { stepIssueCount } from "../draft/panel-rail";
+import { nextStepKey } from "./stepsPanelLogic.js";
 
 type DraftStep = DraftOf<Step>;
 
@@ -122,6 +123,16 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
     updateInDraftArray(mutate, (d) => d.workflow?.steps?.[index], patch);
   };
 
+  /** The identity zone's own label input, gated by `nextStepKey`'s lock
+   * check and deduped against every sibling step's key (design.md). */
+  const updateStepLabel = (next: DraftStep["label"]) => {
+    if (!step) return;
+    const siblingKeys = new Set(steps.filter((s) => s.id !== step.id).map((s) => s.key ?? ""));
+    const derivedKey = nextStepKey(step.key ?? "", step.label, next, baseLocale, siblingKeys);
+    const patch: Partial<DraftStep> = derivedKey === undefined ? { label: next } : { label: next, key: derivedKey };
+    updateStep(patch);
+  };
+
   if (!step) {
     // Only reachable when a selection points at a step the draft no longer
     // holds — the third column shows the checks rail, not this component,
@@ -167,7 +178,7 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
         </label>
         <label>
           label
-          <LocalizedTextInput value={step.label} onChange={(label) => updateStep({ label })} />
+          <LocalizedTextInput value={step.label} onChange={updateStepLabel} />
         </label>
         {/* Sibling of the label, never nested inside it: a <label> takes
             phrasing content, and the design language keeps a field's own
