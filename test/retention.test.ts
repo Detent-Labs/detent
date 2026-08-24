@@ -31,7 +31,7 @@ const body = (): ProcessBody =>
     fields: [],
     workflow: {
       initialStep: "step_a",
-      steps: [step("step_a", { paths: [{ id: "path_ab", key: "path_ab", to: "step_b", trigger: "manual" }] }), step("step_b", { terminal: true })],
+      steps: [step("step_a", { paths: [{ id: "path_ab", key: "path_ab", label: "Ab", to: "step_b", trigger: "manual" }] }), step("step_b", { terminal: true })],
     },
   }) as unknown as ProcessBody;
 

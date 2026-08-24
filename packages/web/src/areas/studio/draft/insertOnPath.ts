@@ -18,6 +18,9 @@ export function insertOnPath(
   sourceStepId: string,
   pathId: string,
   insertedStep: DraftStep,
+  contentLocale: string,
+  baseLocale: string,
+  unnamedStepPlaceholder: string,
 ): DraftStep[] {
   const sourceStep = steps.find((s) => s.id === sourceStepId);
   const splitPath = sourceStep?.paths?.find((p) => p.id === pathId);
@@ -25,12 +28,16 @@ export function insertOnPath(
 
   const oldTarget = splitPath.to;
   const trigger = splitPath.trigger ?? "manual";
+  const resolvedTargetStep = steps.find((s) => s.id === oldTarget);
 
   const next = steps.map((s) => {
     if (s !== sourceStep) return s;
     return { ...s, paths: s.paths!.map((p) => (p !== splitPath ? p : { ...p, to: insertedStep.id })) };
   });
 
-  next.push({ ...insertedStep, paths: [newPath(oldTarget, trigger)] });
+  next.push({
+    ...insertedStep,
+    paths: [newPath(insertedStep, resolvedTargetStep, oldTarget, trigger, contentLocale, baseLocale, unnamedStepPlaceholder)],
+  });
   return next;
 }

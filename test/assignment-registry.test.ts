@@ -55,7 +55,7 @@ const bodyWithTwoBadAssignments = (): ProcessBody =>
         {
           id: "step_a", key: "a", label: { en: "A" }, type: "task",
           assignment: { strategy: { type: "nope_a", config: {} } },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         {
           id: "step_b", key: "b", label: { en: "B" }, type: "task",

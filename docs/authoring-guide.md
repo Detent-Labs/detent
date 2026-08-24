@@ -301,6 +301,12 @@ inside the group need the room two columns take.
 One transition from one step to another. A path is `manual` or `automatic`. A
 single step must not mix the two.
 
+Every path needs a non-empty `key` and a non-empty `label`, whether manual
+or automatic. The studio derives both for you at creation time, from the
+source and target step's own names. You can rename either afterward. A
+manual path's `label` is not just an inspector name. It is the text on the
+button a participant clicks to take it.
+
 A manual path waits for a person. The example gives `review` three of them:
 `approve`, `reject` and `escalate`.
 

@@ -53,7 +53,7 @@ describe("expense-approval definition", () => {
     expect(rejects((d) => {
       d.definition.workflow.steps[1].paths.push({
         id: "path_bbbb2222-9999-4a1c-8e2f-000000000099",
-        key: "auto",
+        key: "auto", label: "Auto",
         to: "step_aaaa1111-0003-4a1c-8e2f-000000000003",
         trigger: "automatic",
         guard: { lang: "cel", src: "true" },
@@ -157,8 +157,8 @@ describe("definition-contract: subprocess step coupling and wait-state", () => {
           ...(opts.spec !== false ? { subprocess: subprocessSpec } : {}),
           paths: [
             opts.manualPath
-              ? { id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }
-              : { id: "path_ab", key: "ab", to: "step_b", trigger: "automatic", priority: 1 },
+              ? { id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }
+              : { id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "automatic", priority: 1 },
           ],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
@@ -195,6 +195,93 @@ describe("definition-contract: subprocess step coupling and wait-state", () => {
     };
     expect(processBody.safeParse(body).success).toBe(false);
   });
+});
+
+describe("definition-contract: A path carries a non-empty key and a non-empty label", () => {
+  const manualBody = (path: Record<string, unknown>): unknown => ({
+    key: "p",
+    label: { en: "P" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", to: "step_b", trigger: "manual", ...path }] },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  });
+
+  const automaticBody = (path: Record<string, unknown>): unknown => ({
+    key: "p",
+    label: { en: "P" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", to: "step_b", trigger: "automatic", ...path }] },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  });
+
+  it("rejects an empty-string path key", () => {
+    expect(processBody.safeParse(manualBody({ key: "", label: "Ab" })).success).toBe(false);
+  });
+
+  it("rejects a whitespace-only path key", () => {
+    expect(processBody.safeParse(manualBody({ key: "   ", label: "Ab" })).success).toBe(false);
+  });
+
+  it("rejects a missing path label", () => {
+    expect(processBody.safeParse(manualBody({ key: "ab" })).success).toBe(false);
+  });
+
+  it("rejects an empty-string path label", () => {
+    expect(processBody.safeParse(manualBody({ key: "ab", label: "" })).success).toBe(false);
+  });
+
+  it("rejects a whitespace-only path label", () => {
+    expect(processBody.safeParse(manualBody({ key: "ab", label: "   " })).success).toBe(false);
+  });
+
+  it("rejects a missing label on an automatic path too, the same way a manual path is rejected", () => {
+    const manual = processBody.safeParse(manualBody({ key: "ab" }));
+    const automatic = processBody.safeParse(automaticBody({ key: "ab" }));
+    expect(manual.success).toBe(false);
+    expect(automatic.success).toBe(false);
+  });
+
+  it("accepts a path whose key and label are both non-empty after trimming", () => {
+    const result = processBody.safeParse(manualBody({ key: "  ab  ", label: "  Ab  " }));
+    expect(result.success).toBe(true);
+    if (result.success) {
+      const path = result.data.workflow.steps[0].paths![0];
+      expect(path.key).toBe("ab");
+      expect(path.label).toBe("Ab");
+    }
+  });
+});
+
+describe("definition-contract: every example carries a non-empty path key and label", () => {
+  const files = ["purchase-requisition.json", "expense-approval.json", "subprocess-loan-parent.json", "subprocess-credit-check-child.json"];
+
+  for (const file of files) {
+    it(`${file}: every path has a non-empty key and label`, () => {
+      const body = JSON.parse(readFileSync(new URL(`../examples/${file}`, import.meta.url), "utf8"));
+      const definition = body.definition ?? body;
+      const steps = definition.workflow?.steps ?? [];
+      for (const step of steps) {
+        for (const path of step.paths ?? []) {
+          expect(typeof path.key).toBe("string");
+          expect(path.key.trim().length).toBeGreaterThan(0);
+          expect(typeof path.label).toBe("string");
+          expect(path.label.trim().length).toBeGreaterThan(0);
+        }
+      }
+    });
+  }
 });
 
 describe("checkPathTriggerConsistency (shared by definition.ts and studio's canvas)", () => {
@@ -272,8 +359,8 @@ describe("definition-contract: full-depth id and key uniqueness", () => {
       workflow: {
         initialStep: "step_a",
         steps: [
-          { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_x", key: "x", to: "step_b", trigger: "automatic", priority: 1 }] },
-          { id: "step_b", key: "b", label: { en: "B" }, type: "task", paths: [{ id: "path_x", key: "y", to: "step_c", trigger: "automatic", priority: 1 }] },
+          { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_x", key: "x", label: "X", to: "step_b", trigger: "automatic", priority: 1 }] },
+          { id: "step_b", key: "b", label: { en: "B" }, type: "task", paths: [{ id: "path_x", key: "y", label: "Y", to: "step_c", trigger: "automatic", priority: 1 }] },
           terminalStep("step_c", "c"),
         ],
       },
@@ -290,7 +377,7 @@ describe("definition-contract: full-depth id and key uniqueness", () => {
           {
             id: "step_a", key: "a", label: { en: "A" }, type: "task",
             onEntry: [{ id: "action_x", type: "noop", config: {} }],
-            paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "automatic", priority: 1 }],
+            paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "automatic", priority: 1 }],
           },
           { ...terminalStep("step_b", "b"), onEntry: [{ id: "action_x", type: "noop", config: {} }] },
         ],
@@ -308,12 +395,12 @@ describe("definition-contract: full-depth id and key uniqueness", () => {
           {
             id: "step_a", key: "a", label: { en: "A" }, type: "task",
             timers: [{ id: "timer_x", duration: "P1D", onFire: { actions: [] } }],
-            paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "automatic", priority: 1 }],
+            paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "automatic", priority: 1 }],
           },
           {
             id: "step_b", key: "b", label: { en: "B" }, type: "task",
             timers: [{ id: "timer_x", duration: "P1D", onFire: { actions: [] } }],
-            paths: [{ id: "path_bc", key: "bc", to: "step_c", trigger: "automatic", priority: 1 }],
+            paths: [{ id: "path_bc", key: "bc", label: "Bc", to: "step_c", trigger: "automatic", priority: 1 }],
           },
           terminalStep("step_c", "c"),
         ],
@@ -576,7 +663,7 @@ describe("definition-contract: Action.output targets resolve to a real field, fr
           ...(position === "onCancel" ? { onCancel: [outputAction(fid)] } : {}),
           ...(position === "onFire" ? { timers: [{ id: "timer_a", duration: "P1D", onFire: { actions: [outputAction(fid)] } }] } : {}),
           paths: [{
-            id: "path_ab", key: "ab", to: "step_b", trigger: "automatic", priority: 1,
+            id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "automatic", priority: 1,
             ...(position === "onPath" ? { onPath: [outputAction(fid)] } : {}),
           }],
         },

@@ -32,7 +32,7 @@ const childBody = (): ProcessBody =>
     workflow: {
       initialStep: "step_c",
       steps: [
-        { id: "step_c", key: "c", label: { en: "C" }, type: "task", paths: [{ id: "path_c", key: "c", to: "step_done", trigger: "manual" }] },
+        { id: "step_c", key: "c", label: { en: "C" }, type: "task", paths: [{ id: "path_c", key: "c", label: "C", to: "step_done", trigger: "manual" }] },
         { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true, outcome: "approved" },
       ],
     },
@@ -52,7 +52,7 @@ const childBodyWithInternalField = (): ProcessBody =>
     workflow: {
       initialStep: "step_c",
       steps: [
-        { id: "step_c", key: "c", label: { en: "C" }, type: "task", paths: [{ id: "path_c", key: "c", to: "step_done", trigger: "manual" }] },
+        { id: "step_c", key: "c", label: { en: "C" }, type: "task", paths: [{ id: "path_c", key: "c", label: "C", to: "step_done", trigger: "manual" }] },
         { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true, outcome: "approved" },
       ],
     },
@@ -66,7 +66,7 @@ const noContractChildBody = (): ProcessBody =>
     workflow: {
       initialStep: "step_c",
       steps: [
-        { id: "step_c", key: "c", label: { en: "C" }, type: "task", paths: [{ id: "path_c", key: "c", to: "step_done", trigger: "manual" }] },
+        { id: "step_c", key: "c", label: { en: "C" }, type: "task", paths: [{ id: "path_c", key: "c", label: "C", to: "step_done", trigger: "manual" }] },
         { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
@@ -81,10 +81,10 @@ const parentBody = (parentKey: string, sub: Record<string, unknown>): ProcessBod
     workflow: {
       initialStep: "step_p_entry",
       steps: [
-        { id: "step_p_entry", key: "p_entry", label: { en: "Entry" }, type: "task", paths: [{ id: "path_p_sub", key: "p_sub", to: "step_p_sub", trigger: "automatic" }] },
+        { id: "step_p_entry", key: "p_entry", label: { en: "Entry" }, type: "task", paths: [{ id: "path_p_sub", key: "p_sub", label: "P Sub", to: "step_p_sub", trigger: "automatic" }] },
         { id: "step_p_sub", key: "p_sub", label: { en: "Sub" }, type: "subprocess",
           subprocess: sub,
-          paths: [{ id: "path_p_done", key: "p_done", to: "step_p_done", trigger: "automatic", priority: 1, guard: cel('child.outcome == "approved"') }] },
+          paths: [{ id: "path_p_done", key: "p_done", label: "P Done", to: "step_p_done", trigger: "automatic", priority: 1, guard: cel('child.outcome == "approved"') }] },
         { id: "step_p_done", key: "p_done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },

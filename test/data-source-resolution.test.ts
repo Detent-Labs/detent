@@ -46,7 +46,7 @@ const dsBody = (): ProcessBody =>
           label: { en: "A" },
           type: "task",
           view: { fields: [{ ref: "field_country" }, { ref: "field_tags" }] },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],

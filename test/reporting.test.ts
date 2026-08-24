@@ -42,17 +42,17 @@ const body = (label: string): ProcessBody =>
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
         {
           id: "step_b", key: "b", label: { en: "B" }, type: "task",
-          paths: [{ id: "path_bc", key: "bc", to: "step_c", trigger: "manual" }],
+          paths: [{ id: "path_bc", key: "bc", label: "Bc", to: "step_c", trigger: "manual" }],
           timers: [{ id: "timer_rem", duration: "P7D", onFire: { actions: [] } }],
         },
         {
           id: "step_c", key: "c", label: { en: "C" }, type: "task",
           paths: [
-            { id: "path_cd", key: "cd", to: "step_d", trigger: "manual" },
-            { id: "path_esc", key: "esc", to: "step_d", trigger: "manual" },
+            { id: "path_cd", key: "cd", label: "Cd", to: "step_d", trigger: "manual" },
+            { id: "path_esc", key: "esc", label: "Esc", to: "step_d", trigger: "manual" },
           ],
           timers: [{ id: "timer_esc", duration: "P14D", onFire: { targetPath: "path_esc" } }],
         },

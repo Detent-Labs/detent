@@ -70,7 +70,7 @@ const mappingBody = (over: { guard?: string; mapping?: Record<string, string>; p
           paths: [
             {
               id: "path_ab",
-              key: "ab",
+              key: "ab", label: "Ab",
               to: "step_b",
               trigger: "manual",
               ...(over.guard ? { guard: { lang: "cel", src: over.guard } } : {}),
@@ -323,7 +323,7 @@ const technicalMappingBody = (): ProcessBody =>
           label: { en: "A" },
           type: "task",
           view: { fields: [{ ref: "field_product" }, { ref: "field_price" }] },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
