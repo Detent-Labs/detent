@@ -12,7 +12,7 @@ import {
   eligibleTargetEntries,
   isCellFlagged,
 } from "../src/areas/studio/panels/fieldMatrixLogic.js";
-import { setFlag, gatedKeys, writtenFieldIds, writtenFieldCounts } from "../src/areas/studio/draft/view-flags.js";
+import { setFlag, gatedKeys, writtenFieldCounts, type WrittenAccessor } from "../src/areas/studio/draft/view-flags.js";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
 import type { DraftViewField } from "../src/areas/studio/draft/view-layout.js";
 import type { Step } from "workflow-engine/schema";
@@ -95,14 +95,16 @@ describe("the cell editor's writer", () => {
     expect("required" in next).toBe(false);
   });
 
+  const noneAccessor: WrittenAccessor = () => 0;
+
   it("gates required/readonly the same way the form editor's strip does", () => {
     const entry = vf({ ref: "field_vendor", visible: false });
-    expect(gatedKeys(entry, new Map(), new Set())).toEqual(["required", "readonly"]);
+    expect(gatedKeys(entry, noneAccessor, new Set(), 0)).toEqual(["required", "readonly"]);
   });
 
   it("gates required/readonly unconditionally for a technical field", () => {
     const entry = vf({ ref: "field_vendor" });
-    expect(gatedKeys(entry, new Map(), new Set(["field_vendor"]))).toEqual(["required", "readonly"]);
+    expect(gatedKeys(entry, noneAccessor, new Set(["field_vendor"]), 0)).toEqual(["required", "readonly"]);
   });
 });
 
@@ -165,7 +167,7 @@ describe("bulk targets", () => {
 });
 
 describe("bulkBadgeOn / applyBulkToggle", () => {
-  const none = new Map<string, number>();
+  const none: WrittenAccessor = () => 0;
   const noTechnical = new Set<string>();
 
   it("reads not-pressed and turns every eligible cell on, when none carry the non-default value", () => {
@@ -238,7 +240,7 @@ describe("bulkBadgeOn / applyBulkToggle", () => {
       ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor", required: true })] } }),
     ];
     const targets = [{ stepIndex: 0, fieldId: "field_vendor" }];
-    const written = new Map([["field_vendor", Infinity]]);
+    const written: WrittenAccessor = () => Infinity;
     expect(bulkBadgeOn(steps, targets, "readonly", written, noTechnical)).toBe(false);
     applyBulkToggle(steps, targets, "readonly", written, noTechnical);
     expect(steps[0]!.view!.fields![0]!.readonly).toBe(true);
@@ -275,8 +277,8 @@ describe("bulkBadgeOn / applyBulkToggle", () => {
   });
 });
 
-describe("writtenFieldIds", () => {
-  it("collects a field written by an action output, a subprocess output mapping, a column mapping, and contract.inputFields", () => {
+describe("writtenFieldCounts accessor", () => {
+  it("collects a field written by an action output, a subprocess output mapping, a column mapping, and contract.inputFields, at that field's own step", () => {
     const body: Draft = {
       fields: [
         df({ id: "field_a" }),
@@ -295,42 +297,72 @@ describe("writtenFieldIds", () => {
         ],
       },
     };
-    const written = writtenFieldIds(body);
-    expect(written.has("field_a")).toBe(true);
-    expect(written.has("field_b")).toBe(true);
-    expect(written.has("field_c")).toBe(true);
-    expect(written.has("field_d")).toBe(true);
+    const written = writtenFieldCounts(body);
+    expect(written("field_a", 0)).toBeGreaterThan(0);
+    expect(written("field_b", 0)).toBeGreaterThan(0);
+    expect(written("field_c", 0)).toBeGreaterThan(0);
+    expect(written("field_d", 0)).toBeGreaterThan(0);
+  });
+});
+
+// gate-required-readonly-reachability, task 4.2: eligibleTargetEntries
+// (which cellEligible/gatedKeys feed) reads the dominance-scoped written
+// accessor at each target's own step index.
+describe("bulk badge eligibility: dominance scoping", () => {
+  it("makes a cell eligible once a dominating step's editable entry writes the field", () => {
+    const steps: DraftStep[] = [
+      ds({ id: "step_a", paths: [{ to: "step_b", trigger: "manual" }], view: { fields: [vf({ ref: "field_vendor" })] } }),
+      ds({ id: "step_b", terminal: true, view: { fields: [vf({ ref: "field_vendor", required: true })] } }),
+    ];
+    const body = { fields: [df({ id: "field_vendor" })], workflow: { initialStep: "step_a", steps } } as Draft;
+    const written = writtenFieldCounts(body);
+    const targets = [{ stepIndex: 1, fieldId: "field_vendor" }];
+    expect(eligibleTargetEntries(steps, targets, "readonly", written, new Set())).toHaveLength(1);
+  });
+
+  it("keeps a cell gated — the badge still skips it — when the only other writer is on a non-dominating step", () => {
+    const steps: DraftStep[] = [
+      ds({ id: "step_a", paths: [{ to: "step_b", trigger: "manual" }], view: { fields: [vf({ ref: "field_vendor", required: true })] } }),
+      ds({ id: "step_b", terminal: true, view: { fields: [vf({ ref: "field_vendor" })] } }),
+    ];
+    const body = { fields: [df({ id: "field_vendor" })], workflow: { initialStep: "step_a", steps } } as Draft;
+    const written = writtenFieldCounts(body);
+    const targets = [{ stepIndex: 0, fieldId: "field_vendor" }];
+    expect(eligibleTargetEntries(steps, targets, "readonly", written, new Set())).toHaveLength(0);
   });
 });
 
 describe("isCellFlagged", () => {
+  const none: WrittenAccessor = () => 0;
+  const written: WrittenAccessor = () => 1;
+
   it("flags a cell that is required while hidden", () => {
     const entry = vf({ ref: "field_vendor", visible: false, required: true });
-    expect(isCellFlagged(entry, "field_vendor", false, new Set())).toBe(true);
+    expect(isCellFlagged(entry, "field_vendor", false, none, 0)).toBe(true);
   });
 
   it("flags a required-and-readonly cell nothing else writes", () => {
     const entry = vf({ ref: "field_vendor", required: true, readonly: true });
-    expect(isCellFlagged(entry, "field_vendor", false, new Set())).toBe(true);
+    expect(isCellFlagged(entry, "field_vendor", false, none, 0)).toBe(true);
   });
 
   it("does not flag a required-and-readonly cell some other source already writes", () => {
     const entry = vf({ ref: "field_vendor", required: true, readonly: true });
-    expect(isCellFlagged(entry, "field_vendor", false, new Set(["field_vendor"]))).toBe(false);
+    expect(isCellFlagged(entry, "field_vendor", false, written, 0)).toBe(false);
   });
 
   it("does not flag a group field's own cell, whatever its values", () => {
     const entry = vf({ ref: "field_group", visible: false, required: true });
-    expect(isCellFlagged(entry, "field_group", true, new Set())).toBe(false);
+    expect(isCellFlagged(entry, "field_group", true, none, 0)).toBe(false);
   });
 
   it("does not flag a cell carrying a CEL-driven flag", () => {
     const entry = vf({ ref: "field_vendor", visible: { lang: "cel", src: "true" }, required: true });
-    expect(isCellFlagged(entry, "field_vendor", false, new Set())).toBe(false);
+    expect(isCellFlagged(entry, "field_vendor", false, none, 0)).toBe(false);
   });
 
   it("does not flag a cell at its defaults", () => {
     const entry = vf({ ref: "field_vendor" });
-    expect(isCellFlagged(entry, "field_vendor", false, new Set())).toBe(false);
+    expect(isCellFlagged(entry, "field_vendor", false, none, 0)).toBe(false);
   });
 });

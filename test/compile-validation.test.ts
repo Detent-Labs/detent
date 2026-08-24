@@ -667,15 +667,93 @@ describe("compile: unsatisfiable required+readonly pair", () => {
     return b;
   };
 
+  /** step_a -> step_b -> step_c -> step_d, all manual paths, step_d
+   * terminal. step_a and step_b both genuinely dominate step_c, unlike
+   * `unwrittenPair()`'s two-step topology, where nothing but step_a
+   * dominates step_a itself (task 2.3). */
+  const chainBody = (): any => ({
+    key: "p",
+    label: { en: "P" },
+    baseLocale: "en",
+    fields: [{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", paths: [{ id: "path_bc", key: "bc", label: "Bc", to: "step_c", trigger: "manual" }] },
+        { id: "step_c", key: "c", label: { en: "C" }, type: "task", paths: [{ id: "path_cd", key: "cd", label: "Cd", to: "step_d", trigger: "manual" }] },
+        { id: "step_d", key: "d", label: { en: "D" }, type: "task", terminal: true },
+      ],
+    },
+  });
+
+  const chainedPair = (): any => {
+    const b = chainBody();
+    b.workflow.steps[2].view = { fields: [{ ref: "field_amount", required: true, readonly: true }] };
+    return b;
+  };
+
   it("rejects a required+readonly pair no source in the body writes", () => {
     const err = rejects(unwrittenPair());
     expect(err.issues.some((i) => i.loc === "steps[0].view.fields[0]" && i.value === "field_amount")).toBe(true);
   });
 
-  it("publishes a pair an action output writes on another step", () => {
+  it("publishes a pair an action output writes on a dominating step", () => {
+    const b = chainedPair();
+    b.workflow.steps[0].onEntry = [{ id: "action_x", type: "t", config: {}, output: { field_amount: cel("result.x") } }];
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("rejects a pair whose only writer is an action output on a non-dominating step", () => {
     const b = unwrittenPair();
     b.workflow.steps[1].onEntry = [{ id: "action_x", type: "t", config: {}, output: { field_amount: cel("result.x") } }];
-    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.value === "field_amount")).toBe(true);
+  });
+
+  it("rejects a pair whose only writer is an editable entry on a sibling branch step", () => {
+    const b: any = {
+      key: "p",
+      label: { en: "P" },
+      baseLocale: "en",
+      fields: [{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
+      workflow: {
+        initialStep: "step_a",
+        steps: [
+          {
+            id: "step_a",
+            key: "a",
+            label: { en: "A" },
+            type: "task",
+            paths: [
+              { id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" },
+              { id: "path_ac", key: "ac", label: "Ac", to: "step_c", trigger: "manual" },
+            ],
+          },
+          {
+            id: "step_b",
+            key: "b",
+            label: { en: "B" },
+            type: "task",
+            view: { fields: [{ ref: "field_amount", required: true, readonly: true }] },
+            paths: [{ id: "path_bd", key: "bd", label: "Bd", to: "step_d", trigger: "manual" }],
+          },
+          { id: "step_c", key: "c", label: { en: "C" }, type: "task", terminal: true, view: { fields: [{ ref: "field_amount" }] } },
+          { id: "step_d", key: "d", label: { en: "D" }, type: "task", terminal: true },
+        ],
+      },
+    };
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.value === "field_amount")).toBe(true);
+  });
+
+  it("rejects a pair whose only writer is a timer's onFire output on a non-dominating step", () => {
+    const b = unwrittenPair();
+    b.workflow.steps[1].timers = [
+      { id: "timer_x", duration: "PT1H", onFire: { actions: [{ id: "action_x", type: "t", config: {}, output: { field_amount: cel("result.x") } }] } },
+    ];
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.value === "field_amount")).toBe(true);
   });
 
   it("publishes a pair the entry's own step's onEntry output writes", () => {
@@ -713,30 +791,52 @@ describe("compile: unsatisfiable required+readonly pair", () => {
     expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
   });
 
-  it("publishes a pair the entry's own step's reminder timer onFire writes", () => {
+  it("rejects a pair whose only writer is the entry's own step's reminder timer, which declares no targetPath", () => {
     const b = unwrittenPair();
     b.workflow.steps[0].timers = [
       { id: "timer_x", duration: "PT1H", onFire: { actions: [{ id: "action_x", type: "t", config: {}, output: { field_amount: cel("result.x") } }] } },
     ];
-    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.value === "field_amount")).toBe(true);
   });
 
-  it("publishes a pair a subprocess outputMapping writes", () => {
-    const b = unwrittenPair();
-    b.workflow.steps.push({
-      id: "step_c",
-      key: "c",
-      label: { en: "C" },
-      type: "subprocess",
-      subprocess: {
-        processId: "proc_child",
-        versionBinding: "pinned",
-        pinnedVersion: 1,
-        inputMapping: {},
-        outputMapping: { field_amount: cel("result.x") },
+  it("publishes a pair a subprocess outputMapping writes on a dominating step", () => {
+    const b: any = {
+      key: "p",
+      label: { en: "P" },
+      baseLocale: "en",
+      fields: [{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
+      workflow: {
+        initialStep: "step_a",
+        steps: [
+          { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
+          { id: "step_b", key: "b", label: { en: "B" }, type: "task", paths: [{ id: "path_b_bsub", key: "b_bsub", label: "BBsub", to: "step_b_sub", trigger: "manual" }] },
+          {
+            id: "step_b_sub",
+            key: "b_sub",
+            label: { en: "B Sub" },
+            type: "subprocess",
+            subprocess: {
+              processId: "proc_child",
+              versionBinding: "pinned",
+              pinnedVersion: 1,
+              inputMapping: {},
+              outputMapping: { field_amount: cel("result.x") },
+            },
+            paths: [{ id: "path_bsub_c", key: "bsub_c", label: "BsubC", to: "step_c", trigger: "automatic" }],
+          },
+          {
+            id: "step_c",
+            key: "c",
+            label: { en: "C" },
+            type: "task",
+            view: { fields: [{ ref: "field_amount", required: true, readonly: true }] },
+            paths: [{ id: "path_cd", key: "cd", label: "Cd", to: "step_d", trigger: "manual" }],
+          },
+          { id: "step_d", key: "d", label: { en: "D" }, type: "task", terminal: true },
+        ],
       },
-      paths: [{ id: "path_cb", key: "cb", label: "Cb", to: "step_b", trigger: "automatic" }],
-    });
+    };
     expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
   });
 
@@ -754,9 +854,25 @@ describe("compile: unsatisfiable required+readonly pair", () => {
     return b;
   };
 
-  it("publishes a pair a columnMapping target writes when the mapping field is editable on another step", () => {
+  it("rejects a pair whose only writer is a columnMapping target editable only on a non-dominating step", () => {
     const b = columnMappingPairBody();
     b.workflow.steps[1].view = { fields: [{ ref: "field_picker" }] };
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.value === "field_amount")).toBe(true);
+  });
+
+  it("publishes a pair a columnMapping target writes when the mapping field is editable on a dominating step", () => {
+    const b = chainedPair();
+    b.dataSources = [{ id: "ds_products", key: "products", type: "db.list", config: { listKey: "products" } }];
+    b.fields.push({
+      id: "field_picker",
+      key: "picker",
+      label: { en: "Picker" },
+      type: "select",
+      dataSource: "ds_products",
+      columnMapping: { price: "field_amount" },
+    });
+    b.workflow.steps[0].view = { fields: [{ ref: "field_picker" }] };
     expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
   });
 
@@ -774,8 +890,15 @@ describe("compile: unsatisfiable required+readonly pair", () => {
     expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
   });
 
-  it("publishes a pair an editable view entry on another step writes", () => {
+  it("rejects a pair whose only writer is an editable view entry on a non-dominating step", () => {
     const b = unwrittenPair();
+    b.workflow.steps[1].view = { fields: [{ ref: "field_amount" }] };
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.value === "field_amount")).toBe(true);
+  });
+
+  it("publishes a pair an editable view entry on a dominating step writes", () => {
+    const b = chainedPair();
     b.workflow.steps[1].view = { fields: [{ ref: "field_amount" }] };
     expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
   });
@@ -865,6 +988,18 @@ describe("compile: unsatisfiable required+readonly pair", () => {
     b.fields.push({ id: "field_g", key: "g", label: { en: "G" }, type: "group", fields: [] });
     b.workflow.steps[0].view = { fields: [{ ref: "field_g", required: true, readonly: true }] };
     expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("a body whose initialStep does not resolve to any step, combined with an unwritten pair, does not throw a TypeError", () => {
+    // A hand-authored body reaches checkUnsatisfiableRequiredReadonly (and
+    // the dominance helper it calls) on the duck-typed, pre-Zod-parse body
+    // inside structuralIssues, before definition.ts's Zod superRefine ever
+    // enforces initialStep resolution (design.md § Decisions, Partial/draft
+    // tolerance). The existing initialStep-resolution rejection stays
+    // covered by definition.ts's own Zod test, untouched by this change.
+    const b = unwrittenPair();
+    b.workflow.initialStep = "step_does_not_exist";
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow(TypeError);
   });
 
   it("a technical field's view entry carrying required and readonly reports only the technical-field issue", () => {

@@ -12,6 +12,7 @@
     "./schema/strip-compiled": "./src/schema/strip-compiled.ts",
     "./cel/check": "./src/cel/check.ts",
     "./schema/compile": "./src/schema/compile.ts",
+    "./schema/step-graph": "./src/schema/step-graph.ts",
     "./engine/registry": "./src/engine/registry.ts",
     "./engine/registry-check": "./src/engine/registry-check.ts",
     "./validate": "./src/validate.ts"
