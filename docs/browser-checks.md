@@ -1580,3 +1580,31 @@ it did not.
 save, restore and clear mechanics against the API. This entry confirms
 `TaskScreen.tsx` renders the Save control, the two notices, and the
 seed-from-draft behavior, which those files cannot observe.
+
+### Studio: path creation names
+
+Source: `require-path-key-label` task 5.6. No defect record exists for these
+behaviors, so `development-toolchain`'s split rule keeps them manual: each is
+a pointer gesture or a visual judgment, not something a `bun:test` assertion
+can observe.
+
+Open a draft with at least two named steps on the canvas.
+
+Drag a connect handle from one named step to another. Pass: the new path
+appears in the inspector's Paths tab with a derived `label` reading
+`"<source step> → <target step>"`, and a non-empty `key`.
+
+Drag a connect handle from a step to empty canvas. Pass: the gesture creates
+both a new step and a path to it, and the new path's label names the new
+step with the "unnamed step" placeholder on the target side (the new step
+carries no name yet).
+
+Drop a step from the edit rail's palette onto an existing path. Pass: the
+retargeted path keeps its own `key`/`label` unchanged, and the new path from
+the dropped step carries the "unnamed step" placeholder on its source side.
+
+Open a step's Paths tab and use "add path" without choosing a target first.
+Pass: "add path" stays disabled, and clicking it (if forced) creates no
+path. Choose a target in the new selector, then click "add path". Pass: a
+new path appears with a derived `key`/`label` matching the chosen source and
+target steps, and the target selector resets to no selection afterward.

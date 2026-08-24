@@ -11,19 +11,19 @@ Do not run `bun test` between these sub-tasks. Treat 1.1 through 1.6
 as one atomic step: between 1.5 and 1.6 the suite stays red on the stale
 `PRE_CHANGE_HASHES` literals.
 
-- [ ] 1.1 In `src/schema/definition.ts`, tighten the `path` object: `key:
+- [x] 1.1 In `src/schema/definition.ts`, tighten the `path` object: `key:
       z.string().trim().min(1)`, `label: z.string().trim().min(1)` (drop
       `.optional()`). In the same edit, correct the comment at
       `definition.ts:49-51` that calls Path label/description
       "Authoring-facing-only... never rendered to a process participant" —
       `PathButtons.tsx:17` renders `path.label ?? path.key` to a
       participant today.
-- [ ] 1.2 Audit every other reader of `Path` (`checkPathTriggerConsistency`
+- [x] 1.2 Audit every other reader of `Path` (`checkPathTriggerConsistency`
       and its `PathTriggerCandidate` interface, the migration/timer checks
       in `definition.ts`, `strip-compiled.ts`) for an assumption that
       `label` may be absent, fix any found, and record the audit's outcome
       (what was checked, what was found) in the commit message.
-- [ ] 1.3 Mechanical sweep, `test/*.ts`: give every local path-builder
+- [x] 1.3 Mechanical sweep, `test/*.ts`: give every local path-builder
       helper a default non-empty `label` derived from its existing
       arguments (`manualPath`/`autoPath` in `automatic.test.ts`,
       `cancel.runtime.test.ts`, `migration.test.ts`, `subprocess.test.ts`,
@@ -42,16 +42,16 @@ as one atomic step: between 1.5 and 1.6 the suite stays red on the stale
       CEL-validation checks. There the added label keeps the body
       schema-valid, so the rejection under test keeps firing for its own
       reason, not for a missing label.
-- [ ] 1.4 Audit all four example definitions
+- [x] 1.4 Audit all four example definitions
       (`purchase-requisition.json`, `expense-approval.json`,
       `subprocess-loan-parent.json`, `subprocess-credit-check-child.json`)
       for any path with an empty/missing `key` or `label`. Expect misses only in the two
       subprocess files (five paths: three in `subprocess-loan-parent.json`,
       two in `subprocess-credit-check-child.json`). A miss anywhere else is
       drift; fix it the same way.
-- [ ] 1.5 Add a non-empty, meaningful `label` (and `key`, wherever task 1.4
+- [x] 1.5 Add a non-empty, meaningful `label` (and `key`, wherever task 1.4
       found one empty) to every path missing one.
-- [ ] 1.6 `test/view-layout-hash.test.ts` hardcodes `PRE_CHANGE_HASHES` for
+- [x] 1.6 `test/view-layout-hash.test.ts` hardcodes `PRE_CHANGE_HASHES` for
       `subprocess-credit-check-child.json` and `subprocess-loan-parent.json`.
       Task 1.5's label additions to those two files change their
       `definitionHash` (the JCS hash of the canonicalized `ProcessBody`), so
@@ -70,7 +70,7 @@ as one atomic step: between 1.5 and 1.6 the suite stays red on the stale
 
 ## 2. Studio: derived path defaults
 
-- [ ] 2.1 In `packages/web/src/areas/studio/draft/createPath.ts`, update
+- [x] 2.1 In `packages/web/src/areas/studio/draft/createPath.ts`, update
       `newPath()` to this ordered parameter list: the source `DraftStep`,
       the target `DraftStep` (typed `DraftStep | undefined`, so the
       dangling-`to` case still resolves), the current `to: string |
@@ -90,7 +90,7 @@ as one atomic step: between 1.5 and 1.6 the suite stays red on the stale
       call site resolves it via the studio catalog's `t` (`CanvasView.tsx`
       both branches, `PathsPanel` for "add path", and `EditScreen.tsx`
       passing it through `insertOnPath()` alongside the two locale args).
-- [ ] 2.2 Write the label-derivation helper: `"<source label-or-key> →
+- [x] 2.2 Write the label-derivation helper: `"<source label-or-key> →
       <target label-or-key>"`, reading "label-or-key" per side as the
       label when non-empty after trimming, else the key when non-empty
       after trimming, else the placeholder. Write the key-derivation helper: a slug
@@ -120,7 +120,7 @@ as one atomic step: between 1.5 and 1.6 the suite stays red on the stale
       helpers `bun:test` coverage as pure functions, independent of
       rendering, in `packages/web/test/studio-createPath.test.ts` (new),
       including this empty-key-and-label case.
-- [ ] 2.3 Update every call site: the canvas's drag-to-connect-to-a-step
+- [x] 2.3 Update every call site: the canvas's drag-to-connect-to-a-step
       branch (`CanvasView.tsx:608`), its drag-to-empty-canvas branch
       (`CanvasView.tsx:616`, which creates the new step first, then must
       pass that step into `newPath()`), and `insertOnPath.ts:34` — the
@@ -168,13 +168,13 @@ as one atomic step: between 1.5 and 1.6 the suite stays red on the stale
       imported there), and every
       call site in `packages/web/test/studio-insertOnPath.test.ts` (six
       calls) to pass the three new arguments.
-- [ ] 2.4 Cover the drag-to-empty-canvas shape in
+- [x] 2.4 Cover the drag-to-empty-canvas shape in
       `packages/web/test/studio-createPath.test.ts`: the just-created step
       (empty `key`, empty label) flows into `newPath()` as the target,
       and the target side comes out as the placeholder, not an empty or
       arrow-only string (the `insertOnPath.ts` dangling-`to` case is
       task 2.3's test).
-- [ ] 2.5 Rework `PathsPanel`'s "add path" action (`PathsPanel.tsx:53`) so
+- [x] 2.5 Rework `PathsPanel`'s "add path" action (`PathsPanel.tsx:53`) so
       it no longer creates a path against `steps[0]` as a stand-in target.
       Add one target `<select>` above the path list, populated the same way
       the per-row `to` select is (reusing its rendering), defaulting
@@ -222,22 +222,22 @@ design.md's Decisions section). It belongs with that file's other
 `test/compile-validation.test.ts`. That file scopes itself to the six
 structural write-path checks `compileProcessBody` adds.
 
-- [ ] 3.1 Add a rejection test for an empty-string `Path.key`.
-- [ ] 3.2 Add a rejection test for a whitespace-only `Path.key`.
-- [ ] 3.3 Add a rejection test for a missing `Path.label`.
-- [ ] 3.4 Add a rejection test for an empty-string `Path.label`.
-- [ ] 3.5 Add a rejection test for a whitespace-only `Path.label`.
-- [ ] 3.6 Add a rejection test covering an automatic path with no `label`,
+- [x] 3.1 Add a rejection test for an empty-string `Path.key`.
+- [x] 3.2 Add a rejection test for a whitespace-only `Path.key`.
+- [x] 3.3 Add a rejection test for a missing `Path.label`.
+- [x] 3.4 Add a rejection test for an empty-string `Path.label`.
+- [x] 3.5 Add a rejection test for a whitespace-only `Path.label`.
+- [x] 3.6 Add a rejection test covering an automatic path with no `label`,
       confirming the rule applies identically to both trigger kinds.
-- [ ] 3.7 Add a passing test for a path with a trimmed non-empty `key` and
+- [x] 3.7 Add a passing test for a path with a trimmed non-empty `key` and
       `label`.
-- [ ] 3.8 Add a `newPath()` composition test in
+- [x] 3.8 Add a `newPath()` composition test in
       `packages/web/test/studio-createPath.test.ts`: two named steps in,
       and the
       returned `DraftPath` carries the derived `key`/`label` pair (the
       helpers' own cases are task 2.2's), and a later rename of either
       step leaves that pair untouched (the spec's no-resync scenario).
-- [ ] 3.9 Add the example-sweep guard design.md's Risks section names: for
+- [x] 3.9 Add the example-sweep guard design.md's Risks section names: for
       each of the four example files, assert every path carries a non-empty
       `key` and `label`. It lands in `test/validate.test.ts` beside 3.1-3.7
       and fails loudly on any example with an empty or absent `label`
@@ -245,15 +245,15 @@ structural write-path checks `compileProcessBody` adds.
 
 ## 4. Documentation
 
-- [ ] 4.1 Add the new-path-name rule to `.claude/rules/process-contract.md`
+- [x] 4.1 Add the new-path-name rule to `.claude/rules/process-contract.md`
       (the "Paths" section).
-- [ ] 4.2 Add the new rule to `.claude/rules/authoring-invariants.md`, and
+- [x] 4.2 Add the new rule to `.claude/rules/authoring-invariants.md`, and
       narrow that file's existing "`Step.key`/`Path.key` stay
       unconstrained: nothing reads them as identifiers" sentence to format
       only ("`Step.key`/`Path.key` stay format-free: nothing reads them
       as identifiers"), so the file stops contradicting the rule it gains.
-- [ ] 4.3 Update `docs/authoring-guide.md` with the new requirement.
-- [ ] 4.4 Register task 5.6's four manual checks in
+- [x] 4.3 Update `docs/authoring-guide.md` with the new requirement.
+- [x] 4.4 Register task 5.6's four manual checks in
       `docs/browser-checks.md` (the repo's home for checks that stay
       manual), as a new `### Studio: path creation names` section. The
       checks stay manual per `development-toolchain`'s split rule: no
@@ -261,9 +261,9 @@ structural write-path checks `compileProcessBody` adds.
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck` and resolve every error.
-- [ ] 5.2 Run `bun run build` and resolve every error.
-- [ ] 5.3 Run the full `bun test` suite with `DATABASE_URL` set, and
+- [x] 5.1 Run `bun run typecheck` and resolve every error.
+- [x] 5.2 Run `bun run build` and resolve every error.
+- [x] 5.3 Run the full `bun test` suite with `DATABASE_URL` set, and
       confirm the skip count against `scripts/gates/silent-green.sh`.
       Never rely on a single-file rerun.
 - [ ] 5.4 Run `sh scripts/gates/prose.sh` over every Markdown file this
