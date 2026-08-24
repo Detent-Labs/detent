@@ -220,7 +220,7 @@ target draws no edge, so it SHALL never take an insert.
 
 Path creation SHALL no longer default `key` to an empty string. It SHALL
 no longer leave `label` absent either. `newPath()` is the one
-path-creation function every path-creating gesture calls. Those gestures are
+path-creation method every path-creating gesture calls. Those gestures are
 drag-to-connect, `PathsPanel`'s "add path" action, and `insertOnPath.ts`'s
 step-dropped-on-a-path gesture. `newPath()` SHALL compute a default `key`
 and `label` from the source step and the target step, at the moment of
@@ -241,7 +241,7 @@ path field.
 
 A drag to empty canvas creates a new step as part of the same gesture. So
 does a step dropped on an existing path. Both leave the new step with an
-empty `key` and an empty `label`. The function `newStep()` hardcodes the
+empty `key` and an empty `label`. The method `newStep()` hardcodes the
 one, and its callers seed the other empty. That path's default SHALL come
 from the new step's own, likewise defaulted, key and label. It SHALL fall
 back to the "unnamed step" placeholder, not to an empty or arrow-only
@@ -297,8 +297,7 @@ string.
 
 - **WHEN** a gesture creates a new step with no `key` and no `label`, the
   state its creation leaves it in
-- **AND** the same gesture connects a new path to that step, either into
-  it as the target or out of it as the source
+- **AND** the same gesture connects a new path to that step
 - **AND** a drag to empty canvas makes the new step the target
 - **AND** a step dropped on a path makes the new step the source, via
   `insertOnPath.ts` reached from `EditScreen.tsx`
