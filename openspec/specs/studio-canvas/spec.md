@@ -1087,11 +1087,14 @@ loads a live `Registry` a registry-resolution check could run against.
 The menu therefore holds nothing session-only.
 
 That heading SHALL also hold a "Manage assignment groups for this
-process" link. The
-link SHALL open the admin area's Groups screen: the `admin-app`
-capability's `/groups` route. It SHALL carry the open process's id as a
-query parameter. That parameter pre-filters the Groups screen to global
-groups plus groups already scoped to this process.
+process" link. The link SHALL open the admin area's Groups screen: the
+`admin-app` capability's `/groups` route.
+
+<!-- antislop: allow synonym-rotation -->
+<!-- "parameter" below names a URL query parameter; "option" elsewhere in this file (the "performed by" segmented control) names an unrelated UI choice, not the same concept. -->
+It SHALL carry the open process's id as a query parameter. That
+parameter pre-filters the Groups screen to global groups plus groups
+already scoped to this process.
 
 <!-- antislop: allow synonym-rotation -->
 <!-- "surface" below names the UI glossary term (structure surface / JSON surface), not a synonym for "show". -->
