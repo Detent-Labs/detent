@@ -31,7 +31,7 @@ const pid = "proc_1" as Instance["processId"];
 
 const cel = (src: string) => ({ lang: "cel", src });
 const act = (id: string): Action => ({ id, type: "notify", config: {} }) as unknown as Action;
-const manualPath = (id: string, to: string) => ({ id, key: id, to, trigger: "manual" });
+const manualPath = (id: string, to: string) => ({ id, key: id, label: `Path ${id}`, to, trigger: "manual" });
 const step = (id: string, over: Record<string, unknown> = {}): Step =>
   ({ id, key: id, label: { en: id }, type: "task", ...over }) as unknown as Step;
 const mkBody = (steps: Step[], initialStep = "step_a"): ProcessBody =>
@@ -550,7 +550,7 @@ test.skipIf(!DB)("commitManualTransition's guard sees the merged data, not just 
       initialStep: "step_a",
       steps: [
         step("step_a", {
-          paths: [{ id: "path_ab", key: "path_ab", to: "step_b", trigger: "manual", guard: cel("data.decision == 'approve'") }],
+          paths: [{ id: "path_ab", key: "path_ab", label: "Ab", to: "step_b", trigger: "manual", guard: cel("data.decision == 'approve'") }],
         }),
         step("step_b", { terminal: true }),
       ],

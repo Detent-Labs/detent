@@ -53,7 +53,7 @@ const bodyWithActions = (opts: { onEntry?: unknown[] }): ProcessBody =>
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: { en: "A" }, type: "task", ...(opts.onEntry ? { onEntry: opts.onEntry } : {}), paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", ...(opts.onEntry ? { onEntry: opts.onEntry } : {}), paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
     },
@@ -80,7 +80,7 @@ const chainTargetBody = (): ProcessBody =>
     workflow: {
       initialStep: "step_t_entry",
       steps: [
-        { id: "step_t_entry", key: "t_entry", label: { en: "Entry" }, type: "task", paths: [{ id: "path_t_done", key: "t_done", to: "step_t_done", trigger: "automatic", priority: 1 }] },
+        { id: "step_t_entry", key: "t_entry", label: { en: "Entry" }, type: "task", paths: [{ id: "path_t_done", key: "t_done", label: "T Done", to: "step_t_done", trigger: "automatic", priority: 1 }] },
         { id: "step_t_done", key: "t_done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
@@ -97,7 +97,7 @@ const chainActorBody = (targetPid: string, mapping: Record<string, unknown>): Pr
     workflow: {
       initialStep: "step_a_entry",
       steps: [
-        { id: "step_a_entry", key: "a_entry", label: { en: "Entry" }, type: "task", paths: [{ id: "path_a_done", key: "a_done", to: "step_a_done", trigger: "manual" }] },
+        { id: "step_a_entry", key: "a_entry", label: { en: "Entry" }, type: "task", paths: [{ id: "path_a_done", key: "a_done", label: "A Done", to: "step_a_done", trigger: "manual" }] },
         {
           id: "step_a_done",
           key: "a_done",
@@ -333,14 +333,14 @@ test.skipIf(!DB)("6.13: an earlier mapping violation and a later unresolvable ta
     workflow: {
       initialStep: "step_entry",
       steps: [
-        { id: "step_entry", key: "entry", label: { en: "Entry" }, type: "task", paths: [{ id: "path_mid", key: "mid", to: "step_mid", trigger: "manual" }] },
+        { id: "step_entry", key: "entry", label: { en: "Entry" }, type: "task", paths: [{ id: "path_mid", key: "mid", label: "Mid", to: "step_mid", trigger: "manual" }] },
         {
           id: "step_mid",
           key: "mid",
           label: { en: "Mid" },
           type: "task",
           onEntry: [{ id: "action_a", type: PROCESS_START_ACTION_TYPE, config: { processId: tv.processId, inputMapping: { field_nonexistent: cel("1") } } }],
-          paths: [{ id: "path_done", key: "done", to: "step_done", trigger: "manual" }],
+          paths: [{ id: "path_done", key: "done", label: "Done", to: "step_done", trigger: "manual" }],
         },
         {
           id: "step_done",
@@ -389,7 +389,7 @@ test.skipIf(!DB)("6.15: a body invalid in both action-registry and CEL raises Re
           label: { en: "A" },
           type: "task",
           onEntry: [{ id: "action_a", type: "nowhere.registered", config: {} }],
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "automatic", priority: 1, guard: cel("data.nope == 1") }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "automatic", priority: 1, guard: cel("data.nope == 1") }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
@@ -507,7 +507,7 @@ test("6.18a: a body clearing duration and structural but violating a superRefine
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_missing", trigger: "manual" }] },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_missing", trigger: "manual" }] },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
     },

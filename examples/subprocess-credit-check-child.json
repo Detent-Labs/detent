@@ -20,8 +20,8 @@
         "label": { "en": "Decide" },
         "type": "task",
         "paths": [
-          { "id": "path_cc_reject", "key": "reject", "to": "step_cc_rejected", "trigger": "automatic", "priority": 1, "guard": { "lang": "cel", "src": "data.amount > 1000.0" } },
-          { "id": "path_cc_approve", "key": "approve", "to": "step_cc_approved", "trigger": "automatic", "priority": 2 }
+          { "id": "path_cc_reject", "key": "reject", "label": "Reject", "to": "step_cc_rejected", "trigger": "automatic", "priority": 1, "guard": { "lang": "cel", "src": "data.amount > 1000.0" } },
+          { "id": "path_cc_approve", "key": "approve", "label": "Approve", "to": "step_cc_approved", "trigger": "automatic", "priority": 2 }
         ]
       },
       { "id": "step_cc_approved", "key": "approved", "label": { "en": "Approved" }, "type": "task", "terminal": true, "outcome": "approved" },

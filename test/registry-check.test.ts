@@ -39,7 +39,7 @@ const bodyWithActions = (opts: {
           ...(opts.onExit ? { onExit: opts.onExit } : {}),
           ...(opts.onCancel ? { onCancel: opts.onCancel } : {}),
           ...(opts.onFire ? { timers: [{ id: "timer_t", duration: "PT1H", onFire: { actions: opts.onFire } }] } : {}),
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual", ...(opts.onPath ? { onPath: opts.onPath } : {}) }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual", ...(opts.onPath ? { onPath: opts.onPath } : {}) }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],

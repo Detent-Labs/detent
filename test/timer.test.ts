@@ -27,9 +27,9 @@ const waitTimerBody = (timer: unknown): ProcessBody =>
     workflow: {
       initialStep: "step_a",
       steps: [
-        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_wait", trigger: "manual" }] },
         { id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task", timers: [timer],
-          paths: [{ id: "path_go", key: "go", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }] },
+          paths: [{ id: "path_go", key: "go", label: "Go", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }] },
         { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
@@ -104,7 +104,7 @@ const initialWaitBody = (timer: unknown): ProcessBody =>
       initialStep: "step_wait",
       steps: [
         { id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task", timers: [timer],
-          paths: [{ id: "path_go", key: "go", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }] },
+          paths: [{ id: "path_go", key: "go", label: "Go", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }] },
         { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
@@ -318,9 +318,9 @@ const deadlineBody = (timers: unknown[], initialStep = "step_a"): ProcessBody =>
     workflow: {
       initialStep,
       steps: [
-        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_wait", trigger: "manual" }] },
         { id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task", timers,
-          paths: [{ id: "path_go", key: "go", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }] },
+          paths: [{ id: "path_go", key: "go", label: "Go", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }] },
         { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },

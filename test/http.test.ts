@@ -58,7 +58,7 @@ const simpleBody = (): ProcessBody =>
           label: { en: "A" },
           type: "task",
           view: { fields: [{ ref: "field_amount", required: true }] },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
@@ -81,7 +81,7 @@ const guardedBody = (): ProcessBody =>
           label: { en: "X" },
           type: "task",
           view: { fields: [{ ref: "field_approved" }] },
-          paths: [{ id: "path_done", key: "done", to: "step_done", trigger: "manual", guard: cel("data.approved == true") }],
+          paths: [{ id: "path_done", key: "done", label: "Done", to: "step_done", trigger: "manual", guard: cel("data.approved == true") }],
         },
         { id: "step_done", key: "done_step", label: { en: "Done" }, type: "task", terminal: true },
       ],
@@ -108,10 +108,10 @@ const cascadeLoopBody = (): ProcessBody =>
           label: { en: "A" },
           type: "task",
           view: { fields: [{ ref: "field_marker" }] },
-          paths: [{ id: "path_ag", key: "ag", to: "step_g", trigger: "manual" }],
+          paths: [{ id: "path_ag", key: "ag", label: "Ag", to: "step_g", trigger: "manual" }],
         },
-        { id: "step_g", key: "g", label: { en: "G" }, type: "task", paths: [{ id: "path_gh", key: "gh", to: "step_h", trigger: "automatic" }] },
-        { id: "step_h", key: "h", label: { en: "H" }, type: "task", paths: [{ id: "path_hg", key: "hg", to: "step_g", trigger: "automatic" }] },
+        { id: "step_g", key: "g", label: { en: "G" }, type: "task", paths: [{ id: "path_gh", key: "gh", label: "Gh", to: "step_h", trigger: "automatic" }] },
+        { id: "step_h", key: "h", label: { en: "H" }, type: "task", paths: [{ id: "path_hg", key: "hg", label: "Hg", to: "step_g", trigger: "automatic" }] },
       ],
     },
   }) as unknown as ProcessBody;
@@ -132,8 +132,8 @@ const twoPathsBody = (): ProcessBody =>
           label: { en: "A" },
           type: "task",
           paths: [
-            { id: "path_x", key: "x", to: "step_x", trigger: "manual" },
-            { id: "path_y", key: "y", to: "step_y", trigger: "manual" },
+            { id: "path_x", key: "x", label: "X", to: "step_x", trigger: "manual" },
+            { id: "path_y", key: "y", label: "Y", to: "step_y", trigger: "manual" },
           ],
         },
         { id: "step_x", key: "x_step", label: { en: "X" }, type: "task", terminal: true },
@@ -157,7 +157,7 @@ const roleGuardedBody = (): ProcessBody =>
           key: "a",
           label: { en: "A" },
           type: "task",
-          paths: [{ id: "path_admin", key: "admin", to: "step_admin", trigger: "manual", guard: cel("'admin' in actor.roles") }],
+          paths: [{ id: "path_admin", key: "admin", label: "Admin", to: "step_admin", trigger: "manual", guard: cel("'admin' in actor.roles") }],
         },
         { id: "step_admin", key: "admin_step", label: { en: "Admin" }, type: "task", terminal: true },
       ],
@@ -177,7 +177,7 @@ const assignedBody = (): ProcessBody =>
         {
           id: "step_a", key: "a", label: { en: "A" }, type: "task",
           assignment: { strategy: { type: "static", config: { candidates: ["approver", "user_1"] } } },
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
@@ -259,7 +259,7 @@ test.skipIf(!DB)("GET /instances/:instanceId resolves a view and returns 200", a
   const view = (await res.json()) as { step: { key: string }; status: string; availablePaths: unknown[] };
   expect(view.step.key).toBe("a");
   expect(view.status).toBe("running");
-  expect(view.availablePaths).toEqual([{ id: "path_ab", key: "ab", label: undefined }]);
+  expect(view.availablePaths).toEqual([{ id: "path_ab", key: "ab", label: "Ab" }]);
 });
 
 test.skipIf(!DB)("GET /instances/:instanceId resolves a dataSource-bound field's options", async () => {
@@ -1849,7 +1849,7 @@ const actionBody = (actionType: string): ProcessBody =>
         {
           id: "step_a", key: "a", label: { en: "A" }, type: "task",
           onEntry: [{ id: "action_x", type: actionType, config: {} }],
-          paths: [{ id: "path_ab", key: "ab", to: "step_b", trigger: "manual" }],
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
@@ -1866,7 +1866,7 @@ const brokenCelBody = (): ProcessBody =>
     workflow: {
       initialStep: "step_x",
       steps: [
-        { id: "step_x", key: "x", label: { en: "X" }, type: "task", paths: [{ id: "path_done", key: "done", to: "step_done", trigger: "manual", guard: cel("data.approved ==") }] },
+        { id: "step_x", key: "x", label: { en: "X" }, type: "task", paths: [{ id: "path_done", key: "done", label: "Done", to: "step_done", trigger: "manual", guard: cel("data.approved ==") }] },
         { id: "step_done", key: "done_step", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },

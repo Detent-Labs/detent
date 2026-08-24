@@ -30,7 +30,7 @@ const guardStep = (src: string, type: "task" | "subprocess" = "task") => ({
   key: "a",
   label: { en: "A" },
   type,
-  paths: [{ id: "path_a", key: "pa", to: "step_b", trigger: "automatic", priority: 1, guard: { lang: "cel", src } }],
+  paths: [{ id: "path_a", key: "pa", label: "Pa", to: "step_b", trigger: "automatic", priority: 1, guard: { lang: "cel", src } }],
 });
 
 const msgs = (issues: CelIssue[]) => issues.map((i) => i.message).join(" | ");
@@ -78,7 +78,7 @@ test("accepts result in an Action.output mapping", () => {
     label: { en: "A" },
     type: "task",
     onEntry: [{ id: "action_a", type: "http", config: {}, output: { field_booking_status: { lang: "cel", src: "result.status" } } }],
-    paths: [{ id: "path_a", key: "pa", to: "step_b", trigger: "manual" }],
+    paths: [{ id: "path_a", key: "pa", label: "Pa", to: "step_b", trigger: "manual" }],
   };
   expect(validateProcessBody(body({ steps: [step] }))).toEqual([]);
 });
@@ -98,7 +98,7 @@ const outputStep = (
   label: { en: "A" },
   type,
   [position]: [{ id: "action_a", type: "http", config: {}, output: { field_booking_status: { lang: "cel", src } } }],
-  paths: [{ id: "path_a", key: "pa", to: "step_b", trigger: "manual" }],
+  paths: [{ id: "path_a", key: "pa", label: "Pa", to: "step_b", trigger: "manual" }],
 });
 
 const OUT_LOC = (position: string) => `steps[0].${position}.actions[0].output.field_booking_status`;
@@ -216,7 +216,7 @@ const deadlineStep = (src: string) => ({
   key: "a",
   label: { en: "A" },
   type: "task",
-  paths: [{ id: "path_a", key: "pa", to: "step_b", trigger: "manual" }],
+  paths: [{ id: "path_a", key: "pa", label: "Pa", to: "step_b", trigger: "manual" }],
   timers: [{ id: "timer_a", deadline: { lang: "cel", src }, onFire: { actions: [] } }],
 });
 
@@ -287,7 +287,7 @@ test("a data source is not visible to a guard either (withheld from every site)"
     paths: [
       {
         id: "path_a",
-        key: "pa",
+        key: "pa", label: "Pa",
         to: "step_b",
         trigger: "automatic",
         priority: 1,
@@ -324,7 +324,7 @@ test("the deadline result-type expectation does not leak into other sites", () =
     },
     // Path guard: a bool.
     paths: [
-      { id: "path_a", key: "pa", to: "step_b", trigger: "automatic", priority: 1, guard: { lang: "cel", src: "data.amount > 0.0" } },
+      { id: "path_a", key: "pa", label: "Pa", to: "step_b", trigger: "automatic", priority: 1, guard: { lang: "cel", src: "data.amount > 0.0" } },
     ],
     // A well-typed deadline alongside them, to prove the sites are collected together.
     timers: [{ id: "timer_a", deadline: { lang: "cel", src: "data.due_at" }, onFire: { actions: [] } }],
@@ -525,7 +525,7 @@ const subprocessStep = (outputMapping: Record<string, ReturnType<typeof cel>>, g
   ({
     id: "step_a", key: "a", label: "A", type: "subprocess",
     subprocess: { processId: "proc_child", versionBinding: "pinned", pinnedVersion: 1, inputMapping: {}, outputMapping },
-    paths: [{ id: "path_a", key: "pa", to: "step_b", trigger: "automatic", priority: 1, guard: cel(guardSrc) }],
+    paths: [{ id: "path_a", key: "pa", label: "Pa", to: "step_b", trigger: "automatic", priority: 1, guard: cel(guardSrc) }],
   }) as unknown;
 
 const childBodyWithOutputs = (outputFieldIds?: string[]): ProcessBody =>

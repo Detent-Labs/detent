@@ -33,7 +33,7 @@ const targetBody = (): ProcessBody =>
       initialStep: "step_t_entry",
       steps: [
         { id: "step_t_entry", key: "t_entry", label: { en: "Entry" }, type: "task",
-          paths: [{ id: "path_t_done", key: "t_done", to: "step_t_done", trigger: "automatic", priority: 1 }] },
+          paths: [{ id: "path_t_done", key: "t_done", label: "T Done", to: "step_t_done", trigger: "automatic", priority: 1 }] },
         { id: "step_t_done", key: "t_done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
@@ -50,7 +50,7 @@ const targetBodyV2 = (): ProcessBody =>
       initialStep: "step_t_entry",
       steps: [
         { id: "step_t_entry", key: "t_entry", label: { en: "Entry" }, type: "task",
-          paths: [{ id: "path_t_done", key: "t_done", to: "step_t_done_v2", trigger: "automatic", priority: 1 }] },
+          paths: [{ id: "path_t_done", key: "t_done", label: "T Done", to: "step_t_done_v2", trigger: "automatic", priority: 1 }] },
         { id: "step_t_done_v2", key: "t_done_v2", label: { en: "Done V2" }, type: "task", terminal: true },
       ],
     },
@@ -72,7 +72,7 @@ const targetBodyWithDefault = (): ProcessBody =>
       initialStep: "step_t_entry",
       steps: [
         { id: "step_t_entry", key: "t_entry", label: { en: "Entry" }, type: "task",
-          paths: [{ id: "path_t_done", key: "t_done", to: "step_t_done", trigger: "automatic", priority: 1 }] },
+          paths: [{ id: "path_t_done", key: "t_done", label: "T Done", to: "step_t_done", trigger: "automatic", priority: 1 }] },
         { id: "step_t_done", key: "t_done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
@@ -88,7 +88,7 @@ const actorBody = (targetPid: string, mapping: Record<string, unknown> = { field
       initialStep: "step_a_entry",
       steps: [
         { id: "step_a_entry", key: "a_entry", label: { en: "Entry" }, type: "task",
-          paths: [{ id: "path_a_done", key: "a_done", to: "step_a_done", trigger: "manual" }] },
+          paths: [{ id: "path_a_done", key: "a_done", label: "A Done", to: "step_a_done", trigger: "manual" }] },
         { id: "step_a_done", key: "a_done", label: { en: "Done" }, type: "task", terminal: true,
           onEntry: [{ id: "action_chain", type: PROCESS_START_ACTION_TYPE, config: { processId: targetPid, inputMapping: mapping } }] },
       ],
@@ -109,7 +109,7 @@ const actionAt = (position: "onExit" | "onCancel" | "onPath" | "onFire", targetP
           ...(position === "onExit" ? { onExit: [chainAction] } : {}),
           ...(position === "onCancel" ? { onCancel: [chainAction] } : {}),
           paths: [{
-            id: "path_a_done", key: "a_done", to: "step_a_done", trigger: "manual",
+            id: "path_a_done", key: "a_done", label: "A Done", to: "step_a_done", trigger: "manual",
             ...(position === "onPath" ? { onPath: [chainAction] } : {}),
           }],
           ...(position === "onFire" ? { timers: [{ id: "timer_a", duration: "PT1H", onFire: { actions: [chainAction] } }] } : {}),

@@ -202,10 +202,10 @@ const waitBody = (
     workflow: {
       initialStep: opts.initialStep ?? "step_a",
       steps: [
-        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", to: "step_wait", trigger: "manual" }] },
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_wait", trigger: "manual" }] },
         { id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task", timers,
           ...(opts.onEntry ? { onEntry: opts.onEntry } : {}),
-          paths: [{ id: "path_go", key: "go", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }] },
+          paths: [{ id: "path_go", key: "go", label: "Go", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }] },
         { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
@@ -409,7 +409,7 @@ const initialDropBody = (): ProcessBody =>
       initialStep: "step_wait",
       steps: [
         { id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task", timers: [dueTimer],
-          paths: [{ id: "path_go", key: "go", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }] },
+          paths: [{ id: "path_go", key: "go", label: "Go", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }] },
         { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
       ],
     },
