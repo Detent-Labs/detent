@@ -3,7 +3,8 @@ import { MoreVertical, Users2 } from "lucide-react";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
 import { resolveBaseLocaleChange } from "../screens/processHeaderLogic.js";
-import { missingTranslationWarning } from "../draft/localized-text";
+import { missingTranslationWarning, resolveDraftLocalizedText } from "../draft/localized-text";
+import { deriveKey, shouldAutoDeriveKey } from "../draft/deriveKey.js";
 import { ContentLocaleBadge, AddLocaleControl } from "./shared/ContentLocaleSwitcher.js";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput.js";
 import { IssueList } from "./shared/IssueList.js";
@@ -157,11 +158,17 @@ export function ProcessHeaderBar({
           value={draft.label}
           placeholder={t("headerBar.unnamedProcess")}
           disabled={!structureActive}
-          onChange={(next) =>
+          onChange={(next) => {
+            const baseLocale = draft.baseLocale ?? "en";
+            const priorDerivedKey = deriveKey(resolveDraftLocalizedText(draft.label, baseLocale, baseLocale) ?? "");
+            const deriveNextKey = shouldAutoDeriveKey(draft.key ?? "", priorDerivedKey);
             mutate((d) => {
               d.label = next;
-            })
-          }
+              if (deriveNextKey) {
+                d.key = deriveKey(resolveDraftLocalizedText(next, baseLocale, baseLocale) ?? "");
+              }
+            });
+          }}
         />
       </h1>
       {missingTranslationWarning(draft.label, contentLocale, draft.baseLocale) && (

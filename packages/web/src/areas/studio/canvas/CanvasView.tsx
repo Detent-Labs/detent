@@ -29,6 +29,7 @@ import { drawnBox, hiddenStepIds, anchorBoxFor, type StepGroup } from "./groups"
 import { computeFit, MIN_SCALE, MAX_SCALE, FIT_GUTTER, type Fit } from "./fit";
 import { resolveDropGesture } from "./dropGesture";
 import { inlineRenamePatch } from "./inlineRename";
+import { nextStepKey } from "../panels/stepsPanelLogic.js";
 import { buildOperands, guardEdgeLabel } from "../panels/shared/conditionLogic";
 
 const HANDLE_RADIUS = 7;
@@ -565,7 +566,12 @@ export function CanvasView({
     const step = steps[index];
     if (step) {
       const patch = inlineRenamePatch(step.label, contentLocale, renaming.value);
-      if (patch) updateInDraftArray(mutate, (d) => d.workflow?.steps?.[index], { label: patch });
+      if (patch) {
+        const siblingKeys = new Set(steps.filter((s) => s.id !== step.id).map((s) => s.key ?? ""));
+        const derivedKey = nextStepKey(step.key ?? "", step.label, patch, baseLocale, siblingKeys);
+        const stepPatch: Partial<(typeof steps)[number]> = derivedKey === undefined ? { label: patch } : { label: patch, key: derivedKey };
+        updateInDraftArray(mutate, (d) => d.workflow?.steps?.[index], stepPatch);
+      }
     }
     setRenaming(null);
   };
