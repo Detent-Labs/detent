@@ -22,7 +22,8 @@ const render = (technicalFieldIds: Set<string>) =>
       row={row()}
       label="Amount"
       stepId={"step_a" as never}
-      written={new Map()}
+      ownStepIndex={0}
+      written={() => 0}
       technicalFieldIds={technicalFieldIds}
       isGroup={false}
       groupKeys={[]}
@@ -49,5 +50,44 @@ describe("FormEditorStrip", () => {
     expect(html).toContain(">readonly<");
     expect(html).toContain(">span<");
     expect(html).toContain(">group<");
+  });
+});
+
+/**
+ * gate-required-readonly-reachability task 4.3: the strip's `required`/
+ * `readonly` gate now reads the dominance-scoped `written` accessor at the
+ * selected field's own step index, instead of a flat, step-blind count.
+ */
+describe("FormEditorStrip: dominance-scoped gating", () => {
+  const renderGated = (written: (fieldId: string, ownStepIndex: number) => number, ownStepIndex = 0) =>
+    renderToStaticMarkup(
+      <FormEditorStrip
+        row={{ ref: "field_amount" as never, required: true }}
+        label="Amount"
+        stepId={"step_c" as never}
+        ownStepIndex={ownStepIndex}
+        written={written}
+        technicalFieldIds={new Set()}
+        isGroup={false}
+        groupKeys={[]}
+        onChangeFlag={() => {}}
+        onChangeSpan={() => {}}
+        onChangeGroup={() => {}}
+      />,
+    );
+
+  it("disables readonly when nothing writes the field at this step", () => {
+    const html = renderGated(() => 0, 2);
+    expect((html.match(/disabled=""/g) ?? []).length).toBe(1);
+  });
+
+  it("leaves readonly enabled when a dominating step already writes the field", () => {
+    const html = renderGated((_fieldId, ownStepIndex) => (ownStepIndex === 2 ? 1 : 0), 2);
+    expect((html.match(/disabled=""/g) ?? []).length).toBe(0);
+  });
+
+  it("keeps gating engaged when the only writer is on a non-dominating step (a step index this accessor never credits)", () => {
+    const html = renderGated(() => 0, 2);
+    expect((html.match(/disabled=""/g) ?? []).length).toBe(1);
   });
 });

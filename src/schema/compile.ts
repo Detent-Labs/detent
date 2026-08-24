@@ -43,6 +43,7 @@ import {
   type ProcessBody,
   type Step,
 } from "./definition.js";
+import { computeDominatorSets, dominates } from "./step-graph.js";
 
 /** A duration-typed value outside the grammar, or a timer duration past the bound. */
 export interface DurationIssue {
@@ -806,22 +807,32 @@ function checkTechnicalFields(body: ProcessBody): CompileIssue[] {
 // ============================================================
 // 8. Unsatisfiable required+readonly pair: reject a view entry declaring
 // literal required: true and literal readonly: true on a step carrying a
-// manual path, when no source in the body writes the field it names. The
-// participant cannot type into a readonly field, and the required check
-// then refuses to advance the step, so nothing can clear the result.
+// manual path, when no source in the body writes the field it names,
+// GUARANTEED before the entry's own step is submitted. The participant
+// cannot type into a readonly field, and the required check then refuses to
+// advance the step, so nothing can clear the result.
+//
+// "Guaranteed before" is a step-graph dominance test (src/schema/step-
+// graph.ts, shared with the studio's own gate): a step-scoped writer (an
+// action output, a subprocess outputMapping, a columnMapping's
+// editable-elsewhere placement, or another editable view entry) counts only
+// when the step that carries it DOMINATES the entry's own step — every path
+// from `initialStep` necessarily passes through it first. See
+// gate-required-readonly-reachability's design.md § Decisions.
 //
 // Counterpart to the studio's `writtenFieldCounts`
 // (packages/web/src/areas/studio/draft/view-flags.ts), duplicated here
 // rather than imported — the dependency direction forbids the import, and
 // the studio walks a Draft (every key optional) while this walks a
-// ProcessBody. Two documented divergences from the studio's version: the
-// post-gate exclusion (an action on the entry's own step at
-// onExit/onPath/onCancel fires only after the submission gate it cannot
-// help, so its output does not count, and likewise a columnMapping target
-// whose mapping field is editable only on the entry's own step) and the
-// literal-default source (a literal catalog default lands via
-// `applyFieldDefaults` at instance creation, which the studio does not
-// count). See design.md § Decisions for the full reasoning.
+// ProcessBody. The dominance computation itself IS shared (step-graph.ts).
+// Two documented divergences from the studio's version: the post-gate
+// exclusion (an action on the entry's own step at onExit/onPath/onCancel
+// fires only after the submission gate it cannot help, so its output does
+// not count, and likewise a columnMapping target whose mapping field is
+// editable only on the entry's own step) and the literal-default source (a
+// literal catalog default lands via `applyFieldDefaults` at instance
+// creation, which the studio does not count). See design.md § Decisions for
+// the full reasoning.
 //
 // Operates on duck-typed input, like checkReservedActionPrefix,
 // checkUnknownKeys and checkTechnicalFields: it runs before any Zod parse
@@ -843,27 +854,41 @@ function stepHasManualPath(s: any): boolean {
 }
 
 /**
- * Every field id some source in the body writes, relative to the step under
- * check (`ownStepIndex`): the post-gate exclusion and the columnMapping
- * editable-elsewhere rule are both relative to that step, so this cannot be
- * one body-wide set the way most of this module's other collectors are.
+ * Every field id some source in the body writes, GUARANTEED before the step
+ * under check (`ownStepIndex`) is submitted: a step-scoped writer (action
+ * output, subprocess outputMapping, columnMapping's editable-elsewhere
+ * placement test, another editable view entry) counts only when the step
+ * carrying it dominates `ownStepIndex` (per `dom`, `step-graph.ts`'s
+ * `computeDominatorSets` over this same body). The post-gate exclusion and
+ * the columnMapping editable-elsewhere rule are both relative to that step
+ * too, so this cannot be one body-wide set the way most of this module's
+ * other collectors are.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function computeWriterSet(body: any, ownStepIndex: number): Set<string> {
+function computeWriterSet(body: any, ownStepIndex: number, dom: Map<string, Set<string>>): Set<string> {
   const written = new Set<string>();
   const steps = body?.workflow?.steps ?? [];
+  const ownStepId = steps[ownStepIndex]?.id;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fields = collectFieldsDeep((body?.fields ?? []) as any);
   const fieldsById = new Map(fields.map((f) => [f.id as string, f]));
 
-  // Action output (1.2): onEntry always counts; onExit/onPath/onCancel count
-  // only off the entry's own step, since on that step they fire after the
-  // submission gate they cannot help. onFire always counts — a reminder
-  // timer's write-back precedes the participant's resubmission, and a
-  // targetPath timer's forced exit runs no required check at all.
+  // Action output / subprocess.outputMapping / timer onFire output: each
+  // counts only when the writing step dominates ownStepIndex (self
+  // included — a step dominates itself). On the entry's OWN step: onEntry
+  // always counts; onExit/onPath/onCancel never count, since they fire only
+  // after the submission gate they cannot help; a timer's onFire output
+  // counts only when that timer declares a targetPath, since a plain
+  // reminder timer is not guaranteed to fire before the participant
+  // resubmits. subprocess.outputMapping carries no own-step exclusion: it
+  // commits at the subprocess step's own spawn/return, not gated by a
+  // participant submission the way an action output is.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   steps.forEach((s: any, si: number) => {
     const own = si === ownStepIndex;
+    const dominatesOwn = own || dominates(dom, s?.id, ownStepId);
+    if (!dominatesOwn) return;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const addOutputs = (actions: any[] | undefined) => {
       (actions ?? []).forEach((a) => Object.keys(a?.output ?? {}).forEach((fid) => written.add(fid)));
@@ -876,17 +901,18 @@ function computeWriterSet(body: any, ownStepIndex: number): Set<string> {
       (s?.paths ?? []).forEach((p: any) => addOutputs(p?.onPath));
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (s?.timers ?? []).forEach((t: any) => addOutputs(t?.onFire?.actions));
+    (s?.timers ?? []).forEach((t: any) => {
+      if (own && typeof t?.onFire?.targetPath !== "string") return;
+      addOutputs(t?.onFire?.actions);
+    });
 
-    // subprocess.outputMapping (1.3), body-wide.
     Object.keys(s?.subprocess?.outputMapping ?? {}).forEach((fid) => written.add(fid));
   });
 
   // Editable view entries (1.6): visible !== false, readonly !== true, not a
-  // group field, carries a ref. Body-wide — the entry under check always
-  // declares readonly: true, so it never counts itself. Also tracks, per
-  // field, which step indices carry such an entry, for the columnMapping
-  // rule below.
+  // group field, carries a ref, on a step OTHER than ownStepIndex that
+  // dominates it. Also tracks, per field, which step indices carry such an
+  // entry (regardless of dominance), for the columnMapping rule below.
   const editableSteps = new Map<string, Set<number>>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   steps.forEach((s: any, si: number) => {
@@ -895,9 +921,9 @@ function computeWriterSet(body: any, ownStepIndex: number): Set<string> {
       if (typeof vf?.ref !== "string") return;
       if (fieldsById.get(vf.ref)?.type === "group") return;
       if (vf.visible === false || vf.readonly === true) return;
-      written.add(vf.ref);
       if (!editableSteps.has(vf.ref)) editableSteps.set(vf.ref, new Set());
       editableSteps.get(vf.ref)!.add(si);
+      if (si !== ownStepIndex && dominates(dom, s?.id, ownStepId)) written.add(vf.ref);
     });
   });
 
@@ -908,15 +934,19 @@ function computeWriterSet(body: any, ownStepIndex: number): Set<string> {
   });
 
   // columnMapping targets (1.4): count only where some step OTHER than
-  // ownStepIndex carries the mapping field in an editable view entry — the
-  // write-back (applyColumnMapping) runs after the submission gate, so a
-  // mapping field editable only on the entry's own step, or on no step at
-  // all, can never satisfy that gate.
+  // ownStepIndex, that DOMINATES ownStepIndex, carries the mapping field in
+  // an editable view entry — the write-back (applyColumnMapping) runs after
+  // the submission gate, so a mapping field editable only on the entry's own
+  // step, on no step at all, or only on a non-dominating step, can never
+  // satisfy that gate.
   fields.forEach((f) => {
     const mapping = f.columnMapping;
     if (!isPlainObject(mapping)) return;
     const editSteps = editableSteps.get(f.id as string) ?? new Set<number>();
-    if (![...editSteps].some((si) => si !== ownStepIndex)) return;
+    const hasDominatingEditor = [...editSteps].some(
+      (si) => si !== ownStepIndex && dominates(dom, steps[si]?.id, ownStepId),
+    );
+    if (!hasDominatingEditor) return;
     Object.values(mapping).forEach((target) => {
       if (typeof target === "string") written.add(target);
     });
@@ -943,11 +973,12 @@ function checkUnsatisfiableRequiredReadonly(body: ProcessBody): CompileIssue[] {
   fields.forEach((f) => {
     if (f.technical === true && typeof f.id === "string") technicalIds.add(f.id);
   });
+  const dom = computeDominatorSets(anyBody.workflow?.steps, anyBody.workflow?.initialStep);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (anyBody.workflow?.steps ?? []).forEach((s: any, si: number) => {
     if (!stepHasManualPath(s)) return;
-    const writerSet = computeWriterSet(anyBody, si);
+    const writerSet = computeWriterSet(anyBody, si, dom);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (s?.view?.fields ?? []).forEach((vf: any, vi: number) => {
       if (typeof vf?.ref !== "string") return;

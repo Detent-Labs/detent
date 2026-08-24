@@ -14,7 +14,7 @@ import type { DraftField } from "../draft/fields";
 import { flattenDraftFields } from "../draft/fields";
 import { flattenRailFields } from "../draft/panel-rail";
 import type { DraftViewField } from "../draft/view-layout";
-import { effectiveFlag, FLAG_DEFAULT, gatedKeys, setFlag, type FlagKey } from "../draft/view-flags";
+import { effectiveFlag, FLAG_DEFAULT, gatedKeys, setFlag, type FlagKey, type WrittenAccessor } from "../draft/view-flags";
 import type { BoolOrExpr } from "./shared/overrideMode";
 import { isExpression } from "./shared/overrideMode";
 
@@ -109,8 +109,14 @@ export function matrixCounts(rows: FieldMatrixRow[], drawnSteps: DraftStep[]): M
  * not gated off by its own `visible: false` or the `required`/`readonly`
  * mutual gate (`studio-app`'s bulk-toggle requirement — "Eligible means
  * live, non-CEL, not gated"). */
-function cellEligible(entry: DraftViewField, key: FlagKey, written: Map<string, number>, technicalFieldIds: Set<string>): boolean {
-  return !isExpression(entry[key]) && !gatedKeys(entry, written, technicalFieldIds).includes(key);
+function cellEligible(
+  entry: DraftViewField,
+  key: FlagKey,
+  written: WrittenAccessor,
+  technicalFieldIds: Set<string>,
+  ownStepIndex: number,
+): boolean {
+  return !isExpression(entry[key]) && !gatedKeys(entry, written, technicalFieldIds, ownStepIndex).includes(key);
 }
 
 /** One (step, field) pair a bulk badge would touch, identified by the
@@ -142,7 +148,7 @@ export function eligibleTargetEntries(
   steps: DraftStep[],
   targets: BulkTarget[],
   key: FlagKey,
-  written: Map<string, number>,
+  written: WrittenAccessor,
   technicalFieldIds: Set<string>,
 ): { target: BulkTarget; entry: DraftViewField }[] {
   const out: { target: BulkTarget; entry: DraftViewField }[] = [];
@@ -150,7 +156,7 @@ export function eligibleTargetEntries(
     const step = steps[target.stepIndex];
     if (!step) continue;
     const cell = cellEntry(step, target.fieldId);
-    if (cell && cellEligible(cell.entry, key, written, technicalFieldIds)) out.push({ target, entry: cell.entry });
+    if (cell && cellEligible(cell.entry, key, written, technicalFieldIds, target.stepIndex)) out.push({ target, entry: cell.entry });
   }
   return out;
 }
@@ -163,7 +169,7 @@ export function bulkBadgeOn(
   steps: DraftStep[],
   targets: BulkTarget[],
   key: FlagKey,
-  written: Map<string, number>,
+  written: WrittenAccessor,
   technicalFieldIds: Set<string>,
 ): boolean {
   const eligible = eligibleTargetEntries(steps, targets, key, written, technicalFieldIds);
@@ -180,7 +186,7 @@ export function applyBulkToggle(
   steps: DraftStep[],
   targets: BulkTarget[],
   key: FlagKey,
-  written: Map<string, number>,
+  written: WrittenAccessor,
   technicalFieldIds: Set<string>,
 ): void {
   const eligible = eligibleTargetEntries(steps, targets, key, written, technicalFieldIds);
@@ -198,18 +204,25 @@ export function applyBulkToggle(
 
 /**
  * The flagged-cell marker: `checkViewFlags`'s exact three-part test
- * (`draft/view-flags.ts`), applied to one live cell (design.md decision 5).
- * Shares `writtenFieldIds`'s one expensive computation with that check
- * instead of reimplementing it, so the two can never disagree about what
- * "already written" means. A CEL-carrying flag skips the marker outright:
- * it resolves only against an instance, so no literal comparison applies.
+ * (`draft/view-flags.ts`), applied to one live cell, at that cell's own
+ * step (design.md decision 5). Shares `writtenFieldCounts`'s one expensive,
+ * dominance-scoped computation with that check instead of reimplementing
+ * it, so the two can never disagree about what "already written" means. A
+ * CEL-carrying flag skips the marker outright: it resolves only against an
+ * instance, so no literal comparison applies.
  */
-export function isCellFlagged(entry: DraftViewField, fieldId: string, isGroupRow: boolean, writtenIds: Set<string>): boolean {
+export function isCellFlagged(
+  entry: DraftViewField,
+  fieldId: string,
+  isGroupRow: boolean,
+  written: WrittenAccessor,
+  ownStepIndex: number,
+): boolean {
   if (isGroupRow) return false;
   if (isExpression(entry.visible) || isExpression(entry.required) || isExpression(entry.readonly)) return false;
   const visible = effectiveFlag(entry.visible, "visible") as boolean;
   const required = effectiveFlag(entry.required, "required") as boolean;
   const readonly = effectiveFlag(entry.readonly, "readonly") as boolean;
   if (required && !visible) return true;
-  return required && readonly && !writtenIds.has(fieldId);
+  return required && readonly && written(fieldId, ownStepIndex) === 0;
 }

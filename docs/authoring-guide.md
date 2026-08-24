@@ -259,10 +259,18 @@ not break it. Ordinary requiredness still lives only in the view.
 
 A view entry that declares `required: true` and `readonly: true` together
 locks a field a participant can never fill. Publishing rejects that pair
-unless some other source in the body writes the field first. That source
-can be an action's output, a subprocess `outputMapping`, or a
-`columnMapping` target. It can also be a `contract` input field, a literal
-catalog `default`, or an editable entry on another step.
+unless some other source in the body writes the field first. The write must
+land before the participant reaches the entry's own step. That source can be
+an action's output or a subprocess `outputMapping`, on a step that dominates
+the entry's own step. Dominates means every path from the process's start
+necessarily passes through that step first.
+
+A `columnMapping` target also
+counts when its mapping field is editable on a dominating step. So does a
+`contract` input field, a literal catalog `default`, or an editable entry on
+a dominating step. A step reachable only after the entry's own step does not
+count. Neither does a step reachable only via a different branch. Nothing
+guarantees either one ran first.
 
 Publishing also lets the pair through on a step whose paths are all
 automatic, or on a terminal step. The required check never runs there, so

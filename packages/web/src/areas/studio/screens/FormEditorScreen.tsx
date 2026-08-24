@@ -19,7 +19,7 @@ import { PALETTE_FIELD_KINDS, mintCatalogField, type PaletteFieldKind } from "..
 import { seedLocalizedText } from "../draft/localized-text";
 import { BooleanOrExpressionInput } from "../panels/shared/BooleanOrExpressionInput";
 import { isExpression, type BoolOrExpr } from "../panels/shared/overrideMode";
-import { effectiveFlag, gatedKeys, setFlag, writtenFieldCounts, type FlagKey } from "../draft/view-flags";
+import { effectiveFlag, gatedKeys, setFlag, writtenFieldCounts, type FlagKey, type WrittenAccessor } from "../draft/view-flags";
 
 type DraftStep = DraftOf<Step>;
 type DraftView = DraftOf<View>;
@@ -93,7 +93,8 @@ export interface FormEditorStripProps {
   row: DraftViewField;
   label: string;
   stepId: DraftStep["id"];
-  written: Map<string, number>;
+  ownStepIndex: number;
+  written: WrittenAccessor;
   technicalFieldIds: Set<string>;
   isGroup: boolean;
   groupKeys: string[];
@@ -113,6 +114,7 @@ export function FormEditorStrip({
   row,
   label,
   stepId,
+  ownStepIndex,
   written,
   technicalFieldIds,
   isGroup,
@@ -143,7 +145,7 @@ export function FormEditorStrip({
           label={t("formEditor.required")}
           stepId={stepId}
           flagKey="required"
-          disabled={gatedKeys(row, written, technicalFieldIds).includes("required")}
+          disabled={gatedKeys(row, written, technicalFieldIds, ownStepIndex).includes("required")}
           value={row.required}
           onChange={(required) => onChangeFlag("required", required)}
         />
@@ -153,7 +155,7 @@ export function FormEditorStrip({
           label={t("formEditor.readonly")}
           stepId={stepId}
           flagKey="readonly"
-          disabled={gatedKeys(row, written, technicalFieldIds).includes("readonly")}
+          disabled={gatedKeys(row, written, technicalFieldIds, ownStepIndex).includes("readonly")}
           value={row.readonly}
           onChange={(readonly) => onChangeFlag("readonly", readonly)}
         />
@@ -497,6 +499,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
               row={selectedRow}
               label={labelFor(selectedRow.ref)}
               stepId={step.id}
+              ownStepIndex={index}
               written={written}
               technicalFieldIds={technicalIds}
               isGroup={isGroupRow(selectedRow)}

@@ -1376,17 +1376,35 @@ Where a live cell's own `visible` resolves to a literal `false`, that
 cell's `required` and `readonly` checkboxes SHALL disable. That is the
 same gating the field matrix applied before this change.
 
-Where no other source in the draft writes a live cell's field, its
+Where no other source in the draft, **guaranteed to be written before
+this cell's own step is submitted**, writes a live cell's field, its
 `required` and `readonly` checkboxes SHALL gate each other. Checking
 `required` SHALL disable `readonly`, while `readonly` does not already
 read `true`. Checking `readonly` SHALL disable `required`, while
-`required` does not already read `true`. "No other source" means none
-of these already write the field:
+`required` does not already read `true`. "No other source, guaranteed
+before this step" means none of these already write the field:
 
-- an action's `output`
-- a subprocess's `outputMapping`
+- an action's `output`, where the action sits on a step that
+  **dominates** this cell's own step (every path from `initialStep` to
+  this cell's step passes through the action's step), or on this
+  cell's own step at `onEntry`, or on this cell's own step's timer
+  `onFire` declaring a `targetPath`
+- a subprocess's `outputMapping`, on a step that dominates this cell's
+  own step
 - a field's `columnMapping`
 - a `contract.inputFields` entry
+- another editable view entry (`visible !== false`, `readonly !==
+  true`) for the same field, on a step that dominates this cell's own
+  step
+
+A step dominating another is the same relation the compile pass's
+`definition-contract` check (`checkUnsatisfiableRequiredReadonly`) now
+uses. The two SHALL share one dominance computation over the draft's
+`workflow.steps`, so neither can disagree with the other about which
+step guarantees a value by the time a given step is submitted. A step
+editable only on a step that does NOT dominate this cell's own step —
+reachable solely after it, or only via a different branch — does NOT
+count, and gating stays engaged.
 
 Where a cell already carries `required: true` and `readonly: true`
 before either gate engages, neither checkbox SHALL disable. The
@@ -1477,14 +1495,16 @@ That same reduced opacity still applies to it.
 #### Scenario: Checking required disables readonly on an unwritten field
 
 - **WHEN** the developer checks a live cell's `required` box
-- **AND** nothing else in the draft writes that field
+- **AND** nothing else in the draft, guaranteed before that cell's own
+  step, writes that field
 - **AND** that cell's `readonly` does not already read `true`
 - **THEN** that cell's `readonly` checkbox disables
 
 #### Scenario: Checking readonly disables required on an unwritten field
 
 - **WHEN** the developer checks a live cell's `readonly` box
-- **AND** nothing else in the draft writes that field
+- **AND** nothing else in the draft, guaranteed before that cell's own
+  step, writes that field
 - **AND** that cell's `required` does not already read `true`
 - **THEN** that cell's `required` checkbox disables
 
@@ -1492,13 +1512,34 @@ That same reduced opacity still applies to it.
 
 - **WHEN** the developer checks a live cell's `required` box
 - **AND** an action output, a subprocess output mapping, a column
-  mapping, or a contract input field already writes that field
+  mapping, a contract input field, or another editable view entry for
+  the same field on a step that dominates this cell's own step already
+  writes that field
 - **THEN** that cell's `readonly` checkbox stays enabled
+
+#### Scenario: A field editable only on a non-dominating step keeps gating engaged
+
+- **WHEN** the developer checks the first step's live cell for a
+  field's `required` box
+- **AND** the field's only other editable placement is on a step
+  reachable only after this first step, or only via a different branch
+- **THEN** that cell's `readonly` checkbox disables
+
+#### Scenario: An own-step post-gate output does not clear gating
+
+- **WHEN** the developer checks a live cell's `required` box
+- **AND** the field's only other writer is an action's `output` on the
+  cell's own step at `onExit`, `onPath`, or `onCancel`
+- **THEN** that cell's `readonly` checkbox still disables — an own-step
+  post-gate output fires after the submission gate, so it does not
+  count as a source that writes the field before this step is
+  submitted
 
 #### Scenario: An entry already carrying both flags stays editable
 
 - **WHEN** a live cell already carries `required: true` and
-  `readonly: true`, on a field nothing else in the draft writes
+  `readonly: true`, on a field nothing else in the draft, guaranteed
+  before that cell's own step, writes
 - **THEN** neither the `required` nor the `readonly` checkbox disables
 - **AND** the developer can uncheck either one
 
@@ -1598,7 +1639,10 @@ A `required` or `readonly` badge SHALL skip any cell already gated for
 that flag. Gated means one of two things: the cell's own `visible`
 resolves to `false`, or the field's other flag among
 `required`/`readonly` already resolves to `true`. The second case
-applies only while nothing else in the draft writes that field.
+applies only while nothing else in the draft, guaranteed to be written
+before that cell's own step is submitted, writes that field — the
+same dominance-scoped "written" test "A live cell edits its own view
+entry inline" defines.
 
 Every `required` and `readonly` bulk badge SHALL treat a technical
 field's cell as gated, unconditionally. This holds on a column header
@@ -1662,8 +1706,18 @@ remaining badges shift into it.
 
 - **WHEN** the developer selects a column's or row's `readonly` badge
 - **AND** a targeted cell already carries `required: true`, on a field
-  nothing else in the draft writes
+  nothing else in the draft, guaranteed before that cell's own step,
+  writes
 - **THEN** the badge does not change that cell's `readonly` value
+
+#### Scenario: A bulk badge does not skip a cell written only on a non-dominating step
+
+- **WHEN** the developer selects a column's or row's `readonly` badge
+- **AND** a targeted cell already carries `required: true`, and the
+  field's only other editable placement is on a step reachable only
+  after that cell's own step, or only via a different branch
+- **THEN** the badge still skips that cell — the non-dominating
+  placement does not make it eligible
 
 #### Scenario: A technical field's row never receives a bulk required or readonly toggle
 
@@ -1683,7 +1737,8 @@ remaining badges shift into it.
 #### Scenario: A row already gated on every cell offers no bulk badge either
 
 - **WHEN** every live cell for one field already carries `required:
-  true`, on a field nothing else in the draft writes
+  true`, on a field nothing else in the draft, guaranteed before each
+  cell's own step, writes
 - **AND** no cell's field declares `technical: true`
 - **THEN** that row header offers no `required` toggle badge
 
@@ -1837,11 +1892,19 @@ checks them:
 
 1. `required` while `visible` resolves to `false`
 2. `required` together with `readonly`, where no other source in the
-   draft already writes that field. None of these SHALL write it:
-   - an action's `output`
-   - a subprocess's `outputMapping`
+   draft, guaranteed to be written before this cell's own step is
+   submitted, already writes that field. None of these SHALL write it:
+   - an action's `output` on a step that dominates this cell's own step
+   - a subprocess's `outputMapping` on a step that dominates this
+     cell's own step
    - a field's `columnMapping`
    - a `contract.inputFields` entry
+   - another editable view entry for the same field on a step that
+     dominates this cell's own step
+
+   A step reachable only after this cell's own step, or only via a
+   different branch, does NOT dominate it, and an editable placement
+   or action output there does not clear this finding.
 
 A live cell whose own field is a group field SHALL carry no flagged
 marker, either way. The engine's own `checkViewFlags` function skips
@@ -1861,19 +1924,56 @@ its other resolved values are.
 
 - **WHEN** a live cell's `required` and `readonly` both resolve to
   `true`
-- **AND** no other source in the draft writes that cell's field
+- **AND** no other source, guaranteed before that cell's own step, in
+  the draft writes that cell's field
 - **THEN** that cell carries the flagged marker
 
 #### Scenario: A required-and-readonly cell already written elsewhere carries no marker
 
 - **WHEN** a live cell's `required` and `readonly` both resolve to
   `true`
-- **AND** one of these already writes that cell's field:
-  - an action output
-  - a subprocess output mapping
+- **AND** one of these already writes that cell's field, guaranteed
+  before that cell's own step is submitted:
+  - an action output on a step that dominates this cell's own step
+  - a subprocess output mapping on a step that dominates this cell's
+    own step
   - a data source column mapping
   - a contract input field entry
+  - another editable view entry for the same field on a step that
+    dominates this cell's own step
 - **THEN** that cell carries no flagged marker
+
+#### Scenario: A required-and-readonly cell written only by an own-step post-gate output still carries the marker
+
+- **WHEN** a live cell's `required` and `readonly` both resolve to
+  `true`
+- **AND** the only other source naming that cell's field is an action's
+  `output` on the cell's OWN step at `onExit`, `onPath`, or `onCancel`
+- **THEN** that cell carries the flagged marker — an own-step post-gate
+  output fires after the submission gate, so it does not clear this
+  finding, the same own-step exclusion `checkUnsatisfiableRequiredReadonly`
+  already applies
+
+#### Scenario: An own-step reminder timer's output still carries the marker
+
+- **WHEN** a live cell's `required` and `readonly` both resolve to
+  `true`
+- **AND** the only other source naming that cell's field is an `onFire`
+  action on the cell's OWN step's timer, and that timer declares no
+  `targetPath`
+- **THEN** that cell carries the flagged marker — an own-step reminder
+  timer with no `targetPath` is not guaranteed to fire before submission,
+  the same own-step reminder-timer exclusion
+  `checkUnsatisfiableRequiredReadonly` already applies
+
+#### Scenario: A required-and-readonly cell written only on a non-dominating step still carries the marker
+
+- **WHEN** a live cell's `required` and `readonly` both resolve to
+  `true`
+- **AND** the only other editable placement or action output for that
+  field is on a step reachable only after this cell's own step, or
+  only via a different branch
+- **THEN** that cell carries the flagged marker
 
 #### Scenario: A group field's cell carries no flagged marker
 
@@ -1885,7 +1985,8 @@ its other resolved values are.
 
 - **WHEN** any of a live cell's `visible`, `required` or `readonly`
   carries a CEL expression
-- **THEN** that cell carries no flagged marker
+- **THEN** that cell carries no flagged marker, whatever its other
+  resolved values are
 
 ### Requirement: The field matrix stays one tab stop; activating a cell reaches its controls
 

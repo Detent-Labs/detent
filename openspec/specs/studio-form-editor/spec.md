@@ -192,18 +192,48 @@ A `visible` of literal `false` SHALL disable the `required` and the
 CEL expression SHALL leave both controls alone. Nobody can read an
 expression's value without an instance.
 
-Where no other source in the draft writes a selected field, its
-`required` and `readonly` controls SHALL gate each other. That is the
-same rule the field matrix's live cell applies. Checking `required` SHALL disable
+Nothing else in the draft writes a selected field before the developer
+submits its own step. When that holds, its `required` and `readonly`
+controls SHALL gate each other. That is the same rule the field
+matrix's live cell applies. Checking `required` SHALL disable
 `readonly`, while `readonly` does not already read `true`. Checking
 `readonly` SHALL disable `required`, while `required` does not already
-read `true`. "No other source" means none of these already write the
-field:
+read `true`.
 
-- an action's `output`
-- a subprocess's `outputMapping`
-- a field's `columnMapping`
-- a `contract.inputFields` entry
+"No other source, guaranteed before this step" means none of these
+already write the field:
+
+- an action's `output`, on a step whose action **dominates** the
+  selected field's own step. Every path from `initialStep` to that
+  step passes through the action's step.
+
+- an action's `output` on the field's own step, set at `onEntry`.
+
+- an action's `output` on the field's own step's timer `onFire`, when
+  that timer declares a `targetPath`.
+
+- a subprocess's `outputMapping`, on a step that dominates the
+  selected field's own step.
+
+- a field's `columnMapping`.
+
+- a `contract.inputFields` entry.
+
+- another editable view entry (`visible !== false`, `readonly !==
+  true`) for the same field, on a step that dominates the selected
+  field's own step.
+
+A step dominating another is the same relation the compile pass's
+`definition-contract` check (`checkUnsatisfiableRequiredReadonly`) and
+the field matrix's live cell use. All three SHALL share one dominance
+computation over the draft's `workflow.steps`. None can disagree with
+the others about which step guarantees a value by the time the
+developer submits a step.
+
+A field editable only on a step that does NOT dominate the selected
+field's own step does NOT count. Gating stays engaged regardless. That
+non-dominating step may be reachable solely after it, or only via a
+different branch.
 
 Where a selected field already carries `required: true` and
 `readonly: true` before either gate engages, neither control SHALL
@@ -267,28 +297,54 @@ disable. The developer keeps a path to uncheck either one.
 
 #### Scenario: Checking required disables readonly on an unwritten field
 
-- **WHEN** the developer checks `required` on a selected field nothing
-  else in the draft writes, and `readonly` does not already read `true`
+- **WHEN** the developer checks `required` on a selected field
+- **AND** nothing else in the draft writes that field before its own
+  step
+- **AND** `readonly` does not already read `true`
 - **THEN** the strip's `readonly` control disables
 
 #### Scenario: Checking readonly disables required on an unwritten field
 
-- **WHEN** the developer checks `readonly` on a selected field nothing
-  else in the draft writes, and `required` does not already read `true`
+- **WHEN** the developer checks `readonly` on a selected field
+- **AND** nothing else in the draft writes that field before its own
+  step
+- **AND** `required` does not already read `true`
 - **THEN** the strip's `required` control disables
 
 #### Scenario: A field something else writes keeps both controls free
 
 - **WHEN** the developer checks `required` on a selected field
-- **AND** an action output, a subprocess output mapping, a column
-  mapping, or a contract input field already writes that field
+- **AND** some other source already writes that field, on a step that
+  dominates the selected field's own step
+- **AND** that source is one the requirement above already lists
 - **THEN** the strip's `readonly` control stays enabled
+
+#### Scenario: A field editable only on a non-dominating step keeps gating engaged
+
+- **WHEN** the developer checks `required` on a field selected on the
+  process's first step
+- **AND** the field's only other writer is an action output or a
+  subprocess output mapping on a non-dominating step
+- **AND** that non-dominating step is reachable only after this first
+  step, or only via a different branch
+- **THEN** the strip's `readonly` control disables
+
+#### Scenario: An own-step post-gate output does not clear gating
+
+- **WHEN** the developer checks `required` on a selected field
+- **AND** the field's only other writer is an action's `output` on the
+  field's own step at `onExit`, `onPath`, or `onCancel`
+- **THEN** the strip's `readonly` control still disables. An own-step
+  post-gate output fires after the submission gate. It does not count
+  as a source that writes the field before the developer submits this
+  step.
 
 #### Scenario: An entry already carrying both flags stays editable
 
 - **WHEN** the developer selects a field whose entry already carries
-  `required: true` and `readonly: true`, on a field nothing else in
-  the draft writes
+  `required: true` and `readonly: true`
+- **AND** nothing else in the draft writes that field before its own
+  step
 - **THEN** neither the `required` nor the `readonly` control disables
 - **AND** the developer can uncheck either one
 

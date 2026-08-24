@@ -1,4 +1,6 @@
-import type { Draft } from "./types";
+import { computeDominatorSets, dominates } from "workflow-engine/schema/step-graph";
+import type { Action } from "workflow-engine/schema";
+import type { Draft, DraftOf } from "./types";
 import type { DraftViewField } from "./view-layout";
 import type { DraftField } from "./fields";
 import { flattenDraftFields } from "./fields";
@@ -59,24 +61,124 @@ export function setFlag(entry: DraftViewField, key: FlagKey, next: BoolOrExpr): 
 }
 
 /**
- * Whether `entry`'s own field has a writer besides `entry` itself, per
- * `written` (`writtenFieldCounts`). A structural source (action output,
- * subprocess `outputMapping`, `columnMapping`, `contract.inputFields`) bumps
- * its field's count by `Infinity`, so it always counts as "another" writer.
- * A live, editable view entry (`visible !== false`, `readonly !== true`)
- * bumps its field's count by one FOR EACH such entry in the draft,
- * `entry` included when `entry` itself is currently editable — so `entry`'s
- * own contribution has to come back out before comparing, or an entry would
- * always read as its own writer the moment it stops being `readonly`, which
- * is exactly the state `gatedKeys` needs to gate. */
-function writtenByOther(entry: DraftViewField, written: Map<string, number>): boolean {
-  if (!entry.ref) return false;
-  const total = written.get(entry.ref) ?? 0;
-  const selfWrites = entry.visible !== false && entry.readonly !== true;
-  return total - (selfWrites ? 1 : 0) > 0;
+ * Every field id some source in the draft writes, GUARANTEED before a given
+ * step is submitted — a per-`(fieldId, ownStepIndex)` accessor, since
+ * dominance is inherently step-relative (an entry at `start` can dominate
+ * `middle` and `end` without the reverse holding). Returns `Infinity` for a
+ * body-wide structural writer (a `contract.inputFields` entry, a
+ * `columnMapping` target, or a step-scoped structural writer — action
+ * output, subprocess `outputMapping` — whose own step dominates
+ * `ownStepIndex`), the count of OTHER, dominating steps' editable view
+ * entries otherwise, `0` for none.
+ *
+ * A step-scoped writer counts only when its own step dominates
+ * `ownStepIndex` (self included — a step dominates itself), computed once
+ * per draft via the same `step-graph.ts` dominance helper the compile
+ * pass's `checkUnsatisfiableRequiredReadonly` uses
+ * (`workflow-engine/schema/step-graph`), so the two can never disagree about
+ * which step guarantees a value first (gate-required-readonly-reachability's
+ * design.md).
+ *
+ * On the entry's OWN step: an action's `onEntry` output always counts;
+ * `onExit`/`onPath`/`onCancel` never do, since they fire only after the
+ * submission gate they cannot help (mirroring `computeWriterSet`'s `!own`
+ * guard, `src/schema/compile.ts`); a timer's `onFire` output counts only
+ * when that timer declares a `targetPath` — a plain reminder timer is not
+ * guaranteed to fire before the participant resubmits. `subprocess.
+ * outputMapping` carries no own-step exclusion: it commits at the
+ * subprocess step's own spawn/return, not gated by a participant submission.
+ * An editable OTHER-step view entry (`visible !== false`, `readonly !==
+ * true`) counts only when that step, other than `ownStepIndex` itself,
+ * dominates it.
+ *
+ * Two documented divergences from the engine's own `computeWriterSet` stay:
+ * `columnMapping`'s target counts unconditionally, body-wide, regardless of
+ * where — or whether — the mapping field is placed editable in the draft
+ * (past the dominance test the two share for every OTHER step-scoped case);
+ * the engine additionally counts a literal catalog `default`, which the
+ * studio does not (design.md § Decisions).
+ *
+ * Shared by `checkViewFlags`'s own finding, the field matrix's flagged-cell
+ * marker (`panels/fieldMatrixLogic.ts`), and `gatedKeys`, so none of the
+ * three can disagree about what "already written" means (design.md decision
+ * 5, `field-matrix-toolbar-and-inline-editing`; decision 2,
+ * `gate-required-readonly-conflict`).
+ */
+export type WrittenAccessor = (fieldId: string, ownStepIndex: number) => number;
+
+export function writtenFieldCounts(body: Draft): WrittenAccessor {
+  const steps = body.workflow?.steps ?? [];
+  const dom = computeDominatorSets(steps, body.workflow?.initialStep);
+  const fieldsById = new Map(flattenDraftFields(body.fields).map((f) => [f.id, f]));
+
+  const contractWritten = new Set<string>();
+  for (const id of body.contract?.inputFields ?? []) {
+    if (id) contractWritten.add(id);
+  }
+  const columnMappingWritten = new Set<string>();
+  for (const field of fieldsById.values()) {
+    for (const target of Object.values(field.columnMapping ?? {})) {
+      if (typeof target === "string") columnMappingWritten.add(target);
+    }
+  }
+
+  return (fieldId: string, ownStepIndex: number): number => {
+    if (contractWritten.has(fieldId) || columnMappingWritten.has(fieldId)) return Infinity;
+
+    const ownStepId = steps[ownStepIndex]?.id;
+    let editableCount = 0;
+    let structural = false;
+
+    for (const [si, step] of steps.entries()) {
+      const own = si === ownStepIndex;
+      const stepDominatesOwn = own || dominates(dom, step.id, ownStepId);
+
+      if (stepDominatesOwn) {
+        const addOutputs = (actions: DraftOf<Action>[] | undefined) => {
+          for (const action of actions ?? []) {
+            if (action?.output && fieldId in action.output) structural = true;
+          }
+        };
+        addOutputs(step.onEntry);
+        if (!own) {
+          addOutputs(step.onExit);
+          addOutputs(step.onCancel);
+          for (const p of step.paths ?? []) addOutputs(p?.onPath);
+        }
+        for (const t of step.timers ?? []) {
+          if (own && typeof t?.onFire?.targetPath !== "string") continue;
+          addOutputs(t?.onFire?.actions);
+        }
+        if (step.subprocess?.outputMapping && fieldId in step.subprocess.outputMapping) structural = true;
+      }
+
+      if (!own && stepDominatesOwn) {
+        for (const entry of step.view?.fields ?? []) {
+          if (entry.ref !== fieldId) continue;
+          if (isGroupField(fieldsById.get(entry.ref))) continue;
+          if (entry.visible === false || entry.readonly === true) continue;
+          editableCount += 1;
+        }
+      }
+    }
+
+    return structural ? Infinity : editableCount;
+  };
 }
 
-/** Which controls the entry's current state disables right now.
+/** `writtenFieldCounts`'s accessor, collapsed to a per-step boolean:
+ * whether a source OTHER than `entry` itself writes `entry`'s field,
+ * guaranteed before `ownStepIndex`. The accessor already excludes `entry`'s
+ * own step from the editable-entry count (a step never counts as an "other"
+ * writer of itself under the dominance rule), so no self-subtraction is
+ * needed here the way the old flat, non-step-aware version required. */
+function writtenByOther(entry: DraftViewField, written: WrittenAccessor, ownStepIndex: number): boolean {
+  if (!entry.ref) return false;
+  return written(entry.ref, ownStepIndex) > 0;
+}
+
+/** Which controls the entry's current state disables right now, for the
+ * step at `ownStepIndex` (the entry's own step).
  *
  * A technical field's entry gates both `required` and `readonly`
  * unconditionally: the definition contract rejects either key on a
@@ -89,126 +191,50 @@ function writtenByOther(entry: DraftViewField, written: Map<string, number>): bo
  * never resolves them for a hidden field. A `visible` holding a CEL
  * expression gates nothing: nobody can read its value without an instance.
  *
- * Where nothing besides `entry` itself already writes the entry's field
- * (`writtenByOther`), `required` and `readonly` gate each other, but only
- * one way: checking one disables the other only while the other does not
- * already read `true`. An entry that already carries both stays fully
- * editable, so an author can always uncheck out of that state (design.md
- * decision 1, `gate-required-readonly-conflict`).
+ * Where nothing besides `entry` itself, guaranteed before `ownStepIndex`,
+ * already writes the entry's field (`writtenByOther`), `required` and
+ * `readonly` gate each other, but only one way: checking one disables the
+ * other only while the other does not already read `true`. An entry that
+ * already carries both stays fully editable, so an author can always
+ * uncheck out of that state (design.md decision 1,
+ * `gate-required-readonly-conflict`).
  */
-export function gatedKeys(entry: DraftViewField, written: Map<string, number>, technicalFieldIds: Set<string>): FlagKey[] {
+export function gatedKeys(
+  entry: DraftViewField,
+  written: WrittenAccessor,
+  technicalFieldIds: Set<string>,
+  ownStepIndex: number,
+): FlagKey[] {
   if (entry.ref !== undefined && technicalFieldIds.has(entry.ref)) return ["required", "readonly"];
   if (entry.visible === false) return ["required", "readonly"];
 
   const gated: FlagKey[] = [];
-  if (!writtenByOther(entry, written)) {
+  if (!writtenByOther(entry, written, ownStepIndex)) {
     if (entry.required === true && entry.readonly !== true) gated.push("readonly");
     if (entry.readonly === true && entry.required !== true) gated.push("required");
   }
   return gated;
 }
 
-/** Whether `key` is one of `entry`'s gated flags right now — the same
- * question `gatedKeys(...).includes(key)` answers, wrapped so the field
- * matrix's `onChange` guard (which carries the native `disabled` attribute's
- * old job, now that a gated checkbox stays enabled for `accent-color`'s sake
- * — design.md's accent-color decision, field-matrix-checkbox-colors) reads
- * as one call instead of re-deriving the array on every keystroke. */
-export function isFlagGated(entry: DraftViewField, written: Map<string, number>, technicalFieldIds: Set<string>, key: FlagKey): boolean {
-  return gatedKeys(entry, written, technicalFieldIds).includes(key);
+/** Whether `key` is one of `entry`'s gated flags right now, for the step at
+ * `ownStepIndex` — the same question `gatedKeys(...).includes(key)` answers,
+ * wrapped so the field matrix's `onChange` guard (which carries the native
+ * `disabled` attribute's old job, now that a gated checkbox stays enabled
+ * for `accent-color`'s sake — design.md's accent-color decision,
+ * field-matrix-checkbox-colors) reads as one call instead of re-deriving the
+ * array on every keystroke. */
+export function isFlagGated(
+  entry: DraftViewField,
+  written: WrittenAccessor,
+  technicalFieldIds: Set<string>,
+  key: FlagKey,
+  ownStepIndex: number,
+): boolean {
+  return gatedKeys(entry, written, technicalFieldIds, ownStepIndex).includes(key);
 }
 
 function readerLabel(field: DraftField | undefined, ref: string): string {
   return field?.key || ref;
-}
-
-/**
- * Every field id some source in the body supplies a value for, counted: a
- * live, editable (`visible !== false`, `readonly !== true`) view entry adds
- * one FOR EACH such entry the field has anywhere in the draft; an action's
- * `output`, a step's `subprocess.outputMapping`, a field's `columnMapping`,
- * or a `contract.inputFields` entry each add `Infinity`, since none of those
- * four is ever the specific view entry a caller is asking about. `gatedKeys`
- * (via `writtenByOther`) needs the count, not just presence, to tell "some
- * OTHER source writes this field" apart from "this very entry, still
- * editable, is the only reason the field reads as written" — a plain
- * Set<string> can't make that distinction. Shared by `checkViewFlags`'s own
- * finding, the field matrix's flagged-cell marker (`panels/
- * fieldMatrixLogic.ts`), and `gatedKeys`, so none of the three can disagree
- * about what "already written" means (design.md decision 5, `field-matrix-
- * toolbar-and-inline-editing`; decision 2, `gate-required-readonly-
- * conflict`).
- *
- * `checkUnwrittenTechnicalFields` (technical-field-marker) reads this count
- * for a fourth reason, and this doc comment's headline sentence — "every
- * field id some source in the body supplies a value for" — stops holding for
- * the case that finding exists to catch. A technical field's view entry can
- * carry no `readonly` key (the compile pass forbids it), so every step that
- * places the field visibly bumps this count by one, same as any other
- * editable entry — while supplying the field no value at all, since a
- * technical field always resolves `readonly: true` regardless of the view.
- * One entry bump is therefore not proof of a writer for a technical field,
- * the way it is for an ordinary one. `checkUnwrittenTechnicalFields` reads
- * finiteness rather than presence for exactly this reason: a finite count
- * means no STRUCTURAL source writes the field, whatever a view entry's own
- * bump contributes. `writtenFieldIds` collapses finite-vs-infinite to
- * presence and so cannot serve it — every placed technical field would read
- * as written. The other two consumers stay unaffected: `isCellFlagged`
- * needs `required && readonly` together, which a technical entry can never
- * carry (its `readonly` always resolves true, forcing `required` false), and
- * `gatedKeys` gates a technical entry's `required`/`readonly` before it ever
- * reads this map.
- */
-export function writtenFieldCounts(body: Draft): Map<string, number> {
-  const steps = body.workflow?.steps ?? [];
-  const fieldsById = new Map(flattenDraftFields(body.fields).map((f) => [f.id, f]));
-  const counts = new Map<string, number>();
-  const bump = (id: string, by: number) => counts.set(id, (counts.get(id) ?? 0) + by);
-
-  for (const step of steps) {
-    for (const entry of step.view?.fields ?? []) {
-      const field = entry.ref ? fieldsById.get(entry.ref) : undefined;
-      if (isGroupField(field)) continue;
-      if (entry.visible !== false && entry.readonly !== true && entry.ref) bump(entry.ref, 1);
-    }
-    const actionLists = [
-      step.onEntry,
-      step.onExit,
-      step.onCancel,
-      ...(step.paths ?? []).map((p) => p.onPath),
-      ...(step.timers ?? []).map((t) => t.onFire?.actions),
-    ];
-    for (const list of actionLists) {
-      for (const action of list ?? []) {
-        for (const key of Object.keys(action?.output ?? {})) bump(key, Infinity);
-      }
-    }
-    for (const key of Object.keys(step.subprocess?.outputMapping ?? {})) bump(key, Infinity);
-  }
-  for (const field of fieldsById.values()) {
-    for (const target of Object.values(field.columnMapping ?? {})) {
-      if (typeof target === "string") bump(target, Infinity);
-    }
-  }
-  for (const id of body.contract?.inputFields ?? []) {
-    if (id) bump(id, Infinity);
-  }
-
-  return counts;
-}
-
-/** `writtenFieldCounts`, collapsed to presence. Every consumer that only
- * asks "is this field written at all" — `checkViewFlags`'s own finding, the
- * field matrix's flagged-cell marker — reads this instead: neither examines
- * one specific entry's own contribution the way `gatedKeys` does, so neither
- * needs the count. */
-export function writtenFieldIds(body: Draft): Set<string> {
-  const counts = writtenFieldCounts(body);
-  const written = new Set<string>();
-  for (const [id, count] of counts) {
-    if (count > 0) written.add(id);
-  }
-  return written;
 }
 
 /**
@@ -224,10 +250,10 @@ export function checkViewFlags(body: Draft): EditorIssue[] {
   const issues: EditorIssue[] = [];
   const steps = body.workflow?.steps ?? [];
   const fieldsById = new Map(flattenDraftFields(body.fields).map((f) => [f.id, f]));
-  const written = writtenFieldIds(body);
+  const written = writtenFieldCounts(body);
 
-  for (const step of steps) {
-    if (!step.id) continue;
+  steps.forEach((step, stepIndex) => {
+    if (!step.id) return;
     for (const entry of step.view?.fields ?? []) {
       if (!entry.ref) continue;
       const field = fieldsById.get(entry.ref);
@@ -243,7 +269,7 @@ export function checkViewFlags(body: Draft): EditorIssue[] {
         });
       }
 
-      if (entry.readonly === true && entry.required === true && !written.has(entry.ref)) {
+      if (entry.readonly === true && entry.required === true && written(entry.ref, stepIndex) === 0) {
         issues.push({
           entityType: "step",
           entityId: step.id,
@@ -252,9 +278,55 @@ export function checkViewFlags(body: Draft): EditorIssue[] {
         });
       }
     }
-  }
+  });
 
   return issues;
+}
+
+/** A field's structural (non-editable-entry) writers, body-wide and
+ * position-unconditional — action output at any position, subprocess
+ * `outputMapping`, `columnMapping`, `contract.inputFields` — mirroring the
+ * pre-dominance `computeWriterSet`'s own unconditional accumulation.
+ * `checkUnwrittenTechnicalFields` alone reads this (task 3.5): a
+ * `technical` field's requiredness is forced engine-wide, not per-step, so
+ * its "does anything write it" check stays body-wide even after
+ * `writtenFieldCounts`'s return shape became step-aware. Folding across
+ * every step's dominance-scoped, own-step-reminder-timer-excluded count
+ * would wrongly miss a technical field whose sole writer is a same-step
+ * reminder timer: that timer's output is real (it fires and writes the
+ * field every time), and the reminder-timer exclusion exists only to serve
+ * the required+readonly "guaranteed before submission" rule. */
+function structuralWriterIds(body: Draft): Set<string> {
+  const steps = body.workflow?.steps ?? [];
+  const written = new Set<string>();
+
+  for (const step of steps) {
+    const actionLists = [
+      step.onEntry,
+      step.onExit,
+      step.onCancel,
+      ...(step.paths ?? []).map((p) => p?.onPath),
+      ...(step.timers ?? []).map((t) => t?.onFire?.actions),
+    ];
+    for (const list of actionLists) {
+      for (const action of list ?? []) {
+        for (const key of Object.keys(action?.output ?? {})) written.add(key);
+      }
+    }
+    for (const key of Object.keys(step.subprocess?.outputMapping ?? {})) written.add(key);
+  }
+
+  const fieldsById = new Map(flattenDraftFields(body.fields).map((f) => [f.id, f]));
+  for (const field of fieldsById.values()) {
+    for (const target of Object.values(field.columnMapping ?? {})) {
+      if (typeof target === "string") written.add(target);
+    }
+  }
+  for (const id of body.contract?.inputFields ?? []) {
+    if (id) written.add(id);
+  }
+
+  return written;
 }
 
 /**
@@ -268,21 +340,21 @@ export function checkViewFlags(body: Draft): EditorIssue[] {
  * own rejection of a technical field's wired-editable view entry is the
  * publish-blocking half of this pair (design.md).
  *
- * Reads `writtenFieldCounts`, not `writtenFieldIds`: see that function's own
- * doc comment for why presence cannot serve this rule. `FieldDef.default`
- * exempts nothing — nothing in the engine applies a `default` to
- * `instance.data`, so a technical field whose only "writer" is a `default`
- * still never holds a value, which is exactly the case this finding exists
- * to report (design.md Risks).
+ * Reads `structuralWriterIds`, not the step-aware `writtenFieldCounts`: see
+ * that function's own doc comment for why. `FieldDef.default` exempts
+ * nothing — nothing in the engine applies a `default` to `instance.data`,
+ * so a technical field whose only "writer" is a `default` still never holds
+ * a value, which is exactly the case this finding exists to report
+ * (design.md Risks).
  */
 export function checkUnwrittenTechnicalFields(body: Draft): EditorIssue[] {
   const issues: EditorIssue[] = [];
   const fieldsById = new Map(flattenDraftFields(body.fields).map((f) => [f.id, f]));
-  const counts = writtenFieldCounts(body);
+  const structural = structuralWriterIds(body);
 
   for (const field of fieldsById.values()) {
     if (field.technical !== true || field.id === undefined) continue;
-    if (!Number.isFinite(counts.get(field.id) ?? 0)) continue; // Infinity => a structural writer
+    if (structural.has(field.id)) continue;
     issues.push({
       entityType: "field",
       entityId: field.id,
