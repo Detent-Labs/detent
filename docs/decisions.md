@@ -57,6 +57,228 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   each id. Do not build this ahead of that ask.
 
 ## Decided, not yet built (each needs its own OpenSpec change)
+- **Instance audit log: a tamper-evident change record for field data.** A
+  design pass on 2026-08-25 settled the shape; the owner approved each piece
+  in turn. Not started. Likely several changes: the table + trigger, the
+  chain + checkpoint, the `redactable` flag + redaction rework.
+
+  **The goal.** Every change to an instance's `data` leaves one readable
+  record: which field, old value visible in clear text, who, when, from
+  which write path. The record is complete by construction, not by
+  discipline, and a reader with database access cannot alter or remove an
+  entry without a later verification detecting it. Redaction of a field on
+  request stays possible without breaking that verification, and it covers
+  the field's whole history in one act, never a single step's value.
+
+  **The design.**
+  - One table, `instance_audit`, one row per field change (a delta, not an
+    instance snapshot): `instance_id`, `seq`, `field_id`, `op` (`set` |
+    `redact`), `value`, `salt`, `value_hash`, `prev_hash`, `hash`, plus
+    actor, timestamp, and `source` (user submit, action writeback,
+    subprocess return, migration, redaction).
+  - A Postgres trigger on `instances` writes the rows. That places the log
+    below all five body-writing sites (`transition.ts`, `outbox.ts`,
+    `subprocess.ts`, claim/release, `retention.ts`) and below any future
+    sixth, which is the completeness argument. The trigger function is
+    `SECURITY DEFINER`; the app role gets `REVOKE UPDATE, DELETE` on the
+    table, so the application can only append.
+  - Hash chain per instance: each row's `hash` covers the row's metadata,
+    its `value_hash`, and `prev_hash`. A nightly checkpoint gathers every
+    chain head and signs it with a key that lives outside the database;
+    the signed checkpoint is stored outside the database too. The chain
+    catches an edited row; the checkpoint catches a recomputed chain.
+  - `FieldDef` gains `redactable: true`. A redactable field's `value_hash`
+    is `H(salt || value)` with a per-row salt; a plain field hashes the
+    value directly. The flag must hold at write time — rows written before
+    a field became redactable hash the clear value and can never be nulled
+    without breaking the chain, so the studio should encourage marking
+    generously at authoring time. The name deliberately states the
+    treatment, not a legal category: no `personal`, no `gdpr`, no `pii`.
+  - Redaction = append one `redact` row naming who, when, why, and which
+    fields, then null `value` and `salt` in every prior row of those
+    fields, across the whole instance. The fingerprints stay, so every
+    hash still verifies. This replaces the current `redactInstance`
+    wipe-`data`-to-`{}` approach; the `data-retention` spec's sentence
+    "history carries no field values, so it needs no redaction" stops
+    being true the moment this lands and must be rewritten in the same
+    change.
+
+  **Explicitly not the goal.**
+  - Not tamper-*proof*, tamper-*evident*: a superuser can rewrite rows,
+    silence the trigger (`session_replication_role = replica`), or drop
+    the table; the checkpoint makes that detectable, never impossible.
+  - Values in clear text on purpose. "Who was originally in this field"
+    must be readable in the audit view without ceremony; an
+    encrypt-at-rest variant (crypto-shredding, which would also have
+    reached old backups) was considered 2026-08-25 and traded away for
+    that readability. Consequence accepted by the owner: a backup taken
+    before a redaction keeps the clear value until the backup itself
+    expires — a rolling backup retention window is the answer, in ops
+    documentation, not in this schema.
+  - No full-instance snapshot per row. "State after step 3" is a replay of
+    rows up to a `seq`, not a stored copy.
+  - No key management. The salt is not a key; it exists so a nulled
+    value cannot be recovered by brute-forcing `H(value)` over a small
+    value space, and it dies with the value.
+  - Not append-everywhere: `instance_comments` and `instance_attachments`
+    stay outside this log and keep their delete-on-redaction handling.
+
+  **Open, deliberately.** Whether actor identities (`actorId` in
+  `history_entries`, claim records, comment authors) are themselves ever
+  redactable is a separate decision with a different retention logic —
+  removing them guts the audit trail's central question. And a redaction
+  request arrives as "this person's data", not as an instance id; finding
+  every instance holding that person needs the cross-instance query
+  machinery of the aggregated-data-source / reporting topics, which were
+  still under design when this entry was written.
+- **Aggregated data source: a field's options read from other instances.** A
+  design pass on 2026-08-25 settled the shape, in the same session as the
+  instance audit log above. Not started.
+
+  **The goal.** A field's option list can come from the field values of
+  other instances. The worked case: an onboarding step offers only the
+  laptops that no other running onboarding instance holds. The author
+  configures it in a form, the publish validates it, and no author writes
+  CEL or SQL to get it.
+
+  **The design.**
+  - A third data source registry type, `instance.query`, beside the
+    existing `static` and `db.list`. Its config names the target process,
+    a status set, a list of field comparisons, and which field supplies an
+    option's value and which its label. A comparison's right side is a
+    literal or a field of the *reading* instance, which is what makes the
+    form cover real cases ("same location as this instance") instead of
+    constants only.
+  - Publish validates every field reference against the target process's
+    field catalog, through the same registry-at-publish-time mechanism
+    `db.list` already uses.
+  - The studio's config form is generated from the handler's Zod schema by
+    `src/engine/config-descriptor.ts`, so no second description of the
+    form is maintained beside the schema.
+  - Read authorization is the existing process-scoped `permission_grants`,
+    checked at publish against the author.
+  - Free SQL stays reachable, but only as a separate registry type against
+    an *external* database, with the connection in operations config
+    rather than in a process definition.
+
+  **Explicitly not the goal.**
+  - No SQL against the engine's own `instances` from any authoring
+    surface. A query there would bypass tenancy, version pinning, and the
+    redaction state of a value. `instance.query` is the only way in.
+  - No CEL over foreign instances. The standing decision that keeps CEL
+    data-source-blind is not reopened here. A `other.data.x == data.x`
+    filter expression was weighed on 2026-08-25 and dropped: it needs a
+    second CEL context, a publish check against a foreign catalog, and a
+    translation to SQL, for cases the form already covers.
+  - No per-field export lists and no cross-process release lists. An
+    author changing process A never has to republish and migrate process
+    B. That was the owner's stated reason for rejecting both.
+  - No per-instance visibility. Consequence accepted on 2026-08-25: an
+    actor granted read on process B sees, through a data source, values
+    from every B instance, including instances they could not open in the
+    app.
+  - The form is a small query language, and calling it "no-code" would be
+    a false claim. What it buys over free SQL is field ids as stable
+    anchors that publish can check, a layer that hides how instance data
+    is stored, and a boundary that can be widened later but never
+    narrowed once definitions depend on it.
+
+  **Open, deliberately.** Per-instance visibility ("who may see instance
+  101") stays open, and it is a larger decision than this topic: the same
+  rule would govern the instance list, the detail view, and reporting.
+  Nothing carries such a list today — `assignment.candidates` covers the
+  current step only, and `instance-query`'s spec states the read is not
+  implicitly scoped to the calling actor. Two shapes were sketched on
+  2026-08-25: accumulate participants as an instance moves through its
+  steps, plus an optional per-process `visibleTo` naming the fields that
+  carry people, for the starter-not-a-candidate gap. Adding it later only
+  narrows a result set, so it invalidates no published definition.
+
+  One property rests on the choice above and would end with it: because
+  authorization settles at publish, runtime resolution needs no actor at
+  all. A timer, an outbox delivery, an automatic transition, a migration,
+  and a participant's open form all resolve the same list. Should
+  per-instance filtering land, submission validation has to decide whether
+  it checks membership against the viewer's list or the full one, and the
+  actor-free execution paths need an answer for whose view they use.
+- **Instance data tables: a report builder over instance field values.** A
+  design pass on 2026-08-25 settled the shape, in the same session as the
+  two entries above. Not started.
+
+  **The goal.** A department builds a table of instances and reads their
+  field values as columns. The worked case: HR lists every onboarding of
+  the last twelve months with `new_employee`, `start_date` and
+  `assigned_manager` as columns. The table is saved, named, and shared
+  with the people who need it.
+
+  **The design.**
+  - The query half is the same one `instance.query` uses (target process,
+    status, date range, field comparisons). Build it once, not twice. The
+    output half differs: several fields become columns rather than one
+    field becoming an option list.
+  - `listInstances` deliberately carries no `data` payload, so this is a
+    read beside it, not a widened version of it.
+  - Column choices come from the **union** of the field catalogs of every
+    version in range, each field marked with the versions that hold it. An
+    instance spans versions over twelve months, and a backward-looking
+    table is exactly the case that needs a field a later version dropped.
+  - A cell is empty for three different reasons, and the three render
+    differently: the field held no value, the field did not exist in that
+    instance's version, and the value was redacted. One rendering for all
+    three would make a reader draw wrong conclusions.
+  - One computed column type, and only one: **merge**, which collects the
+    first non-empty value from an ordered list of fields. It covers a
+    value that moved between differently named fields across versions,
+    for instances a migration plan never touched. Where two source fields
+    both hold a value, the cell concatenates and marks the collision, and
+    the editor counts the affected rows. Concatenating is ugly on purpose:
+    overwriting produces a table that looks right and is wrong, which is
+    the worse failure for a report. A merged column of mixed source types
+    is text, so it sorts as text.
+  - A saved report is a stored object with an `owner` and two principal
+    lists, `viewers` and `editors`. Both hold actor ids and role or group
+    names mixed, matched by the same `isEligibleCandidate` the assignment
+    candidates already use. A personal report is not a mode: it is a
+    report whose lists are empty. The owner cannot be removed from
+    `editors`, so a delegate cannot lock out the person who built it.
+  - Report visibility and process read grants **both** apply. A viewer
+    without a `permission_grants` read on the target process gets an
+    empty table. Sharing a report can therefore only narrow what someone
+    already reads, never widen it, which is what makes an `anyone` share
+    safe.
+
+  **Explicitly not the goal.**
+  - Not the three existing reporting views. Cycle time, bottleneck and
+    SLA (`src/engine/reporting.ts`) compute over time and stay as they
+    are. This is a different artifact that reads field values.
+  - No expression language in the report editor. Merge collects values;
+    it does not compute. Arithmetic, conditions and formatting rules are
+    a second language beside CEL and are not built on speculation.
+  - No aggregates, groupings or charts in the first shape. The owner's
+    request was a table of instances and their values.
+  - A report never grants data access. Rejected 2026-08-25 because it
+    would turn sharing into permission delegation that no administrator
+    sees in `permission_grants`.
+  - No validation that blocks sharing a report with someone who lacks the
+    process grant. Building a report for a viewer with no access to its
+    source is an author mistake, not a case for the engine to prevent.
+    A hint in the editor naming such a viewer is welcome; an error is not.
+  - No as-of values. The table reads current values. Reading a value as
+    of a past date becomes possible once the audit log above exists, and
+    it is a later ask, not part of this.
+
+  **Open, deliberately.** A download of the table (CSV for a department,
+  NDJSON for a machine) is the obvious next request and is unbuilt; it
+  meets the export question this file already records under Open
+  questions. Sorting and filtering a table over field values reads
+  `body->'data'` through expression paths with no index, the same shape
+  `reporting.ts` already carries a note about for `startedAt`. That is
+  where the owner's 2026-08-25 suggestion bites — promote the fields whose
+  structure never changes (`processId`, `version`, `status`,
+  `currentStepId`, `startedAt`, `startedBy`) out of `body` into real
+  columns, retiring the six expression indexes that stand in for them
+  today. It is worth its own change and helps more than this feature.
+  `data` itself cannot follow: its key set belongs to a process version.
 - **Process-scoped permissions: the filter, the draft scope, and the
   `permissions` booleans.** A design pass on 2026-08-15 settled the shape;
   `ROADMAP.md` stage 40 carries it in full. The seam shipped 2026-08-15 as
