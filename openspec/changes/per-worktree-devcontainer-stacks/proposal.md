@@ -30,8 +30,8 @@ the same tables. The second worktree to publish its dev ports loses the bind.
 ## Capabilities
 
 ### New Capabilities
-- `worktree-isolation`: how a checkout derives its own Compose project name and
-  host ports, what stays shared, and what the main checkout keeps.
+- `worktree-isolation`: what a checkout derives for itself, and what the main
+  checkout keeps unchanged.
 
 ### Modified Capabilities
 - `development-toolchain`: the dev port assignment gains a per-checkout offset,

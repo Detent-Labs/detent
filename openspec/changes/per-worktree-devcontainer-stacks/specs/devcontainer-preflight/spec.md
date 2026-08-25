@@ -7,8 +7,8 @@ command SHALL be the literal command, not a description of one.
 
 A command that drives Docker SHALL reach the checkout the preflight ran in.
 Each checkout derives its own Compose project. A command naming the compose
-file alone reaches a different stack, once a developer copies it out of a
-linked worktree.
+file alone reaches a different stack. That happens once a developer copies it
+out of a linked worktree.
 
 Some checks name no single repair command. Such a check SHALL print the file
 to change, and the line it needs.

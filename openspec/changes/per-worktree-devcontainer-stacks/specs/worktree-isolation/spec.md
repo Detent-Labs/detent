@@ -8,11 +8,11 @@ checkout derives, what the main checkout keeps, and how a collision surfaces.
 
 ### Requirement: A checkout derives its own devcontainer identity
 
-The repository SHALL carry one script deriving two things from the checkout it
-runs in: the Compose project name, and the host ports. Every caller that drives
-Docker SHALL read those values from that script. No caller SHALL name a project
-or a port itself. A caller sources the script and reads the values as
-environment variables.
+The repository SHALL carry one script. It derives two values from the checkout
+it runs in. Those are the Compose project name and the host ports. Every
+caller that drives Docker SHALL read those values from that script. No caller
+SHALL name a project or a port itself. A caller sources the script and reads
+the values as environment variables.
 
 The script SHALL ask git which kind of checkout it runs in. It SHALL NOT test
 the filesystem for a `.git` directory. A linked worktree holds a `.git` file
@@ -56,9 +56,9 @@ valid.
 
 ### Requirement: A worktree's stack answers only that worktree
 
-Each checkout's Compose project SHALL own four things: an application
-container, a database server, a mail catcher, and a persistent database volume.
-No two checkouts SHALL share any of them.
+Each checkout's Compose project SHALL own its own application container,
+database server, mail catcher and database volume. No two checkouts SHALL
+share any of them.
 
 A command a developer runs in one checkout SHALL reach that checkout's
 containers, and no other checkout's. The application container SHALL bind-mount
@@ -106,5 +106,5 @@ worktree, and no fixed number holds everywhere.
 #### Scenario: A bring-up names its addresses
 
 - **WHEN** a developer brings up a worktree's stack
-- **THEN** the output names the host address of the engine, of the frontend dev
-  server, and of the mail catcher's web interface
+- **THEN** the output names three host addresses: the engine, the frontend dev
+  server, and the mail catcher

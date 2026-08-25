@@ -38,9 +38,9 @@ than assumed:
 
 ### One Compose project per checkout, not one container with many mounts
 
-The alternative mounts every worktree into a single container under a common
-parent, and isolates them by a database name per mount. It costs less memory:
-one Postgres rather than one per checkout.
+The alternative mounts every worktree into a single container. One database
+name per mount isolates them. It costs less memory: one Postgres rather than
+one per checkout.
 
 This design rejects it on where the friction lands. Adding a worktree means
 regenerating the override and recreating the shared container. That interrupts
@@ -50,15 +50,15 @@ The memory saving arrives once. The interruption arrives on the daily path.
 
 The project-per-checkout design also leaves the existing test-database rule
 alone. Under the shared-container design `DATABASE_URL` is one container-wide
-value. Every command would have to override it per invocation, and a caller
-that forgot would drive the wrong database without saying so.
+value. Every command would have to override it per invocation. A caller that
+forgot would drive the wrong database silently.
 
 ### The derivation reads the directory name, not the branch
 
 A developer renames a branch and checks it out elsewhere. A worktree directory
-keeps the name it got when it was created. Deriving from the branch would
-change a worktree's project name under it. Every branch switch would then
-orphan that worktree's containers and its database volume.
+keeps the name its creator gave it. Deriving from the branch would change a
+worktree's project name under it. Every branch switch would then orphan that
+worktree's containers and its database volume.
 
 ### The main checkout keeps the established identity
 
@@ -76,10 +76,10 @@ to all three published ports, so one worktree's addresses stay easy to read
 together.
 
 A hash admits collisions. The alternative allocator scans what is already
-bound and records its choice. It removes collisions, and it costs a state file
-to keep in sync, a first-run ordering dependence, and a stale entry whenever
+bound and records its choice. It removes collisions. It costs a state file to
+keep in sync, a first-run ordering dependence, and a stale entry whenever
 somebody deletes a worktree. With a handful of worktrees a collision is
-unlikely, and it cannot hide: Docker refuses the second bind and names the
+unlikely. It also cannot hide. Docker refuses the second bind and names the
 port. The script carries a `ponytail:` comment naming that ceiling and the
 allocator as the upgrade path.
 
@@ -90,10 +90,10 @@ the service definition lets the first build populate it and the rest reuse it.
 
 ## Risks / Trade-offs
 
-- The host address differs from Vite's listening port, so the hot-reload
-  client opens its socket on the wrong number → the package reads the client
-  port from the environment. This is the only place the change reaches past
-  infrastructure into application config. The delta spec words it as
+- The host address differs from Vite's listening port → the package reads the
+  hot-reload client port from the environment. Without that, the client opens
+  its socket on the wrong number. This is the only place the change reaches
+  past infrastructure into application config. The delta spec words it as
   observable behavior rather than as a config detail.
 - Two worktrees hash to one offset → the second bring-up fails with a
   port-binding error naming the port. Loud, immediate, and repaired by
@@ -105,8 +105,8 @@ the service definition lets the first build populate it and the rest reuse it.
   dropping the `name:` literal makes that visible. The command then finds no
   containers at all, rather than somebody else's.
 - Documentation naming a fixed address goes stale in a worktree →
-  `docs/browser-checks.md` and the devcontainer skill word the address as
-  derived, and the bring-up prints what it bound.
+  `docs/browser-checks.md` and the devcontainer skill word it as derived. The
+  bring-up prints what it bound.
 
 ## Migration Plan
 
