@@ -59,34 +59,86 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
 ## Decided, not yet built (each needs its own OpenSpec change)
 - **Instance audit log: a tamper-evident change record for field data.** A
   design pass on 2026-08-25 settled the shape; the owner approved each piece
-  in turn. Not started. Likely several changes: the table + trigger, the
-  chain + checkpoint, the `redactable` flag + redaction rework.
+  in turn. Not started. Three changes, in this order.
+
+  1. The table, the `AFTER INSERT OR UPDATE` trigger, the `set_config` call
+     at all five write sites, the hash chain, and
+     `verify_instance_chain()`. The chain belongs here rather than in a
+     later change: a row written without `prev_hash` and `hash` needs its
+     chain computed after the fact, and a chain computed after the fact
+     proves nothing about the window before it existed. Either the log is
+     chained from its first row, or the first rows are decoration.
+  2. `FieldDef.redactable`, the salted `value_hash`,
+     `redact_instance_fields()`, and the rework of `redactInstance`. This
+     one touches `FieldDef`, so it is a definition-contract change and
+     carries that ceremony: the spec delta, the `examples/` sweep,
+     `docs/authoring-guide.md`, and a test that rejects a violating input.
+  3. The nightly checkpoint, its signing key, and where the signed
+     checkpoint is stored. This is the piece with no home in the repository
+     today — there is no key store and no secret-management convention — so
+     it stays last. The chain alone already catches an edited row; the
+     checkpoint only adds the recomputed-chain case, and it slots in later
+     without changing the chain's shape.
 
   **The goal.** Every change to an instance's `data` leaves one readable
   record: which field, old value visible in clear text, who, when, from
-  which write path. The record is complete by construction, not by
-  discipline, and a reader with database access cannot alter or remove an
-  entry without a later verification detecting it. Redaction of a field on
-  request stays possible without breaking that verification, and it covers
-  the field's whole history in one act, never a single step's value.
+  which write path. The record itself is complete by construction: the
+  trigger fires on every write, so no site can omit a row. A reader with
+  database access cannot alter or remove an entry without a later
+  verification detecting it. Redaction of a field on request stays
+  possible without breaking that verification, and it covers the field's
+  whole history in one act, never a single step's value.
+
+  Attribution is not complete the same way. A trigger sees `OLD` and `NEW`
+  and nothing else, so the actor and the source reach it through a
+  transaction-scoped setting each write path sets before its own statement
+  — `SELECT set_config('detent.actor', $1, true)`, read back as
+  `current_setting('detent.actor', true)`, whose second argument makes a
+  missing setting return null instead of raising. A path that forgets
+  writes a row with a null actor. That is a visible gap rather than a
+  missing entry: the field change is still recorded, and a constraint or
+  an operator query finds the unattributed rows. Nothing in `src/` sets a
+  session variable today, so all five sites gain the call.
 
   **The design.**
   - One table, `instance_audit`, one row per field change (a delta, not an
-    instance snapshot): `instance_id`, `seq`, `field_id`, `op` (`set` |
-    `redact`), `value`, `salt`, `value_hash`, `prev_hash`, `hash`, plus
-    actor, timestamp, and `source` (user submit, action writeback,
-    subprocess return, migration, redaction).
-  - A Postgres trigger on `instances` writes the rows. That places the log
-    below all five body-writing sites (`transition.ts`, `outbox.ts`,
-    `subprocess.ts`, claim/release, `retention.ts`) and below any future
-    sixth, which is the completeness argument. The trigger function is
-    `SECURITY DEFINER`; the app role gets `REVOKE UPDATE, DELETE` on the
-    table, so the application can only append.
+    instance snapshot): `instance_id`, `seq`, `transition_seq`, `field_id`,
+    `op` (`set` | `redact`), `value`, `salt`, `value_hash`, `prev_hash`,
+    `hash`, plus actor, timestamp, and `source` (user submit, action
+    writeback, subprocess return, migration, redaction). The two sequence
+    columns count different things. `seq` orders field changes within the
+    instance and carries the chain. `transition_seq` is copied from
+    `NEW.transition_seq`, which the trigger already holds, and it is the
+    join to `history_entries` and `instance_events` — both key on
+    `(instance_id, transition_seq)` and both index it. Without that column
+    there is no way to ask which step changed a field, and the "state after
+    step 3" replay below has no boundary to replay to.
+  - A Postgres trigger on `instances`, `AFTER INSERT OR UPDATE`, writes the
+    rows. The `INSERT` half is load-bearing: `createProcessInstance`
+    inserts a row whose `body` already carries start-form data and seeded
+    `FieldDef.default` values, so an update-only trigger would leave every
+    field's first value out of the log and record the second write as the
+    first `set`. On insert `OLD` is null and the diff is every key in
+    `NEW.body->'data'`. The trigger places the log below all five
+    body-writing sites (`transition.ts`, `outbox.ts`, `subprocess.ts`,
+    claim/release, `retention.ts`) and below any future sixth, which is the
+    completeness argument. The trigger function is `SECURITY DEFINER`; the
+    app role gets `REVOKE UPDATE, DELETE` on the table, so the application
+    can only append.
   - Hash chain per instance: each row's `hash` covers the row's metadata,
-    its `value_hash`, and `prev_hash`. A nightly checkpoint gathers every
-    chain head and signs it with a key that lives outside the database;
-    the signed checkpoint is stored outside the database too. The chain
-    catches an edited row; the checkpoint catches a recomputed chain.
+    its `value_hash`, and `prev_hash`. Verification runs in SQL, as a
+    `verify_instance_chain(instance_id)` function beside the trigger. The
+    trigger hashes with the built-in `sha256()` (no `pgcrypto`) over
+    Postgres's own `jsonb` rendering of the value, which is deterministic
+    but is not RFC 8785: `jsonb::text` emits `{"a": 1}` where
+    `src/schema/canonical-json.ts` emits `{"a":1}`. A verifier written in
+    TypeScript would have to reproduce a Postgres formatting detail exactly
+    and would break silently on the first value shape nobody tried, so it
+    calls the SQL function rather than recomputing the digest. A nightly
+    checkpoint gathers every chain head and signs it with a key that lives
+    outside the database; the signed checkpoint is stored outside the
+    database too. The chain catches an edited row; the checkpoint catches a
+    recomputed chain.
   - `FieldDef` gains `redactable: true`. A redactable field's `value_hash`
     is `H(salt || value)` with a per-row salt; a plain field hashes the
     value directly. The flag must hold at write time — rows written before
@@ -97,7 +149,16 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   - Redaction = append one `redact` row naming who, when, why, and which
     fields, then null `value` and `salt` in every prior row of those
     fields, across the whole instance. The fingerprints stay, so every
-    hash still verifies. This replaces the current `redactInstance`
+    hash still verifies. One narrower check stops, by design: a redacted
+    row's `value_hash` can no longer be checked against its `value`,
+    because the value is gone. The chain still proves that the row was not
+    inserted, reordered or edited. Nulling a prior row is itself an
+    `UPDATE` on a table the app role no longer holds `UPDATE` on, so
+    redaction is a second `SECURITY DEFINER` function that appends the
+    `redact` row and nulls the priors in one place. That function is the
+    deliberate hole in the append-only property and the piece an auditor
+    will ask about, so keep it short enough to read in one sitting. This
+    replaces the current `redactInstance`
     wipe-`data`-to-`{}` approach; the `data-retention` spec's sentence
     "history carries no field values, so it needs no redaction" stops
     being true the moment this lands and must be rewritten in the same
@@ -122,6 +183,11 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     value space, and it dies with the value.
   - Not append-everywhere: `instance_comments` and `instance_attachments`
     stay outside this log and keep their delete-on-redaction handling.
+    `instance_drafts` stays outside too, for a second reason beside that
+    one: a participant's in-progress form data never passes through
+    `instances.body`, so the trigger never sees it, and an uncommitted
+    draft is not a change to field data. It keeps its own
+    delete-on-redaction handling as well.
 
   **Open, deliberately.** Whether actor identities (`actorId` in
   `history_entries`, claim records, comment authors) are themselves ever
