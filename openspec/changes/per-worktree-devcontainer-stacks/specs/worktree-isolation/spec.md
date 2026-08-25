@@ -1,112 +1,110 @@
 ## Purpose
 
-Keeps concurrent work in several git worktrees from colliding, by giving each
-checkout its own devcontainer stack rather than a share of one. Names what a
-checkout derives for itself, what the main checkout keeps unchanged, and how a
-collision surfaces.
+Keeps concurrent work in several git worktrees from colliding. Each checkout
+gets its own devcontainer stack rather than a share of one. Names what a
+checkout derives, what the main checkout keeps, and how a collision surfaces.
 
 ## ADDED Requirements
 
 ### Requirement: A checkout derives its own devcontainer identity
 
-The repository SHALL carry one script that derives, from the checkout it runs
-in, the Compose project name and the host ports that checkout uses. Every
-caller that drives Docker SHALL take those values from that script rather than
-naming a project or a port itself. The script SHALL be sourced, so a caller
-receives the values as environment variables.
+The repository SHALL carry one script deriving two things from the checkout it
+runs in: the Compose project name, and the host ports. Every caller that drives
+Docker SHALL read those values from that script. No caller SHALL name a project
+or a port itself. A caller sources the script and reads the values as
+environment variables.
 
-The derivation SHALL distinguish a main checkout from a linked worktree by
-asking git, not by testing the filesystem for a `.git` directory. In a linked
-worktree `.git` is a file holding a pointer, so a directory test answers false
-inside a real repository.
+The script SHALL ask git which kind of checkout it runs in. It SHALL NOT test
+the filesystem for a `.git` directory. A linked worktree holds a `.git` file
+rather than a directory, so that test answers false inside a real repository.
 
-A main checkout SHALL derive the project name and ports the repository used
-before this capability existed. A clone therefore behaves as it always has, and
-a hosted CI runner, which clones rather than adds a worktree, needs no
-knowledge of this capability at all.
+In a main checkout the script SHALL return the project name and the ports this
+repository used before the change. A clone then behaves as it always has. A
+hosted CI runner clones rather than adding a worktree, so it needs no knowledge
+of this capability.
 
-A linked worktree SHALL derive a project name and a port set of its own, both
-determined by the worktree's directory name alone. The same worktree therefore
-derives the same values on every run, and a bookmarked address stays valid for
-the life of that worktree.
+In a linked worktree the script SHALL return a project name and a port set of
+its own. The worktree's directory name alone determines both. The same worktree
+therefore returns the same values on every run, and a bookmarked address stays
+valid.
 
 #### Scenario: A main checkout keeps the established identity
 
-- **WHEN** the script is sourced in a checkout whose `.git` is a directory
-- **THEN** it exports the project name and the base ports the repository used
-  before this capability existed
+- **WHEN** a caller sources the script in a checkout whose `.git` is a
+  directory
+- **THEN** the script exports the project name and the base ports the
+  repository used before the change
 
 #### Scenario: A linked worktree derives its own identity
 
-- **WHEN** the script is sourced in a checkout whose `.git` is a file holding
-  a `gitdir:` pointer
-- **THEN** it exports a project name and a port set distinct from the main
-  checkout's
+- **WHEN** a caller sources the script in a checkout whose `.git` is a file
+  holding a `gitdir:` pointer
+- **THEN** the script exports a project name and a port set distinct from the
+  main checkout's
 
-#### Scenario: The derivation is stable
+#### Scenario: The derivation holds across a recreate
 
-- **WHEN** the script is sourced twice in the same worktree, with a container
-  recreated in between
+- **WHEN** a caller sources the script twice in one worktree, with a container
+  recreate in between
 - **THEN** both runs export the same project name and the same ports
 
 #### Scenario: Two worktrees differ
 
-- **WHEN** the script is sourced in two worktrees with different directory
-  names
+- **WHEN** a caller sources the script in two worktrees with different
+  directory names
 - **THEN** the two exported port sets differ
 
-### Requirement: A worktree's stack is reachable only from that worktree
+### Requirement: A worktree's stack answers only that worktree
 
-Each checkout's Compose project SHALL own its application container, its
-database server, its mail catcher and its persistent database volume. No two
-checkouts SHALL share any of them.
+Each checkout's Compose project SHALL own four things: an application
+container, a database server, a mail catcher, and a persistent database volume.
+No two checkouts SHALL share any of them.
 
-A command run in one checkout SHALL reach that checkout's containers and no
-other's. The application container of a checkout's project SHALL bind-mount
-that checkout, so a command that compiles, builds or tests reads the files of
-the checkout it was started from.
+A command a developer runs in one checkout SHALL reach that checkout's
+containers, and no other checkout's. The application container SHALL bind-mount
+the checkout its project belongs to. A command that compiles, builds or tests
+therefore reads the files of the checkout the developer started it from.
 
-Isolation of the test database follows from this boundary. The test database
-keeps the name `development-toolchain` specifies; the server holding it is
-private to the checkout, so two checkouts running the suite at once cannot
-truncate each other's tables.
+Test-database isolation follows from that boundary. The test database keeps the
+name `development-toolchain` specifies. The server holding it stays private to
+the checkout. Two checkouts running the suite at once therefore cannot truncate
+each other's tables.
 
 #### Scenario: A command reads the checkout it ran in
 
-- **WHEN** a command that compiles or tests is run in a worktree
-- **THEN** it reads that worktree's files, and a change present only in that
-  worktree is visible to it
+- **WHEN** a developer runs a command that compiles or tests in a worktree
+- **THEN** it reads that worktree's files, and a change only that worktree
+  carries is visible to it
 
 #### Scenario: Two suites run at once
 
 - **WHEN** the test suite runs in two worktrees at the same time
-- **THEN** each run's writes and truncations land in its own database server,
-  and neither run observes the other's
+- **THEN** each run's writes and truncations land in its own database server
+- **AND** neither run observes the other's
 
 ### Requirement: A port collision fails loudly
 
-Two worktrees MAY derive the same port set, because the derivation reads the
-directory name alone and carries no shared registry. That case SHALL surface
-as a refused port binding when the second stack starts.
-
-It SHALL NOT surface as two stacks quietly sharing an address. A developer
-meeting it renames one worktree, or assigns its ports by hand.
+Two worktrees MAY derive one port set. The derivation reads the directory name
+alone and keeps no shared registry. That case SHALL surface as a refused port
+binding when the second stack starts. It SHALL NOT surface as two stacks
+quietly sharing an address. A developer meeting it renames one worktree, or
+assigns its ports by hand.
 
 #### Scenario: The second stack refuses to start
 
 - **WHEN** a worktree brings its stack up while another worktree already
   publishes the same host ports
-- **THEN** the bring-up fails with a port-binding error naming the port, and
-  no second stack binds that address
+- **THEN** the bring-up fails with a port-binding error naming the port
+- **AND** no second stack binds that address
 
 ### Requirement: The bring-up states the addresses it bound
 
 A bring-up SHALL print the host addresses it published, at the end of its run.
-A developer working in several worktrees cannot infer them, because they
-differ per worktree and no fixed number is correct everywhere.
+A developer working in several worktrees cannot infer them. They differ per
+worktree, and no fixed number holds everywhere.
 
 #### Scenario: A bring-up names its addresses
 
 - **WHEN** a developer brings up a worktree's stack
-- **THEN** the output names the host address of the engine, of the frontend
-  dev server, and of the mail catcher's web interface
+- **THEN** the output names the host address of the engine, of the frontend dev
+  server, and of the mail catcher's web interface

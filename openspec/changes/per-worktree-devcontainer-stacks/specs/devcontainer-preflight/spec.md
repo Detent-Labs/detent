@@ -5,10 +5,10 @@
 Every failing check SHALL print a command the developer can copy and run. The
 command SHALL be the literal command, not a description of one.
 
-A command that drives Docker SHALL be the one that reaches the checkout the
-preflight ran in. A checkout derives its own Compose project, so a command
-naming the compose file alone reaches a different stack when it is copied out
-of a linked worktree.
+A command that drives Docker SHALL reach the checkout the preflight ran in.
+Each checkout derives its own Compose project. A command naming the compose
+file alone reaches a different stack, once a developer copies it out of a
+linked worktree.
 
 Some checks name no single repair command. Such a check SHALL print the file
 to change, and the line it needs.
@@ -16,8 +16,8 @@ to change, and the line it needs.
 #### Scenario: A stopped container
 
 - **WHEN** check 2 fails because the containers are down
-- **THEN** the output carries a literal bring-up command that starts the
-  containers of the checkout the preflight ran in
+- **THEN** the output carries a literal bring-up command for the checkout the
+  preflight ran in
 
 #### Scenario: A missing signing secret
 
@@ -29,5 +29,5 @@ to change, and the line it needs.
 #### Scenario: A port that does not answer
 
 - **WHEN** check 4 fails in a linked worktree
-- **THEN** the output names the port that checkout publishes, not the port
-  the main checkout publishes
+- **THEN** the output names the port that checkout publishes, not the port the
+  main checkout publishes
