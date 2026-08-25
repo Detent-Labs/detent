@@ -76,12 +76,13 @@ to all three published ports, so one worktree's addresses stay easy to read
 together.
 
 A hash admits collisions. The alternative allocator scans what is already
-bound and records its choice. It removes collisions. It costs a state file to
-keep in sync, a first-run ordering dependence, and a stale entry whenever
-somebody deletes a worktree. With a handful of worktrees a collision is
-unlikely. It also cannot hide. Docker refuses the second bind and names the
-port. The script carries a `ponytail:` comment naming that ceiling and the
-allocator as the upgrade path.
+bound and records its choice. It removes collisions, and it costs three
+things. Those are a state file, a first-run ordering dependence, and a stale
+entry after a deleted worktree.
+
+With a handful of worktrees a collision is unlikely. It also cannot hide.
+Docker refuses the second bind and names the port. The script carries a
+`ponytail:` comment naming that ceiling and the allocator as the upgrade path.
 
 ### The image carries a name, so the projects share one build
 
