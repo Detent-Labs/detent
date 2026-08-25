@@ -247,6 +247,28 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     already reads, never widen it, which is what makes an `anyone` share
     safe.
 
+    The second half of that rests on a permission nothing carries yet.
+    `Permission` (`src/auth/authorize.ts:77`) is `"publish" | "cancel" |
+    "migrate"`, and no entry covers reading. A pass on 2026-08-25 priced
+    a fourth one and found it additive rather than restrictive, because
+    the bulk read is already closed: `src/http/routes.ts:437` runs
+    `requireRole(actor, ADMIN_ROLE)` for `scope=all`, while `scope=mine`
+    and `scope=started` justify themselves through the caller's own
+    assignment or authorship and need no grant at all. So a `read`
+    permission keeps `ADMIN_ROLE` as its short-circuit and lets a grant
+    open one process to a non-admin, leaving an installation with no
+    grant row every answer it had — the property the storage half
+    shipped under. `listInstances`'s own docstring ("an unfiltered call
+    returns every instance") describes the engine function, not the
+    route above it, and reads as the opposite until the route is
+    checked.
+
+    Order settled 2026-08-25: the `read` permission first, as its own
+    change against `authorization` and `instance-query`; the shared query
+    core (see the aggregated-data-source entry above) second; this
+    feature third. The cost of that order is that the first change this
+    topic produces is not a table.
+
   **Explicitly not the goal.**
   - Not the three existing reporting views. Cycle time, bottleneck and
     SLA (`src/engine/reporting.ts`) compute over time and stay as they
@@ -273,12 +295,74 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   questions. Sorting and filtering a table over field values reads
   `body->'data'` through expression paths with no index, the same shape
   `reporting.ts` already carries a note about for `startedAt`. That is
-  where the owner's 2026-08-25 suggestion bites — promote the fields whose
-  structure never changes (`processId`, `version`, `status`,
-  `currentStepId`, `startedAt`, `startedBy`) out of `body` into real
-  columns, retiring the six expression indexes that stand in for them
-  today. It is worth its own change and helps more than this feature.
-  `data` itself cannot follow: its key set belongs to a process version.
+  where the owner's 2026-08-25 suggestion bites — promote the keys whose
+  structure never changes out of `body` into real columns, retiring the
+  expression indexes that stand in for them today. Which keys qualify is
+  settled under its own entry below, and the answer for this feature is
+  that none of them unblock it: `data` is the key a report sorts and
+  filters over, and `data` is the one key that can never be promoted,
+  since its key set belongs to a process version.
+- **Promoting standardized instance keys out of `body` into columns.** A
+  design pass on 2026-08-25 settled which keys qualify, in the same session
+  as the entry above, which asked for it. Not started.
+
+  **The goal.** A predicate over an instance key reads a plain column
+  through a plain index. Six expression indexes stand in for that today
+  (`instances_selection_idx`, `instances_claimed_by_idx`,
+  `instances_candidates_idx`, `instances_parent_idx`, plus the two the
+  scheduler and the retention sweep own), and `(body->>'startedAt')`
+  carries none at all (`src/engine/reporting.ts:91`).
+
+  **The test a key has to pass.** Its structure is fixed by the runtime
+  schema for every process and every version, never by a process author.
+  `instance` (`src/schema/definition.ts:1144`) splits four ways under it.
+
+  - Already a column, and still written into `body` as well:
+    `instanceId`, `transitionSeq`, `redactedAt`. `redacted_at` is the
+    precedent worth copying — one value in both places, the body
+    unchanged as what `parseInstance` reads.
+  - The six the entry above named: `processId`, `version`, `status`,
+    `currentStepId`, `startedAt`, `startedBy`. Each is a scalar and each
+    is somebody's predicate today.
+  - Standardized, outside that six, each already carrying an expression
+    index or an in-memory filter: `assignment.claimedBy` and
+    `assignment.candidates` (`AssignmentState` is
+    `{candidates, claimedBy?, claimedAt?}` and nothing else, and the two
+    carry the inbox predicate, the hottest read in the product),
+    `parent.instanceId`, `currentStepEnteredAt` (the retention sweep
+    filters it in memory over the reduced row set),
+    `chainedFrom` (no index, no reader, and a report dimension the moment
+    somebody asks which instances a process started).
+  - Never: `data`, whose key set belongs to a process version. `timers`,
+    an array the scheduler already reduces to the one scalar it needs in
+    `next_timer_at`. `definitionHash`, structurally eligible and nobody's
+    predicate anywhere.
+
+  **The mechanism.** A Postgres generated column
+  (`GENERATED ALWAYS AS ((body->>'processId')) STORED`) costs no
+  application change and cannot drift from the body, which a dual write
+  can. One constraint bounds it: the expression must be immutable, and
+  `jsonb ->> text` is while `text::timestamptz` is not, since that cast
+  reads `DateStyle` and `TimeZone`. So a timestamp key takes a generated
+  `text` column instead. Every writer produces
+  `new Date().toISOString()`, and ISO-8601 in UTC orders lexicographically
+  the way it orders chronologically, so a text column still ranges and
+  sorts correctly. Probe that against Postgres 16 before relying on it.
+
+  **The key stays in `body`.** Removing it would make `parseInstance`
+  rebuild an `Instance` from a row plus a body at every read site in the
+  engine, for no gain a promoted column does not already give.
+
+  **Not a prerequisite for the report builder.** Its first shape filters
+  by process and by date range, and `instances_selection_idx` plus
+  `instances_created_idx` already cover both. `created_at` is an
+  approximate double of `startedAt` — `DEFAULT now()` on the insert that
+  writes the body a few milliseconds after the application clock stamped
+  `startedAt`, and rows older than that column got `now()` at migration
+  time, which orders that population among itself and nowhere near its
+  real start. The one predicate this change cannot help is the one the
+  report wants most, sorting and filtering over `body->'data'`, because
+  `data` is the key that never qualifies.
 - **Process-scoped permissions: the filter, the draft scope, and the
   `permissions` booleans.** A design pass on 2026-08-15 settled the shape;
   `ROADMAP.md` stage 40 carries it in full. The seam shipped 2026-08-15 as
@@ -296,6 +380,30 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
 
   The `scope=all` filter and the reporting aggregates turn a gate into a
   query predicate. That reaches `instance-query`, not `authorization`.
+
+  Shape decided 2026-08-25, pulled forward by the instance-data-tables
+  entry above, which depends on it. `Permission` gains a fourth member,
+  `read`, with `ADMIN_ROLE` as its reserved short-circuit in the
+  module-private `PERMISSION_ROLE`. `REPORTS_ROLE` stays what it is,
+  "may use the reporting area", and does not become the short-circuit:
+  area access and data scope are two questions, and one role answering
+  both makes every later narrowing impossible. The three reporting
+  aggregates (`src/http/reporting-routes.ts:40` and `:57`) each already
+  take a `processId`, so `requireRole(actor, REPORTS_ROLE)` there becomes
+  the role plus `read` on that process.
+
+  The work is not the default. It is that a process-scoped grant cannot
+  gate a query naming no process: `requireRole(actor, ADMIN_ROLE)` at
+  `src/http/routes.ts:437` answers yes or no without one, and
+  `requirePermission` needs one. Two answers exist.
+
+  Keep it a gate, and
+  `scope=all` without `ADMIN_ROLE` requires an explicit `processId`;
+  that is cheap, and a report reads exactly one process, so it covers
+  the case that pulled this forward. Or make it the predicate this
+  paragraph originally named, restricting the result set to the granted
+  processes. Build the first. The second waits for somebody asking for a
+  list that spans processes, which nobody has.
 
   A draft-scoped `"author"` permission would let an installation limit who
   sees and edits which draft. `drafts.process_id` is scopeable — it is the
