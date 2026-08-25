@@ -4,7 +4,7 @@
 
 Path creation SHALL no longer default `key` to an empty string. It SHALL
 no longer leave `label` absent either. `newPath()` is the one
-path-creation method every path-creating gesture calls. Those gestures are
+path-creation function every path-creating gesture calls. Those gestures are
 drag-to-connect, `PathsPanel`'s "add path" action, and `insertOnPath.ts`'s
 step-dropped-on-a-path gesture. `newPath()` SHALL compute a default `key`
 and `label` from the source step and the target step, at the moment of
@@ -17,19 +17,19 @@ instead, when the key is non-empty after trimming. A step with neither
 contributes the "unnamed step" placeholder.
 
 The default `key` SHALL be a slug built the same way. A side whose name
-slugs to an empty string SHALL contribute the placeholder's slug instead,
-so the joined `key` never comes out empty. Neither default
+slugs to an empty string SHALL contribute the placeholder's slug instead.
+That keeps the joined `key` from ever coming out empty. Neither default
 stays in sync with a later rename of either step. Each gets computed
 once, at creation. Each stays freely editable afterward, like any other
 path field.
 
 A drag to empty canvas creates a new step as part of the same gesture. So
 does a step dropped on an existing path. Both leave the new step with an
-empty `key` and an empty `label` — `newStep()` hardcodes the one, and
-its callers seed the other empty. That
-path's default SHALL come from the new step's own, likewise defaulted, key
-and label. It SHALL fall back to the "unnamed step" placeholder, not to an
-empty or arrow-only string.
+empty `key` and an empty `label`. The function `newStep()` hardcodes the
+one, and its callers seed the other empty. That path's default SHALL come
+from the new
+step's own, likewise defaulted, key and label. It SHALL fall back to the
+"unnamed step" placeholder, not to an empty or arrow-only string.
 
 #### Scenario: A path dragged between two named steps gets a derived label
 
@@ -81,20 +81,23 @@ empty or arrow-only string.
 
 - **WHEN** a gesture creates a new step with no `key` and no `label`, the
   state its creation leaves it in
-- **AND** the same gesture connects a new path to that step — into it as
-  the target (a drag to empty canvas) or out of it as the source (a step
-  dropped on a path, `insertOnPath.ts` reached from `EditScreen.tsx`)
+- **AND** the same gesture connects a new path to that step
+- **AND** the step is the target (a drag to empty canvas) or the source (a
+  step dropped on a path)
+- **AND** that gesture is `insertOnPath.ts`, reached from `EditScreen.tsx`
 - **THEN** the new path's default `label` names the new step with the
-  "unnamed step" placeholder, on whichever side it sits — not an empty or
-  arrow-only string
+  "unnamed step" placeholder, on whichever side it sits
+- **AND** the label is not an empty or arrow-only string
 - **AND** the placeholder is the same one `CanvasView.tsx`'s own
   `stepLabel()` helper already falls back to
 
 #### Scenario: A path inserted on a path whose target no longer exists falls back for the target side
 
 - **WHEN** the step-dropped-on-a-path gesture runs on a path whose `to`
-  names a step the draft no longer holds (a pure-function edge — the
-  canvas draws no edge for such a path, so the gesture cannot fire there
-  in production)
+  names a step the draft no longer holds
+- **AND** this is a pure-function edge
+- **AND** the canvas draws no edge for such a path, so the gesture cannot
+  fire there in production
 - **THEN** the derivation falls back to the "unnamed step" placeholder for
-  the target side, and the new path keeps the original `to` id
+  the target side
+- **AND** the new path keeps the original `to` id
