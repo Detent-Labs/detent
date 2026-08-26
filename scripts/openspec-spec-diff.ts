@@ -43,8 +43,34 @@ export interface RequirementEntry {
   line: number;
 }
 
+/**
+ * A `## RENAMED Requirements` block declares a header change as a
+ * `- FROM:` / `- TO:` pair, each naming a full `### Requirement:` header.
+ * The MODIFIED section beneath it then carries the TO header, which the
+ * base spec does not hold yet — matching it there pairs with nothing and
+ * reads as a critical the rename block already answers. So a TO header is
+ * folded back onto its FROM header, the one the base still carries and
+ * the one a MODIFIED or REMOVED entry has to pair with.
+ */
+function extractRenames(specText: string): Map<string, string> {
+  const renames = new Map<string, string>();
+  let inBlock = false;
+  let from: string | null = null;
+  for (const line of specText.split("\n")) {
+    if (/^## RENAMED Requirements\s*$/.test(line)) { inBlock = true; from = null; continue; }
+    if (/^## /.test(line)) { inBlock = false; continue; }
+    if (!inBlock) continue;
+    const fromMatch = line.match(/^-\s*FROM:\s*`?### Requirement: (.+?)`?\s*$/);
+    if (fromMatch) { from = normalizeHeading(fromMatch[1]); continue; }
+    const toMatch = line.match(/^-\s*TO:\s*`?### Requirement: (.+?)`?\s*$/);
+    if (toMatch && from) { renames.set(normalizeHeading(toMatch[1]), from); from = null; }
+  }
+  return renames;
+}
+
 export function extractRequirements(specText: string): RequirementEntry[] {
   const entries: RequirementEntry[] = [];
+  const renames = extractRenames(specText);
   let kind: RequirementEntry["kind"] | null = null;
   const lines = specText.split("\n");
   for (let i = 0; i < lines.length; i++) {
@@ -52,7 +78,10 @@ export function extractRequirements(specText: string): RequirementEntry[] {
     if (kindMatch) { kind = kindMatch[1] as RequirementEntry["kind"]; continue; }
     if (/^## /.test(lines[i]) && !kindMatch) kind = null;
     const reqMatch = lines[i].match(/^### Requirement: (.+)$/);
-    if (reqMatch && kind) entries.push({ kind, title: normalizeHeading(reqMatch[1]), line: i + 1 });
+    if (reqMatch && kind) {
+      const title = normalizeHeading(reqMatch[1]);
+      entries.push({ kind, title: renames.get(title) ?? title, line: i + 1 });
+    }
   }
   return entries;
 }

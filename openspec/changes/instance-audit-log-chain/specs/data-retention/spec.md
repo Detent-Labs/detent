@@ -10,13 +10,18 @@
 
 ### Requirement: redactInstance clears personal data across five relations
 
-`redactInstance(instanceId, db)` (`src/engine/retention.ts`) SHALL clear a
-non-`running` instance's personal data in one transaction. It SHALL set
-`instances.body.data` to `{}` and stamp `instances.redacted_at` to the
-current time. It SHALL also delete every row in `instance_comments`,
-`instance_attachments`, and `instance_drafts` whose `instance_id` matches.
+`redactInstance(instanceId, db, opts?: { actor?, reason? })`
+(`src/engine/retention.ts`) SHALL clear a non-`running` instance's
+personal data in one transaction. It SHALL set `instances.body.data` to
+`{}` and stamp `instances.redacted_at` to the current time. It SHALL also
+delete every row in `instance_comments`, `instance_attachments`, and
+`instance_drafts` whose `instance_id` matches.
 
-It SHALL redact every field the instance's audit log holds a value for.
+The optional `opts` names who asked and why. The automatic sweep supplies
+neither, and the audit entries then carry a null actor.
+
+It SHALL redact every field the instance's audit log holds an entry
+for.
 The audit log is the fifth relation, and the only one redaction neither
 leaves alone nor deletes from. Its rows stay and their values go. The
 log still shows that a field changed, when, and at whose hand.
@@ -45,10 +50,32 @@ design.
 
 - **WHEN** `redactInstance` is called for an instance whose audit log
   holds three entries across two fields
-- **THEN** all three entries remain, each holding no value and no salt.
-  The log still names each entry's field, time and actor
+- **THEN** the three original entries remain, each holding no value and
+  no salt. The wipe's own entries and the redaction's stand beside
+  them
 
 #### Scenario: A redacted instance's chain still verifies
 
 - **WHEN** chain verification runs after `redactInstance`
 - **THEN** it reports the chain as holding
+
+### Requirement: redactInstance is idempotent
+
+A second `redactInstance` call against an already-redacted instance SHALL be
+a no-op. It SHALL NOT throw. It SHALL NOT re-run the comment, attachment, or
+draft deletes. It SHALL NOT append a second `redact` entry, and SHALL NOT
+clear any further audit value.
+
+#### Scenario: Redacting twice changes nothing on the second call
+
+- **WHEN** `redactInstance` is called for an instance whose
+  `redacted_at` is already set
+- **THEN** the call returns the unchanged instance and no further row is
+  deleted
+
+#### Scenario: A second redaction appends no second redact entry
+
+- **WHEN** `redactInstance` is called a second time for an instance whose
+  `redacted_at` is already set
+- **THEN** the audit log holds the entries it held before the call, and
+  nothing further is cleared
