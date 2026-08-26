@@ -51,9 +51,9 @@
 ## 6. Verification
 
 - [x] 6.1 Run `bun run typecheck`, `bun run build` and the full `bun test` with `DATABASE_URL` set. Check the skip count.
-- [ ] 6.2 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` and `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. Every delta spec here is a new file, so its base count is 0 and every finding reads as a rise.
+- [x] 6.2 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` and `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. Every delta spec here is a new file, so its base count is 0 and every finding reads as a rise.
 - [x] 6.3 Bring up a worktree stack. Confirm `PORT_APP` and `PORT_MAILPIT` answer on `127.0.0.1`, and differ from main's. Confirm the printed dev-server address matches `PORT_VITE`. The bring-up starts no dev server, so that address answers only once `cd packages/web && bun run dev -- --host 0.0.0.0` runs, as `.claude/skills/devcontainer-exec/SKILL.md` already requires. Vite otherwise binds localhost inside the container.
-- [ ] 6.4 Create a throwaway worktree on a scratch branch. Run `bash scripts/dev-up.sh` in it first. Introduce a type error there, push, and confirm the gate rejects it. Confirm the rejection names the type error from `bun run check`, rather than a stopped preflight. Confirm `docker compose ls` shows the main checkout's containers untouched.
-- [ ] 6.5 From that worktree, run `. scripts/worktree-env.sh && docker compose -f .devcontainer/docker-compose.yml down -v`. Its project and its database volume go with it. Then remove the worktree and its scratch branch on the remote.
-- [ ] 6.6 Run the suite in two worktrees at once. Confirm both pass.
-- [ ] 6.7 Run the new `docs/browser-checks.md` entry in a linked worktree. Confirm the browser updates with no manual reload.
+- [x] 6.4 Create a throwaway worktree on a scratch branch. Run `bash scripts/dev-up.sh` in it first. Introduce a type error there, push, and confirm the gate rejects it. Confirm the rejection names the type error from `bun run check`, rather than a stopped preflight. Confirm `docker compose ls` shows the main checkout's containers untouched.
+- [x] 6.5 From that worktree, run `. scripts/worktree-env.sh && docker compose -f .devcontainer/docker-compose.yml down -v`. Its project and its database volume go with it. Then remove the worktree and its scratch branch on the remote.
+- [x] 6.6 Run the suite in two worktrees at once. Confirm both pass.
+- [x] 6.7 Run the new `docs/browser-checks.md` entry in a linked worktree. Confirm the browser updates with no manual reload.
