@@ -19,7 +19,7 @@
 #   git config core.hooksPath .githooks
 #
 # Needs the container up:
-#   docker compose -f .devcontainer/docker-compose.yml up -d
+#   bash scripts/dev-up.sh
 #
 # MSYS_NO_PATHCONV=1 stops Git Bash rewriting /workspace into a Windows path
 # before Docker sees it.
@@ -28,6 +28,10 @@
 set -e
 
 GATES=scripts/gates
+
+# Reaches this checkout's own Compose project, never a name the hook picks
+# itself (push-gate-checks, worktree-isolation).
+. scripts/worktree-env.sh
 
 # Git feeds the pushed refs on stdin, and only the first reader gets them.
 # Capture once, then replay the file into each gate that needs a range.

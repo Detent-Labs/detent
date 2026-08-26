@@ -141,6 +141,8 @@ describe("one package, one build", () => {
     const config = readFileSync(new URL("../vite.config.ts", import.meta.url).pathname, "utf8");
     expect(config).toContain("port: 5173");
     expect(config).toContain("strictPort: true");
+    expect(config).toContain("hmr");
+    expect(config).toContain("PORT_VITE");
   });
 
   it("bakes in no origin of its own, so a reverse proxy stays possible", () => {
