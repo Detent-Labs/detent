@@ -6,28 +6,28 @@ description: Run commands (bun, tsc, tests) inside this project's devcontainer v
 Source `scripts/worktree-env.sh` first, in the same shell as the compose
 call: `. scripts/worktree-env.sh`. It derives this checkout's own
 `COMPOSE_PROJECT_NAME`, `PORT_APP`, `PORT_VITE` and `PORT_MAILPIT` from the
-worktree's path (worktree-isolation), so a linked worktree never reaches the
-main checkout's containers or database.
+worktree's path (worktree-isolation). A linked worktree then never reaches
+the main checkout's containers or database.
 
-Without the `devcontainer` CLI, drive it via `docker compose`: `bash
+Without the `devcontainer` CLI, drive it via `docker compose`. `bash
 scripts/dev-up.sh` starts the stack (`app` + `db` + `mailpit`; `app`'s
-default command is `sleep infinity`) and generates
+default command is `sleep infinity`). It also generates
 `.devcontainer/docker-compose.ports.yml`, the last `-f` in every command
 below. Add `-f .devcontainer/docker-compose.override.yml` before it only
 where this checkout keeps one. Run every command through `docker compose -f
 .devcontainer/docker-compose.yml [-f .devcontainer/docker-compose.override.yml]
--f .devcontainer/docker-compose.ports.yml exec -w /workspace app <cmd>` — the
-`app` service's default container workdir is `/`, not `/workspace`, so `-w
-/workspace` is required every time. An `exec`/`ps`/`logs` call needs no `-f`
-at all past the base file — the sourced `COMPOSE_PROJECT_NAME` alone resolves
-this checkout's own container.
+-f .devcontainer/docker-compose.ports.yml exec -w /workspace app <cmd>`.
+The `app` service's default container workdir is `/`, not `/workspace`. So
+`-w /workspace` is required every time. An `exec`/`ps`/`logs` call needs no
+`-f` at all past the base file. The sourced `COMPOSE_PROJECT_NAME` alone
+resolves this checkout's own container.
 
-On Windows Git Bash, prefix such commands with `MSYS_NO_PATHCONV=1` — Git
+On Windows Git Bash, prefix such commands with `MSYS_NO_PATHCONV=1`. Git
 Bash otherwise rewrites the Unix-style `/workspace` path into a Windows path
 before Docker sees it, producing `Cwd must be an absolute path` errors.
 
 `DATABASE_URL` is already wired into the `app` service's environment
-(pointing at the `db` service by container name), so DB-backed tests need no
+(pointing at the `db` service by container name). DB-backed tests need no
 extra setup once running through `exec`.
 
 `bash scripts/dev-up.sh` publishes this checkout's derived ports
@@ -37,7 +37,7 @@ server from the host browser, run it from inside the container: `cd
 packages/web && bun run dev -- --host 0.0.0.0`. In a linked worktree, point
 it at that checkout's own engine: `VITE_API_URL=http://127.0.0.1:$PORT_APP`.
 A hand-written `.devcontainer/docker-compose.override.yml` is for an extra
-binding of the contributor's own — a literal `5173:5173` there collides with
+binding of the contributor's own. A literal `5173:5173` there collides with
 the main checkout's port. Never add port publishing to the shared
-`docker-compose.yml` — that's a personal convenience, not a team-wide
+`docker-compose.yml`. That's a personal convenience, not a team-wide
 default.
