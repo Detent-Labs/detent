@@ -93,6 +93,33 @@ in either direction.
 - **WHEN** the suite starts with `DATABASE_URL` set
 - **THEN** its output names the database the run will use
 
+### Requirement: The push gate runs against the checkout it pushes
+
+The pre-push hook SHALL run its checks inside the devcontainer that
+bind-mounts the checkout the push comes from. A hook reaching another
+checkout's container reports on files the push does not carry. Its result then
+says nothing about the branch it gates.
+
+The hook SHALL take the container's identity from the derivation
+`worktree-isolation` specifies. It SHALL NOT name a Compose project itself.
+The same rule holds for every gate the hook runs inside the container.
+
+This refines the container placement "Every push runs the toolchain's checks
+against a real database" already mandates. That requirement puts the checks in
+a container. This one says which container.
+
+#### Scenario: A worktree's push compiles that worktree
+
+- **WHEN** a developer pushes from a linked worktree carrying a type error the
+  main checkout lacks
+- **THEN** the gate reports that type error and refuses the push
+
+#### Scenario: Another checkout's state does not reach the gate
+
+- **WHEN** a developer pushes from a linked worktree while another checkout
+  carries a type error
+- **THEN** the gate does not report the other checkout's type error
+
 ### Requirement: Typechecking remains tsc-based
 Because Bun does not typecheck, type safety SHALL be enforced by
 `tsc --noEmit`. The engine package keeps its own `typecheck` script
@@ -119,21 +146,32 @@ any one of them fails.
 
 Every workspace package that ships a Vite dev server SHALL pin its own port in
 its `vite.config.ts`. It SHALL fail to start rather than fall back to a
-different one. The assignment is one port per package. It stays stable across
+different one. Each package takes one port, and that port stays stable across
 contributors and machines:
 
 | package | port |
 |---|---|
 | `packages/web` | 5173 |
 
-Exactly one package ships a dev server, so exactly one port is assigned. The
-rule stays stated per package rather than as a single constant. That is what a
-second browser package would have to satisfy.
+Exactly one package ships a dev server, so the table holds one row. The rule
+stays per package rather than a single constant. A second browser package
+would have to satisfy it too.
+
+That port is the one the dev server listens on inside its container. Its host
+address is the port `worktree-isolation` derives for the checkout. A main
+checkout keeps the listening port as its host address.
+
+Where the two numbers differ, the package's own config must carry one
+consequence. The browser reaches the dev server on the host address, so the
+hot-reload socket opens on that number. The package SHALL read that
+number from the environment, as `PORT_VITE`. It SHALL NOT assume it equals the
+listening port. The devcontainer SHALL carry `PORT_VITE` in the environment of
+the container the dev server runs in.
 
 Pinning alone is not enough. Without a strict-port setting, Vite serves on the
-next free port when the configured one is taken. That reintroduces the
-start-order dependence the fixed assignment exists to remove. A conflict MUST
-surface as a startup error a contributor can see and act on.
+next free port whenever another process holds the configured one. That
+reintroduces the start-order dependence the fixed assignment removes. A
+conflict MUST surface as a startup error a contributor can act on.
 
 #### Scenario: Starting one dev server
 
@@ -154,12 +192,29 @@ surface as a startup error a contributor can see and act on.
 - **THEN** that dev server exits with a port-in-use error instead of binding
   a different port
 
+#### Scenario: Hot reload reaches the published address
+
+- **WHEN** a browser loads the dev server of a worktree whose host address
+  differs from the listening port
+- **THEN** the hot-reload socket connects to the host address, and a saved
+  file reaches the browser with no manual reload
+
 ### Requirement: The devcontainer permits every frontend dev origin
 
 The devcontainer's `CORS_ALLOWED_ORIGINS` value SHALL list the
 `http://localhost:<port>` origin of every frontend package's dev server. Each
 of them can then call the engine's HTTP wrapper from a browser, with no
-per-contributor setting change. With one browser package, that is one origin.
+per-contributor setting change.
+
+It SHALL list the `http://127.0.0.1:<port>` origin of that same dev server too.
+The manual checklist mandates that address under Windows. A browser following
+it sends an origin the first form does not cover. One browser package therefore
+contributes two entries.
+
+In a checkout whose host address differs from the listening port, the
+allowlisted origin SHALL carry the host address `worktree-isolation` derives.
+The browser reaches the dev server there, so that address is the origin the
+request arrives with.
 
 The value MUST use the allowlist form that `configurable-cors-origins` already
 specifies, a comma-separated origin list. It MUST NOT use the `*` wildcard.
@@ -195,6 +250,13 @@ allowlist change. So SHALL one that adds or removes a frontend package.
 - **WHEN** a frontend workspace package is deleted
 - **THEN** its origin is removed from `CORS_ALLOWED_ORIGINS` in the same
   change that deletes it
+
+#### Scenario: The allowlist carries a worktree's browser origin
+
+- **WHEN** a checkout whose derived host address differs from the listening
+  port brings its stack up
+- **THEN** `CORS_ALLOWED_ORIGINS` names that host address, under both
+  `localhost` and `127.0.0.1`
 
 ### Requirement: The frontend's production bundle builds
 
@@ -597,11 +659,14 @@ Postgres service. It SHALL come from a pinned off-the-shelf image with no
 custom build. The engine service SHALL depend on it and SHALL receive
 `SMTP_HOST`, `SMTP_PORT`, and `SMTP_FROM` pointing at it.
 
-The shared compose file SHALL publish no host port for it. The Postgres
-service already follows that rule: port publishing is a per-machine
-convenience in the gitignored `docker-compose.override.yml`, never a
-team-wide default. A contributor who wants the catcher's web interface in a
-browser SHALL add that binding themselves, on the loopback address.
+The shared compose file SHALL declare no `ports` entry for it. The Postgres
+service already follows that rule. The bring-up publishes the catcher's web
+interface instead, at the port `worktree-isolation` derives, into
+`.devcontainer/docker-compose.ports.yml`. The bring-up generates that file and
+git ignores it, so the shared file still carries no team-wide host
+binding. A contributor who
+wants an extra binding of their own adds it to the gitignored
+`docker-compose.override.yml`, on the loopback address.
 
 This gives the `notification.email` handler's end-to-end test a real SMTP
 endpoint to send to. It follows the same "real dependency, not a mock"
@@ -619,16 +684,15 @@ therefore never depends on a host binding.
 
 #### Scenario: The shared compose file publishes no port for the catcher
 
-- **WHEN** the tracked `docker-compose.yml` is inspected
+- **WHEN** a reader inspects the tracked `docker-compose.yml`
 - **THEN** the catcher service declares no `ports` entry, exactly like the
   Postgres service
 
 #### Scenario: A contributor inspects a delivered message
 
-- **WHEN** a contributor adds the catcher's web port to their own gitignored
-  `docker-compose.override.yml`, bound to `127.0.0.1`
-- **THEN** they open that interface in a host browser and read a delivered
-  message
+- **WHEN** a contributor opens the catcher's web interface at the address the
+  bring-up printed
+- **THEN** they read a delivered message there
 
 #### Scenario: A run without SMTP_HOST skips instead of failing
 
@@ -815,13 +879,20 @@ shape. It calls `createServer`'s handler with no port.
 `docs/browser-checks.md` SHALL open with the operating rules a manual run
 needs.
 
-It SHALL name `127.0.0.1`, not `localhost`, as the address: under Windows
-`localhost` resolves to `::1` and the connection hangs. The port itself is a
-per-machine choice. Git ignores `.devcontainer/docker-compose.override.yml`,
-so no number in this file binds every contributor. The checklist SHALL give
-the two-line snippet that publishes one, with `3001:3000` as the suggested
-mapping. It SHALL also state that the engine serves the bundle from
-`WEB_ROOT`.
+It SHALL name `127.0.0.1` as the address, never `localhost`. Under Windows
+`localhost` resolves to `::1`, and the connection hangs. The port itself is a
+per-machine choice. Git ignores `.devcontainer/docker-compose.override.yml`, so
+no number in this file binds every contributor. The checklist SHALL give the
+two-line snippet that publishes one, suggesting the mapping
+`127.0.0.1:3001:3000`. It
+SHALL also say the engine serves the bundle from `WEB_ROOT`.
+
+The bring-up now publishes the ports `worktree-isolation` derives for the
+checkout. It writes them into `.devcontainer/docker-compose.ports.yml`, a file
+of its own. Compose reads that file beside the contributor's override, where
+one exists. The checklist SHALL say so.
+It SHALL keep the hand-written snippet for a contributor who wants a binding of
+their own. The override file stays theirs.
 
 It SHALL state that a contributor must build the frontend bundle first. The
 engine serves `packages/web/dist`, a build output the repository does not
@@ -839,6 +910,12 @@ Each entry SHALL name the change that first asked for it.
 - **WHEN** a contributor follows the checklist
 - **THEN** the file gives `127.0.0.1`, not `localhost`, and the snippet that
   publishes the contributor's own port
+
+#### Scenario: A reader learns where the port comes from
+
+- **WHEN** a contributor reads the operating rules
+- **THEN** the file names the bring-up as what publishes the ports, and names
+  the generated ports file
 
 #### Scenario: A manual run needs a build
 
