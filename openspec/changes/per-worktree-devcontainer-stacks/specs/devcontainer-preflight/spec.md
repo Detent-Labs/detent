@@ -16,8 +16,8 @@ to change, and the line it needs.
 #### Scenario: A stopped container
 
 - **WHEN** check 2 fails because the containers are down
-- **THEN** the output carries a literal bring-up command for the checkout the
-  preflight ran in
+- **THEN** the output carries a literal bring-up command that publishes this
+  checkout's ports
 
 #### Scenario: A missing signing secret
 
@@ -29,5 +29,5 @@ to change, and the line it needs.
 #### Scenario: A port that does not answer
 
 - **WHEN** check 4 fails in a linked worktree
-- **THEN** the output names the port that checkout publishes, not the port the
-  main checkout publishes
+- **THEN** the output names the port that checkout publishes
+- **AND** it prints the repair command for that checkout

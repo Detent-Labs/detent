@@ -578,12 +578,17 @@ Stage-by-stage status is in `ROADMAP.md`.
   mutually exclusive per spec — a future cookie/session-backed
   `ActorResolver` will need the allowlist mode this change built, not the
   wildcard, so it is that change's job to add the credentials header, not
-  this one's. The devcontainer's `app` service sets
-  `CORS_ALLOWED_ORIGINS=http://localhost:5173`
-  (`pin-frontend-dev-ports`, narrowed by `consolidate-frontend-shell`). That
-  origin is the one frontend dev server. Its `vite.config.ts` pins the port
-  to 5173, with `strictPort: true`. A taken port then fails startup, rather
-  than sliding to the next free one in silence. The list held three origins
+  this one's. The devcontainer's `app` service derives
+  `CORS_ALLOWED_ORIGINS` from `PORT_VITE`
+  (`pin-frontend-dev-ports`, narrowed by `consolidate-frontend-shell`, then
+  made per-checkout by `per-worktree-devcontainer-stacks`), carrying both
+  `http://localhost:${PORT_VITE}` and `http://127.0.0.1:${PORT_VITE}` — the
+  main checkout's own value is still `5173`. That origin is the one frontend
+  dev server. Its `vite.config.ts` pins the in-container port to 5173, with
+  `strictPort: true`. A taken port then fails startup, rather than sliding
+  to the next free one in silence. `scripts/worktree-env.sh` derives each
+  checkout's own `PORT_VITE`, so a linked worktree's frontend dev server
+  never collides with the main checkout's. The list held three origins
   while `app`, `admin` and `studio` were separate packages.
 
   **Static assets fall through behind every API route** (`serve-web-assets`,
@@ -793,7 +798,8 @@ Stage-by-stage status is in `ROADMAP.md`.
     both target it, so `book`'s `Action.output` reads back the same
     `body.status` the action sent. Runs inside the same image and container
     the `app` service already builds — no second image joins the stack for
-    it. A contributor reaches it via `docker compose logs app`, which shows
+    it. A contributor reaches it by sourcing `scripts/worktree-env.sh`, then
+    `docker compose -f .devcontainer/docker-compose.yml logs app`, which shows
     the method, the path, and the `Idempotency-Key` header of every request
     it receives, alongside the dev server's own log lines.
 - Notifications (`src/handlers/notification-email.ts`, roadmap #16): a second
@@ -866,10 +872,13 @@ Stage-by-stage status is in `ROADMAP.md`.
   shows both notifying handlers at the same action position. The
   devcontainer runs `mailpit` for real end-to-end tests, the same "real
   dependency, not a mock" pattern the DB suites use against `db`. The shared
-  compose file publishes no host port for it, matching `db` and the rule that
-  port publishing belongs in the gitignored `docker-compose.override.yml`; the
-  end-to-end test reads messages back over Mailpit's HTTP API inside the
-  compose network, so it never depends on a host binding.
+  compose file publishes no host port for it, matching `db`; each checkout's
+  bring-up (`bash scripts/dev-up.sh`) publishes its own derived `PORT_MAILPIT`
+  into the gitignored, machine-generated `docker-compose.ports.yml`
+  (`per-worktree-devcontainer-stacks`), and a contributor's own
+  `docker-compose.override.yml` stays free for an extra binding of their
+  own; the end-to-end test reads messages back over Mailpit's HTTP API
+  inside the compose network, so it never depends on a host binding.
 - Process chaining (`src/handlers/process-start.ts`, `process-chaining`,
   roadmap #39): a third built-in handler, `process.start`, registered by
   `createDefaultRegistry` beside `httpHandlerDef` and
@@ -2161,13 +2170,16 @@ Stage-by-stage status is in `ROADMAP.md`.
   `migration.ts::migrateOne` read it. Both close a sequential-scan gap the
   function's other jsonb-nested predicates already had an index for.
 
-- CI, local (`.githooks/pre-push`, `add-ci-and-dependency-hygiene`): a
-  `pre-push` hook, which runs `bun run check` (typecheck, then the
-  production build, then `bun test`) through `docker compose exec` in the
-  dev container. A non-zero exit blocks the push. Running there closes
-  the finding's real hazard: the container's environment already carries
-  `DATABASE_URL`. So the 500+ database-backed test sites that make up
-  most of the suite cannot skip silently and report a meaningless green.
+- CI, local (`.githooks/pre-push`, `add-ci-and-dependency-hygiene`,
+  `worktree-isolation` for the per-checkout project name): a `pre-push`
+  hook, which runs `bun run check` (typecheck, then the production build,
+  then `bun test`) through `docker compose exec` in the dev container. The
+  hook sources `scripts/worktree-env.sh` first, so it execs into the
+  pushing checkout's own derived Compose project, never a name or container
+  shared across worktrees. A non-zero exit blocks the push. Running there
+  closes the finding's real hazard: the container's environment already
+  carries `DATABASE_URL`. So the 500+ database-backed test sites that make
+  up most of the suite cannot skip silently and report a meaningless green.
   It also pins Bun to the Dockerfile's version, so no host-side drift.
 
 - CI, hosted (`.github/workflows/check.yml`, `add-ci-workflow`): the same

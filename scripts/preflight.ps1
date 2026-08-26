@@ -3,7 +3,8 @@
 #
 # This file held a second PowerShell implementation of all six until
 # `one-source-gates-and-preflight`. The two hand-synced identical SQL, the
-# service list `app db mailpit`, the port list `3000 8025`, and check 6's whole
+# service list `app db mailpit`, the port list (per-checkout, derived by
+# scripts/worktree-env.sh — see worktree-isolation), and check 6's whole
 # rationale as a comment. Commit 210c526 narrowed the WAL check once, and both
 # files needed the repair by hand.
 #

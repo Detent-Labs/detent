@@ -13,19 +13,28 @@ like. Each names the change that first asked for it.
 ## Before you start
 
 **Address.** Use `127.0.0.1`, not `localhost`. Under Windows, `localhost`
-resolves to `::1` and the connection hangs. The port is your own choice. Git
-ignores `.devcontainer/docker-compose.override.yml`, so no port number in
-this file binds every contributor. Publish one with a two-line override:
+resolves to `::1` and the connection hangs. `bash scripts/dev-up.sh` derives
+this checkout's own port from its path (`worktree-isolation`) and publishes
+it into the gitignored, machine-generated
+`.devcontainer/docker-compose.ports.yml` — a linked worktree then never
+collides with the main checkout's ports. `. scripts/worktree-env.sh` prints
+that derived `PORT_APP` in the shell you source it into. The gitignored
+`.devcontainer/docker-compose.override.yml` stays the contributor's own, for
+an extra binding of their own; a literal `3001:3000` there would collide
+with another worktree's derived port sooner or later. Publish one with a
+two-line override only for a binding the generated file does not cover:
 
 ```yaml
 services:
   app:
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
 ```
 
-The engine then serves the frontend bundle from `WEB_ROOT` on whichever host
-port you chose. That is `3001` in the snippet above.
+The `127.0.0.1:` host_ip prefix is load-bearing on Windows: without it
+Docker binds `[::]`, and the browser meets a connection reset. The engine
+then serves the frontend bundle from `WEB_ROOT` on whichever host port you
+chose. That is `3001` in the snippet above.
 
 **Build the bundle first.** The engine serves `packages/web/dist`, a build
 output the repository does not track. `resolveWebRoot`
@@ -44,6 +53,22 @@ up. Zero of twenty happen with none. Stop the dev server before you run the
 suite. Do not start one while a suite run is in flight.
 
 ## Checklist
+
+### Worktree dev-server hot reload
+
+Source: `per-worktree-devcontainer-stacks` task 5.7.
+
+In a linked worktree (not the main checkout), run `bash scripts/dev-up.sh`,
+then `. scripts/worktree-env.sh && echo $PORT_VITE` to read its derived
+port. Start the frontend dev server inside the container: `cd packages/web
+&& bun run dev -- --host 0.0.0.0`. Open `http://127.0.0.1:<PORT_VITE>/` in
+the browser. Edit a file under `packages/web/src/` and save it.
+
+Pass: the browser updates with no manual reload. This confirms
+`vite.config.ts`'s `hmr.clientPort` (fed from `PORT_VITE`) points the HMR
+websocket at the host-published port this checkout actually used, rather
+than the fixed in-container 5173 a differently-ported worktree would get
+wrong.
 
 ### `iframe` framing from a second origin
 
