@@ -2176,13 +2176,13 @@ Stage-by-stage status is in `ROADMAP.md`.
   `migration.ts::migrateOne` read it. Both close a sequential-scan gap the
   function's other jsonb-nested predicates already had an index for.
 
-- CI, local (`.githooks/pre-push`, `add-ci-and-dependency-hygiene`,
-  `worktree-isolation` for the per-checkout project name): a `pre-push`
-  hook, which runs `bun run check` (typecheck, then the production build,
+- CI, local (`.githooks/pre-push`, `add-ci-and-dependency-hygiene`;
+  `worktree-isolation` names the per-checkout project): a `pre-push`
+  hook. It runs `bun run check` (typecheck, then the production build,
   then `bun test`) through `docker compose exec` in the dev container. The
-  hook sources `scripts/worktree-env.sh` first, so it execs into the
-  pushing checkout's own derived Compose project, never a name or container
-  shared across worktrees. A non-zero exit blocks the push. Running there
+  hook sources `scripts/worktree-env.sh` first. It then execs into the
+  pushing checkout's own derived Compose project, never a shared one. A
+  non-zero exit blocks the push. Running there
   closes the finding's real hazard: the container's environment already
   carries `DATABASE_URL`. So the 500+ database-backed test sites that make
   up most of the suite cannot skip silently and report a meaningless green.

@@ -14,11 +14,16 @@ scripts/dev-up.sh` starts the stack (`app` + `db` + `mailpit`; `app`'s
 default command is `sleep infinity`). It also generates
 `.devcontainer/docker-compose.ports.yml`, the last `-f` in every command
 below. Add `-f .devcontainer/docker-compose.override.yml` before it only
-where this checkout keeps one. Run every command through `docker compose -f
-.devcontainer/docker-compose.yml [-f .devcontainer/docker-compose.override.yml]
--f .devcontainer/docker-compose.ports.yml exec -w /workspace app <cmd>`.
-The `app` service's default container workdir is `/`, not `/workspace`. So
-`-w /workspace` is required every time. An `exec`/`ps`/`logs` call needs no
+where this checkout keeps one.
+
+Run every command through:
+```
+docker compose -f .devcontainer/docker-compose.yml \
+  [-f .devcontainer/docker-compose.override.yml] \
+  -f .devcontainer/docker-compose.ports.yml exec -w /workspace app <cmd>
+```
+The `app` service's default container workdir is `/`, not `/workspace`, so
+every command needs `-w /workspace`. An `exec`/`ps`/`logs` call needs no
 `-f` at all past the base file. The sourced `COMPOSE_PROJECT_NAME` alone
 resolves this checkout's own container.
 
@@ -33,9 +38,13 @@ extra setup once running through `exec`.
 `bash scripts/dev-up.sh` publishes this checkout's derived ports
 (`PORT_APP`, `PORT_VITE`, `PORT_MAILPIT`) into
 `.devcontainer/docker-compose.ports.yml` and prints them. To view a dev
-server from the host browser, run it from inside the container: `cd
-packages/web && bun run dev -- --host 0.0.0.0`. In a linked worktree, point
-it at that checkout's own engine: `VITE_API_URL=http://127.0.0.1:$PORT_APP`.
+server from the host browser, run it from inside the container:
+```
+cd packages/web && bun run dev -- --host 0.0.0.0
+```
+In a linked worktree, point it at that checkout's own engine:
+`VITE_API_URL=http://127.0.0.1:$PORT_APP`.
+
 A hand-written `.devcontainer/docker-compose.override.yml` is for an extra
 binding of the contributor's own. A literal `5173:5173` there collides with
 the main checkout's port. Never add port publishing to the shared
