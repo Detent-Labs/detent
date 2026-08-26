@@ -7,8 +7,7 @@ summaries. A summary carries the instance's identity and lifecycle state:
 `instanceId`, `processId`, `version`, `status`, `currentStepId`,
 `transitionSeq`, `assignment` (candidates and claim state), `startedBy`,
 `createdAt`, `currentStepEnteredAt`, `processLabel`, `stepLabel` and
-`processBaseLocale`. A summary SHALL NOT carry the instance `data` payload
-unless the caller opts in through `includeData`.
+`processBaseLocale`. A summary SHALL NOT carry the instance `data` payload.
 
 `processLabel` and `stepLabel` are `LocalizedText`. The read resolves both
 through the existing cached definition store, against the pinned version body.
@@ -19,8 +18,15 @@ part of the process body, guards and action configs included.
 
 The read SHALL accept these optional filters: `processId`, `version`, `status`
 (one or more of the instance statuses), `currentStepId`, `startedBy`,
-`claimedBy`, `assignedTo`, `excludeInstanceId` and `dataWhere`. It SHALL
-combine them conjunctively.
+`claimedBy`, `assignedTo`, `excludeInstanceId`, `createdAfter`,
+`createdBefore` and `dataWhere`. It SHALL combine them conjunctively.
+
+A `version` filter SHALL accompany a `processId` filter. The read SHALL reject
+a `version` with no `processId`. A version number anchors to one process, so a
+bare `version` names version 2 of every process at once. The
+`instances_selection_idx` index also reaches its `version` column only with the
+leading `processId` column bound. That is the rule `dataWhere` carries, for the
+first of those two reasons.
 
 `assignedTo` SHALL match an instance under either of two conditions. That actor
 holds the claim on its current step. Or its current step carries no claim and
@@ -41,15 +47,24 @@ same id-or-role eligibility `claimStep` already applies through
 check against. It therefore matches by id alone, identically for a claimed and
 an unclaimed instance.
 
-`excludeInstanceId` SHALL omit the named instance from the result. `dataWhere`
-SHALL carry comparisons against the instance `data` payload. The
-`instance-data-query` capability defines their semantics. The comparisons join
-the other filters conjunctively.
+`excludeInstanceId` SHALL omit the named instance from the result.
+`createdAfter` and `createdBefore` SHALL bound the result by the `created_at`
+column. Both bounds SHALL include the instant they name. That matches the
+inclusive convention `src/engine/reporting.ts` already uses for its own date
+range.
 
-`includeData` SHALL stay off unless the caller sets it. When the caller sets
-it, each non-degraded summary SHALL additionally carry the instance's `data`
-payload. A degraded summary SHALL NOT carry `data`, whatever `includeData`
-says. A degraded item cannot resolve the values its caller would read.
+Both bounds SHALL compare against the stored `created_at` value at its full
+precision. Postgres writes that column with microseconds, and the summary's
+`createdAt` truncates to milliseconds. A stored value can carry digits below the
+millisecond. Its summary value then names an earlier instant than the row holds.
+A `createdBefore` carrying that summary value SHALL omit the instance it came
+from. The read exposes millisecond granularity on the value it returns, and
+full precision on the value it compares.
+
+A `dataWhere` filter SHALL carry comparisons against the instance `data`
+payload. The `instance-data-query` capability defines their semantics. That
+includes the `processId` filter a `dataWhere` requires. The comparisons join
+the other filters conjunctively.
 
 With no filters the read SHALL return every instance, subject to paging. The
 read SHALL NOT scope results to the calling actor implicitly.
@@ -96,10 +111,15 @@ than `limit` even while more matching instances exist.
 - **THEN** it returns the instances pinned to version 2 of that process
 - **AND** it omits an instance of that process pinned to version 1
 
+#### Scenario: The read rejects a version with no processId
+
+- **WHEN** a caller passes a `version` and no `processId`
+- **THEN** the read rejects the call
+
 #### Scenario: Filtering by a data comparison
 
 - **WHEN** the read runs with a `dataWhere` comparison naming a field id and a
-  literal
+  scalar literal
 - **THEN** it returns the instances whose `data` holds that value under that
   field id
 
@@ -110,23 +130,27 @@ than `limit` even while more matching instances exist.
 - **THEN** it omits that instance
 - **AND** it returns every other matching instance
 
-#### Scenario: includeData stays off by default
+#### Scenario: Bounding by creation time
 
-- **WHEN** the read runs without `includeData`
-- **THEN** no returned summary carries a `data` field
+- **WHEN** the read runs with a `createdAfter` and a `createdBefore`
+- **THEN** it returns the instances created inside that window
+- **AND** it omits an instance created before the window
+- **AND** it omits an instance created after the window
 
-#### Scenario: includeData returns the data payload
+#### Scenario: A creation bound includes the instant it names
 
-- **WHEN** the read runs with `includeData: true`
-- **THEN** each non-degraded summary carries the instance's `data` payload
-- **AND** every other summary field stays as it was
+- **WHEN** the read runs with a `createdAfter` naming an instance's stored
+  `created_at`, read at the column's full precision
+- **THEN** it returns that instance
+- **AND** a `createdBefore` naming that same instant returns it too
 
-#### Scenario: A degraded summary carries no data even with includeData
+#### Scenario: A creation bound taken from a summary is millisecond-granular
 
-- **WHEN** the read runs with `includeData: true` and `includeDegraded: true`
-- **AND** one matched instance pins a `(processId, version)` with no published
-  body
-- **THEN** that instance's item is a degraded summary carrying no `data` field
+- **WHEN** an instance's stored `created_at` carries digits below the
+  millisecond
+- **AND** a caller passes that instance's summary `createdAt` as a
+  `createdBefore`
+- **THEN** the read omits that instance
 
 #### Scenario: The inbox predicate matches a claimed instance
 

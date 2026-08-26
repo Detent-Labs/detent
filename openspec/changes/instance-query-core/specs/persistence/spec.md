@@ -1,56 +1,83 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
-### Requirement: The current step predicate is a generated column
+### Requirement: Every query predicate the engine relies on has a supporting index
 
-The datastore SHALL carry an `instances.current_step_id text` column. Postgres
-SHALL derive its value from the instance body. The engine SHALL never write it:
+`initSchema` SHALL declare an index for each predicate the engine queries hot
+paths on. The enumeration below names the predicates identified so far:
 
-`ALTER TABLE instances ADD COLUMN IF NOT EXISTS current_step_id text
-GENERATED ALWAYS AS ((body->>'currentStepId')) STORED`
+- `history_entries (instance_id, transition_seq)`. Its structurally identical
+  sibling `instance_events` already has this index. Its readers are the outcome
+  append and the instance record read. The outcome append runs
+  `UPDATE ... WHERE instance_id = $1 AND transition_seq = $2`, for every
+  delivered and dead-lettered outbox row. It runs inside the delivery's marking
+  transaction, holding the outbox row lock, so its scan cost caps outbox
+  throughput. The instance record read has an indexed `instance_events`
+  counterpart.
+- `instances ((body->'parent'->>'instanceId'))`. A plain expression index,
+  matching the treatment the sibling jsonb predicates already get. Those are
+  `instances_claimed_by_idx`, the selection index and the candidates GIN index.
+  Its readers are the cancel cascade's child sweep and the migration live-child
+  gate. The cancel sweep runs once per nesting level, inside the caller's
+  transaction, holding instance row locks.
+- `instances ((body->>'currentStepId'))`, named `instances_current_step_idx`. A
+  plain expression index too, of the same shape as the parent-instance one. Its
+  reader is the instance list read's `currentStepId` filter.
+- `instances ((body->>'startedBy'))`, named `instances_started_by_idx`. A plain
+  expression index of that same shape. Its reader is the instance list read's
+  `startedBy` filter. The `GET /instances` route sets that filter for every
+  `scope=started` request, which is a participant-facing screen.
 
-`initSchema` SHALL add the column with that additive pattern. Every prior
-`instances` column already follows it. `initSchema` SHALL also declare an index
-on the column.
+Those last two predicates carry the list read's `currentStepId` and `startedBy`
+filters. The read carries six plain filters. Of the six, `processId` reaches
+`instances_selection_idx`'s leading column. The `version` filter reaches that
+index's second column with `processId` bound beside it. That index covers
+`processId`, `version` and `status`.
 
-A generated column, rather than a second write, closes a known hazard. Both
-`transition_seq` and `redacted_at` live as a column and as a body key. The
-engine writes both places. Two writers of one fact drift apart. A later write
-site updates one and forgets the other.
+A `status` filter reaches its third column, which needs the two ahead of it
+bound to narrow a scan. A `claimedBy` filter reaches
+`instances_claimed_by_idx`. The `currentStepId` and `startedBy` filters reach
+the two indexes above.
 
-A generated column cannot reach that state, because it has no writer. Postgres
-recomputes it from `body` on every write.
+A `STORED` generated column does not serve the current-step predicate. Postgres
+substitutes an expression index into a predicate. It substitutes no generated
+column. So the index SHALL be an expression index.
 
-The key `currentStepId` SHALL stay in the instance body. The body remains what
-`parseInstance` reads back into an `Instance`. The generated column's
-expression also reads that body key. Dropping the key would leave the column
-nothing to derive from.
+Both tables are append-only or never pruned. So an unindexed predicate against
+them grows with lifetime volume rather than live volume.
+
+Each index SHALL carry a comment naming its readers, the way the existing
+expression indexes do. A reader treats that file as the schema's documentation.
 
 As with the instance population scan, this requirement asks only that the index
-exist. It asserts no query plan.
+exist. It asserts no query plan. A planner may legitimately choose a sequential
+scan on a small relation. Asserting the plan would assert something the
+datastore is free to vary. Confirming that a plan uses each index is a
+verification step for the change that adds it. It is not a property of the
+specification.
 
-#### Scenario: Initialisation adds the column
+#### Scenario: Initialisation creates the history-entry index
 
-- **WHEN** `initSchema` runs against a database created before this capability
-- **THEN** `instances` carries a `current_step_id text` column
-- **AND** every existing row reads its own body's `currentStepId` through it
+- **WHEN** `initSchema` runs
+- **THEN** an index over `history_entries (instance_id, transition_seq)`
+  exists, mirroring the one `instance_events` already has
+
+#### Scenario: Initialisation creates the parent-instance index
+
+- **WHEN** `initSchema` runs
+- **THEN** an expression index over `instances (body->'parent'->>'instanceId')`
+  exists
 
 #### Scenario: Initialisation creates the current-step index
 
 - **WHEN** `initSchema` runs
-- **THEN** an index on `instances (current_step_id)` exists
+- **THEN** an expression index over `instances (body->>'currentStepId')` exists
+
+#### Scenario: Initialisation creates the started-by index
+
+- **WHEN** `initSchema` runs
+- **THEN** an expression index over `instances (body->>'startedBy')` exists
 
 #### Scenario: Initialisation is idempotent
 
 - **WHEN** `initSchema` runs twice
-- **THEN** the second run changes nothing and raises no error
-
-#### Scenario: A step transition updates the column with no engine write
-
-- **WHEN** an instance transitions to another step
-- **AND** the engine writes the instance body alone
-- **THEN** `current_step_id` reads the new step id
-
-#### Scenario: The column rejects a direct write
-
-- **WHEN** a statement writes `current_step_id` directly
-- **THEN** the datastore rejects that statement
+- **THEN** the second run succeeds and changes none of the enumerated indexes
