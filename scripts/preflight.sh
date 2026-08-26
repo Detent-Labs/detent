@@ -11,6 +11,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# shellcheck disable=SC1091
+. scripts/worktree-env.sh
+
 PROFILE="${1:-}"
 if [ "$PROFILE" != "core" ] && [ "$PROFILE" != "serve" ]; then
   echo "Usage: $0 <core|serve>" >&2
@@ -38,7 +41,7 @@ for svc in app db mailpit; do
 done
 [ -z "$UNHEALTHY" ] || fail \
   "check 2 failed: not healthy:$UNHEALTHY" \
-  "docker compose -f .devcontainer/docker-compose.yml up -d"
+  "bash scripts/dev-up.sh"
 
 if [ "$PROFILE" = "serve" ]; then
   # Check 3: the HTTP server process carries AUTH_JWT_SECRET. The container
@@ -55,10 +58,10 @@ if [ "$PROFILE" = "serve" ]; then
     "check 3 failed: no server process carries AUTH_JWT_SECRET" \
     "bash scripts/dev-up.sh"
 
-  # Check 4: every published port answers on the host.
-  for port in 3000 8025; do
+  # Check 4: every published port this checkout owns answers on the host.
+  for port in "$PORT_APP" "$PORT_MAILPIT"; do
     (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null || fail \
-      "check 4 failed: port $port does not answer on the host" \
+      "check 4 failed: port $port ($COMPOSE_PROJECT_NAME) does not answer on the host" \
       "bash scripts/dev-up.sh"
   done
 
@@ -69,7 +72,7 @@ if [ "$PROFILE" = "serve" ]; then
     "select count(*) from auth_users where email = 'demo-superuser@example.test'" 2>/dev/null || echo "0")
   [ "${DEF_COUNT:-0}" != "0" ] && [ "${SUPERUSER_COUNT:-0}" != "0" ] || fail \
     "check 5 failed: the database holds no seed data" \
-    "docker compose -f .devcontainer/docker-compose.yml exec -e SEED_ALLOW=1 -w /workspace app bun run seed"
+    ". scripts/worktree-env.sh && docker compose -f .devcontainer/docker-compose.yml exec -e SEED_ALLOW=1 -w /workspace app bun run seed"
 fi
 
 # Check 6: no stale codebase-memory WAL file holds a lock. Warns rather than

@@ -29,9 +29,16 @@ services:
       DATABASE_URL: postgres://postgres:postgres@db:5432/workflow_engine
       # The one frontend dev server, pinned to its own port (see
       # pin-frontend-dev-ports, consolidate-frontend-shell): packages/web
-      # on 5173.
-      # Unset means the HTTP wrapper emits no CORS headers at all.
-      CORS_ALLOWED_ORIGINS: http://localhost:5173
+      # on 5173, or worktree-isolation's derived offset in a linked worktree.
+      # Unset means the HTTP wrapper emits no CORS headers at all. Both
+      # localhost and 127.0.0.1 forms are listed — the manual checklist
+      # mandates the second address under Windows.
+      CORS_ALLOWED_ORIGINS: http://localhost:${PORT_VITE:-5173},http://127.0.0.1:${PORT_VITE:-5173}
+      # The published host port for the dev server (worktree-isolation).
+      # vite.config.ts reads this to point its hot-reload client at the
+      # address the browser actually reaches, which differs from the
+      # in-container listening port (5173) in a linked worktree.
+      PORT_VITE: ${PORT_VITE:-5173}
       # No AUTH_JWT_SECRET / AUTH_ISSUERS in this container, so the server
       # would otherwise refuse to start. This flag is the explicit, written-down
       # opt-in for that: it disables authentication entirely, trusting
@@ -93,8 +100,10 @@ services:
       retries: 5
 
   # Catches every message the notification.email handler sends. Port 1025 is
-  # SMTP, 8025 the web interface — the host binding for the latter lives in
-  # docker-compose.override.yml, like every other published port.
+  # SMTP, 8025 the web interface — the bring-up publishes the latter into the
+  # generated .devcontainer/docker-compose.ports.yml (worktree-isolation), at
+  # this checkout's derived port. A contributor's own extra binding still
+  # goes in docker-compose.override.yml.
   mailpit:
     image: axllent/mailpit:v1.27
     restart: unless-stopped

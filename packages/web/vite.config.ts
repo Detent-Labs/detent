@@ -43,7 +43,11 @@ export function contentSecurityPolicy(): Plugin {
 
 export default defineConfig({
   plugins: [react(), contentSecurityPolicy()],
-  server: { port: 5173, strictPort: true },
+  // server.port is the in-container listening port, fixed at 5173 always.
+  // hmr.clientPort is the browser-visible port — this checkout's derived
+  // PORT_VITE, published to the host by scripts/worktree-env.sh — so the
+  // HMR websocket reconnects at the address the host actually reached.
+  server: { port: 5173, strictPort: true, hmr: { clientPort: Number(process.env.PORT_VITE) || 5173 } },
   define: { __APP_VERSION__: JSON.stringify(appVersion) },
   // Chrome.tsx's account menu uses the Popover API (`beforetoggle`, for JS
   // positioning): Chrome 114+, Safari 17+, Firefox 125+. Vite's default
