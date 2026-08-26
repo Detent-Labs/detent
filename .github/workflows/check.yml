@@ -70,20 +70,28 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # A runner is always the main checkout's own worktree, so this
+      # resolves to the established name — sourced anyway so the exec steps
+      # below never drift from what `up` started (worktree-isolation).
       - name: Start the devcontainer stack
-        run: docker compose -f .devcontainer/docker-compose.yml up -d --wait
+        run: |
+          . scripts/worktree-env.sh
+          docker compose -f .devcontainer/docker-compose.yml up -d --wait
 
       # A contributor's devcontainer already has node_modules from its
       # first provisioning (scripts/dev-up.sh). A fresh Actions checkout
       # has none, so bun run check would fail before it even reaches
       # typecheck, on a missing Bun type definition.
       - name: bun install
-        run: docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app bun install
+        run: |
+          . scripts/worktree-env.sh
+          docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app bun install
 
       # No pipe into tee: `cmd | tee` returns tee's exit status, not bun's,
       # the same reason .githooks/pre-push captures this way.
       - name: bun run check
         run: |
+          . scripts/worktree-env.sh
           set +e
           docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app \
             bun run check > "$RUNNER_TEMP/check-out.txt" 2>&1
