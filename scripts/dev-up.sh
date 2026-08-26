@@ -15,29 +15,50 @@ cd "$(dirname "$0")/.."
 # into a Windows path before Docker sees it. Harmless no-op elsewhere.
 export MSYS_NO_PATHCONV=1
 
+# shellcheck disable=SC1091
+. scripts/worktree-env.sh
+
 SUPERUSER_EMAIL="demo-superuser@example.test"
 SUPERUSER_PASSWORD="seed-demo-password"
 SUPERUSER_ROLES="system:publish,system:cancel-any,system:admin,system:developer,system:author,system:reports,system:datalists,system:templates"
 SECRET_FILE=".devcontainer/.auth-secret"
-
-COMPOSE_FILES=(-f .devcontainer/docker-compose.yml)
-if [ ! -f .devcontainer/docker-compose.override.yml ]; then
-  echo "No .devcontainer/docker-compose.override.yml — creating one to publish the dev ports to the host."
-  cat > .devcontainer/docker-compose.override.yml <<'EOF'
-services:
+OLD_OVERRIDE='services:
   app:
     ports:
       - "127.0.0.1:3000:3000"
       - "127.0.0.1:5173:5173"
 
-  # Mailpit's web interface. The 127.0.0.1 prefix is load-bearing on Windows:
+  # Mailpit'"'"'s web interface. The 127.0.0.1 prefix is load-bearing on Windows:
   # without it Docker binds [::], and the host browser meets a connection reset.
   mailpit:
     ports:
-      - "127.0.0.1:8025:8025"
-EOF
+      - "127.0.0.1:8025:8025"'
+
+if [ -f .devcontainer/docker-compose.override.yml ] && [ "$(cat .devcontainer/docker-compose.override.yml)" = "$OLD_OVERRIDE" ]; then
+  echo "Removing .devcontainer/docker-compose.override.yml — its ports collide with this checkout's derived ones ($PORT_APP, $PORT_VITE, $PORT_MAILPIT), now published by the generated ports file below."
+  rm .devcontainer/docker-compose.override.yml
+elif [ -f .devcontainer/docker-compose.override.yml ]; then
+  echo "Keeping .devcontainer/docker-compose.override.yml as you left it. This checkout's derived ports are $PORT_APP, $PORT_VITE, $PORT_MAILPIT."
 fi
-COMPOSE_FILES+=(-f .devcontainer/docker-compose.override.yml)
+
+echo "==> Writing .devcontainer/docker-compose.ports.yml ($COMPOSE_PROJECT_NAME: $PORT_APP, $PORT_VITE, $PORT_MAILPIT)"
+cat > .devcontainer/docker-compose.ports.yml <<EOF
+services:
+  app:
+    ports:
+      - "127.0.0.1:${PORT_APP}:3000"
+      - "127.0.0.1:${PORT_VITE}:5173"
+
+  mailpit:
+    ports:
+      - "127.0.0.1:${PORT_MAILPIT}:8025"
+EOF
+
+COMPOSE_FILES=(-f .devcontainer/docker-compose.yml)
+if [ -f .devcontainer/docker-compose.override.yml ]; then
+  COMPOSE_FILES+=(-f .devcontainer/docker-compose.override.yml)
+fi
+COMPOSE_FILES+=(-f .devcontainer/docker-compose.ports.yml)
 compose() { docker compose "${COMPOSE_FILES[@]}" "$@"; }
 
 echo "==> Starting containers"
@@ -78,5 +99,8 @@ echo "==> Confirming the stack is ready"
 bash scripts/preflight.sh serve
 
 echo
-echo "Ready: http://localhost:3000/"
+echo "Ready:"
+echo "  Engine:   http://127.0.0.1:${PORT_APP}/"
+echo "  Frontend: http://127.0.0.1:${PORT_VITE}/ (once you start the dev server — see docs/browser-checks.md)"
+echo "  Mailpit:  http://127.0.0.1:${PORT_MAILPIT}/"
 echo "Login: $SUPERUSER_EMAIL / $SUPERUSER_PASSWORD"

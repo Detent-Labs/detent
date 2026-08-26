@@ -25,6 +25,7 @@
 set -e
 
 . "$(dirname "$0")/_lib.sh"
+. "$(dirname "$0")/../worktree-env.sh"
 
 RULE=frozen-lockfile
 COMPOSE="docker compose -f .devcontainer/docker-compose.yml"
@@ -39,6 +40,6 @@ echo "  bun.lock does not agree with the manifests. The install output:" >&2
 MSYS_NO_PATHCONV=1 $COMPOSE exec -T -w /workspace app \
   bun install --frozen-lockfile 2>&1 | sed 's/^/    /' >&2 || true
 echo "Regenerate the lockfile in the container, then commit it:" >&2
-echo "  $COMPOSE exec -T -w /workspace app bun install" >&2
+echo "  . scripts/worktree-env.sh && $COMPOSE exec -T -w /workspace app bun install" >&2
 no_verify_note
 exit 1

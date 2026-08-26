@@ -31,9 +31,15 @@ stage below instead of adding a capability.
 A preflight now runs first. It names which of six ordered devcontainer
 preconditions is missing, instead of the push failing on a symptom.
 
+Every git worktree checkout derives its own Compose project name and ports
+from its filesystem path. A linked worktree's stack, database and push gate
+then run against its own containers, never the main checkout's.
+
 Change: `add-ci-and-dependency-hygiene`, `specify-the-real-push-gate`,
-`add-devcontainer-preflight`, `add-ci-workflow`.
-Specs: `development-toolchain`, `devcontainer-preflight`.
+`add-devcontainer-preflight`, `add-ci-workflow`,
+`per-worktree-devcontainer-stacks`.
+Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
+`push-gate-checks`.
 
 ## Open stages
 
