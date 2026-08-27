@@ -131,10 +131,12 @@ This client-side check SHALL be presentational only; the server-side
 ### Requirement: All instances are listable with filters and paging
 
 The `/admin/instances` screen SHALL list every instance via `GET /instances`
-with `scope=all`, exposing the filters `InstanceListFilter` supports — process,
-status, current step, `startedBy`, `claimedBy` — and cursor paging. It SHALL
-NOT filter to the operator's own assignments; that is the participant app's
-view.
+with `scope=all`. It SHALL expose five of the filters `InstanceListFilter`
+supports: process, status, current step, `startedBy` and `claimedBy`. It SHALL
+expose cursor paging. It SHALL NOT filter to the operator's own assignments;
+that is the participant app's view.
+
+<!-- antislop: allow passive-voice - the live spec writes this paragraph verbatim -->
 
 Filter and paging state SHALL live in a pure module under the area's
 `screens/` directory with `bun:test` coverage, following
@@ -143,6 +145,7 @@ not required to be tested.
 
 #### Scenario: Listing every instance
 
+<!-- antislop: allow passive-voice - the delta copies this scenario from the live spec verbatim -->
 - **WHEN** the operator opens the instances screen
 - **THEN** instances started by other actors are listed
 

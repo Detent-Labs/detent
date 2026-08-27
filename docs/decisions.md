@@ -276,9 +276,29 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   where the owner's 2026-08-25 suggestion bites — promote the fields whose
   structure never changes (`processId`, `version`, `status`,
   `currentStepId`, `startedAt`, `startedBy`) out of `body` into real
-  columns, retiring the six expression indexes that stand in for them
-  today. It is worth its own change and helps more than this feature.
+  columns. Before `instance-query-core` (2026-08-27), only one expression
+  index, `instances_selection_idx`, stood in for any of those six —
+  covering three (`processId`, `version`, `status`); `currentStepId` and
+  `startedBy` had no index at all. That change added
+  `instances_current_step_idx` and `instances_started_by_idx`, covering
+  those two as well, so five of the six now have an index and only
+  `startedAt` does not. `instances` carried four expression indexes before
+  that change and carries six after; the other three
+  (`instances_claimed_by_idx`, `instances_candidates_idx`,
+  `instances_parent_idx`) stand in for keys this note does not name. So a
+  future promotion of these six fields into real columns retires three
+  indexes — the selection, current-step and started-by ones — not six and
+  not four. It is worth its own change and helps more than this feature.
   `data` itself cannot follow: its key set belongs to a process version.
+
+  `instance-query-core` also adds `createdAfter`/`createdBefore` to the
+  instance list read, bounding `instances.created_at` — a different column
+  from the `startedAt` this note already flags for promotion. The cycle-time
+  range above bounds `startedAt`; these filters bound `created_at`. The two
+  clocks can differ (one is written by the engine at start, the other by
+  Postgres's own `DEFAULT now()`), so one twelve-month question can answer
+  differently depending on which range a caller uses. A later promotion of
+  `startedAt` into a column inherits that question rather than closing it.
 - **Process-scoped permissions: the filter, the draft scope, and the
   `permissions` booleans.** A design pass on 2026-08-15 settled the shape;
   `ROADMAP.md` stage 40 carries it in full. The seam shipped 2026-08-15 as
