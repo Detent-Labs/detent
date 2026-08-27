@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql } from "../src/engine/store.js";
 import { DB, initDb, authHeaders, authedReq } from "./helpers/http-fixture.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { drainOutbox } from "../src/engine/outbox.js";
@@ -36,6 +37,7 @@ const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 beforeAll(initDb);
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_comments, instance_attachments, instance_drafts, definitions, permission_grants`;
+  if (DB) await clearInstanceAudit();
 });
 
 // ============================================================

@@ -12,6 +12,7 @@ import { devHeaderResolver } from "../src/auth/resolve.js";
 import { createServer, resolveAuthResolver, parseAuthIssuers } from "../src/http/server.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { PUBLISH_ROLE, ADMIN_ROLE } from "../src/auth/authorize.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const SECRET = "auth-server-test-secret-0123456789"; // >= 32 encoded bytes, required by resolveAuthResolver
@@ -23,6 +24,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE auth_users, outbox, instances, history_entries, instance_events, definitions`;
+  if (DB) await clearInstanceAudit();
 });
 
 // ============================================================

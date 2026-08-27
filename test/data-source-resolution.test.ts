@@ -12,6 +12,7 @@ import { createDataSourceRegistry, type DataSourceHandlerDef } from "../src/engi
 import { createProcessInstance, getInstanceView, submitAndTransition, SubmissionValidationError } from "../src/runtime/api.js";
 import type { ProcessBody, ProcessId, PathId, Instance } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const actor: Actor = { id: "user_1", roles: [] };
@@ -95,6 +96,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions`;
+  if (DB) await clearInstanceAudit();
 });
 
 test.skipIf(!DB)("getInstanceView resolves a dataSource-bound field's options", async () => {

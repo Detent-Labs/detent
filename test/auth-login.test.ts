@@ -21,6 +21,7 @@ import { createServer, resolveAuthResolver, clientAddressOf } from "../src/http/
 import { PUBLISH_ROLE, ADMIN_ROLE } from "../src/auth/authorize.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import type { ProcessBody } from "../src/schema/definition.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const SECRET = "auth-login-test-secret-value-0123456789"; // >= 32 encoded bytes; models a configuration the server now requires
@@ -45,6 +46,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE auth_users, outbox, instances, history_entries, instance_events, definitions`;
+  if (DB) await clearInstanceAudit();
 });
 
 function loginRequest(email: string, password: string): Request {

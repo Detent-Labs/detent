@@ -13,6 +13,7 @@ import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { executeManualTransition, fireTimer } from "../src/engine/transition.js";
 import { idempotencyKey } from "../src/engine/idempotency.js";
 import type { Actor } from "../src/cel/eval.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const fired = () => ({
   id: "evt_1a2b3c4d-0000-4000-8000-000000000001",
@@ -245,7 +246,7 @@ const historyCount = async (id: string): Promise<number> =>
   ((await sql`SELECT count(*)::int AS n FROM history_entries WHERE instance_id = ${id}`) as { n: number }[])[0].n;
 
 beforeAll(async () => { if (DB) await initSchema(); });
-beforeEach(async () => { if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events`; });
+beforeEach(async () => { if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events`; if (DB) await clearInstanceAudit(); });
 
 // --- 6.1 the sequence in force, and ordering within it -------------------------
 

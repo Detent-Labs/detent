@@ -59,18 +59,21 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
 ## Decided, not yet built (each needs its own OpenSpec change)
 - **Instance audit log: a tamper-evident change record for field data.** A
   design pass on 2026-08-25 settled the shape; the owner approved each piece
-  in turn. Not started. Three changes, in this order.
+  in turn. Change 1 landed as `instance-audit-log-chain`; changes 2 and 3
+  remain. Three changes, in this order.
 
-  1. The table, the `AFTER INSERT OR UPDATE` trigger, the `set_config` call
-     at all five write sites, the hash chain, and
+  1. The table, the two triggers sharing one diff function, the
+     `set_config` call at all six write sites, the hash chain, and
      `verify_instance_chain()`. The chain belongs here rather than in a
      later change: a row written without `prev_hash` and `hash` needs its
      chain computed after the fact, and a chain computed after the fact
      proves nothing about the window before it existed. Either the log is
      chained from its first row, or the first rows are decoration.
-  2. `FieldDef.redactable`, the salted `value_hash`,
-     `redact_instance_fields()`, and the rework of `redactInstance`. This
-     one touches `FieldDef`, so it is a definition-contract change and
+  2. `FieldDef.redactable`, narrowing `redact_instance_fields()`'s field
+     selection to the fields a process author marks redactable. This is the
+     only piece change 1 left out: the salted `value_hash`, the definer
+     redaction function, and the `redactInstance` rework all landed already.
+     This one touches `FieldDef`, so it is a definition-contract change and
      carries that ceremony: the spec delta, the `examples/` sweep,
      `docs/authoring-guide.md`, and a test that rejects a violating input.
   3. The nightly checkpoint, its signing key, and where the signed
@@ -104,33 +107,36 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   - One table, `instance_audit`, one row per field change (a delta, not an
     instance snapshot): `instance_id`, `seq`, `transition_seq`, `field_id`,
     `op` (`set` | `redact`), `value`, `salt`, `value_hash`, `prev_hash`,
-    `hash`, plus actor, timestamp, and `source` (user submit, action
-    writeback, subprocess return, migration, redaction). The two sequence
-    columns count different things. `seq` orders field changes within the
-    instance and carries the chain. `transition_seq` is copied from
-    `NEW.transition_seq`, which the trigger already holds, and it is the
-    join to `history_entries` and `instance_events` — both key on
+    `hash`, plus actor, timestamp, and `source` (instance creation, user
+    submit, action writeback, subprocess return, migration, redaction). The
+    two sequence columns count different things. `seq` orders field changes
+    within the instance and carries the chain. `transition_seq` is copied
+    from `NEW.transition_seq`, which the trigger already holds, and it is
+    the join to `history_entries` and `instance_events` — both key on
     `(instance_id, transition_seq)` and both index it. Without that column
     there is no way to ask which step changed a field, and the "state after
     step 3" replay below has no boundary to replay to.
-  - A Postgres trigger on `instances`, `AFTER INSERT OR UPDATE`, writes the
-    rows. The `INSERT` half is load-bearing: `createProcessInstance`
-    inserts a row whose `body` already carries start-form data and seeded
-    `FieldDef.default` values, so an update-only trigger would leave every
-    field's first value out of the log and record the second write as the
-    first `set`. On insert `OLD` is null and the diff is every key in
-    `NEW.body->'data'`. The trigger places the log below all five
-    body-writing sites (`transition.ts`, `outbox.ts`, `subprocess.ts`,
-    claim/release, `retention.ts`) and below any future sixth, which is the
-    completeness argument. The trigger function is `SECURITY DEFINER`; the
-    app role gets `REVOKE UPDATE, DELETE` on the table, so the application
-    can only append.
+  - Two Postgres triggers on `instances`, one `AFTER INSERT` and one
+    `AFTER UPDATE`, sharing one diff function, write the rows. The `INSERT`
+    half is load-bearing: `createProcessInstance` inserts a row whose
+    `body` already carries start-form data and seeded `FieldDef.default`
+    values, so an update-only trigger would leave every field's first
+    value out of the log and record the second write as the first `set`.
+    On insert `OLD` is null and the diff is every key in
+    `NEW.body->'data'`. The triggers place the log below all six
+    body-writing sites (`store.ts`'s own `createInstance`, `transition.ts`,
+    `outbox.ts`, `subprocess.ts`, `migration.ts`, `retention.ts`) and below
+    any future seventh, which is the completeness argument. The diff
+    function runs with the invoking role's own privileges, never
+    `SECURITY DEFINER`; the app role never receives `UPDATE` or `DELETE` on
+    the table in the first place — there is nothing to revoke — so the
+    application can only append.
   - Hash chain per instance: each row's `hash` covers the row's metadata,
     its `value_hash`, and `prev_hash`. Verification runs in SQL, as a
     `verify_instance_chain(instance_id)` function beside the trigger. The
-    trigger hashes with the built-in `sha256()` (no `pgcrypto`) over
-    Postgres's own `jsonb` rendering of the value, which is deterministic
-    but is not RFC 8785: `jsonb::text` emits `{"a": 1}` where
+    trigger hashes with the built-in `sha256()` over Postgres's own
+    `jsonb` rendering of the value, which is deterministic but is not
+    RFC 8785: `jsonb::text` emits `{"a": 1}` where
     `src/schema/canonical-json.ts` emits `{"a":1}`. A verifier written in
     TypeScript would have to reproduce a Postgres formatting detail exactly
     and would break silently on the first value shape nobody tried, so it
@@ -139,30 +145,33 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     outside the database; the signed checkpoint is stored outside the
     database too. The chain catches an edited row; the checkpoint catches a
     recomputed chain.
-  - `FieldDef` gains `redactable: true`. A redactable field's `value_hash`
-    is `H(salt || value)` with a per-row salt; a plain field hashes the
-    value directly. The flag must hold at write time — rows written before
-    a field became redactable hash the clear value and can never be nulled
-    without breaking the chain, so the studio should encourage marking
-    generously at authoring time. The name deliberately states the
-    treatment, not a legal category: no `personal`, no `gdpr`, no `pii`.
-  - Redaction = append one `redact` row naming who, when, why, and which
-    fields, then null `value` and `salt` in every prior row of those
-    fields, across the whole instance. The fingerprints stay, so every
-    hash still verifies. One narrower check stops, by design: a redacted
-    row's `value_hash` can no longer be checked against its `value`,
-    because the value is gone. The chain still proves that the row was not
-    inserted, reordered or edited. Nulling a prior row is itself an
-    `UPDATE` on a table the app role no longer holds `UPDATE` on, so
-    redaction is a second `SECURITY DEFINER` function that appends the
-    `redact` row and nulls the priors in one place. That function is the
-    deliberate hole in the append-only property and the piece an auditor
-    will ask about, so keep it short enough to read in one sitting. This
-    replaces the current `redactInstance`
-    wipe-`data`-to-`{}` approach; the `data-retention` spec's sentence
-    "history carries no field values, so it needs no redaction" stops
-    being true the moment this lands and must be rewritten in the same
-    change.
+  - Every row's `value_hash` is `H(salt || value)` with a per-row salt,
+    from the first row this change writes — not gated on a field flag.
+    `salt` comes from `pgcrypto`'s `gen_random_bytes`, which `initSchema`
+    installs. `FieldDef.redactable` (change 2) narrows which fields a
+    redaction request offers, a pure authoring-time signal; it changes no
+    hashing behavior, since every row is already salted. The name
+    deliberately states the treatment, not a legal category: no
+    `personal`, no `gdpr`, no `pii`.
+  - Redaction = append one `redact` row per field the instance's audit log
+    holds an entry for, naming who, when, and why, then null `value` and
+    `salt` in every prior row of that field, across the whole instance.
+    The fingerprints stay, so every hash still verifies. One narrower
+    check stops, by design: a redacted row's `value_hash` can no longer be
+    checked against its `value`, because the value is gone. The chain
+    still proves that the row was not inserted, reordered or edited.
+    Nulling a prior row is itself an `UPDATE` on a table the app role
+    holds no `UPDATE` on, so redaction is a `SECURITY DEFINER` function
+    that appends the `redact` rows and nulls the priors in one place. That
+    function is the deliberate hole in the append-only property and the
+    piece an auditor will ask about, so keep it short enough to read in
+    one sitting. `redactInstance`'s existing `data`-to-`{}` wipe stays; the
+    definer function runs alongside it, not in place of it. The
+    `data-retention` spec's sentence "history carries no field values, so
+    it needs no redaction" stays true of `history_entries` and
+    `instance_events`, which is what the delta spec says — it is the
+    audit log, a third relation, that now holds field values and needs the
+    redaction the sentence used to rule out entirely.
 
   **Explicitly not the goal.**
   - Not tamper-*proof*, tamper-*evident*: a superuser can rewrite rows,

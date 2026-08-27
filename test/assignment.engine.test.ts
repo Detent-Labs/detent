@@ -25,6 +25,7 @@ import {
 } from "../src/engine/registry.js";
 import type { ProcessBody, Instance, InstanceEvent } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const eventsOf = async (id: string): Promise<InstanceEvent[]> => {
   const r = (await sql`SELECT event FROM instance_events WHERE instance_id = ${id} ORDER BY id`) as { event: unknown }[];
@@ -79,6 +80,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, instance_events, history_entries, definitions`;
+  if (DB) await clearInstanceAudit();
 });
 
 test.skipIf(!DB)("a step with no assignment leaves instance.assignment unset", async () => {

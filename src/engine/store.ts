@@ -425,6 +425,384 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     scope    jsonb NOT NULL,
     members  text[] NOT NULL DEFAULT '{}'
   )`;
+
+  await initInstanceAudit(db);
+}
+
+/**
+ * Tamper-evident instance field audit log (instance-audit-log-chain). A
+ * separate owner role holds `instance_audit` and `redact_instance_fields` so
+ * the engine's own connecting role can only append (design.md "Who owns the
+ * audit relation"): `initSchema` grants that role INSERT/SELECT on the
+ * relation and EXECUTE on the redaction function alone, never UPDATE or
+ * DELETE.
+ *
+ * Bootstrap order, each guarded so a cluster that cannot perform a step still
+ * boots with the audit log switched off rather than failing every write:
+ * pgcrypto, then the owner role plus the two grants only the engine's own
+ * connecting role (owning `instances` and schema `public`) can make —
+ * CREATE on schema `public` and TRIGGER on `instances` — then the owner's
+ * `SET ROLE` membership, then, only once the role exists, the objects
+ * themselves created under `SET LOCAL ROLE detent_audit_owner` so the owner
+ * role owns them from creation (no `ALTER ... OWNER TO`, which raises on a
+ * second run against an already-correct owner).
+ */
+async function initInstanceAudit(db: SQL): Promise<void> {
+  // gen_random_bytes for instance_audit_append's per-row salt (design.md "The
+  // chain hashes in SQL"). WITH SCHEMA public matches the append function's own
+  // pinned search_path, which calls public.gen_random_bytes explicitly.
+  await db`CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public`;
+
+  const engineRole = (await db`SELECT current_user`)[0].current_user as string;
+
+  // Postgres checks the CREATEROLE attribute before it checks whether the role
+  // exists, so a bare duplicate_object guard alone would still raise 42501 on
+  // every boot of a least-privileged engine role.
+  await db`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'detent_audit_owner') THEN
+        CREATE ROLE detent_audit_owner NOLOGIN;
+      END IF;
+    EXCEPTION
+      WHEN duplicate_object THEN NULL;
+      WHEN insufficient_privilege THEN
+        RAISE WARNING 'detent_audit_owner absent and this role cannot create it; a superuser must run: CREATE ROLE detent_audit_owner NOLOGIN;';
+    END $$
+  `;
+
+  // Postgres 15 removed PUBLIC's default CREATE on schema public; the owner
+  // role needs it to create instance_audit and redact_instance_fields itself
+  // below. Guarded the same way: a role without GRANT OPTION on the schema
+  // (the devcontainer's postgres superuser always has it) cannot pass it on.
+  await db`
+    DO $$
+    BEGIN
+      GRANT CREATE ON SCHEMA public TO detent_audit_owner;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE WARNING 'cannot grant CREATE on schema public to detent_audit_owner; a superuser must run: GRANT CREATE ON SCHEMA public TO detent_audit_owner;';
+    END $$
+  `;
+
+  // CREATE TRIGGER needs the TRIGGER privilege on `instances`, a privilege
+  // distinct from ownership; `instances` is owned by the engine's own
+  // connecting role (it created that table earlier in this same function, no
+  // role switch yet), so that role — never detent_audit_owner, which does not
+  // own `instances` — is the one that can grant it.
+  await db`
+    DO $$
+    BEGIN
+      GRANT TRIGGER ON instances TO detent_audit_owner;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE WARNING 'cannot grant TRIGGER on instances to detent_audit_owner; a superuser must run: GRANT TRIGGER ON instances TO detent_audit_owner;';
+    END $$
+  `;
+
+  // Membership is what lets this role SET ROLE detent_audit_owner below —
+  // membership alone does not carry SET on Postgres 16. No ADMIN OPTION:
+  // Postgres 16 already gives the creator admin option, and re-requesting it
+  // raises invalid_grant_operation (0LP01), which this trap does not catch —
+  // harmless, since a role that just created detent_audit_owner already holds
+  // admin option and never takes this branch for that reason.
+  await db`
+    DO $$ BEGIN
+      GRANT detent_audit_owner TO current_user WITH INHERIT FALSE;
+    EXCEPTION WHEN insufficient_privilege THEN
+      RAISE WARNING 'detent_audit_owner membership missing; the audit log stays inactive until a superuser runs: GRANT CREATE ON SCHEMA public TO detent_audit_owner; GRANT TRIGGER ON instances TO detent_audit_owner; GRANT detent_audit_owner TO <engine role> WITH INHERIT FALSE; then the audit object statements.';
+    END $$
+  `;
+
+  const [{ audit_owner_exists }] = (await db`
+    SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'detent_audit_owner') AS audit_owner_exists
+  `) as { audit_owner_exists: boolean }[];
+  if (!audit_owner_exists) return; // already warned above; the log stays switched off
+
+  // instance_audit_diff/instance_audit_append/verify_instance_chain are never
+  // SECURITY DEFINER (verified by task 5.10), so their owner grants them no
+  // privilege beyond what the calling role already holds — they run outside
+  // the owner-role block, ordinary CREATE OR REPLACE FUNCTION statements
+  // owned by the engine's own connecting role, idempotent on every rerun for
+  // that reason. Postgres resolves a plpgsql body's relations at call time,
+  // so creating these before instance_audit exists is safe; the triggers
+  // below are what actually invoke them.
+  //
+  // Guarded the same way as the owner-role block below: a connecting role
+  // that is not the one that originally created these three (a rotated
+  // engine credential, most plausibly) gets "must be owner of function"
+  // here, caught rather than crashing initSchema — the existing functions
+  // stay in place, unreplaced, and the triggers created below still resolve
+  // them by name.
+  try {
+    await db`
+    CREATE OR REPLACE FUNCTION instance_audit_append(
+      instance_id text,
+      transition_seq bigint,
+      field_id text,
+      op text,
+      value jsonb,
+      actor text,
+      source text,
+      reason text
+    ) RETURNS void
+    LANGUAGE plpgsql
+    SET search_path = pg_catalog, public
+    AS $$
+    DECLARE
+      head_seq bigint;
+      head_hash bytea;
+      v_seq bigint;
+      v_at timestamptz := now();
+      v_salt bytea;
+      v_value_hash bytea;
+      v_prev_hash bytea;
+      v_hash bytea;
+    BEGIN
+      IF strpos(instance_id, E'\\x1e') > 0 OR strpos(instance_id, E'\\x1f') > 0
+         OR strpos(field_id, E'\\x1e') > 0 OR strpos(field_id, E'\\x1f') > 0
+         OR (actor IS NOT NULL AND (strpos(actor, E'\\x1e') > 0 OR strpos(actor, E'\\x1f') > 0))
+         OR (source IS NOT NULL AND (strpos(source, E'\\x1e') > 0 OR strpos(source, E'\\x1f') > 0))
+         OR (reason IS NOT NULL AND (strpos(reason, E'\\x1e') > 0 OR strpos(reason, E'\\x1f') > 0))
+      THEN
+        RAISE EXCEPTION 'instance_audit_append: instance_id, field_id, actor, source and reason must not contain U+001E or U+001F';
+      END IF;
+
+      SELECT ia.seq, ia.hash INTO head_seq, head_hash
+      FROM instance_audit ia
+      WHERE ia.instance_id = instance_audit_append.instance_id
+      ORDER BY ia.seq DESC
+      LIMIT 1;
+
+      v_seq := coalesce(head_seq, 0) + 1;
+      v_prev_hash := coalesce(head_hash, sha256(''::bytea));
+
+      IF value IS NULL THEN
+        v_value_hash := sha256(''::bytea);
+        v_salt := NULL;
+      ELSE
+        v_salt := gen_random_bytes(16);
+        v_value_hash := sha256(v_salt || convert_to(value::text, 'UTF8'));
+      END IF;
+
+      v_hash := sha256(convert_to(concat_ws(E'\\x1e', instance_id, v_seq, transition_seq,
+        field_id, op, coalesce(actor, E'\\x1f'), coalesce(source, E'\\x1f'),
+        coalesce(reason, E'\\x1f'), extract(epoch from v_at)::numeric::text), 'UTF8')
+        || v_value_hash || v_prev_hash);
+
+      INSERT INTO instance_audit
+        (instance_id, seq, transition_seq, field_id, op, value, actor, source, reason, at, salt, value_hash, prev_hash, hash)
+      VALUES
+        (instance_id, v_seq, transition_seq, field_id, op, value, actor, source, reason, v_at, v_salt, v_value_hash, v_prev_hash, v_hash);
+    END;
+    $$
+  `;
+
+  await db`
+    CREATE OR REPLACE FUNCTION instance_audit_diff() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path = pg_catalog, public
+    AS $$
+    DECLARE
+      k text;
+      old_data jsonb := CASE WHEN TG_OP = 'INSERT' THEN NULL ELSE OLD.body->'data' END;
+      new_data jsonb := NEW.body->'data';
+      logged_value jsonb;
+    BEGIN
+      -- jsonb_object_keys raises on a scalar. data is always a JSON
+      -- object through every application write path (instanceSchema
+      -- enforces it); a row some other write made this malformed on is an
+      -- anomaly no audit entry can meaningfully describe by key, and the
+      -- underlying INSERT/UPDATE on instances must still succeed rather
+      -- than fail here.
+      IF (new_data IS NOT NULL AND jsonb_typeof(new_data) <> 'object')
+         OR (old_data IS NOT NULL AND jsonb_typeof(old_data) <> 'object')
+      THEN
+        RETURN NEW;
+      END IF;
+
+      FOR k IN
+        SELECT jsonb_object_keys(old_data)
+        UNION
+        SELECT jsonb_object_keys(new_data)
+      LOOP
+        IF (old_data->k) IS DISTINCT FROM (new_data->k) THEN
+          -- A removed key logs JSON null, distinct from the SQL NULL a
+          -- redaction leaves behind (design.md "The chain hashes in SQL").
+          logged_value := CASE WHEN new_data ? k THEN new_data->k ELSE 'null'::jsonb END;
+          PERFORM instance_audit_append(
+            NEW.instance_id, NEW.transition_seq, k, 'set', logged_value,
+            nullif(current_setting('detent.actor', true), ''),
+            nullif(current_setting('detent.source', true), ''),
+            NULL
+          );
+        END IF;
+      END LOOP;
+      RETURN NEW;
+    END;
+    $$
+  `;
+
+  await db`
+    CREATE OR REPLACE FUNCTION verify_instance_chain(instance_id text)
+    RETURNS TABLE (ok boolean, failed_seq bigint)
+    LANGUAGE plpgsql
+    SET search_path = pg_catalog, public
+    AS $$
+    DECLARE
+      r record;
+      prev bytea := sha256(''::bytea);
+      computed_hash bytea;
+      computed_value_hash bytea;
+    BEGIN
+      FOR r IN
+        SELECT ia.seq, ia.transition_seq, ia.field_id, ia.op, ia.value, ia.actor, ia.source, ia.reason, ia.at, ia.salt, ia.value_hash, ia.prev_hash, ia.hash
+        FROM instance_audit ia
+        WHERE ia.instance_id = verify_instance_chain.instance_id
+        ORDER BY ia.seq
+      LOOP
+        IF r.salt IS NOT NULL THEN
+          computed_value_hash := sha256(r.salt || convert_to(r.value::text, 'UTF8'));
+          IF computed_value_hash <> r.value_hash THEN
+            RETURN QUERY SELECT false, r.seq;
+            RETURN;
+          END IF;
+        END IF;
+
+        IF r.prev_hash <> prev THEN
+          RETURN QUERY SELECT false, r.seq;
+          RETURN;
+        END IF;
+
+        computed_hash := sha256(convert_to(concat_ws(E'\\x1e', verify_instance_chain.instance_id, r.seq,
+          r.transition_seq, r.field_id, r.op, coalesce(r.actor, E'\\x1f'), coalesce(r.source, E'\\x1f'),
+          coalesce(r.reason, E'\\x1f'), extract(epoch from r.at)::numeric::text), 'UTF8')
+          || r.value_hash || prev);
+
+        IF computed_hash <> r.hash THEN
+          RETURN QUERY SELECT false, r.seq;
+          RETURN;
+        END IF;
+
+        prev := r.hash;
+      END LOOP;
+
+      RETURN QUERY SELECT true, NULL::bigint;
+    END;
+    $$
+  `;
+  } catch (err) {
+    if (!isInsufficientPrivilege(err)) throw err;
+  }
+
+  try {
+    await withTransaction(db, async (tx) => {
+      await tx`SET LOCAL ROLE detent_audit_owner`;
+
+      // Comment (not SQL): the primary key IS this relation's only index —
+      // (instance_id, seq) serves both readers, the ordered replay of one
+      // instance's chain and instance_audit_append's own chain-head read
+      // (design.md "The relation's shape"). No second index follows it.
+      await tx`CREATE TABLE IF NOT EXISTS instance_audit (
+        instance_id text NOT NULL,
+        seq bigint NOT NULL,
+        transition_seq bigint NOT NULL,
+        field_id text NOT NULL,
+        op text NOT NULL CHECK (op IN ('set', 'redact')),
+        value jsonb,
+        actor text,
+        source text,
+        reason text,
+        at timestamptz NOT NULL DEFAULT now(),
+        salt bytea,
+        value_hash bytea NOT NULL,
+        prev_hash bytea NOT NULL,
+        hash bytea NOT NULL,
+        PRIMARY KEY (instance_id, seq)
+      )`;
+
+      await tx`DROP TRIGGER IF EXISTS instance_audit_insert_trg ON instances`;
+      await tx`
+        CREATE TRIGGER instance_audit_insert_trg
+          AFTER INSERT ON instances
+          FOR EACH ROW
+          EXECUTE FUNCTION instance_audit_diff()
+      `;
+      await tx`DROP TRIGGER IF EXISTS instance_audit_update_trg ON instances`;
+      await tx`
+        CREATE TRIGGER instance_audit_update_trg
+          AFTER UPDATE ON instances
+          FOR EACH ROW
+          WHEN (OLD.body->'data' IS DISTINCT FROM NEW.body->'data')
+          EXECUTE FUNCTION instance_audit_diff()
+      `;
+
+      // SECURITY DEFINER: the engine's own role holds no UPDATE on
+      // instance_audit, and clearing a prior row's value is an UPDATE
+      // (design.md "Redaction is its own definer function"). It reads no
+      // column off `instances` — the definer role holds no grant there — so
+      // its caller passes transitionSeq explicitly.
+      await tx`
+        CREATE OR REPLACE FUNCTION redact_instance_fields(
+          instance_id text,
+          actor text,
+          reason text,
+          transition_seq bigint
+        ) RETURNS void
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        SET search_path = pg_catalog, public
+        AS $$
+        DECLARE
+          fid text;
+        BEGIN
+          FOR fid IN
+            SELECT DISTINCT ia.field_id
+            FROM instance_audit ia
+            WHERE ia.instance_id = redact_instance_fields.instance_id
+          LOOP
+            PERFORM instance_audit_append(
+              redact_instance_fields.instance_id, redact_instance_fields.transition_seq, fid, 'redact', NULL,
+              redact_instance_fields.actor, 'redaction', redact_instance_fields.reason
+            );
+            UPDATE instance_audit
+              SET value = NULL, salt = NULL
+              WHERE instance_audit.instance_id = redact_instance_fields.instance_id
+                AND instance_audit.field_id = fid
+                AND instance_audit.value IS NOT NULL;
+          END LOOP;
+        END;
+        $$
+      `;
+
+      // A function created with no explicit ACL carries EXECUTE for PUBLIC;
+      // without this revoke, any role able to connect could null another
+      // instance's audit values — the one deliberate hole in the append-only
+      // property, which belongs to the engine's role alone (design.md "Who
+      // owns the audit relation").
+      await tx`REVOKE EXECUTE ON FUNCTION redact_instance_fields(text, text, text, bigint) FROM PUBLIC`;
+      // engineRole is captured above via SELECT current_user, before this
+      // SET LOCAL ROLE — inside the block current_user reads as the owner
+      // role, and granting to current_user here would hand the owner's own
+      // privileges to itself while leaving the engine's role with none.
+      await tx.unsafe(`GRANT INSERT, SELECT ON instance_audit TO "${engineRole}"`);
+      await tx.unsafe(`GRANT EXECUTE ON FUNCTION redact_instance_fields(text, text, text, bigint) TO "${engineRole}"`);
+    });
+  } catch (err) {
+    if (!isInsufficientPrivilege(err)) throw err;
+    // detent_audit_owner exists but this role could not assume it (the
+    // membership grant above failed and warned already, or a DBA created the
+    // role without granting membership) — the relation, both triggers and the
+    // redaction function all sit inside this one block, so a cluster that
+    // reaches here has none of the four and keeps writing instances with the
+    // audit log switched off, exactly as the missing-role case above does.
+  }
+}
+
+/** Postgres SQLSTATE 42501: a role attempted something its grants do not cover. */
+function isInsufficientPrivilege(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  return (err as { errno?: unknown }).errno === "42501";
 }
 
 // Exported (not merely loadInstance-private) because subprocess.ts's return
@@ -460,6 +838,23 @@ export function withTransaction<T>(db: SQL, fn: (tx: SQL) => Promise<T>): Promis
   const joinable = db as SQL & { savepoint?: (fn: (tx: SQL) => Promise<T>) => Promise<T> };
   if (typeof joinable.savepoint === "function") return joinable.savepoint(fn);
   return db.begin(fn) as Promise<T>;
+}
+
+/**
+ * Stamps the instance-audit-log-chain trigger's attribution for every
+ * `instances` write the enclosing transaction goes on to make
+ * (instance-audit-log-chain design.md "Actor and source arrive through
+ * set_config"). `true` scopes both settings to the transaction, not the
+ * statement, so `tx` must be the enclosing transaction handle — never the
+ * pooled `db` — or the setting is gone before the statement it was meant to
+ * attribute. `actor` maps to SQL NULL when unsupplied (a spawned child's
+ * creation, a system-driven writeback): passing `undefined` as the bind
+ * value would land the four-character text "null" instead of a real NULL,
+ * so callers pass `null` here rather than `undefined`.
+ */
+export async function setAuditAttribution(tx: SQL, actor: string | null | undefined, source: string): Promise<void> {
+  await tx`SELECT set_config('detent.actor', ${actor ?? null}, true)`;
+  await tx`SELECT set_config('detent.source', ${source}, true)`;
 }
 
 /**
@@ -667,6 +1062,7 @@ export async function createInstance(
   // needs no ON CONFLICT: outside the guard, a redelivered child creation would
   // collide on the deterministic outbox key and fail the handler.
   await withTransaction(db, async (tx) => {
+    await setAuditAttribution(tx, opts.startedBy ?? null, "creation");
     // resolve_state starts 'pending', not the column's 'idle' default: both
     // callers (startInstance, the subprocess spawn handler) immediately cascade
     // the instance they just created, and a crash between this INSERT and that

@@ -34,6 +34,7 @@ import { ADMIN_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE, AuthorizationError } from "../
 import { RequestShapeError } from "../src/errors.js";
 import type { ProcessBody, ProcessId, PathId, InstanceId, FieldId, Instance, StepId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const actor: Actor = { id: "user_1", roles: [] };
@@ -47,6 +48,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions`;
+  if (DB) await clearInstanceAudit();
 });
 
 // ============================================================

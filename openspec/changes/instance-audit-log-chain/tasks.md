@@ -4,12 +4,12 @@ Task 1.2's `CREATE TABLE` is not runnable standalone — see task 5.4.
 
 <!-- antislop: allow sentence-length -->
 <!-- The CREATE EXTENSION statement is quoted verbatim; its SQL tokens count as prose words. -->
-- [ ] 1.1 Add `CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA
+- [x] 1.1 Add `CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA
   public` to `initSchema`. That matches the `public.gen_random_bytes`
   the append function calls under its pinned search path. Verify a fresh
   `initSchema` installs it into `public`, and that a second run is a
   no-op
-- [ ] 1.2 Add the `instance_audit` DDL to `initSchema`, keyed
+- [x] 1.2 Add the `instance_audit` DDL to `initSchema`, keyed
   `PRIMARY KEY (instance_id, seq)`. Carry the columns `design.md`'s
   "The relation's shape" names, with `seq` and `transition_seq` as
   `bigint`. Declare `transition_seq`, `field_id`, `op`,
@@ -22,11 +22,11 @@ Task 1.2's `CREATE TABLE` is not runnable standalone — see task 5.4.
   Verify a fresh `initSchema` creates it. This `CREATE TABLE` is one of
   task 5.4's three owner-block statements. Write it inside that block,
   not as a bare statement
-- [ ] 1.3 Comment the `instance_audit` DDL in `store.ts`, above the
+- [x] 1.3 Comment the `instance_audit` DDL in `store.ts`, above the
   relation, in the style the existing indexes use. Name the index's two
   readers, the ordered replay and the chain-head read. Verify
   `pg_indexes` lists the index
-- [ ] 1.4 Add `instance_audit` to every `beforeEach` TRUNCATE list naming
+- [x] 1.4 Add `instance_audit` to every `beforeEach` TRUNCATE list naming
   `instances`; verify no suite sees another suite's audit rows. Delete
   rather than truncate. The engine's role holds no `TRUNCATE` and no
   `DELETE` on the relation. The suites' cleanup therefore runs `DELETE
@@ -34,14 +34,14 @@ Task 1.2's `CREATE TABLE` is not runnable standalone — see task 5.4.
   consistent with `design.md`'s "`instance_audit` carries no foreign key
   to `instances`" section. This binds the test harness only; the
   append-only requirement still binds the engine's role at runtime
-- [ ] 1.5 Verify a second `initSchema` run leaves the relation and its
+- [x] 1.5 Verify a second `initSchema` run leaves the relation and its
   rows untouched
 
 ## 2. Trigger
 
 <!-- antislop: allow sentence-length -->
 <!-- The digest is quoted verbatim so the trigger and the verifier cannot drift; its SQL tokens count as prose words. -->
-- [ ] 2.1 Write `instance_audit_append(instance_id, transition_seq,
+- [x] 2.1 Write `instance_audit_append(instance_id, transition_seq,
   field_id, op, value, actor, source, reason)`, carrying the head read,
   the `salt` via `gen_random_bytes(16)`, the `value_hash` and the digest
   `sha256(convert_to(concat_ws(E'\x1e', instance_id, seq, transition_seq,
@@ -72,7 +72,7 @@ Task 1.2's `CREATE TABLE` is not runnable standalone — see task 5.4.
   closes the other half of that pair
 <!-- antislop: allow synonym-rotation -->
 <!-- `UPDATE` and `INSERT` name SQL statements in this task, not synonyms for a field data change. -->
-- [ ] 2.2 Attach two triggers calling `instance_audit_diff()`:
+- [x] 2.2 Attach two triggers calling `instance_audit_diff()`:
   `instance_audit_insert_trg` as `AFTER INSERT ... FOR EACH ROW` with no
   `WHEN`, and `instance_audit_update_trg` as
   `AFTER UPDATE ... FOR EACH ROW WHEN (OLD.body->'data' IS DISTINCT FROM
@@ -86,25 +86,25 @@ Task 1.2's `CREATE TABLE` is not runnable standalone — see task 5.4.
   `instance_audit`. A plpgsql body resolves its relations at call time.
   Nothing would raise until the first `INSERT INTO instances`, and then
   every one of them would
-- [ ] 2.3 Verify a direct `INSERT` writes one row per key. This case and
+- [x] 2.3 Verify a direct `INSERT` writes one row per key. This case and
   the rest of the trigger, chain and verification cases land in a new
   `test/instance-audit.test.ts`
-- [ ] 2.4 Verify an `UPDATE` writes one row per differing key
-- [ ] 2.5 Verify two rows of one value differ in `value_hash`
-- [ ] 2.6 Verify `value_hash` against a hand-computed digest
-- [ ] 2.7 Verify a three-row chain links head to tail
-- [ ] 2.8 Verify an instance's first row chains from `sha256(''::bytea)`
-- [ ] 2.9 Verify a join to `history_entries` on the instance and the
+- [x] 2.4 Verify an `UPDATE` writes one row per differing key
+- [x] 2.5 Verify two rows of one value differ in `value_hash`
+- [x] 2.6 Verify `value_hash` against a hand-computed digest
+- [x] 2.7 Verify a three-row chain links head to tail
+- [x] 2.8 Verify an instance's first row chains from `sha256(''::bytea)`
+- [x] 2.9 Verify a join to `history_entries` on the instance and the
   transition sequence returns that transition's rows
-- [ ] 2.10 Verify a write that removes a key writes a `set` entry whose
+- [x] 2.10 Verify a write that removes a key writes a `set` entry whose
   `value` is JSON null and whose `value_hash` is non-null
-- [ ] 2.11 Add a `ponytail:` comment on the head read naming the
+- [x] 2.11 Add a `ponytail:` comment on the head read naming the
   bulk-migration ceiling
-- [ ] 2.12 Verify a write touching only `assignment` or `status` leaves
+- [x] 2.12 Verify a write touching only `assignment` or `status` leaves
   the relation empty
-- [ ] 2.13 Verify the resolution worker's claim `UPDATE` writes no audit
+- [x] 2.13 Verify the resolution worker's claim `UPDATE` writes no audit
   row
-- [ ] 2.14 Make the DDL idempotent with `CREATE OR REPLACE` and a
+- [x] 2.14 Make the DDL idempotent with `CREATE OR REPLACE` and a
   `DROP TRIGGER IF EXISTS` for `instance_audit_insert_trg` and
   `instance_audit_update_trg`; verify a second `initSchema`. Verify that
   second run leaves `pg_class.relowner`, `pg_proc.proowner` and the
@@ -117,9 +117,9 @@ Task 1.2's `CREATE TABLE` is not runnable standalone — see task 5.4.
 
 ## 3. Actor and source
 
-- [ ] 3.1 Add a `set_config` helper beside `withTransaction`; verify
+- [x] 3.1 Add a `set_config` helper beside `withTransaction`; verify
   `current_setting` reads it back inside one transaction
-- [ ] 3.2 Read actor and source in the trigger as
+- [x] 3.2 Read actor and source in the trigger as
   `nullif(current_setting('detent.actor', true), '')` and
   `nullif(current_setting('detent.source', true), '')`; verify a row
   carries both. `current_setting`'s second argument answers null only on
@@ -129,17 +129,17 @@ Task 1.2's `CREATE TABLE` is not runnable standalone — see task 5.4.
   on Postgres 16.14. The engine runs on a pool, so the empty string is
   what an unattributed write reads in practice. An `Actor.id` is never
   empty, so the `nullif` collapses no value a caller can supply
-- [ ] 3.3 Verify an unset actor writes a null actor and a full field
+- [x] 3.3 Verify an unset actor writes a null actor and a full field
   record. Verify an unset source writes a null source and a full field
   record too. Run the unset case on a connection that already committed
   a transaction writing both values. A never-touched connection does not
   reach the reset path task 3.2's `nullif` exists for
-- [ ] 3.4 Call the helper on the enclosing `tx`, never on `db`, before
+- [x] 3.4 Call the helper on the enclosing `tx`, never on `db`, before
   `INSERT INTO instances` (`store.ts:675`), passing `creation` as the
   source and `opts.startedBy` as the actor. Verify a creation entry
   carries both. Verify a subprocess spawn, which supplies no
   `startedBy`, carries the source and a null actor
-- [ ] 3.5 Call it in `commitTransition` (`transition.ts:437`) on its own
+- [x] 3.5 Call it in `commitTransition` (`transition.ts:437`) on its own
   `tx`, before it reaches `applyStepEntry`, mapping `cause` `user` to
   `submit`. Besides `user`, `commitTransition` passes `timer`,
   `automatic` and `cancel`. None of the three carries field data, so
@@ -147,12 +147,12 @@ Task 1.2's `CREATE TABLE` is not runnable standalone — see task 5.4.
   `commitTransition` at all; task 3.6 handles it on `migrateOne`.
   The non-data-write task verifies that. Verify the submit
   source
-- [ ] 3.6 Call it in `migrateOne` (`migration.ts:527`) with `migration` as
+- [x] 3.6 Call it in `migrateOne` (`migration.ts:527`) with `migration` as
   the source, before it reaches `applyStepEntry`; verify a migration row
   differs from a submit row
-- [ ] 3.7 Call it on the enclosing `tx`, never on `db`, before the
+- [x] 3.7 Call it on the enclosing `tx`, never on `db`, before the
   writebacks in `outbox.ts` and `subprocess.ts`; verify both sources
-- [ ] 3.8 Call the helper on the enclosing `tx`, never on `db`, before
+- [x] 3.8 Call the helper on the enclosing `tx`, never on `db`, before
   the redaction wipe in `retention.ts`.
   Pass `redaction` as the source; verify it. The actor
   argument arrives with `opts` in group 6, and this call passes none yet
@@ -161,7 +161,7 @@ Task 1.2's `CREATE TABLE` is not runnable standalone — see task 5.4.
 
 <!-- antislop: allow sentence-length -->
 <!-- The digest is quoted verbatim so the trigger and the verifier cannot drift; its SQL tokens count as prose words. -->
-- [ ] 4.1 Write `verify_instance_chain(instance_id text) RETURNS TABLE
+- [x] 4.1 Write `verify_instance_chain(instance_id text) RETURNS TABLE
   (ok boolean, failed_seq bigint)`, walking the instance's rows in `seq`
   order with a running `prev` seeded from `sha256(''::bytea)` and
   recomputing each row's `hash` as
@@ -190,18 +190,18 @@ Task 1.2's `CREATE TABLE` is not runnable standalone — see task 5.4.
   Postgres also resolves such a body's relations at creation time. A
   `LANGUAGE sql` verifier would therefore fail `initSchema` on the
   cluster task 5.11 warns about
-- [ ] 4.2 Rewrite one row's value; verify the function names that row's
+- [x] 4.2 Rewrite one row's value; verify the function names that row's
   sequence
-- [ ] 4.3 Delete a middle row; verify the function names the following
+- [x] 4.3 Delete a middle row; verify the function names the following
   row
-- [ ] 4.4 Rewrite two rows in one chain; verify the function names the
+- [x] 4.4 Rewrite two rows in one chain; verify the function names the
   earlier one
-- [ ] 4.5 Export `verifyInstanceChain(instanceId, db)` from
+- [x] 4.5 Export `verifyInstanceChain(instanceId, db)` from
   `src/engine/admin-queries.ts` as a thin
   `SELECT * FROM verify_instance_chain($1)` wrapper returning
   `{ ok: boolean; failedSeq: number | null }`; verify it returns
   the function's verdict unchanged
-- [ ] 4.6 Verify two rows differing only in which of `actor` and
+- [x] 4.6 Verify two rows differing only in which of `actor` and
   `source` holds the null carry different `hash` values. A bare
   `concat_ws` gives that pair one digest, so this is the test that
   measures task 2.1's `coalesce` calls.
@@ -211,7 +211,7 @@ Task 1.2's `CREATE TABLE` is not runnable standalone — see task 5.4.
   `transition_seq = NULL, field_id = '7' || E'\x1e' || 'fld_a'`. Assert
   `verify_instance_chain` names that row. Left open, the two rows share
   one digest, measured on Postgres 16.14
-- [ ] 4.7 Swap two rows' `seq` values; verify the function names the
+- [x] 4.7 Swap two rows' `seq` values; verify the function names the
   earlier of the two
 
 ## 5. Redaction function and append-only privileges
@@ -221,7 +221,7 @@ then 5.11's membership grant, then the `SET LOCAL ROLE` block wrapping
 1.2, 2.2, 5.1 and 5.5. Tasks below are numbered for verifiable
 increments, not code order.
 
-- [ ] 5.1 Write the four-argument `redact_instance_fields`. Its
+- [x] 5.1 Write the four-argument `redact_instance_fields`. Its
   parameters are `instance_id text`, `actor text`, `reason text` and
   `transition_seq bigint`. It is a `SECURITY DEFINER`
   function with a pinned search path. Declare `SET search_path =
@@ -229,7 +229,7 @@ increments, not code order.
   search path. This `CREATE OR REPLACE FUNCTION` is one of the three
   statements task 5.4 wraps in its `SET LOCAL ROLE detent_audit_owner`
   block; write it there, not as a bare statement
-- [ ] 5.2 The function calls `instance_audit_append()` once per distinct
+- [x] 5.2 The function calls `instance_audit_append()` once per distinct
   `field_id` the instance's entries hold, appending one `redact` row each
   time. It then nulls `value` and `salt` on every earlier row of those
   fields. It stamps the `transition_seq` its caller passes on each
@@ -242,14 +242,14 @@ increments, not code order.
   `redact` row passes a NULL value. That is the branch on which
   `instance_audit_append` stamps `value_hash = sha256(''::bytea)` and
   leaves `salt` null
-- [ ] 5.3 Verify the trigger function and `redact_instance_fields` both
+- [x] 5.3 Verify the trigger function and `redact_instance_fields` both
   reach the chain through `instance_audit_append()`, and that no chain
   arithmetic exists twice. Assert it against the catalog rather than by
   reading the source. Read `pg_get_functiondef` for
   `instance_audit_diff` and for `redact_instance_fields`. Each body
   names `instance_audit_append`, and neither names `sha256(` anywhere
   outside that call
-- [ ] 5.4 Create the audit owner role, guarded so a cluster that cannot
+- [x] 5.4 Create the audit owner role, guarded so a cluster that cannot
   create roles still boots. Postgres checks the `CREATEROLE` attribute
   before it checks whether the role exists. A bare `duplicate_object`
   trap then leaves a least-privileged engine role raising 42501:
@@ -304,7 +304,7 @@ increments, not code order.
   ROLE` would not survive to the next statement on a different pooled
   connection. Verify `pg_class.relowner` and `pg_proc.proowner` name the
   owner role
-- [ ] 5.5 Revoke first, then grant. Inside task 5.4's `SET LOCAL ROLE`
+- [x] 5.5 Revoke first, then grant. Inside task 5.4's `SET LOCAL ROLE`
   block, since the owner role is what can grant on its own objects,
   issue in this order:
 
@@ -336,7 +336,7 @@ increments, not code order.
   `redact_instance_fields` names the engine's role and carries no `=X/`
   entry for `PUBLIC`. The negative half alone passes on a role holding
   no grant at all. The positive half is what catches that
-- [ ] 5.6 In `test/preload-db.ts`, duplicate-guarded, create
+- [x] 5.6 In `test/preload-db.ts`, duplicate-guarded, create
   `detent_audit_probe` with `LOGIN PASSWORD 'probe'` and grant it
   `CONNECT` on the derived test database. Both statements go inside
   `ensureDatabase`, on the maintenance connection it already opens. Both
@@ -358,7 +358,7 @@ increments, not code order.
   cluster-scoped rather than per-database. Say so in a comment beside
   the create. A later cluster audit then reads the role as the test
   fixture it is
-- [ ] 5.7 In the privileges suite, a new
+- [x] 5.7 In the privileges suite, a new
   `test/instance-audit-privileges.test.ts`, after `initSchema` has run,
   grant the probe role `INSERT, SELECT ON instance_audit`. Grant it
   `EXECUTE ON FUNCTION redact_instance_fields` too. That is exactly what
@@ -381,7 +381,7 @@ increments, not code order.
   suite with `test.skipIf` on the probe role's absence, the way the DB
   suites guard on `!DB`. A clone whose maintenance role cannot create
   roles must still run every other suite
-- [ ] 5.8 Open a second `SQL` client at `DATABASE_URL`, with the role
+- [x] 5.8 Open a second `SQL` client at `DATABASE_URL`, with the role
   name and password swapped for the probe role's. Verify its `UPDATE` and
   `DELETE` against `instance_audit` are both refused. Then grant the
   probe role membership in `detent_audit_owner` the way task 5.11 grants
@@ -390,12 +390,12 @@ increments, not code order.
   test measure the engine's real privilege shape. Without `INHERIT
   FALSE` the member holds the owner's `UPDATE` and `DELETE` with no `SET
   ROLE`, and both statements land
-- [ ] 5.9 Verify that same role's `INSERT` through the trigger still
+- [x] 5.9 Verify that same role's `INSERT` through the trigger still
   lands
-- [ ] 5.10 Verify `pg_proc.prosecdef` is false for
+- [x] 5.10 Verify `pg_proc.prosecdef` is false for
   `instance_audit_diff` and `instance_audit_append`, and true for
   `redact_instance_fields` alone
-- [ ] 5.11 Issue the membership grant inside a `DO` block trapping
+- [x] 5.11 Issue the membership grant inside a `DO` block trapping
   `insufficient_privilege`:
 
   ```sql
@@ -445,7 +445,7 @@ increments, not code order.
   public` issued without grant option warns rather than raising. The
   refusal surfaces one statement later, so the warning must name the
   schema grant too
-- [ ] 5.12 Verify the degraded cluster. With `detent_audit_owner` absent
+- [x] 5.12 Verify the degraded cluster. With `detent_audit_owner` absent
   and the connecting role unable to create it, `initSchema` returns and
   warns. `pg_trigger` lists neither `instance_audit_insert_trg` nor
   `instance_audit_update_trg`. An `INSERT INTO instances` then succeeds
@@ -456,7 +456,7 @@ increments, not code order.
 
 ## 6. Redaction
 
-- [ ] 6.1 Thread the requesting actor into `redactInstance` from
+- [x] 6.1 Thread the requesting actor into `redactInstance` from
   `handleAdminRedactInstance` (`src/http/admin-routes.ts:348`); the sweep
   passes none and the entry then carries a null actor; verify both. Pass
   `opts.actor` into task 3.8's `set_config` call as well as into
@@ -466,37 +466,37 @@ increments, not code order.
   entries and the
   `redact` entries then name the same actor. Update the handler's doc
   comment, which says it wraps `redactInstance` unchanged
-- [ ] 6.2 Verify one `redact` row lands per field the instance's entries
+- [x] 6.2 Verify one `redact` row lands per field the instance's entries
   name
-- [ ] 6.3 Verify all prior rows of those fields clear
-- [ ] 6.4 Call it from `redactInstance` after the `body.data` wipe.
+- [x] 6.3 Verify all prior rows of those fields clear
+- [x] 6.4 Call it from `redactInstance` after the `body.data` wipe.
   Verify a redacted instance's rows hold no value. Verify the wipe's
   `set` entries and the `redact` entries carry the same actor
-- [ ] 6.5 Verify a second instance's entries keep their values in clear
+- [x] 6.5 Verify a second instance's entries keep their values in clear
   text
-- [ ] 6.6 Verify `verify_instance_chain` still reports holding after a
+- [x] 6.6 Verify `verify_instance_chain` still reports holding after a
   redaction
-- [ ] 6.7 Verify the redaction wipe's own entries carry no value
-- [ ] 6.8 Verify a second `redactInstance` call appends no second
+- [x] 6.7 Verify the redaction wipe's own entries carry no value
+- [x] 6.8 Verify a second `redactInstance` call appends no second
   `redact` entry and nulls nothing further
-- [ ] 6.9 Call `redactInstance` directly with `opts.reason`; verify each
+- [x] 6.9 Call `redactInstance` directly with `opts.reason`; verify each
   `redact` row carries that reason, and that a call without one leaves
   the column null
-- [ ] 6.10 Pass `inst.transitionSeq`, which `redactInstance` already
+- [x] 6.10 Pass `inst.transitionSeq`, which `redactInstance` already
   parses at `retention.ts:26` and holds in scope, as
   `redact_instance_fields`'s fourth argument. Verify each `redact` row's
   `transition_seq` equals the instance's own at redaction time
 
 ## 7. Documentation
 
-- [ ] 7.1 Sync the four delta specs into `openspec/specs/`, creating
+- [x] 7.1 Sync the four delta specs into `openspec/specs/`, creating
   `openspec/specs/instance-audit-log/spec.md` as a new capability; verify
   `openspec validate` passes
-- [ ] 7.2 Rewrite the live `openspec/specs/data-retention/spec.md`
+- [x] 7.2 Rewrite the live `openspec/specs/data-retention/spec.md`
   Purpose. It should read "…leaves `history_entries` and
   `instance_events` intact, and clears the values of `instance_audit`
   while keeping its rows." A delta cannot reach a Purpose block
-- [ ] 7.3 Correct `docs/decisions.md`'s write-site list, its change-2
+- [x] 7.3 Correct `docs/decisions.md`'s write-site list, its change-2
   scope (only `FieldDef.redactable` remains), its
   salt-only-for-redactable-fields statement and its `(no pgcrypto)`
   parenthetical. Correct its table bullet's five-source enumeration too,
@@ -507,7 +507,7 @@ increments, not code order.
   says. Correct the entry's `Not started.` line last: change 1 landed as
   `instance-audit-log-chain`, and changes 2 and 3 remain. The entry
   stays under "Decided, not yet built"
-- [ ] 7.4 Correct `docs/decisions.md`'s `SECURITY DEFINER` claim about
+- [x] 7.4 Correct `docs/decisions.md`'s `SECURITY DEFINER` claim about
   the trigger and its `REVOKE UPDATE, DELETE` claim. Correct its
   single-`AFTER INSERT OR UPDATE`-trigger statement. This proposal splits
   that trigger into two over one shared function. Correct its "this
@@ -519,7 +519,7 @@ increments, not code order.
   fields". This change appends one row per field. Verify the prose
   gate stays level with
   `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`
-- [ ] 7.5 Add an "Instance audit log (`instance-audit-log-chain`)" heading
+- [x] 7.5 Add an "Instance audit log (`instance-audit-log-chain`)" heading
   to `docs/current-state.md`. Name the relation and the grants. Name the
   two triggers, `instance_audit_insert_trg` and
   `instance_audit_update_trg`. Name the four functions too:
@@ -528,7 +528,7 @@ increments, not code order.
   TypeScript wrapper `verifyInstanceChain` in
   `src/engine/admin-queries.ts` beside them, since that file lists
   exported symbols by hand
-- [ ] 7.6 Correct `CLAUDE.md`'s Verification section, which says
+- [x] 7.6 Correct `CLAUDE.md`'s Verification section, which says
   `sh scripts/gates/prose.sh < /dev/null` defaults to
   `origin/main..HEAD` where stdin is empty. The fallback lives in
   `scripts/gates/range.sh:54`, not in `prose.sh`. That script reads its

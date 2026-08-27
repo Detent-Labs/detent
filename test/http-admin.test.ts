@@ -9,6 +9,7 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, createInstance } from "../src/engine/store.js";
 import { DB, initDb, authedReq } from "./helpers/http-fixture.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { createServer } from "../src/http/server.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
@@ -26,6 +27,7 @@ const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 beforeAll(initDb);
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, auth_users, migration_plans, permission_grants`;
+  if (DB) await clearInstanceAudit();
 });
 
 const admin: Actor = { id: "user_admin", roles: [ADMIN_ROLE] };

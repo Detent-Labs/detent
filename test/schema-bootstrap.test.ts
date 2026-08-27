@@ -13,6 +13,7 @@ import { createRegistry, createDataSourceRegistry } from "../src/engine/registry
 import { publishBody } from "../src/engine/definitions.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 
@@ -71,6 +72,7 @@ test.skipIf(!DB)(
   async () => {
     await initSchema(sql);
     await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions`;
+    await clearInstanceAudit();
     const reg = createRegistry();
     const dsReg = createDataSourceRegistry();
     const processId = `proc_schema_bootstrap_${crypto.randomUUID()}` as ProcessId;
