@@ -74,10 +74,10 @@ free to vary.
 accepting requests, and the user-administration CLI SHALL do the same before
 executing a command. Every statement in `initSchema` is idempotent:
 `CREATE ... IF NOT EXISTS` for a relation or index, `ADD COLUMN IF NOT EXISTS`
-for a column, `CREATE OR REPLACE` for a function, `DROP ... IF EXISTS`
-before `CREATE TRIGGER`, a `DO` block guarding a role's creation on
-`pg_roles`, and `GRANT`, which is idempotent by nature, so the
-call is a no-op in effect against a database that already has the schema.
+for a column, `CREATE OR REPLACE` for a function, and `DROP ... IF EXISTS`
+before `CREATE TRIGGER`. A `DO` block guards a role's creation on
+`pg_roles`, and `GRANT` is idempotent by nature. The call is therefore
+a no-op in effect against a database that already has the schema.
 
 The audit relation and its redaction function SHALL be created by the
 role that owns them, under `SET LOCAL ROLE`. `initSchema` SHALL run no
@@ -108,8 +108,8 @@ happens to run first.
 
 - **WHEN** the server is started against a database that already has the
   schema
-- **THEN** startup proceeds normally, no table, index or row is altered,
-  each function and trigger is replaced by an identical definition, and the
+- **THEN** startup proceeds normally: no table, index or row is altered.
+  Each function and trigger is replaced by an identical definition, and the
   audit relation's ownership and grants are unchanged
 
 #### Scenario: Administering users on a fresh database works

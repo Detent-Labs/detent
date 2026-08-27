@@ -4093,52 +4093,67 @@ meets `scope=started` should infer no new permission tier from it.
 
 ## Instance audit log (`instance-audit-log-chain`)
 
-`instance_audit` (`src/engine/store.ts`) holds one append-only row per
-instance field change: `instance_id`, `seq`, `transition_seq`, `field_id`,
-`op` (`set` | `redact`), `value`, `actor`, `source`, `reason`, `at`,
-`salt`, `value_hash`, `prev_hash`, `hash`, keyed `PRIMARY KEY
-(instance_id, seq)`. A separate login-less role, `detent_audit_owner`,
-owns the relation and the redaction function created below it; the
-engine's own connecting role holds `INSERT` and `SELECT` on the relation
-alone, and `EXECUTE` on the redaction function, never `UPDATE` or
+The relation `instance_audit` (`src/engine/store.ts`) holds one
+append-only row per instance field change, keyed `PRIMARY KEY
+(instance_id, seq)`. Its columns are `instance_id`, `seq`,
+`transition_seq`, `field_id`, `op` (`set` | `redact`), `value`,
+`actor`, `source`, `reason`, `at`, `salt`, `value_hash`, `prev_hash`
+and `hash`.
+
+A separate login-less role, `detent_audit_owner`, owns the relation
+and the redaction function created below it. The engine's own
+connecting role holds `INSERT` and `SELECT` on the relation alone. It
+also holds `EXECUTE` on the redaction function, never `UPDATE` or
 `DELETE`.
 
-Two triggers on `instances`, `instance_audit_insert_trg` (`AFTER
-INSERT`) and `instance_audit_update_trg` (`AFTER UPDATE ... WHEN
-(OLD.body->'data' IS DISTINCT FROM NEW.body->'data')`), share one diff
-function and fire on every field-data-changing write, wherever it
-originates.
+Two triggers on `instances` share one diff function:
+`instance_audit_insert_trg` (`AFTER INSERT`) and
+`instance_audit_update_trg` (`AFTER UPDATE ... WHEN
+(OLD.body->'data' IS DISTINCT FROM NEW.body->'data')`). Both fire on
+every field-data-changing write, wherever it originates.
 
-Four SQL functions carry the behavior. `instance_audit_diff()` is the
-trigger function: it diffs `OLD.body->'data'` against `NEW.body->'data'`
-and calls `instance_audit_append()` once per differing key.
-`instance_audit_append(instance_id, transition_seq, field_id, op, value,
-actor, source, reason)` is the one place that reads the chain head,
-salts and hashes a row, and inserts it — the trigger and the redaction
-function both call it, so the chain arithmetic exists once.
-`verify_instance_chain(instance_id) RETURNS TABLE (ok boolean,
-failed_seq bigint)` walks one instance's rows and recomputes each hash,
-naming the first row whose recomputation disagrees. `redact_instance_fields(instance_id,
-actor, reason, transition_seq)`, `SECURITY DEFINER` and owned by
-`detent_audit_owner`, appends one `redact` row per field the instance's
-entries name, then nulls `value` and `salt` on every earlier row of
-those fields; `redactInstance` (`src/engine/retention.ts`) calls it
-after its own `data`-to-`{}` wipe.
+Four SQL functions carry the behavior.
 
-`verifyInstanceChain(instanceId, db)` (`src/engine/admin-queries.ts`)
-is the one TypeScript entry point onto chain verification, a thin
-`SELECT * FROM verify_instance_chain($1)` wrapper. It has no caller in
-this change; an admin audit view is a separate change against
-`admin-app`.
+The trigger function, `instance_audit_diff()`, diffs
+`OLD.body->'data'` against `NEW.body->'data'`. It calls
+`instance_audit_append()` once per differing key.
 
-Actor and source reach the trigger through a transaction-scoped
-`set_config('detent.actor', …, true)` / `set_config('detent.source', …,
-true)` pair (the `setAuditAttribution` helper beside `withTransaction`
-in `src/engine/store.ts`), called on the enclosing transaction
-immediately before each of the six write sites' own statement:
-`createInstance`'s `INSERT` (source `creation`), `commitTransition`'s
-`applyStepEntry` call for a `user`-caused transition (source `submit`),
-`outbox.ts`'s action writeback (source `writeback`), `subprocess.ts`'s
-return writeback (source `subprocess-return`), `migrateOne`'s own
-`applyStepEntry` call (source `migration`), and `redactInstance`'s wipe
-(source `redaction`).
+The append function, `instance_audit_append`, takes `(instance_id,
+transition_seq, field_id, op, value, actor, source, reason)`. It is
+the one place that reads the chain head, salts and hashes a row, and
+inserts it. Both the trigger and the redaction function call it, so
+the chain arithmetic exists once.
+
+The verification function is `verify_instance_chain(instance_id)
+RETURNS TABLE (ok boolean, failed_seq bigint)`. It walks one
+instance's rows and recomputes each hash, naming the first row whose
+recomputation disagrees.
+
+The redaction function, `redact_instance_fields(instance_id, actor,
+reason, transition_seq)`, is `SECURITY DEFINER` and owned by
+`detent_audit_owner`. It appends one `redact` row per field the
+instance's entries name, then nulls `value` and `salt` on every
+earlier row of those fields. `redactInstance`
+(`src/engine/retention.ts`) calls it after its own `data`-to-`{}`
+wipe.
+
+The TypeScript entry point onto chain verification is
+`verifyInstanceChain(instanceId, db)` (`src/engine/admin-queries.ts`),
+a thin `SELECT * FROM verify_instance_chain($1)` wrapper. It has no
+caller in this change. An admin audit view is a separate change
+against `admin-app`.
+
+Actor and source reach the trigger through a transaction-scoped pair
+of `set_config` calls, `detent.actor` and `detent.source`, each with
+`true` as its third argument. The `setAuditAttribution` helper beside
+`withTransaction`
+in `src/engine/store.ts` calls it on the enclosing transaction. Each
+of the six write sites calls it immediately before its own statement:
+
+- `createInstance`'s `INSERT` (source `creation`)
+- `commitTransition`'s `applyStepEntry` call for a `user`-caused
+  transition (source `submit`)
+- `outbox.ts`'s action writeback (source `writeback`)
+- `subprocess.ts`'s return writeback (source `subprocess-return`)
+- `migrateOne`'s own `applyStepEntry` call (source `migration`)
+- `redactInstance`'s wipe (source `redaction`)

@@ -154,31 +154,35 @@ nothing.
 
 That `true` argument scopes the setting to the transaction, not to the
 statement. The helper `withTransaction` joins an open transaction as a
-savepoint when its handle is already inside one; on the plain pooled
-`db` handle it opens a fresh top-level transaction instead, since the
-pooled client carries no `.savepoint` method for `withTransaction` to
-find. `createSeededInstance` runs outside any enclosing transaction —
+savepoint when its handle is already inside one. On the plain pooled
+`db` handle it opens a fresh top-level transaction instead. The pooled
+client carries no `.savepoint` function for `withTransaction` to find.
+
+`createSeededInstance` runs outside any enclosing transaction:
 `outbox.ts` deliberately runs every handler outside a transaction
-(`drainOutbox`'s `deliver` call precedes its `db.begin` mark block) — so
-its own `withTransaction(db, ...)` call opens that fresh top-level
-transaction, not a savepoint of any "spawnSubprocess transaction."
-`createInstance`'s own `withTransaction` nests as a savepoint inside
-THAT transaction instead. The setting lives only for the lifetime of
-`createSeededInstance`'s own transaction; `makeSpawnHandler`'s later
-`resolveAutomatic` call runs on the raw pooled `db` again, after that
-transaction has committed, and any transition it commits opens its own
-new transaction with its own `set_config` call immediately before its
-own statement. No stale attribution can cross between them. Every site
-sets both values immediately before its own statement, rather than
-once per transaction.
+(`drainOutbox`'s `deliver` call precedes its `db.begin` mark block). Its
+own `withTransaction(db, ...)` call therefore opens that fresh
+top-level transaction, not a savepoint of any "spawnSubprocess
+transaction." `createInstance`'s own `withTransaction` nests as a
+savepoint inside THAT transaction instead.
+
+The setting lives only for the lifetime of `createSeededInstance`'s own
+transaction.
+
+The later `resolveAutomatic` call `makeSpawnHandler` makes runs on the
+raw pooled `db` again, after that transaction has committed. Any
+transition it commits opens its own new transaction with its own
+`set_config` call immediately before its own statement. No stale
+attribution can cross between them that way. Every site sets both values
+immediately before its own statement, rather than once per transaction.
 
 Every call runs on the enclosing transaction handle, never on the pooled
 `db` handle. Five of the six sites already sit inside a
-`withTransaction` callback; `outbox.ts`'s sits inside a bare `db.begin`
-block, which hands the same kind of transaction-scoped `tx` handle. On
-`db` it would run in an implicit transaction of its own, on whichever
-connection the pool handed it. The setting would be gone before the
-statement it was meant to attribute.
+`withTransaction` callback. `outbox.ts`'s sits inside a bare `db.begin`
+block instead, which hands the same kind of transaction-scoped `tx`
+handle. On `db` it would run in an implicit transaction of its own, on
+whichever connection the pool handed it. The setting would be gone
+before the statement it was meant to attribute.
 
 Nothing in `src/` sets a session variable today. The helper lands beside
 `withTransaction`, and six call sites use it over the five statements
@@ -234,6 +238,8 @@ append function rejects both separators in `instance_id` and `field_id`
 as well. Every argument `concat_ws` receives is then non-null and
 separator-free.
 
+<!-- antislop: allow sentence-length -->
+<!-- The collision example quotes the SQL field_id literal verbatim; its tokens count as prose words. -->
 Measured on Postgres 16.14, one digest covers two rows. The first
 carries a null `transition_seq` and a `field_id` of `'7' || E'\x1e' ||
 'fld_a'`. The second is an ordinary row whose `transition_seq` is 7 and
@@ -241,10 +247,12 @@ whose `field_id` is `fld_a`. That is the same gap the paragraphs above
 close for `actor` and `reason`, one column further along.
 
 Neither rejection can fire in ordinary operation. An `instance_id`
-carries `inst_` plus a canonical UUID (v4 via `crypto.randomUUID()` for
-a participant-created or chained instance, v5 via the hand-rolled
-`uuidv5` in `idempotency.ts` for a subprocess spawn) — hex digits and
-dashes only, in both cases. A `field_id` is a `FieldDef.key`, which
+carries `inst_` plus a canonical UUID. A participant-created or chained
+instance gets v4, via `crypto.randomUUID()`. A subprocess spawn gets v5
+instead, via the hand-rolled `uuidv5` in `idempotency.ts`. Both forms
+use hex digits and dashes only.
+
+A `field_id` is a `FieldDef.key`, which
 `compile.ts` already holds to `/^[a-z_][a-z0-9_]*$/`. The `NOT NULL`
 breaks no writer either: the
 trigger copies `NEW.transition_seq` from a column `instances` already
@@ -541,10 +549,10 @@ reason. Each of those suites gains `instance_audit` in its own
 
 Test cleanup uses `DELETE FROM instance_audit` under `SET LOCAL ROLE
 detent_audit_owner`, not a grant to the connecting test role. The
-devcontainer's `DATABASE_URL` is the `postgres` superuser, so this
-isn't required for correctness today — a plain `DELETE` would work —
-but it keeps the suite decoupled from that superuser assumption for a
-future non-superuser test environment.
+devcontainer's `DATABASE_URL` is the `postgres` superuser, so a plain
+`DELETE` would work here too. Using the owner role instead keeps the
+suite decoupled from that superuser assumption, for a future
+non-superuser test environment.
 
 ## Migration Plan
 
@@ -746,13 +754,14 @@ holding the membership. In the devcontainer `initSchema` connects as
 just the audit row.**
 
 → `Actor.id` is attacker-influenced under a compromised or malicious
-JWT issuer in production, and trivially caller-controlled via the
-non-production `devHeaderResolver`'s `X-Actor-Id` header in the
-dev/demo/test configuration this repo itself runs. Accepted for this
-change — raising is strictly better than silently corrupting digest
-injectivity — but a defensive strip/reject at actor-resolution time
-(`src/auth/jwt.ts`, `src/auth/resolve.ts`) is the natural fix, left to a
-later change.
+JWT issuer in production. It is also trivially caller-controlled via
+the non-production `devHeaderResolver`'s `X-Actor-Id` header, in the
+dev/demo/test configuration this repo itself runs.
+
+Accepted for this change: raising is strictly better than silently
+corrupting digest injectivity. A defensive strip/reject at
+actor-resolution time (`src/auth/jwt.ts`, `src/auth/resolve.ts`) is the
+natural fix, left to a later change.
 
 ## Open Questions
 

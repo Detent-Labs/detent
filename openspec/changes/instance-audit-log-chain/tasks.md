@@ -1,6 +1,6 @@
 ## 1. Schema
 
-Task 1.2's `CREATE TABLE` is not runnable standalone — see task 5.4.
+Task 1.2's `CREATE TABLE` is not runnable standalone: see task 5.4.
 
 <!-- antislop: allow sentence-length -->
 <!-- The CREATE EXTENSION statement is quoted verbatim; its SQL tokens count as prose words. -->
@@ -30,9 +30,9 @@ Task 1.2's `CREATE TABLE` is not runnable standalone — see task 5.4.
   `instances`; verify no suite sees another suite's audit rows. Delete
   rather than truncate. The engine's role holds no `TRUNCATE` and no
   `DELETE` on the relation. The suites' cleanup therefore runs `DELETE
-  FROM instance_audit` under a `SET LOCAL ROLE detent_audit_owner`,
-  consistent with `design.md`'s "`instance_audit` carries no foreign key
-  to `instances`" section. This binds the test harness only; the
+  FROM instance_audit` under a `SET LOCAL ROLE detent_audit_owner`. This
+  is consistent with `design.md`'s "`instance_audit` carries no foreign
+  key to `instances`" section. This binds the test harness only; the
   append-only requirement still binds the engine's role at runtime
 - [x] 1.5 Verify a second `initSchema` run leaves the relation and its
   rows untouched
@@ -218,8 +218,8 @@ Task 1.2's `CREATE TABLE` is not runnable standalone — see task 5.4.
 
 Execution order inside `initSchema`: 5.4's role + schema-grant guard,
 then 5.11's membership grant, then the `SET LOCAL ROLE` block wrapping
-1.2, 2.2, 5.1 and 5.5. Tasks below are numbered for verifiable
-increments, not code order.
+1.2, 2.2, 5.1 and 5.5. Task numbers below track verifiable increments,
+not code order.
 
 - [x] 5.1 Write the four-argument `redact_instance_fields`. Its
   parameters are `instance_id text`, `actor text`, `reason text` and
@@ -457,7 +457,7 @@ increments, not code order.
 ## 6. Redaction
 
 - [x] 6.1 Thread the requesting actor into `redactInstance` from
-  `handleAdminRedactInstance` (`src/http/admin-routes.ts:348`); the sweep
+  `handleAdminRedactInstance` (`src/http/admin-routes.ts:348`). The sweep
   passes none and the entry then carries a null actor; verify both. Pass
   `opts.actor` into task 3.8's `set_config` call as well as into
   `redact_instance_fields`. That same call passes `opts.reason` as
