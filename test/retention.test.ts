@@ -14,6 +14,7 @@ import { redactInstance, sweepRetention } from "../src/engine/retention.js";
 import { saveInstanceDraft as engineSaveInstanceDraft, getInstanceDraft } from "../src/engine/instance-drafts.js";
 import { NotFoundError, InstanceRunningError } from "../src/errors.js";
 import type { ProcessBody, Instance, InstanceId } from "../src/schema/definition.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const reg = createRegistry();
 const dataSourceReg = createDataSourceRegistry();
@@ -40,6 +41,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_comments, instance_attachments, instance_drafts`;
+  if (DB) await clearInstanceAudit();
 });
 
 const mk = async (data: Record<string, unknown> = { field_x: "value" }): Promise<Instance> =>

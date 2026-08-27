@@ -13,6 +13,7 @@ import { createProcessInstance, claimStep, releaseClaim, delegateClaim, submitAn
 import { AuthorizationError, ADMIN_ROLE } from "../src/auth/authorize.js";
 import type { ProcessBody, ProcessId, PathId, InstanceEvent } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const eventsOf = async (id: string): Promise<InstanceEvent[]> => {
   const r = (await sql`SELECT event FROM instance_events WHERE instance_id = ${id} ORDER BY id`) as { event: unknown }[];
@@ -43,6 +44,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions`;
+  if (DB) await clearInstanceAudit();
 });
 
 // step_a (assigned, initial) --(path_ab, manual, guardless)--> step_b (terminal).

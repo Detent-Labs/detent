@@ -12,6 +12,7 @@ import { saveInstanceDraft as engineSaveInstanceDraft, getInstanceDraft } from "
 import { CANCEL_SINK_STEP_ID } from "../src/schema/definition.js";
 import type { ProcessBody, Instance, Action } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const actor: Actor = { id: "user_1", roles: [] };
@@ -67,7 +68,7 @@ const eventsOf = async (id: string): Promise<any[]> => {
 };
 
 beforeAll(async () => { if (DB) await initSchema(); });
-beforeEach(async () => { if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_drafts`; });
+beforeEach(async () => { if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_drafts`; if (DB) await clearInstanceAudit(); });
 
 // --- 6.1 arm on entry ---------------------------------------------------------
 

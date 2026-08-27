@@ -43,6 +43,28 @@ async function ensureDatabase(testUrl: string): Promise<void> {
     // No CREATE DATABASE IF NOT EXISTS in Postgres, and the identifier cannot be
     // a bind parameter. `name` is derived from DATABASE_URL, not from input.
     if (rows.length === 0) await admin.unsafe(`CREATE DATABASE "${name}"`);
+
+    // instance-audit-log-chain: a login-capable non-superuser probe, proving the
+    // append-only guarantee against a role no grant exempts (design.md "Redaction
+    // is its own definer function"). Runs unconditionally, even on a database
+    // that already existed, so a `_test` database predating this change still
+    // gets the role. Outlives the suite by design — a role is cluster-scoped,
+    // and nothing here drops it.
+    try {
+      await admin`
+        DO $$ BEGIN
+          CREATE ROLE detent_audit_probe LOGIN PASSWORD 'probe';
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$
+      `;
+      await admin.unsafe(`GRANT CONNECT ON DATABASE "${name}" TO detent_audit_probe`);
+    } catch (e) {
+      // A maintenance role without CREATEROLE raises 42501 whether or not the
+      // role is already there — an uncaught throw here would take down every
+      // suite. test/instance-audit-privileges.test.ts guards on the probe
+      // role's absence with test.skipIf, the way the DB suites guard on !DB.
+      console.log(`[test] skipped detent_audit_probe setup: ${e instanceof Error ? e.message : String(e)}`);
+    }
   } finally {
     await admin.close();
   }

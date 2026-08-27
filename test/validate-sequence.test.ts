@@ -30,6 +30,8 @@ import { validateStructure, validateReferences } from "../src/validate.js";
 import { compileProcessBody, DurationValidationError, CompileValidationError } from "../src/schema/compile.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 
+import { clearInstanceAudit } from "./audit-cleanup.js";
+
 const DB = !!process.env.DATABASE_URL;
 const cel = (src: string) => ({ lang: "cel", src });
 
@@ -118,6 +120,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, definitions`;
+  if (DB) await clearInstanceAudit();
 });
 
 // --- 6.1 / 6.1a: both callers agree ---------------------------------------

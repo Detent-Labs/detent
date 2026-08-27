@@ -344,10 +344,10 @@ export async function handleAdminRunMigration(req: Request, resolver: ActorResol
   });
 }
 
-/** Wraps `redactInstance` unchanged. `InstanceRunningError`/`NotFoundError` fall through to `mapError`. */
+/** Wraps `redactInstance`, passing the requesting actor through so the audit log's `redact` entries name who asked for it. `InstanceRunningError`/`NotFoundError` fall through to `mapError`. */
 export async function handleAdminRedactInstance(instanceId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
-  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
-    const updated = await redactInstance(instanceId as InstanceId, db);
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async (actor) => {
+    const updated = await redactInstance(instanceId as InstanceId, db, { actor: actor.id });
     return { status: 200, body: updated };
   });
 }

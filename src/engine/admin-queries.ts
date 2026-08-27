@@ -247,3 +247,16 @@ export async function discardOutboxRow(idempotencyKey: string, db: SQL = sql): P
   ` as unknown) as Parameters<typeof toOutboxRow>[0][];
   return rows[0] ? toOutboxRow(rows[0]) : null;
 }
+
+/**
+ * One instance's instance-audit-log-chain verdict. A thin wrapper over
+ * `verify_instance_chain`, the one entry point a TypeScript caller has onto
+ * the chain check (instance-audit-log-chain design.md "The chain hashes in
+ * SQL, and verification lives in SQL"): the running hash accumulator the SQL
+ * function walks with has no `LANGUAGE sql` form short of a recursive CTE, so
+ * this never recomputes a digest of its own.
+ */
+export async function verifyInstanceChain(instanceId: InstanceId, db: SQL = sql): Promise<{ ok: boolean; failedSeq: number | null }> {
+  const rows = (await db`SELECT * FROM verify_instance_chain(${instanceId})`) as { ok: boolean; failed_seq: number | null }[];
+  return { ok: rows[0].ok, failedSeq: rows[0].failed_seq };
+}

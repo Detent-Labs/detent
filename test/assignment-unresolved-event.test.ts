@@ -9,6 +9,7 @@ import { executeManualTransition, startInstance } from "../src/engine/transition
 import { createAssignmentRegistry, createDefaultAssignmentRegistry } from "../src/engine/registry.js";
 import type { ProcessBody, Instance, InstanceEvent, HistoryEntry } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const actor: Actor = { id: "user_1", roles: [] };
@@ -70,6 +71,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, instance_events, history_entries, definitions`;
+  if (DB) await clearInstanceAudit();
 });
 
 test.skipIf(!DB)("a transition onto a step resolving to nobody records the event and still commits", async () => {

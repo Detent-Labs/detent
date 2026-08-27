@@ -22,6 +22,7 @@ import {
 } from "../src/engine/admin-queries.js";
 import { RequestShapeError } from "../src/errors.js";
 import type { ProcessBody, Instance, MigrationSpec } from "../src/schema/definition.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
@@ -75,6 +76,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, migration_plans`;
+  if (DB) await clearInstanceAudit();
 });
 
 // ============================================================

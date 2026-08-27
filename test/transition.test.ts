@@ -24,6 +24,7 @@ import {
 import { idempotencyKey, subprocessChildId } from "../src/engine/idempotency.js";
 import { saveInstanceDraft as engineSaveInstanceDraft, getInstanceDraft } from "../src/engine/instance-drafts.js";
 import type { ProcessBody, Instance, Step, HistoryEntry, InstanceEvent, Action, TimerState } from "../src/schema/definition.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const actor = { id: "user_1", roles: [] };
@@ -71,6 +72,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_drafts`;
+  if (DB) await clearInstanceAudit();
 });
 
 // --- 5.4: status derivation (pure) ---------------------------------------------

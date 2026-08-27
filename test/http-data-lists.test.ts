@@ -14,6 +14,7 @@ import { ADMIN_ROLE, DATALISTS_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE } from "../src/
 import { publishBody } from "../src/engine/definitions.js";
 import type { Actor } from "../src/cel/eval.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
@@ -60,6 +61,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, definitions, data_list_values, data_lists`;
+  if (DB) await clearInstanceAudit();
 });
 
 test.skipIf(!DB)("the overview lists every data list, the detail route reports inactive values", async () => {
