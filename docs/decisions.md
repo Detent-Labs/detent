@@ -468,80 +468,29 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   without making it impossible. It also costs a second read of the parent
   row on every return delivery. Do not re-propose the hoist without a
   measurement showing the bounded hold is itself the problem.
-- **The editor dock.** The studio canvas edit screen leaves its lower band
-  empty on a tall window. `.studio-canvas-layout` is a grid that grows with
-  the viewport, so the canvas fills its middle column to the bottom edge. The
-  two side columns do not. The 12rem `EditRail` holds seven entries, and the
-  22rem `ChecksRail` holds one line when a draft is clean. A design pass on
-  2026-08-15 settled a dock for that band.
-
-  The dock is a collapsible strip below `.studio-canvas-layout`, full width,
-  collapsed by default. It renders only in the canvas sub-state of the
-  structure surface. The form editor and the panels screen each replace the
-  canvas, so neither shows it. Open, it takes a bounded height, and
-  `.studio-canvas-layout` keeps its 36rem floor.
-
-  Three tabs ship, in this order. **Changes** repeats what
-  `VersionsScreen.diffAgainstBase()` does. An author reads what a publish
-  would change without leaving the canvas. `versionDiffLogic.ts` exports
-  `diffJson` and `canDiff` already, and both are pure. **Field matrix** mounts
-  `FieldMatrixPanel`, and its `/edit/panels/matrix` route stays.
-
-  The change corrected two claims above. Only `diffJson` carries the Changes
-  tab. `canDiff` guards the versions screen's two-version selection, and the
-  dock compares a draft against one version, so its guard is
-  `baseVersion !== null` instead.
-
-  And `FieldMatrixPanel` is not read-only. It writes flags through `setFlag`
-  and `mutate`. A second mount still costs nothing, for a different reason:
-  the panel takes no props, reads `useDraft()`, and holds no state the two
-  mounts must share.
-
-  **Paths** is the one new view. It gives one row per path across the whole
-  process. The columns are source step, trigger, priority, guard and target.
-  A canvas hides the rules that govern paths, and a table shows them. The
-  row-building function is pure over `draft.workflow.steps`, and it carries
-  the test.
-
-  The dock persists nothing. Open state and active tab live in `EditorArea`
-  component state, so they survive a selection change and reset on a reload.
-  The dock claims no key in `saveState.layout`. That blob is per-draft, so one
-  author's open dock would open for every author of the draft. A later
-  "remember my dock" requirement needs a per-author preference store, which no
-  area has today. It does not need a different dock.
-
-  Two failure modes appear at ten times the current scale. A 200-step process
-  gives the Paths tab 400 rows and the Field matrix 200 columns, one per step.
-  The band's height is bounded. Both tabs scroll their own overflow, and a
-  filter is the first thing that scale demands. Neither tab earns a filter at
-  four steps and three fields.
-
-  The Player was rejected for this band and stays rejected. A step form needs
-  height, and the dock's whole premise is that it takes little. Docking the
-  Player would either squeeze the canvas below its floor or show one field at
-  a time. `screens/PlayerScreen.tsx` keeps its own route. Do not re-propose it
-  as a tab without a design that answers the height.
-
-  Two candidate tabs are deferred, not rejected. A translation-coverage grid
-  would map every `LocalizedText` against every locale and mark the gaps that
-  the `baseLocale` invariant permits. A CEL scratchpad would evaluate an
-  expression against the draft's field catalog through `cel/check`. Tabs are
-  additive, so each one costs a single entry in a list once the dock exists.
-
-  The OpenSpec change writes a delta against `studio-canvas`. It touches
-  `screens/EditScreen.tsx`, `app.css`, one new panel component, the studio
-  i18n catalog, and `.claude/rules/ui-glossary.md`. That glossary entry
-  registers **dock** as the one word for this part, beside *edit rail* and
-  *checks rail*. The new component needs a name distinct from
-  `panels/PathsPanel.tsx`, which is the per-step inspector panel. A real
-  browser check covers the collapse, the tab switch, and the canvas floor.
-
-  Built 2026-08-15 under the OpenSpec change `studio-editor-dock`, which is
-  neither applied nor archived yet. The strip lives in `dock/EditorDock.tsx`
-  over the pure `dock/pathRows.ts`, and the glossary carries the noun. This
-  entry leaves the section when that change archives; the decisions that
-  outlive it are the Player rejection, the two deferred tabs and the
-  no-persistence rule.
+- **The editor dock: three surviving decisions.** The dock itself shipped
+  under `studio-editor-dock` (archived), and `docs/current-state.md` and
+  `.claude/rules/ui-glossary.md` describe it as built. Three decisions from
+  that design pass outlive the build log and still govern later dock work.
+  - The Player was rejected for this band and stays rejected. A step form
+    needs height, and the dock's whole premise is that it takes little.
+    Docking the Player would either squeeze the canvas below its floor or
+    show one field at a time. `screens/PlayerScreen.tsx` keeps its own
+    route. Do not re-propose it as a tab without a design that answers the
+    height.
+  - Two candidate tabs are deferred, not rejected. A translation-coverage
+    grid would map every `LocalizedText` against every locale and mark the
+    gaps that the `baseLocale` invariant permits. A CEL scratchpad would
+    evaluate an expression against the draft's field catalog through
+    `cel/check`. Tabs are additive, so each one costs a single entry in a
+    list once the dock exists.
+  - The dock persists nothing, deliberately. Open state and active tab live
+    in `EditorArea` component state, so they survive a selection change and
+    reset on a reload. The dock claims no key in `saveState.layout` — that
+    blob is per-draft, so one author's open dock would open for every author
+    of the draft. A later "remember my dock" requirement needs a per-author
+    preference store, which no area has today; it does not need a different
+    dock.
 - **No "Long text" field type.** `field-catalog-redesign`'s type picker lists
   the ten `baseFieldType` values under friendly names and stops there. The
   contract has no multiline string variant, and `tmp/Field Catalog
