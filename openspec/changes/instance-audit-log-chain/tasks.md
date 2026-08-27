@@ -538,11 +538,11 @@ not code order.
 
 ## 8. Verification
 
-- [ ] 8.1 Run `bun run typecheck` and `bun run build`, then the full
+- [x] 8.1 Run `bun run typecheck` and `bun run build`, then the full
   `bun test` with `DATABASE_URL` set
-- [ ] 8.2 Run `sh scripts/gates/range.sh < /dev/null | sh
+- [x] 8.2 Run `sh scripts/gates/range.sh < /dev/null | sh
   scripts/gates/prose.sh` over the touched files. Run
   `sh scripts/gates/whitespace.sh < /dev/null` too. A bare `prose.sh`
   reads an empty range list and exits 0 without checking anything
-- [ ] 8.3 Pipe the run through `sh scripts/gates/silent-green.sh` and
+- [x] 8.3 Pipe the run through `sh scripts/gates/silent-green.sh` and
   confirm the skip count against `scripts/gates/skip-floor.txt`
