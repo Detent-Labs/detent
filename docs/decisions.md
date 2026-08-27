@@ -101,7 +101,7 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   writes a row with a null actor. That is a visible gap rather than a
   missing entry: the field change is still recorded, and a constraint or
   an operator query finds the unattributed rows. Nothing in `src/` sets a
-  session variable today, so all five sites gain the call.
+  session variable today, so all six sites gain the call.
 
   **The design.**
   - One table, `instance_audit`, one row per field change (a delta, not an
