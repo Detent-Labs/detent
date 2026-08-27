@@ -154,11 +154,23 @@ nothing.
 
 That `true` argument scopes the setting to the transaction, not to the
 statement. The helper `withTransaction` joins an open transaction as a
-savepoint, so a nested path's source outlives its savepoint. That is
-harmless today. The one nesting case is `createSeededInstance` inside
-`spawnSubprocess`'s transaction, and no data write follows it there.
-Every site sets both values immediately before its own statement,
-rather than once per transaction.
+savepoint when its handle is already inside one; on the plain pooled
+`db` handle it opens a fresh top-level transaction instead, since the
+pooled client carries no `.savepoint` method for `withTransaction` to
+find. `createSeededInstance` runs outside any enclosing transaction —
+`outbox.ts` deliberately runs every handler outside a transaction
+(`drainOutbox`'s `deliver` call precedes its `db.begin` mark block) — so
+its own `withTransaction(db, ...)` call opens that fresh top-level
+transaction, not a savepoint of any "spawnSubprocess transaction."
+`createInstance`'s own `withTransaction` nests as a savepoint inside
+THAT transaction instead. The setting lives only for the lifetime of
+`createSeededInstance`'s own transaction; `makeSpawnHandler`'s later
+`resolveAutomatic` call runs on the raw pooled `db` again, after that
+transaction has committed, and any transition it commits opens its own
+new transaction with its own `set_config` call immediately before its
+own statement. No stale attribution can cross between them. Every site
+sets both values immediately before its own statement, rather than
+once per transaction.
 
 Every call runs on the enclosing transaction handle, never on the pooled
 `db` handle. Five of the six sites already sit inside a
@@ -734,10 +746,13 @@ holding the membership. In the devcontainer `initSchema` connects as
 just the audit row.**
 
 → `Actor.id` is attacker-influenced under a compromised or malicious
-JWT issuer. Accepted for this change — raising is strictly better than
-silently corrupting digest injectivity — but a defensive strip/reject
-at actor-resolution time (`src/auth/jwt.ts`, `src/auth/resolve.ts`) is
-the natural fix, left to a later change.
+JWT issuer in production, and trivially caller-controlled via the
+non-production `devHeaderResolver`'s `X-Actor-Id` header in the
+dev/demo/test configuration this repo itself runs. Accepted for this
+change — raising is strictly better than silently corrupting digest
+injectivity — but a defensive strip/reject at actor-resolution time
+(`src/auth/jwt.ts`, `src/auth/resolve.ts`) is the natural fix, left to a
+later change.
 
 ## Open Questions
 
