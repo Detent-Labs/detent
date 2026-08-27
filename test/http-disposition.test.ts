@@ -13,6 +13,7 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql } from "../src/engine/store.js";
 import { DB, initDb, authHeaders, authedReq } from "./helpers/http-fixture.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
@@ -68,6 +69,7 @@ function serverWithToken(): (req: Request) => Promise<Response> {
 beforeAll(initDb);
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_attachments, definitions`;
+  if (DB) await clearInstanceAudit();
 });
 
 const fetch = serverWithToken();

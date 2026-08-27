@@ -22,6 +22,7 @@ import { RequestShapeError, NotFoundError } from "../src/errors.js";
 import { AuthorizationError } from "../src/auth/authorize.js";
 import type { ProcessBody, ProcessId, InstanceId, StepId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const actor: Actor = { id: "user_1", roles: [] };
@@ -33,6 +34,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_drafts, definitions`;
+  if (DB) await clearInstanceAudit();
 });
 
 async function expectRejects(p: Promise<unknown>, ctor: new (...args: never[]) => Error): Promise<void> {

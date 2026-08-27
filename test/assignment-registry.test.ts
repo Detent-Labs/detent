@@ -135,6 +135,8 @@ test("a core.-prefixed strategy type is not exempt from the type check", () => {
 
 // --- DB-backed: checkAssignmentRegistry wired into publishBody ----------------
 
+import { clearInstanceAudit } from "./audit-cleanup.js";
+
 const DB = !!process.env.DATABASE_URL;
 const PID = "proc_assignreg" as ProcessId;
 const actionReg = createRegistry();
@@ -145,6 +147,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, definitions`;
+  if (DB) await clearInstanceAudit();
 });
 
 test.skipIf(!DB)("publish rejects a non-static assignment strategy type and writes no row", async () => {

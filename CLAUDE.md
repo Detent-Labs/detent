@@ -129,8 +129,11 @@ printed, not that you ran it.
   `DATABASE_URL` set. Both rules under Conventions apply. A green without the
   variable is not evidence. A single-file rerun is not the signal.
 - The antislop linter, on every Markdown file the change touched. Run the same
-  check the push gate runs, over the same range: `sh scripts/gates/prose.sh <
-  /dev/null` (no stdin defaults to `origin/main..HEAD`).
+  check the push gate runs, over the same range: `sh scripts/gates/range.sh <
+  /dev/null | sh scripts/gates/prose.sh`. The empty-range fallback to
+  `origin/main..HEAD` lives in `scripts/gates/range.sh`, not in `prose.sh`
+  itself — `prose.sh` reads its ranges on stdin, and an empty list checks
+  nothing and exits 0.
 - Trailing whitespace, blank-at-eof, and CRLF. Run
   `sh scripts/gates/whitespace.sh < /dev/null` rather than reconstructing its
   two probes by hand: `git diff --check` alone misses CRLF here, since

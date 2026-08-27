@@ -10,6 +10,7 @@ import { createGroup, setGroupScope } from "../src/auth/groups.js";
 import { publishBody, GroupScopeValidationError } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
@@ -20,6 +21,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, definitions, groups`;
+  if (DB) await clearInstanceAudit();
 });
 
 const bodyWithGroups = (allowedGroups: string[]): ProcessBody =>

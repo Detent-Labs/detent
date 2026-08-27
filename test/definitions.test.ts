@@ -20,6 +20,8 @@ import { definitionHash } from "../src/schema/hash.js";
 import type { ProcessBody, ProcessId, Instance, Action } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
+import { clearInstanceAudit } from "./audit-cleanup.js";
+
 const DB = !!process.env.DATABASE_URL;
 const PID = "proc_defstore" as ProcessId;
 const actor: Actor = { id: "user_1", roles: [] };
@@ -78,6 +80,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, definitions`;
+  if (DB) await clearInstanceAudit();
 });
 
 // --- publish: persist + idempotent-on-identical -------------------------------

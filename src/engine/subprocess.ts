@@ -28,7 +28,7 @@
 
 import type { SQL } from "bun";
 import { z } from "zod";
-import { withTransaction, loadInstance, parseInstance } from "./store.js";
+import { withTransaction, loadInstance, parseInstance, setAuditAttribution } from "./store.js";
 import {
   resolveAutomatic,
   executeAutomaticTransition,
@@ -207,6 +207,11 @@ export function makeReturnHandler(
           });
         }
       }
+
+      // instance-audit-log-chain: attributes the writeback below to this child's
+      // return, no actor (design.md "Actor and source arrive through
+      // set_config").
+      await setAuditAttribution(tx, null, "subprocess-return");
 
       // Persist the writeback into parent data. The `currentStepId` gate is
       // redundant under the lock and kept as a belt — it costs nothing.

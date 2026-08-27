@@ -689,6 +689,16 @@ test.skipIf(!DB)("the child outcome and data return to the parent, driving it of
   expect(dataField(p, "field_p_result")).toBe("approved"); // child.outcome
   expect(dataField(p, "field_p_back")).toBe(500); // child.data.amount
   expect(await mappingDroppedEvents(parent.instanceId)).toHaveLength(0); // every entry evaluated: no drop recorded
+
+  // instance-audit-log-chain 3.7's second half: the return's writeback is one
+  // of the six attributed sources, and it names no actor. Asserted here rather
+  // than in test/instance-audit.test.ts because the spawn/return fixtures
+  // stand here.
+  const audit = (await sql`SELECT field_id, source, actor FROM instance_audit
+    WHERE instance_id = ${parent.instanceId} AND field_id = 'field_p_back'`) as { source: string; actor: string | null }[];
+  expect(audit).toHaveLength(1);
+  expect(audit[0].source).toBe("subprocess-return");
+  expect(audit[0].actor).toBeNull();
 });
 
 test.skipIf(!DB)("an inputMapping entry over an unwritten parent field is dropped, not fatal to the spawn or the return", async () => {

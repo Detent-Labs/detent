@@ -8,7 +8,7 @@
  * never a field value.
  */
 import type { SQL } from "bun";
-import { sql, withTransaction } from "./store.js";
+import { sql, withTransaction, setAuditAttribution } from "./store.js";
 import { instance as instanceSchema, type Instance, type InstanceId } from "../schema/definition.js";
 import { NotFoundError, InstanceRunningError } from "../errors.js";
 import { logSkippedItem } from "./poll.js";
@@ -16,7 +16,11 @@ import { deleteInstanceDraft } from "./instance-drafts.js";
 
 const BATCH = 500;
 
-export async function redactInstance(instanceId: InstanceId, db: SQL = sql): Promise<Instance> {
+export async function redactInstance(
+  instanceId: InstanceId,
+  db: SQL = sql,
+  opts?: { actor?: string; reason?: string },
+): Promise<Instance> {
   return withTransaction(db, async (tx) => {
     const rows = (await tx`SELECT body, redacted_at FROM instances WHERE instance_id = ${instanceId} FOR UPDATE`) as {
       body: unknown;
@@ -26,8 +30,14 @@ export async function redactInstance(instanceId: InstanceId, db: SQL = sql): Pro
     const inst = instanceSchema.parse(typeof rows[0].body === "string" ? JSON.parse(rows[0].body) : rows[0].body);
     if (inst.status === "running") throw new InstanceRunningError(instanceId, inst.status);
     // Idempotent: a second call against an already-redacted row is a no-op,
-    // not an error, matching the outbox's own no-op-on-repeat shape.
+    // not an error, matching the outbox's own no-op-on-repeat shape. This also
+    // guards redact_instance_fields below from a second, spurious redact entry.
     if (rows[0].redacted_at !== null) return inst;
+
+    // instance-audit-log-chain: attributes both the body.data wipe below and
+    // redact_instance_fields's own trigger-free appends to this redaction
+    // (design.md "Actor and source arrive through set_config").
+    await setAuditAttribution(tx, opts?.actor ?? null, "redaction");
 
     // `redactedAt` is written into `body` too, not just the `redacted_at`
     // column: `Instance.redactedAt` (what getInstanceView/InstanceView
@@ -37,6 +47,10 @@ export async function redactInstance(instanceId: InstanceId, db: SQL = sql): Pro
     const at = new Date().toISOString();
     await tx`UPDATE instances SET body = body || ${{ data: {}, redactedAt: at }}::jsonb, redacted_at = ${at}
       WHERE instance_id = ${instanceId}`;
+    // Clears every prior value the instance's own audit entries hold, across
+    // every field they name — the trigger above only ever appends, never
+    // clears (design.md "Redaction is its own definer function").
+    await tx`SELECT redact_instance_fields(${instanceId}, ${opts?.actor ?? null}, ${opts?.reason ?? null}, ${inst.transitionSeq})`;
     await tx`DELETE FROM instance_comments WHERE instance_id = ${instanceId}`;
     await tx`DELETE FROM instance_attachments WHERE instance_id = ${instanceId}`;
     await deleteInstanceDraft(instanceId, tx);

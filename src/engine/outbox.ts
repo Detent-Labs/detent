@@ -13,7 +13,7 @@
  */
 
 import type { SQL } from "bun";
-import { sql } from "./store.js";
+import { sql, setAuditAttribution } from "./store.js";
 import type { OutboxActors, Registry } from "./registry.js";
 import { logSkippedItem } from "./poll.js";
 import { durationMs } from "./duration.js";
@@ -251,6 +251,11 @@ export async function drainOutbox(
           WHERE idempotency_key = ${row.idempotency_key} AND status = 'claimed'
           RETURNING idempotency_key`) as unknown[];
         if (cas.length === 0) return; // already delivered by a peer
+
+        // instance-audit-log-chain: attributes any instances writeback below to
+        // this action delivery, no actor (design.md "Actor and source arrive
+        // through set_config").
+        await setAuditAttribution(tx, null, "writeback");
 
         // Resolve the field catalog the writeback can be checked against: the
         // process body pinned to this row's field_version (the version this

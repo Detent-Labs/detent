@@ -14,6 +14,7 @@ import { REPORTS_ROLE, ADMIN_ROLE } from "../src/auth/authorize.js";
 import { publishBody } from "../src/engine/definitions.js";
 import type { Actor } from "../src/cel/eval.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
@@ -55,6 +56,7 @@ const body = (label: string): ProcessBody =>
 beforeAll(async () => { if (DB) await initSchema(); });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, auth_users, migration_plans, permission_grants`;
+  if (DB) await clearInstanceAudit();
 });
 
 const VIEWS = ["cycle-time", "bottleneck", "sla"] as const;

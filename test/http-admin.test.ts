@@ -9,6 +9,7 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, createInstance } from "../src/engine/store.js";
 import { DB, initDb, authedReq } from "./helpers/http-fixture.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { createServer } from "../src/http/server.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
@@ -26,6 +27,7 @@ const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 beforeAll(initDb);
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, auth_users, migration_plans, permission_grants`;
+  if (DB) await clearInstanceAudit();
 });
 
 const admin: Actor = { id: "user_admin", roles: [ADMIN_ROLE] };
@@ -985,10 +987,14 @@ test.skipIf(!DB)("POST /admin/instances/:id/redact without system:admin maps to 
   expect((await loadInstance(inst.instanceId)).redactedAt).toBeUndefined();
 });
 
-test.skipIf(!DB)("POST /admin/instances/:id/redact on a completed instance succeeds and clears data", async () => {
+test.skipIf(!DB)("POST /admin/instances/:id/redact on a completed instance succeeds, clears data, and names the requesting actor", async () => {
   const p = migrationPid();
   await publishMigrationVersions(p, 1);
   const inst = await createRunningInstance(p, 1);
+  // A field to redact: the audit log's `redact` rows are one per field it
+  // already holds an entry for, so an instance that never wrote data produces
+  // none, and the attribution below would assert against an empty set.
+  await sql`UPDATE instances SET body = jsonb_set(body, '{data}', ${{ field_x: "personal" }}::jsonb) WHERE instance_id = ${inst.instanceId}`;
   await setInstanceStatus(inst.instanceId, "completed");
 
   const res = await fetch(redactReq(inst.instanceId, admin));
@@ -996,6 +1002,13 @@ test.skipIf(!DB)("POST /admin/instances/:id/redact on a completed instance succe
   const body = (await res.json()) as { data: Record<string, unknown> };
   expect(body.data).toEqual({});
   expect((await loadInstance(inst.instanceId)).redactedAt).toBeDefined();
+
+  // instance-audit-log-chain: the route threads its resolved actor through to
+  // redactInstance, so the log records who asked rather than a null.
+  const audit = (await sql`SELECT actor, source FROM instance_audit
+    WHERE instance_id = ${inst.instanceId} AND op = 'redact'`) as { actor: string | null; source: string }[];
+  expect(audit).toHaveLength(1);
+  expect(audit[0]).toEqual({ actor: admin.id, source: "redaction" });
 });
 
 test.skipIf(!DB)("POST /admin/instances/:id/redact works on cancelled and faulted instances too", async () => {

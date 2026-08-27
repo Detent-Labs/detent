@@ -11,6 +11,7 @@ import { drainResolutions } from "../src/engine/resolution.js";
 import { createRegistry } from "../src/engine/registry.js";
 import type { ProcessBody, Instance, Action } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const actor: Actor = { id: "user_1", roles: [] };
@@ -79,6 +80,7 @@ beforeAll(async () => {
 // the table persists).
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances`;
+  if (DB) await clearInstanceAudit();
 });
 
 // --- happy path: writeback drives the parked wait-state to its result path ----

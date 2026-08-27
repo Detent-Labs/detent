@@ -13,6 +13,7 @@ import { createRegistry } from "../src/engine/registry.js";
 import { createDataSourceRegistry } from "../src/engine/registry.js";
 import { createDefaultDataSourceRegistry, DB_LIST_DATA_SOURCE_TYPE } from "../src/engine/host.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const PID = "proc_dsregpub" as ProcessId;
@@ -33,6 +34,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, definitions`;
+  if (DB) await clearInstanceAudit();
 });
 
 test.skipIf(!DB)("publish rejects an unregistered data source type and writes no row", async () => {
