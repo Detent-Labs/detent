@@ -474,11 +474,11 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     already reads, never widen it, which is what makes an `anyone` share
     safe.
 
-    The second half of that rests on a permission nothing carries yet.
-    `Permission` (`src/auth/authorize.ts:77`) is `"publish" | "cancel" |
-    "migrate"`, and no entry covers reading. A pass on 2026-08-25 priced
+    The second half of that rested on a permission nothing carried yet.
+    `Permission` (`src/auth/authorize.ts:77`) was `"publish" | "cancel" |
+    "migrate"`, with no entry covering reading. A pass on 2026-08-25 priced
     a fourth one and found it additive rather than restrictive, because
-    the bulk read is already closed: `src/http/routes.ts:449` runs
+    the bulk read was already closed: `src/http/routes.ts:449` ran
     `requireRole(actor, ADMIN_ROLE)` for `scope=all`, while `scope=mine`
     and `scope=started` justify themselves through the caller's own
     assignment or authorship and need no grant at all. So a `read`
@@ -496,15 +496,18 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     feature third. The cost of that order is that the first change this
     topic produces is not a table.
 
-    That order did not hold. The shared query core landed 2026-08-27 as
-    `instance-query-core` (archived; see `instance-data-query`'s spec) ahead
-    of the `read` permission, which stays proposed and unimplemented —
-    `openspec/changes/process-read-permission/tasks.md` is still all
-    unchecked, and `Permission` (`src/auth/authorize.ts:77`) has not gained
-    `read`. The report builder is unaffected by the swap: it still needs
-    `read` before a shared table can be restricted to a grant, and the query
-    core it depends on already exists, reusable by `instance.query` too (see
-    the aggregated-data-source entry above).
+    That order did not hold on timing, though the sequence still landed.
+    The shared query core landed 2026-08-27 as `instance-query-core`
+    (archived; see `instance-data-query`'s spec) ahead of the `read`
+    permission. `process-read-permission` has since applied:
+    `Permission` (`src/auth/authorize.ts:77`) now admits `"read"`, mapped
+    to `ADMIN_ROLE`, and `scope=all` routes through it when the request
+    names a `processId`. The **report builder itself stays open** — this
+    change ships only the process-scoped `read` gate on `GET /instances`,
+    not the report/table feature this entry describes, and not the
+    reporting-routes migration (`REPORTS_ROLE` → `read` on the three
+    aggregate routes) `process-read-permission/proposal.md` scopes out as
+    its own later change.
 
   **Explicitly not the goal.**
   - Not the three existing reporting views. Cycle time, bottleneck and
@@ -686,9 +689,9 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   `Actor.roles` stays a `string[]` of free text from either source;
   `auth_users.roles` stays a `TEXT[]`.
 
-  `openspec/changes/process-read-permission/` is now in progress for the
-  `read` permission piece above; its `tasks.md` is still all unchecked, so
-  `src/auth/authorize.ts:77`'s `Permission` type has not gained `read` yet.
+  `openspec/changes/process-read-permission/` has applied the `read`
+  permission piece above: `src/auth/authorize.ts:77`'s `Permission` type
+  now admits `read`, mapped to `ADMIN_ROLE`.
 - **CEL-readable data-source results.** Runtime option-list resolution for
   `field.dataSource` is DONE (see `docs/current-state.md`) — but `src/cel/check.ts`
   still registers a data source at no site (guards/output/transforms), so a CEL

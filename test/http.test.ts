@@ -24,7 +24,7 @@ import { mapError } from "../src/http/errors.js";
 import { parseMaxAttachmentBytes, parseLimit } from "../src/http/routes.js";
 import { MAX_LIST_LIMIT, MAX_RECORD_LIMIT } from "../src/runtime/api.js";
 import { devHeaderResolver, type ActorResolver } from "../src/auth/resolve.js";
-import { PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE } from "../src/auth/authorize.js";
+import { PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, type Permission } from "../src/auth/authorize.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
@@ -189,7 +189,7 @@ const assignedBody = (): ProcessBody =>
 const pid = (n: string) => n as ProcessId;
 
 /** Writes a process-scoped grant directly, bypassing the admin route — that route's own behavior is covered in `test/http-admin.test.ts`. */
-const grantRole = async (role: string, permission: "publish" | "cancel" | "migrate", processId: string): Promise<void> => {
+const grantRole = async (role: string, permission: Permission, processId: string): Promise<void> => {
   await sql`INSERT INTO permission_grants (role, permission, scope) VALUES (${role}, ${permission}, ${{ type: "process", config: { processId } }})`;
 };
 
@@ -1744,6 +1744,28 @@ test.skipIf(!DB)("GET /instances?scope=all without system:admin maps to 403", as
   expect(res.status).toBe(403);
   const body = (await res.json()) as { error: { type: string } };
   expect(body.error.type).toBe("authorization");
+});
+
+test.skipIf(!DB)("GET /instances?scope=all&processId=<P> admits a read grant holder over that process", async () => {
+  const PID = pid("proc_http_list_read_grant");
+  await grantRole("finance-authors", "read", PID);
+  const res = await fetch(authedReq(`http://x/instances?scope=all&processId=${PID}`, "GET", financeAuthor));
+  expect(res.status).toBe(200);
+});
+
+test.skipIf(!DB)("GET /instances?scope=all&processId=<P> refuses a read grant holder over another process", async () => {
+  const PID = pid("proc_http_list_read_grant_scoped");
+  const otherPid = pid("proc_http_list_read_grant_other");
+  await grantRole("finance-authors", "read", PID);
+  const res = await fetch(authedReq(`http://x/instances?scope=all&processId=${otherPid}`, "GET", financeAuthor));
+  expect(res.status).toBe(403);
+});
+
+test.skipIf(!DB)("GET /instances?scope=all with no processId refuses a read grant holder", async () => {
+  const PID = pid("proc_http_list_read_grant_unnamed");
+  await grantRole("finance-authors", "read", PID);
+  const res = await fetch(authedReq("http://x/instances?scope=all", "GET", financeAuthor));
+  expect(res.status).toBe(403);
 });
 
 test.skipIf(!DB)("GET /instances?scope=all with system:admin succeeds", async () => {

@@ -1093,6 +1093,17 @@ test.skipIf(!DB)("an operator writes a grant and reads it back", async () => {
   expect(body.grants.some((g) => g.role === "finance-authors" && g.permission === "publish" && g.scope.config.processId === processId)).toBe(true);
 });
 
+test.skipIf(!DB)("a POSTed read grant stores, and the list carries it", async () => {
+  const processId = grantProcessId();
+  const write = await fetch(writeGrantReq(grantBody(processId, { permission: "read" })));
+  expect(write.status).toBe(200);
+
+  const res = await fetch(listGrantsReq());
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { grants: { role: string; permission: string; scope: { config: { processId: string } } }[] };
+  expect(body.grants.some((g) => g.role === "finance-authors" && g.permission === "read" && g.scope.config.processId === processId)).toBe(true);
+});
+
 test.skipIf(!DB)("a repeated write changes nothing: the list carries one row for it", async () => {
   const processId = grantProcessId();
   await fetch(writeGrantReq(grantBody(processId)));

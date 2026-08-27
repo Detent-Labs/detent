@@ -8,13 +8,26 @@
 The HTTP wrapper SHALL expose the instance listing read as `GET /instances`,
 translating query parameters to the read's filters: `processId`, `status`
 (repeatable, one value per accepted status), `currentStepId`, `startedBy`,
-`claimedBy`, `assignedTo`, plus `limit` and `cursor`. Absent parameters SHALL
-mean "unfiltered", never an error. A `limit` that is not a positive integer,
-or a `status` value that is not an instance status, SHALL be rejected as a
-request error rather than silently ignored. Like every other route, it SHALL
-first resolve the actor through the injected `ActorResolver` (see "Every
-route rejects a missing or invalid bearer token when the JWT resolver is
-active").
+`claimedBy`, `assignedTo`, `version`, `excludeInstanceId`, `createdAfter` and
+`createdBefore`, plus `limit` and `cursor`. Absent parameters SHALL mean
+"unfiltered", never an error.
+
+The route SHALL reject a malformed parameter as a request error rather than
+ignoring it. That covers a `limit` or a `version` that is not a positive
+integer. It covers a `status` value that is not an instance status. It also
+covers a `createdAfter` or a `createdBefore` that is not an ISO-8601 instant.
+
+The route SHALL reject a `version` parameter carrying no `processId` as a
+request error. The `instance-query` capability requires that pairing. The
+route enforces it before the read runs.
+
+The route SHALL expose no `dataWhere` parameter. The `instance-data-query`
+capability's comparisons reach the Runtime API Layer reads in process. The
+route that carries them over HTTP arrives with the consumer that reads them.
+
+Like every other route, it SHALL first resolve the actor through the injected
+`ActorResolver` (see "Every route rejects a missing or invalid bearer token
+when the JWT resolver is active").
 
 The route SHALL additionally accept a `scope` query parameter whose recognized
 values are `"mine"`, `"started"` and `"all"`; any other value SHALL be rejected
@@ -223,3 +236,47 @@ carries no error over it.
 - **THEN** the response is 200
 - **AND** that instance is absent from the page
 - **AND** no item in the page is a degraded summary
+
+#### Scenario: Filtering by version over HTTP
+
+- **WHEN** a caller requests `GET /instances?processId=p1&version=2` with a
+  resolvable credential holding `system:admin`
+- **THEN** the response carries the instances of `p1` pinned to version 2
+- **AND** it omits an instance of `p1` pinned to version 1
+
+#### Scenario: An unparseable version is a request error
+
+- **WHEN** a caller requests `GET /instances?processId=p1&version=abc` with a
+  resolvable credential
+- **THEN** the response is 400 with a typed error body
+
+#### Scenario: A dataWhere query parameter reaches no filter
+
+- **WHEN** a caller requests `GET /instances` with a `dataWhere` query
+  parameter, holding `system:admin`
+- **THEN** the route passes no `dataWhere` to the read
+
+#### Scenario: A version parameter with no processId is a request error
+
+- **WHEN** a caller requests `GET /instances?version=2` with a resolvable
+  credential holding `system:admin`
+- **THEN** the response is 400 with a typed error body
+
+#### Scenario: Excluding one instance by id over HTTP
+
+- **WHEN** a caller requests `GET /instances?excludeInstanceId=inst-1` with a
+  resolvable credential holding `system:admin`
+- **THEN** the page omits `inst-1`
+- **AND** it carries every other matching instance
+
+#### Scenario: Bounding by creation time over HTTP
+
+- **WHEN** a caller passes `createdAfter` and `createdBefore` as ISO-8601
+  instants
+- **THEN** the page carries the instances created inside that window
+
+#### Scenario: A malformed creation bound is a request error
+
+- **WHEN** a caller requests `GET /instances?createdAfter=yesterday` with a
+  resolvable credential
+- **THEN** the response is 400 with a typed error body

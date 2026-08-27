@@ -444,9 +444,20 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
     req,
     resolver,
     db,
-    (actor) => {
+    async (actor) => {
       scope = parseScope(url);
-      if (scope === "all") requireRole(actor, ADMIN_ROLE);
+      if (scope === "all") {
+        // A named process routes through the process-scoped "read" gate; an
+        // omitted one cannot, since a grant names one process and this route
+        // adds no result-set predicate over the processes an actor holds a
+        // grant over — so it keeps the flat ADMIN_ROLE test.
+        const processId = url.searchParams.get("processId");
+        if (processId !== null) {
+          await requirePermission(actor, "read", processId as ProcessId, db);
+        } else {
+          requireRole(actor, ADMIN_ROLE);
+        }
+      }
     },
     async (actor) => {
       const assignedTo = url.searchParams.get("assignedTo") ?? undefined;

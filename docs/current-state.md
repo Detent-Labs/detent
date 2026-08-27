@@ -1167,11 +1167,13 @@ Stage-by-stage status is in `ROADMAP.md`.
   A process-scoped seam sits on top of that check, filled in by
   `process-scoped-permission-grants` (roadmap #40). `src/auth/authorize.ts`
   exports `async can(actor, permission, processId, db)` and
-  `requirePermission`, both taking the caller's `SQL` handle. Three
-  permissions reach them: `"publish"`, `"cancel"` and `"migrate"`. A private
-  `PERMISSION_ROLE` map answers each one with the global role that gates it
-  today. The `migrate` entry names `DEVELOPER_ROLE`, a role the paragraph
-  above does not.
+  `requirePermission`, both taking the caller's `SQL` handle. Four
+  permissions reach them: `"publish"`, `"cancel"`, `"migrate"` and `"read"`
+  (`process-read-permission`). A private `PERMISSION_ROLE` map answers each
+  one with the global role that gates it today. The `migrate` entry names
+  `DEVELOPER_ROLE`, a role the paragraph above does not; `read` names
+  `ADMIN_ROLE`, gating the `scope=all` instance listing below rather than a
+  fresh role of its own.
 
   `can` answers true on either of two tests, in order. The first is the global
   role: array membership, no query. The second is a stored grant.
@@ -1193,17 +1195,21 @@ Stage-by-stage status is in `ROADMAP.md`.
   an `@`-suffixed fallback for that; the owner dropped it 2026-08-16, before
   this change shipped. A scope lives in the grant table alone.
 
-  Six call sites ask through the seam. Two are the publish route
+  Seven call sites ask through the seam. Two are the publish route
   (`handlePublish`, `handlePublishDraft`). Three are the studio migration
   routes (`handleGetMigrationPlan`, `handlePutMigrationPlan`,
-  `handleGetOrphanKeys`). The sixth is `cancelInstance`. It asks `can` in its
-  loaded branch beside the `startedBy` test. A `system:cancel-any` holder
-  still pays no instance load; a grant holder does.
+  `handleGetOrphanKeys`). The sixth is the `scope=all` instance listing
+  (`handleListInstances`), which routes through `requirePermission` with
+  `"read"` when the request names a `processId`, and keeps the flat
+  `requireRole(actor, ADMIN_ROLE)` test when it does not. The seventh is
+  `cancelInstance`. It asks `can` in its loaded branch beside the
+  `startedBy` test. A `system:cancel-any` holder still pays no instance
+  load; a grant holder does.
 
-  `docs/decisions.md` carries what stays unbuilt: the `scope=all` filter and
-  a draft-scoped `"author"` permission. It also carries `permissions`
-  booleans for the resource views, which the web areas read as role strings
-  today.
+  `docs/decisions.md` carries what stays unbuilt: a draft-scoped `"author"`
+  permission, and the three reporting routes' own migration off
+  `REPORTS_ROLE` onto `"read"`. It also carries `permissions` booleans for
+  the resource views, which the web areas read as role strings today.
 - Login rate limiting (`src/auth/login.ts`, `add-login-rate-limit`): closes
   the gap the `add-authentication` entry recorded. `handleLogin` tracks
   attempts per normalized email (`trim().toLowerCase()`) in an in-memory

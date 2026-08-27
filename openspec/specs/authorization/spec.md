@@ -138,14 +138,15 @@ identity" rather than "valid identity, insufficient permission").
 
 ### Requirement: A process-scoped gate asks one function over two tests
 
-Six gated operations name one process. The engine SHALL route each one through
-a single pair of functions in `src/auth/authorize.ts`. Grant storage lives
-behind that pair, so no call site reads a grant.
+Seven gated operations name one process. The engine SHALL route each one
+through a single pair of functions in `src/auth/authorize.ts`. Grant storage
+lives behind that pair, so no call site reads a grant.
 
-The engine SHALL define a `Permission` type of exactly three string values:
-`"publish"`, `"cancel"` and `"migrate"`. These SHALL be the only permissions
-this capability defines. A permission names an operation whose target is one
-process. It is not a role, and no deployment grants one to an actor.
+The engine SHALL define a `Permission` type of exactly four string values:
+`"publish"`, `"cancel"`, `"migrate"` and `"read"`. These SHALL be the only
+permissions this capability defines. A permission names an operation whose
+target is one process. It is not a role, and no deployment grants one to an
+actor.
 
 The engine SHALL expose `can(actor: Actor, permission: Permission, processId:
 ProcessId, db: SQL): Promise<boolean>`. It SHALL answer one question: may
@@ -155,6 +156,12 @@ ProcessId, db: SQL): Promise<boolean>`. It SHALL answer one question: may
 - `"publish"` takes `PUBLISH_ROLE`
 - `"cancel"` takes `CANCEL_ANY_ROLE`
 - `"migrate"` takes `DEVELOPER_ROLE`
+- `"read"` takes `ADMIN_ROLE`
+
+`"read"` SHALL take `ADMIN_ROLE` rather than `REPORTS_ROLE`. `REPORTS_ROLE`
+answers whether an actor may reach the reporting area at all. That is a
+different question from which process's data an actor may see. One role
+answering both would leave an installation no way to narrow the second.
 
 `can` SHALL answer true where either of two tests passes. It SHALL run them in
 this order:
@@ -188,13 +195,14 @@ effect where `can` answers true. It SHALL NOT define a second error type.
 The `PERMISSION_ROLE` map SHALL stay private to its module. No caller outside
 `src/auth/authorize.ts` SHALL read it or replace it.
 
-Five gates SHALL await `requirePermission` in place of a bare `requireRole`:
+Six gates SHALL await `requirePermission` in place of a bare `requireRole`:
 
 - `handlePublish` and `handlePublishDraft`, with `"publish"`
 - `handleGetMigrationPlan` and `handlePutMigrationPlan`, with `"migrate"`
 - `handleGetOrphanKeys`, with `"migrate"`
+- the `scope=all` instance listing, with `"read"`
 
-The sixth site is `cancelInstance`. It awaits `can` where it holds a loaded
+The seventh site is `cancelInstance`. It awaits `can` where it holds a loaded
 instance. The requirement named "An instance's starter may cancel it without
 the reserved role" states that placement.
 
@@ -203,7 +211,6 @@ Every operation whose target is not one process SHALL keep the gate it has:
 - every `/admin/*` route calls `requireRole` with `ADMIN_ROLE`
 - every `/reporting/*` route calls `requireRole` with `REPORTS_ROLE`
 - the two template writes call `requireRole` with `TEMPLATES_ROLE`
-- the `scope=all` listing gate calls `requireRole` with `ADMIN_ROLE`
 - the four draft routes call `requireAuthoring`, the two-role helper in
   `src/http/studio-routes.ts`, and the template reads call `requireStudioRead`
 
@@ -218,8 +225,9 @@ stay synchronous.
 
 - **WHEN** a reader reads the exports of `src/auth/authorize.ts`
 - **THEN** it exports `can` and `requirePermission`
-- **AND** the `Permission` type admits `"publish"`, `"cancel"` and `"migrate"`
-- **AND** the `Permission` type admits no fourth value
+- **AND** the `Permission` type admits `"publish"`, `"cancel"`, `"migrate"` and
+  `"read"`
+- **AND** the `Permission` type admits no fifth value
 
 #### Scenario: A global role holder passes
 
@@ -240,6 +248,28 @@ stay synchronous.
 - **THEN** `"migrate"` answers true
 - **AND** `"publish"` answers false
 - **AND** `"cancel"` answers false
+- **AND** `"read"` answers false
+
+#### Scenario: The operator role carries the read permission
+
+- **WHEN** `can(actor, "read", processId, db)` runs for an actor holding
+  `"system:admin"` alone, over a store holding no grant
+- **THEN** it answers true without reading the grant store
+
+#### Scenario: The reports role does not carry the read permission
+
+- **WHEN** `can(actor, "read", processId, db)` runs for an actor holding
+  `"system:reports"` alone, over a store holding no grant
+- **THEN** it answers false
+
+#### Scenario: A read grant admits one process and not another
+
+- **WHEN** the store holds a grant of `"read"` to the role `"hr-reporting"`
+  over process A
+- **AND** `can` runs for an actor whose `roles` is exactly `["hr-reporting"]`
+- **THEN** `"read"` answers true for process A
+- **AND** `"read"` answers false for process B
+- **AND** `"cancel"` answers false for process A
 
 #### Scenario: A grant admits one process and not another
 
@@ -288,8 +318,8 @@ stay synchronous.
 
 #### Scenario: An installation with no grants keeps today's answers
 
-- **WHEN** an actor calls any of the six gated operations, over a store holding
-  no grant row
+- **WHEN** an actor calls any of the seven gated operations, over a store
+  holding no grant row
 - **THEN** the operation admits the actors it admitted before this change
 - **AND** it refuses the actors it refused before this change
 
@@ -424,11 +454,11 @@ constant or permission. The engine already follows that pattern for the single
 
 `requirePermission` SHALL NOT weaken that rule. It reads the same
 `Actor.roles`, in the same module, and one table of stored rows beside them. It
-resolves three fixed permissions through one compile-time map. It reaches no
+resolves four fixed permissions through one compile-time map. It reaches no
 registry. It loads no code. A caller SHALL NOT be able to add a permission,
 replace the map, or supply a policy.
 
-A grant is data, not policy. It names a role, one of the three fixed
+A grant is data, not policy. It names a role, one of the four fixed
 permissions, and a scope. It carries no expression, no ordering, no priority
 and no deny form. Two grants over one process combine by answering true, which
 is what a set of independent tests already does.
@@ -458,7 +488,7 @@ is what a set of independent tests already does.
 #### Scenario: The permission map does not extend
 
 - **WHEN** a reader reads the `PERMISSION_ROLE` map
-- **THEN** it is a module constant covering exactly three permissions
+- **THEN** it is a module constant covering exactly four permissions
 - **AND** no exported function adds an entry to it
 
 #### Scenario: A grant carries no policy
@@ -550,16 +580,21 @@ stay independent, so that neither one masks the other.
 
 ### Requirement: The operator role gates the operator-facing reads and routes
 
-`ADMIN_ROLE` SHALL gate every `/admin/*` route and, additionally, the two
-existing reads that today carry no permission check at all: the unfiltered
-instance listing (`GET /instances` with `scope=all` or with `scope` omitted)
-and `GET /instances/:instanceId/record`. `scope=mine` SHALL remain open to
-every authenticated actor, so an actor holding no reserved role still fully
-participates in the instances it is a candidate for.
+`ADMIN_ROLE` SHALL gate every `/admin/*` route and, additionally, `GET
+/instances/:instanceId/record`. The `scope=mine` listing SHALL remain open to
+every authenticated actor. An actor holding no reserved role therefore still
+participates fully in the instances it is a candidate for.
 
-This is a **BREAKING** tightening: an account that relied on either read
-without holding `system:admin` must be granted the role via the existing
-`src/auth/cli.ts set-roles`.
+The unfiltered instance listing (`GET /instances` with `scope=all` or with
+`scope` omitted) SHALL NOT rest on a flat `ADMIN_ROLE` test. It SHALL rest on
+the process-scoped gate with the `"read"` permission, which takes `ADMIN_ROLE`
+as its reserved role. An actor holding `ADMIN_ROLE` therefore reaches that
+listing exactly as before, without a grant and without a named process. The
+`http-wrapper` capability states what an actor lacking that role SHALL send.
+
+This is a **BREAKING** tightening. An account that read a record without
+holding `system:admin` loses that read. An operator restores it with the
+existing `src/auth/cli.ts set-roles`.
 
 #### Scenario: A participant can still see their own work
 
@@ -571,6 +606,12 @@ without holding `system:admin` must be granted the role via the existing
 - **WHEN** that actor requests `GET /instances?scope=all` or `GET /instances`
   with no `scope`
 - **THEN** the response is 403
+
+#### Scenario: The operator still sees everything without a grant
+
+- **WHEN** an actor holding `system:admin` requests `GET /instances?scope=all`
+  over a store holding no grant row
+- **THEN** the response is 200 and carries every instance summary
 
 #### Scenario: The same participant cannot read a record
 

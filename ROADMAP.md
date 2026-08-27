@@ -60,9 +60,13 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
     Three pieces stayed open, and each was its own later change. The
     `scope=all` filter and the reporting aggregates turn a gate into a query
     predicate, which reaches `instance-query` rather than `authorization`.
-    That one stays open. A draft-scoped `"author"` permission would let a
-    multi-team installation limit who sees and edits which draft. Today
-    every author reaches every draft. That one stays open too.
+    That one stays open — `process-read-permission` closed a narrower piece
+    of it instead: a per-process `"read"` gate on `GET /instances`'s
+    `scope=all`, admitting a grant holder who names the process, with no
+    result-set predicate over the processes a grant covers and no change to
+    the three reporting routes. A draft-scoped `"author"` permission would
+    let a multi-team installation limit who sees and edits which draft.
+    Today every author reaches every draft. That one stays open too.
     `tmp/open-work-priority.md` tracks both.
 
     The third piece closed 2026-08-19 as `scope-migration-plan-visibility`.
@@ -86,9 +90,13 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
     The seam shipped 2026-08-15 as `process-scoped-permission-seam`, ahead of
     that trigger, because it was the one piece carrying no storage question.
     `can(actor, permission, processId)` and `requirePermission` sit in
-    `src/auth/authorize.ts`, over three permissions: `"publish"`, `"cancel"`
-    and `"migrate"`. A private `PERMISSION_ROLE` map answers each one with the
-    global role that gates it today, so no actor gained or lost access.
+    `src/auth/authorize.ts`, over three permissions at the time: `"publish"`,
+    `"cancel"` and `"migrate"`. A private `PERMISSION_ROLE` map answers each
+    one with the global role that gates it today, so no actor gained or lost
+    access. `process-read-permission` later widened the seam to four
+    permissions, adding `"read"` (mapped to `ADMIN_ROLE`) and moving the
+    `scope=all` instance listing onto it when the request names a
+    `processId` — see below.
 
     Six call sites now ask through the seam. Four swapped one call for another.
     Two did not, and each taught something the design had not stated.

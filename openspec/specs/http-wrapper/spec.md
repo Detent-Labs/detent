@@ -665,12 +665,26 @@ value as a request error. An omitted `scope` SHALL resolve to `"all"`. That is
 what an omitted `scope` has always meant, so an existing request's meaning
 never narrows silently.
 
-`scope=all`, explicit or by omission, SHALL need `ADMIN_ROLE` on the
-resolved actor. The route SHALL check it with `requireRole` before applying the
-filter, so an authenticated actor lacking it receives 403. This is a
-**BREAKING** tightening of a route previously open to every authenticated
-actor. The other filters do not affect the check. Narrowing an unfiltered
-listing does not make it a participant's own listing.
+`scope=all`, explicit or by omission, SHALL rest on the process-scoped
+`"read"` gate rather than on a flat role test.
+
+Where the request names a `processId`, the route SHALL call
+`requirePermission` with `"read"` over that process, before applying the
+filter. An actor holding `ADMIN_ROLE` passes by the reserved-role
+short-circuit, reading no grant row. An actor holding a `"read"` grant over
+that process passes by the grant. Any other authenticated actor receives 403.
+
+Where the request names no `processId`, the route SHALL keep requiring
+`ADMIN_ROLE` through `requireRole`. A process-scoped grant cannot answer a
+query naming no process, and this capability adds no result-set predicate over
+the processes an actor holds a grant over. A grant holder therefore names the
+process it holds.
+
+This stays a **BREAKING** tightening of a route once open to every
+authenticated actor. It takes no answer away from an account that had one:
+every account reaching the unfiltered listing holds `ADMIN_ROLE`, which
+short-circuits the gate. The other filters do not affect the check: narrowing
+an unfiltered listing does not make it a participant's own listing.
 
 Under `scope=mine` the route SHALL need no role. It SHALL derive
 `assignedTo` from the resolved actor rather than from a query parameter. It
@@ -697,7 +711,7 @@ The response SHALL carry the page of summaries and the next cursor. The cursor
 is absent on the last page.
 
 `scope=all` SHALL set `instance-query`'s `includeDegraded` filter, since that
-scope already requires `ADMIN_ROLE`. An instance whose summary the read cannot
+scope already passes the `"read"` gate. An instance whose summary the read cannot
 produce then comes back as a degraded item, per that capability's own
 requirement. Neither `scope=mine` nor `scope=started` SHALL set it. Under
 either of those the page omits such an instance instead. No degraded item
@@ -722,6 +736,27 @@ represents it, and the response still carries no error over it.
 
 - **WHEN** a caller requests `GET /instances?scope=all` with a resolvable
   credential that does not hold `system:admin`
+- **THEN** the response is 403
+
+#### Scenario: A read grant admits scope=all over the named process
+
+- **WHEN** `GET /instances?scope=all&processId=P` is requested with a
+  resolvable credential that does not hold `system:admin`
+- **AND** the store holds a `"read"` grant over P to one of that actor's roles
+- **THEN** the response is 200 and carries that process's instance summaries
+
+#### Scenario: A read grant over another process does not admit this one
+
+- **WHEN** `GET /instances?scope=all&processId=P` is requested with a
+  resolvable credential that does not hold `system:admin`
+- **AND** the store holds a `"read"` grant over Q alone to that actor's roles
+- **THEN** the response is 403
+
+#### Scenario: A grant holder still names the process
+
+- **WHEN** `GET /instances?scope=all` with no `processId` is requested with a
+  resolvable credential that does not hold `system:admin`
+- **AND** the store holds a `"read"` grant over P to one of that actor's roles
 - **THEN** the response is 403
 
 #### Scenario: scope=mine needs no role

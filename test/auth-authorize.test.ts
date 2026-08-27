@@ -24,6 +24,7 @@ import {
   DATALISTS_ROLE,
   TEMPLATES_ROLE,
   AUTHOR_ROLE,
+  type Permission,
 } from "../src/auth/authorize.js";
 import * as authorize from "../src/auth/authorize.js";
 
@@ -142,7 +143,7 @@ test("an actor with no roles at all is rejected", () => {
 const PID_A = "proc_seam_a" as ProcessId;
 const PID_B = "proc_seam_b" as ProcessId;
 
-const writeGrant = async (role: string, permission: "publish" | "cancel" | "migrate", processId: ProcessId): Promise<void> => {
+const writeGrant = async (role: string, permission: Permission, processId: ProcessId): Promise<void> => {
   await sql`INSERT INTO permission_grants (role, permission, scope) VALUES (${role}, ${permission}, ${{ type: "process", config: { processId } }})`;
 };
 
@@ -158,6 +159,21 @@ test.skipIf(!DB)("each permission answers false for an actor missing that role, 
   expect(await can({ id: "user_1", roles: ["employee"] }, "migrate", PID_A, sql)).toBe(false);
 });
 
+test.skipIf(!DB)("an admin-only actor answers true for read", async () => {
+  expect(await can({ id: "user_1", roles: [ADMIN_ROLE] }, "read", PID_A, sql)).toBe(true);
+});
+
+test.skipIf(!DB)("a reports-only actor answers false for read", async () => {
+  expect(await can({ id: "user_1", roles: [REPORTS_ROLE] }, "read", PID_A, sql)).toBe(false);
+});
+
+test.skipIf(!DB)("a read grant admits one process and refuses another", async () => {
+  await writeGrant("hr-reporting", "read", PID_A);
+  const actor = { id: "user_1", roles: ["hr-reporting"] };
+  expect(await can(actor, "read", PID_A, sql)).toBe(true);
+  expect(await can(actor, "read", PID_B, sql)).toBe(false);
+});
+
 test.skipIf(!DB)("no permission implies another", async () => {
   // Same rule the eight role constants hold: DEVELOPER_ROLE reaches migrate
   // and nothing else, so the map cannot quietly widen a grant.
@@ -165,6 +181,7 @@ test.skipIf(!DB)("no permission implies another", async () => {
   expect(await can(developer, "migrate", PID_A, sql)).toBe(true);
   expect(await can(developer, "publish", PID_A, sql)).toBe(false);
   expect(await can(developer, "cancel", PID_A, sql)).toBe(false);
+  expect(await can(developer, "read", PID_A, sql)).toBe(false);
 });
 
 test.skipIf(!DB)("a grant admits one process and not another — the opposite of the pre-storage invariant that processId changed nothing", async () => {
