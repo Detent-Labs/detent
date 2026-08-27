@@ -21,7 +21,16 @@
  */
 
 import type { SQL } from "bun";
-import { sql, createInstance, appendInstanceEvent, appendInstanceEvents, newInstanceEventId, withTransaction, makeAssignmentUnresolvedEvent } from "./store.js";
+import {
+  sql,
+  createInstance,
+  appendInstanceEvent,
+  appendInstanceEvents,
+  newInstanceEventId,
+  withTransaction,
+  makeAssignmentUnresolvedEvent,
+  setAuditAttribution,
+} from "./store.js";
 import { idempotencyKey } from "./idempotency.js";
 import {
   SPAWN_ACTION_TYPE,
@@ -465,6 +474,12 @@ async function commitTransition(
     : overrides?.events;
   const plan = planStepEntry(instance, target, body, { pathId, cause, actorId, actions, assignment, ...overrides, ...(events ? { events } : {}) });
   return withTransaction(db, async (tx) => {
+    // Only a participant's own submit carries field data (timer/automatic/cancel
+    // pass no extraFields, so their applyStepEntry writes no instance_audit row —
+    // instance-audit-log-chain design.md "Actor and source arrive through
+    // set_config"). migrateOne's own "migration" source is set on its own call to
+    // applyStepEntry, never reached through commitTransition.
+    if (cause === "user") await setAuditAttribution(tx, actorId ?? null, "submit");
     const next = await applyStepEntry(tx, plan, extraFields);
     await deleteInstanceDraft(instance.instanceId, tx);
     return next;

@@ -328,7 +328,10 @@ unpublished `fromVersion`/`toVersion` pair.
 `src/http/admin-routes.ts` SHALL expose `POST
 /admin/instances/:id/redact`. It SHALL be gated by `system:admin`, like
 every other `/admin/*` route. The handler SHALL call the existing
-`redactInstance(instanceId, db)` (`src/engine/retention.ts`) unchanged.
+`redactInstance(instanceId, db, { actor: actor.id })`
+(`src/engine/retention.ts`). The actor it passes is the requesting actor
+the route already resolves. The audit log's `redact` entries then name
+who asked for the redaction.
 
 On success, the response SHALL be status 200 with the redacted instance
 summary as its body. A `running` instance SHALL be refused with status
@@ -354,6 +357,11 @@ to `http/errors.ts`.
 - **WHEN** `POST /admin/instances/:id/redact` is requested twice for the
   same instance
 - **THEN** both responses are 200, and the second call changes nothing
+
+#### Scenario: The redaction names the requesting actor
+
+- **WHEN** an actor holding `system:admin` redacts a completed instance
+- **THEN** the audit log's `redact` entries carry that actor's id
 
 #### Scenario: An actor without the admin role is refused
 

@@ -35,7 +35,7 @@ import { createDefinitionStore } from "./definitions.js";
 import { planStepEntry, applyStepEntry, ConcurrencyConflict } from "./transition.js";
 import { armStepTimers, type TimerDrop } from "./duration.js";
 import type { ResolveBody } from "./resolution.js";
-import { sql, newInstanceEventId, appendInstanceEvent, withTransaction } from "./store.js";
+import { sql, newInstanceEventId, appendInstanceEvent, withTransaction, setAuditAttribution } from "./store.js";
 import { CLAIM_LEASE_MS } from "./outbox.js";
 import { deleteInstanceDraft } from "./instance-drafts.js";
 import { log } from "../log.js";
@@ -521,6 +521,11 @@ async function migrateOne(
         events: [...dropEvents, ...transformDropEvents],
       },
     );
+    // instance-audit-log-chain: distinguishes this commit's field-data rows from
+    // an ordinary participant submit, both of which reach applyStepEntry through
+    // the same statement (design.md "Actor and source arrive through
+    // set_config"). No actor: a migration is system-driven, never an acting user.
+    await setAuditAttribution(tx, null, "migration");
     // applyStepEntry itself flags resolve_state = 'pending' on every commit, so
     // migration's cascade deferral (rather than nesting commits) falls out of
     // that general rule and needs no separate flag here.

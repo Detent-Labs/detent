@@ -13,6 +13,7 @@ import { AuthorizationError, ADMIN_ROLE } from "../src/auth/authorize.js";
 import { NotFoundError } from "../src/errors.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const starter: Actor = { id: "user_starter", roles: [] };
@@ -44,6 +45,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_attachments, definitions`;
+  if (DB) await clearInstanceAudit();
 });
 
 // step_a (assigned, initial) --(path_ab, manual, guardless)--> step_b (terminal).

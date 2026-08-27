@@ -12,6 +12,7 @@ import { devHeaderResolver } from "../src/auth/resolve.js";
 import { createServer } from "../src/http/server.js";
 import { handleMetrics } from "../src/http/metrics.js";
 import type { ProcessBody, Instance } from "../src/schema/definition.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
@@ -40,6 +41,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions`;
+  if (DB) await clearInstanceAudit();
 });
 
 test("handleMetrics never throws: a broken db reports 503 with the same content type, not an uncaught rejection", async () => {

@@ -10,6 +10,7 @@ import { sql, initSchema } from "../src/engine/store.js";
 import { createServer, resolveAuthResolver, checkDbReady, handleLivez, handleReadyz } from "../src/http/server.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
@@ -20,6 +21,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions`;
+  if (DB) await clearInstanceAudit();
 });
 
 test("handleLivez returns 200 unconditionally, no database dependency", async () => {

@@ -13,6 +13,7 @@ import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { cycleTime, bottleneck, sla, type DateRange } from "../src/engine/reporting.js";
 import { CANCEL_SINK_STEP_ID, type HistoryEntry, type Instance, type ProcessBody, type ProcessId, type StepId } from "../src/schema/definition.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
@@ -64,6 +65,7 @@ const body = (label: string): ProcessBody =>
 beforeAll(async () => { if (DB) await initSchema(); });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, migration_plans`;
+  if (DB) await clearInstanceAudit();
 });
 
 /** Creates an instance, then forces its startedAt/status/currentStepId to the values a test needs. */

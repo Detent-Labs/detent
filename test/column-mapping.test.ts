@@ -12,6 +12,7 @@ import { createRegistry, createDataSourceRegistry } from "../src/engine/registry
 import { createProcessInstance, submitAndTransition, getInstanceView, SubmissionValidationError } from "../src/runtime/api.js";
 import type { ProcessBody, ProcessId, PathId, StepId, Instance, InstanceEvent, FieldOption, FieldId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const actor: Actor = { id: "user_1", roles: [] };
@@ -99,6 +100,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions`;
+  if (DB) await clearInstanceAudit();
 });
 
 test.skipIf(!DB)("picking a row writes the mapped fields", async () => {
