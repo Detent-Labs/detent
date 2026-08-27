@@ -95,8 +95,13 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
 ## Decided, not yet built (each needs its own OpenSpec change)
 - **Instance audit log: a tamper-evident change record for field data.** A
   design pass on 2026-08-25 settled the shape; the owner approved each piece
-  in turn. Change 1 landed as `instance-audit-log-chain`; changes 2 and 3
-  remain. Three changes, in this order.
+  in turn. Change 1 landed as `instance-audit-log-chain` — `89e4c70`
+  implemented it, `9379091`/`f2631b6`/`7e003e8` corrected the design across
+  review, `2b9b905`/`072b9e1` closed its verification gaps, and `591c6c4`
+  archived it; its spec is `openspec/specs/instance-audit-log/spec.md`.
+  A third change, the nightly checkpoint, was struck 2026-08-27 (see
+  "Explicitly not the goal" below). Change 2 remains. Two changes, in this
+  order.
 
   1. The table, the two triggers sharing one diff function, the
      `set_config` call at all six write sites, the hash chain, and
@@ -104,7 +109,10 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
      later change: a row written without `prev_hash` and `hash` needs its
      chain computed after the fact, and a chain computed after the fact
      proves nothing about the window before it existed. Either the log is
-     chained from its first row, or the first rows are decoration.
+     chained from its first row, or the first rows are decoration. Built:
+     the trigger function and `verify_instance_chain()` are defined in
+     `src/engine/store.ts:658`; `verifyInstanceChain`, the TypeScript wrapper
+     over that SQL function, is `src/engine/admin-queries.ts:259`.
   2. `FieldDef.redactable`, narrowing `redact_instance_fields()`'s field
      selection to the fields a process author marks redactable. This is the
      only piece change 1 left out: the salted `value_hash`, the definer
@@ -112,12 +120,6 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
      This one touches `FieldDef`, so it is a definition-contract change and
      carries that ceremony: the spec delta, the `examples/` sweep,
      `docs/authoring-guide.md`, and a test that rejects a violating input.
-  3. The nightly checkpoint, its signing key, and where the signed
-     checkpoint is stored. This is the piece with no home in the repository
-     today — there is no key store and no secret-management convention — so
-     it stays last. The chain alone already catches an edited row; the
-     checkpoint only adds the recomputed-chain case, and it slots in later
-     without changing the chain's shape.
 
   **The goal.** Every change to an instance's `data` leaves one readable
   record: which field, old value visible in clear text, who, when, from
@@ -176,11 +178,10 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     `src/schema/canonical-json.ts` emits `{"a":1}`. A verifier written in
     TypeScript would have to reproduce a Postgres formatting detail exactly
     and would break silently on the first value shape nobody tried, so it
-    calls the SQL function rather than recomputing the digest. A nightly
-    checkpoint gathers every chain head and signs it with a key that lives
-    outside the database; the signed checkpoint is stored outside the
-    database too. The chain catches an edited row; the checkpoint catches a
-    recomputed chain.
+    calls the SQL function rather than recomputing the digest. The chain
+    catches an edited row that is not also followed by a full chain
+    recompute; it does not catch the recompute itself (see "Explicitly not
+    the goal" below).
   - Every row's `value_hash` is `H(salt || value)` with a per-row salt,
     from the first row this change writes — not gated on a field flag.
     `salt` comes from `pgcrypto`'s `gen_random_bytes`, which `initSchema`
@@ -212,7 +213,16 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   **Explicitly not the goal.**
   - Not tamper-*proof*, tamper-*evident*: a superuser can rewrite rows,
     silence the trigger (`session_replication_role = replica`), or drop
-    the table; the checkpoint makes that detectable, never impossible.
+    the table. `verify_instance_chain()` catches an edit that leaves
+    `prev_hash`/`hash` stale, but the same DB access that rewrites a row can
+    also recompute every `hash` after it, so the chain alone does not catch
+    that. A nightly, externally-signed checkpoint would have caught a
+    recomputed chain too; it was proposed as change 3 and struck 2026-08-27,
+    because the signing key and the checkpoint's own storage have to live
+    outside the database to mean anything — the same actor able to rewrite
+    `instance_audit` could otherwise just re-sign a fresh checkpoint over
+    the tampered chain — and this repo has no key store or
+    secret-management convention to hang that on. Revisit once one exists.
   - Values in clear text on purpose. "Who was originally in this field"
     must be readable in the audit view without ceremony; an
     encrypt-at-rest variant (crypto-shredding, which would also have
@@ -257,6 +267,20 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   - A third data source registry type, `instance.query`, beside the existing
     `static` and `db.list`. A leaf handler like both of them: it reads, and it
     composes nothing.
+  - The read this handler needs exists already in most respects, built for a
+    different consumer since this entry was written. `instance-data-query`'s
+    `queryInstances` (`src/runtime/api.ts:1512`, shipped 2026-08-27 as
+    `instance-query-core`, now archived) filters instances by `processId`,
+    `status`, `currentStepId`, `startedBy`, `claimedBy`, `excludeInstanceId`,
+    `createdAfter`/`createdBefore` and a `dataWhere` list of field/operator/
+    literal comparisons, and returns each match's `instanceId`, `version`,
+    `data` and `redactedAt`. That covers every filter axis this design names
+    but one: `dataWhere`'s right side is a scalar literal only
+    (`instance-data-query`'s spec, "A right side SHALL be a scalar literal"),
+    never a field of the reading instance. `instance.query`'s `resolve`
+    substitutes the reading instance's field values into those comparisons
+    itself, then calls `queryInstances` for the rest, rather than issuing its
+    own SQL against `instances`.
   - The filter axis is `currentStepId`. `Instance.status` is the lifecycle
     (`running`, `completed`, `cancelled`, `faulted`), and every circulating
     laptop is `running` whichever step it stands on, so a status set answers
@@ -298,7 +322,10 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     right side, and the self-exclusion rule below needs the id.
   - A query whose target is the reading instance's own process excludes that
     instance. A rule, not a config option: an instance's own contribution to an
-    aggregate over its own process is never what a picker wants.
+    aggregate over its own process is never what a picker wants. `queryInstances`
+    already carries an `excludeInstanceId` filter built for this same purpose in
+    `instance-data-query`, so this rule costs `instance.query`'s handler nothing
+    beyond passing its own reading-instance id through.
   - Publish validates every field and step reference against the union of the
     catalogs of the target's versions holding live instances, marking each
     reference with the versions carrying it and the instance count outside
@@ -468,6 +495,16 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     core (see the aggregated-data-source entry above) second; this
     feature third. The cost of that order is that the first change this
     topic produces is not a table.
+
+    That order did not hold. The shared query core landed 2026-08-27 as
+    `instance-query-core` (archived; see `instance-data-query`'s spec) ahead
+    of the `read` permission, which stays proposed and unimplemented —
+    `openspec/changes/process-read-permission/tasks.md` is still all
+    unchecked, and `Permission` (`src/auth/authorize.ts:77`) has not gained
+    `read`. The report builder is unaffected by the swap: it still needs
+    `read` before a shared table can be restricted to a grant, and the query
+    core it depends on already exists, reusable by `instance.query` too (see
+    the aggregated-data-source entry above).
 
   **Explicitly not the goal.**
   - Not the three existing reporting views. Cycle time, bottleneck and
