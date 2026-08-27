@@ -805,6 +805,33 @@ function checkTechnicalFields(body: ProcessBody): CompileIssue[] {
 }
 
 // ============================================================
+// 7b. Redactable field marker: reject `redactable: true` on a group field. A
+// group carries no value of its own to redact; the flag is meaningless there,
+// the same reasoning checkTechnicalFields applies to `technical`. Operates on
+// duck-typed input, like checkTechnicalFields: it runs before any Zod parse
+// of the authored body, on both compile branches.
+// ============================================================
+
+function checkRedactableFields(body: ProcessBody): CompileIssue[] {
+  const issues: CompileIssue[] = [];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  walkFieldsIndexed(body.fields as any, "fields", (f) => {
+    if (f?.redactable !== true) return;
+    if (typeof f?.id !== "string") return;
+    if (f.type === "group") {
+      issues.push({
+        loc: `fields.${f.id}.redactable`,
+        value: String(f.type),
+        message: "a group field must not declare redactable: true",
+      });
+    }
+  });
+
+  return issues;
+}
+
+// ============================================================
 // 8. Unsatisfiable required+readonly pair: reject a view entry declaring
 // literal required: true and literal readonly: true on a step carrying a
 // manual path, when no source in the body writes the field it names,
@@ -1020,6 +1047,7 @@ function structuralIssues(body: ProcessBody): CompileIssue[] {
     ...checkIdResolution(body),
     ...checkLengthBounds(body),
     ...checkTechnicalFields(body),
+    ...checkRedactableFields(body),
     ...checkUnsatisfiableRequiredReadonly(body),
     ...checkGroupReference(body),
   ];

@@ -294,6 +294,18 @@ export type FieldDef = {
    * criterion is the reason.
    */
   technical?: boolean;
+  /**
+   * Marks the field's historical values eligible for future redaction: the
+   * instance audit log's redaction path clears a redactable field's values
+   * across its whole history when the instance is redacted, and leaves every
+   * other field's history untouched. A pure authoring-time signal read only
+   * by that path — it changes no CEL type-check, no view resolution, and no
+   * other publish-time rule. A `redactable` field must not be `type:
+   * "group"`, checked as a write-path check
+   * (`compile.ts::checkRedactableFields`), never a refinement here:
+   * `definition-contract`'s unbypassable-check criterion is the reason.
+   */
+  redactable?: boolean;
 };
 export const fieldDef: z.ZodType<FieldDef, unknown> = z.lazy(() =>
   z
@@ -310,6 +322,7 @@ export const fieldDef: z.ZodType<FieldDef, unknown> = z.lazy(() =>
       default: z.union([expression, literal]).optional(),
       fields: z.array(fieldDef).optional(),
       technical: z.boolean().optional(),
+      redactable: z.boolean().optional(),
     })
     .refine((f) => !(f.options && f.dataSource), {
       message: "options and dataSource are mutually exclusive",

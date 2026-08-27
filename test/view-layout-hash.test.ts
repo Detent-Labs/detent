@@ -30,9 +30,14 @@ import { canonicalize } from "../src/schema/canonical-json.js";
  * regression guard from here on: a schema change that alters what
  * `processBody.parse` emits for any of these bodies moves its hash and fails
  * here.
+ *
+ * `redactable-field-flag` moved `expense-approval.json` again: `review_note`
+ * gained `redactable: true`, a declared key present in the canonical JSON,
+ * so its literal below is a third fresh measurement, taken the same way,
+ * against the post-edit body and the current schema.
  */
 const PRE_CHANGE_HASHES: Record<string, string> = {
-  "expense-approval.json": "bb641c63033baf8178df99f9e6f330ff3bd0b811b13d3a85bad4fea5382c541f",
+  "expense-approval.json": "d9782fcbc99eacf57499c8c9aa406537b8c5a422b2fe8941a2440b04b03df165",
   "subprocess-credit-check-child.json": "aa07358556ff42fc66275e8c2908093a085d501075539768693bb7c01619e5b8",
   "subprocess-loan-parent.json": "c3afcb3c7e5c3b95c63c443ebb054f5b90ab883a2fdc78c8c02f534ee838c208",
 };

@@ -571,3 +571,18 @@ test("a field declaring technical: false hashes differently from the same body w
 
   expect(definitionHash(compileProcessBody(withKey))).not.toBe(definitionHash(compileProcessBody(withoutKey)));
 });
+
+// redactable-field-flag: definitionHash reproducibility for the new
+// FieldDef.redactable key. Pure over compileProcessBody/definitionHash, no DB.
+test("a body declaring no field's redactable hashes as before this change", () => {
+  const body = waitBody("sayYes");
+  expect(definitionHash(compileProcessBody(body))).toBe(definitionHash(compileProcessBody(structuredClone(body))));
+});
+
+test("a field declaring redactable: false hashes differently from the same body with the key omitted", () => {
+  const withKey = waitBody("sayYes");
+  (withKey.fields[0] as unknown as { redactable: boolean }).redactable = false;
+  const withoutKey = waitBody("sayYes");
+
+  expect(definitionHash(compileProcessBody(withKey))).not.toBe(definitionHash(compileProcessBody(withoutKey)));
+});

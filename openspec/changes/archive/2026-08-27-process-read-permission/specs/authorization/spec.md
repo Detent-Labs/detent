@@ -187,6 +187,68 @@ stay synchronous.
 - **THEN** the operation admits the actors it admitted before this change
 - **AND** it refuses the actors it refused before this change
 
+### Requirement: Authorization is checked directly at each gated operation, not through an extension point
+
+This capability gates six kinds of operation:
+
+- publishing a process body
+- cancelling an arbitrary instance
+- reading the unfiltered instance listing
+- reading an instance's record
+- every `/admin/*` route
+- every studio route
+
+No plugin envelope, registry, or
+configurable policy SHALL exist for authorization. Each gated operation calls
+`requireRole` or `requirePermission` directly. Each passes its own fixed role
+constant or permission. The engine already follows that pattern for the single
+`"static"` check on `Step.assignment.strategy.type`.
+
+`requirePermission` SHALL NOT weaken that rule. It reads the same
+`Actor.roles`, in the same module, and one table of stored rows beside them. It
+resolves four fixed permissions through one compile-time map. It reaches no
+registry. It loads no code. A caller SHALL NOT be able to add a permission,
+replace the map, or supply a policy.
+
+A grant is data, not policy. It names a role, one of the four fixed
+permissions, and a scope. It carries no expression, no ordering, no priority
+and no deny form. Two grants over one process combine by answering true, which
+is what a set of independent tests already does.
+
+#### Scenario: No authorization plugin registry exists
+
+- **WHEN** a reader reads the engine's `Registry`, `DataSourceRegistry` and
+  `AssignmentRegistry` extension points
+- **THEN** no authorization or permission registry stands alongside them
+
+#### Scenario: Each admin route calls requireRole directly
+
+- **WHEN** a reader reads `src/http/admin-routes.ts`
+- **THEN** each handler calls `requireRole(actor, ADMIN_ROLE)` itself, with no
+  policy abstraction between them
+
+#### Scenario: Each studio route calls requireRole directly
+
+- **WHEN** a reader reads `src/http/studio-routes.ts`
+- **THEN** each handler calls `requireRole` or `requirePermission` itself, with
+  no policy abstraction between them
+- **AND** the two template writes call `requireRole` with `TEMPLATES_ROLE`,
+  while the four draft routes call the `requireAuthoring` helper beside it
+- **AND** the publish route, the two migration-plan routes and the orphan-key
+  route await `requirePermission` with their fixed permission
+
+#### Scenario: The permission map does not extend
+
+- **WHEN** a reader reads the `PERMISSION_ROLE` map
+- **THEN** it is a module constant covering exactly four permissions
+- **AND** no exported function adds an entry to it
+
+#### Scenario: A grant carries no policy
+
+- **WHEN** an operator writes a grant
+- **THEN** it names a role, a permission and a scope, and nothing else
+- **AND** no grant denies a permission the global role already admits
+
 ### Requirement: The operator role gates the operator-facing reads and routes
 
 `ADMIN_ROLE` SHALL gate every `/admin/*` route and, additionally, `GET

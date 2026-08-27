@@ -8,10 +8,10 @@
  * `Step.assignment.strategy.type`, which resolves against the injected
  * `AssignmentRegistry`. No role implies another.
  *
- * `can`/`requirePermission` at the bottom are the process-scoped seam. Six
+ * `can`/`requirePermission` at the bottom are the process-scoped seam. Seven
  * gated operations name one process; each asks through those two rather than
  * through a bare `requireRole`, so a later change to how a grant is stored
- * moves this module alone. Still not an extension point: three fixed
+ * moves this module alone. Still not an extension point: four fixed
  * permissions in a module-private map, no registry, nothing configurable.
  *
  * `can` runs two tests: the global role, then a stored grant.
@@ -70,22 +70,28 @@ export function requireRole(actor: Actor, role: string): void {
 
 /**
  * A gated operation whose target is one process, named by what the call site
- * asks rather than by the role that answers it today. Exactly three exist:
- * publishing a body, cancelling an instance, and the migration routes. Every
- * other gated operation names no process and keeps `requireRole`.
+ * asks rather than by the role that answers it today. Exactly four exist:
+ * publishing a body, cancelling an instance, the migration routes, and the
+ * unfiltered instance listing (`scope=all`). Every other gated operation
+ * names no process and keeps `requireRole`.
  */
-export type Permission = "publish" | "cancel" | "migrate";
+export type Permission = "publish" | "cancel" | "migrate" | "read";
 
 /**
  * The reserved role each permission takes today. Module-private on purpose:
  * nothing outside can read it, replace it, or add an entry, which is what
  * keeps this a direct check rather than the policy extension point the
  * `authorization` capability rules out.
+ *
+ * `"read"` takes `ADMIN_ROLE` rather than `REPORTS_ROLE`: `REPORTS_ROLE`
+ * answers whether an actor may reach the reporting area at all, a different
+ * question from which process's data an actor may see.
  */
 const PERMISSION_ROLE: Record<Permission, string> = {
   publish: PUBLISH_ROLE,
   cancel: CANCEL_ANY_ROLE,
   migrate: DEVELOPER_ROLE,
+  read: ADMIN_ROLE,
 };
 
 /**

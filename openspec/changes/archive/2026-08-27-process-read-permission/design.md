@@ -5,7 +5,7 @@ See `proposal.md` for motivation. The seam this change widens already exists:
 `permission_grants` table behind `src/auth/grants.ts`.
 
 Two facts shape the approach. The `scope=all` listing already sits behind
-`requireRole(actor, ADMIN_ROLE)` at `src/http/routes.ts:437`. So this change
+`requireRole(actor, ADMIN_ROLE)` at `src/http/routes.ts:449`. So this change
 loosens a closed gate rather than closing an open one. And a grant names one
 process, while `GET /instances` accepts a request naming none.
 
@@ -76,10 +76,12 @@ costs no restructuring.
 
 ## Risks / Trade-offs
 
-- A grant holder omits `processId` and reads a 403 naming `ADMIN_ROLE` → The
-  branch raises its own error text instead. It names the missing `processId`
-  rather than the role. The status code stays 403, so no
-  scenario changes.
+- A grant holder omits `processId` and reads a 403 naming `ADMIN_ROLE`,
+  rather than one naming the missing `processId`. The branch keeps the
+  unchanged `requireRole(actor, ADMIN_ROLE)` call rather than raising a new,
+  more specific error. The status code stays 403, so no scenario changes.
+  This change adds no new error path. The trade is a less helpful message
+  for a grant holder who forgot to name their process.
 - One extra database round trip per non-admin `scope=all` call → Bounded by
   construction. `can` reaches the store only after the
   short-circuit fails. An operator and an unauthenticated caller both pay
@@ -95,8 +97,19 @@ costs no restructuring.
 
 None. No table changes, no backfill, no deployment step. The
 `permission_grants` table stores `permission` as `text`
-(`src/engine/store.ts:312`), so a read row needs no column change.
+(`src/engine/store.ts:317-322`), so a read row needs no column change.
 
 Rollback is the revert. A stored read row then matches no permission the code
 defines. The grant lookup answers false over it. The route returns to the
 plain `ADMIN_ROLE` test.
+
+## Open Questions
+
+- When does the reporting-routes tightening (`REPORTS_ROLE` → `read` on the
+  three aggregate routes) land? It needs a per-account migration step.
+  Nobody has assigned an owner or a timeline. `proposal.md` names it as
+  its own later change.
+- Does anyone need a listing spanning more than one process under a `read`
+  grant? Only a per-process gate ships here. A result-set predicate over the
+  processes an actor holds a grant over stays deferred until somebody asks
+  for it.

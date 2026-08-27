@@ -4,7 +4,7 @@
 
 Gives the operator an HTTP surface over the process-scoped permission grants
 that `authorization` reads. The operator lists every grant, writes one, and
-revokes one. A grant maps a role string to one of the three process-scoped
+revokes one. A grant maps a role string to one of the four process-scoped
 permissions, and to the process it covers. An installation can therefore say
 "the finance authors publish the expense process", and hand them no other
 process.
@@ -107,8 +107,8 @@ reaches the store. It SHALL answer `400` where the body fails. Four cases
 fail:
 
 - `role` missing, empty, or not a string.
-- `permission` outside the three the `authorization` capability defines:
-  `"publish"`, `"cancel"` and `"migrate"`.
+- `permission` outside the four the `authorization` capability defines:
+  `"publish"`, `"cancel"`, `"migrate"` and `"read"`.
 - `scope` missing, or carrying a `type` other than `"process"`.
 - A `"process"` scope whose `config.processId` is missing or does not match the
   `proc_` prefix a `ProcessId` requires.
@@ -124,6 +124,14 @@ reads that message rather than guessing.
 - **WHEN** an operator POSTs a grant whose `permission` is `"admin"`
 - **THEN** the response is `400`
 - **AND** the store holds no row for it
+
+#### Scenario: The engine stores a read grant
+
+- **WHEN** an operator POSTs a grant whose `permission` is `"read"` over a
+  well-formed `"process"` scope
+- **THEN** the response reports success
+- **AND** the store holds that row
+- **AND** listing the grants carries it
 
 #### Scenario: The engine refuses an unknown scope type
 

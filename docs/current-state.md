@@ -1167,11 +1167,13 @@ Stage-by-stage status is in `ROADMAP.md`.
   A process-scoped seam sits on top of that check, filled in by
   `process-scoped-permission-grants` (roadmap #40). `src/auth/authorize.ts`
   exports `async can(actor, permission, processId, db)` and
-  `requirePermission`, both taking the caller's `SQL` handle. Three
-  permissions reach them: `"publish"`, `"cancel"` and `"migrate"`. A private
-  `PERMISSION_ROLE` map answers each one with the global role that gates it
-  today. The `migrate` entry names `DEVELOPER_ROLE`, a role the paragraph
-  above does not.
+  `requirePermission`, both taking the caller's `SQL` handle. Four
+  permissions reach them: `"publish"`, `"cancel"`, `"migrate"` and `"read"`
+  (`process-read-permission`). A private `PERMISSION_ROLE` map answers each
+  one with the global role that gates it today. The `migrate` entry names
+  `DEVELOPER_ROLE`, a role the paragraph above does not. The `read` entry
+  names `ADMIN_ROLE`, gating the `scope=all` instance listing below rather
+  than a fresh role of its own.
 
   `can` answers true on either of two tests, in order. The first is the global
   role: array membership, no query. The second is a stored grant.
@@ -1193,17 +1195,22 @@ Stage-by-stage status is in `ROADMAP.md`.
   an `@`-suffixed fallback for that; the owner dropped it 2026-08-16, before
   this change shipped. A scope lives in the grant table alone.
 
-  Six call sites ask through the seam. Two are the publish route
+  Seven call sites ask through the seam. Two are the publish route
   (`handlePublish`, `handlePublishDraft`). Three are the studio migration
   routes (`handleGetMigrationPlan`, `handlePutMigrationPlan`,
-  `handleGetOrphanKeys`). The sixth is `cancelInstance`. It asks `can` in its
-  loaded branch beside the `startedBy` test. A `system:cancel-any` holder
-  still pays no instance load; a grant holder does.
+  `handleGetOrphanKeys`). The sixth is the `scope=all` instance listing
+  (`handleListInstances`). It routes through `requirePermission` with
+  `"read"` when the request names a `processId`. Otherwise it keeps the
+  flat `requireRole(actor, ADMIN_ROLE)` test.
 
-  `docs/decisions.md` carries what stays unbuilt: the `scope=all` filter and
-  a draft-scoped `"author"` permission. It also carries `permissions`
-  booleans for the resource views, which the web areas read as role strings
-  today.
+  The seventh is `cancelInstance`. It asks `can` in its loaded branch
+  beside the `startedBy` test. A `system:cancel-any` holder still pays no
+  instance load; a grant holder does.
+
+  `docs/decisions.md` carries what stays unbuilt: a draft-scoped `"author"`
+  permission, and the three reporting routes' own migration off
+  `REPORTS_ROLE` onto `"read"`. It also carries `permissions` booleans for
+  the resource views, which the web areas read as role strings today.
 - Login rate limiting (`src/auth/login.ts`, `add-login-rate-limit`): closes
   the gap the `add-authentication` entry recorded. `handleLogin` tracks
   attempts per normalized email (`trim().toLowerCase()`) in an in-memory
@@ -4154,12 +4161,22 @@ instance's rows and recomputes each hash, naming the first row whose
 recomputation disagrees.
 
 The redaction function, `redact_instance_fields(instance_id, actor,
-reason, transition_seq)`, is `SECURITY DEFINER` and owned by
-`detent_audit_owner`. It appends one `redact` row per field the
-instance's entries name, then nulls `value` and `salt` on every
-earlier row of those fields. `redactInstance`
-(`src/engine/retention.ts`) calls it after its own `data`-to-`{}`
-wipe.
+reason, transition_seq, field_ids)`, is `SECURITY DEFINER` and owned
+by `detent_audit_owner`. It appends one `redact` row per field named
+in `field_ids` that the instance's entries also hold. It then nulls
+`value` and `salt` on every earlier row of those fields alone. A field
+the instance's entries hold but `field_ids` omits keeps its entries
+untouched.
+
+`redactInstance` (`src/engine/retention.ts`) resolves `field_ids`
+itself, before calling it. It reads the instance's currently pinned
+definition body (`createDefinitionStore(tx)`) and flattens the field
+catalog. It filters to `FieldDef.redactable === true`
+(`redactable-field-flag`). The definer role has no access to
+`definitions` and cannot resolve the flag itself.
+
+The call to the redaction function still comes after
+`redactInstance`'s own `data`-to-`{}` wipe.
 
 The TypeScript entry point onto chain verification is
 `verifyInstanceChain(instanceId, db)` (`src/engine/admin-queries.ts`),

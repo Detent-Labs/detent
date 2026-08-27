@@ -9,11 +9,11 @@ import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
-import { findOrphanKeys } from "../src/engine/migration.js";
+import { findOrphanKeys, registerMigrationPlan, migrateInstances } from "../src/engine/migration.js";
 import { redactInstance, sweepRetention } from "../src/engine/retention.js";
 import { saveInstanceDraft as engineSaveInstanceDraft, getInstanceDraft } from "../src/engine/instance-drafts.js";
 import { NotFoundError, InstanceRunningError } from "../src/errors.js";
-import type { ProcessBody, Instance, InstanceId } from "../src/schema/definition.js";
+import type { ProcessBody, Instance, InstanceId, MigrationSpec } from "../src/schema/definition.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const reg = createRegistry();
@@ -40,12 +40,21 @@ beforeAll(async () => {
   if (DB) await initSchema();
 });
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_comments, instance_attachments, instance_drafts`;
+  if (DB)
+    await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_comments, instance_attachments, instance_drafts, definitions, migration_plans`;
   if (DB) await clearInstanceAudit();
 });
 
-const mk = async (data: Record<string, unknown> = { field_x: "value" }): Promise<Instance> =>
-  createInstance(body(), { processId: pid, version: 1, data: data as Instance["data"] }, sql);
+// redactable-field-flag: redactInstance now resolves the instance's pinned
+// definition body, so every instance must be created against a published
+// version (no `definitions` row means resolveBody returns undefined and
+// redactInstance throws). None of the tests below assert on field-level
+// redaction scoping, only on body.data/comments/attachments/drafts, which
+// stay unconditionally cleared regardless of `redactable`.
+const mk = async (data: Record<string, unknown> = { field_x: "value" }): Promise<Instance> => {
+  const published = await publishBody(pid, body(), reg, dataSourceReg);
+  return createInstance(published.definition, { processId: pid, version: published.version, data: data as Instance["data"] }, sql);
+};
 
 const setStatus = (id: string, status: string) => sql`UPDATE instances SET body = body || ${{ status }}::jsonb WHERE instance_id = ${id}`;
 const setEnteredAt = (id: string, iso: string) => sql`UPDATE instances SET body = body || ${{ currentStepEnteredAt: iso }}::jsonb WHERE instance_id = ${id}`;
@@ -233,6 +242,132 @@ test.skipIf(!DB)("a redacted instance scans clean via findOrphanKeys, and its da
   expect(scan.orphans).toEqual([]);
   expect(scan.unreadable).toEqual([]);
   expect(await rowData(i.instanceId)).toEqual({});
+});
+
+// --- field-scoped redaction (redactable-field-flag) -------------------------
+//
+// redactInstance now resolves the redactable field-id set from the
+// instance's currently pinned definition, so these cases publish a real
+// field catalog rather than the empty one `body()` uses. A separate
+// process id keeps their versions from interleaving with `pid`'s.
+
+const pid2 = "proc_retention_fields" as Instance["processId"];
+type Field = { id: string; key: string; label: { en: string }; type: string; redactable?: boolean };
+const f = (key: string, opts: { redactable?: boolean } = {}): Field => ({ id: `field_${key}`, key, label: { en: key }, type: "string", ...opts });
+
+const fieldsBody = (fields: Field[], tag: string): ProcessBody =>
+  ({
+    key: "retention_test_fields",
+    label: { en: `retention test fields #${tag}` },
+    baseLocale: "en",
+    fields,
+    workflow: {
+      initialStep: "step_a",
+      steps: [step("step_a", { paths: [{ id: "path_ab", key: "path_ab", label: "Ab", to: "step_b", trigger: "manual" }] }), step("step_b", { terminal: true })],
+    },
+  }) as unknown as ProcessBody;
+
+const auditRows = async (id: string, fieldId: string): Promise<{ value: unknown; salt: Buffer | null; op: string }[]> =>
+  (await sql`SELECT value, salt, op FROM instance_audit WHERE instance_id = ${id} AND field_id = ${fieldId} ORDER BY seq`) as {
+    value: unknown;
+    salt: Buffer | null;
+    op: string;
+  }[];
+
+test.skipIf(!DB)("redactInstance clears only the fields the currently pinned version marks redactable", async () => {
+  const published = await publishBody(pid2, fieldsBody([f("a", { redactable: true }), f("b")], "2-2"), reg, dataSourceReg);
+  const i = await createInstance(
+    published.definition,
+    { processId: pid2, version: published.version, data: { field_a: "secret", field_b: "public" } as unknown as Instance["data"] },
+    sql,
+  );
+  await setStatus(i.instanceId, "completed");
+
+  await redactInstance(i.instanceId, sql);
+
+  // redactInstance's unconditional `data -> {}` wipe (every field, regardless
+  // of redactable) also appends its own "set" entry recording the drop to
+  // JSON null — a real jsonb value, not SQL NULL, so instance_audit_append
+  // still salts it. `salt IS NULL` is therefore the reliable signal that a
+  // row was cleared BY redact_instance_fields, not merely superseded by the
+  // wipe: only its own appended "redact" row and the rows its UPDATE clears
+  // ever carry a null salt.
+  const aRows = await auditRows(i.instanceId, "field_a");
+  expect(aRows.some((r) => r.op === "redact")).toBe(true);
+  for (const r of aRows) {
+    expect(r.value).toBeNull();
+    expect(r.salt).toBeNull();
+  }
+  const bRows = await auditRows(i.instanceId, "field_b");
+  expect(bRows.some((r) => r.op === "redact")).toBe(false);
+  expect(bRows[0].value).toBe("public");
+  expect(bRows[0].salt).not.toBeNull();
+});
+
+test.skipIf(!DB)("a field removed from the currently pinned version's catalog keeps its history", async () => {
+  const v1 = await publishBody(pid2, fieldsBody([f("removed", { redactable: true })], "2-3-v1"), reg, dataSourceReg);
+  const v2 = await publishBody(pid2, fieldsBody([], "2-3-v2"), reg, dataSourceReg);
+  await registerMigrationPlan(pid2, v1.version, v2.version, {} as MigrationSpec);
+  const i = await createInstance(
+    v1.definition,
+    { processId: pid2, version: v1.version, data: { field_removed: "keepme" } as unknown as Instance["data"] },
+    sql,
+  );
+  await migrateInstances(pid2, v1.version, v2.version, sql);
+  await setStatus(i.instanceId, "completed");
+
+  await redactInstance(i.instanceId, sql);
+
+  // field_removed is absent from v2's catalog, so redact_instance_fields
+  // never includes it — the unconditional data wipe still logs its own drop
+  // to JSON null (a salted "set" row, see the test above), but the field's
+  // own original row, and every row, keeps its salt: nothing ever clears one.
+  const rows = await auditRows(i.instanceId, "field_removed");
+  expect(rows.some((r) => r.op === "redact")).toBe(false);
+  for (const r of rows) expect(r.salt).not.toBeNull();
+  expect(rows[0].value).toBe("keepme");
+});
+
+test.skipIf(!DB)("the currently pinned version's flag governs, not an earlier one: redactable true -> false leaves values", async () => {
+  const v1 = await publishBody(pid2, fieldsBody([f("flip", { redactable: true })], "2-4a-v1"), reg, dataSourceReg);
+  const v2 = await publishBody(pid2, fieldsBody([f("flip", { redactable: false })], "2-4a-v2"), reg, dataSourceReg);
+  await registerMigrationPlan(pid2, v1.version, v2.version, {} as MigrationSpec);
+  const i = await createInstance(
+    v1.definition,
+    { processId: pid2, version: v1.version, data: { field_flip: "before" } as unknown as Instance["data"] },
+    sql,
+  );
+  await migrateInstances(pid2, v1.version, v2.version, sql);
+  await setStatus(i.instanceId, "completed");
+
+  await redactInstance(i.instanceId, sql);
+
+  const rows = await auditRows(i.instanceId, "field_flip");
+  expect(rows.some((r) => r.op === "redact")).toBe(false);
+  for (const r of rows) expect(r.salt).not.toBeNull();
+  expect(rows[0].value).toBe("before");
+});
+
+test.skipIf(!DB)("the currently pinned version's flag governs, not a later one: redactable absent -> true clears values", async () => {
+  const v1 = await publishBody(pid2, fieldsBody([f("flip2")], "2-4b-v1"), reg, dataSourceReg);
+  const v2 = await publishBody(pid2, fieldsBody([f("flip2", { redactable: true })], "2-4b-v2"), reg, dataSourceReg);
+  await registerMigrationPlan(pid2, v1.version, v2.version, {} as MigrationSpec);
+  const i = await createInstance(
+    v1.definition,
+    { processId: pid2, version: v1.version, data: { field_flip2: "before" } as unknown as Instance["data"] },
+    sql,
+  );
+  await migrateInstances(pid2, v1.version, v2.version, sql);
+  await setStatus(i.instanceId, "completed");
+
+  await redactInstance(i.instanceId, sql);
+
+  const rows = await auditRows(i.instanceId, "field_flip2");
+  expect(rows.length).toBeGreaterThan(0);
+  for (const r of rows.filter((r) => r.op === "set")) {
+    expect(r.value).toBeNull();
+    expect(r.salt).toBeNull();
+  }
 });
 
 // --- the per-instance boundary logs -----------------------------------------

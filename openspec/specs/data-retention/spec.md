@@ -30,11 +30,19 @@ delete every row in `instance_comments`, `instance_attachments`, and
 The optional `opts` names who asked and why. The automatic sweep supplies
 neither, and the audit entries then carry a null actor.
 
-It SHALL redact every field the instance's audit log holds an entry
-for.
-The audit log is the fifth relation, and the only one redaction neither
-leaves alone nor deletes from. Its rows stay and their values go. The
-log still shows that a field changed, when, and at whose hand.
+It SHALL redact a field only when two conditions both hold. First, the
+instance's audit log holds an entry for that field. Second, the
+instance's currently pinned version marks the field `redactable` in its
+field catalog (`definition-contract`). Consider a field the audit log
+holds an entry for, whose currently pinned version does not mark it
+`redactable`. That field SHALL keep its existing entries untouched,
+including one whose id is absent from the catalog entirely.
+
+The audit log is the fifth relation. It is the only one redaction
+neither leaves alone, deletes from, nor clears unconditionally. Its rows
+stay and the redactable fields' values go. The log still shows that a
+field changed, when, and at whose hand. That holds for a redactable field
+as much as for one that stays intact.
 
 The `history_entries` and `instance_events` relations SHALL NOT be
 touched. Neither carries a field value, so neither needs redaction. That
@@ -58,11 +66,17 @@ design.
 
 #### Scenario: Redaction clears the audit log's values and keeps its rows
 
-- **WHEN** `redactInstance` is called for an instance whose audit log
-  holds three entries across two fields
-- **THEN** the three original entries remain, each holding no value and
-  no salt. The wipe's own entries and the redaction's stand beside
-  them
+- **WHEN** `redactInstance` runs on an instance whose audit log holds
+  an entry for a field marked `redactable: true`
+- **THEN** that field's original entries remain, each holding no value and
+  no salt. The wipe's own entries and the redaction's stand beside them
+
+#### Scenario: A non-redactable field's audit values survive redaction
+
+- **WHEN** `redactInstance` runs on an instance whose audit log holds
+  an entry for a field not marked `redactable`
+- **THEN** that field's entries keep their original values and salts
+  unchanged, and no `redact` entry is appended for it
 
 #### Scenario: A redacted instance's chain still verifies
 

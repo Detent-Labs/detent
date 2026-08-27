@@ -752,13 +752,22 @@ async function initInstanceAudit(db: SQL): Promise<void> {
       // instance_audit, and clearing a prior row's value is an UPDATE
       // (design.md "Redaction is its own definer function"). It reads no
       // column off `instances` — the definer role holds no grant there — so
-      // its caller passes transitionSeq explicitly.
+      // its caller passes transitionSeq explicitly. field_ids narrows the
+      // clear to the caller-resolved redactable set
+      // (redactable-field-flag): this role has no access to `definitions`
+      // and cannot resolve FieldDef.redactable itself.
+      //
+      // Postgres treats a changed parameter list as a new overload, not a
+      // replacement of the old one — drop the 4-arg signature explicitly so
+      // only the 5-arg one remains.
+      await tx`DROP FUNCTION IF EXISTS redact_instance_fields(text, text, text, bigint)`;
       await tx`
         CREATE OR REPLACE FUNCTION redact_instance_fields(
           instance_id text,
           actor text,
           reason text,
-          transition_seq bigint
+          transition_seq bigint,
+          field_ids text[]
         ) RETURNS void
         LANGUAGE plpgsql
         SECURITY DEFINER
@@ -771,6 +780,7 @@ async function initInstanceAudit(db: SQL): Promise<void> {
             SELECT DISTINCT ia.field_id
             FROM instance_audit ia
             WHERE ia.instance_id = redact_instance_fields.instance_id
+              AND ia.field_id = ANY(redact_instance_fields.field_ids)
           LOOP
             PERFORM instance_audit_append(
               redact_instance_fields.instance_id, redact_instance_fields.transition_seq, fid, 'redact', NULL,
@@ -791,13 +801,15 @@ async function initInstanceAudit(db: SQL): Promise<void> {
       // instance's audit values — the one deliberate hole in the append-only
       // property, which belongs to the engine's role alone (design.md "Who
       // owns the audit relation").
-      await tx`REVOKE EXECUTE ON FUNCTION redact_instance_fields(text, text, text, bigint) FROM PUBLIC`;
+      await tx`REVOKE EXECUTE ON FUNCTION redact_instance_fields(text, text, text, bigint, text[]) FROM PUBLIC`;
       // engineRole is captured above via SELECT current_user, before this
       // SET LOCAL ROLE — inside the block current_user reads as the owner
       // role, and granting to current_user here would hand the owner's own
       // privileges to itself while leaving the engine's role with none.
       await tx.unsafe(`GRANT INSERT, SELECT ON instance_audit TO "${engineRole}"`);
-      await tx.unsafe(`GRANT EXECUTE ON FUNCTION redact_instance_fields(text, text, text, bigint) TO "${engineRole}"`);
+      await tx.unsafe(
+        `GRANT EXECUTE ON FUNCTION redact_instance_fields(text, text, text, bigint, text[]) TO "${engineRole}"`,
+      );
     });
   } catch (err) {
     if (!isInsufficientPrivilege(err)) throw err;

@@ -44,12 +44,16 @@ const insertRow = async (opts: { key: string; instanceId?: string; status: strin
 let migrationN = 0;
 const migrationPid = () => `proc_http_admin_migration_${++migrationN}` as Instance["processId"];
 
+// redactable-field-flag: field_x is declared redactable so the redaction
+// route test below (which writes field_x) still gets a `redact` audit row
+// under the narrowed rule — a field absent from the catalog now keeps its
+// history untouched rather than always getting one.
 const migrationWaitBody = (key: string): ProcessBody =>
   ({
     key,
     label: { en: key },
     baseLocale: "en",
-    fields: [],
+    fields: [{ id: "field_x", key: "x", label: { en: "X" }, type: "string", redactable: true }],
     workflow: {
       initialStep: "step_wait",
       steps: [
@@ -1091,6 +1095,17 @@ test.skipIf(!DB)("an operator writes a grant and reads it back", async () => {
   expect(res.status).toBe(200);
   const body = (await res.json()) as { grants: { role: string; permission: string; scope: { config: { processId: string } } }[] };
   expect(body.grants.some((g) => g.role === "finance-authors" && g.permission === "publish" && g.scope.config.processId === processId)).toBe(true);
+});
+
+test.skipIf(!DB)("a POSTed read grant stores, and the list carries it", async () => {
+  const processId = grantProcessId();
+  const write = await fetch(writeGrantReq(grantBody(processId, { permission: "read" })));
+  expect(write.status).toBe(200);
+
+  const res = await fetch(listGrantsReq());
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { grants: { role: string; permission: string; scope: { config: { processId: string } } }[] };
+  expect(body.grants.some((g) => g.role === "finance-authors" && g.permission === "read" && g.scope.config.processId === processId)).toBe(true);
 });
 
 test.skipIf(!DB)("a repeated write changes nothing: the list carries one row for it", async () => {

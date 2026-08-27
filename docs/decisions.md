@@ -45,7 +45,7 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   `admin-operations-api` when built, on the same trigger: a concrete
   downloadable-export ask, not a speculative one.
 
-  `migrateInstances` (`src/engine/migration.ts:547`) is the weaker case.
+  `migrateInstances` (`src/engine/migration.ts:557`) is the weaker case.
   It already keyset-paginates instances and buffers outcomes into one
   in-memory `MigrationResult` (`migrated`/`skipped`/`conflicted`/`failed`
   id arrays), not a per-instance record stream, and nothing today asks for
@@ -95,8 +95,17 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
 ## Decided, not yet built (each needs its own OpenSpec change)
 - **Instance audit log: a tamper-evident change record for field data.** A
   design pass on 2026-08-25 settled the shape; the owner approved each piece
-  in turn. Change 1 landed as `instance-audit-log-chain`; changes 2 and 3
-  remain. Three changes, in this order.
+  in turn. Change 1 landed as `instance-audit-log-chain` — `89e4c70`
+  implemented it, `9379091`/`f2631b6`/`7e003e8` corrected the design across
+  review, `2b9b905`/`072b9e1` closed its verification gaps, and `591c6c4`
+  archived it; its spec is `openspec/specs/instance-audit-log/spec.md`.
+  A third change, the nightly checkpoint, was struck 2026-08-27 (see
+  "Explicitly not the goal" below). Change 2, `redactable-field-flag`
+  (`openspec/changes/redactable-field-flag/`), is implemented and
+  verified as of 2026-08-27, pending archive. Two changes, in this
+  order — no third is decided. A readable admin view over the audit log
+  is a real, named gap (see "Open, deliberately" below), but nobody has
+  proposed it as a change yet, so it is not "change 3."
 
   1. The table, the two triggers sharing one diff function, the
      `set_config` call at all six write sites, the hash chain, and
@@ -104,7 +113,10 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
      later change: a row written without `prev_hash` and `hash` needs its
      chain computed after the fact, and a chain computed after the fact
      proves nothing about the window before it existed. Either the log is
-     chained from its first row, or the first rows are decoration.
+     chained from its first row, or the first rows are decoration. Built:
+     the trigger function and `verify_instance_chain()` are defined in
+     `src/engine/store.ts:658`; `verifyInstanceChain`, the TypeScript wrapper
+     over that SQL function, is `src/engine/admin-queries.ts:259`.
   2. `FieldDef.redactable`, narrowing `redact_instance_fields()`'s field
      selection to the fields a process author marks redactable. This is the
      only piece change 1 left out: the salted `value_hash`, the definer
@@ -112,12 +124,17 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
      This one touches `FieldDef`, so it is a definition-contract change and
      carries that ceremony: the spec delta, the `examples/` sweep,
      `docs/authoring-guide.md`, and a test that rejects a violating input.
-  3. The nightly checkpoint, its signing key, and where the signed
-     checkpoint is stored. This is the piece with no home in the repository
-     today — there is no key store and no secret-management convention — so
-     it stays last. The chain alone already catches an edited row; the
-     checkpoint only adds the recomputed-chain case, and it slots in later
-     without changing the chain's shape.
+     Implemented 2026-08-27 as `redactable-field-flag`
+     (`openspec/changes/redactable-field-flag/`), whose design.md settles
+     three questions this entry left open: the instance's *currently
+     pinned* version's catalog is the sole source of `redactable`, never
+     the version active when a given audit row was written; a field id the
+     audit log still holds but that catalog no longer declares stays
+     unredacted through this path, an accepted opt-in limitation rather
+     than a fail-safe default (see "Open, deliberately" below); and
+     `redactable` places no restriction on `technical` — the two flags are
+     independent, and only a `redactable` `group` field fails publish,
+     mirroring `technical`'s own restriction on `group`.
 
   **The goal.** Every change to an instance's `data` leaves one readable
   record: which field, old value visible in clear text, who, when, from
@@ -176,11 +193,10 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     `src/schema/canonical-json.ts` emits `{"a":1}`. A verifier written in
     TypeScript would have to reproduce a Postgres formatting detail exactly
     and would break silently on the first value shape nobody tried, so it
-    calls the SQL function rather than recomputing the digest. A nightly
-    checkpoint gathers every chain head and signs it with a key that lives
-    outside the database; the signed checkpoint is stored outside the
-    database too. The chain catches an edited row; the checkpoint catches a
-    recomputed chain.
+    calls the SQL function rather than recomputing the digest. The chain
+    catches an edited row that is not also followed by a full chain
+    recompute; it does not catch the recompute itself (see "Explicitly not
+    the goal" below).
   - Every row's `value_hash` is `H(salt || value)` with a per-row salt,
     from the first row this change writes — not gated on a field flag.
     `salt` comes from `pgcrypto`'s `gen_random_bytes`, which `initSchema`
@@ -212,7 +228,16 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   **Explicitly not the goal.**
   - Not tamper-*proof*, tamper-*evident*: a superuser can rewrite rows,
     silence the trigger (`session_replication_role = replica`), or drop
-    the table; the checkpoint makes that detectable, never impossible.
+    the table. `verify_instance_chain()` catches an edit that leaves
+    `prev_hash`/`hash` stale, but the same DB access that rewrites a row can
+    also recompute every `hash` after it, so the chain alone does not catch
+    that. A nightly, externally-signed checkpoint would have caught a
+    recomputed chain too; it was proposed as change 3 and struck 2026-08-27,
+    because the signing key and the checkpoint's own storage have to live
+    outside the database to mean anything — the same actor able to rewrite
+    `instance_audit` could otherwise just re-sign a fresh checkpoint over
+    the tampered chain — and this repo has no key store or
+    secret-management convention to hang that on. Revisit once one exists.
   - Values in clear text on purpose. "Who was originally in this field"
     must be readable in the audit view without ceremony; an
     encrypt-at-rest variant (crypto-shredding, which would also have
@@ -242,6 +267,25 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   every instance holding that person needs the cross-instance query
   machinery of the aggregated-data-source / reporting topics, which were
   still under design when this entry was written.
+
+  A field id an instance's audit log still holds, but the currently pinned
+  version's catalog no longer declares, stays unredacted through
+  `redact_instance_fields`. `redactable-field-flag`'s design.md accepted
+  this 2026-08-27 rather than defaulting an unresolvable field id to
+  redactable, to keep `redactable` an opt-in signal rather than inverting
+  it for the one case an author's intent is least knowable. Revisit if a
+  concrete "I deleted a field I needed to redact" case shows up; do not
+  build a fix ahead of one.
+
+  A readable admin view over the audit log is unbuilt and carries no
+  change name or number yet. `docs/current-state.md`'s instance-audit-log
+  section already names the gap: `verifyInstanceChain`
+  (`src/engine/admin-queries.ts:259`) has no caller anywhere in `src/http`
+  or `packages/web`, so today the chain's tamper-evidence is provable only
+  by someone with direct database access, not through the product. That
+  falls short of this entry's own goal ("readable ... without ceremony,"
+  above). Nobody has proposed a change for it, so it stays a named,
+  undecided gap here rather than a numbered change.
 - **Aggregated data source: a field's options read from other instances.** A
   design pass on 2026-08-25 settled a shape, and a second pass the same day
   replaced it. Not started.
@@ -257,6 +301,20 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   - A third data source registry type, `instance.query`, beside the existing
     `static` and `db.list`. A leaf handler like both of them: it reads, and it
     composes nothing.
+  - The read this handler needs exists already in most respects, built for a
+    different consumer since this entry was written. `instance-data-query`'s
+    `queryInstances` (`src/runtime/api.ts:1512`, shipped 2026-08-27 as
+    `instance-query-core`, now archived) filters instances by `processId`,
+    `status`, `currentStepId`, `startedBy`, `claimedBy`, `excludeInstanceId`,
+    `createdAfter`/`createdBefore` and a `dataWhere` list of field/operator/
+    literal comparisons, and returns each match's `instanceId`, `version`,
+    `data` and `redactedAt`. That covers every filter axis this design names
+    but one: `dataWhere`'s right side is a scalar literal only
+    (`instance-data-query`'s spec, "A right side SHALL be a scalar literal"),
+    never a field of the reading instance. `instance.query`'s `resolve`
+    substitutes the reading instance's field values into those comparisons
+    itself, then calls `queryInstances` for the rest, rather than issuing its
+    own SQL against `instances`.
   - The filter axis is `currentStepId`. `Instance.status` is the lifecycle
     (`running`, `completed`, `cancelled`, `faulted`), and every circulating
     laptop is `running` whichever step it stands on, so a status set answers
@@ -298,7 +356,10 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     right side, and the self-exclusion rule below needs the id.
   - A query whose target is the reading instance's own process excludes that
     instance. A rule, not a config option: an instance's own contribution to an
-    aggregate over its own process is never what a picker wants.
+    aggregate over its own process is never what a picker wants. `queryInstances`
+    already carries an `excludeInstanceId` filter built for this same purpose in
+    `instance-data-query`, so this rule costs `instance.query`'s handler nothing
+    beyond passing its own reading-instance id through.
   - Publish validates every field and step reference against the union of the
     catalogs of the target's versions holding live instances, marking each
     reference with the versions carrying it and the instance count outside
@@ -447,11 +508,11 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     already reads, never widen it, which is what makes an `anyone` share
     safe.
 
-    The second half of that rests on a permission nothing carries yet.
-    `Permission` (`src/auth/authorize.ts:77`) is `"publish" | "cancel" |
-    "migrate"`, and no entry covers reading. A pass on 2026-08-25 priced
+    The second half of that rested on a permission nothing carried yet.
+    `Permission` (`src/auth/authorize.ts:77`) was `"publish" | "cancel" |
+    "migrate"`, with no entry covering reading. A pass on 2026-08-25 priced
     a fourth one and found it additive rather than restrictive, because
-    the bulk read is already closed: `src/http/routes.ts:437` runs
+    the bulk read was already closed: `src/http/routes.ts:449` ran
     `requireRole(actor, ADMIN_ROLE)` for `scope=all`, while `scope=mine`
     and `scope=started` justify themselves through the caller's own
     assignment or authorship and need no grant at all. So a `read`
@@ -468,6 +529,19 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     core (see the aggregated-data-source entry above) second; this
     feature third. The cost of that order is that the first change this
     topic produces is not a table.
+
+    That order did not hold on timing, though the sequence still landed.
+    The shared query core landed 2026-08-27 as `instance-query-core`
+    (archived; see `instance-data-query`'s spec) ahead of the `read`
+    permission. `process-read-permission` has since applied:
+    `Permission` (`src/auth/authorize.ts:77`) now admits `"read"`, mapped
+    to `ADMIN_ROLE`, and `scope=all` routes through it when the request
+    names a `processId`. The **report builder itself stays open** — this
+    change ships only the process-scoped `read` gate on `GET /instances`,
+    not the report/table feature this entry describes, and not the
+    reporting-routes migration (`REPORTS_ROLE` → `read` on the three
+    aggregate routes) `process-read-permission/proposal.md` scopes out as
+    its own later change.
 
   **Explicitly not the goal.**
   - Not the three existing reporting views. Cycle time, bottleneck and
@@ -608,7 +682,7 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
 
   The work is not the default. It is that a process-scoped grant cannot
   gate a query naming no process: `requireRole(actor, ADMIN_ROLE)` at
-  `src/http/routes.ts:437` answers yes or no without one, and
+  `src/http/routes.ts:449` answers yes or no without one, and
   `requirePermission` needs one. Two answers exist.
 
   Keep it a gate, and
@@ -649,7 +723,9 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   `Actor.roles` stays a `string[]` of free text from either source;
   `auth_users.roles` stays a `TEXT[]`.
 
-  `tmp/open-work-priority.md` tracks the three open pieces above.
+  `openspec/changes/process-read-permission/` has applied the `read`
+  permission piece above: `src/auth/authorize.ts:77`'s `Permission` type
+  now admits `read`, mapped to `ADMIN_ROLE`.
 - **CEL-readable data-source results.** Runtime option-list resolution for
   `field.dataSource` is DONE (see `docs/current-state.md`) — but `src/cel/check.ts`
   still registers a data source at no site (guards/output/transforms), so a CEL
