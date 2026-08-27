@@ -55,6 +55,42 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   classifies failures into the four buckets by id only, and a
   per-instance NDJSON report would need it to carry a reason alongside
   each id. Do not build this ahead of that ask.
+- Which `instances.body` keys become real columns. The table holds
+  `instance_id`, `transition_seq`, `body`, `resolve_state`,
+  `resolve_claimed_at`, `cancel_sweep_state`, `next_timer_at`, `created_at`
+  and `redacted_at`. Every other field of `Instance` lives inside the jsonb,
+  and four expression indexes stand in for six of those keys:
+  `instances_selection_idx` over `processId`/`version`/`status`,
+  `instances_claimed_by_idx` over `assignment.claimedBy`,
+  `instances_candidates_idx` (GIN) over `assignment.candidates`, and
+  `instances_parent_idx` over `parent.instanceId`.
+
+  Ten keys are standardized in the sense that matters here: the engine owns
+  them, every instance carries them, and their shape never depends on a
+  process version. Those are `processId`, `version`, `definitionHash`,
+  `currentStepId`, `transitionSeq`, `status`, `startedAt`, `startedBy`,
+  `currentStepEnteredAt` and `redactedAt`. Four of them have no index of any
+  kind today — `definitionHash`, `currentStepId`, `startedAt` and
+  `currentStepEnteredAt` — and `startedBy` has none either. `currentStepId`
+  is the one that has since become urgent: the aggregated data source below
+  filters on it on every form render, every submission, every timer fire and
+  every automatic transition, and it is the only filter that whole feature
+  has.
+
+  Three keys cannot follow. `data` belongs to a process version, `timers` is
+  a variable-length array, and `assignment.candidates` is a list that wants
+  the GIN index it already has whether it sits in jsonb or in a `text[]`.
+
+  Look at `transition_seq` and `redacted_at` first when this is designed.
+  Both already exist as a column AND as a body key, so the promotion pattern
+  has a precedent here, and so does its hazard: two writers of one fact drift
+  apart when a later write site forgets one of them. A Postgres generated
+  column (`GENERATED ALWAYS AS (body->>'currentStepId') STORED`) avoids that
+  hazard entirely — it is derived, never written, indexable, and it changes
+  no write site. It costs the same disk the duplicate would cost and leaves
+  `body` canonical, which the read path needs, since it parses the whole jsonb
+  back into an `Instance`. Shrinking `body` is a separate and much larger
+  question, and nothing today asks for it.
 
 ## Decided, not yet built (each needs its own OpenSpec change)
 - **Instance audit log: a tamper-evident change record for field data.** A
@@ -207,75 +243,164 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   machinery of the aggregated-data-source / reporting topics, which were
   still under design when this entry was written.
 - **Aggregated data source: a field's options read from other instances.** A
-  design pass on 2026-08-25 settled the shape, in the same session as the
-  instance audit log above. Not started.
+  design pass on 2026-08-25 settled a shape, and a second pass the same day
+  replaced it. Not started.
 
-  **The goal.** A field's option list can come from the field values of
-  other instances. The worked case: an onboarding step offers only the
-  laptops that no other running onboarding instance holds. The author
-  configures it in a form, the publish validates it, and no author writes
-  CEL or SQL to get it.
+  **The goal.** A field's option list comes from the instances of another
+  process. The worked case: a Laptop Inventory process holds one instance per
+  device, and the step that instance stands on says where the device is — on
+  the shelf, issued, in repair, retired. An onboarding step offers the devices
+  whose own instance stands on the shelf step. The author configures it in a
+  form, publish validates it, and no author writes CEL or SQL.
 
   **The design.**
-  - A third data source registry type, `instance.query`, beside the
-    existing `static` and `db.list`. Its config names the target process,
-    a status set, a list of field comparisons, and which field supplies an
-    option's value and which its label. A comparison's right side is a
-    literal or a field of the *reading* instance, which is what makes the
-    form cover real cases ("same location as this instance") instead of
-    constants only.
-  - Publish validates every field reference against the target process's
-    field catalog, through the same registry-at-publish-time mechanism
-    `db.list` already uses.
-  - The studio's config form is generated from the handler's Zod schema by
-    `src/engine/config-descriptor.ts`, so no second description of the
-    form is maintained beside the schema.
+  - A third data source registry type, `instance.query`, beside the existing
+    `static` and `db.list`. A leaf handler like both of them: it reads, and it
+    composes nothing.
+  - The filter axis is `currentStepId`. `Instance.status` is the lifecycle
+    (`running`, `completed`, `cancelled`, `faulted`), and every circulating
+    laptop is `running` whichever step it stands on, so a status set answers
+    the wrong question. The config names the target process, a set of step ids,
+    a lifecycle status set defaulting to `running` alone, and a list of field
+    comparisons whose right side is a literal or a field of the reading
+    instance.
+  - No set subtraction, which is what the second pass changed. The first pass
+    put the pool in a `db.list` and removed the values other instances held,
+    which needs either an `exclude` mode carrying a base-source reference or a
+    fourth `set.difference` type. Both need one data source to resolve another,
+    so both widen `DataSourceContext` with a resolver callback and add
+    reference and cycle checks at publish. Putting the pool in a process
+    retires all of that: an issued laptop is absent from the list because its
+    own instance stands on the issued step, not because anything subtracted it.
+    Do not re-propose the subtraction without a case whose universe is not
+    itself a process.
+  - An option's `value` is the source instance's id. Its `label` is a field of
+    that instance, and its `attributes` are further fields, which
+    `FieldDef.columnMapping` writes into the reading instance's own catalog
+    fields. That path shipped in stage 29 and needs nothing new.
+  - The id and the label copy are both stored, on purpose. The id survives a
+    rename of the source: an asset tag corrected from `MBP-0041` to
+    `LT-2024-0041` leaves the reference intact, and the picker shows the new
+    tag for the same device. The copy survives the id: a cancelled source
+    instance leaves a reference that resolves to nothing, and the frozen
+    `MBP-0041` is then the only thing a reader has to go on. A field value
+    alone was rejected on 2026-08-25 for two silent failures. A renamed source
+    strands every holder of the old string. And nothing makes a plain field
+    unique the way the `PRIMARY KEY (list_key, value)` of `data_list_values`
+    makes a list value unique, so two identically tagged devices produce two
+    options a submission cannot tell apart.
+  - Every field `columnMapping` writes is `technical: true`. The engine
+    resolves such a field readonly on every step regardless of the view, so the
+    copy has exactly one writer, and a difference against the live value has
+    exactly one cause.
+  - `DataSourceContext` gains the reading instance (`{ id, data }`, the shape
+    `AssignmentContext` already carries). The comparisons need it for their
+    right side, and the self-exclusion rule below needs the id.
+  - A query whose target is the reading instance's own process excludes that
+    instance. A rule, not a config option: an instance's own contribution to an
+    aggregate over its own process is never what a picker wants.
+  - Publish validates every field and step reference against the union of the
+    catalogs of the target's versions holding live instances, marking each
+    reference with the versions carrying it and the instance count outside
+    them. It reports rather than rejects, because `createProcessInstance`
+    accepts an explicit `opts.version` and migration moves instances, so the
+    population a publish-time check reads keeps moving after the check.
+    Checking the latest version alone — what `validateProcessChaining` does for
+    `process.start` — is right there because that action creates an instance at
+    the latest version, and wrong here because this one reads instances across
+    many.
   - Read authorization is the existing process-scoped `permission_grants`,
     checked at publish against the author.
-  - Free SQL stays reachable, but only as a separate registry type against
-    an *external* database, with the connection in operations config
-    rather than in a process definition.
+  - Free SQL stays reachable, but only as a separate registry type against an
+    external database, with the connection in operations config rather than in
+    a process definition.
+
+  **The missing half.** Nothing moves the laptop's own instance from the shelf
+  step to the issued step when a participant picks it. `src/handlers/` holds
+  `http.request`, `notification.email` and `process.start`, plus the
+  engine-owned spawn and return pair. `process.start` creates an instance and
+  the subprocess pair drives a new child, so no action type transitions an
+  instance that already exists. Without one the option list never shrinks and
+  the reading half is decorative. An author can reach `POST
+  /instances/:id/submit` through `http.request` today, which leaves the
+  transaction, authenticates as the configured credential rather than the
+  participant, and guards the HTTP call rather than the business effect with
+  the outbox's idempotency key. That is not the path to recommend for a
+  first-class capability. Whether the transition action ships in this change or
+  its own is undecided. That it ships is not.
 
   **Explicitly not the goal.**
-  - No SQL against the engine's own `instances` from any authoring
-    surface. A query there would bypass tenancy, version pinning, and the
-    redaction state of a value. `instance.query` is the only way in.
-  - No CEL over foreign instances. The standing decision that keeps CEL
-    data-source-blind is not reopened here. A `other.data.x == data.x`
-    filter expression was weighed on 2026-08-25 and dropped: it needs a
-    second CEL context, a publish check against a foreign catalog, and a
-    translation to SQL, for cases the form already covers.
-  - No per-field export lists and no cross-process release lists. An
-    author changing process A never has to republish and migrate process
-    B. That was the owner's stated reason for rejecting both.
-  - No per-instance visibility. Consequence accepted on 2026-08-25: an
-    actor granted read on process B sees, through a data source, values
-    from every B instance, including instances they could not open in the
-    app.
-  - The form is a small query language, and calling it "no-code" would be
-    a false claim. What it buys over free SQL is field ids as stable
-    anchors that publish can check, a layer that hides how instance data
-    is stored, and a boundary that can be widened later but never
-    narrowed once definitions depend on it.
+  - No SQL against the engine's own `instances` from any authoring surface. A
+    query there would bypass tenancy, version pinning, and the redaction state
+    of a value. `instance.query` is the only way in.
+  - No CEL over foreign instances. The standing decision keeping CEL
+    data-source-blind is not reopened here, and it closes one tempting shape: a
+    guard cannot compare a frozen copy against its live source, because
+    `src/cel/check.ts` registers a data source at no site and such a reference
+    is a publish error.
+  - Drift between a frozen copy and its live source is information, not an
+    alarm. A fleet re-tagged on one Monday puts every instance that ever
+    referenced a device into disagreement on Tuesday, and not one of them has a
+    problem. Three states render differently, the same three-way rule the
+    report builder below applies to an empty cell: the reference resolves and
+    agrees, the reference resolves and disagrees (show both, neutrally), the
+    reference does not resolve (this one is the fault).
+  - No per-field export lists and no cross-process release lists. An author
+    changing process A never has to republish and migrate process B. That was
+    the owner's stated reason for rejecting both.
+  - No per-instance visibility. Consequence accepted on 2026-08-25: an actor
+    granted read on process B sees, through a data source, values from every B
+    instance, including instances they could not open in the app.
+  - No composite field value. `Literal` already admits an object, so a field
+    holding `{ ref, display }` is contract-legal, but `FieldOption.value` is a
+    string, and membership validation, the renderer and every CEL read of
+    `data.<key>` assume a scalar. The pointer and its copies stay separate
+    fields, and the convention binding them belongs in
+    `docs/authoring-guide.md`. A migration that splits a pointer from its
+    copies in practice is the evidence that would justify the composite.
+  - The form is a small query language, and calling it "no-code" would be a
+    false claim. What it buys over free SQL is field ids as stable anchors that
+    publish can check, a layer that hides how instance data is stored, and a
+    boundary that can be widened later but never narrowed once definitions
+    depend on it.
 
-  **Open, deliberately.** Per-instance visibility ("who may see instance
-  101") stays open, and it is a larger decision than this topic: the same
-  rule would govern the instance list, the detail view, and reporting.
-  Nothing carries such a list today — `assignment.candidates` covers the
-  current step only, and `instance-query`'s spec states the read is not
-  implicitly scoped to the calling actor. Two shapes were sketched on
-  2026-08-25: accumulate participants as an instance moves through its
-  steps, plus an optional per-process `visibleTo` naming the fields that
-  carry people, for the starter-not-a-candidate gap. Adding it later only
-  narrows a result set, so it invalidates no published definition.
+  **Open, deliberately.**
+  - `config-descriptor.ts` cannot generate this form. Its supported subset is
+    flat — string, number, boolean, enum, string-array — and a nested object
+    property falls back to the studio's raw JSON textarea. A list of field
+    comparisons is exactly that shape. Either the module learns nested arrays,
+    or `instance.query` gets a hand-written form, which is the second
+    description beside the schema that the module exists to prevent.
+  - A source instance the step filter excludes while a reader still holds it.
+    `db.list` settled the analogous case: a value is deactivated, never
+    deleted, so `heldValues` keeps resolving its label. A cancelled or retired
+    source instance needs the same treatment, resolved for a held reference
+    even though the filter excludes it.
+  - Two participants picking the same device. Submission validation re-resolves
+    the option list under the reading instance's row lock, which narrows the
+    window without closing it, since nothing locks the source instance. Once
+    the transition action above exists the collision surfaces there instead, as
+    a second delivery arriving at an instance no longer on the step its path
+    departs from, which the transition machinery can refuse. That is a better
+    failure than a silent duplicate, and still a post-commit one.
+  - Per-instance visibility ("who may see instance 101") stays open, and it is
+    a larger decision than this topic: the same rule would govern the instance
+    list, the detail view, and reporting. Nothing carries such a list today —
+    `assignment.candidates` covers the current step only, and `instance-query`'s
+    spec states the read is not implicitly scoped to the calling actor. Two
+    shapes were sketched on 2026-08-25: accumulate participants as an instance
+    moves through its steps, plus an optional per-process `visibleTo` naming
+    the fields that carry people, for the starter-not-a-candidate gap. Adding
+    it later only narrows a result set, so it invalidates no published
+    definition.
 
-  One property rests on the choice above and would end with it: because
-  authorization settles at publish, runtime resolution needs no actor at
-  all. A timer, an outbox delivery, an automatic transition, a migration,
-  and a participant's open form all resolve the same list. Should
-  per-instance filtering land, submission validation has to decide whether
-  it checks membership against the viewer's list or the full one, and the
-  actor-free execution paths need an answer for whose view they use.
+    One property rests on the choice above and would end with it: because
+    authorization settles at publish, runtime resolution needs no actor at all.
+    A timer, an outbox delivery, an automatic transition, a migration, and a
+    participant's open form all resolve the same list. Should per-instance
+    filtering land, submission validation has to decide whether it checks
+    membership against the viewer's list or the full one, and the actor-free
+    execution paths need an answer for whose view they use.
 - **Instance data tables: a report builder over instance field values.** A
   design pass on 2026-08-25 settled the shape, in the same session as the
   two entries above. Not started.
@@ -374,6 +499,7 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   Postgres's own `DEFAULT now()`), so one twelve-month question can answer
   differently depending on which range a caller uses. A later promotion of
   `startedAt` into a column inherits that question rather than closing it.
+  The full column inventory is under Open questions, above.
 - **Process-scoped permissions: the filter, the draft scope, and the
   `permissions` booleans.** A design pass on 2026-08-15 settled the shape;
   `ROADMAP.md` stage 40 carries it in full. The seam shipped 2026-08-15 as
