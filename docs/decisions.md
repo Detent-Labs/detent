@@ -45,7 +45,7 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   `admin-operations-api` when built, on the same trigger: a concrete
   downloadable-export ask, not a speculative one.
 
-  `migrateInstances` (`src/engine/migration.ts:547`) is the weaker case.
+  `migrateInstances` (`src/engine/migration.ts:557`) is the weaker case.
   It already keyset-paginates instances and buffers outcomes into one
   in-memory `MigrationResult` (`migrated`/`skipped`/`conflicted`/`failed`
   id arrays), not a per-instance record stream, and nothing today asks for
@@ -451,7 +451,7 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     `Permission` (`src/auth/authorize.ts:77`) is `"publish" | "cancel" |
     "migrate"`, and no entry covers reading. A pass on 2026-08-25 priced
     a fourth one and found it additive rather than restrictive, because
-    the bulk read is already closed: `src/http/routes.ts:437` runs
+    the bulk read is already closed: `src/http/routes.ts:449` runs
     `requireRole(actor, ADMIN_ROLE)` for `scope=all`, while `scope=mine`
     and `scope=started` justify themselves through the caller's own
     assignment or authorship and need no grant at all. So a `read`
@@ -608,7 +608,7 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
 
   The work is not the default. It is that a process-scoped grant cannot
   gate a query naming no process: `requireRole(actor, ADMIN_ROLE)` at
-  `src/http/routes.ts:437` answers yes or no without one, and
+  `src/http/routes.ts:449` answers yes or no without one, and
   `requirePermission` needs one. Two answers exist.
 
   Keep it a gate, and
@@ -649,7 +649,9 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   `Actor.roles` stays a `string[]` of free text from either source;
   `auth_users.roles` stays a `TEXT[]`.
 
-  `tmp/open-work-priority.md` tracks the three open pieces above.
+  `openspec/changes/process-read-permission/` is now in progress for the
+  `read` permission piece above; its `tasks.md` is still all unchecked, so
+  `src/auth/authorize.ts:77`'s `Permission` type has not gained `read` yet.
 - **CEL-readable data-source results.** Runtime option-list resolution for
   `field.dataSource` is DONE (see `docs/current-state.md`) — but `src/cel/check.ts`
   still registers a data source at no site (guards/output/transforms), so a CEL
