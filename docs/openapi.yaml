@@ -284,6 +284,28 @@ paths:
           schema:
             type: string
           description: Rejected (400) when combined with `scope=mine`.
+        - name: version
+          in: query
+          schema:
+            type: integer
+          description: Rejected (400) when no `processId` accompanies it.
+        - name: excludeInstanceId
+          in: query
+          schema:
+            type: string
+          description: Omits the named instance. Naming an instance no other filter matches is not an error.
+        - name: createdAfter
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Inclusive lower bound on `created_at`.
+        - name: createdBefore
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Inclusive upper bound on `created_at`.
         - $ref: "#/components/parameters/limit"
         - $ref: "#/components/parameters/cursor"
       responses:
@@ -295,7 +317,8 @@ paths:
                 $ref: "#/components/schemas/InstanceSummaryPage"
         "400":
           description: >-
-            An invalid `limit`/`status` value, `scope=mine` combined with
+            An invalid `limit`/`status`/`version`/`createdAfter`/`createdBefore`
+            value, a `version` with no `processId`, `scope=mine` combined with
             `assignedTo`, or `scope=started` combined with `startedBy`.
           content:
             application/json:

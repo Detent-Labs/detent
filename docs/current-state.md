@@ -989,20 +989,38 @@ Stage-by-stage status is in `ROADMAP.md`.
   CLAUDE.md — so ordering needs its own column) plus three indexes: paging
   (`created_at DESC, instance_id DESC`), and two backing the assignment
   filter (`assignment->>claimedBy`, a GIN index on `assignment->candidates`).
-  `listInstances(filter, page, db)` returns a keyset-paginated
-  (`created_at`/`instance_id` cursor, base64url-encoded, opaque) page of
-  `InstanceSummary` — lifecycle fields only, never `data`. Filters
-  (`processId`, `status[]`, `currentStepId`, `startedBy`, `claimedBy`) combine
-  conjunctively; `assignedTo` is one predicate expressing the inbox
-  disjunction (claimed by that actor, OR unclaimed and that actor's id is an
-  assignment candidate) rather than two filters a caller would have to
-  combine correctly. `scope=mine` (the HTTP wrapper's derived filter, see
-  `end-user-app`) additionally passes `assignedToRoles` — the resolved
-  actor's roles — so the unclaimed half of the disjunction also matches a
-  role-based candidate (`assignment.candidates ?| assignedToRoles`, a second
-  GIN-backed predicate alongside the id one), mirroring the id-or-role
-  eligibility `claimStep`/`isEligibleCandidate` already enforce. A bare
-  `assignedTo=<id>` query has no role list and matches by id only. `getInstanceRecord(instanceId, page, db)` merges an
+  `instance-query-core` adds two more expression indexes,
+  `instances_current_step_idx` and `instances_started_by_idx`, backing the
+  `currentStepId`/`startedBy` filters below. `listInstances(filter, page,
+  db)` returns a keyset-paginated (`created_at`/`instance_id` cursor,
+  base64url-encoded, opaque) page of `InstanceSummary`, lifecycle fields
+  only, never `data`. Filters (`processId`, `version`, `status[]`,
+  `currentStepId`, `startedBy`, `claimedBy`, `excludeInstanceId`,
+  `createdAfter`, `createdBefore`, `dataWhere`) combine conjunctively; a
+  `version` or `dataWhere` filter needs a `processId` beside it.
+  `assignedTo` is one predicate expressing the inbox disjunction (claimed by
+  that actor, OR unclaimed and that actor's id is an assignment candidate)
+  rather than two filters a caller would have to combine correctly.
+  `scope=mine` (the HTTP wrapper's derived filter, see `end-user-app`)
+  additionally passes `assignedToRoles`, the resolved actor's roles, so the
+  unclaimed half of the disjunction also matches a role-based candidate
+  (`assignment.candidates ?| assignedToRoles`, a second GIN-backed predicate
+  alongside the id one), mirroring the id-or-role eligibility
+  `claimStep`/`isEligibleCandidate` already enforce. A bare `assignedTo=<id>`
+  query has no role list and matches by id only. `buildInstanceWhere`
+  compiles every filter above except `dataWhere` into the one `WHERE`
+  fragment both `listInstances` and `queryInstances` interpolate;
+  `dataWhere`'s comparisons (`eq`/`ne`/`in` against a scalar `Literal`)
+  compile separately and fold in conjunctively.
+  `queryInstances(filter, page, db)` reads the same predicate. Its `filter`
+  is `InstanceQueryFilter`, the shared nine plain filters plus `dataWhere`,
+  never the inbox pair or `includeDegraded`, and it returns an
+  `InstanceDataPage` of `InstanceDataItem` (`instanceId`, `version`, `data`,
+  `redactedAt`): no label resolution, no cursor, just a `truncated` flag over
+  a `DEFAULT_LIST_LIMIT`/`MAX_LIST_LIMIT`-bounded, `created_at DESC,
+  instance_id DESC`-ordered result. It is the aggregated data source's
+  option-list read, called in-process; no HTTP route carries it or its
+  `dataWhere`. `getInstanceRecord(instanceId, page, db)` merges an
   instance's `HistoryEntry` and `InstanceEvent` rows into one
   chronologically ordered, discriminated (`{kind: "transition"|"event"}`)
   sequence via a single `UNION ALL` query, ordered `transitionSeq` then `at`
