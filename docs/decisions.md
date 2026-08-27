@@ -296,22 +296,27 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   `body->'data'` through expression paths with no index, the same shape
   `reporting.ts` already carries a note about for `startedAt`. That is
   where the owner's 2026-08-25 suggestion bites — promote the keys whose
-  structure never changes out of `body` into real columns, retiring the
-  expression indexes that stand in for them today. Which keys qualify is
-  settled under its own entry below, and the answer for this feature is
-  that none of them unblock it: `data` is the key a report sorts and
-  filters over, and `data` is the one key that can never be promoted,
-  since its key set belongs to a process version.
+  structure never changes (`processId`, `version`, `status`,
+  `currentStepId`, `startedAt`, `startedBy`) out of `body` into real
+  columns, retiring the expression indexes that stand in for them today.
+  Which keys qualify, and the mechanism, are settled under its own entry
+  below. The answer for this feature is that none of them unblock it:
+  `data` is the key a report sorts and filters over, and `data` is the one
+  key that can never be promoted, since its key set belongs to a process
+  version.
 - **Promoting standardized instance keys out of `body` into columns.** A
   design pass on 2026-08-25 settled which keys qualify, in the same session
   as the entry above, which asked for it. Not started.
 
   **The goal.** A predicate over an instance key reads a plain column
-  through a plain index. Six expression indexes stand in for that today
+  through a plain index. Eight expression indexes stand in for that today
   (`instances_selection_idx`, `instances_claimed_by_idx`,
-  `instances_candidates_idx`, `instances_parent_idx`, plus the two the
-  scheduler and the retention sweep own), and `(body->>'startedAt')`
-  carries none at all (`src/engine/reporting.ts:91`).
+  `instances_candidates_idx`, `instances_parent_idx`,
+  `instances_current_step_idx`, `instances_started_by_idx` — the last two
+  added 2026-08-27 by `instance-query-core`, covering `currentStepId` and
+  `startedBy` for the first time — plus the two the scheduler and the
+  retention sweep own), and `(body->>'startedAt')` carries none at all
+  (`src/engine/reporting.ts:91`).
 
   **The test a key has to pass.** Its structure is fixed by the runtime
   schema for every process and every version, never by a process author.
@@ -363,6 +368,14 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   real start. The one predicate this change cannot help is the one the
   report wants most, sorting and filtering over `body->'data'`, because
   `data` is the key that never qualifies.
+
+  `instance-query-core` (2026-08-27) reaches the same two clocks from a
+  different angle: it added `createdAfter`/`createdBefore` to the instance
+  list read, bounding `instances.created_at` rather than `startedAt`. The
+  cycle-time range above bounds `startedAt`; those filters bound
+  `created_at`. One twelve-month question can therefore answer differently
+  depending on which range a caller uses, and a later promotion of
+  `startedAt` into a column inherits that question rather than closing it.
 - **Process-scoped permissions: the filter, the draft scope, and the
   `permissions` booleans.** A design pass on 2026-08-15 settled the shape;
   `ROADMAP.md` stage 40 carries it in full. The seam shipped 2026-08-15 as

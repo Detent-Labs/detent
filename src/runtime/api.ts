@@ -33,7 +33,7 @@ import { buildGuardContext, evalGuard, evalFieldMap, type Actor } from "../cel/e
 import { requireRole, can, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE, AuthorizationError } from "../auth/authorize.js";
 import { knownUserIds } from "../auth/users.js";
 import { definitionHash } from "../schema/hash.js";
-import { NotFoundError, InstanceNotRunningError } from "../errors.js";
+import { NotFoundError, InstanceNotRunningError, RequestShapeError } from "../errors.js";
 import { saveInstanceDraft as engineSaveInstanceDraft, getInstanceDraft, type InstanceDraft } from "../engine/instance-drafts.js";
 import { encodeCursor, decodeCursor } from "../pagination.js";
 import { instance as instanceSchema, historyEntry as historyEntrySchema, instanceEvent as instanceEventSchema, collectFieldsDeep, leafFields, typeMatches, expectedTypeLabel } from "../schema/definition.js";
@@ -198,19 +198,45 @@ export type DegradedInstanceSummary = {
 export type InstanceSummaryItem = InstanceSummary | DegradedInstanceSummary;
 
 /**
+ * A `dataWhere` comparison against one field of `Instance.data`. The right
+ * side (`value`) is a scalar `Literal` — string, number, boolean or null —
+ * for `"eq"`/`"ne"`, and a non-empty list of such scalars for `"in"`. Not a
+ * discriminated union: a caller can hand a malformed shape (an array where a
+ * scalar belongs, or vice versa), and `buildDataWhere`'s validation raises a
+ * `RequestShapeError` rather than trusting the type. See design.md "A
+ * dataWhere right side is a scalar literal".
+ */
+export type DataComparison = {
+  fieldId: FieldId;
+  operator: "eq" | "ne" | "in";
+  value: Literal | Literal[];
+};
+
+/**
  * Filters combine conjunctively; `assignedTo` alone is a disjunction (see design.md).
  * `assignedToRoles` extends the unclaimed-candidate half of that disjunction to role
  * membership, not just literal id — `assignment.candidates` holds whichever of the two
  * a step's assignment was authored with. Only meaningful alongside `assignedTo`.
+ *
+ * `version` needs `processId` beside it (`instances_selection_idx` reaches
+ * its `version` column only with the leading `processId` column bound), the
+ * same rule `dataWhere` carries. `dataWhere` needs `processId` beside it too:
+ * a field id anchors to one process's field catalog. See
+ * `instance-data-query`'s spec for `dataWhere`'s own semantics.
  */
 export type InstanceListFilter = {
   processId?: ProcessId;
+  version?: number;
   status?: InstanceStatus[];
   currentStepId?: StepId;
   startedBy?: string;
   claimedBy?: string;
   assignedTo?: string;
   assignedToRoles?: string[];
+  excludeInstanceId?: InstanceId;
+  createdAfter?: string;
+  createdBefore?: string;
+  dataWhere?: DataComparison[];
   // Not a query filter: set by the caller's own authorization context (see
   // http-wrapper's `scope=all` / `ADMIN_ROLE` check), never from raw client
   // input. True degrades an unresolvable instance's item instead of omitting
@@ -218,6 +244,37 @@ export type InstanceListFilter = {
   // includeDegraded filter field".
   includeDegraded?: boolean;
 };
+
+/**
+ * `queryInstances`'s own filter type — the ten members `instance-data-query`'s
+ * spec enumerates, and nothing else. No `assignedTo`, `assignedToRoles` or
+ * `includeDegraded`: those resolve the list read's inbox predicate and
+ * degraded-summary behaviour, neither of which this read has. See design.md
+ * "The data read takes its own filter type and rejects a borrowed key".
+ */
+export type InstanceQueryFilter = {
+  processId?: ProcessId;
+  version?: number;
+  status?: InstanceStatus[];
+  currentStepId?: StepId;
+  startedBy?: string;
+  claimedBy?: string;
+  excludeInstanceId?: InstanceId;
+  createdAfter?: string;
+  createdBefore?: string;
+  dataWhere?: DataComparison[];
+};
+
+/** One matched instance's data, with nothing `queryInstances` would pay to resolve and discard. See design.md "The data read resolves no labels". */
+export type InstanceDataItem = {
+  instanceId: InstanceId;
+  version: number;
+  data: Instance["data"];
+  redactedAt?: string;
+};
+
+/** Not `Page<InstanceDataItem>`: `queryInstances` takes no cursor and hands none back — `truncated` says what a cursor would otherwise imply. See design.md "The data read bounds rather than pages". */
+export type InstanceDataPage = { items: InstanceDataItem[]; truncated: boolean };
 
 export type Page<T> = { items: T[]; cursor?: string };
 
@@ -1233,6 +1290,143 @@ export async function cancelInstance(instanceId: InstanceId, actor: Actor, db: S
   return engineCancelInstance(instance, body, actor, db, store.resolveBody);
 }
 
+/** The filters `buildInstanceWhere` compiles — every member both `listInstances` and `queryInstances` share, minus `dataWhere` (compiled separately by `buildDataWhere`) and `includeDegraded` (selects no row). */
+type InstanceWhereFilter = Omit<InstanceListFilter, "includeDegraded" | "dataWhere">;
+
+/**
+ * The `WHERE` fragment both `listInstances` and `queryInstances` interpolate.
+ * Builds no statement, chooses no projection, and knows nothing about paging
+ * or a cursor — see design.md "The predicate is a SQL fragment builder, not a
+ * query builder". `excludeInstanceId` compares the `instance_id` column
+ * directly rather than `body->>'instanceId'`, since that column is the
+ * table's own key.
+ */
+function buildInstanceWhere(filter: InstanceWhereFilter, db: SQL) {
+  const statusArr = filter.status && filter.status.length > 0 ? db.array(filter.status, "TEXT") : null;
+  const assignedToRolesArr = filter.assignedToRoles && filter.assignedToRoles.length > 0 ? db.array(filter.assignedToRoles, "TEXT") : null;
+  // instances_selection_idx indexes body->>'version' as text — see design.md
+  // "The version filter compares as text".
+  const versionText = filter.version !== undefined ? String(filter.version) : null;
+  return db`
+    (${filter.processId ?? null}::text IS NULL OR body->>'processId' = ${filter.processId ?? null})
+    AND (${versionText}::text IS NULL OR body->>'version' = ${versionText})
+    AND (${statusArr}::text[] IS NULL OR body->>'status' = ANY(${statusArr}))
+    AND (${filter.currentStepId ?? null}::text IS NULL OR body->>'currentStepId' = ${filter.currentStepId ?? null})
+    AND (${filter.startedBy ?? null}::text IS NULL OR body->>'startedBy' = ${filter.startedBy ?? null})
+    AND (${filter.claimedBy ?? null}::text IS NULL OR body->'assignment'->>'claimedBy' = ${filter.claimedBy ?? null})
+    AND (
+      ${filter.assignedTo ?? null}::text IS NULL
+      OR body->'assignment'->>'claimedBy' = ${filter.assignedTo ?? null}
+      OR (body->'assignment'->>'claimedBy' IS NULL AND (
+        body->'assignment'->'candidates' @> to_jsonb(${filter.assignedTo ?? null}::text)
+        OR (${assignedToRolesArr}::text[] IS NOT NULL AND body->'assignment'->'candidates' ?| ${assignedToRolesArr})
+      ))
+    )
+    AND (${filter.excludeInstanceId ?? null}::text IS NULL OR instance_id <> ${filter.excludeInstanceId ?? null})
+    AND (${filter.createdAfter ?? null}::timestamptz IS NULL OR created_at >= ${filter.createdAfter ?? null}::timestamptz)
+    AND (${filter.createdBefore ?? null}::timestamptz IS NULL OR created_at <= ${filter.createdBefore ?? null}::timestamptz)
+  `;
+}
+
+/**
+ * Compiles one `dataWhere` comparison against `body->'data'`. Equality
+ * compiles to jsonb containment — indexable by a future GIN index over
+ * `body->'data'`, per design.md. Inequality and membership read
+ * `body->'data'->fieldId` directly, SQL `NULL` for an absent key, which is
+ * the mechanism behind "an absent field does not match, and does not fail".
+ * Every bound JSON value casts `::text::jsonb`, never `::jsonb` alone: the
+ * driver sends a value as text, so an uncast comparison reads a string
+ * literal's content as bare JSON rather than a quoted JSON string — see
+ * design.md "Equality compiles to jsonb containment" for the measured
+ * reasoning. `fieldId` casts `::text` only where it lands in
+ * `jsonb_build_object`'s `VARIADIC "any"` argument, which cannot otherwise
+ * resolve a type for it; the `->` operator resolves an uncast text parameter
+ * on its own.
+ */
+function compileDataComparison(c: DataComparison, db: SQL) {
+  if (c.operator === "eq") {
+    return db`body->'data' @> jsonb_build_object(${c.fieldId}::text, ${JSON.stringify(c.value)}::text::jsonb)`;
+  }
+  if (c.operator === "ne") {
+    return db`body->'data'->${c.fieldId} <> ${JSON.stringify(c.value)}::text::jsonb`;
+  }
+  return db`body->'data'->${c.fieldId} IN (SELECT jsonb_array_elements(${JSON.stringify(c.value)}::text::jsonb))`;
+}
+
+/**
+ * Folds a `dataWhere` list into one fragment, conjunctively — a left-nested
+ * reduce, measured (design.md) to bind correctly and in order at any
+ * comparison count. An empty or absent `dataWhere` folds to `TRUE`: an empty
+ * fragment is not valid SQL inside `WHERE ${...}`.
+ */
+function buildDataWhere(comparisons: DataComparison[] | undefined, db: SQL) {
+  if (!comparisons || comparisons.length === 0) return db`TRUE`;
+  return comparisons.map((c) => compileDataComparison(c, db)).reduce((acc, frag) => db`${acc} AND ${frag}`);
+}
+
+function isDataScalar(v: unknown): v is string | number | boolean | null {
+  return v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean";
+}
+
+/**
+ * Rejects a non-scalar `dataWhere` right side before any query runs: an array
+ * or object for `eq`/`ne`, a non-scalar member or an empty list for `in`. See
+ * design.md "A dataWhere right side is a scalar literal".
+ */
+function validateDataComparisons(comparisons: DataComparison[] | undefined): void {
+  if (!comparisons) return;
+  for (const c of comparisons) {
+    if (c.operator === "in") {
+      if (!Array.isArray(c.value)) throw new RequestShapeError(`dataWhere membership comparison on '${c.fieldId}' needs a list right side`);
+      if (c.value.length === 0) throw new RequestShapeError(`dataWhere membership comparison on '${c.fieldId}' needs a non-empty list`);
+      for (const v of c.value) {
+        if (!isDataScalar(v)) throw new RequestShapeError(`dataWhere membership comparison on '${c.fieldId}' holds a non-scalar value`);
+      }
+    } else if (!isDataScalar(c.value)) {
+      throw new RequestShapeError(`dataWhere comparison on '${c.fieldId}' needs a scalar right side`);
+    }
+  }
+}
+
+/** A version number anchors to one process; `instances_selection_idx` reaches its `version` column only with `processId` bound beside it. See design.md "The version filter compares as text". */
+function assertVersionHasProcessId(filter: { processId?: ProcessId; version?: number }): void {
+  if (filter.version !== undefined && !filter.processId) {
+    throw new RequestShapeError("a version filter needs a processId beside it");
+  }
+}
+
+/** A field id anchors to one process's field catalog; a dataWhere with no processId would scan an unindexed payload across every process. See design.md "A dataWhere needs a processId". */
+function assertDataWhereHasProcessId(filter: { processId?: ProcessId; dataWhere?: DataComparison[] }): void {
+  if (filter.dataWhere && filter.dataWhere.length > 0 && !filter.processId) {
+    throw new RequestShapeError("a dataWhere filter needs a processId beside it");
+  }
+}
+
+/**
+ * Probes each `dataWhere`-compared field id, one query per distinct id, over
+ * the rows the OTHER filters already select — never the cursor predicate, so
+ * every page of a walk evaluates the same probe. A returned row means a
+ * selected instance holds an array or object under that field id, which
+ * containment/`<>`/`IN` would otherwise silently treat as "no match" rather
+ * than the caller error the spec requires. See design.md "A comparison names
+ * a scalar-valued field".
+ */
+async function assertNoNonScalarComparedField(filter: InstanceWhereFilter, comparisons: DataComparison[] | undefined, db: SQL): Promise<void> {
+  if (!comparisons || comparisons.length === 0) return;
+  const fieldIds = [...new Set(comparisons.map((c) => c.fieldId))];
+  for (const fieldId of fieldIds) {
+    const rows = (await db`
+      SELECT 1 FROM instances
+      WHERE ${buildInstanceWhere(filter, db)}
+        AND jsonb_typeof(body->'data'->${fieldId}) IN ('array', 'object')
+      LIMIT 1
+    `) as unknown[];
+    if (rows.length > 0) {
+      throw new RequestShapeError(`dataWhere comparison on '${fieldId}' matched an instance holding a non-scalar value`);
+    }
+  }
+}
+
 /**
  * List instance summaries, conjunctively filtered, keyset-paginated
  * newest-first by `(created_at, instance_id)`. `assignedTo` is the single
@@ -1247,10 +1441,13 @@ export async function listInstances(
   page: { limit?: number; cursor?: string } = {},
   db: SQL = sql,
 ): Promise<Page<InstanceSummaryItem>> {
+  assertVersionHasProcessId(filter);
+  validateDataComparisons(filter.dataWhere);
+  assertDataWhereHasProcessId(filter);
+  await assertNoNonScalarComparedField(filter, filter.dataWhere, db);
+
   const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
   const [cursorCreatedAt, cursorInstanceId] = page.cursor ? decodeCursor(page.cursor, 2) : [undefined, undefined];
-  const statusArr = filter.status && filter.status.length > 0 ? db.array(filter.status, "TEXT") : null;
-  const assignedToRolesArr = filter.assignedToRoles && filter.assignedToRoles.length > 0 ? db.array(filter.assignedToRoles, "TEXT") : null;
 
   // created_at::text (created_at_cursor) carries Postgres's full microsecond
   // precision, unlike the driver's own Date conversion of the plain
@@ -1263,19 +1460,8 @@ export async function listInstances(
   // lossless text avoids that entirely, the same fix listComments applies.
   const rows = (await db`
     SELECT instance_id, body, created_at, created_at::text AS created_at_cursor FROM instances
-    WHERE (${filter.processId ?? null}::text IS NULL OR body->>'processId' = ${filter.processId ?? null})
-      AND (${statusArr}::text[] IS NULL OR body->>'status' = ANY(${statusArr}))
-      AND (${filter.currentStepId ?? null}::text IS NULL OR body->>'currentStepId' = ${filter.currentStepId ?? null})
-      AND (${filter.startedBy ?? null}::text IS NULL OR body->>'startedBy' = ${filter.startedBy ?? null})
-      AND (${filter.claimedBy ?? null}::text IS NULL OR body->'assignment'->>'claimedBy' = ${filter.claimedBy ?? null})
-      AND (
-        ${filter.assignedTo ?? null}::text IS NULL
-        OR body->'assignment'->>'claimedBy' = ${filter.assignedTo ?? null}
-        OR (body->'assignment'->>'claimedBy' IS NULL AND (
-          body->'assignment'->'candidates' @> to_jsonb(${filter.assignedTo ?? null}::text)
-          OR (${assignedToRolesArr}::text[] IS NOT NULL AND body->'assignment'->'candidates' ?| ${assignedToRolesArr})
-        ))
-      )
+    WHERE ${buildInstanceWhere(filter, db)}
+      AND ${buildDataWhere(filter.dataWhere, db)}
       AND (
         ${cursorCreatedAt ?? null}::timestamptz IS NULL
         OR (created_at, instance_id) < (${cursorCreatedAt ?? null}::timestamptz, ${cursorInstanceId ?? null})
@@ -1291,6 +1477,64 @@ export async function listInstances(
   );
   const items = resolved.filter((item): item is InstanceSummaryItem => item !== undefined);
   return { items, cursor };
+}
+
+/**
+ * `queryInstances` never accepts these — each names behaviour only
+ * `listInstances` resolves. Checked at runtime, not by `InstanceQueryFilter`
+ * alone: this read's consumer builds its filter by spreading a wider object,
+ * which a type check alone cannot stop, and `scope` is the HTTP layer's own
+ * derivation, declared by no Runtime API Layer filter type at all. See
+ * design.md "The data read takes its own filter type and rejects a borrowed
+ * key".
+ */
+const QUERY_FILTER_DENYLIST = ["assignedTo", "assignedToRoles", "scope", "includeDegraded"] as const;
+
+function assertNoDenylistedQueryKeys(filter: object): void {
+  const raw = filter as Record<string, unknown>;
+  for (const key of QUERY_FILTER_DENYLIST) {
+    if (key in raw) throw new RequestShapeError(`queryInstances does not accept '${key}'`);
+  }
+}
+
+/**
+ * Reads instances by their `data` payload — the aggregated data source's
+ * option-list resolution, in-process, is this read's first consumer (see
+ * proposal.md). Resolves no process or step labels and opens no definition
+ * store: the option-list path re-resolves on every form render, submission,
+ * timer fire and automatic transition, work each of those would immediately
+ * discard. Bounds rather than pages — a caller resolving an option list
+ * wants it whole, in one call, so a cursor would either loop internally or
+ * hand back a partial list a picker would treat as complete. See design.md
+ * "The data read resolves no labels" and "The data read bounds rather than
+ * pages".
+ */
+export async function queryInstances(
+  filter: InstanceQueryFilter = {},
+  page: { limit?: number } = {},
+  db: SQL = sql,
+): Promise<InstanceDataPage> {
+  assertNoDenylistedQueryKeys(filter);
+  assertVersionHasProcessId(filter);
+  validateDataComparisons(filter.dataWhere);
+  assertDataWhereHasProcessId(filter);
+  await assertNoNonScalarComparedField(filter, filter.dataWhere, db);
+
+  const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
+  const rows = (await db`
+    SELECT body FROM instances
+    WHERE ${buildInstanceWhere(filter, db)}
+      AND ${buildDataWhere(filter.dataWhere, db)}
+    ORDER BY created_at DESC, instance_id DESC
+    LIMIT ${limit + 1}
+  ` as unknown) as { body: unknown }[];
+
+  const truncated = rows.length > limit;
+  const items: InstanceDataItem[] = rows.slice(0, limit).map((r) => {
+    const inst = parseInstance(r.body);
+    return { instanceId: inst.instanceId, version: inst.version, data: inst.data, redactedAt: inst.redactedAt };
+  });
+  return { items, truncated };
 }
 
 /**
