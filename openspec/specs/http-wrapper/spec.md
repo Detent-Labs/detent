@@ -676,13 +676,13 @@ that process passes by the grant. Any other authenticated actor receives 403.
 
 Where the request names no `processId`, the route SHALL keep requiring
 `ADMIN_ROLE` through `requireRole`. A process-scoped grant cannot answer a
-query naming no process, and this capability adds no result-set predicate over
+query naming no process. This capability adds no result-set predicate over
 the processes an actor holds a grant over. A grant holder therefore names the
 process it holds.
 
 This stays a **BREAKING** tightening of a route once open to every
-authenticated actor. It takes no answer away from an account that had one:
-every account reaching the unfiltered listing holds `ADMIN_ROLE`, which
+authenticated actor. It takes no answer away from an account that had one.
+Every account reaching the unfiltered listing holds `ADMIN_ROLE`, which
 short-circuits the gate. The other filters do not affect the check: narrowing
 an unfiltered listing does not make it a participant's own listing.
 

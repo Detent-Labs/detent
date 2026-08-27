@@ -77,11 +77,11 @@ costs no restructuring.
 ## Risks / Trade-offs
 
 - A grant holder omits `processId` and reads a 403 naming `ADMIN_ROLE`,
-  rather than one naming the missing `processId` → The branch keeps the
+  rather than one naming the missing `processId`. The branch keeps the
   unchanged `requireRole(actor, ADMIN_ROLE)` call rather than raising a new,
-  more specific error. The status code stays 403, so no scenario changes and
-  no new error path is added. The trade is a less helpful message for a
-  grant holder who forgot to name their process.
+  more specific error. The status code stays 403, so no scenario changes.
+  This change adds no new error path. The trade is a less helpful message
+  for a grant holder who forgot to name their process.
 - One extra database round trip per non-admin `scope=all` call → Bounded by
   construction. `can` reaches the store only after the
   short-circuit fails. An operator and an unauthenticated caller both pay
@@ -106,8 +106,9 @@ plain `ADMIN_ROLE` test.
 ## Open Questions
 
 - When does the reporting-routes tightening (`REPORTS_ROLE` → `read` on the
-  three aggregate routes) land? It needs a per-account migration step, and no
-  owner or timeline is set. `proposal.md` names it as its own later change.
+  three aggregate routes) land? It needs a per-account migration step.
+  Nobody has assigned an owner or a timeline. `proposal.md` names it as
+  its own later change.
 - Does anyone need a listing spanning more than one process under a `read`
   grant? Only a per-process gate ships here. A result-set predicate over the
   processes an actor holds a grant over stays deferred until somebody asks
