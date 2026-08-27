@@ -387,15 +387,15 @@ fails with `permission denied for schema public`. A superuser skips that
 check, so the devcontainer would not have caught it.
 
 `initSchema` also issues `GRANT TRIGGER ON instances TO
-detent_audit_owner`, from the role that owns `instances` — the engine's
-own connecting role, not `detent_audit_owner`, which owns neither
-`instances` nor anything on it yet at this point. `CREATE TRIGGER` needs
-the `TRIGGER` privilege on the table the trigger attaches to, a
-privilege distinct from owning that table. Without this grant the owner
-role could create `instance_audit` and `redact_instance_fields` inside
-its `SET LOCAL ROLE` block but not the two triggers the same block
-creates on `instances`, since `instances` belongs to the engine's role
-alone.
+detent_audit_owner`. The engine's own connecting role owns `instances`
+and issues that grant. The owner role owns neither `instances` nor
+anything on it yet. The `CREATE TRIGGER` statement needs the `TRIGGER`
+privilege on the target table.
+
+That privilege differs from owning the table. Without this grant, the
+owner role could create `instance_audit` and `redact_instance_fields`.
+It could not create the two triggers on `instances` in the same block.
+Ownership of `instances` stays with the engine's role alone.
 
 The append-only property then rests on a grant nobody made, rather than
 on a revoke a definer function walks past. The definer function holds its
