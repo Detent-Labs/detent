@@ -1441,6 +1441,24 @@ test.skipIf(!DB)("schema init creates the history_entries and instances parent i
   expect(after).toEqual(before);
 });
 
+test.skipIf(!DB)("schema init creates the current-step and started-by indexes, unchanged by a second run", async () => {
+  await initSchema();
+  const before = (await sql`
+    SELECT indexname FROM pg_indexes
+    WHERE indexname IN ('instances_current_step_idx', 'instances_started_by_idx')
+    ORDER BY indexname
+  `) as { indexname: string }[];
+  expect(before.map((r) => r.indexname)).toEqual(["instances_current_step_idx", "instances_started_by_idx"]);
+
+  await initSchema(); // second run must not throw or duplicate either index
+  const after = (await sql`
+    SELECT indexname FROM pg_indexes
+    WHERE indexname IN ('instances_current_step_idx', 'instances_started_by_idx')
+    ORDER BY indexname
+  `) as { indexname: string }[];
+  expect(after).toEqual(before);
+});
+
 // =============================================================================
 // 7. Orphan-key inspection: findOrphanKeys.
 // =============================================================================

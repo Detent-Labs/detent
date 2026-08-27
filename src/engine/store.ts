@@ -260,6 +260,13 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // cardinality, and the parent id alone reduces the scan to a handful of
   // rows. Readers: transition.ts::sweepCancelledChildren, migration.ts::migrateOne.
   await db`CREATE INDEX IF NOT EXISTS instances_parent_idx ON instances ((body->'parent'->>'instanceId'))`;
+  // The instance list read and the instance data read both reach these two
+  // through buildInstanceWhere's shared currentStepId/startedBy filters
+  // (src/runtime/api.ts). currentStepId also backs the bottlenecks view's
+  // GROUP BY (src/engine/reporting.ts). startedBy also backs the
+  // participant-facing GET /instances?scope=started route.
+  await db`CREATE INDEX IF NOT EXISTS instances_current_step_idx ON instances ((body->>'currentStepId'))`;
+  await db`CREATE INDEX IF NOT EXISTS instances_started_by_idx ON instances ((body->>'startedBy'))`;
   // Set once by redactInstance (src/engine/retention.ts); NULL means not
   // redacted, the same convention every other additive instances column uses.
   await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS redacted_at timestamptz`;

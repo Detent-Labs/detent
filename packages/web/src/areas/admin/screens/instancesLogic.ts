@@ -1,7 +1,7 @@
 import type { InstanceListParams } from "../api/client.js";
 import type { LocalizedText, LocaleCode } from "../api/types.js";
 
-/** All-instances filter state, one field per InstanceListFilter the server accepts (minus scope, which the client always sends as "all"). Empty string means unfiltered. */
+/** All-instances filter state, covering five of the filters InstanceListFilter supports (process, status, current step, startedBy and claimedBy — scope is not among them; the client always sends "all"). Empty string means unfiltered. */
 export interface InstanceFilterState {
   processId: string;
   status: string;

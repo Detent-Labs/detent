@@ -411,6 +411,18 @@ function parseStatuses(url: URL): Instance["status"][] | undefined {
   });
 }
 
+/**
+ * `createdAfter`/`createdBefore` must parse as an ISO-8601 instant. Validated
+ * here, before the value ever reaches a SQL `::timestamptz` cast — an invalid
+ * string handed straight to Postgres would raise an untyped error `mapError`
+ * falls back to 500 on, not the 400 the spec requires. Mirrors
+ * `reporting-routes.ts`'s `parseRange`.
+ */
+function parseInstant(raw: string, label: string): string {
+  if (Number.isNaN(Date.parse(raw))) throw new RequestShapeError(`${label} must be an ISO-8601 instant, got '${raw}'`);
+  return raw;
+}
+
 /** An omitted scope resolves to "all" — that is what it has always meant. Any other value is a request error. */
 function parseScope(url: URL): "mine" | "started" | "all" {
   const raw = url.searchParams.get("scope");
@@ -450,8 +462,12 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
       if (scope === "started" && startedBy !== undefined) {
         throw new RequestShapeError("scope=started cannot be combined with an explicit startedBy");
       }
+      const versionRaw = url.searchParams.get("version");
+      const createdAfterRaw = url.searchParams.get("createdAfter");
+      const createdBeforeRaw = url.searchParams.get("createdBefore");
       const filter: InstanceListFilter = {
         processId: (url.searchParams.get("processId") as ProcessId) ?? undefined,
+        version: versionRaw !== null ? parseVersion(versionRaw, "version") : undefined,
         status: parseStatuses(url),
         currentStepId: (url.searchParams.get("currentStepId") as StepId) ?? undefined,
         // scope=started applies no assignment predicate of its own. An explicit
@@ -461,6 +477,13 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
         claimedBy: url.searchParams.get("claimedBy") ?? undefined,
         assignedTo: scope === "mine" ? actor.id : assignedTo,
         assignedToRoles: scope === "mine" ? actor.roles : undefined,
+        excludeInstanceId: (url.searchParams.get("excludeInstanceId") as InstanceId) ?? undefined,
+        createdAfter: createdAfterRaw !== null ? parseInstant(createdAfterRaw, "createdAfter") : undefined,
+        createdBefore: createdBeforeRaw !== null ? parseInstant(createdBeforeRaw, "createdBefore") : undefined,
+        // No `dataWhere`: the instance-data-query capability's comparisons
+        // reach the Runtime API Layer reads in-process. The route that
+        // carries them over HTTP arrives with the consumer that reads them.
+        //
         // scope=all already required ADMIN_ROLE above — reusing that check
         // instead of adding a second one. See design.md "Gate visibility with
         // an includeDegraded filter field". Neither scope=mine nor

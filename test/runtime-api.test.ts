@@ -20,6 +20,7 @@ import {
   submitAndTransition,
   claimStep,
   listInstances,
+  queryInstances,
   getInstanceRecord,
   SubmissionValidationError,
   PinMismatch,
@@ -28,6 +29,7 @@ import {
   type InstanceRecordElement,
   type InstanceSummary,
   type DegradedInstanceSummary,
+  type InstanceQueryFilter,
 } from "../src/runtime/api.js";
 import { redactInstance } from "../src/engine/retention.js";
 import { ADMIN_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE, AuthorizationError } from "../src/auth/authorize.js";
@@ -2286,6 +2288,463 @@ test.skipIf(!DB)("a degraded summary carries identity fields but no label fields
   expect((degraded as unknown as { processLabel?: unknown }).processLabel).toBeUndefined();
   expect((degraded as unknown as { stepLabel?: unknown }).stepLabel).toBeUndefined();
   expect((degraded as unknown as { processBaseLocale?: unknown }).processBaseLocale).toBeUndefined();
+});
+
+// ============================================================
+// buildInstanceWhere: version / excludeInstanceId / createdAfter+Before / dataWhere
+// (instance-query-core)
+// ============================================================
+
+/**
+ * Writes one `data` field directly via SQL. `dataWhere`'s semantics read the
+ * stored jsonb value, not the process's own field catalog (design.md "A
+ * comparison names a scalar-valued field": the check reads values, not
+ * declared types), so a bare `twoPathsBody` (fields: []) instance is enough
+ * — no field-catalog/view fixture needed, and this can write shapes
+ * (an array, an object) no real submission would ever produce.
+ */
+async function setInstanceData(instanceId: string, fieldId: string, value: unknown): Promise<void> {
+  await sql`
+    UPDATE instances
+    SET body = jsonb_set(body, ${sql.array(["data", fieldId], "TEXT")}, ${JSON.stringify(value)}::text::jsonb)
+    WHERE instance_id = ${instanceId}
+  `;
+}
+
+test.skipIf(!DB)("listInstances' version filter excludes another version of the same process, and needs a processId beside it", async () => {
+  const PID = pid("proc_list_version");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const onV1 = await createProcessInstance(PID, actor, dataSourceReg);
+  await publishBody(PID, { ...twoPathsBody(), label: { en: "V2" } }, reg, dataSourceReg);
+  const onV2 = await createProcessInstance(PID, actor, dataSourceReg);
+
+  const page = await listInstances({ processId: PID, version: 2 });
+  expect(page.items.map((i) => i.instanceId)).toEqual([onV2.instanceId]);
+  expect(page.items.map((i) => i.instanceId)).not.toContain(onV1.instanceId);
+
+  let raised: unknown;
+  try {
+    await listInstances({ version: 2 });
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(RequestShapeError);
+});
+
+test.skipIf(!DB)("listInstances' excludeInstanceId omits the named instance, keeps every other matching instance", async () => {
+  const PID = pid("proc_list_exclude");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const a = await createProcessInstance(PID, actor, dataSourceReg);
+  const b = await createProcessInstance(PID, actor, dataSourceReg);
+
+  const page = await listInstances({ processId: PID, excludeInstanceId: a.instanceId });
+  expect(page.items.map((i) => i.instanceId)).toEqual([b.instanceId]);
+});
+
+test.skipIf(!DB)("listInstances' createdAfter/createdBefore bound the result by created_at, inclusive on both ends", async () => {
+  const PID = pid("proc_list_created_window");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const beforeInst = await createProcessInstance(PID, actor, dataSourceReg);
+  const inside = await createProcessInstance(PID, actor, dataSourceReg);
+  const afterInst = await createProcessInstance(PID, actor, dataSourceReg);
+  await sql`UPDATE instances SET created_at = '2026-01-01 00:00:00+00' WHERE instance_id = ${beforeInst.instanceId}`;
+  await sql`UPDATE instances SET created_at = '2026-01-02 00:00:00+00' WHERE instance_id = ${inside.instanceId}`;
+  await sql`UPDATE instances SET created_at = '2026-01-03 00:00:00+00' WHERE instance_id = ${afterInst.instanceId}`;
+
+  const page = await listInstances({
+    processId: PID,
+    createdAfter: "2026-01-01T12:00:00Z",
+    createdBefore: "2026-01-02T12:00:00Z",
+  });
+  expect(page.items.map((i) => i.instanceId)).toEqual([inside.instanceId]);
+});
+
+test.skipIf(!DB)("listInstances' creation bound includes the instant it names, read at the column's full precision", async () => {
+  const PID = pid("proc_list_created_boundary");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  const [{ created_at_text: stamp }] = (await sql`
+    SELECT created_at::text AS created_at_text FROM instances WHERE instance_id = ${created.instanceId}
+  `) as { created_at_text: string }[];
+
+  const afterPage = await listInstances({ processId: PID, createdAfter: stamp });
+  expect(afterPage.items.map((i) => i.instanceId)).toEqual([created.instanceId]);
+  const beforePage = await listInstances({ processId: PID, createdBefore: stamp });
+  expect(beforePage.items.map((i) => i.instanceId)).toEqual([created.instanceId]);
+});
+
+test.skipIf(!DB)("a createdBefore built from a summary's millisecond-truncated createdAt omits a row whose created_at carries sub-millisecond digits", async () => {
+  const PID = pid("proc_list_created_submillisecond");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  await sql`UPDATE instances SET created_at = '2026-01-01 00:00:00.100999+00' WHERE instance_id = ${created.instanceId}`;
+
+  const page = await listInstances({ processId: PID });
+  const summaryCreatedAt = (page.items[0] as InstanceSummary).createdAt;
+  expect(summaryCreatedAt).toBe("2026-01-01T00:00:00.100Z");
+
+  const beforePage = await listInstances({ processId: PID, createdBefore: summaryCreatedAt });
+  expect(beforePage.items).toEqual([]);
+});
+
+// ------------------------------------------------------------
+// dataWhere
+// ------------------------------------------------------------
+
+test.skipIf(!DB)("listInstances' dataWhere needs a processId beside it, and runs no comparison query without one", async () => {
+  let raised: unknown;
+  try {
+    await listInstances({ dataWhere: [{ fieldId: "field_x" as FieldId, operator: "eq", value: 1 }] });
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(RequestShapeError);
+});
+
+test.skipIf(!DB)("listInstances' dataWhere rejects a non-scalar right side (array or object), and runs no query", async () => {
+  const PID = pid("proc_list_data_nonscalar");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  for (const value of [["a", "b"], { x: 1 }]) {
+    let raised: unknown;
+    try {
+      await listInstances({ processId: PID, dataWhere: [{ fieldId: "field_x" as FieldId, operator: "eq", value }] });
+    } catch (e) {
+      raised = e;
+    }
+    expect(raised).toBeInstanceOf(RequestShapeError);
+  }
+});
+
+test.skipIf(!DB)("listInstances' dataWhere membership rejects an empty list and a list holding a non-scalar", async () => {
+  const PID = pid("proc_list_data_membership_invalid");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+
+  let raisedEmpty: unknown;
+  try {
+    await listInstances({ processId: PID, dataWhere: [{ fieldId: "field_x" as FieldId, operator: "in", value: [] }] });
+  } catch (e) {
+    raisedEmpty = e;
+  }
+  expect(raisedEmpty).toBeInstanceOf(RequestShapeError);
+
+  let raisedArrayMember: unknown;
+  try {
+    await listInstances({ processId: PID, dataWhere: [{ fieldId: "field_x" as FieldId, operator: "in", value: [["nested"]] }] });
+  } catch (e) {
+    raisedArrayMember = e;
+  }
+  expect(raisedArrayMember).toBeInstanceOf(RequestShapeError);
+});
+
+test.skipIf(!DB)("listInstances' dataWhere equality matches string, number, boolean and null, preserving each value's JSON type", async () => {
+  const PID = pid("proc_list_data_eq");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const strInst = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(strInst.instanceId, "field_x", "1");
+  const numInst = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(numInst.instanceId, "field_x", 1);
+  const boolInst = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(boolInst.instanceId, "field_x", true);
+  const nullInst = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(nullInst.instanceId, "field_x", null);
+
+  const eq = async (value: string | number | boolean | null) => {
+    const page = await listInstances({ processId: PID, dataWhere: [{ fieldId: "field_x" as FieldId, operator: "eq", value }] });
+    return page.items.map((i) => i.instanceId);
+  };
+  expect(await eq("1")).toEqual([strInst.instanceId]); // not numInst — "1" !== 1
+  expect(await eq(1)).toEqual([numInst.instanceId]); // not strInst — 1 !== "1"
+  expect(await eq(true)).toEqual([boolInst.instanceId]);
+  expect(await eq(null)).toEqual([nullInst.instanceId]);
+});
+
+test.skipIf(!DB)("listInstances' dataWhere binds the field id as a parameter, safe for one holding SQL metacharacters", async () => {
+  const PID = pid("proc_list_data_fieldid_meta");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const weirdFieldId = "field_o'br\"ien";
+  const matching = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(matching.instanceId, weirdFieldId, "yes");
+  const other = await createProcessInstance(PID, actor, dataSourceReg);
+
+  const page = await listInstances({ processId: PID, dataWhere: [{ fieldId: weirdFieldId as FieldId, operator: "eq", value: "yes" }] });
+  expect(page.items.map((i) => i.instanceId)).toEqual([matching.instanceId]);
+  expect(page.items.map((i) => i.instanceId)).not.toContain(other.instanceId);
+});
+
+test.skipIf(!DB)("listInstances' dataWhere inequality omits instances holding the value, returns an instance holding another value", async () => {
+  const PID = pid("proc_list_data_ne");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const excluded = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(excluded.instanceId, "field_x", "match");
+  const kept = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(kept.instanceId, "field_x", "other");
+
+  const page = await listInstances({ processId: PID, dataWhere: [{ fieldId: "field_x" as FieldId, operator: "ne", value: "match" }] });
+  expect(page.items.map((i) => i.instanceId)).toEqual([kept.instanceId]);
+});
+
+test.skipIf(!DB)("listInstances' dataWhere membership selects any listed value", async () => {
+  const PID = pid("proc_list_data_in");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const a = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(a.instanceId, "field_x", "red");
+  const b = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(b.instanceId, "field_x", "blue");
+  const c = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(c.instanceId, "field_x", "green");
+
+  const page = await listInstances({ processId: PID, dataWhere: [{ fieldId: "field_x" as FieldId, operator: "in", value: ["red", "blue"] }] });
+  expect(new Set(page.items.map((i) => i.instanceId))).toEqual(new Set([a.instanceId, b.instanceId]));
+  expect(page.items.map((i) => i.instanceId)).not.toContain(c.instanceId);
+});
+
+test.skipIf(!DB)("listInstances' dataWhere folds correctly at zero, one and three comparisons, binding values in order", async () => {
+  const PID = pid("proc_list_data_fold");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const target = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(target.instanceId, "field_a", 1);
+  await setInstanceData(target.instanceId, "field_b", 2);
+  await setInstanceData(target.instanceId, "field_c", 3);
+  const other = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(other.instanceId, "field_a", 1);
+  await setInstanceData(other.instanceId, "field_b", 2);
+  await setInstanceData(other.instanceId, "field_c", 99);
+
+  const zero = await listInstances({ processId: PID });
+  expect(new Set(zero.items.map((i) => i.instanceId))).toEqual(new Set([target.instanceId, other.instanceId]));
+
+  const one = await listInstances({ processId: PID, dataWhere: [{ fieldId: "field_c" as FieldId, operator: "eq", value: 3 }] });
+  expect(one.items.map((i) => i.instanceId)).toEqual([target.instanceId]);
+
+  const three = await listInstances({
+    processId: PID,
+    dataWhere: [
+      { fieldId: "field_a" as FieldId, operator: "eq", value: 1 },
+      { fieldId: "field_b" as FieldId, operator: "eq", value: 2 },
+      { fieldId: "field_c" as FieldId, operator: "eq", value: 3 },
+    ],
+  });
+  expect(three.items.map((i) => i.instanceId)).toEqual([target.instanceId]);
+});
+
+test.skipIf(!DB)("listInstances' dataWhere fails as a caller error when a selected instance holds an array under the compared field", async () => {
+  const PID = pid("proc_list_data_probe_array");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const arrayInst = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(arrayInst.instanceId, "field_tags", ["a", "b"]);
+
+  let raised: unknown;
+  try {
+    await listInstances({ processId: PID, dataWhere: [{ fieldId: "field_tags" as FieldId, operator: "eq", value: "a" }] });
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(RequestShapeError);
+});
+
+test.skipIf(!DB)("listInstances' dataWhere fails as a caller error when a selected instance holds an object under the compared field", async () => {
+  const PID = pid("proc_list_data_probe_object");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const objInst = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(objInst.instanceId, "field_group", { a: 1 });
+
+  let raised: unknown;
+  try {
+    await listInstances({ processId: PID, dataWhere: [{ fieldId: "field_group" as FieldId, operator: "eq", value: "a" }] });
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(RequestShapeError);
+});
+
+test.skipIf(!DB)("listInstances' dataWhere: an absent field matches neither equality nor inequality, and does not throw", async () => {
+  const PID = pid("proc_list_data_absent");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  await createProcessInstance(PID, actor, dataSourceReg); // never writes field_x
+
+  const eqPage = await listInstances({ processId: PID, dataWhere: [{ fieldId: "field_x" as FieldId, operator: "eq", value: "v" }] });
+  expect(eqPage.items).toEqual([]);
+
+  const nePage = await listInstances({ processId: PID, dataWhere: [{ fieldId: "field_x" as FieldId, operator: "ne", value: "v" }] });
+  expect(nePage.items).toEqual([]);
+});
+
+test.skipIf(!DB)("listInstances' dataWhere comparisons join conjunctively with each other and with currentStepId", async () => {
+  const PID = pid("proc_list_data_conjunctive");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const onA = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(onA.instanceId, "field_x", "v");
+  const movedButMatching = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(movedButMatching.instanceId, "field_x", "v");
+  await submitAndTransition(movedButMatching.instanceId, "path_x" as PathId, {} as Instance["data"], actor, dataSourceReg);
+  const onAWrongValue = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(onAWrongValue.instanceId, "field_x", "other");
+
+  const page = await listInstances({
+    processId: PID,
+    currentStepId: "step_a" as StepId,
+    dataWhere: [{ fieldId: "field_x" as FieldId, operator: "eq", value: "v" }],
+  });
+  expect(page.items.map((i) => i.instanceId)).toEqual([onA.instanceId]);
+});
+
+// ============================================================
+// queryInstances
+// ============================================================
+
+test.skipIf(!DB)("queryInstances returns instanceId, version, data and redactedAt, and nothing that needs label resolution", async () => {
+  const PID = pid("proc_query_shape");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(created.instanceId, "field_x", "v");
+
+  const page = await queryInstances({ processId: PID });
+  expect(page.items).toHaveLength(1);
+  const item = page.items[0]!;
+  expect(item.instanceId).toBe(created.instanceId);
+  expect(item.version).toBe(1);
+  expect(item.data).toEqual({ field_x: "v" } as unknown as Instance["data"]);
+  expect(item.redactedAt).toBeUndefined();
+  expect(Object.keys(item)).not.toContain("processLabel");
+  expect(Object.keys(item)).not.toContain("stepLabel");
+  expect(Object.keys(item)).not.toContain("status");
+  expect(Object.keys(item)).not.toContain("transitionSeq");
+  expect("cursor" in page).toBe(false);
+});
+
+test.skipIf(!DB)("queryInstances rejects a version with no processId", async () => {
+  let raised: unknown;
+  try {
+    await queryInstances({ version: 2 });
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(RequestShapeError);
+});
+
+test.skipIf(!DB)("queryInstances rejects a dataWhere with no processId, running no comparison query", async () => {
+  let raised: unknown;
+  try {
+    await queryInstances({ dataWhere: [{ fieldId: "field_x" as FieldId, operator: "eq", value: 1 }] });
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(RequestShapeError);
+});
+
+test.skipIf(!DB)("queryInstances rejects assignedTo, assignedToRoles, scope and includeDegraded, and ignores an unrecognized key", async () => {
+  const PID = pid("proc_query_denylist");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  await createProcessInstance(PID, actor, dataSourceReg);
+
+  const denied: Record<string, unknown>[] = [
+    { processId: PID, assignedTo: "user_1" },
+    { processId: PID, assignedToRoles: ["approver"] },
+    { processId: PID, scope: "mine" }, // no Runtime API Layer filter type declares `scope` at all
+    { processId: PID, includeDegraded: true },
+  ];
+  for (const bad of denied) {
+    let raised: unknown;
+    try {
+      await queryInstances(bad as unknown as InstanceQueryFilter);
+    } catch (e) {
+      raised = e;
+    }
+    expect(raised).toBeInstanceOf(RequestShapeError);
+  }
+
+  const page = await queryInstances({ processId: PID, somethingElse: true } as unknown as InstanceQueryFilter);
+  expect(page.items).toHaveLength(1);
+});
+
+test.skipIf(!DB)("queryInstances' redactedAt distinguishes a redacted instance from one that never wrote the field", async () => {
+  const PID = pid("proc_query_redacted");
+  await publishBody(PID, cascadeBody(), reg, dataSourceReg);
+  const toRedact = await createProcessInstance(PID, actor, dataSourceReg);
+  const completed = await submitAndTransition(
+    toRedact.instanceId, "path_ab" as PathId, { field_decision: "approve" } as unknown as Instance["data"], actor, dataSourceReg,
+  );
+  expect(completed.status).toBe("completed");
+  await redactInstance(completed.instanceId, sql);
+  const untouched = await createProcessInstance(PID, actor, dataSourceReg);
+
+  const page = await queryInstances({ processId: PID });
+  const redactedItem = page.items.find((i) => i.instanceId === completed.instanceId)!;
+  expect(redactedItem.redactedAt).toBeDefined();
+  const untouchedItem = page.items.find((i) => i.instanceId === untouched.instanceId)!;
+  expect(untouchedItem.redactedAt).toBeUndefined();
+});
+
+test.skipIf(!DB)("queryInstances still returns an instance whose pinned version has no resolvable published body", async () => {
+  const PID = pid("proc_query_unresolvable");
+  const v1 = await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const orphan = await createProcessInstance(PID, actor, dataSourceReg);
+  await sql`UPDATE instances SET body = jsonb_set(body, '{version}', to_jsonb(${v1.version + 1})) WHERE instance_id = ${orphan.instanceId}`;
+
+  const page = await queryInstances({ processId: PID });
+  expect(page.items.map((i) => i.instanceId)).toEqual([orphan.instanceId]);
+  expect(page.items[0]!.version).toBe(v1.version + 1);
+});
+
+test.skipIf(!DB)("queryInstances bounds by a maximum count and reports truncation below, at and above the bound", async () => {
+  const PID = pid("proc_query_bound");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  for (let i = 0; i < 3; i++) await createProcessInstance(PID, actor, dataSourceReg);
+
+  const below = await queryInstances({ processId: PID }, { limit: 10 });
+  expect(below.items).toHaveLength(3);
+  expect(below.truncated).toBe(false);
+
+  const exact = await queryInstances({ processId: PID }, { limit: 3 });
+  expect(exact.items).toHaveLength(3);
+  expect(exact.truncated).toBe(false);
+
+  const above = await queryInstances({ processId: PID }, { limit: 2 });
+  expect(above.items).toHaveLength(2);
+  expect(above.truncated).toBe(true);
+});
+
+test.skipIf(!DB)("queryInstances caps a limit above the enforced maximum", async () => {
+  const PID = pid("proc_query_cap");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  await createProcessInstance(PID, actor, dataSourceReg);
+
+  const page = await queryInstances({ processId: PID }, { limit: 100_000 });
+  expect(page.items.length).toBeLessThanOrEqual(200);
+});
+
+test.skipIf(!DB)("queryInstances orders newest-first, and a truncated result is the same subset on repeat calls", async () => {
+  const PID = pid("proc_query_order");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const created: InstanceId[] = [];
+  for (let i = 0; i < 5; i++) created.push((await createProcessInstance(PID, actor, dataSourceReg)).instanceId);
+
+  const page1 = await queryInstances({ processId: PID }, { limit: 2 });
+  const page2 = await queryInstances({ processId: PID }, { limit: 2 });
+  expect(page1.items.map((i) => i.instanceId)).toEqual(page2.items.map((i) => i.instanceId));
+  expect(page1.items[0]!.instanceId).toBe(created[created.length - 1]);
+});
+
+test.skipIf(!DB)("listInstances and queryInstances select the same instances for one processId, currentStepId and dataWhere comparison together", async () => {
+  const PID = pid("proc_query_shared_predicate");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const match = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(match.instanceId, "field_x", "v");
+  const wrongStep = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(wrongStep.instanceId, "field_x", "v");
+  await submitAndTransition(wrongStep.instanceId, "path_x" as PathId, {} as Instance["data"], actor, dataSourceReg);
+  const wrongValue = await createProcessInstance(PID, actor, dataSourceReg);
+  await setInstanceData(wrongValue.instanceId, "field_x", "other");
+
+  const filter = {
+    processId: PID,
+    currentStepId: "step_a" as StepId,
+    dataWhere: [{ fieldId: "field_x" as FieldId, operator: "eq" as const, value: "v" }],
+  };
+  const listPage = await listInstances(filter);
+  const queryPage = await queryInstances(filter);
+  expect(new Set(listPage.items.map((i) => i.instanceId))).toEqual(new Set([match.instanceId]));
+  expect(new Set(queryPage.items.map((i) => i.instanceId))).toEqual(new Set([match.instanceId]));
 });
 
 // ============================================================
