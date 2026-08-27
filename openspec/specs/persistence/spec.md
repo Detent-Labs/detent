@@ -316,6 +316,8 @@ them grows with lifetime volume rather than live volume.
 Each index SHALL carry a comment naming its readers, the way the existing
 expression indexes do. A reader treats that file as the schema's documentation.
 
+<!-- antislop: allow synonym-rotation -->
+<!-- "change" names an OpenSpec change here; the "update" it pairs with is the SQL privilege the audit requirements above withhold. -->
 As with the instance population scan, this requirement asks only that the index
 exist. It asserts no query plan. A planner may legitimately choose a sequential
 scan on a small relation. Asserting the plan would assert something the

@@ -12,7 +12,8 @@ import { executeManualTransition, claimStep } from "../src/engine/transition.js"
 import { publishBody } from "../src/engine/definitions.js";
 import { registerMigrationPlan, migrateInstances } from "../src/engine/migration.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
-import { redactInstance } from "../src/engine/retention.js";
+import { redactInstance, sweepRetention } from "../src/engine/retention.js";
+import { drainOutbox } from "../src/engine/outbox.js";
 import { verifyInstanceChain } from "../src/engine/admin-queries.js";
 import type { ProcessBody, Instance, Step, MigrationSpec } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
@@ -23,6 +24,9 @@ const actor: Actor = { id: "user_1", roles: [] };
 const cel = (src: string) => ({ lang: "cel", src });
 
 const reg = createRegistry();
+// The writeback source case below publishes an action of this type, so the
+// handler has to resolve at publish as well as at delivery.
+reg.set("setter", { handler: async () => ({ val: 7 }) });
 const dataSourceReg = createDataSourceRegistry();
 
 const step = (id: string, over: Record<string, unknown> = {}): Step => ({ id, key: id, label: { en: id }, type: "task", ...over }) as unknown as Step;
@@ -42,6 +46,28 @@ const simpleBody = (): ProcessBody =>
     workflow: {
       initialStep: "step_a",
       steps: [step("step_a", { paths: [manualPath("path_ab", "step_b")] }), step("step_b", { terminal: true })],
+    },
+  }) as unknown as ProcessBody;
+
+// step_a --manual--> step_b, whose onEntry action writes back into field_n,
+// --manual--> step_c. The writeback's target step must be non-terminal: a
+// writeback onto a completed instance is suppressed and writes no data at all.
+const writebackBody = (): ProcessBody =>
+  ({
+    key: "audit_writeback",
+    label: { en: "audit writeback" },
+    baseLocale: "en",
+    fields: [{ id: "field_n", key: "n", label: { en: "N" }, type: "number" }],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        step("step_a", { paths: [manualPath("path_ab", "step_b")] }),
+        step("step_b", {
+          onEntry: [{ id: "action_set", type: "setter", config: {}, output: { field_n: cel("result.val") } }],
+          paths: [manualPath("path_bc", "step_c")],
+        }),
+        step("step_c", { terminal: true }),
+      ],
     },
   }) as unknown as ProcessBody;
 
@@ -66,6 +92,9 @@ const setData = (id: string, patch: Record<string, unknown>) =>
 const removeDataKey = (id: string, key: string) =>
   sql`UPDATE instances SET body = jsonb_set(body, '{data}', (body->'data') - ${key}) WHERE instance_id = ${id}`;
 const setStatus = (id: string, status: string) => sql`UPDATE instances SET body = body || ${{ status }}::jsonb WHERE instance_id = ${id}`;
+/** Ages an instance past the sweep's retention window. Touches no field data, so it writes no audit row. */
+const setEnteredAt = (id: string, at: string) =>
+  sql`UPDATE instances SET body = body || ${{ currentStepEnteredAt: at }}::jsonb WHERE instance_id = ${id}`;
 
 type AuditRow = {
   seq: string;
@@ -120,6 +149,28 @@ test.skipIf(!DB)("1.5 a second initSchema run leaves instance_audit and its rows
 // ============================================================
 // 2. Trigger
 // ============================================================
+
+// The digest joins its metadata with U+001E and stands a NULL in as U+001F, so
+// either byte inside an argument would let two different rows render one
+// string. The append rejects them instead; this covers all five text arguments
+// against both bytes.
+test.skipIf(!DB)("2.1 the append rejects U+001E and U+001F in each of its five text arguments", async () => {
+  const args = ["instance_id", "field_id", "actor", "source", "reason"] as const;
+  for (const sep of ["\x1e", "\x1f"]) {
+    for (const poisoned of args) {
+      const arg = (name: (typeof args)[number], clean: string | null) => (name === poisoned ? `a${sep}b` : clean);
+      let message = "";
+      try {
+        await sql`SELECT instance_audit_append(
+          ${arg("instance_id", `inst_sep_${crypto.randomUUID()}`)}::text, 0::bigint, ${arg("field_id", "field_x")}::text,
+          'set', '"v"'::jsonb, ${arg("actor", "user_1")}::text, ${arg("source", "submit")}::text, ${arg("reason", null)}::text)`;
+      } catch (e) {
+        message = e instanceof Error ? e.message : String(e);
+      }
+      expect(message).toMatch(/must not contain U\+001E or U\+001F/);
+    }
+  }
+});
 
 test.skipIf(!DB)("2.3 a direct INSERT writes one row per key", async () => {
   const i = await mk({ field_x: "a", field_y: "b" });
@@ -225,19 +276,23 @@ test.skipIf(!DB)("2.13 the resolution worker's claim UPDATE writes no audit row"
   expect(await auditRows(i.instanceId)).toHaveLength(0);
 });
 
+/** Ownership and the engine role's four table privileges, in one row. */
+const auditOwnershipAndGrants = async (): Promise<Record<string, unknown>[]> =>
+  (await sql`
+    SELECT c.relowner::regrole::text AS table_owner, p.proowner::regrole::text AS fn_owner,
+      has_table_privilege(current_user, 'instance_audit', 'INSERT') AS ins,
+      has_table_privilege(current_user, 'instance_audit', 'SELECT') AS sel,
+      has_table_privilege(current_user, 'instance_audit', 'UPDATE') AS upd,
+      has_table_privilege(current_user, 'instance_audit', 'DELETE') AS del
+    FROM pg_class c, pg_proc p
+    WHERE c.relname = 'instance_audit' AND p.proname = 'redact_instance_fields'
+  `) as Record<string, unknown>[];
+
 test.skipIf(!DB)("2.14 a second initSchema run leaves ownership and grants as the first run set them", async () => {
   await mk({ field_x: "hi" });
-  const before = (await sql`
-    SELECT c.relowner::regrole::text AS table_owner, p.proowner::regrole::text AS fn_owner
-    FROM pg_class c, pg_proc p
-    WHERE c.relname = 'instance_audit' AND p.proname = 'redact_instance_fields'
-  `) as { table_owner: string; fn_owner: string }[];
+  const before = await auditOwnershipAndGrants();
   await initSchema();
-  const after = (await sql`
-    SELECT c.relowner::regrole::text AS table_owner, p.proowner::regrole::text AS fn_owner
-    FROM pg_class c, pg_proc p
-    WHERE c.relname = 'instance_audit' AND p.proname = 'redact_instance_fields'
-  `) as { table_owner: string; fn_owner: string }[];
+  const after = await auditOwnershipAndGrants();
   expect(after).toEqual(before);
 });
 
@@ -336,6 +391,24 @@ test.skipIf(!DB)("3.6 a migration row differs from a submit row (source=migratio
   expect(row.source).toBe("migration");
   expect(row.actor).toBeNull();
 });
+
+test.skipIf(!DB)("3.7 an action writeback carries source=writeback and no actor", async () => {
+  const p = pid();
+  const published = await publishBody(p, writebackBody(), reg, dataSourceReg);
+  const created = await createInstance(published.definition, { processId: p, version: published.version, data: {} as Instance["data"] }, sql);
+  await executeManualTransition(created, "path_ab", published.definition, actor, sql);
+  expect(await drainOutbox(sql, reg)).toBe(1);
+
+  const rows = await auditRows(created.instanceId);
+  expect(rows).toHaveLength(1); // the transition itself carried no field data
+  expect(rows[0].field_id).toBe("field_n");
+  expect(rows[0].source).toBe("writeback");
+  expect(rows[0].actor).toBeNull();
+});
+
+// 3.7's other half, the subprocess return, is asserted where the spawn/return
+// fixtures already stand: test/subprocess.test.ts, "the child outcome and data
+// return to the parent".
 
 // ============================================================
 // 4. Chain verification
@@ -457,6 +530,21 @@ test.skipIf(!DB)("4.7 swapping two rows' seq values makes verification name the 
 // ============================================================
 // 6. Redaction
 // ============================================================
+
+test.skipIf(!DB)("6.1 the automatic sweep names no actor, so its rows carry a null one", async () => {
+  const i = await mk({ field_x: "1" });
+  await setStatus(i.instanceId, "completed");
+  await setEnteredAt(i.instanceId, "2020-01-01T00:00:00Z");
+
+  await sweepRetention(sql, 30);
+
+  const rows = await auditRows(i.instanceId);
+  const redactRow = rows.find((r) => r.op === "redact")!;
+  expect(redactRow.source).toBe("redaction");
+  expect(redactRow.actor).toBeNull();
+  // The wipe's own trigger-written rows carry the same null, not a fabricated actor.
+  expect(rows.slice(1).every((r) => r.actor === null)).toBe(true);
+});
 
 test.skipIf(!DB)("6.2/6.3 redaction appends one redact row per field and clears every prior value of those fields", async () => {
   const i = await mk({ field_x: "1" });

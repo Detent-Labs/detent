@@ -71,6 +71,56 @@ test.skipIf(!DB || !PROBE)("5.9 the probe role's INSERT through the trigger stil
   expect(await auditCount(id)).toBe(1);
 });
 
+// The probe role holds exactly the engine's own grants (see the file header),
+// so this measures the engine's real privilege shape. Asserting it against
+// `current_user` instead would pass vacuously: the devcontainer connects as a
+// superuser, whom `has_table_privilege` answers `true` for all four.
+test.skipIf(!DB || !PROBE)("5.5 the engine's grant set is INSERT and SELECT alone, and PUBLIC holds no EXECUTE on the redaction", async () => {
+  const [priv] = (await sql`
+    SELECT has_table_privilege('detent_audit_probe', 'instance_audit', 'INSERT') AS ins,
+           has_table_privilege('detent_audit_probe', 'instance_audit', 'SELECT') AS sel,
+           has_table_privilege('detent_audit_probe', 'instance_audit', 'UPDATE') AS upd,
+           has_table_privilege('detent_audit_probe', 'instance_audit', 'DELETE') AS del
+  `) as { ins: boolean; sel: boolean; upd: boolean; del: boolean }[];
+  expect(priv).toEqual({ ins: true, sel: true, upd: false, del: false });
+
+  const [fn] = (await sql`
+    SELECT array_to_string(proacl, E'\n') AS acl FROM pg_proc WHERE proname = 'redact_instance_fields'
+  `) as { acl: string }[];
+  // The positive half: a role holding no grant at all also satisfies the
+  // negative one, so the grantee has to be named.
+  expect(fn.acl).toContain("detent_audit_probe=X/");
+  // A PUBLIC entry renders with an empty grantee, `=X/owner`.
+  expect(fn.acl).not.toMatch(/(^|\n)=X\//);
+});
+
+test.skipIf(!DB)("5.1 all four audit functions pin their search path", async () => {
+  const rows = (await sql`
+    SELECT proname, proconfig FROM pg_proc
+    WHERE proname IN ('instance_audit_diff', 'instance_audit_append', 'verify_instance_chain', 'redact_instance_fields')
+  `) as { proname: string; proconfig: string[] | null }[];
+  expect(rows).toHaveLength(4);
+  for (const r of rows) {
+    const entry = (r.proconfig ?? []).find((c) => c.startsWith("search_path="));
+    expect(`${r.proname}: ${entry}`).toMatch(/pg_catalog/);
+    expect(`${r.proname}: ${entry}`).toMatch(/public/);
+  }
+});
+
+// Asserted against the catalog rather than the TypeScript source: what runs is
+// the definition the database holds, which a rerun of initSchema replaces.
+test.skipIf(!DB)("5.3 both writers reach the chain through instance_audit_append, and neither hashes on its own", async () => {
+  const rows = (await sql`
+    SELECT proname, pg_get_functiondef(oid) AS def FROM pg_proc
+    WHERE proname IN ('instance_audit_diff', 'redact_instance_fields')
+  `) as { proname: string; def: string }[];
+  expect(rows).toHaveLength(2);
+  for (const r of rows) {
+    expect(r.def).toContain("instance_audit_append(");
+    expect(r.def).not.toContain("sha256(");
+  }
+});
+
 test.skipIf(!DB)("5.10 instance_audit_diff and instance_audit_append are not SECURITY DEFINER; redact_instance_fields alone is", async () => {
   const rows = (await sql`
     SELECT proname, prosecdef FROM pg_proc

@@ -454,6 +454,13 @@ not code order.
   trigger body. Every `createProcessInstance` and every `applyStepEntry`
   then throws on a server that booted clean
 
+  Measured differently in the end. The role is cluster-scoped, so no suite
+  in this shared database can make it absent again. The suite asserts the
+  condition the degraded path turns on instead. A `SET LOCAL ROLE` without
+  membership raises SQLSTATE 42501, which `isInsufficientPrivilege`
+  catches. The full scenario needs a virgin cluster and stays a manual
+  check
+
 ## 6. Redaction
 
 - [x] 6.1 Thread the requesting actor into `redactInstance` from

@@ -575,6 +575,10 @@ async function initInstanceAudit(db: SQL): Promise<void> {
         RAISE EXCEPTION 'instance_audit_append: instance_id, field_id, actor, source and reason must not contain U+001E or U+001F';
       END IF;
 
+      -- ponytail: one index seek per appended row, not per statement; a bulk
+      -- migration pays it once per field it rewrites. Cache the head as
+      -- audit_head_hash/audit_seq columns on instances when a measured
+      -- migration says it costs too much (design.md "Open Questions").
       SELECT ia.seq, ia.hash INTO head_seq, head_hash
       FROM instance_audit ia
       WHERE ia.instance_id = instance_audit_append.instance_id

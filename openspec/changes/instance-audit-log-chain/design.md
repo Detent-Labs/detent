@@ -542,7 +542,7 @@ own head read.
 
 ### `instance_audit` carries no foreign key to `instances`
 
-34 suites truncate `instances` alone and an FK would fail every one;
+36 suites truncate `instances` alone and an FK would fail every one;
 `history_entries` and `instance_events` carry none either, for the same
 reason. Each of those suites gains `instance_audit` in its own
 `TRUNCATE` list instead.
