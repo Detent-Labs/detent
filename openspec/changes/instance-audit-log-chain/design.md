@@ -161,10 +161,12 @@ Every site sets both values immediately before its own statement,
 rather than once per transaction.
 
 Every call runs on the enclosing transaction handle, never on the pooled
-`db` handle. All six sites already sit inside a `withTransaction`
-callback. On `db` it would run in an implicit transaction of its own, on
-whichever connection the pool handed it. The setting would be gone
-before the statement it was meant to attribute.
+`db` handle. Five of the six sites already sit inside a
+`withTransaction` callback; `outbox.ts`'s sits inside a bare `db.begin`
+block, which hands the same kind of transaction-scoped `tx` handle. On
+`db` it would run in an implicit transaction of its own, on whichever
+connection the pool handed it. The setting would be gone before the
+statement it was meant to attribute.
 
 Nothing in `src/` sets a session variable today. The helper lands beside
 `withTransaction`, and six call sites use it over the five statements
@@ -227,9 +229,12 @@ whose `field_id` is `fld_a`. That is the same gap the paragraphs above
 close for `actor` and `reason`, one column further along.
 
 Neither rejection can fire in ordinary operation. An `instance_id`
-carries `inst_` and a `crypto.randomUUID()`, and a `field_id` is a
-`FieldDef.key`, which `compile.ts` already holds to
-`/^[a-z_][a-z0-9_]*$/`. The `NOT NULL` breaks no writer either: the
+carries `inst_` plus a canonical UUID (v4 via `crypto.randomUUID()` for
+a participant-created or chained instance, v5 via the hand-rolled
+`uuidv5` in `idempotency.ts` for a subprocess spawn) — hex digits and
+dashes only, in both cases. A `field_id` is a `FieldDef.key`, which
+`compile.ts` already holds to `/^[a-z_][a-z0-9_]*$/`. The `NOT NULL`
+breaks no writer either: the
 trigger copies `NEW.transition_seq` from a column `instances` already
 declares `NOT NULL`, and `redact_instance_fields` receives
 `inst.transitionSeq`, a required number on `instanceSchema`.
@@ -522,6 +527,13 @@ own head read.
 reason. Each of those suites gains `instance_audit` in its own
 `TRUNCATE` list instead.
 
+Test cleanup uses `DELETE FROM instance_audit` under `SET LOCAL ROLE
+detent_audit_owner`, not a grant to the connecting test role. The
+devcontainer's `DATABASE_URL` is the `postgres` superuser, so this
+isn't required for correctness today — a plain `DELETE` would work —
+but it keeps the suite decoupled from that superuser assumption for a
+future non-superuser test environment.
+
 ## Migration Plan
 
 Existing instances carry no audit history. Nothing backfills them, and
@@ -716,6 +728,16 @@ own role the replace succeeds, and the function keeps its owner, its
 therefore runs as a non-superuser role owning schema `public` and
 holding the membership. In the devcontainer `initSchema` connects as
 `postgres`, whom none of these checks reach.
+
+**An actor id or reason containing `\x1e`/`\x1f` makes
+`instance_audit_append` raise, failing the whole instance write, not
+just the audit row.**
+
+→ `Actor.id` is attacker-influenced under a compromised or malicious
+JWT issuer. Accepted for this change — raising is strictly better than
+silently corrupting digest injectivity — but a defensive strip/reject
+at actor-resolution time (`src/auth/jwt.ts`, `src/auth/resolve.ts`) is
+the natural fix, left to a later change.
 
 ## Open Questions
 

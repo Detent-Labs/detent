@@ -1,5 +1,7 @@
 ## 1. Schema
 
+Task 1.2's `CREATE TABLE` is not runnable standalone — see task 5.4.
+
 <!-- antislop: allow sentence-length -->
 <!-- The CREATE EXTENSION statement is quoted verbatim; its SQL tokens count as prose words. -->
 - [ ] 1.1 Add `CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA
@@ -28,12 +30,10 @@
   `instances`; verify no suite sees another suite's audit rows. Delete
   rather than truncate. The engine's role holds no `TRUNCATE` and no
   `DELETE` on the relation. The suites' cleanup therefore runs `DELETE
-  FROM instance_audit` under a `SET LOCAL ROLE detent_audit_owner`.
-
-  The alternative is granting the test role those two privileges alone,
-  in `test/preload-db.ts`. Pick one and say which. Neither weakens the
-  append-only requirement, which binds the engine's role at runtime and
-  not the test harness
+  FROM instance_audit` under a `SET LOCAL ROLE detent_audit_owner`,
+  consistent with `design.md`'s "`instance_audit` carries no foreign key
+  to `instances`" section. This binds the test harness only; the
+  append-only requirement still binds the engine's role at runtime
 - [ ] 1.5 Verify a second `initSchema` run leaves the relation and its
   rows untouched
 
@@ -215,6 +215,11 @@
   earlier of the two
 
 ## 5. Redaction function and append-only privileges
+
+Execution order inside `initSchema`: 5.4's role + schema-grant guard,
+then 5.11's membership grant, then the `SET LOCAL ROLE` block wrapping
+1.2, 2.2, 5.1 and 5.5. Tasks below are numbered for verifiable
+increments, not code order.
 
 - [ ] 5.1 Write the four-argument `redact_instance_fields`. Its
   parameters are `instance_id text`, `actor text`, `reason text` and
@@ -488,9 +493,9 @@
   `openspec/specs/instance-audit-log/spec.md` as a new capability; verify
   `openspec validate` passes
 - [ ] 7.2 Rewrite the live `openspec/specs/data-retention/spec.md`
-  Purpose. It reads "…leaves `history_entries` and `instance_events`
-  intact, and clears the values of `instance_audit` while keeping its
-  rows." A delta cannot reach a Purpose block
+  Purpose. It should read "…leaves `history_entries` and
+  `instance_events` intact, and clears the values of `instance_audit`
+  while keeping its rows." A delta cannot reach a Purpose block
 - [ ] 7.3 Correct `docs/decisions.md`'s write-site list, its change-2
   scope (only `FieldDef.redactable` remains), its
   salt-only-for-redactable-fields statement and its `(no pgcrypto)`
