@@ -1591,6 +1591,93 @@ test.skipIf(!DB)("GET /instances?status=sideways is a 400 request error", async 
 });
 
 // ============================================================
+// version / excludeInstanceId / createdAfter+Before / dataWhere
+// (instance-query-core)
+// ============================================================
+
+test.skipIf(!DB)("GET /instances?processId=&version= filters by version, and omits an instance pinned to another version", async () => {
+  const PID = pid("proc_http_list_version");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const onV1 = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await publishBody(PID, { ...simpleBody(), label: { en: "V2" } }, reg, dataSourceReg);
+  const onV2 = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances?processId=${PID}&version=2`, "GET", admin));
+  expect(res.status).toBe(200);
+  const page = (await res.json()) as { items: { instanceId: string }[] };
+  expect(page.items.map((i) => i.instanceId)).toEqual([onV2.instanceId]);
+  expect(page.items.map((i) => i.instanceId)).not.toContain(onV1.instanceId);
+});
+
+test.skipIf(!DB)("GET /instances?version=abc is a 400 request error", async () => {
+  const res = await fetch(authedReq("http://x/instances?processId=p1&version=abc", "GET", admin));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("GET /instances?version=2 with no processId is a 400 request error", async () => {
+  const res = await fetch(authedReq("http://x/instances?version=2", "GET", admin));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("GET /instances?excludeInstanceId= omits the named instance, keeps every other matching instance", async () => {
+  const PID = pid("proc_http_list_exclude");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const a = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  const b = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances?excludeInstanceId=${a.instanceId}`, "GET", admin));
+  expect(res.status).toBe(200);
+  const page = (await res.json()) as { items: { instanceId: string }[] };
+  const ids = page.items.map((i) => i.instanceId);
+  expect(ids).not.toContain(a.instanceId);
+  expect(ids).toContain(b.instanceId);
+});
+
+test.skipIf(!DB)("GET /instances?createdAfter=&createdBefore= bounds the page by creation time", async () => {
+  const PID = pid("proc_http_list_created_window");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const outside = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  const inside = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await sql`UPDATE instances SET created_at = '2026-01-01 00:00:00+00' WHERE instance_id = ${outside.instanceId}`;
+  await sql`UPDATE instances SET created_at = '2026-06-01 00:00:00+00' WHERE instance_id = ${inside.instanceId}`;
+
+  const url = `http://x/instances?processId=${PID}&createdAfter=2026-05-01T00:00:00Z&createdBefore=2026-07-01T00:00:00Z`;
+  const res = await fetch(authedReq(url, "GET", admin));
+  expect(res.status).toBe(200);
+  const page = (await res.json()) as { items: { instanceId: string }[] };
+  expect(page.items.map((i) => i.instanceId)).toEqual([inside.instanceId]);
+});
+
+test.skipIf(!DB)("GET /instances?createdAfter=yesterday is a 400 request error", async () => {
+  const res = await fetch(authedReq("http://x/instances?createdAfter=yesterday", "GET", admin));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("GET /instances?createdBefore=not-a-date is a 400 request error", async () => {
+  const res = await fetch(authedReq("http://x/instances?createdBefore=not-a-date", "GET", admin));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("request-shape");
+});
+
+test.skipIf(!DB)("GET /instances?dataWhere=... reaches no filter on the read — the route carries no dataWhere at all", async () => {
+  const PID = pid("proc_http_list_datawhere_ignored");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1));
+
+  const res = await fetch(authedReq(`http://x/instances?processId=${PID}&dataWhere=anything`, "GET", admin));
+  expect(res.status).toBe(200);
+  const page = (await res.json()) as { items: unknown[] };
+  expect(page.items).toHaveLength(1);
+});
+
+// ============================================================
 // A malformed pagination cursor is a client error
 // ============================================================
 

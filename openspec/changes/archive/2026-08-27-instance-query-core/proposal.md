@@ -118,6 +118,11 @@ would carry.
 - `docs/openapi.yaml` documents `GET /instances` at `:239-288`. The
   `http-api-documentation` capability requires a route to state its request
   and response schemas, so the new parameters land there too.
+- `openspec/config.yaml`'s `context:` block names the Runtime API Layer's
+  functions at line 84 as `listInstances`/`getInstanceRecord`. It gains
+  `queryInstances` beside them, and a note for the new `instance-data-query`
+  capability. That note lets the next change proposed against this context
+  know the read exists.
 - `docs/decisions.md` gains a note beside its promote-out-of-`body` entry. The
   note records two date ranges over instances. The reporting range bounds
   `startedAt`, and these filters bound `created_at`. The later promotion change

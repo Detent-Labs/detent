@@ -81,8 +81,13 @@ context: |
   `src/runtime/api.ts` (the Runtime API Layer) is the in-process boundary
   that actually runs an instance — `createProcessInstance`,
   `getInstanceView`, `submitAndTransition`, `claimStep`/`releaseClaim`,
-  `listInstances`/`getInstanceRecord` — validating and writing
-  user-submitted data (nothing else in the engine does). `src/http/` wraps
+  `listInstances`/`getInstanceRecord`/`queryInstances` — validating and
+  writing user-submitted data (nothing else in the engine does).
+  `queryInstances` (`instance-data-query`) reads one process's instances by
+  their `data` payload, in-process only, for a caller resolving an option
+  list or a report cell — no label resolution, no HTTP route.
+  `listInstances` and `queryInstances` share one predicate builder,
+  `buildInstanceWhere`. `src/http/` wraps
   it as `http-wrapper`, with one route module per surface beside
   `routes.ts` — admin, studio, reporting, account and UI strings;
   JWT/local-account auth (`jwt-authentication`,

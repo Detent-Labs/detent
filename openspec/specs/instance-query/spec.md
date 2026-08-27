@@ -17,57 +17,89 @@ capability's `GET /instances` and `GET /instances/:instanceId/record` routes.
 ### Requirement: List instance summaries with filters
 
 The Runtime API Layer SHALL expose a read that returns a page of instance
-summaries. A summary carries the instance's identity and lifecycle state —
+summaries. A summary carries the instance's identity and lifecycle state:
 `instanceId`, `processId`, `version`, `status`, `currentStepId`,
 `transitionSeq`, `assignment` (candidates and claim state), `startedBy`,
-`createdAt`, `currentStepEnteredAt`, `processLabel`, `stepLabel`,
-`processBaseLocale` — and SHALL NOT carry the instance `data` payload.
-`processLabel` and `stepLabel` are `LocalizedText`, resolved through the
-existing cached definition store against the pinned version body;
-`processBaseLocale` is that same body's `baseLocale`, included so a caller can
-resolve `processLabel`/`stepLabel` with the correct fallback locale without a
-second request. No other part of the process body (guards, action configs) is
-exposed through the summary.
+`createdAt`, `currentStepEnteredAt`, `processLabel`, `stepLabel` and
+`processBaseLocale`. A summary SHALL NOT carry the instance `data` payload.
 
-The read SHALL accept these optional filters, combined conjunctively:
-`processId`, `status` (one or more of the instance statuses), `currentStepId`,
-`startedBy`, `claimedBy`, and `assignedTo`. `assignedTo` SHALL match an
-instance whose current step is claimed by that actor, OR whose current step is
-unclaimed and lists that actor's id among its assignment candidates — the
-participant inbox predicate. The read SHALL additionally accept `scope: "mine"`,
-which applies the identical inbox predicate against the calling actor resolved
-from the request's credential rather than a client-supplied id; a caller MUST
-NOT be able to substitute `scope=mine` for the effect of an arbitrary
-`assignedTo` value belonging to another actor. Because `scope: "mine"`
-resolves a full `Actor` (id and roles) rather than a bare id string, its
-inbox predicate additionally matches an unclaimed instance that lists any of
-the actor's roles among its assignment candidates — the same id-or-role
-eligibility `claimStep` already applies (`isEligibleCandidate`). A bare
-`assignedTo=<id>` filter has no role list to check against and so matches by
-id only, identically for a claimed or an unclaimed instance.
+`processLabel` and `stepLabel` are `LocalizedText`. The read resolves both
+through the existing cached definition store, against the pinned version body.
+`processBaseLocale` is that same body's `baseLocale`. The summary includes it
+so a caller resolves `processLabel` and `stepLabel` against the correct
+fallback locale without a second request. The summary SHALL expose no other
+part of the process body, guards and action configs included.
+
+The read SHALL accept these optional filters: `processId`, `version`, `status`
+(one or more of the instance statuses), `currentStepId`, `startedBy`,
+`claimedBy`, `assignedTo`, `excludeInstanceId`, `createdAfter`,
+`createdBefore` and `dataWhere`. It SHALL combine them conjunctively.
+
+A `version` filter SHALL accompany a `processId` filter. The read SHALL reject
+a `version` with no `processId`. A version number anchors to one process, so a
+bare `version` names version 2 of every process at once. The
+`instances_selection_idx` index also reaches its `version` column only with the
+leading `processId` column bound. That is the rule `dataWhere` carries, for the
+first of those two reasons.
+
+`assignedTo` SHALL match an instance under either of two conditions. That actor
+holds the claim on its current step. Or its current step carries no claim and
+lists that actor's id among its assignment candidates. Together those two form
+the participant inbox predicate.
+
+The read SHALL additionally accept `scope: "mine"`. That applies the identical
+inbox predicate against the calling actor. The read resolves that actor from
+the request's credential, not from a client-supplied id. A caller MUST NOT be
+able to substitute `scope=mine` for the effect of an arbitrary `assignedTo`
+value belonging to another actor.
+
+`scope: "mine"` resolves a full `Actor`, id and roles, rather than a bare id
+string. So its inbox predicate additionally matches an unclaimed instance that
+lists any of the actor's roles among its assignment candidates. That is the
+same id-or-role eligibility `claimStep` already applies through
+`isEligibleCandidate`. A bare `assignedTo=<id>` filter carries no role list to
+check against. It therefore matches by id alone, identically for a claimed and
+an unclaimed instance.
+
+`excludeInstanceId` SHALL omit the named instance from the result.
+`createdAfter` and `createdBefore` SHALL bound the result by the `created_at`
+column. Both bounds SHALL include the instant they name. That matches the
+inclusive convention `src/engine/reporting.ts` already uses for its own date
+range.
+
+Both bounds SHALL compare against the stored `created_at` value at its full
+precision. Postgres writes that column with microseconds, and the summary's
+`createdAt` truncates to milliseconds. A stored value can carry digits below the
+millisecond. Its summary value then names an earlier instant than the row holds.
+A `createdBefore` carrying that summary value SHALL omit the instance it came
+from. The read exposes millisecond granularity on the value it returns, and
+full precision on the value it compares.
+
+A `dataWhere` filter SHALL carry comparisons against the instance `data`
+payload. The `instance-data-query` capability defines their semantics. That
+includes the `processId` filter a `dataWhere` requires. The comparisons join
+the other filters conjunctively.
 
 With no filters the read SHALL return every instance, subject to paging. The
 read SHALL NOT scope results to the calling actor implicitly.
 
-A matched instance's summary can fail to resolve. This happens when its
-pinned `(processId, version)` has no resolvable published body, or when its
-`currentStepId` is absent from that body's steps. The read SHALL NOT fail
-the whole page over a failure like this. Every other instance in the same
-page SHALL resolve and return normally.
+A matched instance's summary can fail to resolve. That happens when its pinned
+`(processId, version)` has no resolvable published body. It also happens when
+its `currentStepId` is absent from that body's steps. The read SHALL NOT fail
+the whole page over a failure like this. Every other instance in the same page
+SHALL resolve and return normally.
 
-The read SHALL accept one further filter, `includeDegraded`. A query
-parameter does not expose it. See the `http-wrapper` capability for how a
-caller sets it. When `includeDegraded` is true, the failed item SHALL come
-back as a degraded summary: `instanceId`, `processId`, `version`, `status`,
-`currentStepId`, `transitionSeq`, `startedBy`, `createdAt`, and a failure
-reason.
+The read SHALL accept one further filter, `includeDegraded`. No query parameter
+exposes it. See the `http-wrapper` capability for how a caller sets it. When
+`includeDegraded` is true, the failed item SHALL come back as a degraded
+summary carrying `instanceId`, `processId`, `version`, `status`,
+`currentStepId`, `transitionSeq`, `startedBy`, `createdAt`, and a reason.
 
-A degraded summary SHALL NOT carry `processLabel`, `stepLabel`, or
-`processBaseLocale`. When `includeDegraded` is false or absent, the read
-SHALL omit the failed item from the page instead. Omitting it SHALL NOT
-reduce the page below its requested `limit` by requesting extra rows to
-compensate. The page may come back shorter than `limit` even when more
-matching instances exist.
+A degraded summary SHALL NOT carry `processLabel`, `stepLabel` or
+`processBaseLocale`. When `includeDegraded` is false or absent, the read SHALL
+omit the failed item from the page instead. Omitting it SHALL NOT pull extra
+rows to keep the page at its requested `limit`. The page may come back shorter
+than `limit` even while more matching instances exist.
 
 #### Scenario: Listing every instance
 
@@ -86,6 +118,53 @@ matching instances exist.
 
 - **WHEN** the read is called with a `currentStepId`
 - **THEN** only instances currently parked on that step are returned
+
+#### Scenario: Filtering by version
+
+- **WHEN** the read runs with a `processId` and `version: 2`
+- **THEN** it returns the instances pinned to version 2 of that process
+- **AND** it omits an instance of that process pinned to version 1
+
+#### Scenario: The read rejects a version with no processId
+
+- **WHEN** a caller passes a `version` and no `processId`
+- **THEN** the read rejects the call
+
+#### Scenario: Filtering by a data comparison
+
+- **WHEN** the read runs with a `dataWhere` comparison naming a field id and a
+  scalar literal
+- **THEN** it returns the instances whose `data` holds that value under that
+  field id
+
+#### Scenario: Excluding one instance by id
+
+- **WHEN** the read runs with `excludeInstanceId` naming an instance that every
+  other filter matches
+- **THEN** it omits that instance
+- **AND** it returns every other matching instance
+
+#### Scenario: Bounding by creation time
+
+- **WHEN** the read runs with a `createdAfter` and a `createdBefore`
+- **THEN** it returns the instances created inside that window
+- **AND** it omits an instance created before the window
+- **AND** it omits an instance created after the window
+
+#### Scenario: A creation bound includes the instant it names
+
+- **WHEN** the read runs with a `createdAfter` naming an instance's stored
+  `created_at`, read at the column's full precision
+- **THEN** it returns that instance
+- **AND** a `createdBefore` naming that same instant returns it too
+
+#### Scenario: A creation bound taken from a summary is millisecond-granular
+
+- **WHEN** an instance's stored `created_at` carries digits below the
+  millisecond
+- **AND** a caller passes that instance's summary `createdAt` as a
+  `createdBefore`
+- **THEN** the read omits that instance
 
 #### Scenario: The inbox predicate matches a claimed instance
 

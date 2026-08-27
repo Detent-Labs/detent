@@ -236,7 +236,7 @@ The bottlenecks view is not a second reader. It groups by
 `body->>'currentStepId'` at `src/engine/reporting.ts:320-323`. Its `WHERE`
 filters `processId` and `status`, which `instances_selection_idx` serves.
 
-Measured on Postgres 16 over 80k rows, with both indexes present. The plan is a
+Measured on Postgres 16 over 80k rows, with both indexes in place. The plan is a
 bitmap scan on the selection index. A hash aggregate runs over the reduced set.
 The current-step index is never touched.
 
@@ -456,6 +456,16 @@ should per-instance visibility land. So the spec states the narrow property
 alone: the read does not scope to the caller implicitly. The wider property
 stays here, not in a published requirement.
 
+### The data read resolves no labels
+
+`queryInstances` returns no `processLabel` or `stepLabel`, and it opens no
+definition store. Its first consumer, the option-list path, re-resolves on
+every form render, every submission, every timer fire and every automatic
+transition. Label resolution reads the pinned version's process body from
+the cached definition store. None of those call sites displays a label, so
+each would immediately discard that work. The list read
+keeps resolving labels because a caller there renders them.
+
 ### The data read returns `redactedAt`
 
 `redactInstance` writes `redactedAt` into the body beside `data: {}`
@@ -528,8 +538,9 @@ Every step is additive. Both indexes use `CREATE INDEX IF NOT EXISTS`, and each
 new filter is optional with today's behaviour as its absent case. This change
 adds no column, so `instances` takes no rewrite and no `ACCESS EXCLUSIVE` lock.
 
-An older engine running against a database this change initialised sees two
-extra indexes it never names. Rollback drops them. No data lives only there.
+Rollback is reverting the commit. The two indexes stay behind on any database
+that already ran the new `initSchema`. They are additive, and no code path
+depends on their absence.
 
 ## Open Questions
 

@@ -20,18 +20,21 @@ paths on. The enumeration below names the predicates identified so far:
   gate. The cancel sweep runs once per nesting level, inside the caller's
   transaction, holding instance row locks.
 - `instances ((body->>'currentStepId'))`, named `instances_current_step_idx`. A
-  plain expression index too, of the same shape as the parent-instance one. Its
-  reader is the instance list read's `currentStepId` filter.
+  plain expression index too, of the same shape as the parent-instance one.
+  Its readers are the instance list read and the instance data read, both
+  reaching it through `buildInstanceWhere`'s shared `currentStepId` filter.
 - `instances ((body->>'startedBy'))`, named `instances_started_by_idx`. A plain
-  expression index of that same shape. Its reader is the instance list read's
-  `startedBy` filter. The `GET /instances` route sets that filter for every
-  `scope=started` request, which is a participant-facing screen.
+  expression index of that same shape. Its readers are the instance list read
+  and the instance data read, both reaching it through `buildInstanceWhere`'s
+  shared `startedBy` filter. The `GET /instances` route sets that filter for
+  every `scope=started` request, which is a participant-facing screen.
 
-Those last two predicates carry the list read's `currentStepId` and `startedBy`
-filters. The read carries six plain filters. Of the six, `processId` reaches
-`instances_selection_idx`'s leading column. The `version` filter reaches that
-index's second column with `processId` bound beside it. That index covers
-`processId`, `version` and `status`.
+Those last two predicates carry filters both reads share: `currentStepId` and
+`startedBy`. Both reads carry six plain filters in common: `processId`,
+`status`, `currentStepId`, `startedBy`, `claimedBy` and `version`. Of the six,
+`processId` reaches `instances_selection_idx`'s leading column. The `version`
+filter reaches that index's second column with `processId` bound beside it.
+That index covers `processId`, `version` and `status`.
 
 A `status` filter reaches its third column, which needs the two ahead of it
 bound to narrow a scan. A `claimedBy` filter reaches
