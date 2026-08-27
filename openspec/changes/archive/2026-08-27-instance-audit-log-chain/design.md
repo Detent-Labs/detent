@@ -379,12 +379,23 @@ The `SET LOCAL` has to sit inside a transaction. `initSchema` issues
 bare statements on the pooled `db` handle. A plain `SET ROLE` would not
 survive to the next statement on a different pooled connection.
 
-One grant comes before that block. So `initSchema` issues
+Two grants come before that block. So `initSchema` issues
 `GRANT CREATE ON SCHEMA public TO detent_audit_owner` first. A role
 creating a relation needs `CREATE` on its schema. Postgres 15 removed
 `public`'s default `CREATE` for `PUBLIC`. The `CREATE TABLE` otherwise
 fails with `permission denied for schema public`. A superuser skips that
 check, so the devcontainer would not have caught it.
+
+`initSchema` also issues `GRANT TRIGGER ON instances TO
+detent_audit_owner`, from the role that owns `instances` — the engine's
+own connecting role, not `detent_audit_owner`, which owns neither
+`instances` nor anything on it yet at this point. `CREATE TRIGGER` needs
+the `TRIGGER` privilege on the table the trigger attaches to, a
+privilege distinct from owning that table. Without this grant the owner
+role could create `instance_audit` and `redact_instance_fields` inside
+its `SET LOCAL ROLE` block but not the two triggers the same block
+creates on `instances`, since `instances` belongs to the engine's role
+alone.
 
 The append-only property then rests on a grant nobody made, rather than
 on a revoke a definer function walks past. The definer function holds its

@@ -177,13 +177,16 @@ test.skipIf(!DB || !PROBE)(
   },
 );
 
+// 42501 (insufficient_privilege) is the refusal under test; any other
+// rejection (a dropped connection, a typo'd relation) must fail the test
+// rather than read as a pass, the way a bare catch-and-swallow would.
 async function expectRefused(p: Promise<unknown>): Promise<void> {
   try {
     await p;
     throw new Error("expected statement to be refused, but it succeeded");
   } catch (e) {
     if (e instanceof Error && e.message.startsWith("expected statement to be refused")) throw e;
-    // any other rejection is the refusal under test
+    expect(e).toMatchObject({ errno: "42501" });
   }
 }
 

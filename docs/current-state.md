@@ -4124,6 +4124,12 @@ connecting role holds `INSERT` and `SELECT` on the relation alone. It
 also holds `EXECUTE` on the redaction function, never `UPDATE` or
 `DELETE`.
 
+`initSchema` grants `detent_audit_owner` two privileges before creating
+those objects: `CREATE` on schema `public`, and `TRIGGER` on
+`instances`. The second is what lets the owner role create the two
+triggers below on a table the engine's own connecting role owns, not
+`detent_audit_owner` itself.
+
 Two triggers on `instances` share one diff function:
 `instance_audit_insert_trg` (`AFTER INSERT`) and
 `instance_audit_update_trg` (`AFTER UPDATE ... WHEN

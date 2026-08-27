@@ -113,7 +113,18 @@ Task 1.2's `CREATE TABLE` is not runnable standalone: see task 5.4.
   membership in `detent_audit_owner`. Assert the second one raises
   nothing and warns nothing. In the devcontainer the suite
   connects as `postgres`, and a superuser walks past every ownership
-  check this task exists for
+  check this task exists for.
+
+  Not reproducible as written, for the same reason task 5.12 records:
+  the shared devcontainer database has only one connecting role,
+  `postgres`, and no non-superuser owning schema `public`. The test
+  therefore runs both calls on the shared superuser connection instead
+  and compares ownership and grants before and after, which still
+  catches a second run reassigning ownership or re-granting — the
+  regression this task guards against. It does not exercise task 5.4's
+  `insufficient_privilege` branches; task 5.12 measures the SQLSTATE
+  those branches trap, and the full degraded-`initSchema` scenario
+  stays a manual check on a virgin cluster, as task 5.12 itself says
 
 ## 3. Actor and source
 
@@ -273,6 +284,14 @@ not code order.
   `public`'s default `CREATE` for `PUBLIC`. Make the whole owner block
   conditional on the role existing. A cluster that skipped the create
   does not then fail on the grants.
+
+  Issue `GRANT TRIGGER ON instances TO detent_audit_owner` under the
+  same trap too, from the engine's own connecting role, which owns
+  `instances` — `detent_audit_owner` owns nothing on it. `CREATE
+  TRIGGER` needs the `TRIGGER` privilege on the table it attaches to,
+  distinct from owning that table. Without this grant the owner role's
+  block below can create `instance_audit` and `redact_instance_fields`
+  but not task 2.2's two triggers on `instances`.
 
   Before opening the transaction, capture the engine's own role name,
   which task 5.5 needs as a grantee:

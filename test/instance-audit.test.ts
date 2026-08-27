@@ -137,6 +137,15 @@ test.skipIf(!DB)("1.3 pg_indexes lists instance_audit's primary key index", asyn
   expect(rows.map((r) => r.indexname)).toContain("instance_audit_pkey");
 });
 
+test.skipIf(!DB)("2.2 pg_trigger lists both audit triggers on instances", async () => {
+  const rows = (await sql`
+    SELECT tgname FROM pg_trigger WHERE tgrelid = 'instances'::regclass AND NOT tgisinternal
+  `) as { tgname: string }[];
+  expect(rows.map((r) => r.tgname)).toEqual(
+    expect.arrayContaining(["instance_audit_insert_trg", "instance_audit_update_trg"]),
+  );
+});
+
 test.skipIf(!DB)("1.5 a second initSchema run leaves instance_audit and its rows untouched", async () => {
   const i = await mk({ field_x: "hi" });
   const before = await auditRows(i.instanceId);
@@ -288,6 +297,13 @@ const auditOwnershipAndGrants = async (): Promise<Record<string, unknown>[]> =>
     WHERE c.relname = 'instance_audit' AND p.proname = 'redact_instance_fields'
   `) as Record<string, unknown>[];
 
+// Runs both calls on the shared devcontainer superuser connection, not on a
+// non-superuser role owning schema `public` and holding membership in
+// `detent_audit_owner` as originally specced (tasks.md 2.14) — no such role
+// exists in this shared database, for the reason test/instance-audit-privileges
+// .test.ts's 5.12 comment records. Comparing ownership and grants before and
+// after still catches a second run reassigning ownership or re-granting; it
+// does not exercise the insufficient_privilege branches themselves.
 test.skipIf(!DB)("2.14 a second initSchema run leaves ownership and grants as the first run set them", async () => {
   await mk({ field_x: "hi" });
   const before = await auditOwnershipAndGrants();
