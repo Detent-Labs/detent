@@ -44,12 +44,16 @@ const insertRow = async (opts: { key: string; instanceId?: string; status: strin
 let migrationN = 0;
 const migrationPid = () => `proc_http_admin_migration_${++migrationN}` as Instance["processId"];
 
+// redactable-field-flag: field_x is declared redactable so the redaction
+// route test below (which writes field_x) still gets a `redact` audit row
+// under the narrowed rule — a field absent from the catalog now keeps its
+// history untouched rather than always getting one.
 const migrationWaitBody = (key: string): ProcessBody =>
   ({
     key,
     label: { en: key },
     baseLocale: "en",
-    fields: [],
+    fields: [{ id: "field_x", key: "x", label: { en: "X" }, type: "string", redactable: true }],
     workflow: {
       initialStep: "step_wait",
       steps: [

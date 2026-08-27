@@ -100,8 +100,12 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   review, `2b9b905`/`072b9e1` closed its verification gaps, and `591c6c4`
   archived it; its spec is `openspec/specs/instance-audit-log/spec.md`.
   A third change, the nightly checkpoint, was struck 2026-08-27 (see
-  "Explicitly not the goal" below). Change 2 remains. Two changes, in this
-  order.
+  "Explicitly not the goal" below). Change 2, `redactable-field-flag`
+  (`openspec/changes/redactable-field-flag/`), is implemented and
+  verified as of 2026-08-27, pending archive. Two changes, in this
+  order — no third is decided. A readable admin view over the audit log
+  is a real, named gap (see "Open, deliberately" below), but nobody has
+  proposed it as a change yet, so it is not "change 3."
 
   1. The table, the two triggers sharing one diff function, the
      `set_config` call at all six write sites, the hash chain, and
@@ -120,6 +124,17 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
      This one touches `FieldDef`, so it is a definition-contract change and
      carries that ceremony: the spec delta, the `examples/` sweep,
      `docs/authoring-guide.md`, and a test that rejects a violating input.
+     Implemented 2026-08-27 as `redactable-field-flag`
+     (`openspec/changes/redactable-field-flag/`), whose design.md settles
+     three questions this entry left open: the instance's *currently
+     pinned* version's catalog is the sole source of `redactable`, never
+     the version active when a given audit row was written; a field id the
+     audit log still holds but that catalog no longer declares stays
+     unredacted through this path, an accepted opt-in limitation rather
+     than a fail-safe default (see "Open, deliberately" below); and
+     `redactable` places no restriction on `technical` — the two flags are
+     independent, and only a `redactable` `group` field fails publish,
+     mirroring `technical`'s own restriction on `group`.
 
   **The goal.** Every change to an instance's `data` leaves one readable
   record: which field, old value visible in clear text, who, when, from
@@ -252,6 +267,25 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   every instance holding that person needs the cross-instance query
   machinery of the aggregated-data-source / reporting topics, which were
   still under design when this entry was written.
+
+  A field id an instance's audit log still holds, but the currently pinned
+  version's catalog no longer declares, stays unredacted through
+  `redact_instance_fields`. `redactable-field-flag`'s design.md accepted
+  this 2026-08-27 rather than defaulting an unresolvable field id to
+  redactable, to keep `redactable` an opt-in signal rather than inverting
+  it for the one case an author's intent is least knowable. Revisit if a
+  concrete "I deleted a field I needed to redact" case shows up; do not
+  build a fix ahead of one.
+
+  A readable admin view over the audit log is unbuilt and carries no
+  change name or number yet. `docs/current-state.md`'s instance-audit-log
+  section already names the gap: `verifyInstanceChain`
+  (`src/engine/admin-queries.ts:259`) has no caller anywhere in `src/http`
+  or `packages/web`, so today the chain's tamper-evidence is provable only
+  by someone with direct database access, not through the product. That
+  falls short of this entry's own goal ("readable ... without ceremony,"
+  above). Nobody has proposed a change for it, so it stays a named,
+  undecided gap here rather than a numbered change.
 - **Aggregated data source: a field's options read from other instances.** A
   design pass on 2026-08-25 settled a shape, and a second pass the same day
   replaced it. Not started.

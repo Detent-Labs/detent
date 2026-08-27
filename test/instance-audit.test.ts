@@ -33,14 +33,18 @@ const step = (id: string, over: Record<string, unknown> = {}): Step => ({ id, ke
 const manualPath = (id: string, to: string) => ({ id, key: id, label: `Path ${id}`, to, trigger: "manual" });
 
 // step_a (non-terminal) --manual--> step_b (terminal). field_x/field_y are
-// declared so a real submitted patch validates.
+// declared so a real submitted patch validates. field_x alone is redactable
+// (redactable-field-flag task 2.7): every "6.x" case below touches only
+// field_x, so it stays redacted under the narrowed rule with no other change
+// to its own assertions; "6.2/6.3" is the one case that also touches
+// field_y, and it asserts field_y is left untouched.
 const simpleBody = (): ProcessBody =>
   ({
     key: "audit_test",
     label: { en: "audit test" },
     baseLocale: "en",
     fields: [
-      { id: "field_x", key: "x", label: { en: "X" }, type: "string" },
+      { id: "field_x", key: "x", label: { en: "X" }, type: "string", redactable: true },
       { id: "field_y", key: "y", label: { en: "Y" }, type: "string" },
     ],
     workflow: {
@@ -83,8 +87,18 @@ beforeEach(async () => {
 
 // ---- fixtures ----------------------------------------------------------------
 
-const mk = async (data: Record<string, unknown> = {}, over: { assignment?: unknown } = {}): Promise<Instance> =>
-  createInstance(simpleBody(), { processId: pid(), version: 1, data: data as Instance["data"], ...over } as Parameters<typeof createInstance>[1], sql);
+// redactable-field-flag: redactInstance now resolves the instance's pinned
+// definition body, so every "6.x" instance below must be created against a
+// published version (no `definitions` row means resolveBody returns
+// undefined and redactInstance throws).
+const mk = async (data: Record<string, unknown> = {}, over: { assignment?: unknown } = {}): Promise<Instance> => {
+  const published = await publishBody(pid(), simpleBody(), reg, dataSourceReg);
+  return createInstance(
+    published.definition,
+    { processId: published.processId, version: published.version, data: data as Instance["data"], ...over } as Parameters<typeof createInstance>[1],
+    sql,
+  );
+};
 
 /** Raw jsonb shallow-merge into `body.data`, bypassing the runtime API — exercises the trigger alone. */
 const setData = (id: string, patch: Record<string, unknown>) =>
@@ -562,7 +576,7 @@ test.skipIf(!DB)("6.1 the automatic sweep names no actor, so its rows carry a nu
   expect(rows.slice(1).every((r) => r.actor === null)).toBe(true);
 });
 
-test.skipIf(!DB)("6.2/6.3 redaction appends one redact row per field and clears every prior value of those fields", async () => {
+test.skipIf(!DB)("6.2/6.3 redaction appends a redact row for the redactable field alone and clears every prior value of that field; a non-redactable field keeps its history", async () => {
   const i = await mk({ field_x: "1" });
   await setData(i.instanceId, { field_x: "2" });
   await setData(i.instanceId, { field_y: "a" });
@@ -572,9 +586,24 @@ test.skipIf(!DB)("6.2/6.3 redaction appends one redact row per field and clears 
 
   const rows = await auditRows(i.instanceId);
   const redactRows = rows.filter((r) => r.op === "redact");
-  expect(redactRows.map((r) => r.field_id).sort()).toEqual(["field_x", "field_y"]);
-  const setRows = rows.filter((r) => r.op === "set");
-  expect(setRows.every((r) => r.value === null && r.salt === null)).toBe(true);
+  // field_y is declared in the catalog throughout (never removed) — this is
+  // the "non-redactable field keeps its history" scenario, not the "removed
+  // from the catalog" one (test/retention.test.ts covers that separately via
+  // a migration that drops a field).
+  expect(redactRows.map((r) => r.field_id)).toEqual(["field_x"]);
+  const xSetRows = rows.filter((r) => r.op === "set" && r.field_id === "field_x");
+  expect(xSetRows.every((r) => r.value === null && r.salt === null)).toBe(true);
+
+  // field_y's original row keeps its value and salt, and gets no redact row.
+  // The unconditional body.data wipe still appends its own "set" row for
+  // field_y (JSON null, salted like any other value — not SQL NULL), but
+  // that row is orthogonal to redactable and asserted elsewhere
+  // (test/retention.test.ts's field-scoped cases).
+  const yRows = rows.filter((r) => r.field_id === "field_y");
+  expect(yRows.some((r) => r.op === "redact")).toBe(false);
+  const yOriginalRow = yRows.find((r) => r.value === "a");
+  expect(yOriginalRow).toBeDefined();
+  expect(yOriginalRow!.salt).not.toBeNull();
 });
 
 test.skipIf(!DB)("6.4 redactInstance calls the redaction after the body.data wipe, and the set/redact entries share the actor", async () => {
@@ -600,9 +629,10 @@ test.skipIf(!DB)("6.5 a second instance's entries keep their values in clear tex
   expect(otherRow.value).toBe("keep-me");
 });
 
-test.skipIf(!DB)("6.6 verify_instance_chain still reports holding after a redaction", async () => {
+test.skipIf(!DB)("6.6 verify_instance_chain still reports holding after a redaction mixing a redacted and an untouched field", async () => {
   const i = await mk({ field_x: "1" });
   await setData(i.instanceId, { field_x: "2" });
+  await setData(i.instanceId, { field_y: "keep" }); // field_y is not redactable
   await setStatus(i.instanceId, "completed");
   await redactInstance(i.instanceId as Instance["instanceId"], sql);
   const holding = await verifyInstanceChain(i.instanceId as Instance["instanceId"], sql);

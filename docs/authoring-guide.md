@@ -257,6 +257,27 @@ regardless of what any step's view says. A view entry naming it may not
 declare `required` or `readonly` at all. That refines the rule above; it does
 not break it. Ordinary requiredness still lives only in the view.
 
+A catalog field can also carry `redactable: true`. It marks the field's
+historical values eligible for future erasure. Redaction clears the field's
+audit-log values across its whole history. A field the catalog does not mark
+`redactable` keeps its history intact.
+
+`redactable` carries no runtime behavior of its own. It changes no CEL
+type-check, no view resolution, and no requiredness. Only redaction reads it.
+
+A `group` field must not declare `redactable: true`, the same restriction
+`technical` carries. A group holds fields and carries no value of its own to
+redact.
+
+`redactable` and `technical` are independent. A field may declare either,
+both, or neither. A `technical` field's value comes from the engine, not the
+participant. It can still hold data an author wants erasable.
+
+Redaction always reads the field's `redactable` flag from the instance's
+currently published version, at the moment of redaction. It never reads the
+flag a version held when a participant wrote a particular value. A later
+republish that adds or drops the flag never touches a value from before.
+
 A view entry that declares `required: true` and `readonly: true` together
 locks a field a participant can never fill. Publishing rejects that pair
 unless some other source in the body writes the field first. The write must

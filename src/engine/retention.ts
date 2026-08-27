@@ -9,10 +9,11 @@
  */
 import type { SQL } from "bun";
 import { sql, withTransaction, setAuditAttribution } from "./store.js";
-import { instance as instanceSchema, type Instance, type InstanceId } from "../schema/definition.js";
+import { instance as instanceSchema, collectFieldsDeep, type Instance, type InstanceId } from "../schema/definition.js";
 import { NotFoundError, InstanceRunningError } from "../errors.js";
 import { logSkippedItem } from "./poll.js";
 import { deleteInstanceDraft } from "./instance-drafts.js";
+import { createDefinitionStore } from "./definitions.js";
 
 const BATCH = 500;
 
@@ -47,10 +48,27 @@ export async function redactInstance(
     const at = new Date().toISOString();
     await tx`UPDATE instances SET body = body || ${{ data: {}, redactedAt: at }}::jsonb, redacted_at = ${at}
       WHERE instance_id = ${instanceId}`;
-    // Clears every prior value the instance's own audit entries hold, across
-    // every field they name — the trigger above only ever appends, never
-    // clears (design.md "Redaction is its own definer function").
-    await tx`SELECT redact_instance_fields(${instanceId}, ${opts?.actor ?? null}, ${opts?.reason ?? null}, ${inst.transitionSeq})`;
+    // The redactable field-id set comes from the instance's currently pinned
+    // definition, resolved here rather than inside redact_instance_fields:
+    // that function is SECURITY DEFINER, owned by an audit-only role with no
+    // access to `definitions` (redactable-field-flag design.md "The
+    // currently pinned version's catalog is the sole source of truth").
+    const { resolveBody } = createDefinitionStore(tx);
+    const body = await resolveBody(inst.processId, inst.version);
+    if (!body) {
+      throw new Error(`redactInstance: no published definition for ${inst.processId}@${inst.version}`);
+    }
+    const fieldIds = collectFieldsDeep(body.fields)
+      .filter((f) => f.redactable === true)
+      .map((f) => f.id);
+
+    // Clears every prior value the instance's audit entries hold for a field
+    // the currently pinned version marks redactable — the trigger above only
+    // ever appends, never clears (design.md "Redaction is its own definer
+    // function").
+    await tx`SELECT redact_instance_fields(
+      ${instanceId}, ${opts?.actor ?? null}, ${opts?.reason ?? null}, ${inst.transitionSeq}, ${tx.array(fieldIds, "TEXT")}
+    )`;
     await tx`DELETE FROM instance_comments WHERE instance_id = ${instanceId}`;
     await tx`DELETE FROM instance_attachments WHERE instance_id = ${instanceId}`;
     await deleteInstanceDraft(instanceId, tx);

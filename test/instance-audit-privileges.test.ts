@@ -36,7 +36,7 @@ if (DB) {
     await withTransaction(sql, async (tx) => {
       await tx`SET LOCAL ROLE detent_audit_owner`;
       await tx`GRANT INSERT, SELECT ON instance_audit TO detent_audit_probe`;
-      await tx`GRANT EXECUTE ON FUNCTION redact_instance_fields(text, text, text, bigint) TO detent_audit_probe`;
+      await tx`GRANT EXECUTE ON FUNCTION redact_instance_fields(text, text, text, bigint, text[]) TO detent_audit_probe`;
     });
     await sql`GRANT INSERT, SELECT ON instances TO detent_audit_probe`;
     // Membership in detent_audit_owner is role-level, cluster-scoped state

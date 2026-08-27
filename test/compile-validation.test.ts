@@ -656,6 +656,37 @@ describe("compile: technical field marker", () => {
   });
 });
 
+// redactable-field-marker: a structural check alongside checkTechnicalFields.
+// Not a Zod refinement. An unbypassable check is the reason; see
+// `definition-contract`.
+describe("compile: redactable field marker", () => {
+  it("rejects redactable: true on a group field", () => {
+    const b = baseBody();
+    b.fields.push({ id: "field_g", key: "g", label: { en: "G" }, type: "group", redactable: true, fields: [] });
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "fields.field_g.redactable")).toBe(true);
+  });
+
+  it("publishes a redactable field of a non-group type", () => {
+    const b = baseBody();
+    b.fields[0].redactable = true;
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("publishes a field declaring both technical: true and redactable: true", () => {
+    const b = baseBody();
+    b.fields[0].technical = true;
+    b.fields[0].redactable = true;
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("redactable: false gates nothing: publishes on a group field", () => {
+    const b = baseBody();
+    b.fields.push({ id: "field_g", key: "g", label: { en: "G" }, type: "group", redactable: false, fields: [] });
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+});
+
 // reject-unsatisfiable-required-readonly: the eighth structural check. A view
 // entry declaring literal required: true and literal readonly: true strands
 // an instance unless some source in the body writes the field. See

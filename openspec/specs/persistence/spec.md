@@ -211,10 +211,10 @@ list carries one. The redaction is the single path that clears a stored
 value, and it belongs to the engine's role alone.
 
 The relation and the redaction function SHALL belong to a separate
-login-less owner role `initSchema` creates. Clearing the values of every
-field an instance's entries name SHALL run under that owner's privilege.
-The trigger's append and that redaction SHALL be the only two paths that
-write the relation.
+login-less owner role `initSchema` creates. Clearing the redactable
+fields' values SHALL run under that owner's privilege. The trigger's
+append and that redaction SHALL be the only two paths that write the
+relation.
 
 `initSchema` SHALL grant the engine's role membership in that owner role
 without inheritance. Creating the owner's objects needs the membership.
