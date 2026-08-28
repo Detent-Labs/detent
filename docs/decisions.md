@@ -467,7 +467,7 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     execution paths need an answer for whose view they use.
 - **Instance data tables: a report builder over instance field values.** A
   design pass on 2026-08-25 settled the shape, in the same session as the
-  two entries above. Not started.
+  two entries above. Shipped 2026-08-28 as `instance-data-tables`.
 
   **The goal.** A department builds a table of instances and reads their
   field values as columns. The worked case: HR lists every onboarding of
@@ -539,12 +539,13 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     permission. `process-read-permission` has since applied:
     `Permission` (`src/auth/authorize.ts:77`) now admits `"read"`, mapped
     to `ADMIN_ROLE`, and `scope=all` routes through it when the request
-    names a `processId`. The **report builder itself stays open** — this
-    change ships only the process-scoped `read` gate on `GET /instances`,
-    not the report/table feature this entry describes, and not the
-    reporting-routes migration (`REPORTS_ROLE` → `read` on the three
-    aggregate routes) `process-read-permission/proposal.md` scopes out as
-    its own later change.
+    names a `processId`. `process-read-permission` shipped only the
+    process-scoped `read` gate on `GET /instances`, not the report/table
+    feature this entry describes; `instance-data-tables` closed that gap
+    2026-08-28. The reporting-routes migration (`REPORTS_ROLE` → `read` on
+    the three aggregate routes) `process-read-permission/proposal.md` scopes
+    out stays its own later change — `instance-data-tables` did not fold it
+    in either.
 
   **Explicitly not the goal.**
   - Not the three existing reporting views. Cycle time, bottleneck and

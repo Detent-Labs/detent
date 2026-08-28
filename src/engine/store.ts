@@ -432,6 +432,45 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     scope    jsonb NOT NULL,
     members  text[] NOT NULL DEFAULT '{}'
   )`;
+  // Saved reports (instance-data-tables): a process owner's saved table over
+  // instance field values. `query` is jsonb (status/date-range/dataWhere, the
+  // same axes `queryInstances` accepts) and `columns` is jsonb (the ordered
+  // direct/merge column list), mirroring `data_lists.columns`'s own reason to
+  // stay jsonb rather than a normalized shape: the read side always resolves
+  // the whole object at once, and the shape stays free to grow with no
+  // migration. `owner` carries no foreign key, the same convention
+  // `groups.members` and `auth_users.roles` use, so an owner id survives that
+  // account's own lifecycle.
+  await db`CREATE TABLE IF NOT EXISTS reports (
+    instance_report_id text PRIMARY KEY,
+    owner       text  NOT NULL,
+    process_id  text  NOT NULL,
+    name        text  NOT NULL,
+    query       jsonb NOT NULL DEFAULT '{}',
+    columns     jsonb NOT NULL DEFAULT '[]',
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now()
+  )`;
+  // A report's viewers/editors: one row per name per list per report, unlike
+  // `groups.members`'s single `text[]` column, because a report's access
+  // check runs in the opposite direction from a group's — "which reports name
+  // me" rather than "read one group's members whole" (design.md "Reports are
+  // a new table, not a row shape borrowed from `permission_grants`"). No
+  // column distinguishes an id, a role or a group name; a caller checking
+  // membership expands a `group_`-prefixed principal through
+  // `getGroupMembers` before comparing. Cascades with its report: nothing
+  // else ever holds a live reference to a report the way a running instance
+  // holds a `data_list_values` row, so nothing needs a deleted report's
+  // principal rows to survive it.
+  await db`CREATE TABLE IF NOT EXISTS report_principals (
+    instance_report_id text NOT NULL REFERENCES reports (instance_report_id) ON DELETE CASCADE,
+    list       text NOT NULL,
+    principal  text NOT NULL,
+    PRIMARY KEY (instance_report_id, list, principal)
+  )`;
+  // "Reports visible to me" (`listMyReports`) matches the caller's own id,
+  // roles and group ids against `principal`, filtered by `list`.
+  await db`CREATE INDEX IF NOT EXISTS report_principals_principal_list_idx ON report_principals (principal, list)`;
 
   await initInstanceAudit(db);
 }

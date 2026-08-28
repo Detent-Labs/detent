@@ -55,8 +55,17 @@ test("every requested path is a reporting route", () => {
   for (const path of paths) expect(path.startsWith("/reporting/")).toBe(true);
 });
 
-test("no mutating HTTP method is issued", () => {
-  // Login moved to the shell, so this area now issues no write at all.
-  const methods = [...clientSource.matchAll(/method:\s*"([A-Z]+)"/g)].map((m) => m[1]);
-  expect(methods).toEqual([]);
+test("every mutating request stays confined to /reporting/reports routes", () => {
+  // The report builder (instance-data-tables) is this area's one exception to
+  // "read requests only" — reporting-app's own MODIFIED requirement narrows
+  // the rule to name it, rather than leaving the three original views'
+  // canary silently widened. A mutating call's own request() call carries no
+  // literal path in this same match, so this walks the source around each
+  // "method:" occurrence for the request() call's path argument instead.
+  const calls = [...clientSource.matchAll(/request\(\s*(`[^`]*`|"[^"]*")[^)]*method:\s*"([A-Z]+)"/gs)];
+  const mutating = calls.filter(([, , method]) => method !== "GET");
+  expect(mutating.length).toBeGreaterThan(0);
+  for (const [, path] of mutating) {
+    expect(path.includes("/reporting/reports"), path).toBe(true);
+  }
 });

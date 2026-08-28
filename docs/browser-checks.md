@@ -1684,3 +1684,67 @@ authored JSON `null` in a rendered page. This entry confirms the screen
 draws that distinction correctly. It also confirms a real "Load more"
 click drives the paged list to completion. No row repeats, and none is
 missing.
+
+### The report builder (`instance-data-tables`)
+
+Log in as `demo-superuser@example.test` (holds both `system:reports` and
+`system:admin`, so the same account both builds reports and passes the
+process `read` gate). Open `/reporting/reports`.
+
+Pass: the empty state reads "You have no reports yet." Choose "New report".
+Pass: the process picker gates the screen — no filter/column controls render
+until a process is chosen (mirrors the three existing views' own
+process-first shape).
+
+Pick a process with at least one instance. Pass: the "Add column" picker and
+"Add comparison" button populate from real field ids — both stay disabled
+against a process with zero instances, since column choices resolve from
+in-range instances' own pinned versions, not the bare field catalog.
+
+Name the report, add one direct-field column and one merge column naming two
+source fields, reorder a column with "Move earlier"/"Move later", and remove
+a merge source. Add a viewer and an editor by id. Pass: the owner's own
+editors entry shows "Owner — always an editor" with no Remove control from
+the start — the UI blocks the one removal the engine also rejects, before a
+request is ever sent.
+
+Run "Preview table" against seeded instances covering a real value, an unset
+field (no-value), and a redacted instance, with the merge column's two
+sources both set on one instance and only one set on another. Pass: the
+value cell prints plain, the unset cell prints "—", the redacted cell prints
+a solid bar with no visible text (an `aria-label` carries "Redacted" for a
+screen reader), the merge cell with two sources concatenates and carries a
+"Collision" marker beside it, and the column header states the aggregate
+count ("1 collision" — singular, not "1 collision(s)").
+
+Save. Pass: the URL moves to `/reporting/reports/<id>`, the reports list
+now shows the saved name with an "Owner" tag, and reopening it from that
+list restores the same process, filters, columns and share lists exactly —
+including the just-added viewer, confirmed after a full page reload, not
+only the in-memory state a save leaves behind.
+
+Push a process past the 50-instance execution bound and preview again. Pass:
+a stated notice reads "This table is incomplete — more instances matched
+than are shown," not a silently short table.
+
+Switch the account menu to German and repeat the preview. Pass: every
+control, the owner-lock caption, the sharing hint, the redacted/no-value
+cells' wording, and the collision marker translate, with no English word
+left and no singular/plural literal ("1 Kollision", not "1 Kollision(en)").
+
+Measured on 2026-08-28. This walk did not reach the "not-in-this-version"
+cell state or the column picker's per-field version-coverage note (both
+need a second published version with a diverging field catalog and an
+in-range instance on each) — `test/reports.test.ts`'s 3.4/3.5 cases already
+exercise both directly against the engine, and the same `fieldCellDisplay`
+switch this walk already confirmed renders three of its four kinds
+correctly renders the fourth by the same code path.
+
+`test/reports.test.ts` and `test/http-reporting-reports.test.ts` already
+assert the CRUD, membership, redaction-priority and truncation rules
+against the API. Neither can see a stale ref after a client-side route
+change, an accessible name a screen reader actually gets (the
+"Add columnAdd" duplicate name this walk caught and
+`ColumnEditor.tsx`'s `FieldPicker` since fixed), or a save that silently
+fails to persist a locally-added viewer — the round trip this walk
+confirms with a real reload rather than trusting in-memory state.

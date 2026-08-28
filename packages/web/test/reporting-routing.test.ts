@@ -29,4 +29,13 @@ describe("the reporting area's process-view routes", () => {
     expect(matchRoute("/processes/proc_1/cycle-time")).toEqual({ name: "view", view: "cycle-time", processId: "proc_1" });
     expect(matchRoute("/processes/proc_1/sla")).toEqual({ name: "view", view: "sla", processId: "proc_1" });
   });
+
+  it("matches and round-trips the report builder's own routes", () => {
+    const routes: Route[] = [{ name: "reports" }, { name: "newReport" }, { name: "report", reportId: "rep_1" }];
+    for (const route of routes) expect(matchRoute(routePath(route))).toEqual(route);
+  });
+
+  it("decodes a report id the same way a process id is decoded", () => {
+    expect(matchRoute("/reports/rep%20with%20space")).toEqual({ name: "report", reportId: "rep with space" });
+  });
 });

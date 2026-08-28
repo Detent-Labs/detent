@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChartNoAxesColumn } from "lucide-react";
+import { ChartNoAxesColumn, FileSpreadsheet } from "lucide-react";
 import { matchRoute, routePath, type Route, type ViewName } from "./routing.js";
 import { useAreaRoute, PROFILE_PATH } from "../../shell/routing.js";
 import { Chrome } from "../../shell/Chrome.js";
@@ -8,6 +8,8 @@ import { ProcessPickerScreen } from "./screens/ProcessPickerScreen.js";
 import { CycleTimeScreen } from "./screens/CycleTimeScreen.js";
 import { BottleneckScreen } from "./screens/BottleneckScreen.js";
 import { SlaScreen } from "./screens/SlaScreen.js";
+import { ReportsListScreen } from "./screens/ReportsListScreen.js";
+import { ReportBuilderScreen } from "./screens/ReportBuilderScreen.js";
 import { DateRangeControl } from "./components.js";
 import { t, type CatalogKey } from "./catalog.js";
 import type { AreaRootProps } from "../../shell/App.js";
@@ -64,6 +66,15 @@ export function ReportingArea({ session, locale, localPath, go, onLocaleChange, 
             {t(locale, v.labelKey)}
           </button>
         ))}
+      <button
+        type="button"
+        className="btn btn-secondary"
+        aria-current={route.name === "reports" || route.name === "newReport" || route.name === "report" ? "page" : undefined}
+        onClick={() => navigate({ name: "reports" })}
+      >
+        <FileSpreadsheet size={18} strokeWidth={1.75} aria-hidden="true" />
+        {t(locale, "nav.reports")}
+      </button>
     </nav>
   );
 
@@ -87,6 +98,29 @@ export function ReportingArea({ session, locale, localPath, go, onLocaleChange, 
             setProcessLabel(label);
             navigate({ name: "view", view: "cycle-time", processId });
           }}
+        />
+      ) : route.name === "reports" ? (
+        <ReportsListScreen
+          token={session.token}
+          locale={locale}
+          actorId={session.actorId}
+          onOpen={(reportId) => navigate({ name: "report", reportId })}
+          onNew={() => navigate({ name: "newReport" })}
+        />
+      ) : route.name === "newReport" ? (
+        <ReportBuilderScreen
+          token={session.token}
+          locale={locale}
+          actorId={session.actorId}
+          onSaved={(reportId) => navigate({ name: "report", reportId })}
+        />
+      ) : route.name === "report" ? (
+        <ReportBuilderScreen
+          reportId={route.reportId}
+          token={session.token}
+          locale={locale}
+          actorId={session.actorId}
+          onSaved={(reportId) => navigate({ name: "report", reportId })}
         />
       ) : (
         <main className="rep-screen">

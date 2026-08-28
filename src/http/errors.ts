@@ -26,6 +26,7 @@ import {
   NotClaimedError,
   NotClaimantError,
   UnknownDelegateError,
+  ReportOwnerInvariantError,
 } from "../runtime/api.js";
 import { ActorResolutionError } from "../auth/resolve.js";
 import { AuthorizationError } from "../auth/authorize.js";
@@ -105,6 +106,7 @@ const MESSAGE_ERRORS: MessageMapping[] = [
   { ctor: UnknownDelegateError, status: 422, type: "unknown-delegate" },
   { ctor: DraftConflictError, status: 409, type: "draft-conflict" },
   { ctor: MigrationPlanError, status: 409, type: "migration-plan" },
+  { ctor: ReportOwnerInvariantError, status: 409, type: "report-owner-invariant" },
 ];
 
 export function mapError(err: unknown, ctx?: ErrorContext): HttpResult {
