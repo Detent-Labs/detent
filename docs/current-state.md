@@ -4180,9 +4180,16 @@ The call to the redaction function still comes after
 
 The TypeScript entry point onto chain verification is
 `verifyInstanceChain(instanceId, db)` (`src/engine/admin-queries.ts`),
-a thin `SELECT * FROM verify_instance_chain($1)` wrapper. It has no
-caller in this change. An admin audit view is a separate change
-against `admin-app`.
+a thin `SELECT * FROM verify_instance_chain($1)` wrapper. Its caller is
+`GET /admin/instances/:id/audit/verify` (`instance-audit-log-view`).
+That change also added `listInstanceAudit`, a paginated read over
+`instance_audit` beside `verifyInstanceChain` in the same file, called
+by `GET /admin/instances/:id/audit`. Both routes sit in
+`src/http/admin-routes.ts`, gated by `system:admin`.
+
+The admin area's instance screen renders both. An Audit Log section
+reads from the entries route. A verified/failed stamp reads from the
+verify route, fetched once per screen load, not once per page turn.
 
 Actor and source reach the trigger through a transaction-scoped pair
 of `set_config` calls, `detent.actor` and `detent.source`, each with

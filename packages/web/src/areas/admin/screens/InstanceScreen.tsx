@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
-import { cancelInstance, redactInstance, getInstanceRecord, getInstanceView, listPendingTimers, listProcesses, listVersions } from "../api/client.js";
-import type { InstanceRecordElement, InstanceView, PendingTimer, VersionSummary } from "../api/types.js";
+import {
+  cancelInstance,
+  redactInstance,
+  getInstanceRecord,
+  getInstanceView,
+  listInstanceAudit,
+  listPendingTimers,
+  listProcesses,
+  listVersions,
+  verifyInstanceAudit,
+} from "../api/client.js";
+import type { AuditEntry, AuditVerifyResult, InstanceRecordElement, InstanceView, PendingTimer, VersionSummary } from "../api/types.js";
 import { describeRecordElement } from "../../../api/record.js";
 import type { Route } from "../routing.js";
 import { useRefresh } from "../useRefresh.js";
@@ -21,6 +31,12 @@ interface InstanceScreenProps {
 }
 
 const RECORD_PAGE_LIMIT = 200;
+const AUDIT_PAGE_LIMIT = 200;
+
+/** A `string` prints bare; anything else (number, boolean, or JSON `null`) prints as its JSON literal, so an authored `null` reads as the text "null". */
+function formatAuditValue(value: unknown): string {
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
 // ponytail: no per-instance timer read exists over HTTP (GET /admin/timers has
 // no instanceId filter — see admin-operations-api's three admin-queries.ts
 // functions). A generous single page covers the pending-timer backlog any
@@ -64,6 +80,7 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
   // locale rather than an arbitrary object-key order.
   const [baseLocale, setBaseLocale] = useState<string | undefined>(undefined);
   const [timer, setTimer] = useState<PendingTimer | undefined>(undefined);
+  const [verify, setVerify] = useState<AuditVerifyResult | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [cancelling, setCancelling] = useState(false);
@@ -91,31 +108,55 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
   const recordList = usePagedList<InstanceRecordElement>(fetchRecordPage);
   const { reset: resetRecordList } = recordList;
 
+  // Same shape as `fetchRecordPage`: a pure paged fetch feeding `auditList`
+  // below. The chain's verified/failed state is a separate call (`verify`,
+  // fetched once in `load`), not part of this page — paging the entries
+  // never re-triggers a chain scan.
+  const fetchAuditPage = useCallback(
+    async (cursor?: string) => {
+      setError(undefined);
+      try {
+        const page = await listInstanceAudit(instanceId, token, { limit: AUDIT_PAGE_LIMIT, cursor });
+        return { items: page.items, cursor: page.cursor };
+      } catch (err) {
+        fail(err);
+        throw err;
+      }
+    },
+    [instanceId, token, fail],
+  );
+  const auditList = usePagedList<AuditEntry>(fetchAuditPage);
+  const { reset: resetAuditList } = auditList;
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(undefined);
     try {
       const v = await getInstanceView(instanceId, token);
       setView(v);
-      const [vs, rec, timers, processes] = await Promise.all([
+      const [vs, rec, timers, processes, audit, verifyResult] = await Promise.all([
         listVersions(v.processId, token),
         getInstanceRecord(instanceId, token, { limit: RECORD_PAGE_LIMIT }),
         listPendingTimers(token, { limit: TIMERS_SCAN_LIMIT }),
         listProcesses(token),
+        listInstanceAudit(instanceId, token, { limit: AUDIT_PAGE_LIMIT }),
+        verifyInstanceAudit(instanceId, token),
       ]);
       setVersions(vs);
       // Seeds the hook's own items/cursor from the page this compound fetch
       // already retrieved, so `recordList.loadMore()`'s first call continues
       // from here instead of refetching page one.
       resetRecordList(rec.items, rec.cursor);
+      resetAuditList(audit.items, audit.cursor);
       setTimer(timers.items.find((t) => t.instanceId === instanceId));
+      setVerify(verifyResult);
       setBaseLocale(processes.find((p) => p.processId === v.processId)?.baseLocale);
     } catch (err) {
       fail(err);
     } finally {
       setLoading(false);
     }
-  }, [instanceId, token, locale, fail, resetRecordList]);
+  }, [instanceId, token, locale, fail, resetRecordList, resetAuditList]);
 
   useEffect(() => {
     void load();
@@ -250,6 +291,43 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
         <div className="admin-load-more">
           <button type="button" className="btn btn-secondary" onClick={() => void recordList.loadMore()} disabled={loading || recordList.loading}>
             {t(locale, "instance.loadMoreHistory")}
+          </button>
+        </div>
+      )}
+
+      <h2>
+        {t(locale, "audit.title")}{" "}
+        {verify &&
+          (verify.ok ? (
+            <span className="admin-badge admin-badge-verified">{t(locale, "audit.verified")}</span>
+          ) : (
+            <span className="admin-badge admin-badge-chain-failed">{tFill(locale, "audit.verificationFailed", { seq: verify.failedSeq ?? "?" })}</span>
+          ))}
+      </h2>
+      {auditList.items.length === 0 && !loading && !error && <p className="admin-empty">{t(locale, "audit.empty")}</p>}
+      <ul className="admin-timeline">
+        {auditList.items.map((e) => (
+          <li key={e.seq}>
+            <div className="admin-timeline-meta">
+              {new Date(e.at).toLocaleString(locale)} · <code className="admin-timeline-key">{e.actor ?? "—"}</code> ·{" "}
+              <code className="admin-timeline-key">{e.source ?? "—"}</code>
+            </div>
+            <div>
+              <code className="admin-timeline-key">{e.fieldId}</code> {t(locale, e.op === "redact" ? "audit.opRedact" : "audit.opSet")}{" "}
+              {"value" in e ? (
+                <code className="admin-timeline-key">{formatAuditValue(e.value)}</code>
+              ) : (
+                <span className="admin-badge admin-badge-redacted">{t(locale, "audit.redacted")}</span>
+              )}
+            </div>
+            {e.reason && <div className="admin-timeline-meta">{tFill(locale, "audit.reason", { reason: e.reason })}</div>}
+          </li>
+        ))}
+      </ul>
+      {auditList.cursor && (
+        <div className="admin-load-more">
+          <button type="button" className="btn btn-secondary" onClick={() => void auditList.loadMore()} disabled={loading || auditList.loading}>
+            {t(locale, "audit.loadMore")}
           </button>
         </div>
       )}

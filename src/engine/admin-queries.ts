@@ -248,6 +248,84 @@ export async function discardOutboxRow(idempotencyKey: string, db: SQL = sql): P
   return rows[0] ? toOutboxRow(rows[0]) : null;
 }
 
+export type AuditEntry = {
+  seq: number;
+  transitionSeq: number;
+  fieldId: string;
+  op: string;
+  value?: unknown;
+  actor: string | null;
+  source: string | null;
+  reason: string | null;
+  at: string;
+};
+
+/**
+ * One instance's `instance_audit` entries in ascending `seq` order,
+ * keyset-paged on `seq` alone: `instance_audit`'s primary key is
+ * `(instance_id, seq)`, so `seq` alone gives a total order within one
+ * instance and needs no tiebreaker column
+ * (instance-audit-log-view design.md "Cursor shape mirrors
+ * getInstanceRecord's"). `value` is omitted, never `null`, for a `redact`
+ * entry or a `set` entry a later redaction cleared — both store `value IS
+ * NULL` — so a caller can tell "redacted" apart from an authored JSON null
+ * (design.md "Redacted-value representation").
+ */
+export async function listInstanceAudit(
+  instanceId: InstanceId,
+  page: { limit?: number; cursor?: string } = {},
+  db: SQL = sql,
+): Promise<Page<AuditEntry>> {
+  const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
+  const [cursorSeq] = page.cursor ? decodeCursor(page.cursor, 1) : [undefined];
+
+  // A SQL-NULL `value` column (redacted) and a stored jsonb `null` literal
+  // (an authored JSON null) both deserialize to the same JS `null`, so
+  // `value IS NOT NULL` has to be read off Postgres, not inferred from the
+  // driver's result afterward.
+  // seq/transition_seq are bigint columns: Bun.sql returns them as strings
+  // (unlike outbox's/history_entries' own integer transition_seq), so the
+  // raw row keeps them as strings and only the mapped entry converts to
+  // number — the cursor is re-encoded from the raw string, never a
+  // Number()-roundtripped one.
+  const rows = (await db`
+    SELECT seq, transition_seq, field_id, op, value, (value IS NOT NULL) AS has_value, actor, source, reason, at
+    FROM instance_audit
+    WHERE instance_id = ${instanceId}
+      AND (${cursorSeq ?? null}::bigint IS NULL OR seq > ${cursorSeq ?? null}::bigint)
+    ORDER BY seq ASC
+    LIMIT ${limit + 1}
+  ` as unknown) as {
+    seq: string;
+    transition_seq: string;
+    field_id: string;
+    op: string;
+    value: unknown;
+    has_value: boolean;
+    actor: string | null;
+    source: string | null;
+    reason: string | null;
+    at: string | Date;
+  }[];
+
+  const hasMore = rows.length > limit;
+  const pageRows = rows.slice(0, limit);
+  const items: AuditEntry[] = pageRows.map((r) => ({
+    seq: Number(r.seq),
+    transitionSeq: Number(r.transition_seq),
+    fieldId: r.field_id,
+    op: r.op,
+    ...(r.has_value ? { value: r.value } : {}),
+    actor: r.actor,
+    source: r.source,
+    reason: r.reason,
+    at: new Date(r.at).toISOString(),
+  }));
+  const last = pageRows[pageRows.length - 1];
+  const cursor = hasMore && last ? encodeCursor([last.seq]) : undefined;
+  return { items, cursor };
+}
+
 /**
  * One instance's instance-audit-log-chain verdict. A thin wrapper over
  * `verify_instance_chain`, the one entry point a TypeScript caller has onto

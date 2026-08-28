@@ -19,7 +19,9 @@ import {
   getOutboxRow,
   getTimerLagStats,
   countInstancesByStatus,
+  listInstanceAudit,
 } from "../src/engine/admin-queries.js";
+import { redactInstance } from "../src/engine/retention.js";
 import { RequestShapeError } from "../src/errors.js";
 import type { ProcessBody, Instance, MigrationSpec } from "../src/schema/definition.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
@@ -39,6 +41,22 @@ const waitBody = (label: string): ProcessBody =>
     label: { en: label },
     baseLocale: "en",
     fields: [],
+    workflow: {
+      initialStep: "step_wait",
+      steps: [
+        { id: "step_wait", key: "wait", label: { en: "Wait" }, type: "task", paths: [{ id: "path_done", key: "done", label: "Done", to: "step_done", trigger: "manual" }] },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+/** Like `waitBody`, plus one redactable field, for `listInstanceAudit`'s fixtures. */
+const auditWaitBody = (label: string): ProcessBody =>
+  ({
+    key: "admin_q_audit_wait",
+    label: { en: label },
+    baseLocale: "en",
+    fields: [{ id: "field_x", key: "x", label: { en: "X" }, type: "string", redactable: true }],
     workflow: {
       initialStep: "step_wait",
       steps: [
@@ -385,4 +403,63 @@ test.skipIf(!DB)("a discarded row is not claimed by drainOutbox, and its instanc
     field_version: number;
   }[];
   expect(field_version).toBe(v2.version);
+});
+
+// ============================================================
+// listInstanceAudit
+// ============================================================
+
+test.skipIf(!DB)(
+  "listInstanceAudit orders by seq, pages by cursor, and a redaction's cleared value reads as absent while an authored JSON null reads as null",
+  async () => {
+    const P = pid();
+    const v = await publishBody(P, auditWaitBody("audit_read"), reg, dataSourceReg);
+    const body = (await createDefinitionStore(sql).resolveBody(P, v.version))!;
+    const inst = await createInstance(body, { processId: P, version: v.version, data: { field_x: "1" } as Instance["data"] }, sql);
+
+    // seq 2: an ordinary overwrite.
+    await sql`UPDATE instances SET body = jsonb_set(body, '{data}', (body->'data') || '{"field_x":"2"}'::jsonb) WHERE instance_id = ${inst.instanceId}`;
+    // seq 3: removing the key logs an authored JSON null (jsonb 'null', not SQL NULL).
+    await sql`UPDATE instances SET body = jsonb_set(body, '{data}', (body->'data') - 'field_x') WHERE instance_id = ${inst.instanceId}`;
+
+    const page1 = await listInstanceAudit(inst.instanceId as Instance["instanceId"], { limit: 2 }, sql);
+    expect(page1.items.map((e) => e.seq)).toEqual([1, 2]);
+    expect(page1.items[0].value).toBe("1");
+    expect(page1.items[1].value).toBe("2");
+    expect(page1.cursor).toBeDefined();
+
+    const page2 = await listInstanceAudit(inst.instanceId as Instance["instanceId"], { limit: 2, cursor: page1.cursor }, sql);
+    expect(page2.items.map((e) => e.seq)).toEqual([3]);
+    expect(page2.items[0].op).toBe("set");
+    expect("value" in page2.items[0]).toBe(true);
+    expect(page2.items[0].value).toBeNull(); // JSON null, present and readable as null
+
+    // seq 4+: redaction. Must be non-running first (redactInstance's own guard).
+    await sql`UPDATE instances SET body = body || '{"status":"completed"}'::jsonb WHERE instance_id = ${inst.instanceId}`;
+    await redactInstance(inst.instanceId as Instance["instanceId"], sql, { actor: "admin_1", reason: "gdpr" });
+
+    const page3 = await listInstanceAudit(inst.instanceId as Instance["instanceId"], { limit: 10, cursor: page2.cursor }, sql);
+    const redactEntry = page3.items.find((e) => e.op === "redact")!;
+    expect(redactEntry).toBeDefined();
+    expect("value" in redactEntry).toBe(false); // omitted, not null-as-a-value
+    expect(redactEntry.reason).toBe("gdpr");
+
+    // The earlier `set field_x` rows the redaction cleared now carry an
+    // absent value too, distinguishable from the authored JSON null above.
+    const clearedSetEntry = page3.items.find((e) => e.op === "set" && e.fieldId === "field_x")!;
+    expect(clearedSetEntry).toBeDefined();
+    expect("value" in clearedSetEntry).toBe(false);
+
+    expect(page3.cursor).toBeUndefined();
+  },
+);
+
+test.skipIf(!DB)("listInstanceAudit with a malformed cursor raises RequestShapeError", async () => {
+  let raised: unknown;
+  try {
+    await listInstanceAudit("inst_missing" as Instance["instanceId"], { cursor: "%%%" }, sql);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(RequestShapeError);
 });

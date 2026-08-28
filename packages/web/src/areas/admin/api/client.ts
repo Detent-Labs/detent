@@ -1,4 +1,6 @@
 import type {
+  AuditEntryPage,
+  AuditVerifyResult,
   DataListColumn,
   DataListDetail,
   DataListPage,
@@ -55,6 +57,19 @@ export async function cancelInstance(instanceId: string, token: string): Promise
 
 export async function redactInstance(instanceId: string, token: string): Promise<void> {
   await request(`/admin/instances/${encodeURIComponent(instanceId)}/redact`, token, { method: "POST" });
+}
+
+/** Same `{ limit, cursor }` query-parameter shape `getInstanceRecord` uses. */
+export function listInstanceAudit(instanceId: string, token: string, opts: { limit?: number; cursor?: string } = {}): Promise<AuditEntryPage> {
+  const params = new URLSearchParams();
+  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
+  if (opts.cursor !== undefined) params.set("cursor", opts.cursor);
+  const qs = params.toString();
+  return getJson<AuditEntryPage>(`/admin/instances/${encodeURIComponent(instanceId)}/audit${qs ? `?${qs}` : ""}`, token);
+}
+
+export function verifyInstanceAudit(instanceId: string, token: string): Promise<AuditVerifyResult> {
+  return getJson<AuditVerifyResult>(`/admin/instances/${encodeURIComponent(instanceId)}/audit/verify`, token);
 }
 
 export async function listVersions(processId: string, token: string): Promise<VersionSummary[]> {

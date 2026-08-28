@@ -99,13 +99,16 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   implemented it, `9379091`/`f2631b6`/`7e003e8` corrected the design across
   review, `2b9b905`/`072b9e1` closed its verification gaps, and `591c6c4`
   archived it; its spec is `openspec/specs/instance-audit-log/spec.md`.
-  A third change, the nightly checkpoint, was struck 2026-08-27 (see
-  "Explicitly not the goal" below). Change 2, `redactable-field-flag`
+  The nightly checkpoint, once proposed as a third change, was struck
+  2026-08-27 (see "Explicitly not the goal" below), vacating that slot.
+  Change 2, `redactable-field-flag`
   (`openspec/changes/redactable-field-flag/`), is implemented and
-  verified as of 2026-08-27, pending archive. Two changes, in this
-  order — no third is decided. A readable admin view over the audit log
-  is a real, named gap (see "Open, deliberately" below), but nobody has
-  proposed it as a change yet, so it is not "change 3."
+  verified as of 2026-08-27, pending archive. Change 3,
+  `instance-audit-log-view`, took the vacated slot and closes the
+  readable-admin-view gap "Open, deliberately" named below: it adds the
+  audit-entry read beside `verifyInstanceChain`, a `system:admin` route
+  over each, and the instance screen's own Audit Log section. Three
+  changes, in this order.
 
   1. The table, the two triggers sharing one diff function, the
      `set_config` call at all six write sites, the hash chain, and
@@ -277,15 +280,15 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   concrete "I deleted a field I needed to redact" case shows up; do not
   build a fix ahead of one.
 
-  A readable admin view over the audit log is unbuilt and carries no
-  change name or number yet. `docs/current-state.md`'s instance-audit-log
-  section already names the gap: `verifyInstanceChain`
-  (`src/engine/admin-queries.ts:259`) has no caller anywhere in `src/http`
-  or `packages/web`, so today the chain's tamper-evidence is provable only
-  by someone with direct database access, not through the product. That
-  falls short of this entry's own goal ("readable ... without ceremony,"
-  above). Nobody has proposed a change for it, so it stays a named,
-  undecided gap here rather than a numbered change.
+  A readable admin view over the audit log was the one open gap here.
+  `instance-audit-log-view` (change 3, above) closed it: `GET
+  /admin/instances/:id/audit` reads the log itself, keyset-paginated,
+  and `GET /admin/instances/:id/audit/verify` exposes
+  `verifyInstanceChain` (`src/engine/admin-queries.ts:259`), which
+  previously had no caller anywhere in `src/http` or `packages/web`. The
+  instance screen's Audit Log section renders both, so an operator now
+  reads the log and its verified state through the product, not only by
+  querying the database directly.
 - **Aggregated data source: a field's options read from other instances.** A
   design pass on 2026-08-25 settled a shape, and a second pass the same day
   replaced it. Not started.

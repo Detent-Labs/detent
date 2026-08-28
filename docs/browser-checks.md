@@ -1645,3 +1645,42 @@ even if forced. Choose a target in the new selector, then click "add path".
 Pass: a new path appears with a derived `key`/`label` matching the chosen
 source and target step. The target selector resets to no selection
 afterward.
+
+### Instance screen: the Audit Log section
+
+Source: `instance-audit-log-view` task 3.2.
+
+Seed an instance whose audit log holds several `set` entries for a
+redactable field, then redact it. Open its `/admin/instances/:id` screen.
+
+Pass: an Audit Log section renders below Record. Each entry shows its
+field id, operation, actor, source and timestamp, in `seq` order. The
+redaction clears some entries: the `set` rows its own `body.data` wipe
+wrote, and the explicit `redact` row itself. Every one of those shows a
+"Redacted" stamp in place of a value. None shows a blank cell. The
+`redact` row alone carries the reason line.
+
+A heading-level "Verified" stamp sits beside "Audit log". It sources
+from one `GET .../audit/verify` call. The network log shows that call
+firing once per screen load, not once per page turn.
+
+Push the same instance's audit log past 200 entries, task 1.1's page
+size. Pass: a "Load more entries" control appears. Activating it appends
+the remaining entries. Paging repeats no entry and skips none. The last
+page's own last entry is the log's true last entry, and the control then
+disappears. Paging through entries triggers no second call to
+`.../audit/verify`.
+
+Measured on 2026-08-28. The section reused the existing
+`admin-timeline`/`admin-load-more` classes. It reused the existing
+`admin-badge` stamp component too, with no new tone, matching
+`design.md`. The redacted marker reused the instance-level redaction
+badge's own tone.
+
+`test/admin-queries.test.ts` and `test/http-admin.test.ts` already
+assert the read, the cursor paging and the role gate against the API.
+Neither can see a cleared `set` row's absent `value` next to an
+authored JSON `null` in a rendered page. This entry confirms the screen
+draws that distinction correctly. It also confirms a real "Load more"
+click drives the paged list to completion. No row repeats, and none is
+missing.

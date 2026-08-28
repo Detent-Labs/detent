@@ -135,6 +135,34 @@ export interface GroupPage {
   cursor?: string;
 }
 
+/**
+ * Mirrors src/engine/admin-queries.ts::AuditEntry. `value` is absent, not
+ * `null`, for a `redact` entry or a `set` entry a later redaction cleared —
+ * distinguishable from a `set` entry whose authored value is a JSON null.
+ */
+export interface AuditEntry {
+  seq: number;
+  transitionSeq: number;
+  fieldId: string;
+  op: string;
+  value?: unknown;
+  actor: string | null;
+  source: string | null;
+  reason: string | null;
+  at: string;
+}
+
+export interface AuditEntryPage {
+  items: AuditEntry[];
+  cursor?: string;
+}
+
+/** Mirrors src/engine/admin-queries.ts::verifyInstanceChain's return shape. */
+export interface AuditVerifyResult {
+  ok: boolean;
+  failedSeq: number | null;
+}
+
 /** Mirrors src/engine/migration.ts::MigrationResult. */
 export interface MigrationResult {
   migrated: string[];
