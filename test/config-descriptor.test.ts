@@ -10,6 +10,7 @@ import { staticDataSourceConfigSchema, dbListDataSourceConfigSchema } from "../s
 import { notificationEmailConfigSchema } from "../src/handlers/notification-email.js";
 import { httpConfigSchema } from "../src/handlers/http.js";
 import { processStartConfigSchema } from "../src/handlers/process-start.js";
+import { instanceTransitionConfigSchema } from "../src/handlers/instance-transition.js";
 
 test("staticAssignmentConfigSchema produces a descriptor", () => {
   const descriptor = describeConfigSchema(staticAssignmentConfigSchema, "static");
@@ -192,4 +193,18 @@ test("a non-string array property sends the whole type to raw JSON", () => {
 test("a nested object property sends the whole type to raw JSON", () => {
   const schema = z.object({ x: z.object({ a: z.string() }) });
   expect(describeConfigSchema(schema, "test.nested-object")).toBeUndefined();
+});
+
+// The generated form is the whole studio surface this action has (tasks 4.1
+// and 7.5): three flat strings, no picker and no hand-written panel. A branded
+// processId/fieldId/pathId schema carries a `.regex()`, and one pattern takes
+// the WHOLE config back to the raw JSON textarea, so this pins the shape the
+// form depends on rather than leaving it to a browser pass.
+test("instanceTransitionConfigSchema produces a three-string descriptor, never the raw JSON fallback", () => {
+  const descriptor = describeConfigSchema(instanceTransitionConfigSchema, "instance.transition");
+  expect(descriptor).toEqual([
+    { key: "processId", kind: "string", required: true },
+    { key: "instanceIdField", kind: "string", required: true },
+    { key: "pathId", kind: "string", required: true },
+  ]);
 });

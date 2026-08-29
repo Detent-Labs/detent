@@ -41,11 +41,16 @@ export interface DraftSummary {
   updatedAt: string;
 }
 
-/** Mirrors src/engine/definitions.ts::PublishFinding — a reported (not rejected) reference `"instance.query"`'s cross-process check flags. */
+/**
+ * Mirrors src/engine/definitions.ts::PublishFinding — a reported (not
+ * rejected) reference `"instance.query"`'s or `instance.transition`'s
+ * cross-process check flags. `dataSourceId` is optional: an action-site
+ * finding names no data source.
+ */
 export interface PublishFinding {
   loc: string;
-  dataSourceId: string;
-  referenceKind: "step" | "field";
+  dataSourceId?: string;
+  referenceKind: "step" | "field" | "path";
   reference: string;
   carriedByVersions: number[];
   liveInstanceCountOutsideCarryingVersions: number;

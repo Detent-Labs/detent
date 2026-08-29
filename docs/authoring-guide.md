@@ -243,6 +243,40 @@ mutable slug that references nothing. See Columns on a data list, below, for
 the mapping rules themselves. They apply the same way whichever data source
 type fills the columns.
 
+`instance.transition` closes the write half of the pattern `instance.query`
+opens. `instance.query` only reads another process's instances. This action
+moves the one a participant picked:
+
+```json
+{ "id": "action_issue", "type": "instance.transition",
+  "config": {
+    "processId": "proc_laptop_inventory",
+    "instanceIdField": "field_device",
+    "pathId": "path_issue"
+  } }
+```
+
+`processId` names the target process, the same one `ds_devices` above reads.
+`instanceIdField` names a field of THIS process holding the picked
+instance's id. That is `field_device` above. An option's value is always
+the source instance's id. `pathId` names a manual path on the target's own
+current step. The action drives the target along it, as the system actor.
+A guard on that path sees the system actor, never the participant whose
+submission triggered the action.
+
+Put the action where the pick takes effect. Use `onEntry` of the step the
+picker's own path leads to, or `onPath` of that path itself. The device
+leaves the shelf the moment the participant who picked it moves on.
+
+The target moves at most once per submission. A redelivered outbox row
+finds its own prior move already recorded and does nothing further.
+
+Two participants who pick the same device race for it. The first moves it.
+The second dead-letters immediately, naming the step the device already
+stands on. It does not retry five times first. A target already off the
+path's source step dead-letters the same way. So does one already not
+running, or one refusing the path's own guard.
+
 ### Columns on a data list
 
 A `db.list` row can carry more than a value and a label. An operator declares
