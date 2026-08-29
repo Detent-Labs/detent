@@ -59,23 +59,27 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   `instance_id`, `transition_seq`, `body`, `resolve_state`,
   `resolve_claimed_at`, `cancel_sweep_state`, `next_timer_at`, `created_at`
   and `redacted_at`. Every other field of `Instance` lives inside the jsonb,
-  and four expression indexes stand in for six of those keys:
+  and six expression indexes stand in for eight of those keys:
   `instances_selection_idx` over `processId`/`version`/`status`,
   `instances_claimed_by_idx` over `assignment.claimedBy`,
-  `instances_candidates_idx` (GIN) over `assignment.candidates`, and
-  `instances_parent_idx` over `parent.instanceId`.
+  `instances_candidates_idx` (GIN) over `assignment.candidates`,
+  `instances_parent_idx` over `parent.instanceId`,
+  `instances_current_step_idx` over `currentStepId` and
+  `instances_started_by_idx` over `startedBy`
+  (`src/engine/store.ts:240`, `:253`, `:254`, `:262`, `:268`, `:269`).
 
   Ten keys are standardized in the sense that matters here: the engine owns
   them, every instance carries them, and their shape never depends on a
   process version. Those are `processId`, `version`, `definitionHash`,
   `currentStepId`, `transitionSeq`, `status`, `startedAt`, `startedBy`,
-  `currentStepEnteredAt` and `redactedAt`. Four of them have no index of any
-  kind today — `definitionHash`, `currentStepId`, `startedAt` and
-  `currentStepEnteredAt` — and `startedBy` has none either. `currentStepId`
-  is the one that has since become urgent: the aggregated data source below
-  filters on it on every form render, every submission, every timer fire and
-  every automatic transition, and it is the only filter that whole feature
-  has.
+  `currentStepEnteredAt` and `redactedAt`. Three of them have no index of any
+  kind today: `definitionHash`, `startedAt` and `currentStepEnteredAt`.
+  `currentStepId` was the urgent one when this entry was written, because the
+  aggregated data source below filters on it on every form render, every
+  submission, every timer fire and every automatic transition, and it is the
+  only filter that whole feature has. `instance-query-core` closed that on
+  2026-08-27 with the expression index above, so what remains here is the
+  column question, not a missing index.
 
   Three keys cannot follow. `data` belongs to a process version, `timers` is
   a variable-length array, and `assignment.candidates` is a list that wants
@@ -102,8 +106,8 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   The nightly checkpoint, once proposed as a third change, was struck
   2026-08-27 (see "Explicitly not the goal" below), vacating that slot.
   Change 2, `redactable-field-flag`
-  (`openspec/changes/redactable-field-flag/`), is implemented and
-  verified as of 2026-08-27, pending archive. Change 3,
+  (`openspec/changes/archive/2026-08-27-redactable-field-flag/`), shipped
+  and archived 2026-08-27. Change 3,
   `instance-audit-log-view`, took the vacated slot and closes the
   readable-admin-view gap "Open, deliberately" named below: it adds the
   audit-entry read beside `verifyInstanceChain`, a `system:admin` route
@@ -117,9 +121,10 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
      chain computed after the fact, and a chain computed after the fact
      proves nothing about the window before it existed. Either the log is
      chained from its first row, or the first rows are decoration. Built:
-     the trigger function and `verify_instance_chain()` are defined in
-     `src/engine/store.ts:658`; `verifyInstanceChain`, the TypeScript wrapper
-     over that SQL function, is `src/engine/admin-queries.ts:259`.
+     the trigger function is defined at `src/engine/store.ts:652` and
+     `verify_instance_chain()` at `:697`; `verifyInstanceChain`, the
+     TypeScript wrapper over that SQL function, is
+     `src/engine/admin-queries.ts:337`.
   2. `FieldDef.redactable`, narrowing `redact_instance_fields()`'s field
      selection to the fields a process author marks redactable. This is the
      only piece change 1 left out: the salted `value_hash`, the definer
@@ -128,7 +133,8 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
      carries that ceremony: the spec delta, the `examples/` sweep,
      `docs/authoring-guide.md`, and a test that rejects a violating input.
      Implemented 2026-08-27 as `redactable-field-flag`
-     (`openspec/changes/redactable-field-flag/`), whose design.md settles
+     (`openspec/changes/archive/2026-08-27-redactable-field-flag/`), whose
+     design.md settles
      three questions this entry left open: the instance's *currently
      pinned* version's catalog is the sole source of `redactable`, never
      the version active when a given audit row was written; a field id the
@@ -284,7 +290,7 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   `instance-audit-log-view` (change 3, above) closed it: `GET
   /admin/instances/:id/audit` reads the log itself, keyset-paginated,
   and `GET /admin/instances/:id/audit/verify` exposes
-  `verifyInstanceChain` (`src/engine/admin-queries.ts:259`), which
+  `verifyInstanceChain` (`src/engine/admin-queries.ts:337`), which
   previously had no caller anywhere in `src/http` or `packages/web`. The
   instance screen's Audit Log section renders both, so an operator now
   reads the log and its verified state through the product, not only by
@@ -306,7 +312,7 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     composes nothing.
   - The read this handler needs exists already in most respects, built for a
     different consumer since this entry was written. `instance-data-query`'s
-    `queryInstances` (`src/runtime/api.ts:1512`, shipped 2026-08-27 as
+    `queryInstances` (`src/runtime/api.ts:1560`, shipped 2026-08-27 as
     `instance-query-core`, now archived) filters instances by `processId`,
     `status`, `currentStepId`, `startedBy`, `claimedBy`, `excludeInstanceId`,
     `createdAfter`/`createdBefore` and a `dataWhere` list of field/operator/
@@ -518,7 +524,7 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     safe.
 
     The second half of that rested on a permission nothing carried yet.
-    `Permission` (`src/auth/authorize.ts:77`) was `"publish" | "cancel" |
+    `Permission` (`src/auth/authorize.ts:78`) was `"publish" | "cancel" |
     "migrate"`, with no entry covering reading. A pass on 2026-08-25 priced
     a fourth one and found it additive rather than restrictive, because
     the bulk read was already closed: `src/http/routes.ts:449` ran
@@ -543,13 +549,14 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     The shared query core landed 2026-08-27 as `instance-query-core`
     (archived; see `instance-data-query`'s spec) ahead of the `read`
     permission. `process-read-permission` has since applied:
-    `Permission` (`src/auth/authorize.ts:77`) now admits `"read"`, mapped
+    `Permission` (`src/auth/authorize.ts:78`) now admits `"read"`, mapped
     to `ADMIN_ROLE`, and `scope=all` routes through it when the request
     names a `processId`. `process-read-permission` shipped only the
     process-scoped `read` gate on `GET /instances`, not the report/table
     feature this entry describes; `instance-data-tables` closed that gap
     2026-08-28. The reporting-routes migration (`REPORTS_ROLE` → `read` on
-    the three aggregate routes) `process-read-permission/proposal.md` scopes
+    the three aggregate routes)
+    `archive/2026-08-27-process-read-permission/proposal.md` scopes
     out stays its own later change — `instance-data-tables` did not fold it
     in either.
 
@@ -604,7 +611,7 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
 
   **The test a key has to pass.** Its structure is fixed by the runtime
   schema for every process and every version, never by a process author.
-  `instance` (`src/schema/definition.ts:1144`) splits four ways under it.
+  `instance` (`src/schema/definition.ts:1157`) splits four ways under it.
 
   - Already a column, and still written into `body` as well:
     `instanceId`, `transitionSeq`, `redactedAt`. `redacted_at` is the
@@ -686,9 +693,17 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   "may use the reporting area", and does not become the short-circuit:
   area access and data scope are two questions, and one role answering
   both makes every later narrowing impossible. The three reporting
-  aggregates (`src/http/reporting-routes.ts:40` and `:57`) each already
-  take a `processId`, so `requireRole(actor, REPORTS_ROLE)` there becomes
-  the role plus `read` on that process.
+  aggregates (`handleReportingCycleTime`, `handleReportingBottleneck` and
+  `handleReportingSla`, `src/http/reporting-routes.ts:141`, `:145` and
+  `:149`) each already take a `processId`, so `requireRole(actor,
+  REPORTS_ROLE)` there becomes the role plus `read` on that process.
+
+  That file has grown since this was written. `instance-data-tables` put
+  the saved-report routes beside the aggregates, so twelve handlers now
+  gate on `REPORTS_ROLE`, not three. The report routes carry their own
+  per-report `viewers`/`editors` check plus the process `read` grant, so
+  they need no part of this migration. It stays scoped to the three
+  aggregates above.
 
   The work is not the default. It is that a process-scoped grant cannot
   gate a query naming no process: `requireRole(actor, ADMIN_ROLE)` at
@@ -733,9 +748,9 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   `Actor.roles` stays a `string[]` of free text from either source;
   `auth_users.roles` stays a `TEXT[]`.
 
-  `openspec/changes/process-read-permission/` has applied the `read`
-  permission piece above: `src/auth/authorize.ts:77`'s `Permission` type
-  now admits `read`, mapped to `ADMIN_ROLE`.
+  `openspec/changes/archive/2026-08-27-process-read-permission/` has
+  applied the `read` permission piece above: `src/auth/authorize.ts:78`'s
+  `Permission` type now admits `read`, mapped to `ADMIN_ROLE`.
 - **CEL-readable data-source results.** Runtime option-list resolution for
   `field.dataSource` is DONE (see `docs/current-state.md`) — but `src/cel/check.ts`
   still registers a data source at no site (guards/output/transforms), so a CEL
