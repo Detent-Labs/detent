@@ -1856,27 +1856,29 @@ the finding line's own text. Neither one sees which surface
 
 Source: `studio-play-draft-instance` task 7.2.
 
-Measured on 2026-08-29 against the production build served from `WEB_ROOT`
-(`bun run --filter './packages/web' build`, then `bash scripts/dev-up.sh`'s
-own `bun run serve`), not `bun run dev` — the same pre-existing Studio
-dev-mode crash this file's `instance-transition-action` entry above already
-records ruled that path out.
+Measured on 2026-08-29 against the production build served from `WEB_ROOT`.
+Built with `bun run --filter './packages/web' build`, then served via
+`bash scripts/dev-up.sh`'s own `bun run serve`. This walk skips
+`bun run dev`. This file's `instance-transition-action` entry above already
+records the same pre-existing Studio dev-mode crash that rules that path out.
 
 Started one ordinary instance of Expense Approval from the app area's Start
 a process screen. The studio Player's "Create new instance" button still
-plays the process's published version, not its draft — `draft-test-instances`
-task 4's route (`POST /drafts/:processId/instances`) is Phase 3 Track D's
-own screen to wire up, out of this task's scope — so a genuine `kind: "test"`
-instance was created by calling that route directly from the authenticated
-browser session (`fetch` in the page's own JS context, carrying the session's
-own bearer token), the same route `test/draft-test-instances.test.ts` already
-covers server-side.
+plays the process's published version, not its draft. `draft-test-instances`
+task 4's route, `POST /drafts/:processId/instances`, belongs to Phase 3
+Track D's own screen. Wiring it up sits outside this task's scope.
+
+So this check called that route directly from the authenticated browser
+session instead. It used `fetch` in the page's own JS context, with the
+session's own bearer token. That produced a genuine `kind: "test"` instance
+through the same route `test/draft-test-instances.test.ts` already covers
+server-side.
 
 Opened `/admin/instances` with both instances present. Pass: a fourth table
 column, Kind, sits right of Status. The published rows read plain lowercase
-`published` text; the test row carries a stamp reading `TEST`, in the same
-muted grey tone `admin-badge-cancelled`/`-discarded`/`-redacted` already use,
-beside the row's own red `RUNNING` stamp.
+`published` text. The test row carries a stamp reading `TEST`, in the same
+muted grey tone `admin-badge-cancelled`/`-discarded`/`-redacted` already use.
+That stamp sits beside the row's own red `RUNNING` stamp.
 
 Picked "Test" from the new kind filter, alongside the five existing filters.
 Pass: the table narrows to the one test-kind row alone. Picked "Published".
@@ -1884,31 +1886,36 @@ Pass: the table shows the two ordinary rows and drops the test one. Picked
 "All kinds". Pass: all three rows return.
 
 `packages/web/test/admin-instancesLogic.test.ts` already asserts
-`toListParams`'s kind passthrough and omission as pure functions; it cannot
-see a table column render or a `<select>` actually narrow a live page. This
-walk confirms both.
+`toListParams`'s kind passthrough and omission as pure functions. It cannot
+see a table column render, or a `<select>` narrow a live page. This walk
+confirms both.
 
 ### Player: "Create test instance" plays a draft-only process end to end
 
 Source: `studio-play-draft-instance` task 8.4.
 
-Create a new empty-process draft. Add two steps in the JSON surface (or the
-canvas): a non-terminal initial step with one manual path to a terminal
-step, so the process has no published version at all, only a draft. Save
-the draft. Open its Player.
+Create a new empty-process draft. Add two steps in the JSON surface, or the
+canvas. Make the initial step non-terminal, with one manual path to a
+terminal step.
+
+That leaves the process with no published version at all, only a draft.
+Save the draft. Open its Player.
 
 Pass: "Create test instance" sits beside "Create new instance" in the
 instance access fieldset. Click it. A running instance renders at the
-initial step, and a `TEST` stamp sits beside the status line. Submit the
-manual path. Pass: the Player re-renders at the terminal step, status
-`completed`, the `TEST` stamp still shown, and the record pane lists the
-transition. Opening the same instance again by id (the "Open existing
-instance id" field) shows the same `TEST` stamp — the marker is not
+initial step, with a `TEST` stamp beside the status line.
+
+Submit the manual path. Pass: the Player re-renders at the terminal step,
+status `completed`. The `TEST` stamp still shows, and the record pane lists
+the transition.
+
+Open the same instance again by id, through the "Open existing instance id"
+field. Pass: it shows the same `TEST` stamp. The marker is not
 create-flow-only.
 
 `packages/web/test/studio-playerLogic.test.ts` covers the create-then-load
-flow and the marker's visibility rule as pure functions (this repo ships no
-DOM test library — see `studio-draftProvider-chainingFetch.test.ts`'s own
-note). Neither sees the two buttons render side by side, the stamp's actual
-paint, or a real submit round trip through the running server. That stays a
-browser check.
+flow and the marker's visibility rule as pure functions. This repo ships no
+DOM test library. See `studio-draftProvider-chainingFetch.test.ts`'s own
+note. Neither one sees the two buttons render side by side. Neither sees
+the stamp's actual paint, or a real submit round trip through the running
+server. That stays a browser check.
