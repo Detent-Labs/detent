@@ -5,6 +5,8 @@ export type { LocalizedText, LocaleCode };
 
 export type InstanceStatus = "running" | "completed" | "cancelled" | "faulted";
 
+export type InstanceKind = "published" | "test";
+
 /** Mirrors src/runtime/api.ts::InstanceSummary — never the `data` payload. */
 export interface InstanceSummary {
   instanceId: string;
@@ -20,6 +22,7 @@ export interface InstanceSummary {
   processLabel: LocalizedText;
   stepLabel: LocalizedText;
   processBaseLocale: LocaleCode;
+  kind: InstanceKind;
 }
 
 /**
@@ -39,6 +42,7 @@ export interface DegradedInstanceSummary {
   startedBy?: string;
   createdAt: string;
   reason: "missing-definition" | "current-step-not-in-body";
+  kind: InstanceKind;
 }
 
 export type InstanceSummaryItem = InstanceSummary | DegradedInstanceSummary;

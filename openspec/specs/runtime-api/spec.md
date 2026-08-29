@@ -351,6 +351,23 @@ that same `AuthorizationError`, so an unrelated caller cannot
 distinguish a nonexistent instance from one they may not read. A
 caller holding `ADMIN_ROLE` SHALL see the ordinary not-found failure.
 
+When the loaded instance is a test instance (`kind: "test"`, per the
+`draft-test-instances` capability), the relationship rule narrows. The
+rule SHALL authorize a non-administrative actor only as that test
+instance's own `startedBy`. For an ordinary instance, the current step's
+claimant or an eligible assignment candidate can read it directly. A test
+instance's non-administrative actor SHALL NOT rely on that standing
+alone.
+
+This narrowing lets the actor who created a test instance view and drive
+it. The `draft-test-instances` capability's studio-only creation route
+stamps `startedBy` from the authenticated actor. The caller cannot
+supply it. A different actor who merely holds a claim or candidacy on
+the test instance cannot read it. That same standing would grant access
+to an ordinary instance's real assignment holder. The `ADMIN_ROLE` role
+continues to authorize access to a test instance exactly as it does to
+an ordinary one.
+
 `fields` SHALL contain exactly the current step's `ViewField`s whose
 resolved `visible` (literal `boolean`, used as-is, or CEL, evaluated
 with total semantics, default `true`) is `true` against
@@ -366,6 +383,10 @@ matching `ViewField.span`, or `1` when the view declares none.
 `view.columns`, or `1` when the view declares none. `columns` reports
 regardless of `status`, the same way `step` itself does, since it
 describes the step's declared layout rather than instance state.
+
+`InstanceView` SHALL also carry `kind` (`"published"` or `"test"`),
+mirroring the underlying instance's own `kind`. A caller then renders a
+test instance distinctly with no separate lookup.
 
 A `ViewField` whose `ref` resolves to a `FieldDef` of `type: "group"`
 (a container, never a leaf value in `instance.data`) SHALL still
@@ -485,6 +506,39 @@ caller can distinguish these cases.
   `ViewField` declares `span: 2`
 - **THEN** `InstanceView.columns` is `2` and that field's resolved
   `span` is `2`
+
+#### Scenario: A test instance's view carries kind "test"
+
+- **WHEN** `getInstanceView` resolves an instance whose `kind` is `"test"`
+- **THEN** the returned `InstanceView.kind` is `"test"`
+
+#### Scenario: A published instance's view carries kind "published"
+
+- **WHEN** `getInstanceView` resolves an instance whose `kind` is
+  `"published"`
+- **THEN** the returned `InstanceView.kind` is `"published"`
+
+#### Scenario: A test instance's own creator retains access
+
+- **WHEN** the caller is a test instance's `startedBy` actor, holding no
+  `ADMIN_ROLE`
+- **THEN** `getInstanceView` resolves the view exactly as it would for
+  that same actor on an ordinary instance they started
+
+#### Scenario: A claimant who is not the creator is refused a test instance
+
+- **WHEN** the caller is a test instance's current step's claimant or an
+  eligible assignment candidate
+- **AND** the caller is not that test instance's `startedBy` and holds no
+  `ADMIN_ROLE`
+- **THEN** `getInstanceView` throws `AuthorizationError`, the same
+  refusal a caller with no relationship to the instance at all receives
+
+#### Scenario: Administrative access to a test instance is unaffected
+
+- **WHEN** the caller holds `ADMIN_ROLE`
+- **THEN** `getInstanceView` resolves a test instance's view exactly as
+  it resolves an ordinary instance's
 
 ### Requirement: The instance view carries the current step's assignment state
 
@@ -1159,10 +1213,15 @@ left.
 ### Requirement: Post a free-text comment on an instance through the runtime API
 
 `postComment(instanceId, actor, text, db?)` SHALL apply the same
-visibility rule `getInstanceView` applies. That rule admits
-`system:admin`. It also admits the instance's `startedBy`. It also
-admits the current step's `claimedBy`. It also admits an eligible
-assignment candidate on the current step.
+visibility rule `getInstanceView` applies, including its test-instance
+narrowing. On a test instance, a non-administrative actor may act only
+as its `startedBy`, never merely as claimant or eligible candidate.
+
+That rule admits `system:admin`. It also admits the instance's
+`startedBy`. On an ordinary instance it also admits the current step's
+`claimedBy`, and an eligible assignment candidate on the current step.
+A test instance narrows those last two away for a non-administrative
+caller.
 
 On success it SHALL insert an `instance_comments` row. That row carries
 a fresh `comment_`-prefixed id, the instance id, the calling actor's id,
@@ -1191,13 +1250,22 @@ for an actor who may not read the instance.
   candidate, or `system:admin` calls `postComment`
 - **THEN** it throws `AuthorizationError` and no row is inserted
 
+#### Scenario: A test instance's creator can comment, a mere claimant cannot
+
+- **WHEN** a test instance's `startedBy` actor calls `postComment`
+- **THEN** the comment is inserted
+- **WHEN** a different, non-administrative actor holding only a claim or
+  candidacy on that same test instance calls `postComment`
+- **THEN** it throws `AuthorizationError` and no row is inserted
+
 ### Requirement: List an instance's comments through the runtime API
 
 `listComments(instanceId, actor, page, db?)` SHALL apply the same
-visibility rule `postComment` applies. It SHALL return a page of the
-instance's comments ordered `createdAt` ascending, then `id` ascending.
-It SHALL reuse the same `limit`/`cursor` keyset-pagination shape
-`listInstances` and `getInstanceRecord` already use.
+visibility rule `postComment` applies, including its test-instance
+narrowing. It SHALL return a page of the instance's comments ordered
+`createdAt` ascending, then `id` ascending. It SHALL reuse the same
+`limit`/`cursor` keyset-pagination shape `listInstances` and
+`getInstanceRecord` already use.
 
 #### Scenario: Listing returns comments oldest first
 
@@ -1218,13 +1286,21 @@ It SHALL reuse the same `limit`/`cursor` keyset-pagination shape
   candidate, or `system:admin` calls `listComments`
 - **THEN** it throws `AuthorizationError`
 
+#### Scenario: A claimant who is not the creator cannot list a test instance's comments
+
+- **WHEN** a non-administrative actor holding only a claim or candidacy
+  (not `startedBy`) on a test instance calls `listComments`
+- **THEN** it throws `AuthorizationError`
+
 ### Requirement: Upload an attachment to an instance through the runtime API
 
 `uploadAttachment(instanceId, actor, { filename, contentType, data, sizeBytes }, db?)` SHALL apply the same
-visibility rule `postComment` applies (`loadInstanceForActor`). That rule
-admits `system:admin`. It also admits the instance's `startedBy`. It also
-admits the current step's `claimedBy`. It also admits an eligible
-assignment candidate on the current step.
+visibility rule `postComment` applies (`loadInstanceForActor`), including
+its test-instance narrowing. That rule admits `system:admin`. It also
+admits the instance's `startedBy`. On an ordinary instance it also admits
+the current step's `claimedBy`, and an eligible assignment candidate on
+the current step. A test instance narrows those last two away for a
+non-administrative caller.
 
 On success it SHALL insert an `instance_attachments` row. That row
 carries a fresh `attachment_`-prefixed id, the instance id, the calling
@@ -1254,14 +1330,20 @@ actor who may not read the instance.
   candidate, or `system:admin` calls `uploadAttachment`
 - **THEN** it throws `AuthorizationError` and no row is inserted
 
+#### Scenario: A claimant who is not the creator cannot upload to a test instance
+
+- **WHEN** a non-administrative actor holding only a claim or candidacy
+  (not `startedBy`) on a test instance calls `uploadAttachment`
+- **THEN** it throws `AuthorizationError` and no row is inserted
+
 ### Requirement: List an instance's attachments through the runtime API
 
 `listAttachments(instanceId, actor, page, db?)` SHALL apply the same
-visibility rule `uploadAttachment` applies. It SHALL return a page of the
-instance's attachments ordered `createdAt` ascending, then `id`
-ascending. It SHALL reuse the same `limit`/`cursor` keyset-pagination
-shape `listComments` already uses. It SHALL NOT include `data` in any
-returned item.
+visibility rule `uploadAttachment` applies, including its test-instance
+narrowing. It SHALL return a page of the instance's attachments ordered
+`createdAt` ascending, then `id` ascending. It SHALL reuse the same
+`limit`/`cursor` keyset-pagination shape `listComments` already uses. It
+SHALL NOT include `data` in any returned item.
 
 #### Scenario: Listing returns attachment metadata only
 
@@ -1282,11 +1364,18 @@ returned item.
   candidate, or `system:admin` calls `listAttachments`
 - **THEN** it throws `AuthorizationError`
 
+#### Scenario: A claimant who is not the creator cannot list a test instance's attachments
+
+- **WHEN** a non-administrative actor holding only a claim or candidacy
+  (not `startedBy`) on a test instance calls `listAttachments`
+- **THEN** it throws `AuthorizationError`
+
 ### Requirement: Read one attachment's bytes through the runtime API
 
 `getAttachment(instanceId, attachmentId, actor, db?)` SHALL apply the
-same visibility rule `uploadAttachment` applies. On success it SHALL
-return the attachment's `filename`, `contentType`, and `data`.
+same visibility rule `uploadAttachment` applies, including its
+test-instance narrowing. On success it SHALL return the attachment's
+`filename`, `contentType`, and `data`.
 
 The lookup SHALL match both `attachmentId` and `instanceId`. An
 `attachmentId` belonging to a different instance counts as not found,
@@ -1318,6 +1407,13 @@ the same as one that does not exist at all. `getAttachment` SHALL raise
 - **WHEN** an eligible candidate calls `getAttachment` with an
   `attachmentId` that does not exist
 - **THEN** it throws `NotFoundError`
+
+#### Scenario: A claimant who is not the creator cannot download a test instance's attachment
+
+- **WHEN** a non-administrative actor holding only a claim or candidacy
+  (not `startedBy`) on a test instance calls `getAttachment`
+- **AND** the call targets one of that instance's attachments
+- **THEN** it throws `AuthorizationError`
 
 ### Requirement: The engine writes mapped column attributes into data
 

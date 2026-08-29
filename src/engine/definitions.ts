@@ -783,6 +783,21 @@ export function createDefinitionStore(
     const key = `${processId}:${version}`;
     const hit = cache.get(key);
     if (hit) return hit;
+    // A negative version is a test-instance run's reserved identifier
+    // (draft-test-instances), never a real published version — those are
+    // always positive, assigned monotonically at publish. The two identifier
+    // spaces are disjoint, so this branch never reads `definitions` and the
+    // branch below never reads `draft_snapshots`. A test-instance's frozen
+    // body is immutable once written, the same as a published version's, so
+    // it is cached under the same rule.
+    if (version < 0) {
+      const rows = (await db`SELECT body FROM draft_snapshots
+        WHERE process_id = ${processId} AND version = ${version} LIMIT 1`) as { body: unknown }[];
+      if (rows.length === 0) return undefined;
+      const body = parseBody(rows[0].body);
+      cache.set(key, body);
+      return body;
+    }
     const rows = (await db`SELECT body FROM definitions
       WHERE process_id = ${processId} AND version = ${version} LIMIT 1`) as { body: unknown }[];
     if (rows.length === 0) return undefined;

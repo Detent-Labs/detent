@@ -431,6 +431,13 @@ function parseScope(url: URL): "mine" | "started" | "all" {
   return raw;
 }
 
+function parseKind(url: URL): Instance["kind"] | undefined {
+  const raw = url.searchParams.get("kind");
+  if (raw === null) return undefined;
+  if (raw !== "published" && raw !== "test") throw new RequestShapeError(`unknown kind '${raw}'`);
+  return raw;
+}
+
 export async function handleListInstances(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   const url = new URL(req.url);
   // `parseScope` runs inside the `gate` closure rather than at this top
@@ -491,6 +498,7 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
         excludeInstanceId: (url.searchParams.get("excludeInstanceId") as InstanceId) ?? undefined,
         createdAfter: createdAfterRaw !== null ? parseInstant(createdAfterRaw, "createdAfter") : undefined,
         createdBefore: createdBeforeRaw !== null ? parseInstant(createdBeforeRaw, "createdBefore") : undefined,
+        kind: parseKind(url),
         // No `dataWhere`: the instance-data-query capability's comparisons
         // reach the Runtime API Layer reads in-process. The route that
         // carries them over HTTP arrives with the consumer that reads them.
@@ -501,6 +509,12 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
         // scope=started sets it; each lists one actor's own instances, and the
         // screens behind them render a resolved summary alone.
         includeDegraded: scope === "all",
+        // Same scoping rule as includeDegraded, one line up: scope=all
+        // already required ADMIN_ROLE (or a process-scoped read grant)
+        // above. draft-test-instances: neither scope=mine nor scope=started
+        // opts in, so a test instance never reaches a participant-facing
+        // list, direct-id access aside (loadInstanceForActor's own check).
+        includeTestInstances: scope === "all",
       };
       const limit = parseLimit(url, MAX_LIST_LIMIT);
       const cursor = url.searchParams.get("cursor") ?? undefined;

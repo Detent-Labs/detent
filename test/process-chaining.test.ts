@@ -371,3 +371,37 @@ test.skipIf(!DB)("a process.start delivery that keeps failing dead-letters, and 
   expect(after!.status).toBe(inst.status); // the acting instance's own record is untouched
   expect(after!.data).toEqual(inst.data);
 });
+
+// --- draft-test-instances: kind propagates through a process.start chain -----
+
+test.skipIf(!DB)("a process.start action dispatched from a test instance starts a new instance with kind: test", async () => {
+  const { registry } = chainRegistry();
+  const tv = await publishBody("proc_pc_kind_target_test" as Instance["processId"], targetBody(), registry, dataSourceReg);
+  const av = await publishBody("proc_pc_kind_actor_test" as Instance["processId"], actorBody(tv.processId), registry, dataSourceReg);
+  const started = await createInstance(av.definition, { processId: av.processId, version: av.version, kind: "test" });
+  const done = await commitManualTransition(started, "path_a_done", av.definition, actor, sql, { field_a_amount: 500 } as unknown as Instance["data"]);
+  expect(done.kind).toBe("test");
+
+  await drainAll(registry);
+
+  const expectedId = `inst_${idempotencyKey(done.instanceId, done.transitionSeq, "action_chain")}`;
+  const target = await loadInstance(expectedId);
+  expect(target).toBeDefined();
+  expect(target!.kind).toBe("test");
+});
+
+test.skipIf(!DB)("a process.start action dispatched from a published instance starts a new instance with kind: published (regression)", async () => {
+  const { registry } = chainRegistry();
+  const tv = await publishBody("proc_pc_kind_target_pub" as Instance["processId"], targetBody(), registry, dataSourceReg);
+  const av = await publishBody("proc_pc_kind_actor_pub" as Instance["processId"], actorBody(tv.processId), registry, dataSourceReg);
+  const started = await startInstance(av.definition, { processId: av.processId, version: av.version }, actor);
+  const done = await commitManualTransition(started, "path_a_done", av.definition, actor, sql, { field_a_amount: 500 } as unknown as Instance["data"]);
+  expect(done.kind).toBe("published");
+
+  await drainAll(registry);
+
+  const expectedId = `inst_${idempotencyKey(done.instanceId, done.transitionSeq, "action_chain")}`;
+  const target = await loadInstance(expectedId);
+  expect(target).toBeDefined();
+  expect(target!.kind).toBe("published");
+});

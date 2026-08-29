@@ -31,6 +31,7 @@ export interface InstanceListParams {
   currentStepId?: string;
   startedBy?: string;
   claimedBy?: string;
+  kind?: string;
   limit?: number;
   cursor?: string;
 }
@@ -42,6 +43,7 @@ export async function listInstances(token: string, params: InstanceListParams = 
   if (params.currentStepId) query.set("currentStepId", params.currentStepId);
   if (params.startedBy) query.set("startedBy", params.startedBy);
   if (params.claimedBy) query.set("claimedBy", params.claimedBy);
+  if (params.kind) query.set("kind", params.kind);
   if (params.limit !== undefined) query.set("limit", String(params.limit));
   if (params.cursor !== undefined) query.set("cursor", params.cursor);
   return getJson<InstancePage>(`/instances?${query}`, token);

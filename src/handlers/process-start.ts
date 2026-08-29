@@ -85,6 +85,9 @@ async function processStartHandler(ctx: HandlerContext): Promise<unknown> {
       mapping: config.inputMapping,
       link: { chainedFrom: acting.instanceId },
       assignmentRegistry,
+      // draft-test-instances: a chain started from a test instance stays
+      // entirely within the test-instance visibility rules, at every link.
+      kind: acting.kind,
     });
   }
 

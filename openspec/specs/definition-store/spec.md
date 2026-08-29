@@ -222,6 +222,18 @@ The store SHALL provide `resolveBody(processId, version)` returning the persiste
 returned body MUST hash to the version's persisted `definitionHash`, so an
 instance rehydrating against it passes its pin check.
 
+`version` identifiers occupy two disjoint spaces. A real published version is
+always a positive number, assigned monotonically by publish. A test-instance
+run claims a separate identifier space that never coincides with a published
+version's identifier.
+
+The store SHALL resolve a test-instance identifier to the exact `ProcessBody`
+frozen when that run started. It SHALL never resolve to the process's
+live/current draft body. It SHALL never resolve to any published version's
+body. A test-instance run's frozen body stays immutable once written, the
+same as a published version's. The store therefore caches it without
+invalidation, under the rule it already applies to published bodies.
+
 #### Scenario: Resolving a persisted pin returns its body
 
 - **WHEN** `resolveBody(processId, version)` is called for a persisted version
@@ -233,6 +245,32 @@ instance rehydrating against it passes its pin check.
 - **WHEN** `resolveBody` is called for a `(processId, version)` that was never
   published
 - **THEN** it returns `undefined` and does not throw
+
+#### Scenario: Resolving a test-instance's reserved identifier returns its frozen body
+
+- **WHEN** a caller calls `resolveBody(processId, version)` with the
+  identifier assigned to a test-instance run
+- **THEN** it returns the exact `ProcessBody` frozen when that run started,
+  not the process's current draft body
+
+#### Scenario: The two identifier spaces never resolve to each other's body
+
+- **WHEN** a process has both a real published version and a test-instance
+  run
+- **AND** a caller might otherwise expect one identifier to reach the
+  other's body
+- **THEN** resolving the published version's identifier returns only that
+  published body
+- **AND** resolving the test-instance's reserved identifier returns only
+  that test-instance's frozen body, never the other's
+
+#### Scenario: Resolving an ordinary published pin stays unchanged
+
+- **WHEN** a caller calls `resolveBody(processId, version)` for a real,
+  positive published `version`
+- **THEN** it resolves exactly as it did before test-instance runs existed
+- **AND** it returns that version's persisted body with no change in
+  behavior for every caller resolving a published pin
 
 ### Requirement: Resolve the newest published version for a process
 
@@ -373,9 +411,17 @@ list. The hash-hit path returns before validation runs, so it computes no
 findings. Reporting a stale set from an earlier publish would be worse than
 reporting none.
 
-Today `cross-process-validation`'s reference check over an `"instance.query"`
-data source is the only producer of a finding. The channel is general, and a
-later check reporting rather than rejecting uses it without widening anything.
+Two checks produce a finding. `cross-process-validation`'s reference check over
+an `"instance.query"` data source produces one. Its path check over an
+`instance.transition` action produces the other.
+
+A finding SHALL name the site it came from. A data-source finding names the
+data source. An action finding names no data source, because an action is not
+one. A finding's identifying name SHALL therefore be optional. A reader SHALL
+fall back to the finding's location in the body when the name is absent.
+
+A finding's reference kind SHALL admit `"path"` beside `"step"` and `"field"`.
+An action's path reference is neither of the other two.
 
 #### Scenario: A publish raising no finding returns an empty list
 
@@ -388,6 +434,14 @@ later check reporting rather than rejecting uses it without widening anything.
   target version holds
 - **THEN** the result carries the new version and a finding naming that
   reference
+
+#### Scenario: An action finding falls back to its location
+
+- **WHEN** a body publishes carrying an `instance.transition` action whose
+  `pathId` no live target version holds
+- **THEN** the result carries the new version and a finding whose reference
+  kind is `"path"`, naming no data source
+- **AND** a reader identifies that finding by its location in the body
 
 #### Scenario: A rejected publish returns nothing at all
 

@@ -1,13 +1,14 @@
 import type { InstanceListParams } from "../api/client.js";
 import type { LocalizedText, LocaleCode } from "../api/types.js";
 
-/** All-instances filter state, covering five of the filters InstanceListFilter supports (process, status, current step, startedBy and claimedBy — scope is not among them; the client always sends "all"). Empty string means unfiltered. */
+/** All-instances filter state, covering six of the filters InstanceListFilter supports (process, status, current step, startedBy, claimedBy and kind — scope is not among them; the client always sends "all"). Empty string means unfiltered. */
 export interface InstanceFilterState {
   processId: string;
   status: string;
   currentStepId: string;
   startedBy: string;
   claimedBy: string;
+  kind: string;
 }
 
 export const EMPTY_INSTANCE_FILTER: InstanceFilterState = {
@@ -16,6 +17,7 @@ export const EMPTY_INSTANCE_FILTER: InstanceFilterState = {
   currentStepId: "",
   startedBy: "",
   claimedBy: "",
+  kind: "",
 };
 
 /** Builds the request params for GET /instances?scope=all from filter state, dropping empty fields (unfiltered) rather than sending them as empty-string values. */
@@ -26,6 +28,7 @@ export function toListParams(filter: InstanceFilterState, limit: number, cursor?
     currentStepId: filter.currentStepId || undefined,
     startedBy: filter.startedBy || undefined,
     claimedBy: filter.claimedBy || undefined,
+    kind: filter.kind || undefined,
     limit,
     cursor,
   };

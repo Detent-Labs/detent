@@ -139,6 +139,20 @@ export function getInstanceView(instanceId: string, token: string): Promise<Inst
   return getJson(`/instances/${encodeURIComponent(instanceId)}`, token);
 }
 
+/**
+ * Creates a running instance from the process's CURRENT draft body — no
+ * published version required (draft-play-instance-marker, studio-player
+ * spec). The created instance carries `kind: "test"`.
+ */
+export async function createTestInstance(processId: string, token: string): Promise<{ instanceId: string }> {
+  const res = await request(`/drafts/${encodeURIComponent(processId)}/instances`, token, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  return (await res.json()) as { instanceId: string };
+}
+
 export async function claimStep(instanceId: string, token: string): Promise<void> {
   await request(`/instances/${encodeURIComponent(instanceId)}/claim`, token, { method: "POST" });
 }

@@ -86,6 +86,12 @@ export function InstancesScreen({ token, locale, navigate, onUnauthorized }: Ins
           value={filter.claimedBy}
           onChange={(e) => setFilter((f) => ({ ...f, claimedBy: e.target.value }))}
         />
+        {/* Every `value` here is the kind token the route matches; only the label follows the locale. */}
+        <select value={filter.kind} onChange={(e) => setFilter((f) => ({ ...f, kind: e.target.value }))}>
+          <option value="">{t(locale, "instances.allKinds")}</option>
+          <option value="published">{t(locale, "instances.kindPublished")}</option>
+          <option value="test">{t(locale, "instances.kindTest")}</option>
+        </select>
         <button type="button" className="btn btn-secondary" onClick={refresh} disabled={loading}>
           {t(locale, "common.refresh")}
         </button>
@@ -102,6 +108,7 @@ export function InstancesScreen({ token, locale, navigate, onUnauthorized }: Ins
               <th>{t(locale, "instances.colProcess")}</th>
               <th>{t(locale, "instances.colStep")}</th>
               <th>{t(locale, "instances.colStatus")}</th>
+              <th>{t(locale, "instances.colKind")}</th>
               <th>{t(locale, "instances.colStartedBy")}</th>
               <th>{t(locale, "instances.colClaimedBy")}</th>
               <th>{t(locale, "instances.colCreated")}</th>
@@ -118,6 +125,7 @@ export function InstancesScreen({ token, locale, navigate, onUnauthorized }: Ins
                   <td>
                     <span className={`admin-badge admin-badge-${item.status}`}>{item.status}</span>
                   </td>
+                  <td>{item.kind === "test" ? <span className="admin-badge admin-badge-test">{item.kind}</span> : item.kind}</td>
                   <td>{item.startedBy ?? "—"}</td>
                   <td>—</td>
                   <td>{new Date(item.createdAt).toLocaleString(locale)}</td>
@@ -142,6 +150,7 @@ export function InstancesScreen({ token, locale, navigate, onUnauthorized }: Ins
                   <td>
                     <span className={`admin-badge admin-badge-${item.status}`}>{item.status}</span>
                   </td>
+                  <td>{item.kind === "test" ? <span className="admin-badge admin-badge-test">{item.kind}</span> : item.kind}</td>
                   <td>{item.startedBy ?? "—"}</td>
                   <td>{item.assignment?.claimedBy ?? "—"}</td>
                   <td>{new Date(item.createdAt).toLocaleString(locale)}</td>

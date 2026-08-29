@@ -83,6 +83,14 @@ function makeSpawnHandler(
       if (!step?.subprocess) throw new Error(`spawn: not a subprocess step: ${subprocessStepId}`);
       const spec = step.subprocess;
 
+      // draft-test-instances: a test instance never spawns a real child,
+      // categorically — checked before any child resolution attempt, so this
+      // fails the same controlled way whether or not the child process has a
+      // resolvable published version (see design.md's subprocess-step risk).
+      if (parent.kind === "test") {
+        throw new Error(`spawn: a test instance may not spawn a subprocess child (step '${subprocessStepId}')`);
+      }
+
       // Resolve the child body + version per versionBinding.
       let childVersion: number | undefined;
       let spawnedBody: ProcessBody | undefined;
