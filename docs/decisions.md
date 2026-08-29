@@ -97,9 +97,10 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   question, and nothing today asks for it.
 
 ## Decided, not yet built (each needs its own OpenSpec change)
-- **Instance audit log: a tamper-evident change record for field data.** A
-  design pass on 2026-08-25 settled the shape; the owner approved each piece
-  in turn. Change 1 landed as `instance-audit-log-chain` — `89e4c70`
+- **Instance audit log: a tamper-evident change record for field data.**
+  Shipped in full. A design pass on 2026-08-25 settled the shape; the owner
+  approved each piece in turn. All three changes landed and archived, in
+  this order. Change 1 landed as `instance-audit-log-chain` — `89e4c70`
   implemented it, `9379091`/`f2631b6`/`7e003e8` corrected the design across
   review, `2b9b905`/`072b9e1` closed its verification gaps, and `591c6c4`
   archived it; its spec is `openspec/specs/instance-audit-log/spec.md`.
@@ -107,12 +108,14 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   2026-08-27 (see "Explicitly not the goal" below), vacating that slot.
   Change 2, `redactable-field-flag`
   (`openspec/changes/archive/2026-08-27-redactable-field-flag/`), shipped
-  and archived 2026-08-27. Change 3,
-  `instance-audit-log-view`, took the vacated slot and closes the
-  readable-admin-view gap "Open, deliberately" named below: it adds the
-  audit-entry read beside `verifyInstanceChain`, a `system:admin` route
-  over each, and the instance screen's own Audit Log section. Three
-  changes, in this order.
+  and archived 2026-08-27. Change 3, `instance-audit-log-view`
+  (`openspec/changes/archive/2026-08-28-instance-audit-log-view/`), took
+  the vacated slot and closed the readable-admin-view gap "Open,
+  deliberately" named below: it adds the audit-entry read beside
+  `verifyInstanceChain`, a `system:admin` route over each, and the instance
+  screen's own Audit Log section. Shipped and archived 2026-08-28. Nothing
+  in this topic is left to build; the two items under "Open, deliberately"
+  below are accepted deferrals, not open work.
 
   1. The table, the two triggers sharing one diff function, the
      `set_config` call at all six write sites, the hash chain, and
