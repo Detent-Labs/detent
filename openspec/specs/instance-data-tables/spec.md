@@ -273,9 +273,10 @@ column's value type SHALL be text. It SHALL sort as text regardless of the
 source fields' own declared types.
 
 When no source field holds a non-empty value on an instance, the cell SHALL
-be a no-value cell, not a value cell holding the empty string — the same
-distinct empty state a direct field's cell carries, so a reader does not
-mistake a merge column's absence of data for an actual empty value.
+be a no-value cell. It is not a value cell holding the empty string. This is
+the same distinct empty state a direct field's cell carries. A reader
+therefore does not mistake a merge column's absence of data for an actual
+empty value.
 
 When redaction has set an instance's `redactedAt`, a merge column's cell
 for that instance SHALL render as redacted. This is not an ordinary empty
