@@ -223,15 +223,16 @@ returned body MUST hash to the version's persisted `definitionHash`, so an
 instance rehydrating against it passes its pin check.
 
 `version` identifiers occupy two disjoint spaces. A real published version is
-always a positive number, assigned monotonically by publish. A separate space
-of identifiers is reserved for test-instance runs and can never coincide with
-a real published version's identifier. The store SHALL resolve a version
-identifier reserved for test-instance runs to the exact `ProcessBody` frozen
-at the moment that test-instance run was created, never to the process's
-live/current draft body, and never to any published version's body. A
-test-instance run's frozen body is immutable once written, the same as a
-published version's, so it is cached without invalidation under the same
-rule this capability already applies to published bodies.
+always a positive number, assigned monotonically by publish. A test-instance
+run claims a separate identifier space that never coincides with a published
+version's identifier.
+
+The store SHALL resolve a test-instance identifier to the exact `ProcessBody`
+frozen when that run started. It SHALL never resolve to the process's
+live/current draft body. It SHALL never resolve to any published version's
+body. A test-instance run's frozen body stays immutable once written, the
+same as a published version's. The store therefore caches it without
+invalidation, under the rule it already applies to published bodies.
 
 #### Scenario: Resolving a persisted pin returns its body
 
@@ -247,28 +248,29 @@ rule this capability already applies to published bodies.
 
 #### Scenario: Resolving a test-instance's reserved identifier returns its frozen body
 
-- **WHEN** `resolveBody(processId, version)` is called with the reserved
+- **WHEN** a caller calls `resolveBody(processId, version)` with the
   identifier assigned to a test-instance run
-- **THEN** it returns the exact `ProcessBody` that was frozen when that run
-  was created, not the process's current draft body
+- **THEN** it returns the exact `ProcessBody` frozen when that run started,
+  not the process's current draft body
 
 #### Scenario: The two identifier spaces never resolve to each other's body
 
 - **WHEN** a process has both a real published version and a test-instance
-  run whose reserved identifier a caller might otherwise expect to interact
-  with it
+  run
+- **AND** a caller might otherwise expect one identifier to reach the
+  other's body
 - **THEN** resolving the published version's identifier returns only that
-  published body, and resolving the test-instance's reserved identifier
-  returns only that test-instance's frozen body — neither resolution ever
-  returns the other's body
+  published body
+- **AND** resolving the test-instance's reserved identifier returns only
+  that test-instance's frozen body, never the other's
 
-#### Scenario: Resolving an ordinary published pin is unaffected
+#### Scenario: Resolving an ordinary published pin stays unchanged
 
-- **WHEN** `resolveBody(processId, version)` is called for a real, positive
-  published `version`
-- **THEN** it resolves exactly as it did before test-instance runs existed,
-  returning that version's persisted body with no change in behavior for
-  every caller resolving a published pin
+- **WHEN** a caller calls `resolveBody(processId, version)` for a real,
+  positive published `version`
+- **THEN** it resolves exactly as it did before test-instance runs existed
+- **AND** it returns that version's persisted body with no change in
+  behavior for every caller resolving a published pin
 
 ### Requirement: Resolve the newest published version for a process
 

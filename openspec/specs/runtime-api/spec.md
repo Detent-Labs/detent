@@ -352,19 +352,21 @@ distinguish a nonexistent instance from one they may not read. A
 caller holding `ADMIN_ROLE` SHALL see the ordinary not-found failure.
 
 When the loaded instance is a test instance (`kind: "test"`, per the
-`draft-test-instances` capability), the relationship rule narrows: a
-non-administrative actor SHALL be authorized only when that actor is
-the test instance's own `startedBy`. Being the current step's claimant
-or an eligible assignment candidate — standing that authorizes a direct
-read of an ordinary instance — SHALL NOT by itself authorize a
-non-administrative actor to read a test instance. This exception exists
-so the actor who created a test instance (through the `draft-test-instances`
-capability's studio-only creation route, which stamps `startedBy` from
-the authenticated actor and cannot be supplied by the caller) can view
-and drive it, while a different actor who merely holds a claim or
-candidacy on it — the same standing an ordinary instance's real
-assignment can produce — cannot. `ADMIN_ROLE` continues to authorize
-access to a test instance exactly as it does to an ordinary one.
+`draft-test-instances` capability), the relationship rule narrows. The
+rule SHALL authorize a non-administrative actor only as that test
+instance's own `startedBy`. For an ordinary instance, the current step's
+claimant or an eligible assignment candidate can read it directly. A test
+instance's non-administrative actor SHALL NOT rely on that standing
+alone.
+
+This narrowing lets the actor who created a test instance view and drive
+it. The `draft-test-instances` capability's studio-only creation route
+stamps `startedBy` from the authenticated actor. The caller cannot
+supply it. A different actor who merely holds a claim or candidacy on
+the test instance cannot read it. That same standing would grant access
+to an ordinary instance's real assignment holder. The `ADMIN_ROLE` role
+continues to authorize access to a test instance exactly as it does to
+an ordinary one.
 
 `fields` SHALL contain exactly the current step's `ViewField`s whose
 resolved `visible` (literal `boolean`, used as-is, or CEL, evaluated
@@ -382,9 +384,9 @@ matching `ViewField.span`, or `1` when the view declares none.
 regardless of `status`, the same way `step` itself does, since it
 describes the step's declared layout rather than instance state.
 
-`InstanceView` SHALL also carry `kind` (`"published"` or `"test"`,
-mirroring the underlying instance's own `kind`), so a caller renders a
-test instance distinctly without a separate lookup.
+`InstanceView` SHALL also carry `kind` (`"published"` or `"test"`),
+mirroring the underlying instance's own `kind`. A caller then renders a
+test instance distinctly with no separate lookup.
 
 A `ViewField` whose `ref` resolves to a `FieldDef` of `type: "group"`
 (a container, never a leaf value in `instance.data`) SHALL still
@@ -526,8 +528,9 @@ caller can distinguish these cases.
 #### Scenario: A claimant who is not the creator is refused a test instance
 
 - **WHEN** the caller is a test instance's current step's claimant or an
-  eligible assignment candidate, but is not that test instance's
-  `startedBy`, and holds no `ADMIN_ROLE`
+  eligible assignment candidate
+- **AND** the caller is not that test instance's `startedBy` and holds no
+  `ADMIN_ROLE`
 - **THEN** `getInstanceView` throws `AuthorizationError`, the same
   refusal a caller with no relationship to the instance at all receives
 
@@ -1211,13 +1214,14 @@ left.
 
 `postComment(instanceId, actor, text, db?)` SHALL apply the same
 visibility rule `getInstanceView` applies, including its test-instance
-narrowing: a non-administrative actor may act on a test instance only
-as its `startedBy`, not merely as claimant or eligible candidate. That
-rule admits `system:admin`. It also admits the instance's `startedBy`.
-It also admits the current step's `claimedBy`. It also admits an
-eligible assignment candidate on the current step — for an ordinary
-instance; a test instance narrows the latter two away for a
-non-administrative caller.
+narrowing. On a test instance, a non-administrative actor may act only
+as its `startedBy`, never merely as claimant or eligible candidate.
+
+That rule admits `system:admin`. It also admits the instance's
+`startedBy`. On an ordinary instance it also admits the current step's
+`claimedBy`, and an eligible assignment candidate on the current step.
+A test instance narrows those last two away for a non-administrative
+caller.
 
 On success it SHALL insert an `instance_comments` row. That row carries
 a fresh `comment_`-prefixed id, the instance id, the calling actor's id,
@@ -1293,10 +1297,10 @@ narrowing. It SHALL return a page of the instance's comments ordered
 `uploadAttachment(instanceId, actor, { filename, contentType, data, sizeBytes }, db?)` SHALL apply the same
 visibility rule `postComment` applies (`loadInstanceForActor`), including
 its test-instance narrowing. That rule admits `system:admin`. It also
-admits the instance's `startedBy`. It also admits the current step's
-`claimedBy`. It also admits an eligible assignment candidate on the
-current step — for an ordinary instance; a test instance narrows the
-latter two away for a non-administrative caller.
+admits the instance's `startedBy`. On an ordinary instance it also admits
+the current step's `claimedBy`, and an eligible assignment candidate on
+the current step. A test instance narrows those last two away for a
+non-administrative caller.
 
 On success it SHALL insert an `instance_attachments` row. That row
 carries a fresh `attachment_`-prefixed id, the instance id, the calling
@@ -1407,8 +1411,8 @@ the same as one that does not exist at all. `getAttachment` SHALL raise
 #### Scenario: A claimant who is not the creator cannot download a test instance's attachment
 
 - **WHEN** a non-administrative actor holding only a claim or candidacy
-  (not `startedBy`) on a test instance calls `getAttachment` for one of
-  its attachments
+  (not `startedBy`) on a test instance calls `getAttachment`
+- **AND** the call targets one of that instance's attachments
 - **THEN** it throws `AuthorizationError`
 
 ### Requirement: The engine writes mapped column attributes into data

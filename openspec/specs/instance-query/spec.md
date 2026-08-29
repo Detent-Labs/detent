@@ -83,17 +83,22 @@ the other filters conjunctively.
 With no filters the read SHALL return every instance, subject to paging. The
 read SHALL NOT scope results to the calling actor implicitly.
 
-A test instance (an instance whose `kind` is `"test"`, per the
-`draft-test-instances` capability, as opposed to the `"published"` kind every
-ordinary instance carries) SHALL be excluded from a summary list requested
-under a participant-facing scope — `scope: "mine"`, `scope: "started"`, or any
-other call made by a caller with no administrative standing over the read.
-This exclusion applies regardless of whether the calling actor started,
-claims, or is an eligible assignment candidate on the test instance; it is not
-a filter a participant-facing caller can opt out of. A summary list requested
-under administrative scope (`scope: "all"`, gated by `ADMIN_ROLE` per the
-`http-wrapper` capability, or an equivalent process-scoped read grant) SHALL
-include a test instance like any other, subject to its other filters.
+A test instance is an instance whose `kind` is `"test"`, per the
+`draft-test-instances` capability. An ordinary instance carries the
+`"published"` kind instead.
+
+The read SHALL exclude a test instance from a summary list under a
+participant-facing scope. Participant-facing scope means `scope: "mine"`,
+`scope: "started"`, or any call from a caller with no administrative
+standing over the read. The exclusion applies no matter how the actor
+relates to the instance. It applies whether they started it, claim it, or
+are an eligible assignment candidate on it. A participant-facing caller
+cannot opt out.
+
+The read SHALL include a test instance, subject to its other filters, in a
+summary list under administrative scope. Administrative scope means
+`scope: "all"`, gated by `ADMIN_ROLE` per the `http-wrapper` capability, or
+an equivalent process-scoped read grant.
 
 A matched instance's summary can fail to resolve. That happens when its pinned
 `(processId, version)` has no resolvable published body. It also happens when
@@ -244,17 +249,18 @@ than `limit` even while more matching instances exist.
 - **WHEN** a test instance and an ordinary instance both exist
 - **AND** actor A started, claims, and is an eligible assignment candidate on
   the test instance's current step
-- **AND** the read is called with `scope: "mine"` (or `scope: "started"`) by
-  actor A, holding no administrative standing
-- **THEN** the ordinary instance is returned when it also matches A's filters
-- **AND** the test instance is omitted from every page of the walk
+- **AND** actor A, holding no administrative standing, calls the read with
+  `scope: "mine"` (or `scope: "started"`)
+- **THEN** the read returns the ordinary instance when it also matches A's
+  filters
+- **AND** the read omits the test instance from every page of the walk
 
 #### Scenario: Administrative scope includes a test instance
 
 - **WHEN** a test instance exists
-- **AND** the read is called under `scope: "all"` by an actor holding
-  `ADMIN_ROLE`
-- **THEN** the test instance is returned in the page like any other instance
+- **AND** an actor holding `ADMIN_ROLE` calls the read under `scope: "all"`
+- **THEN** the read returns the test instance in the page like any other
+  instance
 
 #### Scenario: With includeDegraded, an unresolvable body degrades instead of failing the page
 
