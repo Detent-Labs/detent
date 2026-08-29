@@ -36,9 +36,12 @@ export async function createSeededInstance(
     mapping: Record<FieldId, Expression>;
     link: { parent: { instanceId: string; stepId: StepId } } | { chainedFrom: string };
     assignmentRegistry: AssignmentRegistry;
+    // Threaded straight through to createInstance's own opts.kind. Omitted
+    // (or "published") for an ordinary spawn/chain target.
+    kind?: Instance["kind"];
   },
 ): Promise<Instance> {
-  const { instanceId, processId, version, body, source, mapping, link, assignmentRegistry } = opts;
+  const { instanceId, processId, version, body, source, mapping, link, assignmentRegistry, kind } = opts;
 
   // Seed from the mapping (source instance's context; targets keyed by the
   // created instance's fieldId). A raising entry is total: omitted rather
@@ -97,6 +100,7 @@ export async function createSeededInstance(
         data: seedData as Instance["data"],
         assignment: resolved?.assignment,
         events: createdEvents,
+        ...(kind !== undefined ? { kind } : {}),
         ...link,
       },
       tx,

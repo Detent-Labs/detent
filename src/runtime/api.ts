@@ -111,6 +111,9 @@ export type InstanceView = {
   processId: ProcessId;
   version: number;
   status: InstanceStatus;
+  // Mirrors the underlying instance's own `kind`, so a caller renders a test
+  // instance distinctly without a separate lookup.
+  kind: Instance["kind"];
   step: { id: StepId; key: string; label: LocalizedText; type: StepType };
   fields: ResolvedViewField[];
   // The current step's `view.columns`, or 1 when the view declares none.
@@ -975,6 +978,7 @@ export async function createProcessInstance(
     timers: [],
     status: initial.terminal ? "completed" : "running",
     startedAt: new Date().toISOString(),
+    kind: "published",
   };
 
   // Seeds the catalog's own `default` values into any slot `opts.data` left
@@ -1078,6 +1082,7 @@ export async function getInstanceView(instanceId: InstanceId, actor: Actor, regi
     processId: instance.processId,
     version: instance.version,
     status: instance.status,
+    kind: instance.kind,
     step: { id: step.id, key: step.key, label: step.label, type: step.type },
     fields: await resolveFields(body, step, instance, actor, registry, db),
     columns: step.view?.columns ?? 1,
