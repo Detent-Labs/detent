@@ -1,0 +1,112 @@
+{
+  "processId": "proc_laptop_inventory",
+  "version": 1,
+  "definitionHash": "f9b8eef00c06d92cbe95e5e5ebd0f86fc08d09e3a018e8e568d1d1f181802401",
+  "status": "published",
+  "publishedAt": "2026-08-29T09:00:00Z",
+  "definition": {
+    "key": "laptop_inventory",
+    "label": {
+      "en": "Laptop Inventory"
+    },
+    "description": {
+      "en": "One instance per device: on the shelf, or issued to someone. `instance-query-data-source`'s target example — Employee Onboarding's device picker reads this process's shelf-step instances directly, with no copy of the list and no SQL of its own."
+    },
+    "baseLocale": "en",
+    "fields": [
+      {
+        "id": "field_8a1c2e60-0001-4a1c-8e2f-000000000001",
+        "key": "asset_tag",
+        "label": {
+          "en": "Asset Tag"
+        },
+        "type": "string",
+        "validation": {
+          "minLength": 3,
+          "maxLength": 20
+        }
+      },
+      {
+        "id": "field_8a1c2e60-0002-4a1c-8e2f-000000000002",
+        "key": "serial",
+        "label": {
+          "en": "Serial Number"
+        },
+        "type": "string",
+        "validation": {
+          "minLength": 3,
+          "maxLength": 40
+        }
+      }
+    ],
+    "workflow": {
+      "initialStep": "step_3b5d7f10-0001-4a1c-8e2f-000000000001",
+      "steps": [
+        {
+          "id": "step_3b5d7f10-0001-4a1c-8e2f-000000000001",
+          "key": "shelf",
+          "label": {
+            "en": "On the Shelf"
+          },
+          "description": {
+            "en": "Available. Onboarding's device picker names this step, so only a shelf-step device is offered."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": ["it-asset-manager"]
+              }
+            }
+          },
+          "view": {
+            "fields": [
+              {
+                "ref": "field_8a1c2e60-0001-4a1c-8e2f-000000000001",
+                "required": true
+              },
+              {
+                "ref": "field_8a1c2e60-0002-4a1c-8e2f-000000000002",
+                "required": true
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_9c4e6a20-0001-4a1c-8e2f-000000000001",
+              "key": "issue",
+              "label": "Issue",
+              "to": "step_3b5d7f10-0002-4a1c-8e2f-000000000002",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_3b5d7f10-0002-4a1c-8e2f-000000000002",
+          "key": "issued",
+          "label": {
+            "en": "Issued"
+          },
+          "description": {
+            "en": "Out of the shelf-step filter from this point on. `docs/decisions.md` records the transition action that would drive this move automatically as a follow-up change, not yet built."
+          },
+          "type": "task",
+          "terminal": true,
+          "view": {
+            "fields": [
+              {
+                "ref": "field_8a1c2e60-0001-4a1c-8e2f-000000000001",
+                "readonly": true
+              },
+              {
+                "ref": "field_8a1c2e60-0002-4a1c-8e2f-000000000002",
+                "readonly": true
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

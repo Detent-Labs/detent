@@ -124,6 +124,17 @@ export async function getGroupMembers(groupId: string, db: SQL = sql): Promise<s
 }
 
 /**
+ * The reverse of `getGroupMembers`: every group id whose `members` array
+ * contains `actorId`. Powers "reports visible to me" (`listMyReports`),
+ * which starts from the actor rather than from one already-known report, so
+ * it needs this direction and not the forward one.
+ */
+export async function getGroupsForMember(actorId: string, db: SQL = sql): Promise<string[]> {
+  const rows = (await db`SELECT group_id FROM groups WHERE ${actorId} = ANY(members)`) as { group_id: string }[];
+  return rows.map((r) => r.group_id);
+}
+
+/**
  * Batch-by-ids scope lookup, mirroring `knownUserIds`'s shape. A missing key
  * in the returned map is how a caller detects a nonexistent group id.
  */

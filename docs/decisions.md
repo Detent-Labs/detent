@@ -99,13 +99,16 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   implemented it, `9379091`/`f2631b6`/`7e003e8` corrected the design across
   review, `2b9b905`/`072b9e1` closed its verification gaps, and `591c6c4`
   archived it; its spec is `openspec/specs/instance-audit-log/spec.md`.
-  A third change, the nightly checkpoint, was struck 2026-08-27 (see
-  "Explicitly not the goal" below). Change 2, `redactable-field-flag`
+  The nightly checkpoint, once proposed as a third change, was struck
+  2026-08-27 (see "Explicitly not the goal" below), vacating that slot.
+  Change 2, `redactable-field-flag`
   (`openspec/changes/redactable-field-flag/`), is implemented and
-  verified as of 2026-08-27, pending archive. Two changes, in this
-  order — no third is decided. A readable admin view over the audit log
-  is a real, named gap (see "Open, deliberately" below), but nobody has
-  proposed it as a change yet, so it is not "change 3."
+  verified as of 2026-08-27, pending archive. Change 3,
+  `instance-audit-log-view`, took the vacated slot and closes the
+  readable-admin-view gap "Open, deliberately" named below: it adds the
+  audit-entry read beside `verifyInstanceChain`, a `system:admin` route
+  over each, and the instance screen's own Audit Log section. Three
+  changes, in this order.
 
   1. The table, the two triggers sharing one diff function, the
      `set_config` call at all six write sites, the hash chain, and
@@ -277,18 +280,18 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   concrete "I deleted a field I needed to redact" case shows up; do not
   build a fix ahead of one.
 
-  A readable admin view over the audit log is unbuilt and carries no
-  change name or number yet. `docs/current-state.md`'s instance-audit-log
-  section already names the gap: `verifyInstanceChain`
-  (`src/engine/admin-queries.ts:259`) has no caller anywhere in `src/http`
-  or `packages/web`, so today the chain's tamper-evidence is provable only
-  by someone with direct database access, not through the product. That
-  falls short of this entry's own goal ("readable ... without ceremony,"
-  above). Nobody has proposed a change for it, so it stays a named,
-  undecided gap here rather than a numbered change.
+  A readable admin view over the audit log was the one open gap here.
+  `instance-audit-log-view` (change 3, above) closed it: `GET
+  /admin/instances/:id/audit` reads the log itself, keyset-paginated,
+  and `GET /admin/instances/:id/audit/verify` exposes
+  `verifyInstanceChain` (`src/engine/admin-queries.ts:259`), which
+  previously had no caller anywhere in `src/http` or `packages/web`. The
+  instance screen's Audit Log section renders both, so an operator now
+  reads the log and its verified state through the product, not only by
+  querying the database directly.
 - **Aggregated data source: a field's options read from other instances.** A
   design pass on 2026-08-25 settled a shape, and a second pass the same day
-  replaced it. Not started.
+  replaced it. Shipped 2026-08-29 as `instance-query-data-source`.
 
   **The goal.** A field's option list comes from the instances of another
   process. The worked case: a Laptop Inventory process holds one instance per
@@ -351,9 +354,13 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     resolves such a field readonly on every step regardless of the view, so the
     copy has exactly one writer, and a difference against the live value has
     exactly one cause.
-  - `DataSourceContext` gains the reading instance (`{ id, data }`, the shape
-    `AssignmentContext` already carries). The comparisons need it for their
-    right side, and the self-exclusion rule below needs the id.
+  - `DataSourceContext` gains the reading instance, `{ id, processId, data,
+    baseLocale }` — not the sibling `AssignmentContext.instance`'s own shape:
+    that one is `{ id, startedBy, data }`. Each carries what its own
+    dimension needs and nothing the other one does. The comparisons need
+    `data` for their right side, the self-exclusion rule below needs `id`
+    and `processId`, and wrapping a resolved label as `LocalizedText` needs
+    `baseLocale`.
   - A query whose target is the reading instance's own process excludes that
     instance. A rule, not a config option: an instance's own contribution to an
     aggregate over its own process is never what a picker wants. `queryInstances`
@@ -464,7 +471,7 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     execution paths need an answer for whose view they use.
 - **Instance data tables: a report builder over instance field values.** A
   design pass on 2026-08-25 settled the shape, in the same session as the
-  two entries above. Not started.
+  two entries above. Shipped 2026-08-28 as `instance-data-tables`.
 
   **The goal.** A department builds a table of instances and reads their
   field values as columns. The worked case: HR lists every onboarding of
@@ -536,12 +543,13 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     permission. `process-read-permission` has since applied:
     `Permission` (`src/auth/authorize.ts:77`) now admits `"read"`, mapped
     to `ADMIN_ROLE`, and `scope=all` routes through it when the request
-    names a `processId`. The **report builder itself stays open** — this
-    change ships only the process-scoped `read` gate on `GET /instances`,
-    not the report/table feature this entry describes, and not the
-    reporting-routes migration (`REPORTS_ROLE` → `read` on the three
-    aggregate routes) `process-read-permission/proposal.md` scopes out as
-    its own later change.
+    names a `processId`. `process-read-permission` shipped only the
+    process-scoped `read` gate on `GET /instances`, not the report/table
+    feature this entry describes; `instance-data-tables` closed that gap
+    2026-08-28. The reporting-routes migration (`REPORTS_ROLE` → `read` on
+    the three aggregate routes) `process-read-permission/proposal.md` scopes
+    out stays its own later change — `instance-data-tables` did not fold it
+    in either.
 
   **Explicitly not the goal.**
   - Not the three existing reporting views. Cycle time, bottleneck and

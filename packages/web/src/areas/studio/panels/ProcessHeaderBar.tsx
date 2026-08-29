@@ -298,6 +298,19 @@ export function ProcessHeaderBar({
           </button>
         </p>
       )}
+      {publishResult && publishResult.findings.length > 0 && (
+        <ul className="issue-list">
+          {publishResult.findings.map((f, i) => (
+            <li key={i} className="issue issue-finding">
+              {t("headerBar.findingPrefix")} {f.dataSourceId}: {f.reference} (
+              {f.carriedByVersions.length > 0
+                ? `${t("headerBar.findingCarriedBy")} v${f.carriedByVersions.join(", v")}, ${f.liveInstanceCountOutsideCarryingVersions} ${t("headerBar.findingLiveElsewhere")}`
+                : t("headerBar.findingCarriedByNone")}
+              )
+            </li>
+          ))}
+        </ul>
+      )}
     </header>
   );
 }

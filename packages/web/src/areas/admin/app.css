@@ -146,7 +146,8 @@
    green. */
 .admin-badge-completed,
 .admin-badge-delivered,
-.admin-badge-enabled {
+.admin-badge-enabled,
+.admin-badge-verified {
   color: var(--color-text);
 }
 
@@ -181,7 +182,8 @@
 .admin-badge-dead-letter,
 .admin-badge-overdue,
 .admin-badge-disabled,
-.admin-badge-degraded {
+.admin-badge-degraded,
+.admin-badge-chain-failed {
   color: var(--color-surface);
   background: var(--color-refusal);
   border-color: var(--color-refusal);

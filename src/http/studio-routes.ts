@@ -138,17 +138,23 @@ export async function handlePublishDraft(
       requireAuthoring(actor);
       await requirePermission(actor, "publish", processId as ProcessId, db);
     },
-    async () => {
+    async (actor) => {
       const draft = await getDraft(processId as ProcessId, db);
       if (!draft) return notFound(`no draft: ${processId}`);
       const published = await withTransaction(db, async (tx) => {
-        const result = await publishBody(processId as ProcessId, draft.body as ProcessBody, registry, dataSourceRegistry, tx, assignmentRegistry);
+        const result = await publishBody(processId as ProcessId, draft.body as ProcessBody, registry, dataSourceRegistry, tx, assignmentRegistry, actor);
         await markDraftPublished(processId as ProcessId, result.version, tx);
         return result;
       });
       return {
         status: 200,
-        body: { processId: published.processId, version: published.version, definitionHash: published.definitionHash, status: published.status },
+        body: {
+          processId: published.processId,
+          version: published.version,
+          definitionHash: published.definitionHash,
+          status: published.status,
+          findings: published.findings,
+        },
       };
     },
   );

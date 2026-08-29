@@ -1,0 +1,139 @@
+{
+  "processId": "proc_employee_onboarding",
+  "version": 1,
+  "definitionHash": "414bdf125ca26143607262f216203da4a1f503ebbbd7c5c549725fa35ca773f6",
+  "status": "published",
+  "publishedAt": "2026-08-29T09:00:00Z",
+  "definition": {
+    "key": "employee_onboarding",
+    "label": {
+      "en": "Employee Onboarding"
+    },
+    "description": {
+      "en": "`instance-query-data-source`'s worked example: the device field reads Laptop Inventory's own shelf-step instances, offers the picked device's id as the field's value, and its columnMapping copies the device's serial number onto this instance. See docs/decisions.md's \"Aggregated data source\" entry and examples/laptop-inventory.json."
+    },
+    "baseLocale": "en",
+    "fields": [
+      {
+        "id": "field_4d7f9b30-0001-4a1c-8e2f-000000000001",
+        "key": "employee_name",
+        "label": {
+          "en": "Employee Name"
+        },
+        "type": "string",
+        "validation": {
+          "minLength": 2,
+          "maxLength": 100
+        }
+      },
+      {
+        "id": "field_4d7f9b30-0002-4a1c-8e2f-000000000002",
+        "key": "assigned_device",
+        "label": {
+          "en": "Assigned Device"
+        },
+        "description": {
+          "en": "Offers every Laptop Inventory instance standing on its shelf step. The option value is that instance's own id, never its asset tag — renaming a device afterward leaves this reference intact."
+        },
+        "type": "select",
+        "dataSource": "ds_2f6a8c40-0001-4a1c-8e2f-000000000001",
+        "columnMapping": {
+          "serial": "field_4d7f9b30-0003-4a1c-8e2f-000000000003"
+        }
+      },
+      {
+        "id": "field_4d7f9b30-0003-4a1c-8e2f-000000000003",
+        "key": "device_serial",
+        "label": {
+          "en": "Device Serial Number"
+        },
+        "description": {
+          "en": "Written by assigned_device's columnMapping. Read-only everywhere a participant sees it."
+        },
+        "type": "string"
+      }
+    ],
+    "dataSources": [
+      {
+        "id": "ds_2f6a8c40-0001-4a1c-8e2f-000000000001",
+        "key": "available_devices",
+        "type": "instance.query",
+        "config": {
+          "processId": "proc_laptop_inventory",
+          "stepIds": ["step_3b5d7f10-0001-4a1c-8e2f-000000000001"],
+          "labelFieldId": "field_8a1c2e60-0001-4a1c-8e2f-000000000001",
+          "attributes": {
+            "serial": "field_8a1c2e60-0002-4a1c-8e2f-000000000002"
+          }
+        }
+      }
+    ],
+    "workflow": {
+      "initialStep": "step_6e2c4a50-0001-4a1c-8e2f-000000000001",
+      "steps": [
+        {
+          "id": "step_6e2c4a50-0001-4a1c-8e2f-000000000001",
+          "key": "capture",
+          "label": {
+            "en": "Capture"
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": ["hr-coordinator"]
+              }
+            }
+          },
+          "view": {
+            "fields": [
+              {
+                "ref": "field_4d7f9b30-0001-4a1c-8e2f-000000000001",
+                "required": true
+              },
+              {
+                "ref": "field_4d7f9b30-0002-4a1c-8e2f-000000000002",
+                "required": true
+              },
+              {
+                "ref": "field_4d7f9b30-0003-4a1c-8e2f-000000000003",
+                "readonly": true
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_1a3c5e70-0001-4a1c-8e2f-000000000001",
+              "key": "complete",
+              "label": "Complete",
+              "to": "step_6e2c4a50-0002-4a1c-8e2f-000000000002",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_6e2c4a50-0002-4a1c-8e2f-000000000002",
+          "key": "done",
+          "label": {
+            "en": "Done"
+          },
+          "type": "task",
+          "terminal": true,
+          "view": {
+            "fields": [
+              {
+                "ref": "field_4d7f9b30-0001-4a1c-8e2f-000000000001",
+                "readonly": true
+              },
+              {
+                "ref": "field_4d7f9b30-0003-4a1c-8e2f-000000000003",
+                "readonly": true
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

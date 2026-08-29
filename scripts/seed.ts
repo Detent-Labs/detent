@@ -5,10 +5,11 @@
  *
  * Reserved for seed data — do not reuse for an unrelated process: the keys
  * `expense_approval`, `purchase_requisition`, `loan_application`,
- * `credit_check`, and the literal
- * processId `proc_credit_check` (pinned by `examples/subprocess-loan-parent.json`'s
- * subprocess reference, so `credit_check` always publishes under that exact id,
- * never a script-minted one).
+ * `credit_check`, `laptop_inventory`, `employee_onboarding`, and the literal
+ * processIds `proc_credit_check` (pinned by `examples/subprocess-loan-parent.json`'s
+ * subprocess reference) and `proc_laptop_inventory` (pinned by
+ * `examples/employee-onboarding.json`'s `instance.query` data source) — each
+ * always publishes under that exact id, never a script-minted one.
  *
  * Demo account passwords are fixed and known. This is for local development
  * only — never point this script at a shared or production database.
@@ -58,6 +59,10 @@ const EXAMPLES: { path: string; fixedProcessId?: ProcessId }[] = [
   { path: "../examples/subprocess-loan-parent.json" },
   { path: "../examples/expense-approval.json" },
   { path: "../examples/purchase-requisition.json" },
+  // laptop_inventory first: employee-onboarding.json's instance.query data
+  // source pins this literal id.
+  { path: "../examples/laptop-inventory.json", fixedProcessId: "proc_laptop_inventory" as ProcessId },
+  { path: "../examples/employee-onboarding.json" },
 ];
 
 function readExampleBody(path: string): ProcessBody {

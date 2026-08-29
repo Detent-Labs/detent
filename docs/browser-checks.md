@@ -58,6 +58,19 @@ records the measurement. Three red runs of twenty happen with a dev server
 up. Zero of twenty happen with none. Stop the dev server before you run the
 suite. Do not start one while a suite run is in flight.
 
+**Restart `bun run serve` after a backend edit.** Bun runs `src/` directly,
+with no separate compile step. But a long-lived `bun run serve` process does
+not reread its own source on a save. A browser check against a stale process
+exercises the code from before the edit, silently.
+
+`pkill -f "src/http/server.ts"` then a fresh `bash scripts/dev-up.sh`
+restarts it with the right `AUTH_JWT_SECRET`. A bare `bun run serve` omits
+that variable and breaks `POST /auth/login` outright.
+
+Measured in `instance-query-data-source`. A stale server answered a publish
+with no `findings` key. A fresh one, right after, answered the identical
+request with the finding a fresh publish-time check now computes.
+
 ## Checklist
 
 ### Worktree dev-server hot reload
@@ -1645,3 +1658,170 @@ even if forced. Choose a target in the new selector, then click "add path".
 Pass: a new path appears with a derived `key`/`label` matching the chosen
 source and target step. The target selector resets to no selection
 afterward.
+
+### Instance screen: the Audit Log section
+
+Source: `instance-audit-log-view` task 3.2.
+
+Seed an instance whose audit log holds several `set` entries for a
+redactable field, then redact it. Open its `/admin/instances/:id` screen.
+
+Pass: an Audit Log section renders below Record. Each entry shows its
+field id, operation, actor, source and timestamp, in `seq` order. The
+redaction clears some entries: the `set` rows its own `body.data` wipe
+wrote, and the explicit `redact` row itself. Every one of those shows a
+"Redacted" stamp in place of a value. None shows a blank cell. The
+`redact` row alone carries the reason line.
+
+A heading-level "Verified" stamp sits beside "Audit log". It sources
+from one `GET .../audit/verify` call. The network log shows that call
+firing once per screen load, not once per page turn.
+
+Push the same instance's audit log past 200 entries, task 1.1's page
+size. Pass: a "Load more entries" control appears. Activating it appends
+the remaining entries. Paging repeats no entry and skips none. The last
+page's own last entry is the log's true last entry, and the control then
+disappears. Paging through entries triggers no second call to
+`.../audit/verify`.
+
+Measured on 2026-08-28. The section reused the existing
+`admin-timeline`/`admin-load-more` classes. It reused the existing
+`admin-badge` stamp component too, with no new tone, matching
+`design.md`. The redacted marker reused the instance-level redaction
+badge's own tone.
+
+`test/admin-queries.test.ts` and `test/http-admin.test.ts` already
+assert the read, the cursor paging and the role gate against the API.
+Neither can see a cleared `set` row's absent `value` next to an
+authored JSON `null` in a rendered page. This entry confirms the screen
+draws that distinction correctly. It also confirms a real "Load more"
+click drives the paged list to completion. No row repeats, and none is
+missing.
+
+### The report builder (`instance-data-tables`)
+
+Log in as `demo-superuser@example.test` (holds both `system:reports` and
+`system:admin`, so the same account both builds reports and passes the
+process `read` gate). Open `/reporting/reports`.
+
+Pass: the empty state reads "You have no reports yet." Choose "New report".
+Pass: the process picker gates the screen. No filter/column controls render
+until you choose a process, which mirrors the three existing views' own
+process-first shape.
+
+Pick a process with at least one instance. Pass: the "Add column" picker and
+"Add comparison" button populate from real field ids. Both stay disabled
+against a process with zero instances. Column choices resolve from in-range
+instances' own pinned versions, not the bare field catalog.
+
+Name the report and add one direct-field column and one merge column naming
+two source fields. Reorder a column with "Move earlier"/"Move later", and
+remove a merge source. Add a viewer and an editor by id. Pass: the owner's
+own editors entry shows "Owner, always an editor" with no Remove control
+from the start. The UI blocks the one removal the engine also rejects,
+before a request is ever sent.
+
+Run "Preview table" against seeded instances covering a real value, an
+unset field (no-value), and a redacted instance. Also include an instance
+with both merge sources set, and another with only one set.
+
+Pass: the value cell prints plain, and the unset cell prints an em dash. The redacted cell
+prints a solid bar with no visible text. An `aria-label` carries "Redacted"
+for a screen reader. The merge cell with two sources concatenates and
+carries a "Collision" marker beside it. The column header states the
+aggregate count as "1 collision", singular, not "1 collision(s)".
+
+Save. Pass: the URL moves to `/reporting/reports/<id>`, and the reports list
+now shows the saved name with an "Owner" tag. Reopening it from that list
+restores the same process, filters, columns and share lists exactly,
+including the just-added viewer. Confirm this after a full page reload, not
+only from the in-memory state a save leaves behind.
+
+Push a process past the 50-instance execution bound and preview again. Pass:
+a stated notice starts "This table is incomplete" and explains more
+instances matched than the table can show. The table never goes silently
+short with no explanation.
+
+Switch the account menu to German and repeat the preview. Pass: every
+control translates, including the owner-lock caption, the sharing hint, the
+redacted/no-value cells' wording, and the collision marker. No English word
+remains. No singular/plural literal survives either ("1 Kollision", not "1
+Kollision(en)").
+
+Measured on 2026-08-28. This walk did not reach the "not-in-this-version"
+cell state or the column picker's per-field version-coverage note. Both
+need a second published version with a diverging field catalog and an
+in-range instance on each. `test/reports.test.ts`'s 3.4/3.5 cases already
+exercise both directly against the engine. This walk already confirmed
+that the same `fieldCellDisplay` switch renders three of its four kinds
+correctly. That switch renders the fourth kind by the same code path.
+
+`test/reports.test.ts` and `test/http-reporting-reports.test.ts` already
+assert the CRUD, membership, redaction-priority and truncation rules
+against the API. Neither test can see a stale ref after a client-side route
+change. Neither can see an accessible name a screen reader gets. This walk
+caught the "Add columnAdd" duplicate name, since fixed in
+`ColumnEditor.tsx`'s `FieldPicker`. Nor can either see a save that silently
+fails to persist a locally-added viewer. This walk confirms that round trip
+with a real reload, rather than trusting in-memory state.
+
+### The instance.query data source's purpose-built form
+
+Source: `instance-query-data-source` tasks 6.1-6.5.
+
+Open a draft's Data sources panel (Process links -> "Data sources" ->
+"+ Add data source"). Select `instance.query` in the type picker. Pass: the
+purpose-built form replaces both the generated form and the raw JSON
+textarea, for this type alone. Switch the type to `db.list` and back. Pass:
+`db.list`'s own dedicated list-key picker still renders untouched.
+
+Pick a target process. Pass: the step checkboxes and the label-field,
+comparison-field and attribute-field pickers populate with that process's
+real step and field labels. They draw from every published version's
+catalog, never free text. Check a step, pick a label field, add one
+comparison row and one attribute row, filling every control.
+
+Click "Edit as JSON". Pass: the textarea holds the plain `{ type, config }`
+object the raw JSON path would have produced. It carries the same
+`processId`, `stepIds`, `labelFieldId`, `where` and `attributes` keys the
+form's controls wrote, byte for byte.
+
+Hand-edit `labelFieldId` to an id no version declares, then click "Edit as
+form". Pass: the form re-renders with every prior control intact. The
+label-field row shows a stale-reference warning as a sibling of the picker,
+not inside its `<label>`. The picker's own accessible name stays "label
+field", not lengthened by the warning text.
+
+Save the draft, then Publish. Use an actor holding `system:admin`, or a
+process-scoped `read` grant on the target; a developer with neither sees a
+real, correctly-mapped 403.
+
+Pass: the publish succeeds even though `labelFieldId` names a process with
+no live instance. Right below the "Published vN (hash)" line, the header bar
+lists one line per unresolved reference. Each reads "Stale reference in
+<data source id>: <field id> (not carried by any live version)". Change the
+config back to a resolvable reference and publish again. Pass: no finding
+line renders.
+
+Measured on 2026-08-29 against the production build served from `WEB_ROOT`
+(`bun run --filter './packages/web' build`, then the engine's own port), not
+`bun run dev`. The dev server's esbuild pre-bundle of
+`workflow-engine/validate` reaches `src/log.ts`'s module-level
+`process.env.LOG_LEVEL` read. That throws `ReferenceError: process is not
+defined` in a browser. It crashes the whole Studio area behind its
+`ErrorBoundary`, on the first draft-validation call.
+
+Confirmed pre-existing and unrelated to this change. `registry.ts`'s diff for
+this change adds types only. `git show main:src/engine/registry.ts` already
+carries the same `process.env` reference `src/log.ts` does. Not fixed here.
+It sits out of scope for a data source change, and it affects every draft,
+not only one carrying `instance.query`.
+
+`test/instance-query-source.test.ts`, `test/instance-query-cross-process.test.ts`
+and `test/http-studio.test.ts` already assert the handler, the publish-time
+checks and the route's response shape against the API. None can see the
+generated-form/raw-JSON precedence `PluginEnvelopeEditor` renders. None can
+see an accessible name a screen reader gets. None can confirm a picker's
+options match a real published catalog. This walk caught the labelFieldId
+picker's stale mark polluting its own accessible name. The fix moves the
+mark outside the `<label>`, in `InstanceQueryForm.tsx`.

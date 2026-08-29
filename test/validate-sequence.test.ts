@@ -244,7 +244,10 @@ describe("6.8: publishBody accepts and rejects exactly what it does today", () =
     // child's processId as "proc_credit_check" — the child must publish
     // under that exact id for the parent to resolve it.
     await publishBody("proc_credit_check" as ProcessId, readExample("subprocess-credit-check-child.json"), registry, dataSourceReg);
-    for (const name of ["expense-approval.json", "subprocess-loan-parent.json", "purchase-requisition.json"]) {
+    // laptop-inventory.json's own fixed id — employee-onboarding.json's
+    // instance.query data source pins it, the same reason credit_check needs one.
+    await publishBody("proc_laptop_inventory" as ProcessId, readExample("laptop-inventory.json"), registry, dataSourceReg);
+    for (const name of ["expense-approval.json", "subprocess-loan-parent.json", "purchase-requisition.json", "employee-onboarding.json"]) {
       const body = readExample(name);
       const v = await publishBody(nextPid(name.replace(/\W/g, "_")), body, registry, dataSourceReg, sql, assignmentReg);
       expect(v.status).toBe("published");

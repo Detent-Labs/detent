@@ -1052,6 +1052,88 @@ test.skipIf(!DB)("POST /admin/instances/:id/redact is idempotent on a re-call", 
 });
 
 // ============================================================
+// GET /admin/instances/:id/audit, GET /admin/instances/:id/audit/verify
+// ============================================================
+
+const auditReq = (instanceId: string, actor: Actor, qs = "") => authedReq(`http://x/admin/instances/${instanceId}/audit${qs}`, "GET", actor);
+const verifyReq = (instanceId: string, actor: Actor) => authedReq(`http://x/admin/instances/${instanceId}/audit/verify`, "GET", actor);
+
+test.skipIf(!DB)("GET /admin/instances/:id/audit with no resolvable credential maps to 401", async () => {
+  const res = await fetch(new Request("http://x/admin/instances/inst_x/audit"));
+  expect(res.status).toBe(401);
+});
+
+test.skipIf(!DB)("GET /admin/instances/:id/audit without system:admin maps to 403", async () => {
+  const p = migrationPid();
+  await publishMigrationVersions(p, 1);
+  const inst = await createRunningInstance(p, 1);
+  await sql`UPDATE instances SET body = jsonb_set(body, '{data}', ${{ field_x: "v1" }}::jsonb) WHERE instance_id = ${inst.instanceId}`;
+
+  const res = await fetch(auditReq(inst.instanceId, bystander));
+  expect(res.status).toBe(403);
+});
+
+test.skipIf(!DB)("GET /admin/instances/:id/audit returns entries in seq order for an admin actor", async () => {
+  const p = migrationPid();
+  await publishMigrationVersions(p, 1);
+  const inst = await createRunningInstance(p, 1);
+  await sql`UPDATE instances SET body = jsonb_set(body, '{data}', ${{ field_x: "v1" }}::jsonb) WHERE instance_id = ${inst.instanceId}`;
+  await sql`UPDATE instances SET body = jsonb_set(body, '{data}', (body->'data') || '{"field_x":"v2"}'::jsonb) WHERE instance_id = ${inst.instanceId}`;
+
+  const res = await fetch(auditReq(inst.instanceId, admin));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { items: { seq: number; fieldId: string; value?: unknown }[]; cursor?: string };
+  expect(body.items.map((i) => i.value)).toEqual(["v1", "v2"]);
+  expect(body.items[0].seq).toBeLessThan(body.items[1].seq);
+});
+
+test.skipIf(!DB)("GET /admin/instances/:id/audit pages by cursor, with no gap and no repeat", async () => {
+  const p = migrationPid();
+  await publishMigrationVersions(p, 1);
+  const inst = await createRunningInstance(p, 1);
+  await sql`UPDATE instances SET body = jsonb_set(body, '{data}', ${{ field_x: "v1" }}::jsonb) WHERE instance_id = ${inst.instanceId}`;
+  for (const v of ["v2", "v3"]) {
+    await sql`UPDATE instances SET body = jsonb_set(body, '{data}', (body->'data') || ${{ field_x: v }}::jsonb) WHERE instance_id = ${inst.instanceId}`;
+  }
+
+  const page1 = await fetch(auditReq(inst.instanceId, admin, "?limit=2"));
+  const body1 = (await page1.json()) as { items: { value?: unknown }[]; cursor?: string };
+  expect(body1.items.map((i) => i.value)).toEqual(["v1", "v2"]);
+  expect(body1.cursor).toBeDefined();
+
+  const page2 = await fetch(auditReq(inst.instanceId, admin, `?limit=2&cursor=${encodeURIComponent(body1.cursor!)}`));
+  const body2 = (await page2.json()) as { items: { value?: unknown }[]; cursor?: string };
+  expect(body2.items.map((i) => i.value)).toEqual(["v3"]);
+  expect(body2.cursor).toBeUndefined();
+});
+
+test.skipIf(!DB)("GET /admin/instances/:id/audit/verify with no resolvable credential maps to 401", async () => {
+  const res = await fetch(new Request("http://x/admin/instances/inst_x/audit/verify"));
+  expect(res.status).toBe(401);
+});
+
+test.skipIf(!DB)("GET /admin/instances/:id/audit/verify without system:admin maps to 403", async () => {
+  const p = migrationPid();
+  await publishMigrationVersions(p, 1);
+  const inst = await createRunningInstance(p, 1);
+
+  const res = await fetch(verifyReq(inst.instanceId, bystander));
+  expect(res.status).toBe(403);
+});
+
+test.skipIf(!DB)("GET /admin/instances/:id/audit/verify reports an intact chain as verified for an admin actor", async () => {
+  const p = migrationPid();
+  await publishMigrationVersions(p, 1);
+  const inst = await createRunningInstance(p, 1);
+  await sql`UPDATE instances SET body = jsonb_set(body, '{data}', ${{ field_x: "v1" }}::jsonb) WHERE instance_id = ${inst.instanceId}`;
+
+  const res = await fetch(verifyReq(inst.instanceId, admin));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { ok: boolean; failedSeq: number | null };
+  expect(body).toEqual({ ok: true, failedSeq: null });
+});
+
+// ============================================================
 // GET/POST /admin/permission-grants, POST /admin/permission-grants/revoke
 // ============================================================
 

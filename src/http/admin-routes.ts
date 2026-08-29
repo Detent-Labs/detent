@@ -13,7 +13,18 @@
  */
 import type { SQL } from "bun";
 import { withTransaction } from "../engine/store.js";
-import { listOutbox, countOutboxByStatus, listPendingTimers, requeueOutboxRow, discardOutboxRow, getOutboxRow, MAX_LIST_LIMIT, type OutboxListFilter } from "../engine/admin-queries.js";
+import {
+  listOutbox,
+  countOutboxByStatus,
+  listPendingTimers,
+  requeueOutboxRow,
+  discardOutboxRow,
+  getOutboxRow,
+  listInstanceAudit,
+  verifyInstanceChain,
+  MAX_LIST_LIMIT,
+  type OutboxListFilter,
+} from "../engine/admin-queries.js";
 import {
   listUsers,
   createUser,
@@ -349,6 +360,25 @@ export async function handleAdminRedactInstance(instanceId: string, req: Request
   return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async (actor) => {
     const updated = await redactInstance(instanceId as InstanceId, db, { actor: actor.id });
     return { status: 200, body: updated };
+  });
+}
+
+/** Same `limit`/`cursor` paging query parameters `GET /instances/:id/record` already accepts. */
+export async function handleAdminListInstanceAudit(instanceId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
+    const url = new URL(req.url);
+    const limit = parseLimit(url, MAX_LIST_LIMIT);
+    const cursor = url.searchParams.get("cursor") ?? undefined;
+    const page = await listInstanceAudit(instanceId as InstanceId, { limit, cursor }, db);
+    return { status: 200, body: page };
+  });
+}
+
+/** Calls `verifyInstanceChain` directly and returns its verdict unchanged — this route recomputes no digest of its own. */
+export async function handleAdminVerifyInstanceAudit(instanceId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
+    const result = await verifyInstanceChain(instanceId as InstanceId, db);
+    return { status: 200, body: result };
   });
 }
 

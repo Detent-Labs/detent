@@ -26,10 +26,21 @@ The engine SHALL provide a `DataSourceRegistry` (`src/engine/registry.ts`)
 mirroring the existing action `Registry`: a `Map<string, DataSourceHandlerDef>`
 keyed by `type`. `DataSourceHandlerDef` is `{ resolve: (ctx: DataSourceContext)
 => Promise<FieldOption[]>, configSchema?: z.ZodTypeAny }`. `DataSourceContext`
-is `{ config: Record<string, unknown>, heldValues?: string[] }`. `heldValues`
-carries the values the instance already holds for the field under resolution,
-so a handler can return a value that is otherwise retired; a handler that has
-no such notion ignores it.
+is `{ config: Record<string, unknown>, heldValues?: string[], instance: { id:
+InstanceId, processId: ProcessId, data: Record<string, Literal>, baseLocale:
+LocaleCode } }`.
+`heldValues` carries the values the instance already holds for the field under
+resolution, so a handler can return a value that is otherwise retired; a
+handler that has no such notion ignores it.
+`instance` carries the reading instance, the one whose form or submission the
+engine is resolving. A handler comparing against the reader's own values needs
+`data`, a handler excluding the reader from its own result needs `id` and
+`processId`, and a handler synthesizing a `LocalizedText` from a non-localized
+value needs `baseLocale`. `"static"` and `"db.list"` ignore it.
+
+Every `DataSourceContext` carries `instance`, never omitting it. A handler
+needing the reader has no sane fallback without it, and every resolution runs
+for exactly one instance.
 `createDataSourceRegistry` SHALL construct a `DataSourceRegistry`, mirroring
 the action registry's own factory. Registration and lookup use the
 `DataSourceRegistry` `Map` directly. A caller registers a handler with
@@ -47,6 +58,13 @@ interface change.
 - **WHEN** a caller calls `reg.get(type)` on a `DataSourceRegistry` for a
   type never set
 - **THEN** it returns `undefined`
+
+<!-- Scenario bullets stay verbatim: the OpenSpec archive step matches this block by exact text. -->
+<!-- antislop: allow passive-voice -->
+#### Scenario: The context carries the reading instance
+- **WHEN** a handler's `resolve` is called for a field of some instance
+- **THEN** `ctx.instance` carries that instance's `id`, its `processId`, its
+  `data`, and its process's `baseLocale`
 
 ### Requirement: A built-in "static" data source handler echoes a configured option list
 
@@ -69,19 +87,36 @@ returns exactly `ctx.config.options` unchanged. The handler SHALL ignore
 
 ### Requirement: A data-source-bound view field's options are resolved at runtime
 
+<!-- antislop: allow sentence-length passive-voice -->
+<!-- Paragraph carried from the main spec, including the dedup note in parentheses. -->
 `resolveFields` (`src/runtime/api.ts`) SHALL accept a `registry:
 DataSourceRegistry` parameter and, for each view field whose `FieldDef`
 declares `dataSource`, resolve the referenced `DataSourceDef` from
 `body.dataSources`, look up its handler in `registry` by `type`, call
-`resolve({ config: def.config, heldValues })`, and attach the result.
-`heldValues` SHALL carry the values the instance holds for that field: none
-when the field is unset, one for a `select`, and the whole array for a
-`multiselect`. Each view field resolves through its own `resolve` call. Two
+`resolve({ config: def.config, heldValues, instance })`, and attach the
+result. `heldValues` SHALL carry the values the instance holds for that field:
+none when the field is unset, one for a `select`, and the whole array for a
+`multiselect`. `instance` SHALL carry the instance whose view or submission is
+resolving, with its `id`, its `processId`, its current `data`, and its
+process's `baseLocale`. Each view
+field resolves through its own `resolve` call. Two
 fields on the same step bound to the same data source and holding the same
 values each trigger their own call; neither call's result is shared with the
 other (`dedup-runtime-pagination-webhook-sink`: the per-call memoization this
 requirement once described added 18 lines to dedupe a case `resolveFields`
 does not hit in a hot loop, and was removed).
+
+`instance.data` SHALL be the instance's committed data. A submission SHALL
+resolve against the same data the view read resolved against. It SHALL NOT
+resolve against the submitted payload merged over that data.
+
+The renderer draws its option list before the participant submits anything, so
+it resolves against committed data. Membership validation must check the list
+the participant chose from. Resolving a submission against a merged payload
+would check a different list.
+
+A handler comparing against a reading-instance field therefore reads the value
+that field held at step entry.
 
 `ResolvedViewField` SHALL gain an `options?: FieldOption[]` property,
 populated from `field.options` when the field declares static options
@@ -116,6 +151,22 @@ submission validation) SHALL read options from, rather than reading
   and the participant submits the step without changing that field
 - **THEN** the resolved options carry that value, and submission validation
   accepts it
+
+<!-- Scenario bullets stay verbatim: the OpenSpec archive step matches this block by exact text. -->
+<!-- antislop: allow passive-voice -->
+#### Scenario: A submission resolves against the committed data
+- **WHEN** a participant submits a step filling field G, and a data source
+  compares against G
+- **THEN** the resolution reads the value G held when the step was entered,
+  not the submitted value
+
+<!-- Scenario bullets stay verbatim: shortening the WHEN would drop its second precondition. -->
+<!-- antislop: allow sentence-length -->
+#### Scenario: The rendered list and the validated list agree
+- **WHEN** a participant submits a value picked from the list the step's view
+  read offered, and no other instance changed in between
+- **THEN** submission validation resolves the same list, and accepts that
+  value
 
 ### Requirement: Submission validation enforces membership against resolved options, including data-source-bound fields
 
@@ -168,6 +219,10 @@ registry.
 one tenant's option values to every tenant. That is the cross-tenant read this
 model exists to prevent.
 
+`instance.query` reads another process's instances. The same rule binds it,
+for the same reason. It reaches those instances through the Runtime API
+Layer's instance data read, and passes that read the context's own handle.
+
 The `static` type reads no database and SHALL ignore the handle.
 
 #### Scenario: A list resolves in the instance's own tenant
@@ -184,6 +239,11 @@ The `static` type reads no database and SHALL ignore the handle.
 
 - **WHEN** a field resolves a `static` source
 - **THEN** it answers its configured options, as it does today
+
+#### Scenario: An instance query resolves in the instance's own tenant
+
+- **WHEN** a field in tenant `acme` resolves an `instance.query` source
+- **THEN** the options come from `acme`'s own instances
 
 ### Requirement: A resolved option carries its attributes to the view
 

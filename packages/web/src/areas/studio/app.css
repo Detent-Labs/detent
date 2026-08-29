@@ -2802,3 +2802,71 @@ tr[data-group="true"] .studio-matrix-row-header {
   align-items: center;
   gap: var(--space-1);
 }
+
+/* --- The instance.query purpose-built form (instance-query-data-source) --
+   Same shape as .plugin-field's checkbox groups above: unstyled fieldsets,
+   flush-left rows, a 1px hairline between a section and the next — no
+   border/radius/shadow of its own. */
+.instance-query-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.instance-query-form > label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.9rem;
+  width: 100%;
+}
+
+.instance-query-form-steps,
+.instance-query-form-statuses,
+.instance-query-form-where,
+.instance-query-form-attributes {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  width: 100%;
+}
+
+.instance-query-form-steps > legend,
+.instance-query-form-statuses > legend,
+.instance-query-form-where > legend,
+.instance-query-form-attributes > legend {
+  padding: 0;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.instance-query-form-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.instance-query-form-label-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  width: 100%;
+}
+
+.instance-query-form-where-row,
+.instance-query-form-attribute-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-2);
+}

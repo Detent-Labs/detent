@@ -32,6 +32,7 @@ import {
 import { buildGuardContext, evalGuard, evalFieldMap, type Actor } from "../cel/eval.js";
 import { requireRole, can, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE, AuthorizationError } from "../auth/authorize.js";
 import { knownUserIds } from "../auth/users.js";
+import { getGroupMembers, getGroupsForMember } from "../auth/groups.js";
 import { definitionHash } from "../schema/hash.js";
 import { NotFoundError, InstanceNotRunningError, RequestShapeError } from "../errors.js";
 import { saveInstanceDraft as engineSaveInstanceDraft, getInstanceDraft, type InstanceDraft } from "../engine/instance-drafts.js";
@@ -41,6 +42,7 @@ import {
   createDefaultAssignmentRegistry,
   resolveStepAssignment,
   type DataSourceRegistry,
+  type DataSourceContext,
   type AssignmentRegistry,
 } from "../engine/registry.js";
 import type {
@@ -256,10 +258,11 @@ export type InstanceQueryFilter = {
   processId?: ProcessId;
   version?: number;
   status?: InstanceStatus[];
-  currentStepId?: StepId;
+  currentStepId?: StepId | StepId[];
   startedBy?: string;
   claimedBy?: string;
   excludeInstanceId?: InstanceId;
+  instanceIds?: InstanceId[];
   createdAfter?: string;
   createdBefore?: string;
   dataWhere?: DataComparison[];
@@ -514,10 +517,16 @@ function heldValuesOf(value: Literal | undefined): string[] {
  * matching the project's existing style (e.g. the `definitionHash` pin
  * mismatch).
  */
-function resolveDataSourceOptions(def: DataSourceDef, heldValues: string[], registry: DataSourceRegistry, db: SQL): Promise<FieldOption[]> {
+function resolveDataSourceOptions(
+  def: DataSourceDef,
+  heldValues: string[],
+  instance: DataSourceContext["instance"],
+  registry: DataSourceRegistry,
+  db: SQL,
+): Promise<FieldOption[]> {
   const handler = registry.get(def.type);
   if (!handler) throw new Error(`data source type '${def.type}' is not registered in the runtime registry`);
-  return handler.resolve({ config: def.config, heldValues: [...heldValues].sort(), db });
+  return handler.resolve({ config: def.config, heldValues: [...heldValues].sort(), instance, db });
 }
 
 /**
@@ -545,6 +554,16 @@ async function resolveFields(body: ProcessBody, step: Step, instance: Instance, 
   const ctx = buildGuardContext(body, instance, actor);
   const fieldsById = new Map(collectFieldsDeep(body.fields).map((f) => [f.id as string, f]));
   const dataSourcesById = new Map((body.dataSources ?? []).map((d) => [d.id as string, d]));
+  // Committed data, not a merged submission payload: a handler comparing
+  // against the reader's own values must read the value a field held at step
+  // entry, not one the caller is submitting right now. See design.md
+  // "instance.data is the instance's committed data".
+  const dsInstance: DataSourceContext["instance"] = {
+    id: instance.instanceId,
+    processId: instance.processId,
+    data: instance.data,
+    baseLocale: body.baseLocale,
+  };
   const out: ResolvedViewField[] = [];
   for (const vf of step.view?.fields ?? []) {
     const field = fieldsById.get(vf.ref as string);
@@ -559,7 +578,7 @@ async function resolveFields(body: ProcessBody, step: Step, instance: Instance, 
     if (field.dataSource) {
       const def = dataSourcesById.get(field.dataSource as string);
       if (!def) throw new Error(`data source not found: ${field.dataSource}`); // publish-time invariant guarantees resolution; defensive only
-      options = await resolveDataSourceOptions(def, heldValuesOf(value), registry, db);
+      options = await resolveDataSourceOptions(def, heldValuesOf(value), dsInstance, registry, db);
     }
     out.push({ field, value, required, readonly, group: vf.group, options, span: vf.span ?? 1 });
   }
@@ -1290,8 +1309,14 @@ export async function cancelInstance(instanceId: InstanceId, actor: Actor, db: S
   return engineCancelInstance(instance, body, actor, db, store.resolveBody);
 }
 
-/** The filters `buildInstanceWhere` compiles — every member both `listInstances` and `queryInstances` share, minus `dataWhere` (compiled separately by `buildDataWhere`) and `includeDegraded` (selects no row). */
-type InstanceWhereFilter = Omit<InstanceListFilter, "includeDegraded" | "dataWhere">;
+/**
+ * The filters `buildInstanceWhere` compiles — every member both `listInstances` and `queryInstances` share, minus `dataWhere` (compiled separately by `buildDataWhere`) and `includeDegraded` (selects no row).
+ * `currentStepId` widens past `InstanceListFilter`'s own single-id member: `listInstances` keeps passing one id, for free, while `queryInstances` can pass a set. `instanceIds` has no `InstanceListFilter` counterpart at all — no list-read caller needs it.
+ */
+type InstanceWhereFilter = Omit<InstanceListFilter, "includeDegraded" | "dataWhere" | "currentStepId"> & {
+  currentStepId?: StepId | StepId[];
+  instanceIds?: InstanceId[];
+};
 
 /**
  * The `WHERE` fragment both `listInstances` and `queryInstances` interpolate.
@@ -1301,17 +1326,24 @@ type InstanceWhereFilter = Omit<InstanceListFilter, "includeDegraded" | "dataWhe
  * directly rather than `body->>'instanceId'`, since that column is the
  * table's own key.
  */
-function buildInstanceWhere(filter: InstanceWhereFilter, db: SQL) {
+export function buildInstanceWhere(filter: InstanceWhereFilter, db: SQL) {
   const statusArr = filter.status && filter.status.length > 0 ? db.array(filter.status, "TEXT") : null;
   const assignedToRolesArr = filter.assignedToRoles && filter.assignedToRoles.length > 0 ? db.array(filter.assignedToRoles, "TEXT") : null;
   // instances_selection_idx indexes body->>'version' as text — see design.md
   // "The version filter compares as text".
   const versionText = filter.version !== undefined ? String(filter.version) : null;
+  const currentStepIdArr = Array.isArray(filter.currentStepId)
+    ? db.array(filter.currentStepId, "TEXT")
+    : filter.currentStepId
+      ? db.array([filter.currentStepId], "TEXT")
+      : null;
+  const instanceIdsArr = filter.instanceIds && filter.instanceIds.length > 0 ? db.array(filter.instanceIds, "TEXT") : null;
   return db`
     (${filter.processId ?? null}::text IS NULL OR body->>'processId' = ${filter.processId ?? null})
     AND (${versionText}::text IS NULL OR body->>'version' = ${versionText})
     AND (${statusArr}::text[] IS NULL OR body->>'status' = ANY(${statusArr}))
-    AND (${filter.currentStepId ?? null}::text IS NULL OR body->>'currentStepId' = ${filter.currentStepId ?? null})
+    AND (${currentStepIdArr}::text[] IS NULL OR body->>'currentStepId' = ANY(${currentStepIdArr}))
+    AND (${instanceIdsArr}::text[] IS NULL OR instance_id = ANY(${instanceIdsArr}))
     AND (${filter.startedBy ?? null}::text IS NULL OR body->>'startedBy' = ${filter.startedBy ?? null})
     AND (${filter.claimedBy ?? null}::text IS NULL OR body->'assignment'->>'claimedBy' = ${filter.claimedBy ?? null})
     AND (
@@ -1359,7 +1391,7 @@ function compileDataComparison(c: DataComparison, db: SQL) {
  * comparison count. An empty or absent `dataWhere` folds to `TRUE`: an empty
  * fragment is not valid SQL inside `WHERE ${...}`.
  */
-function buildDataWhere(comparisons: DataComparison[] | undefined, db: SQL) {
+export function buildDataWhere(comparisons: DataComparison[] | undefined, db: SQL) {
   if (!comparisons || comparisons.length === 0) return db`TRUE`;
   return comparisons.map((c) => compileDataComparison(c, db)).reduce((acc, frag) => db`${acc} AND ${frag}`);
 }
@@ -1399,6 +1431,22 @@ function assertVersionHasProcessId(filter: { processId?: ProcessId; version?: nu
 function assertDataWhereHasProcessId(filter: { processId?: ProcessId; dataWhere?: DataComparison[] }): void {
   if (filter.dataWhere && filter.dataWhere.length > 0 && !filter.processId) {
     throw new RequestShapeError("a dataWhere filter needs a processId beside it");
+  }
+}
+
+/**
+ * An empty `currentStepId` array or an empty `instanceIds` array is a caller
+ * error, the same rule a `dataWhere` membership comparison's empty right side
+ * already carries: an empty list matches nothing, so accepting one would
+ * silently answer the whole read with an empty result rather than the
+ * "no filter" a caller might have meant.
+ */
+function assertNoEmptyListFilters(filter: InstanceQueryFilter): void {
+  if (Array.isArray(filter.currentStepId) && filter.currentStepId.length === 0) {
+    throw new RequestShapeError("queryInstances currentStepId list must not be empty");
+  }
+  if (filter.instanceIds && filter.instanceIds.length === 0) {
+    throw new RequestShapeError("queryInstances instanceIds list must not be empty");
   }
 }
 
@@ -1516,6 +1564,7 @@ export async function queryInstances(
 ): Promise<InstanceDataPage> {
   assertNoDenylistedQueryKeys(filter);
   assertVersionHasProcessId(filter);
+  assertNoEmptyListFilters(filter);
   validateDataComparisons(filter.dataWhere);
   assertDataWhereHasProcessId(filter);
   await assertNoNonScalarComparedField(filter, filter.dataWhere, db);
@@ -1535,6 +1584,391 @@ export async function queryInstances(
     return { instanceId: inst.instanceId, version: inst.version, data: inst.data, redactedAt: inst.redactedAt };
   });
   return { items, truncated };
+}
+
+// ============================================================
+// Saved reports (instance-data-tables)
+// ============================================================
+
+/**
+ * A report's query configuration: the three `queryInstances` axes that vary
+ * a table's row set over a date range — status, date range and field
+ * comparisons. Deliberately narrower than `InstanceQueryFilter`: a report
+ * names no version, step or claim, only what changes which instances (and
+ * hence which columns) it can show.
+ */
+export type ReportQuery = {
+  status?: InstanceStatus[];
+  createdAfter?: string;
+  createdBefore?: string;
+  dataWhere?: DataComparison[];
+};
+
+export type ReportColumn = { type: "field"; fieldId: FieldId } | { type: "merge"; fieldIds: FieldId[] };
+
+export type Report = {
+  reportId: string;
+  owner: string;
+  processId: ProcessId;
+  name: string;
+  query: ReportQuery;
+  columns: ReportColumn[];
+  viewers: string[];
+  editors: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ReportInput = {
+  processId: ProcessId;
+  name: string;
+  query?: ReportQuery;
+  columns?: ReportColumn[];
+  viewers?: string[];
+  editors?: string[];
+};
+
+export type ReportPatch = Partial<Pick<ReportInput, "name" | "query" | "columns" | "viewers" | "editors">> & { owner?: string };
+
+/** Thrown by `updateReport` when a patch would leave the owner out of `editors` — see the "owner cannot be removed from editors" requirement. */
+export class ReportOwnerInvariantError extends Error {
+  constructor(reportId: string) {
+    super(`report '${reportId}' must keep its owner in its editors list`);
+    this.name = "ReportOwnerInvariantError";
+  }
+}
+
+type ReportDbRow = {
+  instance_report_id: string;
+  owner: string;
+  process_id: string;
+  name: string;
+  query: unknown;
+  columns: unknown;
+  created_at: Date | string;
+  updated_at: Date | string;
+};
+
+function parseJsonColumn<T>(raw: unknown): T {
+  return (typeof raw === "string" ? JSON.parse(raw) : raw) as T;
+}
+
+function toReport(row: ReportDbRow, principals: { list: string; principal: string }[]): Report {
+  return {
+    reportId: row.instance_report_id,
+    owner: row.owner,
+    processId: row.process_id as ProcessId,
+    name: row.name,
+    query: parseJsonColumn<ReportQuery>(row.query),
+    columns: parseJsonColumn<ReportColumn[]>(row.columns),
+    viewers: principals.filter((p) => p.list === "viewer").map((p) => p.principal),
+    editors: principals.filter((p) => p.list === "editor").map((p) => p.principal),
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+  };
+}
+
+async function fetchReportRaw(reportId: string, db: SQL): Promise<Report | undefined> {
+  const rows = (await db`SELECT * FROM reports WHERE instance_report_id = ${reportId}`) as ReportDbRow[];
+  const row = rows[0];
+  if (!row) return undefined;
+  const principals = (await db`SELECT list, principal FROM report_principals WHERE instance_report_id = ${reportId}`) as { list: string; principal: string }[];
+  return toReport(row, principals);
+}
+
+/**
+ * A `group_`-prefixed principal (the id shape `src/auth/groups.ts:51` mints)
+ * expands to its current member ids; an id or role principal passes through
+ * unchanged. `isEligibleCandidate` itself has no notion of a group.
+ */
+async function expandGroupPrincipals(principals: string[], db: SQL): Promise<string[]> {
+  const out: string[] = [];
+  for (const p of principals) {
+    if (p.startsWith("group_")) out.push(...(await getGroupMembers(p, db)));
+    else out.push(p);
+  }
+  return out;
+}
+
+async function hasReportMembership(actor: Actor, principals: string[], db: SQL): Promise<boolean> {
+  return isEligibleCandidate(actor, await expandGroupPrincipals(principals, db));
+}
+
+/** Replaces the whole `list` slice of a report's principals, matching `setGroupMembers`'s replace-not-merge semantics. */
+async function writeReportPrincipals(reportId: string, list: "viewer" | "editor", principals: string[], db: SQL): Promise<void> {
+  await db`DELETE FROM report_principals WHERE instance_report_id = ${reportId} AND list = ${list}`;
+  for (const principal of new Set(principals)) {
+    await db`INSERT INTO report_principals (instance_report_id, list, principal) VALUES (${reportId}, ${list}, ${principal})`;
+  }
+}
+
+/**
+ * The owner is always forced into `editors`, so the "owner cannot be removed
+ * from editors" invariant holds by construction from creation on — a later
+ * read never needs a separate owner check beside the editors/viewers
+ * membership test.
+ */
+export async function createReport(actor: Actor, input: ReportInput, db: SQL = sql): Promise<Report> {
+  const reportId = `rep_${crypto.randomUUID()}`;
+  const editors = new Set([actor.id, ...(input.editors ?? [])]);
+  await withTransaction(db, async (tx) => {
+    await tx`INSERT INTO reports (instance_report_id, owner, process_id, name, query, columns)
+      VALUES (${reportId}, ${actor.id}, ${input.processId}, ${input.name}, ${input.query ?? {}}, ${input.columns ?? []})`;
+    await writeReportPrincipals(reportId, "editor", [...editors], tx);
+    await writeReportPrincipals(reportId, "viewer", input.viewers ?? [], tx);
+  });
+  return (await fetchReportRaw(reportId, db))!;
+}
+
+/**
+ * `undefined` for an unknown id (the HTTP layer's 404), `AuthorizationError`
+ * for an actor outside `owner`/`editors` (403), `ReportOwnerInvariantError`
+ * for a patch that would strand the owner outside `editors` (409).
+ */
+export async function updateReport(reportId: string, actor: Actor, patch: ReportPatch, db: SQL = sql): Promise<Report | undefined> {
+  const current = await fetchReportRaw(reportId, db);
+  if (!current) return undefined;
+  if (!(await hasReportMembership(actor, current.editors, db))) {
+    throw new AuthorizationError(`actor '${actor.id}' is not an owner or editor of report '${reportId}'`);
+  }
+
+  const nextOwner = patch.owner ?? current.owner;
+  const nextEditors = patch.editors ? [...new Set(patch.editors)] : current.editors;
+  if (!nextEditors.includes(nextOwner)) throw new ReportOwnerInvariantError(reportId);
+
+  await withTransaction(db, async (tx) => {
+    await tx`UPDATE reports SET
+        owner = ${nextOwner},
+        name = ${patch.name ?? current.name},
+        query = ${patch.query ?? current.query},
+        columns = ${patch.columns ?? current.columns},
+        updated_at = now()
+      WHERE instance_report_id = ${reportId}`;
+    if (patch.editors) await writeReportPrincipals(reportId, "editor", nextEditors, tx);
+    if (patch.viewers) await writeReportPrincipals(reportId, "viewer", [...new Set(patch.viewers)], tx);
+  });
+  return fetchReportRaw(reportId, db);
+}
+
+export async function deleteReport(reportId: string, actor: Actor, db: SQL = sql): Promise<{ deleted: true } | undefined> {
+  const current = await fetchReportRaw(reportId, db);
+  if (!current) return undefined;
+  if (!(await hasReportMembership(actor, current.editors, db))) {
+    throw new AuthorizationError(`actor '${actor.id}' is not an owner or editor of report '${reportId}'`);
+  }
+  // report_principals rows cascade with the delete (ON DELETE CASCADE) —
+  // nothing else ever holds a live reference to a report.
+  await db`DELETE FROM reports WHERE instance_report_id = ${reportId}`;
+  return { deleted: true };
+}
+
+export async function getReport(reportId: string, actor: Actor, db: SQL = sql): Promise<Report | undefined> {
+  const report = await fetchReportRaw(reportId, db);
+  if (!report) return undefined;
+  if (!(await hasReportMembership(actor, [...report.editors, ...report.viewers], db))) {
+    throw new AuthorizationError(`actor '${actor.id}' may not read report '${reportId}'`);
+  }
+  return report;
+}
+
+/**
+ * Every report naming the caller's own id, a role they hold, or a group they
+ * belong to, in either principal list. `getGroupsForMember` runs the reverse
+ * direction of the per-report membership check above: it starts from the
+ * actor and asks which groups they belong to, once, rather than resolving
+ * each candidate report's own group principals forward.
+ */
+export async function listMyReports(actor: Actor, db: SQL = sql): Promise<Report[]> {
+  const groupIds = await getGroupsForMember(actor.id, db);
+  const matchSet = [actor.id, ...actor.roles, ...groupIds];
+  const rows = (await db`
+    SELECT DISTINCT r.* FROM reports r
+    JOIN report_principals rp ON rp.instance_report_id = r.instance_report_id
+    WHERE rp.principal = ANY(${db.array(matchSet, "TEXT")})
+    ORDER BY r.updated_at DESC
+  `) as ReportDbRow[];
+  if (rows.length === 0) return [];
+
+  const ids = rows.map((r) => r.instance_report_id);
+  const principalRows = (await db`
+    SELECT instance_report_id, list, principal FROM report_principals
+    WHERE instance_report_id = ANY(${db.array(ids, "TEXT")})
+  `) as { instance_report_id: string; list: string; principal: string }[];
+  const byReport = new Map<string, { list: string; principal: string }[]>();
+  for (const p of principalRows) {
+    const list = byReport.get(p.instance_report_id);
+    if (list) list.push(p);
+    else byReport.set(p.instance_report_id, [p]);
+  }
+  return rows.map((r) => toReport(r, byReport.get(r.instance_report_id) ?? []));
+}
+
+// ------------------------------------------------------------
+// Report execution
+// ------------------------------------------------------------
+
+export type ColumnChoice = { fieldId: FieldId; versions: number[] };
+
+/**
+ * Every field id declared by a version of `processId` that has at least one
+ * in-range instance, keyed by that version — the per-version half of the
+ * column-choice union below, and the same per-instance lookup
+ * `executeReport`'s cell-state computation needs to tell "no value" from
+ * "not in this version" apart. Built from `leafFields`: a `type: "group"`
+ * container carries no value of its own, so offering one as a column choice
+ * would only ever render empty.
+ */
+async function resolveVersionCoverage(processId: ProcessId, query: ReportQuery, db: SQL): Promise<Map<number, Set<FieldId>>> {
+  const filter: InstanceWhereFilter = {
+    processId,
+    status: query.status,
+    createdAfter: query.createdAfter,
+    createdBefore: query.createdBefore,
+  };
+  const rows = (await db`
+    SELECT DISTINCT (body->>'version')::int AS version FROM instances
+    WHERE ${buildInstanceWhere(filter, db)} AND ${buildDataWhere(query.dataWhere, db)}
+  `) as { version: number }[];
+
+  const store = createDefinitionStore(db);
+  const coverage = new Map<number, Set<FieldId>>();
+  for (const { version } of rows) {
+    const body = await store.resolveBody(processId, version);
+    // A version that no longer resolves contributes no fields — the same
+    // "resolves to nothing" treatment a dangling reference gets elsewhere.
+    if (!body) continue;
+    coverage.set(version, new Set(leafFields(body.fields).map((f) => f.id)));
+  }
+  return coverage;
+}
+
+/** The union of every in-range version's field catalog, each field tagged with which versions declare it — the choices a report builder offers. */
+export async function resolveReportColumnChoices(processId: ProcessId, query: ReportQuery, db: SQL = sql): Promise<ColumnChoice[]> {
+  const coverage = await resolveVersionCoverage(processId, query, db);
+  const byField = new Map<FieldId, Set<number>>();
+  for (const [version, fieldIds] of coverage) {
+    for (const fieldId of fieldIds) {
+      const versions = byField.get(fieldId);
+      if (versions) versions.add(version);
+      else byField.set(fieldId, new Set([version]));
+    }
+  }
+  return [...byField.entries()].map(([fieldId, versions]) => ({ fieldId, versions: [...versions].sort((a, b) => a - b) }));
+}
+
+/** Same check every draft/saved-report read applies: an actor with no `read` grant on the target process sees no real data, from a preview or a saved execution alike. */
+export async function previewReportColumnChoices(processId: ProcessId, query: ReportQuery, actor: Actor, db: SQL = sql): Promise<ColumnChoice[]> {
+  if (!(await can(actor, "read", processId, db))) return [];
+  return resolveReportColumnChoices(processId, query, db);
+}
+
+export type ReportCell =
+  | { kind: "value"; value: Literal }
+  | { kind: "no-value" }
+  | { kind: "not-in-version" }
+  | { kind: "redacted" };
+
+export type MergeReportCell = { kind: "value"; value: string; collision: boolean } | { kind: "no-value" } | { kind: "redacted" };
+
+export type ReportResultColumn = { type: "field"; fieldId: FieldId } | { type: "merge"; fieldIds: FieldId[]; collisions: number };
+
+export type ReportExecutionRow = { instanceId: InstanceId; cells: (ReportCell | MergeReportCell)[] };
+
+export type ReportExecutionResult = { columns: ReportResultColumn[]; rows: ReportExecutionRow[]; truncated: boolean };
+
+function emptyResultColumn(c: ReportColumn): ReportResultColumn {
+  return c.type === "field" ? { type: "field", fieldId: c.fieldId } : { type: "merge", fieldIds: c.fieldIds, collisions: 0 };
+}
+
+/**
+ * Redaction wins first and applies to the WHOLE instance: `redactInstance`
+ * wipes `data` wholesale, so this does not gate on the field's own
+ * `redactable` flag. Otherwise: not declared by the instance's own pinned
+ * version's catalog, or declared but never written.
+ */
+function fieldCell(item: InstanceDataItem, fieldId: FieldId, declared: Set<FieldId> | undefined): ReportCell {
+  if (item.redactedAt) return { kind: "redacted" };
+  if (!declared?.has(fieldId)) return { kind: "not-in-version" };
+  const value = item.data[fieldId];
+  if (value === undefined) return { kind: "no-value" };
+  return { kind: "value", value };
+}
+
+/**
+ * First non-empty source wins; two or more non-empty sources concatenate and
+ * mark a collision. A source the instance's own version does not declare, or
+ * never wrote, is treated as empty here — a merge column reports one
+ * combined value, not a per-source empty reason. Zero non-empty sources is
+ * `no-value`, not a `value` of `""`, so an empty merge cell reads the same
+ * distinct way a direct field's empty cell does.
+ */
+function mergeCell(item: InstanceDataItem, fieldIds: FieldId[], declared: Set<FieldId> | undefined): MergeReportCell {
+  if (item.redactedAt) return { kind: "redacted" };
+  const values = fieldIds
+    .filter((id) => declared?.has(id))
+    .map((id) => item.data[id])
+    .filter((v): v is Exclude<Literal, null | undefined> => v !== undefined && v !== null && v !== "");
+  if (values.length === 0) return { kind: "no-value" };
+  return { kind: "value", value: values.map((v) => String(v)).join(", "), collision: values.length > 1 };
+}
+
+async function runReportQuery(spec: { processId: ProcessId; query: ReportQuery; columns: ReportColumn[] }, db: SQL): Promise<ReportExecutionResult> {
+  const filter: InstanceQueryFilter = { processId: spec.processId, ...spec.query };
+  const [{ items, truncated }, coverage] = await Promise.all([
+    queryInstances(filter, {}, db),
+    resolveVersionCoverage(spec.processId, spec.query, db),
+  ]);
+
+  const collisionCounts = spec.columns.map(() => 0);
+  const rows: ReportExecutionRow[] = items.map((item) => {
+    const declared = coverage.get(item.version);
+    const cells = spec.columns.map((col, i) => {
+      if (col.type === "field") return fieldCell(item, col.fieldId, declared);
+      const cell = mergeCell(item, col.fieldIds, declared);
+      if (cell.kind === "value" && cell.collision) collisionCounts[i]!++;
+      return cell;
+    });
+    return { instanceId: item.instanceId, cells };
+  });
+
+  const columns: ReportResultColumn[] = spec.columns.map((c, i) =>
+    c.type === "field" ? { type: "field", fieldId: c.fieldId } : { type: "merge", fieldIds: c.fieldIds, collisions: collisionCounts[i]! },
+  );
+  return { columns, rows, truncated };
+}
+
+/**
+ * Two independent gates, in order: report membership (owner/editor/viewer,
+ * refused outright for anyone else), then the target process's own `read`
+ * permission (an empty table, not a refusal, when membership passes and this
+ * fails — see the "sharing narrows access, never widens it" requirement).
+ */
+export async function executeReport(reportId: string, actor: Actor, db: SQL = sql): Promise<ReportExecutionResult | undefined> {
+  const report = await fetchReportRaw(reportId, db);
+  if (!report) return undefined;
+  if (!(await hasReportMembership(actor, [...report.editors, ...report.viewers], db))) {
+    throw new AuthorizationError(`actor '${actor.id}' may not execute report '${reportId}'`);
+  }
+  if (!(await can(actor, "read", report.processId, db))) {
+    return { columns: report.columns.map(emptyResultColumn), rows: [], truncated: false };
+  }
+  return runReportQuery(report, db);
+}
+
+/**
+ * The same execution as `executeReport`, for a configuration not yet saved
+ * as a report — the builder's own live preview. Carries no membership check:
+ * nothing is shared yet, so only the process `read` gate applies.
+ */
+export async function previewReportDraft(
+  draft: { processId: ProcessId; query: ReportQuery; columns: ReportColumn[] },
+  actor: Actor,
+  db: SQL = sql,
+): Promise<ReportExecutionResult> {
+  if (!(await can(actor, "read", draft.processId, db))) {
+    return { columns: draft.columns.map(emptyResultColumn), rows: [], truncated: false };
+  }
+  return runReportQuery(draft, db);
 }
 
 /**

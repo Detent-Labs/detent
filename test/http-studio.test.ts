@@ -9,18 +9,20 @@ import { sql, createInstance } from "../src/engine/store.js";
 import { DB, initDb, authedReq } from "./helpers/http-fixture.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
-import { createDefinitionStore } from "../src/engine/definitions.js";
+import { createDefinitionStore, publishBody } from "../src/engine/definitions.js";
+import { INSTANCE_QUERY_DATA_SOURCE_TYPE, createInstanceQueryDataSourceHandlerDef } from "../src/engine/instance-query-source.js";
 import { migrateInstances } from "../src/engine/migration.js";
 import { createServer } from "../src/http/server.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
 import { DEVELOPER_ROLE, PUBLISH_ROLE, TEMPLATES_ROLE, ADMIN_ROLE, REPORTS_ROLE, AUTHOR_ROLE, DATALISTS_ROLE } from "../src/auth/authorize.js";
 import type { Actor } from "../src/cel/eval.js";
-import type { ProcessId } from "../src/schema/definition.js";
+import type { ProcessId, ProcessBody } from "../src/schema/definition.js";
 
 const reg = createRegistry();
 const dataSourceReg = createDataSourceRegistry();
 reg.set("http.request", { handler: async () => undefined });
 dataSourceReg.set("static", { resolve: async () => [] });
+dataSourceReg.set(INSTANCE_QUERY_DATA_SOURCE_TYPE, createInstanceQueryDataSourceHandlerDef(200));
 const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
 beforeAll(initDb);
@@ -73,6 +75,25 @@ const publishableBody = (label: string, fields: { id: string; key: string; label
       { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
     ],
   },
+});
+
+/** A dataSources entry of type "instance.query" naming `targetProcessId`, on an otherwise-publishable body. */
+const instanceQueryDraftBody = (targetProcessId: string) => ({
+  key: "wf",
+  label: { en: "IQ Draft" },
+  baseLocale: "en",
+  fields: [],
+  dataSources: [{ id: "ds_iq", key: "iq", type: "instance.query", config: { processId: targetProcessId, labelFieldId: "field_label" } }],
+  workflow: { initialStep: "step_a", steps: [{ id: "step_a", key: "a", label: { en: "A" }, type: "task", terminal: true }] },
+});
+
+/** step_t: field_label, terminal. Published directly (bypassing HTTP) as the instance.query target. */
+const instanceQueryTargetBody = () => ({
+  key: "iq_target",
+  label: { en: "IQ Target" },
+  baseLocale: "en",
+  fields: [{ id: "field_label", key: "label", label: { en: "Label" }, type: "string" }],
+  workflow: { initialStep: "step_t", steps: [{ id: "step_t", key: "t", label: { en: "T" }, type: "task", terminal: true }] },
 });
 
 /** A running instance pinned to a published version, its body resolved from the store so its hash matches the compiled pin — same pattern as migration.test.ts's `mkInstance`. */
@@ -339,6 +360,30 @@ test.skipIf(!DB)("a second publish after further edits updates base_version to t
   expect(stored[0]!.base_version).toBe(2);
 });
 
+test.skipIf(!DB)("a successful publish carries findings in its response body", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+
+  const res = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { findings: unknown[] };
+  expect(body.findings).toEqual([]);
+});
+
+test.skipIf(!DB)("publishing a draft carrying an instance.query source without a read grant on its target fails with an authorization error", async () => {
+  const targetId = pid();
+  await publishBody(targetId as ProcessId, instanceQueryTargetBody() as unknown as ProcessBody, reg, dataSourceReg);
+
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: instanceQueryDraftBody(targetId), layout: {}, revision: 0 }));
+
+  // authorPublisher: AUTHOR_ROLE + PUBLISH_ROLE, no ADMIN_ROLE and no grant row.
+  const res = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", authorPublisher));
+  expect(res.status).toBe(403);
+  const errBody = (await res.json()) as { error: { type: string } };
+  expect(errBody.error.type).toBe("authorization");
+});
+
 // ============================================================
 // GET /processes/:processId/versions/:version
 // ============================================================
@@ -586,7 +631,7 @@ test.skipIf(!DB)("GET /registry keeps the type-name arrays to exactly those thre
   const res = await fetch(authedReq("http://x/registry", "GET", developer));
   const body = (await res.json()) as { actionTypes: string[]; dataSourceTypes: string[]; assignmentStrategyTypes: string[] };
   expect(body.actionTypes).toEqual(["http.request"]);
-  expect(body.dataSourceTypes).toEqual(["static"]);
+  expect(body.dataSourceTypes).toEqual(["static", INSTANCE_QUERY_DATA_SOURCE_TYPE]);
   // All three entries the shipped registry holds: the built-in `static`, and
   // the org-aware `org.manager-of-starter`/`org.group-members` the
   // composition root adds.

@@ -41,12 +41,23 @@ export interface DraftSummary {
   updatedAt: string;
 }
 
+/** Mirrors src/engine/definitions.ts::PublishFinding — a reported (not rejected) reference `"instance.query"`'s cross-process check flags. */
+export interface PublishFinding {
+  loc: string;
+  dataSourceId: string;
+  referenceKind: "step" | "field";
+  reference: string;
+  carriedByVersions: number[];
+  liveInstanceCountOutsideCarryingVersions: number;
+}
+
 /** Echoed by POST /drafts/:processId/publish — mirrors src/engine/definitions.ts's publishBody return. */
 export interface PublishResult {
   processId: string;
   version: number;
   definitionHash: string;
   status: string;
+  findings: PublishFinding[];
 }
 
 /** Mirrors src/engine/migration.ts::resolveMigrationPlan's return shape. `spec` is opaque JSON, never parsed client-side — same as DraftRecord.body. */

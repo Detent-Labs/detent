@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { Plugin } from "workflow-engine/schema";
 import type { DraftOf } from "../../draft/types";
 import type { ConfigFieldDescriptor } from "../../api/types.js";
@@ -21,6 +21,19 @@ interface Props {
   registryTypes?: string[];
   /** The matching slice of GET /registry's per-type config-schema descriptions, keyed by type. */
   registrySchemas?: Record<string, ConfigFieldDescriptor[]>;
+  /**
+   * A purpose-built editor for one type whose config nests past what the
+   * generator covers (a list of objects, for instance) — `"instance.query"`
+   * is the first. Takes precedence over both the generated form and the raw
+   * JSON fallback for `type` alone; the raw JSON escape hatch stays reachable
+   * through the same `showRawJson` switch every other type already uses. See
+   * `studio-plugin-config-form`'s "A purpose-built form serves the
+   * instance.query data source type".
+   */
+  customConfigEditor?: {
+    type: string;
+    render: (config: Record<string, unknown>, onChange: (next: Record<string, unknown>) => void) => ReactNode;
+  };
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -158,7 +171,7 @@ function GeneratedField({
  * that type. A type with no schema description keeps the raw JSON textarea,
  * exactly as before this capability.
  */
-export function PluginEnvelopeEditor({ label, value, onChange, typePlaceholder, registryTypes, registrySchemas }: Props) {
+export function PluginEnvelopeEditor({ label, value, onChange, typePlaceholder, registryTypes, registrySchemas, customConfigEditor }: Props) {
   const [configText, setConfigText] = useState(() => JSON.stringify(value?.config ?? {}, null, 2));
   const [configError, setConfigError] = useState<string | null>(null);
   const [showRawJson, setShowRawJson] = useState(false);
@@ -182,7 +195,9 @@ export function PluginEnvelopeEditor({ label, value, onChange, typePlaceholder, 
   // picker just declines to offer them.
   const selectableTypes = registryTypes?.filter((rt) => !rt.startsWith("core."));
   const descriptorList = registrySchemas?.[currentType];
-  const useGeneratedForm = descriptorList !== undefined && !showRawJson;
+  const hasCustomEditor = customConfigEditor?.type === currentType;
+  const useCustomEditor = hasCustomEditor && !showRawJson;
+  const useGeneratedForm = !useCustomEditor && descriptorList !== undefined && !showRawJson;
 
   const setConfigField = (key: string, fieldValue: unknown) => {
     const config = { ...((value?.config as Record<string, unknown> | undefined) ?? {}), [key]: fieldValue };
@@ -230,7 +245,17 @@ export function PluginEnvelopeEditor({ label, value, onChange, typePlaceholder, 
         )}
       </label>
 
-      {useGeneratedForm ? (
+      {useCustomEditor ? (
+        <>
+          {customConfigEditor.render((value?.config as Record<string, unknown> | undefined) ?? {}, (config) => {
+            onChange({ ...value, type: currentType, config });
+            setConfigText(JSON.stringify(config, null, 2));
+          })}
+          <button type="button" className="btn btn-secondary" onClick={switchToJson}>
+            {t("plugin.switchToJson")}
+          </button>
+        </>
+      ) : useGeneratedForm ? (
         <>
           {descriptorList.map((descriptor) => (
             <GeneratedField
@@ -255,7 +280,7 @@ export function PluginEnvelopeEditor({ label, value, onChange, typePlaceholder, 
               {t("common.configErrorPrefix")} {configError}
             </p>
           )}
-          {descriptorList !== undefined && (
+          {(descriptorList !== undefined || hasCustomEditor) && (
             <button type="button" className="btn btn-secondary" onClick={() => setShowRawJson(false)}>
               {t("plugin.switchToForm")}
             </button>

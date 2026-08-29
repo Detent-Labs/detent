@@ -272,6 +272,189 @@
   color: var(--color-refusal);
 }
 
+/* -------------------------------------------------------------- picker list (reports) */
+
+.rep-report-picker {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.rep-report-picker li {
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* ---------------------------------------------------------- column editor */
+
+.rep-column-list {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.rep-column-row {
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-2) 0;
+}
+
+.rep-column-row-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.rep-column-index {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  min-width: 1.5em;
+}
+
+.rep-column-row-actions {
+  display: flex;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+.rep-merge-sources {
+  margin: var(--space-2) 0 0 calc(1.5em + var(--space-2));
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--color-border);
+}
+
+.rep-merge-sources ol {
+  list-style: none;
+  margin: 0 0 var(--space-2);
+  padding: 0;
+}
+
+.rep-merge-source-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+}
+
+.rep-column-add {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.rep-field-picker select {
+  font: inherit;
+}
+
+/* -------------------------------------------------------------- comparisons */
+
+.rep-comparison-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* ----------------------------------------------------------------- sharing */
+
+.rep-share-list {
+  margin-bottom: var(--space-4);
+}
+
+.rep-principal-list {
+  list-style: none;
+  margin: 0 0 var(--space-2);
+  padding: 0;
+}
+
+.rep-principal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+.rep-share-add {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* --------------------------------------------------------- report table cells
+
+   Four states share one column and must never look alike. A value prints as
+   plain text. `no-value` is the same muted em dash the percentile rows
+   already use elsewhere in this package. `not-in-version` is a muted italic
+   caption, so it reads as a fact about the schema rather than a missing
+   number. `redacted` renders as a solid bar — the one deliberate visual
+   borrowing from a redacted paper document, using only the existing ink
+   token, so it needs no new color and cannot be mistaken for an empty
+   value. */
+
+.rep-table-scroll {
+  overflow-x: auto;
+}
+
+.rep-report-table td.rep-cell-value {
+  font-family: var(--font-mono);
+}
+
+.rep-cell-no-value {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.rep-cell-not-in-version {
+  color: var(--color-text-muted);
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+.rep-cell-redacted {
+  padding: var(--space-2) var(--space-3) !important;
+}
+
+.rep-redaction-bar {
+  display: block;
+  height: 0.85em;
+  width: 100%;
+  min-width: 3rem;
+  background: var(--color-text);
+}
+
+.rep-cell-collision {
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+.rep-collision-mark {
+  margin-left: var(--space-2);
+  color: var(--color-accent);
+}
+
+.rep-column-collisions {
+  color: var(--color-text-muted);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;

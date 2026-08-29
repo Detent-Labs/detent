@@ -8,6 +8,9 @@ import { useRegistry } from "./shared/useRegistry.js";
 import { useDataLists } from "./shared/useDataLists.js";
 import { IssueList } from "./shared/IssueList";
 import { DB_LIST_TYPE, keyOptions, listKeyOf, unknownListKeyWarning } from "./dataListKeysLogic.js";
+import { INSTANCE_QUERY_TYPE } from "./instanceQueryTypeLogic.js";
+import { InstanceQueryForm } from "./shared/InstanceQueryForm.js";
+import { fieldsToRefs, type TargetRef } from "./shared/useTargetProcessCatalog.js";
 import type { ConfigFieldDescriptor } from "../api/types.js";
 
 type DraftDataSource = DraftOf<DataSourceDef>;
@@ -17,11 +20,13 @@ interface DataSourceRowProps {
   listKeys: string[] | undefined;
   registryTypes: string[] | undefined;
   registrySchemas: Record<string, ConfigFieldDescriptor[]> | undefined;
+  token: string;
+  ownFields: TargetRef[];
   onChange: (patch: Partial<DraftDataSource>) => void;
   onRemove: () => void;
 }
 
-function DataSourceRow({ ds, listKeys, registryTypes, registrySchemas, onChange, onRemove }: DataSourceRowProps) {
+function DataSourceRow({ ds, listKeys, registryTypes, registrySchemas, token, ownFields, onChange, onRemove }: DataSourceRowProps) {
   const warning = unknownListKeyWarning(ds.type, ds.config, listKeys);
   const listKey = listKeyOf(ds.config);
   return (
@@ -41,6 +46,12 @@ function DataSourceRow({ ds, listKeys, registryTypes, registrySchemas, onChange,
         onChange={onChange}
         registryTypes={registryTypes}
         registrySchemas={registrySchemas}
+        customConfigEditor={{
+          type: INSTANCE_QUERY_TYPE,
+          render: (config, onConfigChange) => (
+            <InstanceQueryForm token={token} config={config} onChange={onConfigChange} ownFields={ownFields} />
+          ),
+        }}
       />
       {ds.type === DB_LIST_TYPE && listKeys !== undefined && (
         <label>
@@ -99,6 +110,10 @@ export function DataSourcesPanel({ token, selectedId, onAdd, onRemove }: Props) 
     ? Object.fromEntries(Object.entries(registry.dataSourceSchemas).filter(([type]) => type !== DB_LIST_TYPE))
     : undefined;
 
+  // The reading process's own catalog — the "field of this process" option
+  // an `instance.query` comparison's `valueFromField` right side offers.
+  const ownFields = fieldsToRefs(draft.fields ?? [], draft.baseLocale ?? "en");
+
   return (
     <div className="data-sources-panel">
       <h3>{t("dataSources.heading")}</h3>
@@ -110,6 +125,8 @@ export function DataSourcesPanel({ token, selectedId, onAdd, onRemove }: Props) 
           listKeys={listKeys}
           registryTypes={registry?.dataSourceTypes}
           registrySchemas={dataSourceSchemasForForm}
+          token={token}
+          ownFields={ownFields}
           onChange={updateDataSource}
           onRemove={() => onRemove(index)}
         />

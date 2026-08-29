@@ -8,6 +8,7 @@ import { test, expect } from "bun:test";
 import { z } from "zod";
 import { checkDataSourceRegistry } from "../src/engine/registry-check.js";
 import { createDataSourceRegistry } from "../src/engine/registry.js";
+import { instanceQueryDataSourceConfigSchema } from "../src/engine/instance-query-source.js";
 import type { ProcessBody } from "../src/schema/definition.js";
 
 const dataSource = (id: string, type: string, config: Record<string, unknown> = {}) => ({ id, key: id.replace("ds_", ""), type, config });
@@ -68,4 +69,69 @@ test("multiple invalid data sources each produce their own issue, not just the f
   ]);
   const issues = checkDataSourceRegistry(body, reg);
   expect(issues.length).toBe(2);
+});
+
+// ============================================================
+// instance.query's own configSchema
+// ============================================================
+
+const validInstanceQueryConfig = () => ({ processId: "proc_target", labelFieldId: "field_label" });
+
+test("instance.query config schema accepts processId and labelFieldId alone", () => {
+  expect(instanceQueryDataSourceConfigSchema.safeParse(validInstanceQueryConfig()).success).toBe(true);
+});
+
+test("instance.query config schema rejects an explicit empty statuses list", () => {
+  const config = { ...validInstanceQueryConfig(), statuses: [] };
+  expect(instanceQueryDataSourceConfigSchema.safeParse(config).success).toBe(false);
+});
+
+test("instance.query config schema rejects a missing processId", () => {
+  const { processId: _processId, ...rest } = validInstanceQueryConfig();
+  expect(instanceQueryDataSourceConfigSchema.safeParse(rest).success).toBe(false);
+});
+
+test("instance.query config schema rejects a key the schema does not declare", () => {
+  const config = { ...validInstanceQueryConfig(), notAKey: true };
+  expect(instanceQueryDataSourceConfigSchema.safeParse(config).success).toBe(false);
+});
+
+test("instance.query config schema rejects a where entry carrying both value and valueFromField", () => {
+  const config = { ...validInstanceQueryConfig(), where: [{ fieldId: "field_x", operator: "eq", value: "a", valueFromField: "field_y" }] };
+  expect(instanceQueryDataSourceConfigSchema.safeParse(config).success).toBe(false);
+});
+
+test("instance.query config schema rejects a where entry carrying neither value nor valueFromField", () => {
+  const config = { ...validInstanceQueryConfig(), where: [{ fieldId: "field_x", operator: "eq" }] };
+  expect(instanceQueryDataSourceConfigSchema.safeParse(config).success).toBe(false);
+});
+
+test("instance.query config schema accepts a where entry carrying exactly one right side", () => {
+  const config = { ...validInstanceQueryConfig(), where: [{ fieldId: "field_x", operator: "eq", value: "a" }] };
+  expect(instanceQueryDataSourceConfigSchema.safeParse(config).success).toBe(true);
+});
+
+test("instance.query config schema rejects an 'in' comparison paired with valueFromField", () => {
+  const config = { ...validInstanceQueryConfig(), where: [{ fieldId: "field_x", operator: "in", valueFromField: "field_y" }] };
+  expect(instanceQueryDataSourceConfigSchema.safeParse(config).success).toBe(false);
+});
+
+test("instance.query config schema rejects an 'in' comparison with a scalar value", () => {
+  const config = { ...validInstanceQueryConfig(), where: [{ fieldId: "field_x", operator: "in", value: "a" }] };
+  expect(instanceQueryDataSourceConfigSchema.safeParse(config).success).toBe(false);
+});
+
+test("instance.query config schema rejects an 'in' comparison with an empty list value", () => {
+  const config = { ...validInstanceQueryConfig(), where: [{ fieldId: "field_x", operator: "in", value: [] }] };
+  expect(instanceQueryDataSourceConfigSchema.safeParse(config).success).toBe(false);
+});
+
+test("instance.query config schema rejects an 'eq' comparison with a list value", () => {
+  const config = { ...validInstanceQueryConfig(), where: [{ fieldId: "field_x", operator: "eq", value: ["a", "b"] }] };
+  expect(instanceQueryDataSourceConfigSchema.safeParse(config).success).toBe(false);
+});
+
+test("instance.query config schema accepts an 'in' comparison with a non-empty list value", () => {
+  const config = { ...validInstanceQueryConfig(), where: [{ fieldId: "field_x", operator: "in", value: ["a", "b"] }] };
+  expect(instanceQueryDataSourceConfigSchema.safeParse(config).success).toBe(true);
 });
