@@ -227,6 +227,26 @@ test.skipIf(!DB)("editing the draft after a test instance is created does not ch
   expect((frozen2!.workflow.steps[0] as unknown as { label: { en: string } }).label.en).toBe("Edited");
 });
 
+test.skipIf(!DB)("two test instances created at different draft revisions each resolve their own frozen snapshot, unaffected by a later edit", async () => {
+  await saveDraft(PID, { body: bodyWithLabel("A"), layout: {}, revision: 0, updatedBy: actor.id });
+  const created1 = await createProcessInstance(PID, actor, dataSourceReg, { fromDraft: true });
+
+  // Each successful save bumps the stored revision by one: the row created
+  // above at revision 0 expects 0 on this save, then 1 on the next.
+  await saveDraft(PID, { body: bodyWithLabel("B"), layout: {}, revision: 0, updatedBy: actor.id });
+  const created2 = await createProcessInstance(PID, actor, dataSourceReg, { fromDraft: true });
+
+  // A later edit, made after both instances already exist, must reach neither snapshot.
+  await saveDraft(PID, { body: bodyWithLabel("C"), layout: {}, revision: 1, updatedBy: actor.id });
+
+  const { resolveBody } = createDefinitionStore();
+  const frozen1 = await resolveBody(PID, created1.version);
+  const frozen2 = await resolveBody(PID, created2.version);
+  expect((frozen1!.workflow.steps[0] as unknown as { label: { en: string } }).label.en).toBe("A");
+  expect((frozen2!.workflow.steps[0] as unknown as { label: { en: string } }).label.en).toBe("B");
+  expect(created1.version).not.toBe(created2.version);
+});
+
 test.skipIf(!DB)("an unresolvable draft (initialStep naming an absent step) fails creation with a diagnostic, typed error", async () => {
   const badBody = { ...bodyWithLabel("A"), workflow: { initialStep: "step_missing", steps: bodyWithLabel("A").workflow.steps } } as ProcessBody;
   await saveDraft(PID, { body: badBody, layout: {}, revision: 0, updatedBy: actor.id });
