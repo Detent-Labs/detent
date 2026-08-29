@@ -35,6 +35,7 @@ import {
   createDefaultAssignmentRegistry,
   describeTypeNames,
   PROCESS_START_ACTION_TYPE,
+  INSTANCE_TRANSITION_ACTION_TYPE,
   type Registry,
   type DataSourceRegistry,
   type AssignmentRegistry,
@@ -147,18 +148,22 @@ export class GroupScopeValidationError extends Error {
 }
 
 /**
- * One reference an `"instance.query"` data source makes into its target
- * process that not every version holding a live instance carries. Reports
- * rather than rejects: the population it reads keeps moving after publish —
- * `createProcessInstance` accepts an explicit version, and migration moves
- * instances between versions. See `cross-process-validation`'s "Step and
- * field references are reported against the versions holding live
- * instances".
+ * One reference an `"instance.query"` data source, or an `instance.transition`
+ * action, makes into its target process that not every version holding a live
+ * instance carries. Reports rather than rejects: the population it reads keeps
+ * moving after publish — `createProcessInstance` accepts an explicit version,
+ * and migration moves instances between versions. See `cross-process-
+ * validation`'s "Step and field references are reported against the versions
+ * holding live instances".
+ *
+ * `dataSourceId` is optional: an `instance.transition` action's `pathId`
+ * finding names no data source, because an action is not one. A reader falls
+ * back to `loc` when it is absent.
  */
 export interface PublishFinding {
   loc: string;
-  dataSourceId: string;
-  referenceKind: "step" | "field";
+  dataSourceId?: string;
+  referenceKind: "step" | "field" | "path";
   reference: string;
   carriedByVersions: number[];
   liveInstanceCountOutsideCarryingVersions: number;
@@ -342,19 +347,111 @@ async function validateInstanceQueryReferences(
   return findings;
 }
 
+/** Shape of an `instance.transition` action's config — see `handlers/instance-transition.ts`. Kept local rather than imported: the handler file imports `createDefinitionStore` from this module, so a value import back would cycle (a type-only import would not, but this keeps the same avoidance this module already applies to `PROCESS_START_ACTION_TYPE`). */
+type InstanceTransitionActionConfig = { processId: string; instanceIdField: string; pathId: string };
+
+/**
+ * Publish-time checks over every `instance.transition` action
+ * (`cross-process-validation`'s three `instance.transition` requirements).
+ *
+ * `processId` resolves against the published processes, rejecting an
+ * unresolved one — self-targeting excepted, the same exception
+ * `validateInstanceQueryReferences` makes for `"instance.query"`.
+ *
+ * `instanceIdField` resolves against the PUBLISHING body's own catalog, a
+ * fact in hand at publish time that does not move afterwards. A typo here
+ * would otherwise dead-letter every delivery, one instance at a time, with
+ * nothing said at publish time — so this rejects rather than reports.
+ *
+ * `pathId` resolves into the target process, against the versions holding
+ * live instances — the same reporting rule, and the same reason, the
+ * `"instance.query"` step/field references above follow: the population a
+ * publish-time check reads keeps moving after the check.
+ */
+async function validateInstanceTransitionReferences(
+  body: ProcessBody,
+  processId: ProcessId,
+  resolvers: { resolveBody: ResolveBody; resolveLatest: ResolveLatest },
+  db: SQL,
+): Promise<PublishFinding[]> {
+  const findings: PublishFinding[] = [];
+  const catalog = new Set(collectFieldsDeep(body.fields).map((f) => f.id as string));
+  const sites = collect(body).filter((s) => s.action.type === INSTANCE_TRANSITION_ACTION_TYPE);
+  // One live-count query per target process, not per action site: two actions
+  // naming the same target otherwise run the same aggregate twice. The bodies
+  // those counts resolve come from `resolveBody`'s own cache already.
+  const countsByProcess = new Map<string, { version: number; runningCount: number }[]>();
+
+  for (const { action, loc } of sites) {
+    const config = action.config as InstanceTransitionActionConfig;
+    const targetProcessId = config.processId as ProcessId;
+
+    // 3.3
+    if (targetProcessId !== processId) {
+      const target = await resolvers.resolveLatest(targetProcessId);
+      if (!target) {
+        throw new CrossProcessValidationError(
+          `instance.transition action at '${loc}' references process '${targetProcessId}' which is not published`,
+        );
+      }
+    }
+
+    // 3.4
+    if (!catalog.has(config.instanceIdField)) {
+      throw new CrossProcessValidationError(
+        `instance.transition action at '${loc}' names instanceIdField '${config.instanceIdField}' which the publishing body's own catalog does not declare`,
+      );
+    }
+
+    // 3.5
+    let counts = countsByProcess.get(targetProcessId);
+    if (!counts) {
+      counts = await liveVersionCounts(targetProcessId, db);
+      countsByProcess.set(targetProcessId, counts);
+    }
+    const carrying: number[] = [];
+    for (const c of counts) {
+      const vBody = await resolvers.resolveBody(targetProcessId, c.version);
+      if (vBody && vBody.workflow.steps.some((s) => (s.paths ?? []).some((p) => (p.id as string) === config.pathId))) {
+        carrying.push(c.version);
+      }
+    }
+    const missingVersions = counts.filter((c) => !carrying.includes(c.version));
+    const carriedByEveryLiveVersion = counts.length > 0 && missingVersions.length === 0;
+    if (!carriedByEveryLiveVersion) {
+      findings.push({
+        loc,
+        referenceKind: "path",
+        reference: config.pathId,
+        carriedByVersions: carrying,
+        liveInstanceCountOutsideCarryingVersions: missingVersions.reduce((sum, c) => sum + c.runningCount, 0),
+      });
+    }
+  }
+
+  return findings;
+}
+
 /**
  * 5.4: the publishing actor must hold `read` on every `"instance.query"`
- * data source's target process. Skipped entirely when `actor` is absent — the
- * publish entry point runs actor-free by default; see
- * `cross-process-validation`'s "The publishing author holds a read grant on
- * the target process".
+ * data source's target process, and on every `instance.transition` action's
+ * target process — the second mutates a live instance of the target, a
+ * stronger reach than the first's read, so it does not carry a weaker gate.
+ * Both site kinds check against the same `read` permission, collected
+ * together and checked once per target process per publish. Skipped entirely
+ * when `actor` is absent — the publish entry point runs actor-free by
+ * default; see `cross-process-validation`'s "The publishing author holds a
+ * read grant on the target process".
  */
-async function validateInstanceQueryReadGrant(body: ProcessBody, actor: Actor | undefined, db: SQL): Promise<void> {
+async function validateCrossProcessReadGrant(body: ProcessBody, actor: Actor | undefined, db: SQL): Promise<void> {
   if (!actor) return;
   const targetProcessIds = new Set<string>();
   for (const dataSource of body.dataSources ?? []) {
     if (dataSource.type !== INSTANCE_QUERY_DATA_SOURCE_TYPE) continue;
     targetProcessIds.add((dataSource.config as InstanceQueryDataSourceConfig).processId as string);
+  }
+  for (const { action } of collect(body).filter((s) => s.action.type === INSTANCE_TRANSITION_ACTION_TYPE)) {
+    targetProcessIds.add((action.config as InstanceTransitionActionConfig).processId);
   }
   for (const targetProcessId of targetProcessIds) {
     await requirePermission(actor, "read", targetProcessId as ProcessId, db);
@@ -477,7 +574,7 @@ export async function publishBody(
   db: SQL = sql,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
   // Trailing and optional so the ~25 existing callers compile unchanged. The
-  // read-grant check in validateInstanceQueryReadGrant runs only when a
+  // read-grant check in validateCrossProcessReadGrant runs only when a
   // caller supplies this — every authorization gate otherwise sits at the
   // HTTP route, which this one check cannot: it gates on a process only the
   // body names, resolved after the route hands off. See
@@ -581,8 +678,11 @@ export async function publishBody(
   await validateCrossProcess(body, definitionStore);
   await validateProcessChaining(body, definitionStore);
   await validateGroupScope(body, processId, db);
-  const findings = await validateInstanceQueryReferences(body, processId, definitionStore, db);
-  await validateInstanceQueryReadGrant(body, actor, db);
+  const findings = [
+    ...(await validateInstanceQueryReferences(body, processId, definitionStore, db)),
+    ...(await validateInstanceTransitionReferences(body, processId, definitionStore, db)),
+  ];
+  await validateCrossProcessReadGrant(body, actor, db);
 
   const max = (await db`SELECT COALESCE(MAX(version), 0) AS m FROM definitions
     WHERE process_id = ${processId}`) as { m: number }[];

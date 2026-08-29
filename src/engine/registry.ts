@@ -88,6 +88,15 @@ export const RETURN_ACTION_TYPE = "core.returnSubprocess";
  */
 export const PROCESS_START_ACTION_TYPE = "process.start";
 
+/**
+ * The `instance.transition` action type, homed here for the same reason as
+ * `PROCESS_START_ACTION_TYPE`. `handlers/instance-transition.ts` needs
+ * `createDefinitionStore` from `engine/definitions.ts`, and `definitions.ts`
+ * needs this constant for its own publish-time checks, so defining it in the
+ * handler file would cycle back through `definitions.ts`.
+ */
+export const INSTANCE_TRANSITION_ACTION_TYPE = "instance.transition";
+
 export type Registry = Map<string, HandlerDef>;
 
 export function createRegistry(): Registry {

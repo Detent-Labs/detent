@@ -1151,6 +1151,19 @@ export const instanceEvent = z.discriminatedUnion("kind", [
     kind: z.literal("datasource.attribute-dropped"),
     payload: z.object({ fieldId, column: z.string(), targetFieldId: fieldId, reason: z.literal("type-mismatch") }).strict(),
   }),
+  // An `instance.transition` action moved this instance along a manual path.
+  // Recorded on the TARGET, not the acting instance — the acting instance's
+  // own record already carries the action's ActionOutcome. Carries the seq
+  // the accompanying transition advances to, in the same transaction as that
+  // transition's own commit. `idempotencyKey` is load-bearing beyond
+  // attribution: the handler reads it back to recognize a redelivery of a
+  // transition that already committed, distinguishing that from a collision
+  // with another acting instance.
+  z.object({
+    ...instanceEventEnvelope,
+    kind: z.literal("instance.transitioned-by-action"),
+    payload: z.object({ byInstanceId: instanceId, actionId, idempotencyKey: z.string(), pathId }).strict(),
+  }),
 ]);
 export type InstanceEvent = z.infer<typeof instanceEvent>;
 

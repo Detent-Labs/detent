@@ -912,6 +912,57 @@ Stage-by-stage status is in `ROADMAP.md`.
   `src/engine/definitions.ts` checks it at publish, over every action position
   `collect` visits. The referenced process must carry a published version, and
   every `inputMapping` key must name a field that process declares.
+- Instance transition (`src/handlers/instance-transition.ts`,
+  `instance-transition-action`). A fourth built-in handler,
+  `instance.transition`. `createDefaultRegistry` registers it beside
+  `httpHandlerDef`, `notificationEmailHandlerDef` and
+  `processStartHandlerDef`. An `instance.query` data source reads another
+  process's instances. This action moves the one an author picked, closing
+  the pattern's write half.
+
+  Its config carries three flat strings. One is `processId`. One is
+  `instanceIdField`, a field of the ACTING instance's own catalog. One is
+  `pathId`. `config-descriptor.ts` generates its studio form from these
+  three. It needs no hand-written surface.
+
+  The handler reads the target instance's id out of
+  `acting.data[instanceIdField]` and loads it. It drives the target along
+  `pathId`, via `executeManualTransition`. It runs as `SYSTEM_ACTOR`, never
+  as the triggering participant.
+
+  It appends an `instance.transitioned-by-action` event on the TARGET, not
+  the acting instance. That event carries `{byInstanceId, actionId,
+  idempotencyKey, pathId}`. It lands in the same commit as the target's own
+  transition.
+
+  That event serves two roles. One is attribution. The other is the
+  redelivery guard: before transitioning, the handler looks for one carrying
+  the delivery's own idempotency key. That lookup caps a redelivered row at
+  one move.
+
+  Six conditions dead-letter as a `PermanentError` rather than consuming a
+  retry. Three name a bad reference: an empty `instanceIdField`, an
+  unloadable target, and a target of the wrong process. Three name a bad
+  state: a non-manual `pathId`, a target off the path's source step, and a
+  non-running target. A refused guard is a seventh.
+
+  The outbox can deliver two acting instances' rows concurrently. So an
+  eighth condition joins them: a lost `ConcurrencyConflict` race on the
+  target's own transition. The handler catches that race. It rethrows it as
+  a `PermanentError` too.
+
+  `src/engine/definitions.ts::validateInstanceTransitionReferences` checks it
+  at publish, over every action position `collect` visits. An unresolved
+  `processId` rejects publishing, excepting a self-targeting action.
+
+  So does an `instanceIdField` the publishing body's own catalog does not
+  declare. A `pathId` not carried by every version of the target holding a
+  live instance instead reports a `PublishFinding`. That finding names
+  `referenceKind: "path"`, with no `dataSourceId`.
+
+  `validateInstanceQueryReadGrant` becomes `validateCrossProcessReadGrant`.
+  It now also gates an `instance.transition` action's target. The gate uses
+  the same `read` permission `"instance.query"` already requires.
 - Reconcile in-flight action writebacks across a migration (`src/engine/migration.ts`,
   `src/engine/outbox.ts`): closes what was previously a "Decided, not yet built" gap.
   `migrateOne`'s in-flight-actions check now blocks only a `claimed` outbox row with
