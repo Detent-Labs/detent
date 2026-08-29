@@ -1,3 +1,6 @@
+<!-- antislop: allow-file em-dash passive-voice run-ons sentence-length synonym-rotation -->
+<!-- This delta spec is new (no prior committed version) and its MODIFIED requirements must carry the base spec's full text, so the ratchet reads the base spec's own existing Gherkin/SHALL-normative style as a rise; not rewritten here per openspec-delta-specs-import-antislop-debt. -->
+
 ## MODIFIED Requirements
 
 ### Requirement: Resolve a display-ready view of an instance

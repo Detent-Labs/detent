@@ -1,3 +1,6 @@
+<!-- antislop: allow-file long-words passive-voice sentence-length -->
+<!-- This delta spec is new (no prior committed version) and its MODIFIED requirement must carry the base spec's full text, so the ratchet reads the base spec's own existing Gherkin/SHALL-normative style as a rise; not rewritten here per openspec-delta-specs-import-antislop-debt. -->
+
 ## MODIFIED Requirements
 
 ### Requirement: Every reporting view is scoped to one process and a date range

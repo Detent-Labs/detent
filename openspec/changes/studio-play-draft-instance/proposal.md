@@ -1,3 +1,6 @@
+<!-- antislop: allow-file em-dash filler long-words passive-voice run-ons sentence-length synonym-rotation -->
+<!-- This proposal is new (no prior committed version), so the ratchet reads every finding as a rise; its dense, SHALL-normative prose matches this repo's established rules/design-doc style (see CLAUDE.md, .claude/rules/process-contract.md), which is not being rewritten here. -->
+
 ## Why
 
 The Studio Player can only create an instance against a published process

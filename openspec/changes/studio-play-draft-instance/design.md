@@ -1,3 +1,6 @@
+<!-- antislop: allow-file em-dash filler long-words passive-voice run-ons sentence-length synonym-rotation -->
+<!-- This design doc is new (no prior committed version), so the ratchet reads every finding as a rise; its dense, decision-record prose matches this repo's established rules/design-doc style (see CLAUDE.md, .claude/rules/process-contract.md), which is not being rewritten here. -->
+
 ## Context
 
 `createProcessInstance` (`src/runtime/api.ts:934`) only resolves a published

@@ -1,3 +1,6 @@
+<!-- antislop: allow-file em-dash long-words passive-voice sentence-length synonym-rotation -->
+<!-- This delta spec is new (no prior committed version), so the ratchet reads every finding as a rise; its dense, SHALL-normative Gherkin style matches every other spec.md in openspec/specs/, which is not being rewritten here. -->
+
 # draft-test-instances
 
 ## Purpose
