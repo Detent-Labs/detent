@@ -162,12 +162,12 @@
 
 ## 6. Reporting exclusion
 
-- [ ] 6.1 Add a `kind`-based exclusion to `selectInRange`/`scan()`
+- [x] 6.1 Add a `kind`-based exclusion to `selectInRange`/`scan()`
       (`src/engine/reporting.ts`), the shared query `cycleTime`, `bottleneck`'s
       ranking, and `sla` all read through, and verify a `bun:test` case: a
       process's reported cycle-time percentiles, bottleneck ranking, and SLA
       breach rate are identical with and without a test instance present.
-- [ ] 6.2 Add the same `kind`-based exclusion to `bottleneck`'s separate,
+- [x] 6.2 Add the same `kind`-based exclusion to `bottleneck`'s separate,
       standalone work-in-progress query (the one that does NOT go through
       `selectInRange` — grep `src/engine/reporting.ts` for the raw
       `body->>'status' = 'running'` count query), and verify a `bun:test`
