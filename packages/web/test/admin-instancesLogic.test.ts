@@ -9,22 +9,29 @@ describe("toListParams", () => {
       currentStepId: undefined,
       startedBy: undefined,
       claimedBy: undefined,
+      kind: undefined,
       limit: 50,
       cursor: undefined,
     });
   });
 
   it("carries through set filter fields, limit and cursor", () => {
-    const filter = { processId: "proc_a", status: "running", currentStepId: "step_a", startedBy: "user_1", claimedBy: "user_2" };
+    const filter = { processId: "proc_a", status: "running", currentStepId: "step_a", startedBy: "user_1", claimedBy: "user_2", kind: "test" };
     expect(toListParams(filter, 25, "cursor_x")).toEqual({
       processId: "proc_a",
       status: "running",
       currentStepId: "step_a",
       startedBy: "user_1",
       claimedBy: "user_2",
+      kind: "test",
       limit: 25,
       cursor: "cursor_x",
     });
+  });
+
+  it("carries through kind alone when it is the only set field", () => {
+    const filter = { ...EMPTY_INSTANCE_FILTER, kind: "published" };
+    expect(toListParams(filter, 50).kind).toBe("published");
   });
 });
 

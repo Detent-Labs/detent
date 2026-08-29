@@ -1851,3 +1851,39 @@ carries no data source id to name instead.
 `packages/web/test/studio-processHeaderBar-findingFallback.test.tsx` asserts
 the finding line's own text. Neither one sees which surface
 `PluginEnvelopeEditor` picks for this type. That half stays a browser check.
+
+### The admin instances list: kind badge and filter (`studio-play-draft-instance`)
+
+Source: `studio-play-draft-instance` task 7.2.
+
+Measured on 2026-08-29 against the production build served from `WEB_ROOT`
+(`bun run --filter './packages/web' build`, then `bash scripts/dev-up.sh`'s
+own `bun run serve`), not `bun run dev` — the same pre-existing Studio
+dev-mode crash this file's `instance-transition-action` entry above already
+records ruled that path out.
+
+Started one ordinary instance of Expense Approval from the app area's Start
+a process screen. The studio Player's "Create new instance" button still
+plays the process's published version, not its draft — `draft-test-instances`
+task 4's route (`POST /drafts/:processId/instances`) is Phase 3 Track D's
+own screen to wire up, out of this task's scope — so a genuine `kind: "test"`
+instance was created by calling that route directly from the authenticated
+browser session (`fetch` in the page's own JS context, carrying the session's
+own bearer token), the same route `test/draft-test-instances.test.ts` already
+covers server-side.
+
+Opened `/admin/instances` with both instances present. Pass: a fourth table
+column, Kind, sits right of Status. The published rows read plain lowercase
+`published` text; the test row carries a stamp reading `TEST`, in the same
+muted grey tone `admin-badge-cancelled`/`-discarded`/`-redacted` already use,
+beside the row's own red `RUNNING` stamp.
+
+Picked "Test" from the new kind filter, alongside the five existing filters.
+Pass: the table narrows to the one test-kind row alone. Picked "Published".
+Pass: the table shows the two ordinary rows and drops the test one. Picked
+"All kinds". Pass: all three rows return.
+
+`packages/web/test/admin-instancesLogic.test.ts` already asserts
+`toListParams`'s kind passthrough and omission as pure functions; it cannot
+see a table column render or a `<select>` actually narrow a live page. This
+walk confirms both.

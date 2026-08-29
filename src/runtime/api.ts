@@ -176,6 +176,7 @@ export type InstanceSummary = {
   processLabel: LocalizedText;
   stepLabel: LocalizedText;
   processBaseLocale: LocaleCode;
+  kind: Instance["kind"];
 };
 
 /**
@@ -199,6 +200,7 @@ export type DegradedInstanceSummary = {
   startedBy?: string;
   createdAt: string;
   reason: "missing-definition" | "current-step-not-in-body";
+  kind: Instance["kind"];
 };
 
 export type InstanceSummaryItem = InstanceSummary | DegradedInstanceSummary;
@@ -243,6 +245,13 @@ export type InstanceListFilter = {
   createdAfter?: string;
   createdBefore?: string;
   dataWhere?: DataComparison[];
+  // A genuine client-settable filter, unlike includeDegraded/includeTestInstances
+  // below: an exact match against the instance's own kind, narrowing to
+  // published-only or test-only rather than merely toggling test-instance
+  // inclusion. Composes safely with includeTestInstances's default exclusion —
+  // a non-admin scope's includeTestInstances stays false, so kind: "test"
+  // yields zero rows for it rather than leaking test instances.
+  kind?: Instance["kind"];
   // Not a query filter: set by the caller's own authorization context (see
   // http-wrapper's `scope=all` / `ADMIN_ROLE` check), never from raw client
   // input. True degrades an unresolvable instance's item instead of omitting
@@ -416,6 +425,7 @@ async function toSummary(inst: Instance, createdAt: string, store: DefinitionSto
     processLabel: body.label,
     stepLabel: step.label,
     processBaseLocale: body.baseLocale,
+    kind: inst.kind,
   };
 }
 
@@ -431,6 +441,7 @@ function toDegradedSummary(inst: Instance, createdAt: string, reason: DegradedIn
     startedBy: inst.startedBy,
     createdAt: new Date(createdAt).toISOString(),
     reason,
+    kind: inst.kind,
   };
 }
 
@@ -1395,6 +1406,7 @@ export function buildInstanceWhere(filter: InstanceWhereFilter, db: SQL) {
     AND (${filter.createdAfter ?? null}::timestamptz IS NULL OR created_at >= ${filter.createdAfter ?? null}::timestamptz)
     AND (${filter.createdBefore ?? null}::timestamptz IS NULL OR created_at <= ${filter.createdBefore ?? null}::timestamptz)
     AND (kind <> 'test' OR ${filter.includeTestInstances ?? false})
+    AND (${filter.kind ?? null}::text IS NULL OR kind = ${filter.kind ?? null})
   `;
 }
 

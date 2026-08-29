@@ -176,7 +176,7 @@
 
 ## 7. Admin UI
 
-- [ ] 7.1 Before implementing, invoke `/frontend-design:frontend-design` for
+- [x] 7.1 Before implementing, invoke `/frontend-design:frontend-design` for
       visual direction on the badge and filter control (plus the installed
       Vercel skills per CLAUDE.md), per CLAUDE.md's rule that UI work in
       `packages/web` goes through the design skills first. Add a `kind`
@@ -187,7 +187,7 @@
       existing five filters, following `instancesLogic.ts`'s existing
       pure-module pattern with its own `bun:test` coverage per
       `packages/web/src/areas/app/screens/inboxLogic.ts`'s convention.
-- [ ] 7.2 Verify with a real browser (per CLAUDE.md's UI-change rule): open
+- [x] 7.2 Verify with a real browser (per CLAUDE.md's UI-change rule): open
       the admin instances list with both an ordinary and a test instance
       present, confirm the test instance is visually identifiable and the
       filter dimension works; record the check in `docs/browser-checks.md`.
