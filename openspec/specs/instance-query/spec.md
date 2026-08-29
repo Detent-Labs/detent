@@ -83,6 +83,18 @@ the other filters conjunctively.
 With no filters the read SHALL return every instance, subject to paging. The
 read SHALL NOT scope results to the calling actor implicitly.
 
+A test instance (an instance whose `kind` is `"test"`, per the
+`draft-test-instances` capability, as opposed to the `"published"` kind every
+ordinary instance carries) SHALL be excluded from a summary list requested
+under a participant-facing scope — `scope: "mine"`, `scope: "started"`, or any
+other call made by a caller with no administrative standing over the read.
+This exclusion applies regardless of whether the calling actor started,
+claims, or is an eligible assignment candidate on the test instance; it is not
+a filter a participant-facing caller can opt out of. A summary list requested
+under administrative scope (`scope: "all"`, gated by `ADMIN_ROLE` per the
+`http-wrapper` capability, or an equivalent process-scoped read grant) SHALL
+include a test instance like any other, subject to its other filters.
+
 A matched instance's summary can fail to resolve. That happens when its pinned
 `(processId, version)` has no resolvable published body. It also happens when
 its `currentStepId` is absent from that body's steps. The read SHALL NOT fail
@@ -226,6 +238,23 @@ than `limit` even while more matching instances exist.
 - **THEN** that instance is returned
 - **AND** an equivalent bare `assignedTo: A` call (no role list available)
   does not return it
+
+#### Scenario: A participant-facing scope excludes a test instance
+
+- **WHEN** a test instance and an ordinary instance both exist
+- **AND** actor A started, claims, and is an eligible assignment candidate on
+  the test instance's current step
+- **AND** the read is called with `scope: "mine"` (or `scope: "started"`) by
+  actor A, holding no administrative standing
+- **THEN** the ordinary instance is returned when it also matches A's filters
+- **AND** the test instance is omitted from every page of the walk
+
+#### Scenario: Administrative scope includes a test instance
+
+- **WHEN** a test instance exists
+- **AND** the read is called under `scope: "all"` by an actor holding
+  `ADMIN_ROLE`
+- **THEN** the test instance is returned in the page like any other instance
 
 #### Scenario: With includeDegraded, an unresolvable body degrades instead of failing the page
 
