@@ -1887,3 +1887,28 @@ Pass: the table shows the two ordinary rows and drops the test one. Picked
 `toListParams`'s kind passthrough and omission as pure functions; it cannot
 see a table column render or a `<select>` actually narrow a live page. This
 walk confirms both.
+
+### Player: "Create test instance" plays a draft-only process end to end
+
+Source: `studio-play-draft-instance` task 8.4.
+
+Create a new empty-process draft. Add two steps in the JSON surface (or the
+canvas): a non-terminal initial step with one manual path to a terminal
+step, so the process has no published version at all, only a draft. Save
+the draft. Open its Player.
+
+Pass: "Create test instance" sits beside "Create new instance" in the
+instance access fieldset. Click it. A running instance renders at the
+initial step, and a `TEST` stamp sits beside the status line. Submit the
+manual path. Pass: the Player re-renders at the terminal step, status
+`completed`, the `TEST` stamp still shown, and the record pane lists the
+transition. Opening the same instance again by id (the "Open existing
+instance id" field) shows the same `TEST` stamp — the marker is not
+create-flow-only.
+
+`packages/web/test/studio-playerLogic.test.ts` covers the create-then-load
+flow and the marker's visibility rule as pure functions (this repo ships no
+DOM test library — see `studio-draftProvider-chainingFetch.test.ts`'s own
+note). Neither sees the two buttons render side by side, the stamp's actual
+paint, or a real submit round trip through the running server. That stays a
+browser check.

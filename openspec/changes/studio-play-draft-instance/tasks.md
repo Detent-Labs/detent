@@ -194,7 +194,7 @@
 
 ## 8. Studio Player UI
 
-- [ ] 8.1 Before implementing, invoke `/frontend-design:frontend-design` for
+- [x] 8.1 Before implementing, invoke `/frontend-design:frontend-design` for
       visual direction on the new action and marker (plus the installed
       Vercel skills per CLAUDE.md), per CLAUDE.md's rule that UI work in
       `packages/web` goes through the design skills first. Add a "Create
@@ -203,14 +203,14 @@
       new route, alongside the existing "Create new instance" action, and
       verify a `bun:test`/component test: choosing it for a process with a
       draft and no published version creates and renders a running instance.
-- [ ] 8.2 Add a visible test-instance marker to the Player's instance view
+- [x] 8.2 Add a visible test-instance marker to the Player's instance view
       (created via the new action, or opened by id) and verify a
       `bun:test`/component test: an ordinary instance shows no marker, a
       test instance does.
-- [ ] 8.3 Verify a `bun:test`/component test: the existing "Create new
+- [x] 8.3 Verify a `bun:test`/component test: the existing "Create new
       instance" action against a published version is unaffected and still
       creates a non-test instance.
-- [ ] 8.4 Verify with a real browser (per CLAUDE.md's UI-change rule): play
+- [x] 8.4 Verify with a real browser (per CLAUDE.md's UI-change rule): play
       a process with only a draft (no published version) end-to-end through
       "Create test instance" — submit at least one step and confirm the
       Player renders the next step correctly.

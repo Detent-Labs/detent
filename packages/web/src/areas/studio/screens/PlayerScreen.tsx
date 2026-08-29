@@ -1,9 +1,9 @@
 import { useCallback, useState } from "react";
 import { FieldForm, PathButtons, filterToEditable } from "form-ui";
 import type { SubmissionIssue } from "form-ui";
-import { createInstance, getInstanceView, submitPath, claimStep, releaseClaim, getInstanceRecord, StudioClientError } from "../api/client.js";
+import { createInstance, createTestInstance, getInstanceView, submitPath, claimStep, releaseClaim, getInstanceRecord, StudioClientError } from "../api/client.js";
 import type { InstanceView, InstanceRecordElement } from "../api/types.js";
-import { seedFormValues } from "./playerLogic.js";
+import { seedFormValues, createAndOpenInstance, isTestInstance } from "./playerLogic.js";
 import { describeRecordElement } from "../../../api/record.js";
 import type { Route } from "../routing.js";
 import { describeError, describeCaughtError } from "../errors.js";
@@ -95,9 +95,20 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
 
   const doCreate = () =>
     withErrorHandling(async () => {
-      const created = await createInstance(processId, token);
-      const fresh = await getInstanceView(created.instanceId, token);
-      applyView(created.instanceId, fresh);
+      const { instanceId: id, view } = await createAndOpenInstance(
+        () => createInstance(processId, token),
+        (i) => getInstanceView(i, token),
+      );
+      applyView(id, view);
+    });
+
+  const doCreateTest = () =>
+    withErrorHandling(async () => {
+      const { instanceId: id, view } = await createAndOpenInstance(
+        () => createTestInstance(processId, token),
+        (i) => getInstanceView(i, token),
+      );
+      applyView(id, view);
     });
 
   const doOpen = () =>
@@ -172,6 +183,9 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
           <button type="button" className="btn btn-primary" disabled={loading} onClick={() => void doCreate()}>
             Create new instance
           </button>
+          <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => void doCreateTest()}>
+            Create test instance
+          </button>
         </div>
         <label>
           Open existing instance id
@@ -200,6 +214,12 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
           <section className="studio-player-form">
             <p className="studio-conflict">
               instance {instanceId} · step {view.step.key} · status {view.status}
+              {isTestInstance(view) && (
+                <>
+                  {" "}
+                  <span className="studio-player-test-badge">Test</span>
+                </>
+              )}
             </p>
 
             <FieldForm fields={view.fields} values={formValues} onChange={(fieldId, value) => setFormValues((v) => ({ ...v, [fieldId]: value }))} locale="en" issuesByField={issuesByField} columns={view.columns ?? 1} />
