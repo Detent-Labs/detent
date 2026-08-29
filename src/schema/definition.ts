@@ -1199,5 +1199,9 @@ export const instance = z.object({
   // Set once by redactInstance; absent means not redacted, same as an
   // instance that predates this field.
   redactedAt: timestamp.optional(),
+  // "published" for an instance created against a definitions row (every
+  // instance that predates this field reads back as this default); "test"
+  // for a draft-test-instances run, resolved via a draft_snapshots row.
+  kind: z.enum(["published", "test"]).default("published"),
 });
 export type Instance = z.infer<typeof instance>;

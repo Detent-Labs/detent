@@ -19,6 +19,7 @@
 import type { SQL } from "bun";
 import { withTransaction } from "../engine/store.js";
 import { getDraft, saveDraft, listDrafts, deleteDraft, markDraftPublished, type Draft } from "../engine/drafts.js";
+import { createProcessInstance } from "../runtime/api.js";
 import { getTemplate, listTemplates, saveTemplate, deleteTemplate } from "../engine/templates.js";
 import { publishBody, createDefinitionStore } from "../engine/definitions.js";
 import { registerMigrationPlan, resolveMigrationPlan, findOrphanKeys } from "../engine/migration.js";
@@ -36,7 +37,7 @@ import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, requirePermission, can, AuthorizationError, DEVELOPER_ROLE, TEMPLATES_ROLE, AUTHOR_ROLE } from "../auth/authorize.js";
 import { notFound, type HttpResult } from "./errors.js";
 import { route, readJson, parseVersion } from "./routes.js";
-import type { ProcessId, ProcessBody, MigrationSpec } from "../schema/definition.js";
+import type { ProcessId, ProcessBody, MigrationSpec, Instance } from "../schema/definition.js";
 
 /**
  * Either authoring role admits. The whole no-code authoring surface takes it:
@@ -108,6 +109,48 @@ export async function handleDeleteDraft(processId: string, req: Request, resolve
     const removed = await deleteDraft(processId as ProcessId, db);
     if (!removed) return notFound(`no draft: ${processId}`);
     return { status: 204, body: null };
+  });
+}
+
+/**
+ * draft-test-instances: creates a real, running instance from the process's
+ * CURRENT draft body instead of a published version — no published version
+ * required. `requireAuthoring`, the same gate as the other four draft
+ * routes: a role-gated route, not a flag on the public instance-creation
+ * route, is the server-enforced boundary design.md's "the real bypass risk"
+ * decision requires (see `POST /processes/:processId/instances`, which the
+ * app area's own calling code — not a role — is what stops a participant
+ * from using today).
+ *
+ * Checks `getDraft` itself, exactly like `handleGetDraft`, rather than
+ * letting `createProcessInstance`'s own internal `NotFoundError` reach
+ * `mapError`: that error type maps to 500 there (design.md's "Keep
+ * not-found at 500"), not the 404 `notFound()` shape this route needs — no
+ * new error type, matching `handleGetDraft`'s own pattern. A draft deleted
+ * between this check and creation still surfaces as that 500, an accepted,
+ * narrow race no route here otherwise closes.
+ */
+export async function handleCreateTestInstance(
+  processId: string,
+  req: Request,
+  resolver: ActorResolver,
+  dataSourceRegistry: DataSourceRegistry,
+  db: SQL,
+  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+): Promise<HttpResult> {
+  return route(req, resolver, db, requireAuthoring, async (actor) => {
+    const draft = await getDraft(processId as ProcessId, db);
+    if (!draft) return notFound(`no draft: ${processId}`);
+    const parsed = (await readJson(req)) as { data?: unknown };
+    const created = await createProcessInstance(
+      processId as ProcessId,
+      actor,
+      dataSourceRegistry,
+      { fromDraft: true, data: parsed.data as Instance["data"] | undefined },
+      db,
+      assignmentRegistry,
+    );
+    return { status: 201, body: created };
   });
 }
 

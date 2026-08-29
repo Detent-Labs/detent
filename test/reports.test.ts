@@ -302,6 +302,25 @@ test.skipIf(!DB)("3.2 executeReport's rows match an equivalent direct queryInsta
   expect(new Set(executed?.rows.map((r) => r.instanceId))).toEqual(new Set(direct.items.map((i) => i.instanceId)));
 });
 
+// draft-test-instances (5.8): runReportQuery's InstanceQueryFilter carries no
+// includeTestInstances opt-in, so buildInstanceWhere's default kind
+// exclusion already covers executeReport/previewReportDraft — no code
+// change here beyond that default.
+test.skipIf(!DB)("executeReport never returns a row for a test-kind instance, even when the report's filters would otherwise match", async () => {
+  const PID = pid("excludes_test_kind");
+  const v = await publishBody(PID, reportBody("excludes_test_kind", [{ id: "field_x", key: "x" }]), reg, dataSourceReg);
+  const ordinary = await createInstance(v.definition, { processId: PID, version: v.version, data: { field_x: "a" } as Instance["data"] }, sql);
+  await createInstance(v.definition, { processId: PID, version: v.version, kind: "test", data: { field_x: "a" } as Instance["data"] }, sql);
+
+  const report = await createReport(
+    owner,
+    { processId: PID, name: "R", columns: [{ type: "field", fieldId: "field_x" as FieldId }], viewers: [admin.id] },
+    sql,
+  );
+  const executed = await executeReport(report.reportId, admin, sql);
+  expect(executed?.rows.map((r) => r.instanceId)).toEqual([ordinary.instanceId]);
+});
+
 test.skipIf(!DB)("3.3 report sharing narrows access, never widens it", async () => {
   const PID = pid("narrows_access");
   const v = await publishBody(PID, reportBody("narrows_access", [{ id: "field_x", key: "x" }]), reg, dataSourceReg);

@@ -163,14 +163,16 @@
    for secondary text. */
 .admin-badge-cancelled,
 .admin-badge-discarded,
-.admin-badge-redacted {
+.admin-badge-redacted,
+.admin-badge-test {
   color: #726e6e;
 }
 
 @media (prefers-color-scheme: dark) {
   .admin-badge-cancelled,
   .admin-badge-discarded,
-  .admin-badge-redacted {
+  .admin-badge-redacted,
+  .admin-badge-test {
     color: var(--color-neutral-500);
   }
 }

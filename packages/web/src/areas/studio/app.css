@@ -2154,6 +2154,22 @@ tr[data-group="true"] .studio-matrix-row-header {
   }
 }
 
+/* Test-instance marker (draft-play-instance-marker): the stamp pattern —
+   mono, uppercase, tracked, 2px outline in currentColor. Accent tone: a test
+   instance is a state fact, not a fault, and accent is already this
+   system's "open/live" tone. */
+.studio-player-test-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 2px solid currentcolor;
+  padding: 2px 7px;
+  color: var(--color-accent);
+}
+
 .step-section-issue-stamp {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;

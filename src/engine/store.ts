@@ -221,6 +221,20 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   )`;
   // Idempotent-publish lookup: an identical re-publish matches by (process_id, hash).
   await db`CREATE INDEX IF NOT EXISTS definitions_hash_idx ON definitions (process_id, definition_hash)`;
+  // A test instance's frozen draft body, one row per test-instance run — a
+  // sibling to `definitions`, never a row inside it (see design.md "A frozen
+  // draft snapshot lives in a new table, not in definitions"). `version` is a
+  // negative, per-process-decrementing sentinel (createDraftSnapshot below),
+  // disjoint from `definitions`' always-positive published versions, so
+  // `resolveBody`'s `version < 0` fallback can never collide with a real one.
+  await db`CREATE TABLE IF NOT EXISTS draft_snapshots (
+    process_id text NOT NULL,
+    version integer NOT NULL,
+    definition_hash text NOT NULL,
+    body jsonb NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (process_id, version)
+  )`;
   // Migration plans: the rule moving instances from one version to another, keyed by
   // its version pair and independent of `definitions` (a published body stays
   // immutable while its plan is corrected before use, and several source versions may
@@ -270,6 +284,14 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // Set once by redactInstance (src/engine/retention.ts); NULL means not
   // redacted, the same convention every other additive instances column uses.
   await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS redacted_at timestamptz`;
+  // "published" (an instance created against a definitions row) or "test" (a
+  // draft-test-instances run, resolved via draft_snapshots below). A real
+  // column, not just a field of the jsonb body: every kind-exclusion
+  // predicate filters the stored row directly, and a pre-existing row's body
+  // has no `kind` key at all — a `body->>'kind'` predicate would read that as
+  // SQL NULL and silently drop it under three-valued logic. The column
+  // default backfills every pre-existing row to 'published' at ALTER time.
+  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'published'`;
   // The retention sweep's selection query filters on this column first (most
   // rows are NULL forever, so a partial index stays small), then checks
   // status/currentStepEnteredAt in memory over the reduced row set.
@@ -1024,6 +1046,10 @@ export async function createInstance(
     // produced no candidate: it must land in the same transaction as the INSERT,
     // and only the caller knows the reason.
     events?: InstanceEvent[];
+    // "test" for a draft-test-instances run; omitted (or "published") for an
+    // ordinary instance. Threaded into both the jsonb body and the real
+    // `kind` SQL column below, which every kind-exclusion predicate filters.
+    kind?: Instance["kind"];
   },
   db: SQL = sql,
 ): Promise<Instance> {
@@ -1059,6 +1085,7 @@ export async function createInstance(
     startedAt,
     currentStepEnteredAt: startedAt,
     ...(opts.startedBy !== undefined ? { startedBy: opts.startedBy } : {}),
+    ...(opts.kind !== undefined ? { kind: opts.kind } : {}),
   });
   const { armed: timers, drops } = armStepTimers(initial, startedAt, body, seed);
   const inst: Instance = { ...seed, timers, assignment: opts.assignment };
@@ -1130,8 +1157,8 @@ export async function createInstance(
     // the instance they just created, and a crash between this INSERT and that
     // cascade's first hop would otherwise leave a cascade-eligible initial step
     // unmarked — the same gap applyStepEntry closes for every later commit.
-    const inserted = (await tx`INSERT INTO instances (instance_id, transition_seq, body, next_timer_at, resolve_state)
-      VALUES (${inst.instanceId}, ${inst.transitionSeq}, ${inst}, ${minFireAt(timers)}, 'pending')
+    const inserted = (await tx`INSERT INTO instances (instance_id, transition_seq, body, next_timer_at, resolve_state, kind)
+      VALUES (${inst.instanceId}, ${inst.transitionSeq}, ${inst}, ${minFireAt(timers)}, 'pending', ${inst.kind})
       ON CONFLICT (instance_id) DO NOTHING
       RETURNING instance_id`) as unknown[];
     if (inserted.length === 0) return;
@@ -1142,6 +1169,29 @@ export async function createInstance(
     }
   });
   return inst;
+}
+
+/**
+ * Reserve the next negative sentinel version for a test-instance run against
+ * `processId` and persist its frozen body under it. Sentinels are assigned
+ * per test instance, never a shared value, so the frozen-at-creation
+ * guarantee holds even when several test instances exist for one process.
+ *
+ * `pg_advisory_xact_lock` scoped to `processId` serializes the read-then-insert
+ * against a concurrent "play" creation of the same process's draft: the
+ * `(process_id, version)` primary key alone is not enough, since two
+ * concurrent transactions could both read the same `MIN(version)` before
+ * either commits and then collide on the same computed sentinel.
+ */
+export async function createDraftSnapshot(processId: ProcessId, hash: string, body: ProcessBody, db: SQL = sql): Promise<number> {
+  return withTransaction(db, async (tx) => {
+    await tx`SELECT pg_advisory_xact_lock(hashtext(${processId}))`;
+    const rows = (await tx`SELECT COALESCE(MIN(version), 0) - 1 AS next FROM draft_snapshots WHERE process_id = ${processId}`) as { next: number }[];
+    const version = Number(rows[0]!.next);
+    await tx`INSERT INTO draft_snapshots (process_id, version, definition_hash, body)
+      VALUES (${processId}, ${version}, ${hash}, ${body})`;
+    return version;
+  });
 }
 
 export class PinMismatch extends Error {

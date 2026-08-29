@@ -76,8 +76,9 @@ async function seed(opts: {
   startedAt: string;
   status?: Instance["status"];
   currentStepId?: StepId;
+  kind?: Instance["kind"];
 }): Promise<Instance> {
-  const inst = await createInstance(opts.body, { processId: opts.processId, version: opts.version }, sql);
+  const inst = await createInstance(opts.body, { processId: opts.processId, version: opts.version, kind: opts.kind }, sql);
   const patch: Record<string, unknown> = { startedAt: opts.startedAt, currentStepEnteredAt: opts.startedAt };
   if (opts.status) patch.status = opts.status;
   if (opts.currentStepId) patch.currentStepId = opts.currentStepId;
@@ -123,8 +124,8 @@ async function firedEvent(instanceId: string, seq: number, version: number, time
 }
 
 /** a(10m) -> b(30m) -> c(10m) -> d. Total 50m. Ends `completed` unless told otherwise. */
-async function runThrough(P: ProcessId, v: number, b: ProcessBody, startMin = 0, status: Instance["status"] = "completed") {
-  const inst = await seed({ processId: P, version: v, body: b, startedAt: at(startMin), status, currentStepId: "step_d" as StepId });
+async function runThrough(P: ProcessId, v: number, b: ProcessBody, startMin = 0, status: Instance["status"] = "completed", kind?: Instance["kind"]) {
+  const inst = await seed({ processId: P, version: v, body: b, startedAt: at(startMin), status, currentStepId: "step_d" as StepId, kind });
   await entry({ instanceId: inst.instanceId, seq: 1, version: v, fromStepId: "step_a", toStepId: "step_b", at: at(startMin + 10), cause: "user", pathId: "path_ab" });
   await entry({ instanceId: inst.instanceId, seq: 2, version: v, fromStepId: "step_b", toStepId: "step_c", at: at(startMin + 40), cause: "user", pathId: "path_bc" });
   await entry({ instanceId: inst.instanceId, seq: 3, version: v, fromStepId: "step_c", toStepId: "step_d", at: at(startMin + 50), cause: "user", pathId: "path_cd" });
@@ -334,6 +335,41 @@ test.skipIf(!DB)("the work-in-progress count ignores the date range and counts r
   expect(wip.get("step_b" as StepId)).toBe(1);
   // Out-of-range start contributes no traversal to the ranking.
   expect(view.ranking).toEqual([]);
+});
+
+// ------------------------------------------------------------- test instances
+
+test.skipIf(!DB)("a test instance changes no view's numbers: cycle time, bottleneck ranking, and SLA breach rate all read the same", async () => {
+  const P = pid();
+  const { body: b, version } = await publish(P, "v1");
+  await runThrough(P, version, b, 0);
+  const before = {
+    cycle: (await cycleTime(P, RANGE))!,
+    bottle: (await bottleneck(P, RANGE))!,
+    sla: (await sla(P, RANGE))!,
+  };
+
+  const testInst = await runThrough(P, version, b, 100, "completed", "test");
+  await firedEvent(testInst.instanceId, 1, version, "timer_rem", at(125));
+  const after = {
+    cycle: (await cycleTime(P, RANGE))!,
+    bottle: (await bottleneck(P, RANGE))!,
+    sla: (await sla(P, RANGE))!,
+  };
+
+  expect(after.cycle).toEqual(before.cycle);
+  expect(after.bottle.ranking).toEqual(before.bottle.ranking);
+  expect(after.sla.steps).toEqual(before.sla.steps);
+});
+
+test.skipIf(!DB)("a test instance parked mid-step contributes nothing to that step's work-in-progress count", async () => {
+  const P = pid();
+  const { body: b, version } = await publish(P, "v1");
+  await seed({ processId: P, version, body: b, startedAt: at(0), status: "running", currentStepId: "step_b" as StepId, kind: "test" });
+
+  const view = (await bottleneck(P, RANGE))!;
+  const wip = new Map(view.workInProgress.map((r) => [r.stepId, r.running]));
+  expect(wip.get("step_b" as StepId) ?? 0).toBe(0);
 });
 
 // ---------------------------------------------------------------------- SLA

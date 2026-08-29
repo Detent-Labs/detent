@@ -99,6 +99,7 @@ async function selectInRange(processId: ProcessId, range: DateRange, db: SQL): P
   const rows = (await db`
     SELECT body FROM instances
     WHERE body->>'processId' = ${processId}
+      AND kind <> 'test'
       AND (body->>'startedAt')::timestamptz >= ${range.from}::timestamptz
       AND (body->>'startedAt')::timestamptz <= ${range.to}::timestamptz
   `) as { body: unknown }[];
@@ -319,7 +320,7 @@ export async function bottleneck(processId: ProcessId, range: DateRange, db: SQL
   const wipRows = (await db`
     SELECT body->>'currentStepId' AS step_id, count(*)::int AS n
     FROM instances
-    WHERE body->>'processId' = ${processId} AND body->>'status' = 'running'
+    WHERE body->>'processId' = ${processId} AND body->>'status' = 'running' AND kind <> 'test'
     GROUP BY body->>'currentStepId'
   `) as { step_id: string; n: number }[];
   const wip = new Map(wipRows.map((r) => [r.step_id as StepId, r.n]));

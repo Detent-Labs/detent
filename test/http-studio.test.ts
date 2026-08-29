@@ -27,7 +27,7 @@ const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
 beforeAll(initDb);
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE drafts, templates, outbox, instances, history_entries, instance_events, definitions, migration_plans, permission_grants`;
+  if (DB) await sql`TRUNCATE drafts, draft_snapshots, templates, outbox, instances, history_entries, instance_events, definitions, migration_plans, permission_grants`;
   if (DB) await clearInstanceAudit();
 });
 
@@ -382,6 +382,59 @@ test.skipIf(!DB)("publishing a draft carrying an instance.query source without a
   expect(res.status).toBe(403);
   const errBody = (await res.json()) as { error: { type: string } };
   expect(errBody.error.type).toBe("authorization");
+});
+
+// ============================================================
+// POST /drafts/:processId/instances (draft-test-instances)
+// ============================================================
+
+// publishableBody, not authoredBody: authoredBody's step deliberately has no
+// exit (legal to SAVE as a draft, since saveDraft never parses it), but
+// createProcessInstance's draft path DOES run processBody.parse to get a
+// typed ProcessBody — the same "a non-terminal step needs an exit" baseline
+// structural check every published body already satisfies. See this file's
+// "for a process with no draft" test below for the deliberately-unparseable
+// case this route is meant to fail gracefully on instead.
+test.skipIf(!DB)("POST /drafts/:processId/instances succeeds for a developer, running the draft body with no published version", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+
+  const res = await fetch(authedReq(`http://x/drafts/${processId}/instances`, "POST", developer, {}));
+  expect(res.status).toBe(201);
+  const body = (await res.json()) as { kind: string; processId: string; version: number };
+  expect(body.kind).toBe("test");
+  expect(body.processId).toBe(processId);
+  expect(body.version).toBeLessThan(0);
+});
+
+test.skipIf(!DB)("POST /drafts/:processId/instances succeeds for an author", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", author, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+
+  const res = await fetch(authedReq(`http://x/drafts/${processId}/instances`, "POST", author, {}));
+  expect(res.status).toBe(201);
+  const body = (await res.json()) as { kind: string };
+  expect(body.kind).toBe("test");
+});
+
+test.skipIf(!DB)("POST /drafts/:processId/instances without an authoring role maps to 403 and creates no instance", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: authoredBody("v1"), layout: {}, revision: 0 }));
+
+  const res = await fetch(authedReq(`http://x/drafts/${processId}/instances`, "POST", bystander, {}));
+  expect(res.status).toBe(403);
+  const errBody = (await res.json()) as { error: { type: string } };
+  expect(errBody.error.type).toBe("authorization");
+
+  const rows = (await sql`SELECT count(*)::int AS n FROM instances WHERE body->>'processId' = ${processId}`) as { n: number }[];
+  expect(rows[0]!.n).toBe(0);
+});
+
+test.skipIf(!DB)("POST /drafts/:processId/instances for a process with no draft at all maps to the notFound() 404 shape", async () => {
+  const res = await fetch(authedReq(`http://x/drafts/${pid()}/instances`, "POST", developer, {}));
+  expect(res.status).toBe(404);
+  const errBody = (await res.json()) as { error: { type: string; message: string } };
+  expect(errBody.error.type).toBe("not-found");
 });
 
 // ============================================================
