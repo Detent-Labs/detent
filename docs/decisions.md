@@ -389,19 +389,18 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     external database, with the connection in operations config rather than in
     a process definition.
 
-  **The missing half.** Nothing moves the laptop's own instance from the shelf
-  step to the issued step when a participant picks it. `src/handlers/` holds
-  `http.request`, `notification.email` and `process.start`, plus the
-  engine-owned spawn and return pair. `process.start` creates an instance and
-  the subprocess pair drives a new child, so no action type transitions an
-  instance that already exists. Without one the option list never shrinks and
-  the reading half is decorative. An author can reach `POST
-  /instances/:id/submit` through `http.request` today, which leaves the
-  transaction, authenticates as the configured credential rather than the
-  participant, and guards the HTTP call rather than the business effect with
-  the outbox's idempotency key. That is not the path to recommend for a
-  first-class capability. Whether the transition action ships in this change or
-  its own is undecided. That it ships is not.
+  **The missing half — closed.** Nothing moved the laptop's own instance from
+  the shelf step to the issued step when a participant picked it, because no
+  action type transitioned an instance that already existed: `process.start`
+  created a new one, and the subprocess pair drove a new child. Shipped
+  2026-08-29 as its own change, `instance-transition-action`: a fourth
+  author-visible handler, `instance.transition`, alongside `http.request`,
+  `notification.email` and `process.start`. Its config names the target
+  process, a field of the acting instance holding the picked instance's id,
+  and a manual path on the target's current step. It drives the target along
+  that path as the system actor, appending an `instance.transitioned-by-action`
+  event on the target that doubles as the redelivery guard. See its own
+  design.md for the collision, redelivery and permanent-failure rules.
 
   **Explicitly not the goal.**
   - No SQL against the engine's own `instances` from any authoring surface. A
@@ -450,13 +449,16 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     deleted, so `heldValues` keeps resolving its label. A cancelled or retired
     source instance needs the same treatment, resolved for a held reference
     even though the filter excludes it.
-  - Two participants picking the same device. Submission validation re-resolves
-    the option list under the reading instance's row lock, which narrows the
-    window without closing it, since nothing locks the source instance. Once
-    the transition action above exists the collision surfaces there instead, as
-    a second delivery arriving at an instance no longer on the step its path
-    departs from, which the transition machinery can refuse. That is a better
-    failure than a silent duplicate, and still a post-commit one.
+  - Two participants picking the same device — resolved by
+    `instance-transition-action`. The collision surfaces where that change
+    predicted: a second `instance.transition` delivery arriving at a target no
+    longer on the path's source step, which the handler refuses permanently
+    rather than retrying. A genuinely concurrent pair of deliveries that both
+    find the target still on that step races inside the target's own
+    optimistic-concurrency check instead; the loser is refused the same way.
+    Either way one participant's device moves and the other's delivery
+    dead-letters, naming the step the device stands on — a better failure than
+    a silent duplicate, and still a post-commit one.
   - Per-instance visibility ("who may see instance 101") stays open, and it is
     a larger decision than this topic: the same rule would govern the instance
     list, the detail view, and reporting. Nothing carries such a list today —

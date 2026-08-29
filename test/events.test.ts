@@ -65,6 +65,17 @@ const unresolved = () => ({
   },
 });
 
+const transitionedByAction = () => ({
+  ...fired(),
+  kind: "instance.transitioned-by-action",
+  payload: {
+    byInstanceId: "inst_1a2b3c4d-0000-4000-8000-000000000006",
+    actionId: "action_1a2b3c4d-0000-4000-8000-000000000004",
+    idempotencyKey: "key-1",
+    pathId: "path_1a2b3c4d-0000-4000-8000-000000000007",
+  },
+});
+
 describe("InstanceEvent", () => {
   it("accepts both declared kinds", () => {
     expect(instanceEvent.safeParse(fired()).success).toBe(true);
@@ -177,6 +188,13 @@ describe("InstanceEvent", () => {
 
   it("rejects an undeclared kind", () => {
     expect(instanceEvent.safeParse({ ...fired(), kind: "migration.applied" }).success).toBe(false);
+  });
+
+  it("accepts instance.transitioned-by-action and rejects a payload missing idempotencyKey", () => {
+    const e = transitionedByAction();
+    expect(instanceEvent.safeParse(e).success).toBe(true);
+    const { idempotencyKey: _idempotencyKey, ...missingKey } = e.payload;
+    expect(instanceEvent.safeParse({ ...e, payload: missingKey }).success).toBe(false);
   });
 });
 

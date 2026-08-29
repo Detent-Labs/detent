@@ -9,8 +9,8 @@ required), so these have nowhere to go in it. Together the two records are the a
 backbone: they interleave by instant and correlate by `transitionSeq`, which an event
 records but never advances.
 
-Twelve kinds are defined, added additively while the record shape stays settled.
-This table is the canonical enumeration; four of the twelve (`assignment.claimed`,
+Thirteen kinds are defined, added additively while the record shape stays settled.
+This table is the canonical enumeration; four of the thirteen (`assignment.claimed`,
 `assignment.released`, `assignment.delegated`, `instance.faulted`) are owned in
 detail by other capabilities' specs (`assignment-claim-release-consolidation`,
 `assignment-claim-enforcement`, `automatic-transitions`) and are listed here
@@ -30,6 +30,7 @@ only for completeness:
 | `assignment.delegated` | the current claimant delegated their claim to a named target actor | no |
 | `instance.faulted` | an automatic cascade re-entered a step it already entered, parking the instance | no |
 | `datasource.attribute-dropped` | a `columnMapping` attribute did not match its target field's declared type, so the engine did not write it | no |
+| `instance.transitioned-by-action` | an `instance.transition` action moved this instance, with the acting instance, the action, the idempotency key and the path | no |
 
 A kind that enqueues actions carries their `ActionOutcome`s; a kind that enqueues
 none MUST NOT invite a reader to expect them.

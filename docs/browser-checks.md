@@ -1825,3 +1825,29 @@ see an accessible name a screen reader gets. None can confirm a picker's
 options match a real published catalog. This walk caught the labelFieldId
 picker's stale mark polluting its own accessible name. The fix moves the
 mark outside the `<label>`, in `InstanceQueryForm.tsx`.
+
+### The instance.transition action's config form (`instance-transition-action`)
+
+Source: `instance-transition-action` tasks 4.1 and 7.5.
+
+Open a draft. Select a step. Open its on-entry action list. Add one action.
+In the type picker, choose `instance.transition`.
+
+Pass: the generated form renders three text inputs. They are `processId`,
+`instanceIdField` and `pathId`. The raw JSON textarea does not stand in for
+the form.
+
+Fill all three. Name a published target process. Name a field of this process
+that holds an instance id. Name a manual path on the target's own step.
+
+Save the draft. Publish it. Pass: the publish succeeds.
+
+Now change `pathId` to an id no live version of the target carries. Publish
+again. Pass: the header bar lists one finding line below the published-version
+line. That line names the action's location in the body, since an action
+carries no data source id to name instead.
+
+`test/config-descriptor.test.ts` asserts the descriptor this form reads.
+`packages/web/test/studio-processHeaderBar-findingFallback.test.tsx` asserts
+the finding line's own text. Neither one sees which surface
+`PluginEnvelopeEditor` picks for this type. That half stays a browser check.

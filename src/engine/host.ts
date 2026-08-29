@@ -26,6 +26,7 @@ import {
 import { HTTP_ACTION_TYPE, httpHandlerDef } from "../handlers/http.js";
 import { NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef } from "../handlers/notification-email.js";
 import { PROCESS_START_ACTION_TYPE, processStartHandlerDef } from "../handlers/process-start.js";
+import { INSTANCE_TRANSITION_ACTION_TYPE, instanceTransitionHandlerDef } from "../handlers/instance-transition.js";
 import { z } from "zod";
 import { fieldOption, type FieldOption } from "../schema/definition.js";
 import { MAX_KEY_LENGTH } from "../schema/compile.js";
@@ -53,6 +54,7 @@ export function createDefaultRegistry(): Registry {
   reg.set(HTTP_ACTION_TYPE, httpHandlerDef);
   reg.set(NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef);
   reg.set(PROCESS_START_ACTION_TYPE, processStartHandlerDef);
+  reg.set(INSTANCE_TRANSITION_ACTION_TYPE, instanceTransitionHandlerDef);
   return reg;
 }
 
