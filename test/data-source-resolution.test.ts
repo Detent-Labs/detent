@@ -9,6 +9,7 @@ import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry } from "../src/engine/registry.js";
 import { createDataSourceRegistry, type DataSourceHandlerDef } from "../src/engine/registry.js";
+import { createDefaultDataSourceRegistry } from "../src/engine/host.js";
 import { createProcessInstance, getInstanceView, submitAndTransition, SubmissionValidationError } from "../src/runtime/api.js";
 import type { ProcessBody, ProcessId, PathId, Instance } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
@@ -47,6 +48,35 @@ const dsBody = (): ProcessBody =>
           label: { en: "A" },
           type: "task",
           view: { fields: [{ ref: "field_country" }, { ref: "field_tags" }] },
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+// step_a: field_marker (plain string, not dataSource-bound) and
+// field_country (select, dataSource-bound to ds_countries), both editable on
+// the same step --(path_ab, manual, guardless)--> step_b.
+const dsMarkerBody = (): ProcessBody =>
+  ({
+    key: "ds_marker_body",
+    label: { en: "DS Marker Body" },
+    baseLocale: "en",
+    fields: [
+      { id: "field_marker", key: "marker", label: { en: "Marker" }, type: "string" },
+      { id: "field_country", key: "country", label: { en: "Country" }, type: "select", dataSource: "ds_countries" },
+    ],
+    dataSources: [{ id: "ds_countries", key: "countries", type: "static", config: { options: COUNTRY_OPTIONS } }],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          view: { fields: [{ ref: "field_marker" }, { ref: "field_country" }] },
           paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
@@ -224,6 +254,101 @@ test.skipIf(!DB)("a retired value the instance holds stays visible and stays sub
   // the resolved options — optionValuesValid needs no change of its own.
   const updated = await submitAndTransition(created.instanceId, "path_ab" as PathId, { field_country: "cc_old" } as unknown as Instance["data"], actor, dsReg);
   expect(updated.currentStepId as string).toBe("step_b");
+});
+
+test.skipIf(!DB)("a handler sees the pre-submit value of a field filled in the same submission", async () => {
+  const dsReg = createDataSourceRegistry();
+  const seenMarkers: (string | undefined)[] = [];
+  dsReg.set("static", {
+    resolve: async (ctx) => {
+      seenMarkers.push((ctx.instance.data as Record<string, unknown>).field_marker as string | undefined);
+      return COUNTRY_OPTIONS;
+    },
+  });
+  await publishBody(PID, dsMarkerBody(), reg, dsReg);
+  const created = await createProcessInstance(PID, actor, dsReg);
+  seenMarkers.length = 0;
+  await submitAndTransition(
+    created.instanceId,
+    "path_ab" as PathId,
+    { field_marker: "filled-in-this-submission", field_country: "us" } as unknown as Instance["data"],
+    actor,
+    dsReg,
+  );
+  // resolveFields runs against the instance's committed data, before the
+  // submitted payload merges over it — see design.md "instance.data is the
+  // instance's committed data". field_marker was unset at step entry, so the
+  // handler must see it unset even though this same submission fills it.
+  expect(seenMarkers).toEqual([undefined]);
+});
+
+test.skipIf(!DB)("an instance.query-bound field resolves through resolveFields/getInstanceView end-to-end", async () => {
+  // The real default registry, not a stub resolve() — proves resolveFields'
+  // dsInstance construction (api.ts:561-566) for the instance.query handler
+  // specifically, which every other test in this file exercises only via
+  // "static". See instance-query-data-source's design.md.
+  const dsReg = createDefaultDataSourceRegistry();
+  const TARGET = "proc_ds_resolution_iq_target" as ProcessId;
+  const READER = "proc_ds_resolution_iq_reader" as ProcessId;
+
+  const iqTargetBody = (): ProcessBody =>
+    ({
+      key: "iq_target",
+      label: { en: "Target" },
+      baseLocale: "en",
+      fields: [{ id: "field_t_label", key: "label", label: { en: "Label" }, type: "string" }],
+      workflow: {
+        initialStep: "step_shelf",
+        steps: [
+          {
+            id: "step_shelf",
+            key: "shelf",
+            label: { en: "Shelf" },
+            type: "task",
+            view: { fields: [{ ref: "field_t_label" }] },
+            paths: [{ id: "path_issue", key: "issue", label: "Issue", to: "step_issued", trigger: "manual" }],
+          },
+          { id: "step_issued", key: "issued", label: { en: "Issued" }, type: "task", terminal: true },
+        ],
+      },
+    }) as unknown as ProcessBody;
+
+  const iqReaderBody = (): ProcessBody =>
+    ({
+      key: "iq_reader",
+      label: { en: "Reader" },
+      baseLocale: "en",
+      fields: [{ id: "field_device", key: "device", label: { en: "Device" }, type: "select", dataSource: "ds_devices" }],
+      dataSources: [
+        { id: "ds_devices", key: "devices", type: "instance.query", config: { processId: TARGET, stepIds: ["step_shelf"], labelFieldId: "field_t_label" } },
+      ],
+      workflow: {
+        initialStep: "step_r",
+        steps: [
+          {
+            id: "step_r",
+            key: "r",
+            label: { en: "R" },
+            type: "task",
+            view: { fields: [{ ref: "field_device" }] },
+            paths: [{ id: "path_r_done", key: "done", label: "Done", to: "step_done", trigger: "manual" }],
+          },
+          { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
+        ],
+      },
+    }) as unknown as ProcessBody;
+
+  await publishBody(TARGET, iqTargetBody(), reg, dsReg);
+  const device = await createProcessInstance(TARGET, actor, dsReg, { data: { field_t_label: "Widget" } as unknown as Instance["data"] });
+  await publishBody(READER, iqReaderBody(), reg, dsReg);
+  const created = await createProcessInstance(READER, actor, dsReg);
+
+  const view = await getInstanceView(created.instanceId, actor, dsReg);
+  const deviceField = view.fields.find((f) => f.field.key === "device")!;
+  expect(deviceField.options).toEqual([{ value: device.instanceId, label: { en: "Widget" } }]);
+
+  const updated = await submitAndTransition(created.instanceId, "path_r_done" as PathId, { field_device: device.instanceId } as unknown as Instance["data"], actor, dsReg);
+  expect(updated.currentStepId as string).toBe("step_done");
 });
 
 test.skipIf(!DB)("a runtime registry mismatch for a published data source type throws a plain canary Error", async () => {

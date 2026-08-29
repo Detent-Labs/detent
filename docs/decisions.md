@@ -291,7 +291,7 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   querying the database directly.
 - **Aggregated data source: a field's options read from other instances.** A
   design pass on 2026-08-25 settled a shape, and a second pass the same day
-  replaced it. Not started.
+  replaced it. Shipped 2026-08-29 as `instance-query-data-source`.
 
   **The goal.** A field's option list comes from the instances of another
   process. The worked case: a Laptop Inventory process holds one instance per
@@ -354,9 +354,13 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     resolves such a field readonly on every step regardless of the view, so the
     copy has exactly one writer, and a difference against the live value has
     exactly one cause.
-  - `DataSourceContext` gains the reading instance (`{ id, data }`, the shape
-    `AssignmentContext` already carries). The comparisons need it for their
-    right side, and the self-exclusion rule below needs the id.
+  - `DataSourceContext` gains the reading instance, `{ id, processId, data,
+    baseLocale }` — not the sibling `AssignmentContext.instance`'s own shape:
+    that one is `{ id, startedBy, data }`. Each carries what its own
+    dimension needs and nothing the other one does. The comparisons need
+    `data` for their right side, the self-exclusion rule below needs `id`
+    and `processId`, and wrapping a resolved label as `LocalizedText` needs
+    `baseLocale`.
   - A query whose target is the reading instance's own process excludes that
     instance. A rule, not a config option: an instance's own contribution to an
     aggregate over its own process is never what a picker wants. `queryInstances`

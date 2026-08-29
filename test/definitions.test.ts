@@ -98,6 +98,19 @@ test.skipIf(!DB)("publishBody persists a version; an identical re-publish is a n
   expect(rows[0].n).toBe(1);
 });
 
+test.skipIf(!DB)("a publish raising no finding returns the version with an empty findings list", async () => {
+  const v1 = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
+  expect(v1.findings).toEqual([]);
+});
+
+test.skipIf(!DB)("an identical re-publish returns the existing version and an empty findings list", async () => {
+  const body = waitBody("sayYes");
+  await publishBody(PID, body, reg, dataSourceReg);
+  const v2 = await publishBody(PID, body, reg, dataSourceReg); // hash-hit no-op
+  expect(v2.version).toBe(1);
+  expect(v2.findings).toEqual([]);
+});
+
 // --- publish: a changed body gets the next version ----------------------------
 
 test.skipIf(!DB)("publishing a changed body assigns version = latest + 1", async () => {

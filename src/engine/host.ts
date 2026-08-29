@@ -29,6 +29,7 @@ import { PROCESS_START_ACTION_TYPE, processStartHandlerDef } from "../handlers/p
 import { z } from "zod";
 import { fieldOption, type FieldOption } from "../schema/definition.js";
 import { MAX_KEY_LENGTH } from "../schema/compile.js";
+import { INSTANCE_QUERY_DATA_SOURCE_TYPE, createInstanceQueryDataSourceHandlerDef } from "./instance-query-source.js";
 
 /**
  * A registry pre-populated with the built-in, vendor-neutral `http.request`
@@ -68,6 +69,18 @@ export const DB_LIST_DATA_SOURCE_TYPE = "db.list";
 export const MAX_DATA_LIST_VALUES = 500;
 
 export const dbListDataSourceConfigSchema = z.object({ listKey: z.string().min(1).max(MAX_KEY_LENGTH) });
+
+/**
+ * The most instances an `"instance.query"` data source may offer. Equal to
+ * `MAX_LIST_LIMIT` (`src/runtime/api.ts`), the instance data read's own hard
+ * cap — a bound above it would make `queryInstances` silently truncate
+ * earlier than this constant claims, turning "the match count exceeds
+ * MAX_INSTANCE_QUERY_OPTIONS" and "the read's own bound truncated the
+ * result" into two different thresholds instead of one. See design.md's Open
+ * Questions on this constant, and `MAX_DATA_LIST_VALUES` above for the
+ * precedent it follows.
+ */
+export const MAX_INSTANCE_QUERY_OPTIONS = 200;
 
 /**
  * The most columns one data list may declare beyond `value` and `label`. The
@@ -208,6 +221,7 @@ export function createDefaultDataSourceRegistry(): DataSourceRegistry {
         });
     },
   });
+  reg.set(INSTANCE_QUERY_DATA_SOURCE_TYPE, createInstanceQueryDataSourceHandlerDef(MAX_INSTANCE_QUERY_OPTIONS));
   return reg;
 }
 

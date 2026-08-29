@@ -976,11 +976,20 @@ Stage-by-stage status is in `ROADMAP.md`.
   mismatch). The HTTP wrapper and the editor Player thread this through
   unchanged in shape: the Player's forced free-text fallback for
   `dataSource`-bound fields is gone, rendering a populated `select` from the
-  resolved options like a static-`options` field. Only `"static"` ships in
-  v1; the registry mechanism holds more without a built-in for each.
+  resolved options like a static-`options` field. Only `"static"` shipped in
+  v1; the registry mechanism held more without a built-in for each. Three
+  types ship as of `instance-query-data-source`: `"static"` (this entry),
+  `"db.list"` (below), and `"instance.query"`. The third type's option list is
+  another process's own running instances. See `docs/decisions.md`'s
+  "Aggregated data source" entry and `examples/employee-onboarding.json`.
   CEL-readable data-source results remain untouched and out of scope — a CEL
   reference to a data source is still a publish error (see "Decided, not yet
-  built" in `docs/decisions.md`).
+  built" in `docs/decisions.md`). Its own `stepIds` config narrows to a
+  current step; an absent or empty list applies none. A `where` comparison's
+  `valueFromField` reads the reading instance's own committed data. A query
+  naming the reading instance's own process excludes that instance. The
+  constant `MAX_INSTANCE_QUERY_OPTIONS` bounds the result at 200; a read past
+  the bound raises rather than truncating.
 - Read/query API (`src/runtime/api.ts`, `src/engine/definitions.ts`, `src/http/`,
   `test/runtime-api.test.ts`, `test/definitions.test.ts`, `test/http.test.ts`):
   closes the gap where the HTTP wrapper could only address a single instance by

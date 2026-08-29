@@ -58,6 +58,19 @@ records the measurement. Three red runs of twenty happen with a dev server
 up. Zero of twenty happen with none. Stop the dev server before you run the
 suite. Do not start one while a suite run is in flight.
 
+**Restart `bun run serve` after a backend edit.** Bun runs `src/` directly,
+with no separate compile step. But a long-lived `bun run serve` process does
+not reread its own source on a save. A browser check against a stale process
+exercises the code from before the edit, silently.
+
+`pkill -f "src/http/server.ts"` then a fresh `bash scripts/dev-up.sh`
+restarts it with the right `AUTH_JWT_SECRET`. A bare `bun run serve` omits
+that variable and breaks `POST /auth/login` outright.
+
+Measured in `instance-query-data-source`. A stale server answered a publish
+with no `findings` key. A fresh one, right after, answered the identical
+request with the finding a fresh publish-time check now computes.
+
 ## Checklist
 
 ### Worktree dev-server hot reload
@@ -1751,3 +1764,64 @@ caught the "Add columnAdd" duplicate name, since fixed in
 `ColumnEditor.tsx`'s `FieldPicker`. Nor can either see a save that silently
 fails to persist a locally-added viewer. This walk confirms that round trip
 with a real reload, rather than trusting in-memory state.
+
+### The instance.query data source's purpose-built form
+
+Source: `instance-query-data-source` tasks 6.1-6.5.
+
+Open a draft's Data sources panel (Process links -> "Data sources" ->
+"+ Add data source"). Select `instance.query` in the type picker. Pass: the
+purpose-built form replaces both the generated form and the raw JSON
+textarea, for this type alone. Switch the type to `db.list` and back. Pass:
+`db.list`'s own dedicated list-key picker still renders untouched.
+
+Pick a target process. Pass: the step checkboxes and the label-field,
+comparison-field and attribute-field pickers populate with that process's
+real step and field labels. They draw from every published version's
+catalog, never free text. Check a step, pick a label field, add one
+comparison row and one attribute row, filling every control.
+
+Click "Edit as JSON". Pass: the textarea holds the plain `{ type, config }`
+object the raw JSON path would have produced. It carries the same
+`processId`, `stepIds`, `labelFieldId`, `where` and `attributes` keys the
+form's controls wrote, byte for byte.
+
+Hand-edit `labelFieldId` to an id no version declares, then click "Edit as
+form". Pass: the form re-renders with every prior control intact. The
+label-field row shows a stale-reference warning as a sibling of the picker,
+not inside its `<label>`. The picker's own accessible name stays "label
+field", not lengthened by the warning text.
+
+Save the draft, then Publish. Use an actor holding `system:admin`, or a
+process-scoped `read` grant on the target; a developer with neither sees a
+real, correctly-mapped 403.
+
+Pass: the publish succeeds even though `labelFieldId` names a process with
+no live instance. Right below the "Published vN (hash)" line, the header bar
+lists one line per unresolved reference. Each reads "Stale reference in
+<data source id>: <field id> (not carried by any live version)". Change the
+config back to a resolvable reference and publish again. Pass: no finding
+line renders.
+
+Measured on 2026-08-29 against the production build served from `WEB_ROOT`
+(`bun run --filter './packages/web' build`, then the engine's own port), not
+`bun run dev`. The dev server's esbuild pre-bundle of
+`workflow-engine/validate` reaches `src/log.ts`'s module-level
+`process.env.LOG_LEVEL` read. That throws `ReferenceError: process is not
+defined` in a browser. It crashes the whole Studio area behind its
+`ErrorBoundary`, on the first draft-validation call.
+
+Confirmed pre-existing and unrelated to this change. `registry.ts`'s diff for
+this change adds types only. `git show main:src/engine/registry.ts` already
+carries the same `process.env` reference `src/log.ts` does. Not fixed here.
+It sits out of scope for a data source change, and it affects every draft,
+not only one carrying `instance.query`.
+
+`test/instance-query-source.test.ts`, `test/instance-query-cross-process.test.ts`
+and `test/http-studio.test.ts` already assert the handler, the publish-time
+checks and the route's response shape against the API. None can see the
+generated-form/raw-JSON precedence `PluginEnvelopeEditor` renders. None can
+see an accessible name a screen reader gets. None can confirm a picker's
+options match a real published catalog. This walk caught the labelFieldId
+picker's stale mark polluting its own accessible name. The fix moves the
+mark outside the `<label>`, in `InstanceQueryForm.tsx`.

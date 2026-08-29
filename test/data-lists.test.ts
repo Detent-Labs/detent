@@ -6,10 +6,16 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { createDefaultDataSourceRegistry, MAX_DATA_LIST_VALUES, DB_LIST_DATA_SOURCE_TYPE } from "../src/engine/host.js";
+import type { InstanceId, ProcessId, LocaleCode } from "../src/schema/definition.js";
 
 const DB = !!process.env.DATABASE_URL;
 
 const handler = () => createDefaultDataSourceRegistry().get(DB_LIST_DATA_SOURCE_TYPE)!;
+
+// `instance` is required on DataSourceContext but "db.list" ignores it — see
+// `data-source-resolution`'s "A data source that reads the database..." and
+// design.md "DataSourceContext.instance is required, not optional".
+const instance = { id: "inst_stub" as InstanceId, processId: "proc_stub" as ProcessId, data: {}, baseLocale: "en" as LocaleCode };
 
 async function seedList(listKey: string, values: { value: string; label: string; active?: boolean; sortOrder?: number }[]): Promise<void> {
   await sql`INSERT INTO data_lists (list_key, label, updated_by) VALUES (${listKey}, ${listKey}, ${"tester"})`;
@@ -53,7 +59,7 @@ test.skipIf(!DB)("one value per key per list", async () => {
 
 test.skipIf(!DB)("an existing list with no values resolves to an empty option list", async () => {
   await seedList("empty", []);
-  expect(await handler().resolve({ config: { listKey: "empty" } , db: sql })).toEqual([]);
+  expect(await handler().resolve({ config: { listKey: "empty" }, instance, db: sql })).toEqual([]);
 });
 
 test.skipIf(!DB)("an active value resolves to an option, an inactive value nobody holds stays out", async () => {
@@ -61,7 +67,7 @@ test.skipIf(!DB)("an active value resolves to an option, an inactive value nobod
     { value: "cc1", label: "One" },
     { value: "cc2", label: "Two", active: false },
   ]);
-  expect(await handler().resolve({ config: { listKey: "cost_centres" } , db: sql })).toEqual([{ value: "cc1", label: { en: "One" } }]);
+  expect(await handler().resolve({ config: { listKey: "cost_centres" }, instance, db: sql })).toEqual([{ value: "cc1", label: { en: "One" } }]);
 });
 
 test.skipIf(!DB)("an inactive value heldValues names comes back with its label", async () => {
@@ -69,7 +75,7 @@ test.skipIf(!DB)("an inactive value heldValues names comes back with its label",
     { value: "cc1", label: "One" },
     { value: "cc2", label: "Two", active: false },
   ]);
-  const options = await handler().resolve({ config: { listKey: "cost_centres" }, heldValues: ["cc2"] , db: sql });
+  const options = await handler().resolve({ config: { listKey: "cost_centres" }, heldValues: ["cc2"], instance, db: sql });
   expect(options).toEqual([
     { value: "cc1", label: { en: "One" } },
     { value: "cc2", label: { en: "Two" } },
@@ -82,7 +88,7 @@ test.skipIf(!DB)("options come back ordered by sort_order, then value", async ()
     { value: "a", label: "A", sortOrder: 2 },
     { value: "c", label: "C", sortOrder: 1 },
   ]);
-  const options = await handler().resolve({ config: { listKey: "ordered" } , db: sql });
+  const options = await handler().resolve({ config: { listKey: "ordered" }, instance, db: sql });
   expect(options.map((o) => o.value)).toEqual(["b", "c", "a"]);
 });
 
@@ -93,7 +99,7 @@ test.skipIf(!DB)("a list over the bound raises rather than truncating, naming th
     SELECT ${"big"}, v, ${{ en: "x" }}, ${"tester"} FROM unnest(${sql.array(values, "TEXT")}) AS v`;
   let raised: unknown;
   try {
-    await handler().resolve({ config: { listKey: "big" } , db: sql });
+    await handler().resolve({ config: { listKey: "big" }, instance, db: sql });
   } catch (e) {
     raised = e;
   }
@@ -111,8 +117,8 @@ test.skipIf(!DB)("a list sitting exactly on the bound still resolves for a holde
   await sql`INSERT INTO data_list_values (list_key, value, label, active, updated_by)
     VALUES (${"full"}, ${"retired_held"}, ${{ en: "Old" }}, false, ${"tester"})`;
 
-  expect(await handler().resolve({ config: { listKey: "full" } , db: sql })).toHaveLength(MAX_DATA_LIST_VALUES);
-  const forHolder = await handler().resolve({ config: { listKey: "full" }, heldValues: ["retired_held"] , db: sql });
+  expect(await handler().resolve({ config: { listKey: "full" }, instance, db: sql })).toHaveLength(MAX_DATA_LIST_VALUES);
+  const forHolder = await handler().resolve({ config: { listKey: "full" }, heldValues: ["retired_held"], instance, db: sql });
   expect(forHolder).toHaveLength(MAX_DATA_LIST_VALUES + 1);
   expect(forHolder).toContainEqual({ value: "retired_held", label: { en: "Old" } });
 });
@@ -127,7 +133,7 @@ test.skipIf(!DB)("a list one active value over the bound still raises, even for 
 
   let raised: unknown;
   try {
-    await handler().resolve({ config: { listKey: "over" }, heldValues: ["retired_held"] , db: sql });
+    await handler().resolve({ config: { listKey: "over" }, heldValues: ["retired_held"], instance, db: sql });
   } catch (e) {
     raised = e;
   }
@@ -138,7 +144,7 @@ test.skipIf(!DB)("a list one active value over the bound still raises, even for 
 test.skipIf(!DB)("an unknown listKey raises a plain canary Error naming the key", async () => {
   let raised: unknown;
   try {
-    await handler().resolve({ config: { listKey: "no_such_list" } , db: sql });
+    await handler().resolve({ config: { listKey: "no_such_list" }, instance, db: sql });
   } catch (e) {
     raised = e;
   }
@@ -149,5 +155,5 @@ test.skipIf(!DB)("an unknown listKey raises a plain canary Error naming the key"
 test.skipIf(!DB)("the static handler ignores heldValues", async () => {
   const options = [{ value: "us", label: { en: "United States" } }];
   const staticDef = createDefaultDataSourceRegistry().get("static")!;
-  expect(await staticDef.resolve({ config: { options }, heldValues: ["ca"] , db: sql })).toEqual(options);
+  expect(await staticDef.resolve({ config: { options }, heldValues: ["ca"], instance, db: sql })).toEqual(options);
 });

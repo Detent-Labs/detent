@@ -14,10 +14,14 @@ import {
   parseJsonb,
   type DataListColumn,
 } from "../src/engine/host.js";
+import type { InstanceId, ProcessId, LocaleCode } from "../src/schema/definition.js";
 
 const DB = !!process.env.DATABASE_URL;
 
 const handler = () => createDefaultDataSourceRegistry().get(DB_LIST_DATA_SOURCE_TYPE)!;
+
+// `instance` is required on DataSourceContext but "db.list" ignores it.
+const instance = { id: "inst_stub" as InstanceId, processId: "proc_stub" as ProcessId, data: {}, baseLocale: "en" as LocaleCode };
 
 async function seedList(
   listKey: string,
@@ -34,7 +38,7 @@ async function seedList(
 }
 
 const resolve = (listKey: string, heldValues?: string[]) =>
-  handler().resolve({ config: { listKey }, db: sql, heldValues });
+  handler().resolve({ config: { listKey }, db: sql, heldValues, instance });
 
 beforeAll(async () => {
   if (DB) await initSchema();

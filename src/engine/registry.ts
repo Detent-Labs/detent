@@ -6,7 +6,7 @@
 
 import type { SQL } from "bun";
 import { z } from "zod";
-import type { Action, AssignmentUnresolvedReason, FieldOption, Instance, Step } from "../schema/definition.js";
+import type { Action, AssignmentUnresolvedReason, FieldOption, Instance, InstanceId, LocaleCode, ProcessId, Step } from "../schema/definition.js";
 
 /**
  * The actor ids in force at the commit that enqueued an outbox row, frozen onto
@@ -304,6 +304,22 @@ export interface DataSourceContext {
    * such notion (`"static"`) ignores it.
    */
   heldValues?: string[];
+  /**
+   * The reading instance — the one whose form or submission the engine is
+   * resolving. Required, not optional: a handler needing the reader has no
+   * sane fallback without it, and every resolution runs for exactly one
+   * instance. A handler comparing against the reader's own values needs
+   * `data`, a handler excluding the reader from its own result needs `id` and
+   * `processId`, and a handler synthesizing a `LocalizedText` from a
+   * non-localized value needs `baseLocale`. `"static"` and `"db.list"` ignore
+   * it.
+   */
+  instance: {
+    id: InstanceId;
+    processId: ProcessId;
+    data: Instance["data"];
+    baseLocale: LocaleCode;
+  };
 }
 
 /** `resolve` is async even for a pure config-echo handler, so a future I/O-backed type is a drop-in, not an interface change. */

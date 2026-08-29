@@ -165,6 +165,84 @@ resolving a short list. A truncated list would reject a value a participant
 legitimately holds. A retired value a running instance holds sits on top of
 that count. A full list therefore keeps working for its holders.
 
+`instance.query` holds its options in another process's own running
+instances:
+
+```json
+{ "id": "ds_devices", "key": "devices", "type": "instance.query",
+  "config": {
+    "processId": "proc_laptop_inventory",
+    "stepIds": ["step_shelf"],
+    "labelFieldId": "field_asset_tag"
+  } }
+```
+
+`processId` names the target process. `stepIds` narrows to the instance's
+current step. An absent or empty list means every step. The step carries this
+filter, never `statuses`. Every circulating instance is `running` regardless
+of which step it stands on. Only the step can say "on the shelf"; `statuses`
+cannot.
+
+The config's `statuses` key defaults to `["running"]` alone. The schema
+rejects an explicit empty list rather than reading it as "every status".
+Widening it admits a completed or cancelled instance. A picker almost never
+wants those.
+`labelFieldId` names the field the picker shows. A source instance holding no
+value there falls back to showing the instance's own id. So does a source
+instance holding a non-scalar value there, such as a `multiselect` or a
+`group`.
+
+The studio form draws `stepIds`, `labelFieldId`, a comparison's target field,
+and an attribute's target field from the target process's own published
+catalog. An author picks these, never types them. The raw JSON view stays
+reachable for anything the form does not cover.
+
+An option's `value` is always the source instance's id, never a business key.
+Renaming the source instance's own label field afterward leaves every
+reference to it intact.
+
+A source targeting the author's own process excludes the reading instance
+itself. An instance never offers itself as one of its own options.
+
+`where` narrows further, by the target instances' own field values:
+
+```json
+{ "config": {
+    "processId": "proc_laptop_inventory",
+    "labelFieldId": "field_asset_tag",
+    "where": [{ "fieldId": "field_location", "operator": "eq",
+                "valueFromField": "field_wanted_location" }]
+} }
+```
+
+Each entry names a target field and an operator: `eq`, `ne`, or `in`. Each
+entry also carries exactly one right side. `value` is a literal.
+`valueFromField` names a field of the author's own process instead. A
+`valueFromField` entry reads the value that field held when the reading
+instance entered its current step. It never reads a value the same step
+fills later. Put the field on an earlier step if the picker needs to react to
+it.
+
+`eq` and `ne` take a scalar `value`. `in` takes a non-empty list `value` and
+never pairs with `valueFromField`. It always resolves to a scalar field, and
+a scalar field can never satisfy a membership comparison. The config rejects
+the mismatched pairing outright rather than let it fail at runtime.
+
+`attributes` copies more than the label onto the option, for a
+`columnMapping` to pick up:
+
+```json
+{ "id": "field_device", "key": "device", "type": "select",
+  "dataSource": "ds_devices",
+  "columnMapping": { "serial": "field_serial" } }
+```
+
+An author writes the column key here by hand, the same as a `db.list`
+column. It never comes from the source field's own `key`. A `key` is a
+mutable slug that references nothing. See Columns on a data list, below, for
+the mapping rules themselves. They apply the same way whichever data source
+type fills the columns.
+
 ### Columns on a data list
 
 A `db.list` row can carry more than a value and a label. An operator declares

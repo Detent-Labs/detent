@@ -16,6 +16,7 @@ import { DB, initDb, authHeaders, authedReq } from "./helpers/http-fixture.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
+import { INSTANCE_QUERY_DATA_SOURCE_TYPE, createInstanceQueryDataSourceHandlerDef } from "../src/engine/instance-query-source.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { drainResolutions } from "../src/engine/resolution.js";
 import { ConcurrencyConflict } from "../src/engine/transition.js";
@@ -32,6 +33,7 @@ const cel = (src: string) => ({ lang: "cel", src });
 const reg = createRegistry();
 const dataSourceReg = createDataSourceRegistry();
 dataSourceReg.set("static", { resolve: async (ctx) => (ctx.config as { options: unknown[] }).options as never });
+dataSourceReg.set(INSTANCE_QUERY_DATA_SOURCE_TYPE, createInstanceQueryDataSourceHandlerDef(200));
 const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
 beforeAll(initDb);
@@ -212,6 +214,8 @@ const admin: Actor = { id: "user_admin", roles: [PUBLISH_ROLE, CANCEL_ANY_ROLE, 
 const bystander: Actor = { id: "user_bystander", roles: [] };
 /** system:developer, no system:admin — for the record route's developer-and-starter bypass. */
 const developer: Actor = { id: "user_developer", roles: [DEVELOPER_ROLE] };
+/** PUBLISH_ROLE alone, no ADMIN_ROLE — passes the route's own publish gate but holds no read grant on any process, for instance.query's publish-time read-grant check. */
+const publisherNoRead: Actor = { id: "user_publisher_no_read", roles: [PUBLISH_ROLE] };
 
 // ============================================================
 // Happy path per route
@@ -2021,13 +2025,45 @@ test.skipIf(!DB)("POST /processes publishes a valid body and it is readable from
   const PID = "proc_http_publish_ok";
   const res = await fetch(publishReq(admin, PID, simpleBody()));
   expect(res.status).toBe(200);
-  const body = (await res.json()) as { processId: string; version: number; definitionHash: string; status: string };
+  const body = (await res.json()) as { processId: string; version: number; definitionHash: string; status: string; findings: unknown[] };
   expect(body.version).toBe(1);
   expect(body.processId).toBe(PID);
+  expect(body.findings).toEqual([]);
 
   const store = createDefinitionStore(sql);
   const resolved = await store.resolveBody(PID as ProcessId, 1);
   expect(resolved).toBeDefined();
+});
+
+/** step_r: a dataSources entry of type "instance.query" naming `targetProcessId`, plus a required labelFieldId of the reading body's own catalog (unused by the check, just schema-valid). */
+const instanceQueryReaderBody = (targetProcessId: string): ProcessBody =>
+  ({
+    key: "iq_reader_body",
+    label: { en: "IQ Reader" },
+    baseLocale: "en",
+    fields: [],
+    dataSources: [{ id: "ds_iq", key: "iq", type: "instance.query", config: { processId: targetProcessId, labelFieldId: "field_label" } }],
+    workflow: { initialStep: "step_r", steps: [{ id: "step_r", key: "r", label: { en: "R" }, type: "task", terminal: true }] },
+  }) as unknown as ProcessBody;
+
+/** step_t: field_label, terminal. Published directly (bypassing HTTP) as the instance.query target. */
+const instanceQueryTargetBody = (): ProcessBody =>
+  ({
+    key: "iq_target_body",
+    label: { en: "IQ Target" },
+    baseLocale: "en",
+    fields: [{ id: "field_label", key: "label", label: { en: "Label" }, type: "string" }],
+    workflow: { initialStep: "step_t", steps: [{ id: "step_t", key: "t", label: { en: "T" }, type: "task", terminal: true }] },
+  }) as unknown as ProcessBody;
+
+test.skipIf(!DB)("POST /processes: an actor with no read grant on an instance.query source's target fails with an authorization error", async () => {
+  const TARGET = "proc_http_publish_iq_target";
+  await publishBody(TARGET as ProcessId, instanceQueryTargetBody(), reg, dataSourceReg);
+
+  const res = await fetch(publishReq(publisherNoRead, "proc_http_publish_iq_reader", instanceQueryReaderBody(TARGET)));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error?: { type?: string } };
+  expect(body.error?.type).toBe("authorization");
 });
 
 test.skipIf(!DB)("POST /processes re-publishing an identical body returns the same version and hash", async () => {

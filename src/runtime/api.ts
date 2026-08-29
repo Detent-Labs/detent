@@ -42,6 +42,7 @@ import {
   createDefaultAssignmentRegistry,
   resolveStepAssignment,
   type DataSourceRegistry,
+  type DataSourceContext,
   type AssignmentRegistry,
 } from "../engine/registry.js";
 import type {
@@ -257,10 +258,11 @@ export type InstanceQueryFilter = {
   processId?: ProcessId;
   version?: number;
   status?: InstanceStatus[];
-  currentStepId?: StepId;
+  currentStepId?: StepId | StepId[];
   startedBy?: string;
   claimedBy?: string;
   excludeInstanceId?: InstanceId;
+  instanceIds?: InstanceId[];
   createdAfter?: string;
   createdBefore?: string;
   dataWhere?: DataComparison[];
@@ -515,10 +517,16 @@ function heldValuesOf(value: Literal | undefined): string[] {
  * matching the project's existing style (e.g. the `definitionHash` pin
  * mismatch).
  */
-function resolveDataSourceOptions(def: DataSourceDef, heldValues: string[], registry: DataSourceRegistry, db: SQL): Promise<FieldOption[]> {
+function resolveDataSourceOptions(
+  def: DataSourceDef,
+  heldValues: string[],
+  instance: DataSourceContext["instance"],
+  registry: DataSourceRegistry,
+  db: SQL,
+): Promise<FieldOption[]> {
   const handler = registry.get(def.type);
   if (!handler) throw new Error(`data source type '${def.type}' is not registered in the runtime registry`);
-  return handler.resolve({ config: def.config, heldValues: [...heldValues].sort(), db });
+  return handler.resolve({ config: def.config, heldValues: [...heldValues].sort(), instance, db });
 }
 
 /**
@@ -546,6 +554,16 @@ async function resolveFields(body: ProcessBody, step: Step, instance: Instance, 
   const ctx = buildGuardContext(body, instance, actor);
   const fieldsById = new Map(collectFieldsDeep(body.fields).map((f) => [f.id as string, f]));
   const dataSourcesById = new Map((body.dataSources ?? []).map((d) => [d.id as string, d]));
+  // Committed data, not a merged submission payload: a handler comparing
+  // against the reader's own values must read the value a field held at step
+  // entry, not one the caller is submitting right now. See design.md
+  // "instance.data is the instance's committed data".
+  const dsInstance: DataSourceContext["instance"] = {
+    id: instance.instanceId,
+    processId: instance.processId,
+    data: instance.data,
+    baseLocale: body.baseLocale,
+  };
   const out: ResolvedViewField[] = [];
   for (const vf of step.view?.fields ?? []) {
     const field = fieldsById.get(vf.ref as string);
@@ -560,7 +578,7 @@ async function resolveFields(body: ProcessBody, step: Step, instance: Instance, 
     if (field.dataSource) {
       const def = dataSourcesById.get(field.dataSource as string);
       if (!def) throw new Error(`data source not found: ${field.dataSource}`); // publish-time invariant guarantees resolution; defensive only
-      options = await resolveDataSourceOptions(def, heldValuesOf(value), registry, db);
+      options = await resolveDataSourceOptions(def, heldValuesOf(value), dsInstance, registry, db);
     }
     out.push({ field, value, required, readonly, group: vf.group, options, span: vf.span ?? 1 });
   }
@@ -1291,8 +1309,14 @@ export async function cancelInstance(instanceId: InstanceId, actor: Actor, db: S
   return engineCancelInstance(instance, body, actor, db, store.resolveBody);
 }
 
-/** The filters `buildInstanceWhere` compiles — every member both `listInstances` and `queryInstances` share, minus `dataWhere` (compiled separately by `buildDataWhere`) and `includeDegraded` (selects no row). */
-type InstanceWhereFilter = Omit<InstanceListFilter, "includeDegraded" | "dataWhere">;
+/**
+ * The filters `buildInstanceWhere` compiles — every member both `listInstances` and `queryInstances` share, minus `dataWhere` (compiled separately by `buildDataWhere`) and `includeDegraded` (selects no row).
+ * `currentStepId` widens past `InstanceListFilter`'s own single-id member: `listInstances` keeps passing one id, for free, while `queryInstances` can pass a set. `instanceIds` has no `InstanceListFilter` counterpart at all — no list-read caller needs it.
+ */
+type InstanceWhereFilter = Omit<InstanceListFilter, "includeDegraded" | "dataWhere" | "currentStepId"> & {
+  currentStepId?: StepId | StepId[];
+  instanceIds?: InstanceId[];
+};
 
 /**
  * The `WHERE` fragment both `listInstances` and `queryInstances` interpolate.
@@ -1308,11 +1332,18 @@ export function buildInstanceWhere(filter: InstanceWhereFilter, db: SQL) {
   // instances_selection_idx indexes body->>'version' as text — see design.md
   // "The version filter compares as text".
   const versionText = filter.version !== undefined ? String(filter.version) : null;
+  const currentStepIdArr = Array.isArray(filter.currentStepId)
+    ? db.array(filter.currentStepId, "TEXT")
+    : filter.currentStepId
+      ? db.array([filter.currentStepId], "TEXT")
+      : null;
+  const instanceIdsArr = filter.instanceIds && filter.instanceIds.length > 0 ? db.array(filter.instanceIds, "TEXT") : null;
   return db`
     (${filter.processId ?? null}::text IS NULL OR body->>'processId' = ${filter.processId ?? null})
     AND (${versionText}::text IS NULL OR body->>'version' = ${versionText})
     AND (${statusArr}::text[] IS NULL OR body->>'status' = ANY(${statusArr}))
-    AND (${filter.currentStepId ?? null}::text IS NULL OR body->>'currentStepId' = ${filter.currentStepId ?? null})
+    AND (${currentStepIdArr}::text[] IS NULL OR body->>'currentStepId' = ANY(${currentStepIdArr}))
+    AND (${instanceIdsArr}::text[] IS NULL OR instance_id = ANY(${instanceIdsArr}))
     AND (${filter.startedBy ?? null}::text IS NULL OR body->>'startedBy' = ${filter.startedBy ?? null})
     AND (${filter.claimedBy ?? null}::text IS NULL OR body->'assignment'->>'claimedBy' = ${filter.claimedBy ?? null})
     AND (
@@ -1400,6 +1431,22 @@ function assertVersionHasProcessId(filter: { processId?: ProcessId; version?: nu
 function assertDataWhereHasProcessId(filter: { processId?: ProcessId; dataWhere?: DataComparison[] }): void {
   if (filter.dataWhere && filter.dataWhere.length > 0 && !filter.processId) {
     throw new RequestShapeError("a dataWhere filter needs a processId beside it");
+  }
+}
+
+/**
+ * An empty `currentStepId` array or an empty `instanceIds` array is a caller
+ * error, the same rule a `dataWhere` membership comparison's empty right side
+ * already carries: an empty list matches nothing, so accepting one would
+ * silently answer the whole read with an empty result rather than the
+ * "no filter" a caller might have meant.
+ */
+function assertNoEmptyListFilters(filter: InstanceQueryFilter): void {
+  if (Array.isArray(filter.currentStepId) && filter.currentStepId.length === 0) {
+    throw new RequestShapeError("queryInstances currentStepId list must not be empty");
+  }
+  if (filter.instanceIds && filter.instanceIds.length === 0) {
+    throw new RequestShapeError("queryInstances instanceIds list must not be empty");
   }
 }
 
@@ -1517,6 +1564,7 @@ export async function queryInstances(
 ): Promise<InstanceDataPage> {
   assertNoDenylistedQueryKeys(filter);
   assertVersionHasProcessId(filter);
+  assertNoEmptyListFilters(filter);
   validateDataComparisons(filter.dataWhere);
   assertDataWhereHasProcessId(filter);
   await assertNoNonScalarComparedField(filter, filter.dataWhere, db);

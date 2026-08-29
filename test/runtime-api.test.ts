@@ -2747,6 +2747,62 @@ test.skipIf(!DB)("listInstances and queryInstances select the same instances for
   expect(new Set(queryPage.items.map((i) => i.instanceId))).toEqual(new Set([match.instanceId]));
 });
 
+test.skipIf(!DB)("queryInstances rejects an empty currentStepId array", async () => {
+  let raised: unknown;
+  try {
+    await queryInstances({ currentStepId: [] });
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(RequestShapeError);
+});
+
+test.skipIf(!DB)("queryInstances' currentStepId list selects instances on any of the named steps, disjunctively, joined conjunctively with status", async () => {
+  const PID = pid("proc_query_step_list");
+  const published = await publishBody(PID, twoStepOverrideBody(), reg, dataSourceReg);
+  const onA = await createProcessInstance(PID, actor, dataSourceReg);
+  const onB = await createProcessInstance(PID, actor, dataSourceReg);
+  await submitAndTransition(onB.instanceId, "path_ab" as PathId, { field_amount: 100 } as unknown as Instance["data"], actor, dataSourceReg);
+  const cancelledOnA = await createProcessInstance(PID, actor, dataSourceReg);
+  await cancelInstance(cancelledOnA, published.definition, actor);
+  const onStepC = await createProcessInstance(PID, actor, dataSourceReg);
+  await submitAndTransition(onStepC.instanceId, "path_ab" as PathId, { field_amount: 100 } as unknown as Instance["data"], actor, dataSourceReg);
+  await submitAndTransition(onStepC.instanceId, "path_bc" as PathId, {} as unknown as Instance["data"], actor, dataSourceReg);
+
+  const page = await queryInstances({ processId: PID, currentStepId: ["step_a" as StepId, "step_b" as StepId], status: ["running"] });
+  expect(new Set(page.items.map((i) => i.instanceId))).toEqual(new Set([onA.instanceId, onB.instanceId]));
+});
+
+test.skipIf(!DB)("queryInstances' instanceIds selects the named instances, ignoring an unknown id, and rejects an empty list", async () => {
+  const PID = pid("proc_query_instance_ids");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const a = await createProcessInstance(PID, actor, dataSourceReg);
+  const b = await createProcessInstance(PID, actor, dataSourceReg);
+  await createProcessInstance(PID, actor, dataSourceReg); // not named, must not appear
+
+  const page = await queryInstances({ instanceIds: [a.instanceId, b.instanceId, "inst_00000000-0000-0000-0000-000000000000" as InstanceId] });
+  expect(new Set(page.items.map((i) => i.instanceId))).toEqual(new Set([a.instanceId, b.instanceId]));
+
+  let raised: unknown;
+  try {
+    await queryInstances({ instanceIds: [] });
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(RequestShapeError);
+});
+
+test.skipIf(!DB)("queryInstances' instanceIds still joins conjunctively with status, excluding a named-but-cancelled instance", async () => {
+  const PID = pid("proc_query_instance_ids_status");
+  const published = await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const cancelled = await createProcessInstance(PID, actor, dataSourceReg);
+  await cancelInstance(cancelled, published.definition, actor);
+  const running = await createProcessInstance(PID, actor, dataSourceReg);
+
+  const page = await queryInstances({ instanceIds: [cancelled.instanceId, running.instanceId], status: ["running"] });
+  expect(page.items.map((i) => i.instanceId)).toEqual([running.instanceId]);
+});
+
 // ============================================================
 // getInstanceRecord
 // ============================================================

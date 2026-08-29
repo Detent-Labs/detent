@@ -265,7 +265,14 @@ describe("definition-contract: A path carries a non-empty key and a non-empty la
 });
 
 describe("definition-contract: every example carries a non-empty path key and label", () => {
-  const files = ["purchase-requisition.json", "expense-approval.json", "subprocess-loan-parent.json", "subprocess-credit-check-child.json"];
+  const files = [
+    "purchase-requisition.json",
+    "expense-approval.json",
+    "subprocess-loan-parent.json",
+    "subprocess-credit-check-child.json",
+    "laptop-inventory.json",
+    "employee-onboarding.json",
+  ];
 
   for (const file of files) {
     it(`${file}: every path has a non-empty key and label`, () => {

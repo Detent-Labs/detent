@@ -569,10 +569,16 @@ export async function handlePublish(
     // publishBody's to enforce. `can` ignores the value today, and a scoped
     // grant later must not read it as an id the store already holds.
     await requirePermission(actor, "publish", parsed.processId as ProcessId, db);
-    const published = await publishBody(parsed.processId as ProcessId, parsed.body as ProcessBody, registry, dataSourceRegistry, db, assignmentRegistry);
+    const published = await publishBody(parsed.processId as ProcessId, parsed.body as ProcessBody, registry, dataSourceRegistry, db, assignmentRegistry, actor);
     return {
       status: 200,
-      body: { processId: published.processId, version: published.version, definitionHash: published.definitionHash, status: published.status },
+      body: {
+        processId: published.processId,
+        version: published.version,
+        definitionHash: published.definitionHash,
+        status: published.status,
+        findings: published.findings,
+      },
     };
   });
 }
