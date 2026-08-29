@@ -217,8 +217,8 @@
 
 ## 9. Verification
 
-- [ ] 9.1 Run `bun run typecheck` and confirm zero errors.
-- [ ] 9.2 Run `bun run build` and confirm it succeeds.
-- [ ] 9.3 Run the FULL `bun test` suite with `DATABASE_URL` set (never a
+- [x] 9.1 Run `bun run typecheck` and confirm zero errors.
+- [x] 9.2 Run `bun run build` and confirm it succeeds.
+- [x] 9.3 Run the FULL `bun test` suite with `DATABASE_URL` set (never a
       single-file rerun) and confirm every test passes with no silent skips
       (check the skip count, per CLAUDE.md's `silent-green.sh` gate).
