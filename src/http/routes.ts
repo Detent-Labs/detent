@@ -501,6 +501,12 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
         // scope=started sets it; each lists one actor's own instances, and the
         // screens behind them render a resolved summary alone.
         includeDegraded: scope === "all",
+        // Same scoping rule as includeDegraded, one line up: scope=all
+        // already required ADMIN_ROLE (or a process-scoped read grant)
+        // above. draft-test-instances: neither scope=mine nor scope=started
+        // opts in, so a test instance never reaches a participant-facing
+        // list, direct-id access aside (loadInstanceForActor's own check).
+        includeTestInstances: scope === "all",
       };
       const limit = parseLimit(url, MAX_LIST_LIMIT);
       const cursor = url.searchParams.get("cursor") ?? undefined;

@@ -14,7 +14,7 @@ import { createAssignmentRegistry, type AssignmentRegistry } from "../src/engine
 import { drainOutbox } from "../src/engine/outbox.js";
 import { drainResolutions } from "../src/engine/resolution.js";
 import { subprocessChildId } from "../src/engine/idempotency.js";
-import { authoredProcessBody } from "../src/schema/definition.js";
+import { authoredProcessBody, processBody } from "../src/schema/definition.js";
 import { compileProcessBody, CompileValidationError } from "../src/schema/compile.js";
 import { contractHash } from "../src/schema/hash.js";
 import { buildGuardContext, evalFieldMap, SYSTEM_ACTOR } from "../src/cel/eval.js";
@@ -1660,4 +1660,33 @@ test.skipIf(!DB)("an ordinary creation enqueues nothing and records no spawn eve
   expect(inst.currentStepId as string).toBe("step_p_entry"); // not a subprocess step
   expect(await spawnEvents(inst.instanceId)).toHaveLength(0);
   expect(await outboxAt(inst.instanceId, 0)).toHaveLength(0);
+});
+
+// --- draft-test-instances: a test instance never spawns a real child ----------
+
+// Neither test publishes the parent: a draft-test-instance's frozen body never
+// goes through publishBody's cross-process validation (which would otherwise
+// reject a subprocess step pinned to an unpublished child version) — the same
+// "no pre-play validation" property createProcessInstance's own draft path
+// relies on. `processBody.parse` alone (no compileProcessBody) is enough to
+// get a typed ProcessBody, matching that path's own parse.
+test.skipIf(!DB)("a test instance's subprocess step fails gracefully when the child has no resolvable version, creating no child", async () => {
+  const { registry } = engineRegistry();
+  const NOVER_PID = "proc_parent_test_kind_unresolved" as Instance["processId"];
+  const body = processBody.parse(subInitialParentBody(999999));
+  const parent = await createInstance(body, { processId: NOVER_PID, version: -1, kind: "test" });
+  expect(parent.currentStepId as string).toBe("step_p_sub");
+  await drainAll(registry);
+  expect(await countChildren(parent.instanceId)).toBe(0);
+});
+
+test.skipIf(!DB)("a test instance's subprocess step fails gracefully even when the child HAS a resolvable version, creating no child", async () => {
+  const { registry } = engineRegistry();
+  const RESOLV_PID = "proc_parent_test_kind_resolved" as Instance["processId"];
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry, dataSourceReg);
+  const body = processBody.parse(subInitialParentBody(cv.version));
+  const parent = await createInstance(body, { processId: RESOLV_PID, version: -1, kind: "test" });
+  expect(parent.currentStepId as string).toBe("step_p_sub");
+  await drainAll(registry);
+  expect(await countChildren(parent.instanceId)).toBe(0);
 });

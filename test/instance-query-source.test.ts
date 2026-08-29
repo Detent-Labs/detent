@@ -7,7 +7,7 @@
  * round-trip is needed to exercise the handler itself.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
-import { sql, initSchema } from "../src/engine/store.js";
+import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { createDefaultDataSourceRegistry } from "../src/engine/host.js";
@@ -93,6 +93,29 @@ test.skipIf(!DB)("an instance on a configured step becomes an option, one on ano
     db: sql,
   });
   expect(options.map((o) => o.value)).toEqual([onShelf.instanceId]);
+});
+
+// draft-test-instances (5.7): buildInstanceWhere's default kind exclusion
+// (queryInstances's InstanceQueryFilter carries no includeTestInstances
+// opt-in) already covers this — no code change here beyond that default.
+test.skipIf(!DB)("a test-kind instance never resolves as an option, even though its status and step would otherwise match", async () => {
+  const PID = pid("proc_iq_test_kind_excluded");
+  const v = await publishBody(PID, targetBody(), reg, emptyDsReg);
+  const ordinary = await createProcessInstance(PID, actor, emptyDsReg, { data: { field_t_label: "Widget" } as unknown as Instance["data"] });
+  const testInst = await createInstance(v.definition, {
+    processId: PID,
+    version: v.version,
+    kind: "test",
+    data: { field_t_label: "TestWidget" } as unknown as Instance["data"],
+  });
+
+  const options = await handler().resolve({
+    config: { processId: PID, stepIds: ["step_shelf"], labelFieldId: "field_t_label" },
+    instance: stubReader(),
+    db: sql,
+  });
+  expect(options.map((o) => o.value)).toEqual([ordinary.instanceId]);
+  expect(options.map((o) => o.value)).not.toContain(testInst.instanceId);
 });
 
 test.skipIf(!DB)("a configuration with no statuses selects running instances, omitting a completed one, with no stepIds filter needed", async () => {

@@ -59,7 +59,7 @@
 
 ## 3. Test-instance creation
 
-- [ ] 3.1 Add a draft-instance creation path to `createProcessInstance`
+- [x] 3.1 Add a draft-instance creation path to `createProcessInstance`
       (`src/runtime/api.ts`) that reads the current draft body via
       `getDraft` (`src/engine/drafts.ts`), computes the next sentinel,
       inserts the frozen body + `definitionHash` into `draft_snapshots`, and
@@ -68,21 +68,21 @@
       field, and verify a `bun:test` case creates a test instance for a
       process with a draft and no published version and asserts
       `kind === "test"`.
-- [ ] 3.2 Verify a `bun:test` case: the created test instance's
+- [x] 3.2 Verify a `bun:test` case: the created test instance's
       `definitionHash` matches the real JCS hash of the frozen draft body
       (same computation the published path already uses).
-- [ ] 3.3 Verify a `bun:test` case: editing the draft after a test instance
+- [x] 3.3 Verify a `bun:test` case: editing the draft after a test instance
       is created does not change the already-created instance's resolved
       body (the frozen-snapshot guarantee).
-- [ ] 3.4 Verify a `bun:test` case: an unresolvable draft (e.g.
+- [x] 3.4 Verify a `bun:test` case: an unresolvable draft (e.g.
       `workflow.initialStep` naming a step id absent from the draft) fails
       creation with a diagnostic, typed error — not an unhandled crash.
-- [ ] 3.5 Verify a `bun:test` case: a test instance reaching a `subprocess`
+- [x] 3.5 Verify a `bun:test` case: a test instance reaching a `subprocess`
       step whose child has no resolvable published version fails in a
       controlled way, per the "subprocess step always fails gracefully for a
       test instance" requirement's unresolvable-child scenario, rather than
       crashing or spawning a real child.
-- [ ] 3.6 Add a `kind === "test"` gate to the spawn handler in
+- [x] 3.6 Add a `kind === "test"` gate to the spawn handler in
       `src/engine/subprocess.ts`, checked before `resolveLatestByContract` is
       called, so a test instance reaching a `subprocess` step fails in the
       same controlled way even when the referenced child process HAS a
@@ -90,7 +90,7 @@
       instance's subprocess step, with a child process that DOES have a
       published version, fails gracefully with a diagnostic and creates no
       child instance, per the requirement's resolvable-child scenario.
-- [ ] 3.7 Change `src/handlers/process-start.ts` so the instance it starts is
+- [x] 3.7 Change `src/handlers/process-start.ts` so the instance it starts is
       created with `kind: acting.kind` instead of defaulting to
       `kind: "published"`, passed through `processStartHandler`'s
       `createSeededInstance` call via task 1.7's new `opts` field, and
@@ -104,21 +104,21 @@
 
 ## 4. Route and authorization
 
-- [ ] 4.1 Add `POST /drafts/:processId/instances` to
+- [x] 4.1 Add `POST /drafts/:processId/instances` to
       `src/http/studio-routes.ts`, gated by the same `requireAuthoring` check
       as the other `/drafts/*` routes, calling the new draft-instance
       creation path, and verify an integration test: an actor holding
       `AUTHOR_ROLE` or `DEVELOPER_ROLE` succeeds.
-- [ ] 4.2 Verify an integration test: an actor with neither role is refused
+- [x] 4.2 Verify an integration test: an actor with neither role is refused
       with a 403/`AuthorizationError`, before any draft lookup or instance
       creation runs.
-- [ ] 4.3 Verify an integration test: a process with no draft at all returns
+- [x] 4.3 Verify an integration test: a process with no draft at all returns
       the existing `notFound()` shape, matching `handleGetDraft`'s pattern —
       no new error type introduced.
 
 ## 5. Visibility: list and direct access
 
-- [ ] 5.1 Change `buildInstanceWhere` (`src/runtime/api.ts:1329`) to exclude
+- [x] 5.1 Change `buildInstanceWhere` (`src/runtime/api.ts:1329`) to exclude
       `kind: "test"` by default (`kind <> 'test' OR
       filter.includeTestInstances`), add `includeTestInstances` only to
       `InstanceListFilter`, and have `listInstances` set it true only for
@@ -128,9 +128,9 @@
       `queryInstances` caller stays excluded unconditionally. Verify a
       `bun:test` case: `scope: "mine"` excludes a test instance the calling
       actor is claimant/candidate/`startedBy` on.
-- [ ] 5.2 Verify a `bun:test` case: administrative scope (`scope: "all"`)
+- [x] 5.2 Verify a `bun:test` case: administrative scope (`scope: "all"`)
       includes a test instance like any other.
-- [ ] 5.3 Add the `kind` check to `loadInstanceForActor` (a non-administrative
+- [x] 5.3 Add the `kind` check to `loadInstanceForActor` (a non-administrative
       actor addressing a test instance directly by id is authorized only as
       that instance's own `startedBy`; a claim or candidacy alone, sufficient
       for an ordinary instance, is not sufficient for a test instance; the
@@ -138,22 +138,22 @@
       instance), and verify a `bun:test` case: a claimant who is not the
       test instance's `startedBy` is refused direct access via
       `getInstanceView`.
-- [ ] 5.4 Verify a `bun:test` case: a test instance's own `startedBy` actor
+- [x] 5.4 Verify a `bun:test` case: a test instance's own `startedBy` actor
       retains access via `getInstanceView`, and an administrative actor's
       direct access to a test instance is unaffected.
-- [ ] 5.5 Verify a `bun:test` case: `postComment` and `listComments` apply
+- [x] 5.5 Verify a `bun:test` case: `postComment` and `listComments` apply
       the same `startedBy`-only narrowing for a non-administrative,
       non-starter claimant on a test instance.
-- [ ] 5.6 Verify a `bun:test` case: `uploadAttachment`, `listAttachments`,
+- [x] 5.6 Verify a `bun:test` case: `uploadAttachment`, `listAttachments`,
       and `getAttachment` apply the same `startedBy`-only narrowing for a
       non-administrative, non-starter claimant on a test instance.
-- [ ] 5.7 Verify a `bun:test` case: the `instance.query` CEL data source
+- [x] 5.7 Verify a `bun:test` case: the `instance.query` CEL data source
       (`src/engine/instance-query-source.ts:130`, via `queryInstances`)
       never resolves a test-kind instance as a field option, even when its
       status/step/data comparisons would otherwise match it — no code
       change is needed here beyond task 5.1's `buildInstanceWhere` default,
       since `InstanceQueryFilter` carries no `includeTestInstances` opt-in.
-- [ ] 5.8 Verify a `bun:test` case: `runReportQuery`
+- [x] 5.8 Verify a `bun:test` case: `runReportQuery`
       (`src/runtime/api.ts:1918`, backing `executeReport`,
       `previewReportDraft`, and the instance-data-tables preview) never
       returns a row for a test-kind instance, even when the report's

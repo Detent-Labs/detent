@@ -9,8 +9,9 @@
  */
 
 import type { SQL } from "bun";
-import { sql, createInstance, rehydrate, withTransaction, newInstanceEventId, PinMismatch } from "../engine/store.js";
+import { sql, createInstance, createDraftSnapshot, rehydrate, withTransaction, newInstanceEventId, PinMismatch } from "../engine/store.js";
 import { createDefinitionStore } from "../engine/definitions.js";
+import { getDraft } from "../engine/drafts.js";
 import {
   commitManualTransition,
   resolveAutomatic,
@@ -37,7 +38,7 @@ import { definitionHash } from "../schema/hash.js";
 import { NotFoundError, InstanceNotRunningError, RequestShapeError } from "../errors.js";
 import { saveInstanceDraft as engineSaveInstanceDraft, getInstanceDraft, type InstanceDraft } from "../engine/instance-drafts.js";
 import { encodeCursor, decodeCursor } from "../pagination.js";
-import { instance as instanceSchema, historyEntry as historyEntrySchema, instanceEvent as instanceEventSchema, collectFieldsDeep, leafFields, typeMatches, expectedTypeLabel } from "../schema/definition.js";
+import { instance as instanceSchema, processBody as processBodySchema, historyEntry as historyEntrySchema, instanceEvent as instanceEventSchema, collectFieldsDeep, leafFields, typeMatches, expectedTypeLabel } from "../schema/definition.js";
 import {
   createDefaultAssignmentRegistry,
   resolveStepAssignment,
@@ -248,6 +249,12 @@ export type InstanceListFilter = {
   // it — see toSummary/listInstances and design.md "Gate visibility with an
   // includeDegraded filter field".
   includeDegraded?: boolean;
+  // Not a query filter either, same scoping rule as includeDegraded: set by
+  // the caller's own administrative-scope check (scope=all), never from raw
+  // client input. draft-test-instances: absent (or false) excludes a
+  // kind: "test" instance from the result, the default every
+  // participant-facing scope gets.
+  includeTestInstances?: boolean;
 };
 
 /**
@@ -938,14 +945,29 @@ export async function createProcessInstance(
   processId: ProcessId,
   actor: Actor,
   registry: DataSourceRegistry,
-  opts?: { version?: number; data?: Instance["data"] },
+  opts?: { version?: number; data?: Instance["data"]; fromDraft?: boolean },
   db: SQL = sql,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<Instance> {
   const store = getStore(db);
   let version: number;
   let body: ProcessBody;
-  if (opts?.version !== undefined) {
+  const kind: Instance["kind"] = opts?.fromDraft ? "test" : "published";
+  if (opts?.fromDraft) {
+    // draft-test-instances: run the process's CURRENT draft body, frozen at
+    // this moment into draft_snapshots under a fresh negative sentinel — no
+    // published version required. `processBody.parse` is the same structural
+    // gate `resolveBody` applies on read (and the only one: no `compileProcessBody`/
+    // `authoredProcessBody` invariant pass runs here, deliberately — see
+    // draft-test-instances' "no dedicated pre-play validation" requirement).
+    // An unresolvable reference the base schema already refines against
+    // unconditionally (e.g. `workflow.initialStep` naming an absent step)
+    // surfaces here as a diagnostic ZodError, not a crash.
+    const draft = await getDraft(processId, db);
+    if (!draft) throw new NotFoundError(`no draft: ${processId}`);
+    body = processBodySchema.parse(draft.body);
+    version = await createDraftSnapshot(processId, definitionHash(body), body, db);
+  } else if (opts?.version !== undefined) {
     const resolved = await store.resolveBody(processId, opts.version);
     if (!resolved) throw new NotFoundError(`no published body for process ${processId} version ${opts.version}`);
     version = opts.version;
@@ -978,7 +1000,7 @@ export async function createProcessInstance(
     timers: [],
     status: initial.terminal ? "completed" : "running",
     startedAt: new Date().toISOString(),
-    kind: "published",
+    kind,
   };
 
   // Seeds the catalog's own `default` values into any slot `opts.data` left
@@ -1022,7 +1044,7 @@ export async function createProcessInstance(
 
   const created = await createInstance(
     body,
-    { processId, version, instanceId: mintedId, data: submitted as Instance["data"], startedBy: actor.id, assignment, events },
+    { processId, version, instanceId: mintedId, data: submitted as Instance["data"], startedBy: actor.id, assignment, events, kind },
     db,
   );
   return resolveAutomatic(created, body, actor, db, assignmentRegistry);
@@ -1052,6 +1074,16 @@ async function loadInstanceForActor(instanceId: InstanceId, actor: Actor, db: SQ
     ({ instance, body } = await loadInstanceForRead(instanceId, db));
   } catch {
     throw new AuthorizationError(`actor '${actor.id}' may not read instance '${instanceId}'`);
+  }
+  // draft-test-instances: a non-administrative actor may read a test
+  // instance only as its own startedBy. A claim or candidacy alone —
+  // sufficient for an ordinary instance below — is not sufficient here; the
+  // refusal is the same AuthorizationError a nonexistent instance gets.
+  if (instance.kind === "test") {
+    if (instance.startedBy !== actor.id) {
+      throw new AuthorizationError(`actor '${actor.id}' may not read instance '${instanceId}'`);
+    }
+    return { instance, body };
   }
   if (
     instance.startedBy !== actor.id &&
@@ -1362,6 +1394,7 @@ export function buildInstanceWhere(filter: InstanceWhereFilter, db: SQL) {
     AND (${filter.excludeInstanceId ?? null}::text IS NULL OR instance_id <> ${filter.excludeInstanceId ?? null})
     AND (${filter.createdAfter ?? null}::timestamptz IS NULL OR created_at >= ${filter.createdAfter ?? null}::timestamptz)
     AND (${filter.createdBefore ?? null}::timestamptz IS NULL OR created_at <= ${filter.createdBefore ?? null}::timestamptz)
+    AND (kind <> 'test' OR ${filter.includeTestInstances ?? false})
   `;
 }
 
