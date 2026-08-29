@@ -1863,8 +1863,10 @@ Built with `bun run --filter './packages/web' build`, then served via
 records the same pre-existing Studio dev-mode crash that rules that path out.
 
 Started one ordinary instance of Expense Approval from the app area's Start
-a process screen. The studio Player's "Create new instance" button still
-plays the process's published version, not its draft. `draft-test-instances`
+a process screen.
+
+The studio Player's "Create new instance" button still plays the published
+version. It does not play the draft. `draft-test-instances`
 task 4's route, `POST /drafts/:processId/instances`, belongs to Phase 3
 Track D's own screen. Wiring it up sits outside this task's scope.
 
@@ -1895,7 +1897,7 @@ confirms both.
 Source: `studio-play-draft-instance` task 8.4.
 
 Create a new empty-process draft. Add two steps in the JSON surface, or the
-canvas. Make the initial step non-terminal, with one manual path to a
+canvas. The initial step must be non-terminal, with one manual path to a
 terminal step.
 
 That leaves the process with no published version at all, only a draft.
