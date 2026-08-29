@@ -136,3 +136,10 @@ test("mergeCellDisplay carries the collision flag on a value, and renders redact
   expect(mergeCellDisplay({ kind: "value", value: "a", collision: false }, "en").collision).toBe(false);
   expect(mergeCellDisplay({ kind: "redacted" }, "en").kind).toBe("redacted");
 });
+
+test("mergeCellDisplay renders no-value distinctly from a value of the empty string", () => {
+  const display = mergeCellDisplay({ kind: "no-value" }, "en");
+  expect(display.kind).toBe("no-value");
+  expect(display.collision).toBe(false);
+  expect(display.kind).not.toBe(mergeCellDisplay({ kind: "value", value: "", collision: false }, "en").kind);
+});

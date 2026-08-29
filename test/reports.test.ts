@@ -231,6 +231,31 @@ test.skipIf(!DB)("2.3 a role listed on a report grants access to any actor holdi
   expect((await getReport(created.reportId, roleActor, sql))?.reportId).toBe(created.reportId);
 });
 
+test.skipIf(!DB)("2.3 leaving a group revokes report access with no write to the report itself", async () => {
+  const PID = pid("membership_group_revoke");
+  await publishBody(PID, reportBody("membership_group_revoke", []), reg, dataSourceReg);
+  const group = await createGroup("Revocable viewers", { type: "global" }, sql);
+  const groupMember: Actor = { id: "user_group_revoke", roles: [] };
+  await sql`INSERT INTO auth_users (user_id, email, password_hash) VALUES (${groupMember.id}, ${"group-revoke@example.com"}, ${"x"})`;
+  await setGroupMembers(group.groupId, [groupMember.id], sql);
+
+  const created = await createReport(owner, { processId: PID, name: "R", viewers: [group.groupId] }, sql);
+  expect((await getReport(created.reportId, groupMember, sql))?.reportId).toBe(created.reportId);
+
+  // The member leaves the group. Access is expanded live on every check
+  // (expandGroupPrincipals), so this alone revokes it — no report_principals
+  // row ever named the member, and none needs to change.
+  await setGroupMembers(group.groupId, [], sql);
+
+  let revoked: unknown;
+  try {
+    await getReport(created.reportId, groupMember, sql);
+  } catch (e) {
+    revoked = e;
+  }
+  expect(revoked).toBeInstanceOf(AuthorizationError);
+});
+
 test.skipIf(!DB)("2.4 saving a report never rejects on a viewer/editor lacking process read access", async () => {
   const PID = pid("share_unblocked");
   await publishBody(PID, reportBody("share_unblocked", []), reg, dataSourceReg);
@@ -412,6 +437,24 @@ test.skipIf(!DB)("3.6 a merge column takes the first non-empty source and marks 
   expect(cellFor(noCollision.instanceId)).toEqual({ kind: "value", value: "second", collision: false });
   expect(cellFor(collision.instanceId)).toEqual({ kind: "value", value: "first, second", collision: true });
   expect(result?.columns[0]).toEqual({ type: "merge", fieldIds: column.fieldIds, collisions: 1 });
+});
+
+test.skipIf(!DB)("3.6 a merge column with every source empty reads no-value, not a value of the empty string", async () => {
+  const PID = pid("merge_no_value");
+  const v = await publishBody(
+    PID,
+    reportBody("merge_no_value", [{ id: "field_m1", key: "m1" }, { id: "field_m2", key: "m2" }]),
+    reg,
+    dataSourceReg,
+  );
+  const inst = await createInstance(v.definition, { processId: PID, version: v.version, data: {} }, sql);
+
+  const column: ReportColumn = { type: "merge", fieldIds: ["field_m1" as FieldId, "field_m2" as FieldId] };
+  const report = await createReport(owner, { processId: PID, name: "R", columns: [column], viewers: [admin.id] }, sql);
+  const result = await executeReport(report.reportId, admin, sql);
+  const row = result?.rows.find((r) => r.instanceId === inst.instanceId);
+  expect(row?.cells[0]).toEqual({ kind: "no-value" });
+  expect(result?.columns[0]).toEqual({ type: "merge", fieldIds: column.fieldIds, collisions: 0 });
 });
 
 test.skipIf(!DB)("3.6 a merge column on a redacted instance renders redacted, not an ordinary empty value", async () => {

@@ -140,5 +140,6 @@ export function fieldCellDisplay(cell: ReportCell, locale: UiLocale): CellDispla
 
 export function mergeCellDisplay(cell: MergeReportCell, locale: UiLocale): CellDisplay & { collision: boolean } {
   if (cell.kind === "redacted") return { kind: "redacted", text: "", srLabel: t(locale, "cell.redacted"), collision: false };
+  if (cell.kind === "no-value") return { kind: "no-value", text: "—", srLabel: t(locale, "cell.noValue"), collision: false };
   return { kind: "value", text: cell.value, srLabel: "", collision: cell.collision };
 }

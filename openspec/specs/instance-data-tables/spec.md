@@ -1,3 +1,5 @@
+# instance-data-tables Specification
+
 ## Purpose
 
 A report is a saved, shareable definition that reads one process's instances
@@ -5,7 +7,7 @@ as a table of field-value columns. It reuses the existing instance-query
 filtering and the existing process-scoped `read` permission. It does not
 introduce a second query engine or a second access-control model.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: A report is a stored object naming a query and a column list
 

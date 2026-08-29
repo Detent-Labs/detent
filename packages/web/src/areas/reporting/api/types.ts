@@ -81,7 +81,7 @@ export type ReportCell =
   | { kind: "not-in-version" }
   | { kind: "redacted" };
 
-export type MergeReportCell = { kind: "value"; value: string; collision: boolean } | { kind: "redacted" };
+export type MergeReportCell = { kind: "value"; value: string; collision: boolean } | { kind: "no-value" } | { kind: "redacted" };
 
 export type ReportResultColumn = { type: "field"; fieldId: string } | { type: "merge"; fieldIds: string[]; collisions: number };
 

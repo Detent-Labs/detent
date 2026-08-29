@@ -1820,7 +1820,7 @@ export type ReportCell =
   | { kind: "not-in-version" }
   | { kind: "redacted" };
 
-export type MergeReportCell = { kind: "value"; value: string; collision: boolean } | { kind: "redacted" };
+export type MergeReportCell = { kind: "value"; value: string; collision: boolean } | { kind: "no-value" } | { kind: "redacted" };
 
 export type ReportResultColumn = { type: "field"; fieldId: FieldId } | { type: "merge"; fieldIds: FieldId[]; collisions: number };
 
@@ -1850,7 +1850,9 @@ function fieldCell(item: InstanceDataItem, fieldId: FieldId, declared: Set<Field
  * First non-empty source wins; two or more non-empty sources concatenate and
  * mark a collision. A source the instance's own version does not declare, or
  * never wrote, is treated as empty here — a merge column reports one
- * combined value, not a per-source empty reason.
+ * combined value, not a per-source empty reason. Zero non-empty sources is
+ * `no-value`, not a `value` of `""`, so an empty merge cell reads the same
+ * distinct way a direct field's empty cell does.
  */
 function mergeCell(item: InstanceDataItem, fieldIds: FieldId[], declared: Set<FieldId> | undefined): MergeReportCell {
   if (item.redactedAt) return { kind: "redacted" };
@@ -1858,6 +1860,7 @@ function mergeCell(item: InstanceDataItem, fieldIds: FieldId[], declared: Set<Fi
     .filter((id) => declared?.has(id))
     .map((id) => item.data[id])
     .filter((v): v is Exclude<Literal, null | undefined> => v !== undefined && v !== null && v !== "");
+  if (values.length === 0) return { kind: "no-value" };
   return { kind: "value", value: values.map((v) => String(v)).join(", "), collision: values.length > 1 };
 }
 
