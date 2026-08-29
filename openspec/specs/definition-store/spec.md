@@ -373,9 +373,17 @@ list. The hash-hit path returns before validation runs, so it computes no
 findings. Reporting a stale set from an earlier publish would be worse than
 reporting none.
 
-Today `cross-process-validation`'s reference check over an `"instance.query"`
-data source is the only producer of a finding. The channel is general, and a
-later check reporting rather than rejecting uses it without widening anything.
+Two checks produce a finding. `cross-process-validation`'s reference check over
+an `"instance.query"` data source produces one. Its path check over an
+`instance.transition` action produces the other.
+
+A finding SHALL name the site it came from. A data-source finding names the
+data source. An action finding names no data source, because an action is not
+one. A finding's identifying name SHALL therefore be optional. A reader SHALL
+fall back to the finding's location in the body when the name is absent.
+
+A finding's reference kind SHALL admit `"path"` beside `"step"` and `"field"`.
+An action's path reference is neither of the other two.
 
 #### Scenario: A publish raising no finding returns an empty list
 
@@ -388,6 +396,14 @@ later check reporting rather than rejecting uses it without widening anything.
   target version holds
 - **THEN** the result carries the new version and a finding naming that
   reference
+
+#### Scenario: An action finding falls back to its location
+
+- **WHEN** a body publishes carrying an `instance.transition` action whose
+  `pathId` no live target version holds
+- **THEN** the result carries the new version and a finding whose reference
+  kind is `"path"`, naming no data source
+- **AND** a reader identifies that finding by its location in the body
 
 #### Scenario: A rejected publish returns nothing at all
 

@@ -9,7 +9,7 @@ import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody, CrossProcessValidationError } from "../src/engine/definitions.js";
 import { createDataSourceRegistry } from "../src/engine/registry.js";
-import { createDefaultRegistry } from "../src/engine/host.js";
+import { createDefaultRegistry, createDefaultDataSourceRegistry } from "../src/engine/host.js";
 import { createProcessInstance } from "../src/runtime/api.js";
 import { writeGrant } from "../src/auth/grants.js";
 import { AuthorizationError, ADMIN_ROLE } from "../src/auth/authorize.js";
@@ -20,6 +20,9 @@ import { clearInstanceAudit } from "./audit-cleanup.js";
 const DB = !!process.env.DATABASE_URL;
 const reg = createDefaultRegistry(); // instance.transition registered, for publishBody's own registry check
 const dsReg = createDataSourceRegistry();
+// instance.query registered too, only for the combined-site-kinds test below —
+// every other test's body carries no data source, so the empty dsReg above stays their default.
+const defaultDsReg = createDefaultDataSourceRegistry();
 const actor: Actor = { id: "user_1", roles: [] };
 const pid = (n: string) => n as ProcessId;
 
@@ -214,5 +217,59 @@ test.skipIf(!DB)("a publish with no actor supplied skips the check", async () =>
   await createProcessInstance(TARGET_ID, actor, dsReg);
 
   const result = await publishBody(ACTOR_ID, actorBody({ processId: TARGET_ID, instanceIdField: "field_target_id", pathId: "path_ab" }), reg, dsReg);
+  expect(result.version).toBeGreaterThan(0);
+});
+
+/**
+ * `validateCrossProcessReadGrant` collects target `processId`s from two
+ * loops — every `"instance.query"` data source, then every
+ * `instance.transition` action — into one `Set` before checking. A body
+ * naming the same target from BOTH loops exercises that merge: this is the
+ * one shape the single-site-kind tests above cannot reach, since each of
+ * them carries only one kind of site.
+ */
+const combinedSiteBody = (): ProcessBody =>
+  ({
+    key: "combined",
+    label: { en: "Combined" },
+    baseLocale: "en",
+    fields: [{ id: "field_target_id", key: "target_id", label: { en: "Target Id" }, type: "string" }],
+    dataSources: [{ id: "ds_iq", key: "iq", type: "instance.query", config: { processId: TARGET_ID, labelFieldId: "field_target_id" } }],
+    workflow: {
+      initialStep: "step_r",
+      steps: [
+        {
+          id: "step_r",
+          key: "r",
+          label: { en: "R" },
+          type: "task",
+          terminal: true,
+          onEntry: [{ id: "action_it", type: "instance.transition", config: { processId: TARGET_ID, instanceIdField: "field_target_id", pathId: "path_ab" } }],
+        },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+test.skipIf(!DB)("publishing rejects a body naming one ungranted target from both an instance.query source and an instance.transition action", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, defaultDsReg);
+  await createProcessInstance(TARGET_ID, actor, defaultDsReg);
+  const noGrant: Actor = { id: "user_nogrant_combined", roles: [] };
+
+  let raised: unknown;
+  try {
+    await publishBody(ACTOR_ID, combinedSiteBody(), reg, defaultDsReg, sql, undefined, noGrant);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(AuthorizationError);
+});
+
+test.skipIf(!DB)("an author holding the read grant publishes a body naming one target from both site kinds", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, defaultDsReg);
+  await createProcessInstance(TARGET_ID, actor, defaultDsReg);
+  await writeGrant({ role: "itcp-reader-combined", permission: "read", scope: { type: "process", config: { processId: TARGET_ID } } }, sql);
+  const granted: Actor = { id: "user_granted_combined", roles: ["itcp-reader-combined"] };
+
+  const result = await publishBody(ACTOR_ID, combinedSiteBody(), reg, defaultDsReg, sql, undefined, granted);
   expect(result.version).toBeGreaterThan(0);
 });
