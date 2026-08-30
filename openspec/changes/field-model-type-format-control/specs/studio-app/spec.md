@@ -387,4 +387,3 @@ condition.
   view references
 - **THEN** the row shows disabled and states that no step asks for
   the field yet
-
