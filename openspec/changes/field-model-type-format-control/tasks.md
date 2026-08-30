@@ -126,15 +126,15 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Run `bun run typecheck` and report what it printed.
-- [ ] 6.2 Run `bun run build` and report what it printed.
-- [ ] 6.3 Run the FULL `bun test` with `DATABASE_URL` set, never a single-file
+- [x] 6.1 Run `bun run typecheck` and report what it printed.
+- [x] 6.2 Run `bun run build` and report what it printed.
+- [x] 6.3 Run the FULL `bun test` with `DATABASE_URL` set, never a single-file
       rerun, and pipe it through `scripts/gates/silent-green.sh`; report the
       pass count and the skip count.
-- [ ] 6.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`
+- [x] 6.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`
       and `sh scripts/gates/whitespace.sh < /dev/null`; report both verdicts.
-- [ ] 6.5 Check one field per format member and per control member in a real
+- [x] 6.5 Check one field per format member and per control member in a real
       browser, since a green suite sees no rendered widget; record what stays
       manual in `docs/browser-checks.md`.
-- [ ] 6.6 Reseed the developer database, since a stored draft carrying a removed
+- [x] 6.6 Reseed the developer database, since a stored draft carrying a removed
       type value no longer reads; verify the studio lists its drafts again.
