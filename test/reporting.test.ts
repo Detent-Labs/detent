@@ -492,6 +492,26 @@ test.skipIf(!DB)("an instance started before the range contributes to none of th
   expect((await sla(P, RANGE))!.steps).toEqual([]);
 });
 
+test.skipIf(!DB)("selectInRange's boundary is inclusive on both ends, through the generated started_at column", async () => {
+  const P = pid();
+  const { body: b, version } = await publish(P, "v1");
+  // RANGE is ["2026-07-01T00:00:00.000Z", "2026-07-31T00:00:00.000Z"]. One
+  // instance lands on each boundary exactly, one just outside each side —
+  // the four cases a text comparison on `started_at` has to get right the
+  // same way a timestamptz comparison would.
+  const atFrom = await seed({ processId: P, version, body: b, startedAt: RANGE.from, status: "completed", currentStepId: "step_d" as StepId });
+  const atTo = await seed({ processId: P, version, body: b, startedAt: RANGE.to, status: "completed", currentStepId: "step_d" as StepId });
+  await seed({ processId: P, version, body: b, startedAt: "2026-06-30T23:59:59.999Z", status: "completed", currentStepId: "step_d" as StepId });
+  await seed({ processId: P, version, body: b, startedAt: "2026-07-31T00:00:00.001Z", status: "completed", currentStepId: "step_d" as StepId });
+  for (const inst of [atFrom, atTo]) {
+    await entry({ instanceId: inst.instanceId, seq: 1, version, fromStepId: "step_a", toStepId: "step_b", at: inst.startedAt, cause: "user", pathId: "path_ab" });
+    await entry({ instanceId: inst.instanceId, seq: 2, version, fromStepId: "step_b", toStepId: "step_c", at: inst.startedAt, cause: "user", pathId: "path_bc" });
+    await entry({ instanceId: inst.instanceId, seq: 3, version, fromStepId: "step_c", toStepId: "step_d", at: inst.startedAt, cause: "user", pathId: "path_cd" });
+  }
+
+  expect((await cycleTime(P, RANGE))!.sampleSize).toBe(2);
+});
+
 test.skipIf(!DB)("an instance started inside the range but still running is in range, per each view's own status rule", async () => {
   const P = pid();
   const { body: b, version } = await publish(P, "v1");

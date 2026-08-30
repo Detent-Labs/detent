@@ -599,17 +599,25 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   version.
 - **Promoting standardized instance keys out of `body` into columns.** A
   design pass on 2026-08-25 settled which keys qualify, in the same session
-  as the entry above, which asked for it. Not started.
+  as the entry above, which asked for it. Change 1, the six scalars below,
+  landed as `promote-instance-scalar-columns` (2026-08-30). Change 2 (the
+  assignment pair, `parent.instanceId`, `currentStepEnteredAt`,
+  `chainedFrom`, and a rebuild of the five expression indexes those and the
+  six scalars share) is not started; `tmp/offene-items.md` item 25 carries
+  the split.
 
   **The goal.** A predicate over an instance key reads a plain column
-  through a plain index. Eight expression indexes stand in for that today
-  (`instances_selection_idx`, `instances_claimed_by_idx`,
+  through a plain index. Eight expression indexes stood in for that before
+  Change 1 (`instances_selection_idx`, `instances_claimed_by_idx`,
   `instances_candidates_idx`, `instances_parent_idx`,
   `instances_current_step_idx`, `instances_started_by_idx` — the last two
   added 2026-08-27 by `instance-query-core`, covering `currentStepId` and
   `startedBy` for the first time — plus the two the scheduler and the
-  retention sweep own), and `(body->>'startedAt')` carries none at all
-  (`src/engine/reporting.ts:91`).
+  retention sweep own), and `(body->>'startedAt')` carried none at all.
+  Change 1 gave it `instances_started_idx`, over the new generated
+  `started_at` column, and rewrote `selectInRange` to use it
+  (`src/engine/reporting.ts:87-104`); none of the other seven indexes
+  changed.
 
   **The test a key has to pass.** Its structure is fixed by the runtime
   schema for every process and every version, never by a process author.
@@ -621,7 +629,8 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     unchanged as what `parseInstance` reads.
   - The six the entry above named: `processId`, `version`, `status`,
     `currentStepId`, `startedAt`, `startedBy`. Each is a scalar and each
-    is somebody's predicate today.
+    is somebody's predicate today. All six are the generated columns
+    Change 1 added.
   - Standardized, outside that six, each already carrying an expression
     index or an in-memory filter: `assignment.claimedBy` and
     `assignment.candidates` (`AssignmentState` is
@@ -645,7 +654,10 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   `text` column instead. Every writer produces
   `new Date().toISOString()`, and ISO-8601 in UTC orders lexicographically
   the way it orders chronologically, so a text column still ranges and
-  sorts correctly. Probe that against Postgres 16 before relying on it.
+  sorts correctly. Change 1 probed both claims directly against Postgres
+  16.15: the `timestamptz` cast does raise "generation expression is not
+  immutable", and the plain `text`/`integer` generation expressions do
+  succeed.
 
   **The key stays in `body`.** Removing it would make `parseInstance`
   rebuild an `Instance` from a row plus a body at every read site in the

@@ -296,6 +296,27 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // rows are NULL forever, so a partial index stays small), then checks
   // status/currentStepEnteredAt in memory over the reduced row set.
   await db`CREATE INDEX IF NOT EXISTS instances_redacted_idx ON instances (redacted_at) WHERE redacted_at IS NULL`;
+  // Six standardized Instance scalars, promoted out of the jsonb body into
+  // real columns, on the redacted_at precedent above: the key stays in body
+  // (parseInstance is unchanged), and the column is additive infrastructure
+  // a query MAY use instead of a jsonb ->> lookup. GENERATED ALWAYS ... STORED
+  // rather than a dual write: it cannot drift from body, which a second
+  // write path could. startedAt is `text`, not `timestamptz` — verified
+  // against Postgres 16.15 that `(body->>'startedAt')::timestamptz` raises
+  // "generation expression is not immutable" (the timestamptz input path
+  // reads session DateStyle/TimeZone). Every writer produces startedAt as
+  // `new Date().toISOString()`, a fixed-width ISO-8601 string in UTC, so a
+  // text column ranges and sorts the same way a timestamptz column would.
+  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS process_id text GENERATED ALWAYS AS ((body->>'processId')) STORED`;
+  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS version integer GENERATED ALWAYS AS (((body->>'version')::integer)) STORED`;
+  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS status text GENERATED ALWAYS AS ((body->>'status')) STORED`;
+  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS current_step_id text GENERATED ALWAYS AS ((body->>'currentStepId')) STORED`;
+  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS started_by text GENERATED ALWAYS AS ((body->>'startedBy')) STORED`;
+  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS started_at text GENERATED ALWAYS AS ((body->>'startedAt')) STORED`;
+  // Backs selectInRange's range predicate (src/engine/reporting.ts), rewritten
+  // to filter on this column directly — the planner would not substitute this
+  // index into a query still naming the original body->>'startedAt' expression.
+  await db`CREATE INDEX IF NOT EXISTS instances_started_idx ON instances (started_at)`;
   // Project-local user accounts (src/auth/users.ts). user_id is the value used
   // as Actor.id — the same convention as assignment.candidates/claimedBy.
   await db`CREATE TABLE IF NOT EXISTS auth_users (

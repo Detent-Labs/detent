@@ -86,22 +86,20 @@ function parseRow<T>(raw: unknown, parse: (v: unknown) => T): T {
 /**
  * The in-range instances of one process. `body->>'processId'` leads
  * `instances_selection_idx`, so the process predicate is indexed; the range
- * predicate then filters within that one process.
- *
- * ponytail: `(body->>'startedAt')::timestamptz` is unindexed. The leading
- * process predicate bounds the scan and the caller always sends a range, so
- * this holds until one process accumulates enough instances to measure. The
- * fix is one line — `CREATE INDEX instances_started_idx ON instances
- * ((body->>'startedAt'))` — plus keyset paging over this scan in the shape
- * migrateInstances and the retention sweep already use.
+ * predicate filters on the generated `started_at` text column, backed by
+ * `instances_started_idx`, instead of casting `body->>'startedAt'` to
+ * `timestamptz` — `range.from`/`range.to` are already ISO-8601 UTC strings
+ * (`toISOString()`), the same fixed-width form `started_at` is generated
+ * from, so the text comparison ranges the same way a timestamptz comparison
+ * would.
  */
 async function selectInRange(processId: ProcessId, range: DateRange, db: SQL): Promise<Instance[]> {
   const rows = (await db`
     SELECT body FROM instances
     WHERE body->>'processId' = ${processId}
       AND kind <> 'test'
-      AND (body->>'startedAt')::timestamptz >= ${range.from}::timestamptz
-      AND (body->>'startedAt')::timestamptz <= ${range.to}::timestamptz
+      AND started_at >= ${range.from}
+      AND started_at <= ${range.to}
   `) as { body: unknown }[];
   return rows.map((r) => parseRow(r.body, (v) => instanceSchema.parse(v)));
 }
