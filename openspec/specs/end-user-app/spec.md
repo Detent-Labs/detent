@@ -386,10 +386,21 @@ no entry. UI chrome strings SHALL be looked up from a catalog shaped `locale →
 
 Switching locale SHALL apply across areas, not per area.
 
+The Task screen's step form is process content for this rule. A field's
+`LocalizedText` label, and each of its option labels, SHALL resolve using
+`InstanceView.baseLocale` as the fallback.
+
 #### Scenario: Process content falls back to baseLocale
 
 - **WHEN** a `LocalizedText` value has no entry for the active locale
 - **THEN** it resolves using the process's `baseLocale` entry instead
+
+#### Scenario: A task field label falls back to the process's base locale
+
+- **WHEN** the Task screen renders a step whose field label has no entry for
+  the participant's active locale
+- **THEN** the label renders the process's `baseLocale` text rather than the
+  field's raw `key`
 
 #### Scenario: Initial locale comes from the browser
 

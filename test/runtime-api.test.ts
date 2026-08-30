@@ -398,6 +398,7 @@ test.skipIf(!DB)("createProcessInstance succeeds with a valid data seed, and get
   const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
   expect(view.status).toBe("running");
   expect(view.step.key).toBe("a");
+  expect(view.baseLocale).toBe("en");
   const byKey = new Map(view.fields.map((f) => [f.field.key, f]));
   expect(byKey.get("amount")!.value).toBe(100);
   expect(byKey.get("readonly_f")!.readonly).toBe(true);
@@ -1024,6 +1025,7 @@ test.skipIf(!DB)("getInstanceView on a completed instance still resolves, with n
   const view = await getInstanceView(result.instanceId, actor, dataSourceReg);
   expect(view.status).toBe("completed");
   expect(view.availablePaths).toEqual([]);
+  expect(view.baseLocale).toBe("en");
 });
 
 test.skipIf(!DB)("getInstanceView on a cancelled instance still resolves, with no available paths", async () => {

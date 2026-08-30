@@ -9,12 +9,6 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
 - The formal expression context is pinned (`src/cel/check.ts`): `instance`
   `{id, status, transitionSeq, currentStepId}`, `actor` `{id, roles}`. Both are
   deliberately minimal; widen when the engine surfaces a concrete need.
-- `TaskScreen.tsx`'s (app area) `InstanceView` carries no process
-  `baseLocale` field, so a task field's `LocalizedText` label renders blank
-  instead of falling back, whenever the participant's active locale has no
-  entry. Pre-existing gap, not introduced by `studio-formui-ridealong-cuts`'s
-  removal of `FieldForm`'s `baseLocale` prop. Fixing it needs an `InstanceView`
-  API change plus a `TaskScreen.tsx` wiring change.
 - `checkUnknownKeys` (`src/schema/compile.ts`) needs the raw authored body,
   and the studio holds only the Zod-stripped result of
   `authoredProcessBody.safeParse(draft).data`, so the studio's checks rail

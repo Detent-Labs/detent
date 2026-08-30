@@ -115,6 +115,11 @@ export type InstanceView = {
   // Mirrors the underlying instance's own `kind`, so a caller renders a test
   // instance distinctly without a separate lookup.
   kind: Instance["kind"];
+  // The resolved body's own `baseLocale`. A caller resolving a field's
+  // `LocalizedText` label falls back to this, not to the active locale
+  // twice. Reported for every status, since it describes the process
+  // rather than transient instance state.
+  baseLocale: LocaleCode;
   step: { id: StepId; key: string; label: LocalizedText; type: StepType };
   fields: ResolvedViewField[];
   // The current step's `view.columns`, or 1 when the view declares none.
@@ -1126,6 +1131,7 @@ export async function getInstanceView(instanceId: InstanceId, actor: Actor, regi
     version: instance.version,
     status: instance.status,
     kind: instance.kind,
+    baseLocale: body.baseLocale,
     step: { id: step.id, key: step.key, label: step.label, type: step.type },
     fields: await resolveFields(body, step, instance, actor, registry, db),
     columns: step.view?.columns ?? 1,

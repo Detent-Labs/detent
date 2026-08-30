@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Stamp } from "lucide-react";
-import { FieldForm, PathButtons, filterToEditable } from "form-ui";
+import { FieldForm, PathButtons, filterToEditable, resolveFieldsLocale } from "form-ui";
 import type { SubmissionIssue } from "form-ui";
 import {
   cancelInstance,
@@ -281,7 +281,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
       {view && (
         <>
           <FieldForm
-            fields={view.fields}
+            fields={resolveFieldsLocale(view.fields, locale, view.baseLocale)}
             values={formValues}
             onChange={(fieldId, value) => setFormValues((v) => ({ ...v, [fieldId]: value }))}
             locale={locale}

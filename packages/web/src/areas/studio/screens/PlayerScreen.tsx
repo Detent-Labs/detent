@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { FieldForm, PathButtons, filterToEditable } from "form-ui";
+import { FieldForm, PathButtons, filterToEditable, resolveFieldsLocale } from "form-ui";
 import type { SubmissionIssue } from "form-ui";
 import { createInstance, createTestInstance, getInstanceView, submitPath, claimStep, releaseClaim, getInstanceRecord, StudioClientError } from "../api/client.js";
 import type { InstanceView, InstanceRecordElement } from "../api/types.js";
@@ -222,7 +222,14 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
               )}
             </p>
 
-            <FieldForm fields={view.fields} values={formValues} onChange={(fieldId, value) => setFormValues((v) => ({ ...v, [fieldId]: value }))} locale="en" issuesByField={issuesByField} columns={view.columns ?? 1} />
+            <FieldForm
+              fields={resolveFieldsLocale(view.fields, "en", view.baseLocale)}
+              values={formValues}
+              onChange={(fieldId, value) => setFormValues((v) => ({ ...v, [fieldId]: value }))}
+              locale="en"
+              issuesByField={issuesByField}
+              columns={view.columns ?? 1}
+            />
 
             <div className="studio-controls">
               {!claimedByMe && (

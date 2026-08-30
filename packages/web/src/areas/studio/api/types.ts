@@ -125,6 +125,7 @@ export interface InstanceView {
   status: "running" | "completed" | "cancelled" | "faulted";
   /** Mirrors the underlying instance's own `kind` (draft-play-instance-marker). */
   kind: "published" | "test";
+  baseLocale: LocaleCode;
   step: { id: string; key: string; label: LocalizedText; type: string };
   fields: ResolvedViewField[];
   /** The step's declared form width. Optional here, unlike on the engine's own

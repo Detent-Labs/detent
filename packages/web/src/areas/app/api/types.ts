@@ -31,6 +31,7 @@ export interface InstanceView {
   processId: string;
   version: number;
   status: "running" | "completed" | "cancelled" | "faulted";
+  baseLocale: LocaleCode;
   step: { id: string; key: string; label: LocalizedText; type: string };
   fields: ResolvedViewField[];
   /** The step's declared form width. Optional here, unlike on the engine's own

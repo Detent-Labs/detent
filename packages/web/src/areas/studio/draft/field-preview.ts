@@ -4,14 +4,12 @@ import type { DraftField } from "./fields";
 import { resolveDraftLocalizedText, type DraftLocalizedText } from "./localized-text";
 
 /** `text` resolved to a single entry keyed by `locale`, falling back to
- * `baseLocale` the way every other authoring surface does. `FieldForm`
- * itself carries no separate base-locale concept — its own read
- * (`resolveText(def.label, locale, locale)`, `packages/form-ui`) passes the
- * same value twice, which the Player's call relies on since it has no
- * content-locale concept of its own (design.md decision 5). Baking the
- * fallback in here, rather than passing the field's raw `LocalizedText`
- * through, is what lets the preview still read correctly in a multi-language
- * draft under the studio's own `contentLocale`. */
+ * `baseLocale` the way every other authoring surface does. `form-ui` offers
+ * a shared helper for this same fallback (`resolveFieldsLocale`), but this
+ * preview has no `InstanceView` behind it, so it bakes the fallback in here
+ * directly instead. Baking it in here, rather than passing the field's raw
+ * `LocalizedText` through, is what lets the preview still read correctly in
+ * a multi-language draft under the studio's own `contentLocale`. */
 function resolvedLabel(text: DraftLocalizedText, locale: string, baseLocale: string): LocalizedText {
   return { [locale]: resolveDraftLocalizedText(text, locale, baseLocale) ?? "" };
 }
