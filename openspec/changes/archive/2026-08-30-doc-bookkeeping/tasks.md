@@ -48,19 +48,26 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck` inside the devcontainer and confirm it
-      exits 0 (proves no accidental code touch). BLOCKED: the devcontainer's
-      `app` container failed to start. `docker compose up` hung on
-      container creation past 30 minutes, survived a Docker Desktop
-      restart, and hung again on the retry. `git diff --stat` against
-      this branch's base shows only the four documentation files this
-      change lists; no `src/`, `packages/`, or `test/` file changed.
-- [ ] 5.2 Run `bun run build` inside the devcontainer and confirm it
-      exits 0. BLOCKED for the same reason as 5.1.
-- [ ] 5.3 Run the full `bun test` suite inside the devcontainer with
+- [x] 5.1 Run `bun run typecheck` inside the devcontainer and confirm it
+      exits 0 (proves no accidental code touch). The devcontainer's `app`
+      container initially failed to start (`docker compose up` hung on
+      container creation past 30 minutes and hung again after one Docker
+      Desktop restart); a second `docker compose down && up` cycle after
+      that restart succeeded, all three containers came up healthy, and
+      `bun run typecheck` exits 0 (`tsc --noEmit`, `form-ui`, `web` all
+      exit 0). `git diff --stat` against this branch's base confirms only
+      the four documentation files this change lists changed; no `src/`,
+      `packages/`, or `test/` file changed.
+- [x] 5.2 Run `bun run build` inside the devcontainer and confirm it
+      exits 0. Confirmed: `web build` completes and exits 0.
+- [x] 5.3 Run the full `bun test` suite inside the devcontainer with
       `DATABASE_URL` set and confirm 0 fail, checking the skip count
-      against the known baseline (no new skips). BLOCKED for the same
-      reason as 5.1.
+      against the known baseline (no new skips). Confirmed: 3483 pass, 1
+      skip (`a picked day spans that day in local time, not in UTC` — a
+      pre-existing, environment-dependent skip unrelated to this change),
+      0 fail, 10218 expect() calls across 190 files.
+      `scripts/gates/silent-green.sh` against the captured run output
+      exits 0.
 - [x] 5.4 Run the antislop gate
       (`sh scripts/gates/range.sh | sh scripts/gates/prose.sh`) and the
       whitespace gate (`sh scripts/gates/whitespace.sh < /dev/null`) and
