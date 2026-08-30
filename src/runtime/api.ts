@@ -535,7 +535,7 @@ function heldValuesOf(value: Literal | undefined): string[] {
 
 /**
  * Resolve a `dataSource`-bound field's options via the registry. Held values
- * are sorted before reaching the handler, so a multiselect's array order
+ * are sorted before reaching the handler, so a `list` field's array order
  * never leaks into what the handler sees. A missing handler here means the
  * registry passed at runtime differs from the one the body was published
  * against — publish-time `data-source-registry-validation` already confirmed
