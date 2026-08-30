@@ -1,71 +1,75 @@
 ## 1. The schema and the two publish-time checks
 
-- [ ] 1.1 Shrink `baseFieldType` in `src/schema/definition.ts` to `string`,
+- [x] 1.1 Shrink `baseFieldType` in `src/schema/definition.ts` to `string`,
       `number`, `boolean`, `list`, `file`, `group`, and verify `bun run
       typecheck` reports every site that still names a removed member.
-- [ ] 1.2 Add the `fieldFormat` and `fieldControl` enums beside it, with
+- [x] 1.2 Add the `fieldFormat` and `fieldControl` enums beside it, with
       `format` and `control` as optional keys on `fieldDef`; verify a body
       declaring both keys parses and one declaring `format: "phone"` does not.
-- [ ] 1.3 Add the allowed-pairs table as an exhaustive
+- [x] 1.3 Add the allowed-pairs table as an exhaustive
       `Record<BaseFieldType, {formats, controls}>` beside `JS_TYPE`, matching
       design.md Decision 2; verify a missing type member is a compile error.
-- [ ] 1.4 Add the four format value checks (`date` with a calendar round trip,
+- [x] 1.4 Add the four format value checks (`date` with a calendar round trip,
       `datetime`, `integer`, `email` with the WHATWG regex) as one exported
       predicate; verify `2026-02-30` fails and `2026-02-28` passes.
-- [ ] 1.5 Update `typeMatches` to take the field rather than its `type`, run the
+- [x] 1.5 Update `typeMatches` to take the field rather than its `type`, run the
       format check after the JS-shape check, and let `expectedTypeLabel`
       return the format name where one is declared; verify a unit test covers
       both halves and the plugin-envelope opaque case.
-- [ ] 1.6 Add `checkFieldFormatControl` to `checkFieldTree` in
+- [x] 1.6 Add `checkFieldFormatControl` to `checkFieldTree` in
       `src/schema/compile.ts`, rejecting a disallowed pair and a literal
       `default` the field's format refuses; verify one test per rejection,
       each asserting the issue's `loc`.
-- [ ] 1.7 Update `checkColumnMapping`'s type rule from `select` to `string`;
+- [x] 1.7 Update `checkColumnMapping`'s type rule from `select` to `string`;
       verify a `list` field declaring `columnMapping` still fails the publish.
 
 ## 2. The CEL type and the engine callers
 
-- [ ] 2.1 Update `celType` in `src/cel/check.ts` to take the field, map the six
+- [x] 2.1 Update `celType` in `src/cel/check.ts` to take the field, map the six
       types per design.md Decision 5, and report `int` under
       `format: "integer"`; remove the `ponytail:` comment at `:53-56` that
       names this fix. Verify `data.anzahl % 2 == 0` type-checks against a
       marked field and fails against an unmarked one.
-- [ ] 2.2 Update `dataSchema`, `contractFieldSchema` and `fieldTypeById` in the
+- [x] 2.2 Update `dataSchema`, `contractFieldSchema` and `fieldTypeById` in the
       same file to pass the whole field; verify the CEL suite passes.
-- [ ] 2.3 Update the `celType` call in `src/engine/migration.ts`, and verify a
+- [x] 2.3 Update the `celType` call in `src/engine/migration.ts`, and verify a
       migration transform onto an `int` field reports the type disagreement.
-- [ ] 2.4 Update `isNonScalarFieldType` in `src/engine/definitions.ts` so it reads
+- [x] 2.4 Update `isNonScalarFieldType` in `src/engine/definitions.ts` so it reads
       `list` and `group`; verify a `valueFromField` naming a `list` field still
       fails the publish.
-- [ ] 2.5 Update the `typeMatches` call sites in `src/engine/outbox.ts` and the
+- [x] 2.5 Update the `typeMatches` call sites in `src/engine/outbox.ts` and the
       three in `src/runtime/api.ts` to pass the field; verify an
       `Action.output` value a format refuses lands in `droppedTargets`.
 
 ## 3. Definitions, docs and the engine suites
 
-- [ ] 3.1 Rewrite every field declaration under `examples/` per design.md
+- [x] 3.1 Rewrite every field declaration under `examples/` per design.md
       Decision 8's table; verify each of the six files publishes through the
       existing example test.
-- [ ] 3.2 Update the engine suites naming a removed member (`cel`,
+- [x] 3.2 Update the engine suites naming a removed member (`cel`,
       `column-mapping`, `compile-validation`, `data-list-columns`,
       `data-source-resolution`, `http-data-lists`, `http`,
       `instance-query-cross-process`, `instance-query-source`,
       `localized-text`, `runtime-api`, `validate`); verify the full suite is
       green before the web work starts.
-- [ ] 3.3 State the three keys in `docs/authoring-guide.md`, with D17's rule
+- [x] 3.3 State the three keys in `docs/authoring-guide.md`, with D17's rule
       for a checkbox list and D24's two integer consequences; verify the guide
       names no removed type member.
-- [ ] 3.4 Update `docs/current-state.md`, and record the item list S1 defers as
+- [x] 3.4 Update `docs/current-state.md`, and record the item list S1 defers as
       an open question in `docs/decisions.md`; verify each passage naming a
       field-model symbol still matches the code.
-- [ ] 3.5 Rewrite the "No Long text field type" entry in
+- [x] 3.5 Rewrite the "No Long text field type" entry in
       `docs/decisions.md`, which `control: "multiline"` reverses; verify the
       entry names this change and states what shipped.
-- [ ] 3.6 Confirm the three wording-only deltas need no code:
+- [x] 3.6 Confirm the three wording-only deltas need no code:
       `data-source-resolution` (`heldValuesOf` branches on the value shape),
       `instance-data-query` (the read checks values, not declared types) and
       `authored-content-localization`; verify each by reading the named
       function and recording that it needs no edit.
+      Verified. `heldValuesOf` (`src/runtime/api.ts:531`) branches on
+      `Array.isArray`. `isDataScalar` (`:1455`) checks the value, never a
+      declared type. The localization invariant reads `FieldOption.label` on
+      any field carrying `options`. None of the three needs an edit.
 
 ## 4. The renderer
 

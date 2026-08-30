@@ -49,6 +49,16 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   classifies failures into the four buckets by id only, and a
   per-instance NDJSON report would need it to carry a reason alongside
   each id. Do not build this ahead of that ask.
+- An item list, the repeating sub-table an expense claim needs: five lines,
+  each holding a date, an amount and a category. The flat `data` object keyed
+  by `fieldId` cannot hold that, and the definition contract promises that
+  flatness. Under a sub-table CEL sees `dyn` and the generated columns find
+  nothing. An author who needs it today declares `pos1_betrag`, `pos2_betrag`
+  and further keys by hand, so the ceiling is whatever number they pick in
+  advance. `docs/field-model-redesign.md` records this as S1 and assigns it
+  change 4, which depends on `field-model-type-format-control`. Nothing is
+  designed yet, and the open question is what shape holds the rows without
+  breaking CEL, the generated columns and instance migration at once.
 - Which `instances.body` keys become real columns. The table holds
   `instance_id`, `transition_seq`, `body`, `resolve_state`,
   `resolve_claimed_at`, `cancel_sweep_state`, `next_timer_at`, `created_at`
@@ -838,15 +848,17 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     of the draft. A later "remember my dock" requirement needs a per-author
     preference store, which no area has today; it does not need a different
     dock.
-- **No "Long text" field type.** `field-catalog-redesign`'s type picker lists
-  the ten `baseFieldType` values under friendly names and stops there. The
-  contract has no multiline string variant, and `tmp/Field Catalog
-  Redesign/`, the Claude Design template that change realizes, is direction
-  rather than a contract proposal — it shows a "Long text" entry the
-  definition contract cannot back. A future multiline type is a separate
-  definition-contract change, gated on a real need: rendered behavior (a
-  `<textarea>` versus a single-line `<input>`) that a `string` field cannot
-  already express through the existing renderer.
+- **"Long text" was rejected as a type and shipped as a control.**
+  `field-catalog-redesign` listed the ten `baseFieldType` values under
+  friendly names and stopped there, because the contract carried no multiline
+  string variant. `tmp/Field Catalog Redesign/`, the Claude Design template
+  that change realizes, showed a "Long text" entry the definition contract
+  could not back. The rejection named the one thing that would reverse it:
+  rendered behavior a `string` field cannot already express. Adding a type
+  member was never the way to supply it.
+  `field-model-type-format-control` supplies it as `control: "multiline"`,
+  which renders a `<textarea>` over an ordinary `{"type": "string"}` field.
+  The type enum gains no member, and only the renderer reads the key.
 - **`FieldDef.default` now seeds an instance's initial data.**
   `field-catalog-redesign` shipped no editor for it and no runtime reader,
   since building one before the engine read the value would have shipped UI
