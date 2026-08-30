@@ -90,8 +90,7 @@ export function DefaultValueEditor({ field, onChange }: Props) {
 }
 
 function LiteralDefaultInput({ field, value, onChange }: { field: DraftField; value: DraftDefault; onChange: (next: DraftDefault) => void }) {
-  const dataSourceBound = field.dataSource !== undefined;
-  const kind = literalControlKind(field.type, dataSourceBound);
+  const kind = literalControlKind(field);
 
   if (kind === "boolean") {
     return (
@@ -113,12 +112,15 @@ function LiteralDefaultInput({ field, value, onChange }: { field: DraftField; va
       </label>
     );
   }
-  if (kind === "date" || kind === "datetime") {
+  // A formatted string takes that format's own native input, so the value an
+  // author types faces the same domain check at publish that a participant's
+  // faces at submission.
+  if (kind === "date" || kind === "datetime" || kind === "email") {
     return (
       <label>
         {t("defaultValue.literalLabel")}
         <input
-          type={kind === "date" ? "date" : "datetime-local"}
+          type={kind === "datetime" ? "datetime-local" : kind}
           value={typeof value === "string" ? value : ""}
           onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value)}
         />
@@ -128,7 +130,7 @@ function LiteralDefaultInput({ field, value, onChange }: { field: DraftField; va
   if (kind === "none") {
     return <p className="studio-note">{t("defaultValue.dataSourceNoOptions")}</p>;
   }
-  if (kind === "select") {
+  if (kind === "options") {
     return (
       <label>
         {t("defaultValue.literalLabel")}
@@ -143,10 +145,10 @@ function LiteralDefaultInput({ field, value, onChange }: { field: DraftField; va
       </label>
     );
   }
-  if (kind === "multiselect") {
+  if (kind === "options-multi") {
     const selected = Array.isArray(value) ? (value as string[]) : [];
     return (
-      <fieldset className="default-value-multiselect">
+      <fieldset className="default-value-options">
         <legend>{t("defaultValue.literalLabel")}</legend>
         {(field.options ?? []).map((opt, i) => (
           <label key={i} className="plugin-field-option">

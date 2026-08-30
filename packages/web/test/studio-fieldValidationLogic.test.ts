@@ -14,14 +14,12 @@ describe("offeredKeys", () => {
     expect(offeredKeys("number")).toEqual(["min", "max", "rule"]);
   });
 
-  it("offers minLength, maxLength, pattern and rule for a string-valued field", () => {
-    for (const type of ["string", "date", "datetime", "select", "reference"] as const) {
-      expect(offeredKeys(type)).toEqual(["minLength", "maxLength", "pattern", "rule"]);
-    }
+  it("offers minLength, maxLength, pattern and rule for a string field", () => {
+    expect(offeredKeys("string")).toEqual(["minLength", "maxLength", "pattern", "rule"]);
   });
 
-  it("offers minLength, maxLength and rule for a multiselect field, since a list carries no pattern", () => {
-    expect(offeredKeys("multiselect")).toEqual(["minLength", "maxLength", "rule"]);
+  it("offers minLength, maxLength and rule for a list field, since a list carries no pattern", () => {
+    expect(offeredKeys("list")).toEqual(["minLength", "maxLength", "rule"]);
   });
 
   it("offers rule alone for boolean and group, since neither ever reaches a checkConstraints branch", () => {

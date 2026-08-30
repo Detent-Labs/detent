@@ -1,4 +1,4 @@
-import type { BaseFieldType, FieldOption, LocalizedText } from "workflow-engine/schema";
+import type { BaseFieldType, FieldFormat, FieldOption, LocalizedText } from "workflow-engine/schema";
 import type { ResolvedViewField } from "form-ui";
 import type { DraftField } from "./fields";
 import { resolveDraftLocalizedText, type DraftLocalizedText } from "./localized-text";
@@ -14,28 +14,34 @@ function resolvedLabel(text: DraftLocalizedText, locale: string, baseLocale: str
   return { [locale]: resolveDraftLocalizedText(text, locale, baseLocale) ?? "" };
 }
 
+/** One sample value per format, for the "How it will look" preview. A format
+ * narrows the value domain the engine checks, so the sample must lie inside
+ * it or the preview shows a value a participant could not submit. */
+const FORMAT_SAMPLE: Record<FieldFormat, unknown> = {
+  date: "2026-01-15",
+  datetime: "2026-01-15T09:00",
+  integer: 42,
+  email: "sample@example.com",
+};
+
 /** One sample value per base type, for the "How it will look" preview
- * (design.md decision 5). A `select`/`multiselect` field previews its first
- * declared option when it carries one; a plugin (custom) type takes the
- * same free-text sample `FieldForm` itself falls back to for one — the
- * engine treats a plugin type as opaque the same way (`JS_TYPE`,
- * `src/schema/definition.ts`). */
-function sampleValue(type: BaseFieldType, options: FieldOption[]): unknown {
+ * (design.md decision 5). A field carrying options previews its first
+ * declared one; a plugin (custom) type takes the same free-text sample
+ * `FieldForm` itself falls back to for one — the engine treats a plugin type
+ * as opaque the same way (`JS_TYPE`, `src/schema/definition.ts`).
+ *
+ * The format wins over the type where the field declares one, since the
+ * format is the narrower of the two rules a submitted value faces. */
+function sampleValue(type: BaseFieldType, format: FieldFormat | undefined, options: FieldOption[]): unknown {
+  if (format !== undefined) return FORMAT_SAMPLE[format];
   switch (type) {
     case "string":
-    case "reference":
-      return "Sample text";
+      return options[0] ? options[0].value : "Sample text";
     case "number":
       return 42;
     case "boolean":
       return true;
-    case "date":
-      return "2026-01-15";
-    case "datetime":
-      return "2026-01-15T09:00";
-    case "select":
-      return options[0]?.value;
-    case "multiselect":
+    case "list":
       return options[0] ? [options[0].value] : [];
     case "file":
       return "example.pdf";
@@ -75,10 +81,14 @@ function synthesizeEntry(field: DraftField, group: string | undefined, locale: s
       key,
       label: resolvedLabel(field.label, locale, baseLocale),
       type,
+      // Both keys reach the preview: an author who picks a format or a
+      // control sees the input a participant will get, not the type default.
+      format: field.format,
+      control: field.control,
       options: options.length ? options : undefined,
       dataSource: field.dataSource,
     },
-    value: sampleValue(type, options),
+    value: sampleValue(type, field.format, options),
     required: false,
     readonly: true,
     group,

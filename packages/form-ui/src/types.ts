@@ -1,4 +1,4 @@
-import type { BaseFieldType, Plugin, LocalizedText, FieldOption } from "workflow-engine/schema";
+import type { BaseFieldType, FieldControl, FieldFormat, Plugin, LocalizedText, FieldOption } from "workflow-engine/schema";
 
 /**
  * Wire shapes for a step form — what a consumer gets back from the HTTP
@@ -12,6 +12,13 @@ export interface WireField {
   key: string;
   label: LocalizedText;
   type: BaseFieldType | Plugin;
+  /** The value's semantics, over and above its form. The renderer reads it to
+   * pick a native input (`date`, `datetime-local`, `email`) and to step a
+   * number by one. The engine reads it too — it is what validates the value. */
+  format?: FieldFormat;
+  /** The input form. The renderer is its only reader: nothing else in the
+   * system changes behavior because a string draws as a textarea. */
+  control?: FieldControl;
   options?: FieldOption[];
   dataSource?: string;
 }

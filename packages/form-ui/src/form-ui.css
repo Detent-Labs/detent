@@ -88,7 +88,8 @@
 }
 
 .form-ui-field input,
-.form-ui-field select {
+.form-ui-field select,
+.form-ui-field textarea {
   font: inherit;
   font-size: 14px;
   padding: var(--space-2);
@@ -98,9 +99,52 @@
 }
 
 .form-ui-field input:focus-visible,
-.form-ui-field select:focus-visible {
+.form-ui-field select:focus-visible,
+.form-ui-field textarea:focus-visible {
   border-color: var(--color-accent);
   outline-offset: 0;
+}
+
+/* A multiline string grows downward only. Horizontal resize would break the
+   grid track the field sits in. */
+.form-ui-field textarea {
+  resize: vertical;
+}
+
+/* A tick box is not a text field: the border IS the control the platform
+   draws, so the field border above must not double it. The accent marks the
+   checked state, the one place it acts as a stamp inside a form. */
+.form-ui-field input[type="checkbox"],
+.form-ui-field input[type="radio"] {
+  padding: 0;
+  border: none;
+  background: none;
+  accent-color: var(--color-accent);
+}
+
+/* A radio group and a checkbox group. The <legend> takes the field label's own
+   face, since it IS the field label — not the 16px heading a `group` field's
+   legend carries, which names a section rather than a control. */
+.form-ui-field-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.form-ui-field-options > legend {
+  padding: 0;
+  margin-bottom: var(--space-1);
+}
+
+/* Each option: the tick box, then its own label text, on one row. */
+.form-ui-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 14px;
 }
 
 .form-ui-field-group {

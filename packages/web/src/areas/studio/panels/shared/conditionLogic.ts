@@ -14,7 +14,7 @@
  */
 
 import { parseAst, serializeAst, celType, INSTANCE_SCHEMA, ACTOR_SCHEMA } from "workflow-engine/cel/check";
-import type { ProcessBody } from "workflow-engine/schema";
+import type { BaseFieldType, ProcessBody } from "workflow-engine/schema";
 import type { DraftField } from "../../draft/fields";
 import { flattenDraftFields } from "../../draft/fields";
 import { resolveDraftLocalizedText } from "../../draft/localized-text";
@@ -32,10 +32,15 @@ export interface Operand {
   celType: string;
   /**
    * The catalog's own field type, which the value editor needs and `celType`
-   * cannot supply: `date` and `datetime` both type as CEL `string`, but they
-   * take different native inputs.
+   * cannot supply on its own.
    */
   declaredType?: string;
+  /**
+   * The catalog's declared `format`. Three of the four members type as CEL
+   * `string`, so the format is what decides which native input the value
+   * editor draws — see `inputTypeFor`.
+   */
+  format?: string;
   /** Present when the value editor can offer a closed list. */
   options?: OperandOption[];
   /** A select bound to a data source: no studio route resolves its options. */
@@ -59,8 +64,25 @@ export const CMP_OPS: CmpOp[] = ["==", "!=", "<", "<=", ">", ">="];
 /** Operators offered per CEL type. A list gets `in` alone; it is the only mirrored form. */
 export function operatorsFor(celTypeName: string): CmpOp[] {
   if (celTypeName === "list<string>") return ["in"];
-  if (celTypeName === "double") return CMP_OPS;
+  if (celTypeName === "double" || celTypeName === "int") return CMP_OPS;
   return ["==", "!="];
+}
+
+/**
+ * The native input a literal value editor draws for an operand. The format
+ * decides it where the field declares one: `date`, `datetime` and `email` all
+ * type as CEL `string`, so `celType` cannot tell the three apart. The type
+ * decides it otherwise.
+ *
+ * One copy, read by both builders — the condition builder and the rule
+ * builder each held their own before this.
+ */
+export function inputTypeFor(operand: Pick<Operand, "declaredType" | "format">): "number" | "date" | "datetime-local" | "email" | "text" {
+  if (operand.format === "date") return "date";
+  if (operand.format === "datetime") return "datetime-local";
+  if (operand.format === "email") return "email";
+  if (operand.declaredType === "number") return "number";
+  return "text";
 }
 
 // --- operands -------------------------------------------------------------
@@ -93,8 +115,9 @@ export function fieldOperand(f: DraftField, prefix: string, locale: string, base
   const operand: Operand = {
     path: `${prefix}.${f.key}`,
     label: fieldLabel(f, locale, baseLocale),
-    celType: celType(f.type as never),
+    celType: celType({ type: f.type as BaseFieldType, format: f.format }),
     declaredType: typeof f.type === "string" ? f.type : undefined,
+    format: f.format,
   };
   if (f.options?.length) {
     operand.options = f.options.flatMap((o) =>
@@ -305,9 +328,18 @@ function celString(v: string): string {
  * author typed. A `number` field is CEL `double`, so `data.count == 5` fails
  * and needs `5.0` — the builder writes it, and the papercut disappears for
  * everyone who authors here.
+ *
+ * A field carrying `format: "integer"` types as CEL `int` instead, and the
+ * two do not mix: `data.anzahl > 3.0` fails the check against one. So an
+ * `int` operand takes a bare integer, and a value with a decimal part is no
+ * literal for it at all.
  */
 export function celLiteral(value: string | number | boolean, celTypeName: string): string | undefined {
   if (celTypeName === "bool") return value === true || value === "true" ? "true" : "false";
+  if (celTypeName === "int") {
+    const n = typeof value === "number" ? value : Number(value);
+    return Number.isInteger(n) ? String(n) : undefined;
+  }
   if (celTypeName === "double") {
     const n = typeof value === "number" ? value : Number(value);
     if (!Number.isFinite(n)) return undefined;

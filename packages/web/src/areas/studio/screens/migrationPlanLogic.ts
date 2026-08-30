@@ -9,7 +9,7 @@
  * version bodies it already holds.
  */
 import { celType } from "workflow-engine/cel/check";
-import { CANCEL_SINK_STEP_ID, type BaseFieldType } from "workflow-engine/schema";
+import { CANCEL_SINK_STEP_ID, type BaseFieldType, type FieldFormat } from "workflow-engine/schema";
 import { resolveDraftLocalizedText } from "../draft/localized-text.js";
 
 const CANCEL_SINK: string = CANCEL_SINK_STEP_ID;
@@ -95,7 +95,10 @@ export function readCatalog(body: unknown): VersionCatalog {
         id: field.id,
         key: typeof field.key === "string" ? field.key : "",
         label: entryLabel(field, baseLocale),
-        celType: celType((field.type ?? {}) as BaseFieldType | object),
+        // `celType` reads the format too: an `integer` number reports `int`,
+        // so the form can report a `double` source mapped onto an `int`
+        // target rather than passing the pair as a match.
+        celType: celType({ type: (field.type ?? {}) as BaseFieldType, format: field.format as FieldFormat | undefined }),
       });
     }
   };

@@ -1,5 +1,5 @@
 import { t } from "../../catalog.js";
-import { operatorsFor, type CmpOp } from "./conditionLogic";
+import { inputTypeFor, operatorsFor, type CmpOp } from "./conditionLogic";
 import {
   fieldValueOperandsFor,
   isRuleRowComplete,
@@ -15,14 +15,6 @@ interface Props {
   onChange: (next: RuleCondition) => void;
 }
 
-/** The native input type a literal value editor uses, by the operand's
- * declared field type. Mirrors `ConditionBuilder`'s own `inputTypeFor`. */
-function inputTypeFor(declared: string | undefined): "number" | "date" | "datetime-local" | "text" {
-  if (declared === "number") return "number";
-  if (declared === "date") return "date";
-  if (declared === "datetime") return "datetime-local";
-  return "text";
-}
 
 function LiteralEditor({
   row,
@@ -62,7 +54,7 @@ function LiteralEditor({
 
   return (
     <input
-      type={inputTypeFor(operand.declaredType)}
+      type={inputTypeFor(operand)}
       aria-label={label}
       placeholder={t("condition.valuePlaceholder")}
       value={String(current ?? "")}

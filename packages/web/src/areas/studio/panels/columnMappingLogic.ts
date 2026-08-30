@@ -40,13 +40,15 @@ function boundList(
  * Whether the editor appears for this field.
  *
  * Two of the three conditions are the engine's: `checkColumnMapping` refuses a
- * mapping on a field carrying no `dataSource`, and on a field that is not a
- * `select`. The `"db.list"` narrowing is this editor's own — only a data list
- * declares columns, so no other source type gives the picker anything to
- * offer. A mapping on such a source stays authorable in the JSON view.
+ * mapping on a field carrying no `dataSource`, and on a field whose type is
+ * not `string`. A mapping writes one row's columns into other fields, and a
+ * `list` field picks several rows for one target. The `"db.list"` narrowing is
+ * this editor's own — only a data list declares columns, so no other source
+ * type gives the picker anything to offer. A mapping on such a source stays
+ * authorable in the JSON view.
  */
 export function showsColumnMapping(field: DraftField, dataSources: readonly DraftDataSource[]): boolean {
-  if (field.type !== "select" || field.dataSource === undefined) return false;
+  if (field.type !== "string" || field.dataSource === undefined) return false;
   return dataSources.find((d) => d?.id === field.dataSource)?.type === DB_LIST_TYPE;
 }
 

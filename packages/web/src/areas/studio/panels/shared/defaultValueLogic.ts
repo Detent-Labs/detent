@@ -16,25 +16,40 @@ export function asExpression(v: DraftDefault): DraftExpression | undefined {
     : undefined;
 }
 
-/** design.md Decision 3: a group's own default is never read, and a
- * reference/file field has no author-typeable literal shape — both disable
- * the whole Default-value zone rather than accept a value that silently
- * never applies. */
+/** design.md Decision 3: a group's own default is never read, and a `file`
+ * field has no author-typeable literal shape — both disable the whole
+ * Default-value zone rather than accept a value that silently never applies.
+ *
+ * `reference` is gone from the type enum, and with it the one line that
+ * separated it from a `string`: it now takes a default like any other string
+ * field. */
 export function defaultValueDisabledReason(type: FieldType): "group" | "type" | undefined {
   if (type === "group") return "group";
-  if (type === "reference" || type === "file") return "type";
+  if (type === "file") return "type";
   return undefined;
 }
 
-export type LiteralControlKind = "string" | "number" | "boolean" | "date" | "datetime" | "select" | "multiselect" | "none";
+export type LiteralControlKind = "string" | "number" | "boolean" | "date" | "datetime" | "email" | "options" | "options-multi" | "none";
 
-/** Which literal control the zone offers, per design.md Decision 3's
- * per-type mapping. A `dataSource`-bound select/multiselect offers none: the
- * draft carries no resolved rows to build one from. */
-export function literalControlKind(type: FieldType, dataSourceBound: boolean): LiteralControlKind {
-  if (type === "select" || type === "multiselect") return dataSourceBound ? "none" : type;
-  if (type === "number" || type === "boolean" || type === "date" || type === "datetime") return type;
-  return "string"; // string, and the custom/plugin fallback
+/** Which literal control the zone offers. It reads the same three keys the
+ * renderer does, in the same order — the options first, then the format, then
+ * the type — so an author types a default into the input a participant will
+ * fill, and the publish-time literal-`default` check verdicts what they typed
+ * against the same domain.
+ *
+ * A `dataSource`-bound picker offers none: the draft carries no resolved rows
+ * to build one from. `control` is deliberately absent. It changes how a
+ * participant picks, never what an author may type here. */
+export function literalControlKind(field: Pick<DraftField, "type" | "format" | "options" | "dataSource">): LiteralControlKind {
+  const { type } = field;
+  if (type === "boolean" || type === "number") return type;
+  if (type === "list") return field.dataSource !== undefined ? "none" : "options-multi";
+  if (type === "string") {
+    if (field.dataSource !== undefined) return "none";
+    if ((field.options ?? []).length > 0) return "options";
+    if (field.format === "date" || field.format === "datetime" || field.format === "email") return field.format;
+  }
+  return "string"; // a plain string, and the custom/plugin fallback
 }
 
 /** Parse `text` as CEL for the Default-value zone's raw-CEL arm. Empty text
@@ -46,7 +61,7 @@ export function parseCelDefault(text: string): { ok: true; value: DraftExpressio
   return parseAst(text) === null ? { ok: false } : { ok: true, value: { lang: "cel", src: text } as DraftExpression };
 }
 
-/** A multiselect literal default's checkbox-group toggle. An emptied
+/** A `list` field's literal-default checkbox-group toggle. An emptied
  * selection clears the `default` key rather than writing `[]` — the schema
  * reads `default` as optional, and a body carrying `[]` says an author meant
  * something they did not (the same rule `columnMapping`'s own empty-object

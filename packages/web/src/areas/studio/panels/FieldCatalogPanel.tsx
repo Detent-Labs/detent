@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from "react";
-import type { BaseFieldType, DataSourceDef, Expression, FieldDef, FieldOption } from "workflow-engine/schema";
+import type { BaseFieldType, DataSourceDef, Expression, FieldControl, FieldDef, FieldFormat, FieldOption } from "workflow-engine/schema";
 import { FieldForm } from "form-ui";
 import type { DraftOf } from "../draft/types";
 import { useDraft, type Mutate } from "../draft/store";
@@ -17,8 +17,8 @@ import { FieldValidationEditor } from "./shared/FieldValidationEditor";
 import { DefaultValueEditor } from "./shared/DefaultValueEditor";
 import { fieldLocaleGaps, missingTranslationWarning, seedLocalizedText } from "../draft/localized-text";
 import { draftFields } from "../draft/fields";
-import { nextFieldKey } from "./fieldCatalogLogic.js";
-import { FIELD_TYPE_LABELS } from "../draft/field-type-labels";
+import { allowedForType, droppedByTypeChange, nextFieldKey } from "./fieldCatalogLogic.js";
+import { FIELD_CONTROL_LABELS, FIELD_FORMAT_LABELS, FIELD_TYPE_LABELS } from "../draft/field-type-labels";
 import {
   applyTechnicalMarker,
   applyVisibleOverride,
@@ -35,13 +35,98 @@ type DraftField = DraftOf<FieldDef>;
 type DraftDataSource = DraftOf<DataSourceDef>;
 type DraftOption = DraftOf<FieldOption>;
 
-const BASE_FIELD_TYPES: BaseFieldType[] = [
-  "string", "number", "boolean", "date", "datetime",
-  "select", "multiselect", "reference", "file", "group",
-];
+const BASE_FIELD_TYPES: BaseFieldType[] = ["string", "number", "boolean", "list", "file", "group"];
 
 function isCustomType(type: DraftField["type"]): type is DraftOf<FieldDef>["type"] & object {
   return typeof type === "object" && type !== null;
+}
+
+/**
+ * Applies a type switch, dropping a `format` or a `control` the new type
+ * refuses and naming that drop before it happens.
+ *
+ * Leaving the key in place would let the developer publish a body
+ * `checkFieldFormatControl` rejects, and neither picker would still offer the
+ * refused member, so no control on screen would say why.
+ */
+function changeType(field: DraftField, raw: string, onChange: (patch: Partial<DraftField>) => void): void {
+  const type: DraftField["type"] = raw === "__custom__" ? { type: "", config: {} } : (raw as BaseFieldType);
+  const dropped = droppedByTypeChange(field, type);
+  if (dropped.length > 0) {
+    // One key per whole sentence: a translator reads the sentence, never two
+    // halves glued around a key name.
+    const message =
+      dropped.length === 2
+        ? t("fieldCatalog.typeDropsBothConfirm")
+        : dropped[0] === "format"
+          ? t("fieldCatalog.typeDropsFormatConfirm")
+          : t("fieldCatalog.typeDropsControlConfirm");
+    if (!confirm(message)) return;
+  }
+  onChange({
+    type,
+    ...(dropped.includes("format") ? { format: undefined } : {}),
+    ...(dropped.includes("control") ? { control: undefined } : {}),
+  });
+}
+
+/**
+ * The format picker and the control picker, below the type picker at both
+ * editing sites. Each offers the selected type's own allowed members, read
+ * from the one table the compile pass verdicts against, plus an entry for
+ * declaring no member at all.
+ *
+ * A type whose row allows no member hides that picker outright. An empty
+ * picker states nothing, and a `file` field shows neither.
+ */
+function FormatControlPickers({ field, onChange }: { field: DraftField; onChange: (patch: Partial<DraftField>) => void }) {
+  const allowed = allowedForType(field.type);
+  const format = field.format;
+  const control = field.control;
+  return (
+    <>
+      {allowed.formats.length > 0 && (
+        <>
+          <label>
+            format
+            <select
+              className="studio-mono"
+              value={format ?? ""}
+              onChange={(e) => onChange({ format: e.target.value === "" ? undefined : (e.target.value as FieldFormat) })}
+            >
+              <option value="">{t("fieldCatalog.noneOption")}</option>
+              {allowed.formats.map((f) => (
+                <option key={f} value={f}>
+                  {FIELD_FORMAT_LABELS[f].name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {format !== undefined && <p className="studio-note">{FIELD_FORMAT_LABELS[format].note}</p>}
+        </>
+      )}
+      {allowed.controls.length > 0 && (
+        <>
+          <label>
+            control
+            <select
+              className="studio-mono"
+              value={control ?? ""}
+              onChange={(e) => onChange({ control: e.target.value === "" ? undefined : (e.target.value as FieldControl) })}
+            >
+              <option value="">{t("fieldCatalog.noneOption")}</option>
+              {allowed.controls.map((c) => (
+                <option key={c} value={c}>
+                  {FIELD_CONTROL_LABELS[c].name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {control !== undefined && <p className="studio-note">{FIELD_CONTROL_LABELS[control].note}</p>}
+        </>
+      )}
+    </>
+  );
 }
 
 interface SubFieldRowProps {
@@ -170,14 +255,7 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
       )}
       <label>
         type
-        <select
-          className="studio-mono"
-          value={typeSelectValue}
-          onChange={(e) => {
-            if (e.target.value === "__custom__") onChange({ type: { type: "", config: {} } });
-            else onChange({ type: e.target.value as BaseFieldType });
-          }}
-        >
+        <select className="studio-mono" value={typeSelectValue} onChange={(e) => changeType(field, e.target.value, onChange)}>
           {BASE_FIELD_TYPES.map((bft) => (
             <option key={bft} value={bft}>
               {bft}
@@ -186,6 +264,7 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
           <option value="__custom__">{t("fieldCatalog.customTypeOption")}</option>
         </select>
       </label>
+      <FormatControlPickers field={field} onChange={onChange} />
       <label className="studio-field-technical">
         {t("fieldCatalog.technicalLabel")}
         <input
@@ -538,14 +617,7 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
         )}
         <label>
           type
-          <select
-            className="studio-mono"
-            value={typeSelectValue}
-            onChange={(e) => {
-              if (e.target.value === "__custom__") onChange({ type: { type: "", config: {} } });
-              else onChange({ type: e.target.value as BaseFieldType });
-            }}
-          >
+          <select className="studio-mono" value={typeSelectValue} onChange={(e) => changeType(field, e.target.value, onChange)}>
             {BASE_FIELD_TYPES.map((bft) => (
               <option key={bft} value={bft}>
                 {FIELD_TYPE_LABELS[bft].name}
@@ -555,6 +627,7 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
           </select>
         </label>
         {typeof field.type === "string" && <p className="studio-note">{FIELD_TYPE_LABELS[field.type].note}</p>}
+        <FormatControlPickers field={field} onChange={onChange} />
         <label className="studio-field-technical">
           {t("fieldCatalog.technicalLabel")}
           <input

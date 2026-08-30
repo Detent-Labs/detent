@@ -1,4 +1,4 @@
-import type { BaseFieldType } from "workflow-engine/schema";
+import type { BaseFieldType, FieldFormat } from "workflow-engine/schema";
 import type { DraftField } from "./fields";
 import { mintId } from "./ids";
 
@@ -10,19 +10,23 @@ export type PaletteFieldKind = "text" | "choice" | "date" | "file" | "section";
 
 export const PALETTE_FIELD_KINDS: PaletteFieldKind[] = ["text", "choice", "date", "file", "section"];
 
-/** The catalog `BaseFieldType` a palette entry mints. */
-export function baseTypeForPaletteKind(kind: PaletteFieldKind): BaseFieldType {
+/** The catalog declaration a palette entry mints: a `BaseFieldType`, plus the
+ * `format` that entry names where the type alone does not carry it. "Date" is
+ * the one such entry — a date is a `string` whose format says so. "Choice" is
+ * a plain `string`: what makes a field a picker is the options an author adds
+ * next, not its type. */
+export function baseTypeForPaletteKind(kind: PaletteFieldKind): { type: BaseFieldType; format?: FieldFormat } {
   switch (kind) {
     case "text":
-      return "string";
+      return { type: "string" };
     case "choice":
-      return "select";
+      return { type: "string" };
     case "date":
-      return "date";
+      return { type: "string", format: "date" };
     case "file":
-      return "file";
+      return { type: "file" };
     case "section":
-      return "group";
+      return { type: "group" };
   }
 }
 
@@ -35,8 +39,9 @@ export function baseTypeForPaletteKind(kind: PaletteFieldKind): BaseFieldType {
  * own sub-field editor (`FieldCatalogPanel`) reads and appends to it.
  */
 export function mintCatalogField(kind: PaletteFieldKind, label: DraftField["label"]): DraftField {
-  const type = baseTypeForPaletteKind(kind);
+  const { type, format } = baseTypeForPaletteKind(kind);
   const field: DraftField = { id: mintId("field"), key: "", label, type };
+  if (format !== undefined) field.format = format;
   if (type === "group") field.fields = [];
   return field;
 }

@@ -1396,7 +1396,7 @@
   gap: var(--space-2);
 }
 
-.default-value-multiselect {
+.default-value-options {
   border: none;
   padding: 0;
   margin: 0;
