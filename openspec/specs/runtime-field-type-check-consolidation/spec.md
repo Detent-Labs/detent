@@ -25,20 +25,32 @@ fail-open runtime default. A `FieldDef["type"]` that is not a
 opaque-accept case, evaluated before the table lookup, unchanged from
 pre-consolidation behavior.
 
+The declared `format`'s own value check SHALL live in that same one
+implementation, behind the same entry point. No caller SHALL keep a second
+copy. The entry point SHALL therefore take the field, not its `type` alone, so
+one argument covers both halves. The `expected` label SHALL name the declared
+format when the field carries one, and the JS shape otherwise.
+
 #### Scenario: A scalar-typed field's value is checked against its JS shape
 
-- **WHEN** a field of type `string`, `date`, `datetime`, `select`, or
-  `reference` is checked against a submitted value
+- **WHEN** a field of type `string` is checked against a submitted value
 - **THEN** the check passes only if the value is a JS `string`, and a
-  failing `type-mismatch` issue's `expected` is `"string"` — identical to
-  pre-consolidation behavior
+  failing `type-mismatch` issue's `expected` is `"string"`
 
 #### Scenario: A multiselect field's value is checked as an array of strings
 
-- **WHEN** a `multiselect` field is checked against a submitted value
+- **WHEN** a `list` field is checked against a submitted value
 - **THEN** the check passes only if the value is an array whose every
   element is a JS `string`, and a failing `type-mismatch` issue's
-  `expected` is `"string[]"` — identical to pre-consolidation behavior
+  `expected` is `"string[]"`
+
+#### Scenario: A formatted field's value passes both halves in one call
+
+- **WHEN** the check runs over a `{type: "string", format: "date"}` field and a
+  submitted value
+- **THEN** one call runs the JS-shape half and the format half
+- **AND** a value failing the format half draws a `type-mismatch` issue whose
+  `expected` is `"date"`
 
 #### Scenario: An opaque field type always matches
 

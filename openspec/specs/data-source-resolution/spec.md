@@ -95,10 +95,10 @@ declares `dataSource`, resolve the referenced `DataSourceDef` from
 `body.dataSources`, look up its handler in `registry` by `type`, call
 `resolve({ config: def.config, heldValues, instance })`, and attach the
 result. `heldValues` SHALL carry the values the instance holds for that field:
-none when the field is unset, one for a `select`, and the whole array for a
-`multiselect`. `instance` SHALL carry the instance whose view or submission is
-resolving, with its `id`, its `processId`, its current `data`, and its
-process's `baseLocale`. Each view
+none when the field is unset, one for a `string` field, and the whole array
+for a `list` field. `instance` SHALL carry the instance whose view or
+submission is resolving, with its `id`, its `processId`, its current `data`,
+and its process's `baseLocale`. Each view
 field resolves through its own `resolve` call. Two
 fields on the same step bound to the same data source and holding the same
 values each trigger their own call; neither call's result is shared with the

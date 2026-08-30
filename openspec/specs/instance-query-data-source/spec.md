@@ -150,11 +150,11 @@ to a field whose declared type holds a non-scalar value.
 <!-- antislop: allow synonym-rotation -->
 This is an in-process check, unlike the compared field's own type check
 above. No target-process lookup happens, since the reference names the
-publishing body's own catalog. Left unchecked, a `multiselect`- or
-`group`-typed `valueFromField` substitutes an array or an object as the
-read's comparison right side. The instance data read then rejects that
-non-scalar value as invalid, at resolution time. This happens on every form
-render and every submission that reaches the source, not once at publish.
+publishing body's own catalog. Left unchecked, a `list`- or `group`-typed
+`valueFromField` substitutes an array or an object as the read's comparison
+right side. The instance data read then rejects that non-scalar value as
+invalid, at resolution time. This happens on every form render and every
+submission that reaches the source, not once at publish.
 
 #### Scenario: An unresolvable valueFromField fails the publish
 - **WHEN** a `valueFromField` names a field id absent from the reading
@@ -163,7 +163,7 @@ render and every submission that reaches the source, not once at publish.
 
 #### Scenario: A non-scalar valueFromField field fails the publish
 - **WHEN** a `valueFromField` names a field of the reading process's own
-  catalog whose declared type is `multiselect` or `group`
+  catalog whose declared type is `list` or `group`
 - **THEN** validation produces a located issue for that data source's config
 
 #### Scenario: A scalar valueFromField field publishes
@@ -229,7 +229,7 @@ all.
 A source instance holding a non-scalar value under a configured `attributes`
 field SHALL produce no entry for that column key. This is the same treatment
 an unfilled field gets. The `attributes` values are plain
-`string | number | boolean`. A `multiselect` or `group` field can hold an
+`string | number | boolean`. A `list` or `group` field can hold an
 array or an object instead. No publish check rules that out for an
 `attributes` reference.
 

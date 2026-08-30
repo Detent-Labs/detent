@@ -47,12 +47,12 @@ body SHALL still carry no `columnMapping` for that field.
 
 ### Requirement: The editor appears only where a mapping can publish
 
-The editor SHALL appear for a `select` field bound to a `"db.list"` data
+The editor SHALL appear for a `string` field bound to a `"db.list"` data
 source, and for no other field.
 
 Two of those conditions come from the engine. `checkColumnMapping` refuses a
-mapping on a field carrying no `dataSource`. It refuses one on a field that is
-not a `select`. An editor offered there would invite an author to build a
+mapping on a field carrying no `dataSource`. It refuses one on a field whose
+type is not `string`. An editor offered there would invite an author to build a
 publish error, which the checks rail then reports.
 
 The `"db.list"` narrowing is this editor's own. Only a data list declares
@@ -62,28 +62,28 @@ it.
 
 Losing either condition SHALL hide the editor. The field's stored
 `columnMapping` SHALL survive that, so restoring the condition restores the
-rows. A `multiselect` picks several rows for one target, and the author who
-switches back has not asked to drop the mapping.
+rows. A `list` field picks several rows for one target. The author who switches
+back has not asked to drop the mapping.
 
 #### Scenario: A select field bound to a data list shows the editor
 
-- **WHEN** an author opens a `select` field bound to a `"db.list"` source
+- **WHEN** an author opens a `string` field bound to a `"db.list"` source
 - **THEN** the editor appears
 
 #### Scenario: A field with inline options shows no editor
 
-- **WHEN** an author opens a `select` field carrying inline `options`
+- **WHEN** an author opens a `string` field carrying inline `options`
 - **THEN** the editor does not appear
 
 #### Scenario: A multiselect shows no editor
 
-- **WHEN** an author switches a mapping field's type to `multiselect`
+- **WHEN** an author switches a mapping field's type to `list`
 - **THEN** the editor does not appear, and the draft keeps the field's
   `columnMapping`
 
 #### Scenario: Restoring the type restores the rows
 
-- **WHEN** that author switches the type back to `select`
+- **WHEN** that author switches the type back to `string`
 - **THEN** the editor shows the rows the field still carried
 
 ### Requirement: The column picker offers what the bound list declares

@@ -15,10 +15,10 @@ and `runtime-field-type-check-consolidation` capabilities, for the same
 ### Requirement: The compile-pass field-tree checks share one walk
 
 The write-path field checks SHALL run as one traversal of `body.fields`.
-The four checks are: pattern compilation and length, `columnMapping`
-validation, field-key format, and field-key length. One
-`walkFieldsIndexed` pass runs all four at each field, instead of four
-separate traversals.
+The five checks are: pattern compilation and length, `columnMapping`
+validation, field-key format, field-key length, and the `format`/`control`
+check the `definition-contract` capability states. One `walkFieldsIndexed`
+pass runs all five at each field, instead of five separate traversals.
 
 The merge SHALL NOT change the set of `CompileIssue`s a body produces.
 Every violation keeps the same `loc`, `value`, and `message` a
@@ -31,14 +31,19 @@ check's own sweep.
 #### Scenario: A body with several field-level defects reports the same issues
 
 - **WHEN** a body's fields carry a mix of pattern, `columnMapping`,
-  key-format, and key-length violations spread across several fields
+  key-format, key-length, and `format`/`control` violations spread across
+  several fields
 - **THEN** `compileProcessBody` throws a `CompileValidationError`. Treat
   its issues as a set of `{loc, value, message}` triples. That set
-  matches what four pre-consolidation functions produced together.
-  Those four are `checkPatterns`, `checkColumnMapping`,
-  `checkFieldKeyFormat`, and the field-key-length loop of
-  `checkLengthBounds`. `body.fields` gets walked once instead of four
-  times.
+  matches what the five checks produce independently. `body.fields` gets
+  walked once instead of five times.
+
+#### Scenario: A disallowed format reports from the same walk
+
+- **WHEN** one field declares a `format` its `type` does not allow and
+  another field on the same body carries a key-format violation
+- **THEN** both issues appear in the one `CompileValidationError`, each
+  located at its own field
 
 #### Scenario: checkLengthBounds retains bounds it does not share with the merged walk
 
@@ -58,6 +63,10 @@ FieldDef[]`, declared in `src/schema/definition.ts` beside
 `collectFieldsDeep`. Neither of the three functions SHALL filter
 `collectFieldsDeep`'s output for `type !== "group"` inline, on its own.
 
+Each of the three reads the whole `FieldDef`, not its `type` alone, since a
+field's CEL type now follows its `format` as well. The helper's return shape
+already carries both keys.
+
 #### Scenario: CEL check's data schema excludes group fields
 
 - **WHEN** `validateProcessBody` builds the `data` namespace's type schema
@@ -65,6 +74,13 @@ FieldDef[]`, declared in `src/schema/definition.ts` beside
 - **THEN** the resulting key set holds exactly the process's leaf fields. A
   `group`-typed field at any depth contributes no entry, matching
   pre-consolidation `dataSchema` output exactly.
+
+#### Scenario: A nested integer field reports int in the data schema
+
+- **WHEN** that same body carries a `{type: "number", format: "integer"}`
+  field inside a group
+- **THEN** the `data` namespace holds that field's key with the CEL type
+  `int`
 
 #### Scenario: Runtime guard context re-keys only leaf fields
 

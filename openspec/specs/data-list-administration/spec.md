@@ -49,7 +49,7 @@ Every body written before the column declaration existed takes that case.
 - **THEN** the detail response names that process
 
 #### Scenario: The detail route reports a mapped column key
-- **WHEN** a published body binds a select field to that list, and the field
+- **WHEN** a published body binds a string field to that list, and the field
   maps the list's `price` column
 - **THEN** the entry for that process carries `price`
 

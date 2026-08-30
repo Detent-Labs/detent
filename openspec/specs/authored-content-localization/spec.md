@@ -51,8 +51,8 @@ locales are optional.
   invariant)
 
 #### Scenario: The invariant applies to nested group fields and field options
-- **WHEN** a `group`-type field's nested field, or a `select`-type field's
-  `FieldOption.label`, is missing the process's `baseLocale` entry
+- **WHEN** a `group`-type field's nested field, or the `FieldOption.label` of
+  a field carrying `options`, is missing the process's `baseLocale` entry
 - **THEN** the process body fails to parse, exactly as it would for a
   top-level field's `label`
 

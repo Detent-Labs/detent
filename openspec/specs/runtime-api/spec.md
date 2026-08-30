@@ -976,15 +976,19 @@ For every field key present in a submission, `submitAndTransition` (and
 `createProcessInstance`'s `opts.data` seed) SHALL validate the submitted
 value, against the merged (not-yet-committed) data, in this order:
 
-1. A type match against the field's declared `FieldDef.type`, mirroring
-   `check.ts::celType`'s existing mapping: `string`/`date`/`datetime`/
-   `select`/`reference` require a JS `string`; `number` a JS `number`;
-   `boolean` a JS `boolean`; `multiselect` an array of strings; `file` and a
-   plugin (object) type are opaque and accepted as-is.
+1. A type match against the field's declared `FieldDef.type`, mirroring the
+   catalog's CEL-type mapping: `string` requires a JS `string`; `number` a JS
+   `number`; `boolean` a JS `boolean`; `list` an array of strings; `file` and a
+   plugin (object) type are opaque and accepted as-is. Where the field also
+   declares a `format`, the value SHALL satisfy that format's value domain
+   too. The `definition-contract` capability states each domain. A value
+   failing either half carries a `type-mismatch` issue. That issue's
+   `expected` names the format where the field declares one, and the JS shape
+   otherwise.
 2. If the field's resolved `options` is non-empty — populated from static
    `FieldDef.options`, or from a `dataSource`-bound field's runtime-resolved
    options, per the `data-source-resolution` capability — the value (each
-   item, for `multiselect`) must equal one resolved option's `value`.
+   item, for a `list` field) must equal one resolved option's `value`.
 3. Its effective constraints (`min`, `max`, `minLength`, `maxLength`,
    `pattern`).
 4. If present, its effective `rule` CEL expression, evaluated with total
@@ -993,6 +997,10 @@ value, against the merged (not-yet-committed) data, in this order:
    catalog field's `rule` against (no `result`, no `child`). A rule
    referencing the field's own value does so via `data.<key>`, like any
    other guard.
+
+The format half of step 1 SHALL run wherever the type half runs. The outbox's
+writeback check of a handler's `Action.output` value reads the same rule. A
+handler therefore cannot write a value a participant could not submit.
 
 The effective validation for a field in a step is the catalog field's
 `validation` when the step's matching `view.fields[]` entry declares no
@@ -1018,6 +1026,28 @@ transition.
 - **WHEN** a submitted value does not match its field's declared type
 - **THEN** the result carries a `type-mismatch` issue for that field
 
+#### Scenario: A value the declared format refuses is rejected
+- **WHEN** a submitted value for a `{type: "string", format: "date"}` field is
+  a string that is not a calendar date
+- **THEN** the result carries a `type-mismatch` issue for that field, whose
+  `expected` reads `date`
+
+#### Scenario: A fractional value for an integer field is rejected
+- **WHEN** a submitted value for a `{type: "number", format: "integer"}` field
+  carries a fractional part
+- **THEN** the result carries a `type-mismatch` issue for that field, whose
+  `expected` reads `integer`
+
+#### Scenario: A field declaring no format keeps its type check alone
+- **WHEN** a submitted value for a `{type: "string"}` field is any JS string
+- **THEN** the value passes the type check, whatever its content
+
+#### Scenario: A handler writeback faces the same format check
+- **WHEN** an action's `output` writes a value a field's declared `format`
+  refuses
+- **THEN** the writeback drops that target, exactly as it drops a value the
+  declared type refuses
+
 #### Scenario: A value outside a field's declared options is rejected
 - **WHEN** a submitted value for a field with declared static `options` does
   not equal any `option.value`
@@ -1029,9 +1059,8 @@ transition.
 - **THEN** the result carries an `invalid-option` issue for that field
 
 #### Scenario: A multiselect value is checked item-by-item against options
-- **WHEN** a `multiselect` field declares `options` (static or
-  `dataSource`-bound) and a submitted array includes an item not among the
-  resolved options
+- **WHEN** a `list` field declares `options` (static or `dataSource`-bound)
+  and a submitted array includes an item not among the resolved options
 - **THEN** the result carries an `invalid-option` issue for that field
 
 #### Scenario: A constraint violation is rejected
@@ -1487,7 +1516,7 @@ resolves. A strategy on that step therefore reads the final data, mapped values
 included.
 
 #### Scenario: Picking a row writes the mapped fields
-- **WHEN** a participant submits a `select` field whose picked option carries
+- **WHEN** a participant submits a `string` field whose picked option carries
   `attributes.price` and whose `columnMapping` sends `price` to a number field
 - **THEN** that number field holds the attribute's value after the commit
 
