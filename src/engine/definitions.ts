@@ -201,13 +201,13 @@ async function validateGroupScope(body: ProcessBody, processId: ProcessId, db: S
 }
 
 /**
- * "multiselect" holds `string[]`, "group" holds a nested object — neither
+ * "list" holds `string[]`, "group" holds a nested object — neither
  * compares at the JSON level. Every other declared field type is scalar,
  * including a custom field-type plugin envelope (`FieldDef.type` is
  * `BaseFieldType | Plugin`), which the spec names no rejection for.
  */
 function isNonScalarFieldType(type: unknown): boolean {
-  return type === "multiselect" || type === "group";
+  return type === "list" || type === "group";
 }
 
 /**

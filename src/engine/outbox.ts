@@ -292,7 +292,7 @@ export async function drainOutbox(
           // not in the catalog) is not checked — see the resolver-miss note
           // above.
           const field = fieldsById?.get(fid);
-          if (field && !typeMatches(field.type, val as Literal)) {
+          if (field && !typeMatches(field, val as Literal)) {
             droppedTargets.push(fid as FieldId);
             continue;
           }

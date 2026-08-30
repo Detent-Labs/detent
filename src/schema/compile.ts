@@ -39,7 +39,13 @@ import {
   CANCEL_SINK_KEY,
   RESERVED_CANCEL_OUTCOME,
   RESERVED_ACTION_PREFIX,
+  ALLOWED_BY_TYPE,
+  formatMatches,
   type Action,
+  type BaseFieldType,
+  type FieldControl,
+  type FieldFormat,
+  type Literal,
   type ProcessBody,
   type Step,
 } from "./definition.js";
@@ -506,8 +512,8 @@ function checkColumnMapping(f: any, floc: string, fieldsById: Map<string, any>, 
   if (f.dataSource === undefined) {
     issues.push({ loc, value: String(f.id), message: "columnMapping needs a dataSource: an inline options array declares no columns" });
   }
-  if (f.type !== "select") {
-    issues.push({ loc, value: String(f.type), message: "columnMapping needs a select field: a multiselect picks several rows for one target" });
+  if (f.type !== "string") {
+    issues.push({ loc, value: String(f.type), message: "columnMapping needs a string field: a list picks several rows for one target" });
   }
 
   const seenTargets = new Map<string, string>();
@@ -566,8 +572,53 @@ function checkFieldExpressionLength(f: any, floc: string, issues: CompileIssue[]
   checkExpr(f?.default, `${floc}.default`);
 }
 
+/**
+ * The allowed-pair check (design.md Decision 2, D22): reject a `format` or a
+ * `control` the field's own `type` does not admit, and a literal `default`
+ * the declared `format` refuses (Decision 9). `ALLOWED_BY_TYPE` is the one
+ * table both halves read; a plugin-typed field has no row, so it may declare
+ * neither key.
+ *
+ * A write-path check, not a Zod refinement: a refinement runs on READ, so a
+ * tightened one makes an already-published body throw when the store resolves
+ * it. `.claude/rules/authoring-invariants.md` states the placement rule, and
+ * a hand-written body must not bypass this one.
+ *
+ * An `Expression` default is skipped. The CEL layer types that one, and that
+ * layer reads no format.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function checkFieldFormatControl(f: any, floc: string, issues: CompileIssue[]): void {
+  const allowed = typeof f?.type === "string" ? ALLOWED_BY_TYPE[f.type as BaseFieldType] : undefined;
+
+  if (f?.format !== undefined) {
+    if (!allowed || !allowed.formats.includes(f.format as FieldFormat)) {
+      issues.push({
+        loc: `${floc}.format`,
+        value: String(f.format),
+        message: `field type '${String(f.type)}' does not allow format '${String(f.format)}'`,
+      });
+    } else if (f.default !== undefined && isLiteralDefault(f.default) && !formatMatches(f.format as FieldFormat, f.default as Literal)) {
+      issues.push({
+        loc: `${floc}.default`,
+        value: JSON.stringify(f.default),
+        message: `default value does not match format '${String(f.format)}'`,
+      });
+    }
+  }
+
+  if (f?.control !== undefined && (!allowed || !allowed.controls.includes(f.control as FieldControl))) {
+    issues.push({
+      loc: `${floc}.control`,
+      value: String(f.control),
+      message: `field type '${String(f.type)}' does not allow control '${String(f.control)}'`,
+    });
+  }
+}
+
 /** One pass over `body.fields`, running `checkPatterns`, `checkColumnMapping`,
- * `checkFieldKeyFormat`, `checkFieldExpressionLength`, and the field-key-length
+ * `checkFieldKeyFormat`, `checkFieldFormatControl`,
+ * `checkFieldExpressionLength`, and the field-key-length
  * bound together per field, in that fixed sequence. `fieldsById` is built once,
  * over the whole tree, since `checkColumnMapping` alone resolves a mapping
  * target that can name any field in the process, not only the one under walk. */
@@ -582,6 +633,7 @@ function checkFieldTree(body: ProcessBody): CompileIssue[] {
     checkPatterns(f, floc, issues);
     checkColumnMapping(f, floc, fieldsById, issues);
     checkFieldKeyFormat(f, floc, issues);
+    checkFieldFormatControl(f, floc, issues);
     checkFieldExpressionLength(f, floc, issues);
     if (typeof f?.key === "string" && f.key.length > MAX_KEY_LENGTH) {
       issues.push({ loc: `${floc}.key`, value: f.key, message: `key exceeds the ${MAX_KEY_LENGTH}-character bound` });
