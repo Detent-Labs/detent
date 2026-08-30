@@ -19,7 +19,7 @@
  * cover keys that no read reproduces, and the resulting pin would never
  * rehydrate.
  *
- * Every check in this module — durations and the nine structural checks alike —
+ * Every check in this module — durations and the eleven structural checks alike —
  * runs on BOTH compile branches, ahead of the `publishedProcessBody`-valid
  * early return: that placement is what makes a check unbypassable by a
  * hand-written body that merely satisfies `publishedProcessBody` (which
@@ -490,6 +490,41 @@ function checkGroupReference(body: ProcessBody): CompileIssue[] {
   return issues;
 }
 
+// ============================================================
+// 9. actor-from-field-assignment: a step's org.actor-from-field fieldId must
+// name a field the body declares with `format: "person"` (D14). A direct
+// sibling of the check above, resolving against the FIELD tree rather than a
+// body-level list. Without it an author meets the mistake only as an empty
+// candidate list at runtime. The literal "org.actor-from-field" mirrors
+// ACTOR_FROM_FIELD_STRATEGY_TYPE in src/engine/assignment-strategies.ts — not
+// imported, for the same reason the check above does not import its own.
+// ============================================================
+
+function checkActorFromFieldReference(body: ProcessBody): CompileIssue[] {
+  const issues: CompileIssue[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fieldsById = new Map(collectFieldsDeep((body.fields ?? []) as any).map((f: any) => [String(f.id), f]));
+
+  body.workflow.steps.forEach((s, si) => {
+    const strategy = s.assignment?.strategy;
+    if (strategy?.type !== "org.actor-from-field") return;
+    const fieldId = (strategy.config as { fieldId?: unknown })?.fieldId;
+    if (typeof fieldId !== "string") return; // left to the registry config-schema check
+    const field = fieldsById.get(fieldId);
+    // A missing field and a wrongly-formatted one report the same way: both
+    // mean the strategy has nothing valid to read.
+    if (!field || field.format !== "person") {
+      issues.push({
+        loc: `workflow.steps[${si}].assignment.strategy.config.fieldId`,
+        value: String(fieldId),
+        message: `step '${s.key}' references field '${fieldId}' via org.actor-from-field, but it does not declare format: "person"`,
+      });
+    }
+  });
+
+  return issues;
+}
+
 /**
  * `FieldDef.columnMapping` bounds. Seven rules, all write-path: a hand-written
  * body could satisfy `publishedProcessBody` while breaking one, so
@@ -598,7 +633,7 @@ function checkFieldFormatControl(f: any, floc: string, issues: CompileIssue[]): 
         value: String(f.format),
         message: `field type '${String(f.type)}' does not allow format '${String(f.format)}'`,
       });
-    } else if (f.default !== undefined && isLiteralDefault(f.default) && !formatMatches(f.format as FieldFormat, f.default as Literal)) {
+    } else if (f.default !== undefined && isLiteralDefault(f.default) && !formatMatches({ type: f.type as BaseFieldType, format: f.format as FieldFormat }, f.default as Literal)) {
       issues.push({
         loc: `${floc}.default`,
         value: JSON.stringify(f.default),
@@ -1102,6 +1137,7 @@ function structuralIssues(body: ProcessBody): CompileIssue[] {
     ...checkRedactableFields(body),
     ...checkUnsatisfiableRequiredReadonly(body),
     ...checkGroupReference(body),
+    ...checkActorFromFieldReference(body),
   ];
 }
 
@@ -1111,7 +1147,7 @@ export function compileProcessBody(body: ProcessBody): ProcessBody {
   const durations = validateDurations(body);
   if (durations.length > 0) throw new DurationValidationError(durations);
 
-  // The nine structural checks, same placement as validateDurations and for
+  // The eleven structural checks, same placement as validateDurations and for
   // the same reason: ahead of the publishedProcessBody-valid early return
   // below, so a hand-written body that merely satisfies that schema (which
   // checks only the cancel-sink count) cannot skip any of them.

@@ -18,6 +18,7 @@
 import { z } from "zod";
 import { getManagerOf } from "../auth/users.js";
 import { getGroupMembers } from "../auth/groups.js";
+import type { FieldId } from "../schema/definition.js";
 import {
   type AssignmentRegistry,
   type AssignmentStrategyDef,
@@ -80,9 +81,44 @@ export const groupMembersStrategyDef: AssignmentStrategyDef = {
   },
 };
 
+export const ACTOR_FROM_FIELD_STRATEGY_TYPE = "org.actor-from-field";
+
+/** Strict, one key: the strategy reads only the field it resolves against. */
+export const actorFromFieldConfigSchema = z.object({ fieldId: z.string() }).strict();
+
+/**
+ * Resolve the person the instance's own data names, read live at every step
+ * entry from `data[config.fieldId]` (`actor-from-field-assignment`). Homed
+ * here, not in leaf `registry.ts`, for the same reason `org.group-members` is:
+ * the `group_` branch reads the database (`getGroupMembers`).
+ *
+ * A `user_`-prefixed value is the sole candidate. A `group_`-prefixed value
+ * expands through `getGroupMembers`, which already excludes a disabled account
+ * and resolves an unknown group to `[]`. The `user_` passthrough filters
+ * nothing, matching the built-in `static` resolver: a disabled account cannot
+ * authenticate to claim a step whichever strategy named it.
+ *
+ * Resolution is total. An unwritten field, a non-string value and a string
+ * carrying neither prefix each resolve to `[]`, which
+ * `resolveStepAssignment` classifies as `no-candidates`. The publish-time
+ * check (`compile.ts::checkActorFromFieldReference`) is what catches the
+ * authoring mistake ahead of that.
+ */
+export const actorFromFieldStrategyDef: AssignmentStrategyDef = {
+  configSchema: actorFromFieldConfigSchema,
+  resolve: async (ctx) => {
+    const { fieldId } = ctx.config as { fieldId: string };
+    const value = ctx.instance.data[fieldId as FieldId];
+    if (typeof value !== "string") return [];
+    if (value.startsWith("group_")) return getGroupMembers(value, ctx.db);
+    if (value.startsWith("user_")) return [value];
+    return [];
+  },
+};
+
 /**
  * The registry the engine ships: the built-in `static` entry plus
- * `org.manager-of-starter` and `org.group-members`.
+ * `org.manager-of-starter`, `org.group-members` and `org.actor-from-field`.
  *
  * It takes no database. Each resolution reads `ctx.db`, so one registry serves
  * every tenant — a handle bound here would resolve every tenant's manager
@@ -92,5 +128,6 @@ export function createDefaultAssignmentRegistry(): AssignmentRegistry {
   const reg = createStaticAssignmentRegistry();
   reg.set(MANAGER_OF_STARTER_STRATEGY_TYPE, managerOfStarterStrategyDef);
   reg.set(GROUP_MEMBERS_STRATEGY_TYPE, groupMembersStrategyDef);
+  reg.set(ACTOR_FROM_FIELD_STRATEGY_TYPE, actorFromFieldStrategyDef);
   return reg;
 }

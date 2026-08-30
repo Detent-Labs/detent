@@ -977,6 +977,7 @@ describe("compile: unsatisfiable required+readonly pair", () => {
     "subprocess-credit-check-child.json",
     "subprocess-loan-parent.json",
     "purchase-requisition.json",
+    "access-request.json",
   ];
 
   it("publishes each example definition unchanged", () => {
@@ -1075,6 +1076,71 @@ describe("compile: org.group-members groupId resolves within allowedGroups", () 
   it("rejects the violation even on a body that already satisfies publishedProcessBody", () => {
     const compiled: any = compileProcessBody(groupBody("group_finance", ["group_finance"]) as ProcessBody);
     compiled.allowedGroups = [];
+    expect(publishedProcessBody.safeParse(compiled).success).toBe(true);
+    expect(() => compileProcessBody(compiled)).toThrow(CompileValidationError);
+  });
+});
+
+// actor-from-field-assignment: a step's org.actor-from-field fieldId must name
+// a field the body declares with `format: "person"`. Resolves against the
+// FIELD tree rather than a body-level list, so a missing field and a
+// wrongly-formatted one report the same way.
+describe("compile: org.actor-from-field fieldId names a person-formatted field", () => {
+  const actorBody = (fieldId: string, field?: any): any => {
+    const b = baseBody();
+    if (field) b.fields.push(field);
+    b.workflow.steps[0].assignment = { strategy: { type: "org.actor-from-field", config: { fieldId } } };
+    return b;
+  };
+
+  const personField = { id: "field_approver", key: "approver", label: { en: "Approver" }, type: "string", format: "person" };
+
+  it("publishes when the fieldId names a person-formatted field", () => {
+    const b = actorBody("field_approver", personField);
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("publishes for a list-typed person field too", () => {
+    const b = actorBody("field_approvers", {
+      id: "field_approvers",
+      key: "approvers",
+      label: { en: "Approvers" },
+      type: "list",
+      format: "person",
+    });
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("rejects when the fieldId names no field in the body, naming the step and the field id", () => {
+    const b = actorBody("field_ghost");
+    const err = rejects(b);
+    expect(
+      err.issues.some((i) => i.loc === "workflow.steps[0].assignment.strategy.config.fieldId" && i.value === "field_ghost"),
+    ).toBe(true);
+  });
+
+  it("rejects when the named field declares no person format", () => {
+    const b = actorBody("field_amount");
+    const err = rejects(b);
+    expect(
+      err.issues.some((i) => i.loc === "workflow.steps[0].assignment.strategy.config.fieldId" && i.value === "field_amount"),
+    ).toBe(true);
+  });
+
+  it("reaches a person field nested inside a group, so the check walks the whole field tree", () => {
+    const b = actorBody("field_approver", {
+      id: "field_g",
+      key: "g",
+      label: { en: "G" },
+      type: "group",
+      fields: [personField],
+    });
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("rejects the violation even on a body that already satisfies publishedProcessBody", () => {
+    const compiled: any = compileProcessBody(actorBody("field_approver", personField) as ProcessBody);
+    compiled.fields[1].format = "email";
     expect(publishedProcessBody.safeParse(compiled).success).toBe(true);
     expect(() => compileProcessBody(compiled)).toThrow(CompileValidationError);
   });

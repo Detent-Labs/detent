@@ -685,10 +685,10 @@ test.skipIf(!DB)("GET /registry keeps the type-name arrays to exactly those thre
   const body = (await res.json()) as { actionTypes: string[]; dataSourceTypes: string[]; assignmentStrategyTypes: string[] };
   expect(body.actionTypes).toEqual(["http.request"]);
   expect(body.dataSourceTypes).toEqual(["static", INSTANCE_QUERY_DATA_SOURCE_TYPE]);
-  // All three entries the shipped registry holds: the built-in `static`, and
-  // the org-aware `org.manager-of-starter`/`org.group-members` the
-  // composition root adds.
-  expect(body.assignmentStrategyTypes).toEqual(["static", "org.manager-of-starter", "org.group-members"]);
+  // All four entries the shipped registry holds: the built-in `static`, and
+  // the org-aware `org.manager-of-starter`/`org.group-members`/
+  // `org.actor-from-field` the composition root adds.
+  expect(body.assignmentStrategyTypes).toEqual(["static", "org.manager-of-starter", "org.group-members", "org.actor-from-field"]);
 });
 
 test.skipIf(!DB)("GET /registry carries a config-schema description only for a schema-backed type", async () => {

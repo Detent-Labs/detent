@@ -127,8 +127,12 @@ function LiteralDefaultInput({ field, value, onChange }: { field: DraftField; va
       </label>
     );
   }
+  // Two fields reach "none", and the note names which one the author is on.
+  // The data-source string names a data source by hand, so a bare person
+  // field — which declares none — takes its own instead, never both.
   if (kind === "none") {
-    return <p className="studio-note">{t("defaultValue.dataSourceNoOptions")}</p>;
+    const personNote = field.format === "person" && field.dataSource === undefined;
+    return <p className="studio-note">{t(personNote ? "defaultValue.personNoOptions" : "defaultValue.dataSourceNoOptions")}</p>;
   }
   if (kind === "options") {
     return (

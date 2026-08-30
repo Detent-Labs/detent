@@ -145,6 +145,19 @@ export async function getGroupScopes(groupIds: string[], db: SQL = sql): Promise
 }
 
 /**
+ * Batch-by-ids name lookup, mirroring `getGroupScopes`'s shape over the same
+ * id set. A missing key in the returned map is how a caller detects a
+ * nonexistent group id — read by `resolveFields`' person-field option
+ * resolution (`src/runtime/api.ts`), which keeps the id itself as the label
+ * for one, so a stale `allowedGroups` entry stays visible.
+ */
+export async function groupNamesForIds(groupIds: string[], db: SQL = sql): Promise<Map<string, string>> {
+  if (groupIds.length === 0) return new Map();
+  const rows = (await db`SELECT group_id, name FROM groups WHERE group_id = ANY(${db.array(groupIds, "TEXT")})`) as { group_id: string; name: string }[];
+  return new Map(rows.map((r) => [r.group_id, r.name]));
+}
+
+/**
  * Every PUBLISHED process whose `allowedGroups` still names `groupId`, an
  * `EXISTS` scan of `definitions` matching `src/http/admin-routes.ts::
  * referencingProcesses`'s shape (task 1.7). Uses the `@>` containment

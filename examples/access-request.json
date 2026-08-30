@@ -1,0 +1,200 @@
+{
+  "processId": "proc_access_request",
+  "version": 1,
+  "definitionHash": "fd55401de818a9c1f50726e5c8f61e4c0bddf76807d7b721ab70d3de82649e11",
+  "status": "published",
+  "publishedAt": "2026-08-31T09:00:00Z",
+  "definition": {
+    "key": "access_request",
+    "label": {
+      "en": "Access Request"
+    },
+    "description": {
+      "en": "One `allowedGroups` entry serves two readers. It is the people list a `format: \"person\"` field's picker offers, and it is the allowlist the `org.group-members` step below references. The requester names one approver and any number of reviewers; `org.actor-from-field` routes the approval step to whoever that first field holds."
+    },
+    "baseLocale": "en",
+    "allowedGroups": ["group_it_ops"],
+    "fields": [
+      {
+        "id": "field_7d2f4b80-0001-4a1c-8e2f-000000000001",
+        "key": "system",
+        "label": {
+          "en": "System"
+        },
+        "description": {
+          "en": "The system the requester wants access to."
+        },
+        "type": "string",
+        "validation": {
+          "minLength": 2,
+          "maxLength": 60
+        }
+      },
+      {
+        "id": "field_7d2f4b80-0002-4a1c-8e2f-000000000002",
+        "key": "approver",
+        "label": {
+          "en": "Approver"
+        },
+        "description": {
+          "en": "One person, stored as a bare principal id. The picker offers `group_it_ops` itself plus that group's member accounts, since the body declares no `options` and no `dataSource` on this field."
+        },
+        "type": "string",
+        "format": "person"
+      },
+      {
+        "id": "field_7d2f4b80-0003-4a1c-8e2f-000000000003",
+        "key": "reviewers",
+        "label": {
+          "en": "Reviewers"
+        },
+        "description": {
+          "en": "Several people, from the same list the Approver field draws on. `format: \"person\"` on a `list` field is the multi-person shape."
+        },
+        "type": "list",
+        "format": "person",
+        "control": "checkboxes"
+      },
+      {
+        "id": "field_7d2f4b80-0004-4a1c-8e2f-000000000004",
+        "key": "justification",
+        "label": {
+          "en": "Justification"
+        },
+        "type": "string",
+        "control": "multiline",
+        "validation": {
+          "maxLength": 500
+        }
+      }
+    ],
+    "workflow": {
+      "initialStep": "step_1e6a9c30-0001-4a1c-8e2f-000000000001",
+      "steps": [
+        {
+          "id": "step_1e6a9c30-0001-4a1c-8e2f-000000000001",
+          "key": "request",
+          "label": {
+            "en": "Raise the Request"
+          },
+          "description": {
+            "en": "The requester picks the approver and the reviewers here. Both pickers read `allowedGroups`."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": ["requester"]
+              }
+            }
+          },
+          "view": {
+            "fields": [
+              {
+                "ref": "field_7d2f4b80-0001-4a1c-8e2f-000000000001",
+                "required": true
+              },
+              {
+                "ref": "field_7d2f4b80-0002-4a1c-8e2f-000000000002",
+                "required": true
+              },
+              {
+                "ref": "field_7d2f4b80-0003-4a1c-8e2f-000000000003"
+              },
+              {
+                "ref": "field_7d2f4b80-0004-4a1c-8e2f-000000000004",
+                "required": true
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_5c8b3a10-0001-4a1c-8e2f-000000000001",
+              "key": "submit",
+              "label": "Submit",
+              "to": "step_1e6a9c30-0002-4a1c-8e2f-000000000002",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_1e6a9c30-0002-4a1c-8e2f-000000000002",
+          "key": "approve",
+          "label": {
+            "en": "Approve the Request"
+          },
+          "description": {
+            "en": "Assigned through `org.actor-from-field` against the Approver field. A `user_` value routes to that account alone; a `group_` value expands to the group's current members."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "org.actor-from-field",
+              "config": {
+                "fieldId": "field_7d2f4b80-0002-4a1c-8e2f-000000000002"
+              }
+            }
+          },
+          "view": {
+            "fields": [
+              {
+                "ref": "field_7d2f4b80-0001-4a1c-8e2f-000000000001",
+                "readonly": true
+              },
+              {
+                "ref": "field_7d2f4b80-0004-4a1c-8e2f-000000000004",
+                "readonly": true
+              },
+              {
+                "ref": "field_7d2f4b80-0003-4a1c-8e2f-000000000003",
+                "readonly": true
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_5c8b3a10-0002-4a1c-8e2f-000000000002",
+              "key": "grant",
+              "label": "Grant",
+              "to": "step_1e6a9c30-0003-4a1c-8e2f-000000000003",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_1e6a9c30-0003-4a1c-8e2f-000000000003",
+          "key": "provision",
+          "label": {
+            "en": "Provision the Access"
+          },
+          "description": {
+            "en": "Assigned through `org.group-members` against `group_it_ops`, the same `allowedGroups` entry the Approver field's picker draws on."
+          },
+          "type": "task",
+          "terminal": true,
+          "assignment": {
+            "strategy": {
+              "type": "org.group-members",
+              "config": {
+                "groupId": "group_it_ops"
+              }
+            }
+          },
+          "view": {
+            "fields": [
+              {
+                "ref": "field_7d2f4b80-0001-4a1c-8e2f-000000000001",
+                "readonly": true
+              },
+              {
+                "ref": "field_7d2f4b80-0002-4a1c-8e2f-000000000002",
+                "readonly": true
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

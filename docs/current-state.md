@@ -21,7 +21,7 @@ Stage-by-stage status is in `ROADMAP.md`.
     `list`, `file` and `group`. Each one maps to a single CEL type and a
     single JS shape, so neither `celType` (`src/cel/check.ts`) nor `JS_TYPE`
     collapses members any more.
-  - `fieldFormat` holds `date`, `datetime`, `integer` and `email`.
+  - `fieldFormat` holds `date`, `datetime`, `integer`, `email` and `person`.
     `fieldControl` holds `multiline`, `radio` and `checkboxes`. Both keys are
     optional on `FieldDef`, and both enums stay closed, so every member
     carries a publish-time check.
@@ -32,6 +32,12 @@ Stage-by-stage status is in `ROADMAP.md`.
   - `formatMatches` checks a value against its format, and `typeMatches`
     runs it after the JS-shape check. Both take the whole field, as do
     `celType` and `expectedTypeLabel`, since the format is half the rule.
+  - The `person` format sits on the `string` row and on the `list` row. It
+    is the only format `ALLOWED_BY_TYPE` admits on a `list`. So
+    `formatMatches` forks on the field's own `type` for it. A `string` field
+    checks the scalar, a `list` field checks every element. Each one must
+    carry the `user_` or `group_` prefix, and the engine stores no name
+    beside the id.
   - A `format: "integer"` field reports the CEL type `int` rather than
     `double`, so `data.anzahl % 2 == 0` type-checks. The author pays twice
     for it: integer division truncates, and an expression mixing an integer
@@ -119,7 +125,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   only the cascade resumes. A first call that omitted `resolveBody` therefore
   leaves a `pending` sweep a later call can finish.
 - Publish-time structural checks (`src/schema/compile.ts`, harden-publish-validation;
-  `test/compile-validation.test.ts`, `test/cancel.test.ts`). Eight write-path checks
+  `test/compile-validation.test.ts`, `test/cancel.test.ts`). Eleven write-path checks
   run inside `compileProcessBody`. They run right after `validateDurations`.
   They run **before** the `publishedProcessBody`-valid idempotent early return.
   That placement makes a check unbypassable. A hand-written body cannot skip it
@@ -232,7 +238,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   <!-- antislop: allow synonym-rotation -->
   <!-- "build"/"create" both name this file's existing, larger split usage of the concept; this passage keeps "build" consistently within itself. -->
   Two exported functions form the seam. `validateStructure(authored)` runs
-  the Zod gate, duration and the nine structural checks, in that order. It
+  the Zod gate, duration and the eleven structural checks, in that order. It
   builds the compiled body the second function needs. It is the only
   sanctioned way to build one from an authored input.
 
@@ -677,7 +683,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   declares a resolver (`(ctx) => Promise<string[]>`) and may declare a config
   schema. `"static"` (`registry.ts::STATIC_ASSIGNMENT_STRATEGY_TYPE`,
   registered by `createDefaultAssignmentRegistry`) is the entry an author gets
-  by default; two more now ship beside it. `"org.manager-of-starter"`
+  by default; three more now ship beside it. `"org.manager-of-starter"`
   (`engine/assignment-strategies.ts::MANAGER_OF_STARTER_STRATEGY_TYPE`), whose
   config schema is a strict empty object. Its resolver returns the manager
   of `instance.startedBy` as the single candidate. ONE hop: never a chain, and
@@ -687,15 +693,32 @@ Stage-by-stage status is in `ROADMAP.md`.
   (`engine/assignment-strategies.ts::GROUP_MEMBERS_STRATEGY_TYPE`) takes one
   config key, `{ groupId: string }`. Its resolver reads the named group's
   CURRENT member list from the `groups` store (`src/auth/groups.ts`),
-  excluding a disabled or nonexistent account. It is the one strategy of the
-  three whose result is not frozen at step entry.
+  excluding a disabled or nonexistent account. That member list reads live at
+  every entry, never from a value frozen earlier.
 
-  It reads `auth_users.manager_user_id` through `auth/users.ts::getManagerOf`.
+  `"org.actor-from-field"`
+  (`engine/assignment-strategies.ts::ACTOR_FROM_FIELD_STRATEGY_TYPE`) takes
+  one config key, `{ fieldId: string }`, and reads `instance.data[fieldId]`.
+  A `user_` value is the sole candidate. A `group_` value expands through the
+  same `getGroupMembers` call `org.group-members` makes, so it reads live
+  too. An unset field, a non-string value and any other prefix each resolve
+  to no candidate at all.
+
+  `compile.ts::checkActorFromFieldReference` is what catches the authoring
+  mistake first. At publish it rejects a step whose `config.fieldId` names no
+  field, or names one declaring no `format: "person"`. It resolves against
+  `collectFieldsDeep`, so a person field nested in a group satisfies it. It
+  is the direct sibling of `checkGroupReference`, which holds an
+  `org.group-members` `groupId` to the body's own `allowedGroups`.
+
+  The manager strategy reads `auth_users.manager_user_id` through
+  `auth/users.ts::getManagerOf`.
   That is why it lives in its own module rather than in leaf `registry.ts`:
   `store.ts` imports `registry.ts` back, so a database-reading entry there
   would close a cycle.
-  `assignment-strategies.ts::createDefaultAssignmentRegistry(db)` returns the
-  static entry plus this one, and deliberately shares the leaf factory's NAME.
+  `assignment-strategies.ts::createDefaultAssignmentRegistry()` takes no
+  database and returns the static entry plus those three. It deliberately
+  shares the leaf factory's NAME.
   The three `src/http/*` modules therefore switch the whole HTTP surface onto
   it by changing which module the identifier comes from, with no
   default-parameter expression touched. Every in-engine default parameter still
@@ -1070,6 +1093,25 @@ Stage-by-stage status is in `ROADMAP.md`.
   naming the reading instance's own process excludes that instance. The
   constant `MAX_INSTANCE_QUERY_OPTIONS` bounds the result at 200; a read past
   the bound raises rather than truncating.
+- A person field's own option list (`src/runtime/api.ts::resolvePersonOptions`,
+  `test/data-source-resolution.test.ts`). A `format: "person"` field declaring
+  neither `options` nor `dataSource` reads the body's own `allowedGroups`
+  instead. That branch sits in `resolveFields` beside the `dataSource` one,
+  and reaches no registry.
+
+  The helper returns three layers in one array, and the renderer draws them in
+  that order. First one entry per `allowedGroups` id, taking its name from
+  `auth/groups.ts::groupNamesForIds`. Then one per member account from
+  `getGroupMembers`, deduplicated across groups, taking its name from
+  `auth/users.ts::displayNamesForUserIds`. Last the committed values the first
+  two layers left out. That tail keeps a value submittable after its account
+  leaves the group.
+
+  The helper keys every label by the body's own `baseLocale`. Neither an
+  account nor a group carries a per-locale name to key any other way. An id no
+  store resolves keeps the id as its own label. A body declaring no
+  `allowedGroups` resolves to `[]`, and `optionValuesValid` reads that as no
+  bound at all.
 - Read/query API (`src/runtime/api.ts`, `src/engine/definitions.ts`, `src/http/`,
   `test/runtime-api.test.ts`, `test/definitions.test.ts`, `test/http.test.ts`):
   closes the gap where the HTTP wrapper could only address a single instance by
@@ -3321,6 +3363,13 @@ Stage-by-stage status is in `ROADMAP.md`.
   absent, and so is a disabled account. A message nobody may act on looks
   delivered and is not. The empty set short-circuits without a query.
   `notification.email`'s `toActors` resolution reads it.
+
+  `displayNamesForUserIds(userIds, db)` is its sibling, shaped the same way
+  and applying the module's own `resolveDisplayName`. A `NULL`
+  `display_name` therefore falls back to the email, exactly as `listUsers`
+  does. It differs in one way: it does NOT filter a disabled account. A
+  person field's option list needs a name for an account taken out of
+  service. Otherwise a held value loses its label.
 
   `PATCH /admin/users/:id/manager` is the fifth `/admin/users*` route, body
   `{ managerUserId: string | null }`. It answers 400 for a self-pointer

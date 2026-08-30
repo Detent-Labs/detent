@@ -11,7 +11,9 @@ import { createRegistry } from "../src/engine/registry.js";
 import { createDataSourceRegistry, type DataSourceHandlerDef } from "../src/engine/registry.js";
 import { createDefaultDataSourceRegistry } from "../src/engine/host.js";
 import { createProcessInstance, getInstanceView, submitAndTransition, SubmissionValidationError } from "../src/runtime/api.js";
-import type { ProcessBody, ProcessId, PathId, Instance } from "../src/schema/definition.js";
+import { createUser, setDisplayName } from "../src/auth/users.js";
+import { createGroup, setGroupMembers } from "../src/auth/groups.js";
+import type { ProcessBody, ProcessId, PathId, Instance, FieldId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
 
@@ -125,7 +127,7 @@ beforeAll(async () => {
   if (DB) await initSchema();
 });
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions`;
+  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, auth_users, groups`;
   if (DB) await clearInstanceAudit();
 });
 
@@ -367,4 +369,235 @@ test.skipIf(!DB)("a runtime registry mismatch for a published data source type t
   expect(raised).toBeInstanceOf(Error);
   expect(raised).not.toBeInstanceOf(SubmissionValidationError);
   expect((raised as Error).message).toContain("static");
+});
+
+// ============================================================
+// The people list's first layer: a person field declaring neither `options`
+// nor `dataSource` reads the body's own `allowedGroups` (D23).
+// ============================================================
+
+const PERSON_PID = "proc_person_options" as ProcessId;
+
+/**
+ * step_a shows `field_approver` (string/person) and `field_reviewers`
+ * (list/person). `field_hidden` is a person field the view does NOT show, for
+ * the off-view creation arm. --(path_ab, manual, guardless)--> step_b.
+ */
+const personBody = (allowedGroups: string[], over: Record<string, unknown> = {}): ProcessBody =>
+  ({
+    key: "person_body",
+    label: { en: "Person Body" },
+    baseLocale: "en",
+    allowedGroups,
+    fields: [
+      { id: "field_approver", key: "approver", label: { en: "Approver" }, type: "string", format: "person", ...over },
+      { id: "field_reviewers", key: "reviewers", label: { en: "Reviewers" }, type: "list", format: "person" },
+      { id: "field_hidden", key: "hidden", label: { en: "Hidden" }, type: "string", format: "person" },
+    ],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          view: { fields: [{ ref: "field_approver" }, { ref: "field_reviewers" }] },
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+async function seedGroup(name: string, memberEmails: string[]): Promise<{ groupId: string; userIds: string[] }> {
+  const userIds: string[] = [];
+  for (const email of memberEmails) userIds.push((await createUser(email, "pw", [])).userId);
+  const group = await createGroup(name, { type: "global" });
+  await setGroupMembers(group.groupId, userIds);
+  return { groupId: group.groupId, userIds };
+}
+
+test.skipIf(!DB)("a bare person field resolves one option per allowed group, then one per member", async () => {
+  const { groupId, userIds } = await seedGroup("Finance", ["p1@example.com", "p2@example.com"]);
+  await setDisplayName(userIds[0]!, "Anna Erste");
+  const dsReg = createDefaultDataSourceRegistry();
+  await publishBody(PERSON_PID, personBody([groupId]), reg, dsReg);
+  const created = await createProcessInstance(PERSON_PID, actor, dsReg);
+  const view = await getInstanceView(created.instanceId, actor, dsReg);
+
+  const approver = view.fields.find((f) => f.field.key === "approver")!;
+  const values = approver.options!.map((o) => o.value);
+  // Groups lead, in the declared order of allowedGroups. The member tail
+  // follows in getGroupMembers' own order, which carries no ORDER BY, so the
+  // assertion pins membership rather than a database-arbitrary sequence.
+  expect(values[0]).toBe(groupId);
+  expect(values.slice(1).sort()).toEqual([...userIds].sort());
+  expect(approver.options![0]!.label).toEqual({ en: "Finance" });
+
+  const labelOf = (id: string) => approver.options!.find((o) => o.value === id)!.label;
+  expect(labelOf(userIds[0]!)).toEqual({ en: "Anna Erste" });
+  // A NULL display_name falls back to the email, the same resolution listUsers takes.
+  expect(labelOf(userIds[1]!)).toEqual({ en: "p2@example.com" });
+});
+
+test.skipIf(!DB)("a bare person field resolves an empty list when the body declares no allowedGroups", async () => {
+  // Fails closed (D15): no declared group is an empty list, never every
+  // account in the system.
+  const dsReg = createDefaultDataSourceRegistry();
+  await publishBody(PERSON_PID, personBody([]), reg, dsReg);
+  const created = await createProcessInstance(PERSON_PID, actor, dsReg);
+  const view = await getInstanceView(created.instanceId, actor, dsReg);
+  expect(view.fields.find((f) => f.field.key === "approver")!.options).toEqual([]);
+});
+
+test.skipIf(!DB)("a held value survives its account leaving the group, appended after the two layers", async () => {
+  const { groupId, userIds } = await seedGroup("Finance", ["p3@example.com", "p4@example.com"]);
+  const dsReg = createDefaultDataSourceRegistry();
+  await publishBody(PERSON_PID, personBody([groupId]), reg, dsReg);
+  const created = await createProcessInstance(PERSON_PID, actor, dsReg, {
+    data: { field_approver: userIds[1] } as unknown as Instance["data"],
+  });
+
+  await setGroupMembers(groupId, [userIds[0]!]);
+  const view = await getInstanceView(created.instanceId, actor, dsReg);
+  const approver = view.fields.find((f) => f.field.key === "approver")!;
+  // The departed account is last: a survival entry, not an offer.
+  expect(approver.options!.map((o) => o.value)).toEqual([groupId, userIds[0], userIds[1]]);
+  expect(approver.options![2]!.label).toEqual({ en: "p4@example.com" });
+});
+
+test.skipIf(!DB)("a person field declaring a dataSource still resolves through the dataSource branch", async () => {
+  const dsReg = createDataSourceRegistry();
+  dsReg.set("static", { resolve: async (ctx) => (ctx.config as { options: typeof COUNTRY_OPTIONS }).options });
+  const { groupId } = await seedGroup("Finance", ["p5@example.com"]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const body = personBody([groupId], { dataSource: "ds_people" }) as any;
+  body.dataSources = [{ id: "ds_people", key: "people", type: "static", config: { options: COUNTRY_OPTIONS } }];
+  await publishBody(PERSON_PID, body as ProcessBody, reg, dsReg);
+  const created = await createProcessInstance(PERSON_PID, actor, dsReg);
+  const view = await getInstanceView(created.instanceId, actor, dsReg);
+  expect(view.fields.find((f) => f.field.key === "approver")!.options).toEqual(COUNTRY_OPTIONS);
+});
+
+// D11: the stored value is the bare id, never an object carrying a name.
+test.skipIf(!DB)("a submitted person option is stored as the bare id string, with no name snapshot", async () => {
+  const { groupId, userIds } = await seedGroup("Finance", ["p6@example.com"]);
+  await setDisplayName(userIds[0]!, "Berta Zweite");
+  const dsReg = createDefaultDataSourceRegistry();
+  await publishBody(PERSON_PID, personBody([groupId]), reg, dsReg);
+  const created = await createProcessInstance(PERSON_PID, actor, dsReg);
+  const updated = await submitAndTransition(
+    created.instanceId,
+    "path_ab" as PathId,
+    { field_approver: userIds[0], field_reviewers: [groupId] } as unknown as Instance["data"],
+    actor,
+    dsReg,
+  );
+  expect(updated.data["field_approver" as FieldId]).toBe(userIds[0]);
+  expect(typeof updated.data["field_approver" as FieldId]).toBe("string");
+  expect(updated.data["field_reviewers" as FieldId]).toEqual([groupId]);
+});
+
+test.skipIf(!DB)("a group_ value from allowedGroups submits, since the group entry is offered", async () => {
+  const { groupId } = await seedGroup("Finance", ["p7@example.com"]);
+  const dsReg = createDefaultDataSourceRegistry();
+  await publishBody(PERSON_PID, personBody([groupId]), reg, dsReg);
+  const created = await createProcessInstance(PERSON_PID, actor, dsReg);
+  const updated = await submitAndTransition(
+    created.instanceId,
+    "path_ab" as PathId,
+    { field_approver: groupId } as unknown as Instance["data"],
+    actor,
+    dsReg,
+  );
+  expect(updated.currentStepId as string).toBe("step_b");
+});
+
+test.skipIf(!DB)("a user_ id outside the expansion draws invalid-option", async () => {
+  const { groupId } = await seedGroup("Finance", ["p8@example.com"]);
+  const outsider = await createUser("p9@example.com", "pw", []);
+  const dsReg = createDefaultDataSourceRegistry();
+  await publishBody(PERSON_PID, personBody([groupId]), reg, dsReg);
+  const created = await createProcessInstance(PERSON_PID, actor, dsReg);
+  let raised: unknown;
+  try {
+    await submitAndTransition(
+      created.instanceId,
+      "path_ab" as PathId,
+      { field_approver: outsider.userId } as unknown as Instance["data"],
+      actor,
+      dsReg,
+    );
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(SubmissionValidationError);
+  expect((raised as SubmissionValidationError).issues.some((i) => i.kind === "invalid-option" && i.fieldId === "field_approver")).toBe(true);
+});
+
+test.skipIf(!DB)("a literal person default outside the expansion fails createProcessInstance on a shown field", async () => {
+  const { groupId } = await seedGroup("Finance", ["pa@example.com"]);
+  const outsider = await createUser("pb@example.com", "pw", []);
+  const dsReg = createDefaultDataSourceRegistry();
+  await publishBody(PERSON_PID, personBody([groupId], { default: outsider.userId }), reg, dsReg);
+  let raised: unknown;
+  try {
+    await createProcessInstance(PERSON_PID, actor, dsReg);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(SubmissionValidationError);
+  expect((raised as SubmissionValidationError).issues.some((i) => i.kind === "invalid-option" && i.fieldId === "field_approver")).toBe(true);
+});
+
+test.skipIf(!DB)("the same default on a field the initial view does NOT show creates successfully", async () => {
+  // The off-view arm reads the catalog entry's own `options`, absent on a bare
+  // person field, so no membership check runs there (design.md Decision 8).
+  const { groupId } = await seedGroup("Finance", ["pc@example.com"]);
+  const outsider = await createUser("pd@example.com", "pw", []);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const body = personBody([groupId]) as any;
+  body.fields[2].default = outsider.userId; // field_hidden, absent from step_a's view
+  const dsReg = createDefaultDataSourceRegistry();
+  await publishBody(PERSON_PID, body as ProcessBody, reg, dsReg);
+  const created = await createProcessInstance(PERSON_PID, actor, dsReg);
+  expect(created.data["field_hidden" as FieldId]).toBe(outsider.userId);
+});
+
+test.skipIf(!DB)("an empty resolved list places no membership bound, leaving the format shape check alone", async () => {
+  // `optionValuesValid` reads `[]` and `undefined` alike and returns true, so
+  // a body declaring no allowedGroups binds nothing.
+  const dsReg = createDefaultDataSourceRegistry();
+  await publishBody(PERSON_PID, personBody([]), reg, dsReg);
+  const created = await createProcessInstance(PERSON_PID, actor, dsReg);
+  const updated = await submitAndTransition(
+    created.instanceId,
+    "path_ab" as PathId,
+    { field_approver: "user_a" } as unknown as Instance["data"],
+    actor,
+    dsReg,
+  );
+  expect(updated.currentStepId as string).toBe("step_b");
+  expect(updated.data["field_approver" as FieldId]).toBe("user_a");
+});
+
+test.skipIf(!DB)("the format shape check is the one rule an unbound person value still faces", async () => {
+  const dsReg = createDefaultDataSourceRegistry();
+  await publishBody(PERSON_PID, personBody([]), reg, dsReg);
+  const created = await createProcessInstance(PERSON_PID, actor, dsReg);
+  let raised: unknown;
+  try {
+    await submitAndTransition(
+      created.instanceId,
+      "path_ab" as PathId,
+      { field_approver: "roman" } as unknown as Instance["data"],
+      actor,
+      dsReg,
+    );
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(SubmissionValidationError);
+  expect((raised as SubmissionValidationError).issues.some((i) => i.fieldId === "field_approver" && i.kind !== "invalid-option")).toBe(true);
 });

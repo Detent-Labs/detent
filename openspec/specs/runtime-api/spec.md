@@ -372,10 +372,12 @@ an ordinary one.
 resolved `visible` (literal `boolean`, used as-is, or CEL, evaluated
 with total semantics, default `true`) is `true` against
 `buildGuardContext(body, instance, actor)`. Each entry carries its
-resolved `required`, `readonly`, `span`, and `options` (per the
-`data-source-resolution` capability: populated from static
-`FieldDef.options` unchanged, or resolved at runtime for a
-`dataSource`-bound field). A field resolving invisible SHALL be
+resolved `required`, `readonly`, `span`, and `options`, per the
+`data-source-resolution` capability. That capability names three sources
+for `options`. Static `FieldDef.options` carries through unchanged. A
+`dataSource`-bound field resolves its own at runtime. A field declaring
+`format: "person"` and neither of those resolves the body's own
+`allowedGroups` expansion. A field resolving invisible SHALL be
 omitted entirely, not included with a flag. `span` SHALL be the
 matching `ViewField.span`, or `1` when the view declares none.
 
@@ -488,6 +490,14 @@ caller can distinguish these cases.
   whose visible fields include one bound to a `dataSource`
 - **THEN** that field's resolved `options` reflects the data source's
   resolved result, not an empty or undefined list
+
+#### Scenario: A bare person field's view carries its allowedGroups-resolved options
+
+- **WHEN** `getInstanceView` is called for an instance parked on a step
+  whose visible fields include one declaring `format: "person"` and neither
+  `options` nor `dataSource`
+- **THEN** that field's resolved `options` reflects the body's own
+  `allowedGroups` expansion, per the `data-source-resolution` capability
 
 #### Scenario: A field's span defaults to 1
 
@@ -976,6 +986,8 @@ For every field key present in a submission, `submitAndTransition` (and
 `createProcessInstance`'s `opts.data` seed) SHALL validate the submitted
 value, against the merged (not-yet-committed) data, in this order:
 
+<!-- antislop: allow em-dash -->
+<!-- Normative wording reviewed in field-model-person-format; a rewrite here would change the rule. -->
 1. A type match against the field's declared `FieldDef.type`, mirroring the
    catalog's CEL-type mapping: `string` requires a JS `string`; `number` a JS
    `number`; `boolean` a JS `boolean`; `list` an array of strings; `file` and a
@@ -986,9 +998,15 @@ value, against the merged (not-yet-committed) data, in this order:
    `expected` names the format where the field declares one, and the JS shape
    otherwise.
 2. If the field's resolved `options` is non-empty — populated from static
-   `FieldDef.options`, or from a `dataSource`-bound field's runtime-resolved
-   options, per the `data-source-resolution` capability — the value (each
-   item, for a `list` field) must equal one resolved option's `value`.
+   `FieldDef.options`, from a `dataSource`-bound field's runtime-resolved
+   options, or from the `allowedGroups` expansion a `format: "person"` field
+   declaring neither of those resolves, per the `data-source-resolution`
+   capability — the value (each item, for a `list` field) must equal one
+   resolved option's `value`.
+
+   This item reads the resolved list alone. It never re-derives one from the
+   value's own shape. A person id passes here on membership, not on its
+   `user_`/`group_` prefix. Step 1 already checked that prefix.
 3. Its effective constraints (`min`, `max`, `minLength`, `maxLength`,
    `pattern`).
 4. If present, its effective `rule` CEL expression, evaluated with total
@@ -1057,6 +1075,39 @@ transition.
 - **WHEN** a submitted value for a `dataSource`-bound field does not equal
   any of that data source's resolved options' `value`
 - **THEN** the result carries an `invalid-option` issue for that field
+
+#### Scenario: A value outside a bare person field's resolved options is rejected
+
+<!-- antislop: allow sentence-length -->
+<!-- Normative wording reviewed in field-model-person-format; a rewrite here would change the rule. -->
+- **WHEN** a submitted principal id for a field declaring `format:
+  "person"` and neither `options` nor `dataSource` equals none of that
+  field's `allowedGroups`-resolved options' `value`, and the body declares at
+  least one `allowedGroups` entry
+- **THEN** the result carries an `invalid-option` issue for that field
+
+#### Scenario: An on-view person default outside the expansion fails creation
+
+<!-- antislop: allow sentence-length -->
+<!-- Normative wording reviewed in field-model-person-format; a rewrite here would change the rule. -->
+- **WHEN** `createProcessInstance` seeds a `format: "person"` field's
+  literal `default`, that field is present in the initial step's resolved
+  view, and the seeded value sits outside the body's own `allowedGroups`
+  expansion
+- **THEN** creation fails with an `invalid-option` issue for that field, since
+  the seeded default faces the same resolved-options check step 2 states for
+  a submitted value
+
+#### Scenario: An off-view person default faces no membership check
+
+- **WHEN** `createProcessInstance` seeds a `format: "person"` field's
+  literal `default`, and that field is absent from the initial step's
+  resolved view
+- **THEN** the value faces its `type` and `format` checks alone, and no
+  `invalid-option` issue
+- **AND** the reason is the off-view rule the sibling creation requirement
+  states. That rule reads the catalog entry's own static `options`. A bare
+  person field declares none
 
 #### Scenario: A multiselect value is checked item-by-item against options
 - **WHEN** a `list` field declares `options` (static or `dataSource`-bound)

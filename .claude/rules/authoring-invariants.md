@@ -131,3 +131,14 @@ only the cancel-sink count.
   first be compared — see `definition-contract`'s placement rule. A `groupId`
   that is absent or non-string is left to the assignment-registry
   config-schema check instead, so the two checks never both flag one step.
+- A step whose `assignment.strategy.type === "org.actor-from-field"` and whose
+  `config.fieldId` is a string must name a field the body declares with
+  `format: "person"`. The compile pass checks this
+  (`compile.ts::checkActorFromFieldReference`), the direct sibling of the
+  check above and placed for the same reason — see `definition-contract`'s
+  placement rule. It resolves against the field tree
+  (`collectFieldsDeep`), so a person field nested in a group satisfies it. A
+  missing field and a wrongly-formatted one draw one message: both mean the
+  strategy has nothing valid to read. A `fieldId` that is absent or
+  non-string is left to the assignment-registry config-schema check, so the
+  two checks never both flag one step.

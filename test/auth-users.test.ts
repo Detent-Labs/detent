@@ -22,6 +22,7 @@ import {
   getAccountById,
   updateAccount,
   emailsForUserIds,
+  displayNamesForUserIds,
   SelfManagerError,
 } from "../src/auth/users.js";
 
@@ -503,4 +504,35 @@ test.skipIf(!DB)("emailsForUserIds leaves out a disabled account", async () => {
 
 test.skipIf(!DB)("emailsForUserIds answers the empty set with nothing", async () => {
   expect((await emailsForUserIds([])).size).toBe(0);
+});
+
+// --- displayNamesForUserIds -------------------------------------------------
+
+test.skipIf(!DB)("displayNamesForUserIds falls back to the email for a NULL display_name", async () => {
+  const a = await createUser("n1@example.com", "pw", []);
+  const b = await createUser("n2@example.com", "pw", []);
+  await setDisplayName(b.userId, "Zweite Person");
+  const found = await displayNamesForUserIds([a.userId, b.userId]);
+  expect(found.get(a.userId)).toBe("n1@example.com");
+  expect(found.get(b.userId)).toBe("Zweite Person");
+});
+
+test.skipIf(!DB)("displayNamesForUserIds still names a disabled account, unlike emailsForUserIds", async () => {
+  // The caller labels a person an instance already holds, and an account taken
+  // out of service still needs a name beside the value it left behind.
+  const a = await createUser("n3@example.com", "pw", []);
+  await setDisplayName(a.userId, "Ausgeschieden");
+  await setDisabled(a.userId, true);
+  const found = await displayNamesForUserIds([a.userId]);
+  expect(found.get(a.userId)).toBe("Ausgeschieden");
+});
+
+test.skipIf(!DB)("displayNamesForUserIds leaves out an id matching no row", async () => {
+  const a = await createUser("n4@example.com", "pw", []);
+  const found = await displayNamesForUserIds([a.userId, "user_no_such_row"]);
+  expect([...found.keys()]).toEqual([a.userId]);
+});
+
+test.skipIf(!DB)("displayNamesForUserIds answers the empty set with nothing", async () => {
+  expect((await displayNamesForUserIds([])).size).toBe(0);
 });

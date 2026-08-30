@@ -543,6 +543,15 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
   const usage = fieldId ? fieldUsage(draft, fieldId, contentLocale, baseLocale) : [];
   const visibleState = fieldId ? fieldVisibleOverrides(draft, fieldId) : ({ kind: "none" } as const);
   const preview = previewViewFields(field, contentLocale, baseLocale);
+  // Two fields preview with no option list, and the row names which one. A
+  // bare person field declares no data source, so it takes its own wording
+  // rather than the data-source string (design.md Decision 8).
+  const previewNote: CatalogKey | undefined =
+    field.dataSource !== undefined
+      ? "fieldCatalog.previewResolvesAtRuntime"
+      : field.format === "person" && (field.options ?? []).length === 0
+        ? "fieldCatalog.previewPersonResolvesAtRuntime"
+        : undefined;
 
   const writeVisible = (next: DraftOf<Expression> | undefined) => {
     if (fieldId === undefined) return;
@@ -672,7 +681,7 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
         {preview && (
           <details className="field-preview">
             <summary>{t("fieldCatalog.previewHeading")}</summary>
-            {field.dataSource !== undefined && <p className="studio-note">{t("fieldCatalog.previewResolvesAtRuntime")}</p>}
+            {previewNote !== undefined && <p className="studio-note">{t(previewNote)}</p>}
             {/* Sample controls take no keyboard or pointer interaction — every
                 synthesized entry is already forced `readonly`, and `inert`
                 additionally takes the whole container out of the tab order

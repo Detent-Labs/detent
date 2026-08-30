@@ -22,7 +22,9 @@ import {
   fieldFormat,
   fieldControl,
   fieldDef,
+  type BaseFieldType,
   type FieldDef,
+  type FieldFormat,
   type ProcessBody,
 } from "../src/schema/definition.js";
 import { compileProcessBody, CompileValidationError } from "../src/schema/compile.js";
@@ -30,6 +32,9 @@ import { celType, checkAgainstFields } from "../src/cel/check.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const fld = (over: any): FieldDef => ({ id: "field_x", key: "x", label: { en: "X" }, ...over }) as FieldDef;
+
+/** The pair `formatMatches` takes: `format` required, unlike `FieldDef`'s. */
+const ff = (type: BaseFieldType, format: FieldFormat) => ({ type, format });
 
 /** A minimal, otherwise-clean two-step body carrying one catalog field. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -91,67 +96,96 @@ describe("the type enum", () => {
 
 describe("formatMatches: date", () => {
   it("accepts an ISO-8601 calendar date", () => {
-    expect(formatMatches("date", "2026-02-28")).toBe(true);
+    expect(formatMatches(ff("string", "date"), "2026-02-28")).toBe(true);
   });
 
   it("rejects a date the calendar does not hold", () => {
-    expect(formatMatches("date", "2026-02-30")).toBe(false);
+    expect(formatMatches(ff("string", "date"), "2026-02-30")).toBe(false);
   });
 
   it("rejects free text, which the type check alone accepted", () => {
-    expect(formatMatches("date", "banane")).toBe(false);
+    expect(formatMatches(ff("string", "date"), "banane")).toBe(false);
   });
 
   it("rejects a datetime, which carries a time part", () => {
-    expect(formatMatches("date", "2026-02-28T10:00")).toBe(false);
+    expect(formatMatches(ff("string", "date"), "2026-02-28T10:00")).toBe(false);
   });
 });
 
 describe("formatMatches: datetime", () => {
   it("accepts what a datetime-local input produces", () => {
-    expect(formatMatches("datetime", "2026-02-28T10:00")).toBe(true);
+    expect(formatMatches(ff("string", "datetime"), "2026-02-28T10:00")).toBe(true);
   });
 
   it("accepts a seconds part, a fractional part and a zone offset", () => {
-    expect(formatMatches("datetime", "2026-02-28T10:00:30")).toBe(true);
-    expect(formatMatches("datetime", "2026-02-28T10:00:30.250Z")).toBe(true);
-    expect(formatMatches("datetime", "2026-02-28T10:00:30+02:00")).toBe(true);
+    expect(formatMatches(ff("string", "datetime"), "2026-02-28T10:00:30")).toBe(true);
+    expect(formatMatches(ff("string", "datetime"), "2026-02-28T10:00:30.250Z")).toBe(true);
+    expect(formatMatches(ff("string", "datetime"), "2026-02-28T10:00:30+02:00")).toBe(true);
   });
 
   it("rejects an out-of-range hour", () => {
-    expect(formatMatches("datetime", "2026-02-28T24:00")).toBe(false);
+    expect(formatMatches(ff("string", "datetime"), "2026-02-28T24:00")).toBe(false);
   });
 
   it("rejects a date with no time part", () => {
-    expect(formatMatches("datetime", "2026-02-28")).toBe(false);
+    expect(formatMatches(ff("string", "datetime"), "2026-02-28")).toBe(false);
   });
 });
 
 describe("formatMatches: integer", () => {
   it("accepts a whole number", () => {
-    expect(formatMatches("integer", 3)).toBe(true);
+    expect(formatMatches(ff("number", "integer"), 3)).toBe(true);
   });
 
   it("rejects a decimal", () => {
-    expect(formatMatches("integer", 3.5)).toBe(false);
+    expect(formatMatches(ff("number", "integer"), 3.5)).toBe(false);
   });
 
   it("rejects a numeric string", () => {
-    expect(formatMatches("integer", "3")).toBe(false);
+    expect(formatMatches(ff("number", "integer"), "3")).toBe(false);
   });
 });
 
 describe("formatMatches: email", () => {
   it("accepts what the native control accepts", () => {
-    expect(formatMatches("email", "a.b+c@example.co.uk")).toBe(true);
+    expect(formatMatches(ff("string", "email"), "a.b+c@example.co.uk")).toBe(true);
   });
 
   it("rejects an address with no domain", () => {
-    expect(formatMatches("email", "roman@")).toBe(false);
+    expect(formatMatches(ff("string", "email"), "roman@")).toBe(false);
   });
 
   it("rejects an address carrying a space", () => {
-    expect(formatMatches("email", "a b@example.com")).toBe(false);
+    expect(formatMatches(ff("string", "email"), "a b@example.com")).toBe(false);
+  });
+});
+
+// The first format `ALLOWED_BY_TYPE` admits on `list`, so the first one whose
+// rule forks on the field's own type rather than reading the value alone
+// (field-model-person-format design.md Decision 2).
+describe("formatMatches: person", () => {
+  it("accepts one prefixed id on a string field", () => {
+    expect(formatMatches(ff("string", "person"), "user_a")).toBe(true);
+    expect(formatMatches(ff("string", "person"), "group_finance")).toBe(true);
+  });
+
+  it("accepts a list of prefixed ids on a list field", () => {
+    expect(formatMatches(ff("list", "person"), ["user_a", "group_finance"])).toBe(true);
+    expect(formatMatches(ff("list", "person"), [])).toBe(true);
+  });
+
+  it("rejects an id carrying neither prefix", () => {
+    expect(formatMatches(ff("string", "person"), "roman")).toBe(false);
+    expect(formatMatches(ff("string", "person"), "role_finance")).toBe(false);
+  });
+
+  it("rejects a list where one element carries no prefix", () => {
+    expect(formatMatches(ff("list", "person"), ["user_a", "not-a-principal-id"])).toBe(false);
+  });
+
+  it("forks on the field's type, so each rejects the other's value shape", () => {
+    expect(formatMatches(ff("string", "person"), ["user_a"])).toBe(false);
+    expect(formatMatches(ff("list", "person"), "user_a")).toBe(false);
   });
 });
 
@@ -337,6 +371,19 @@ describe("compile: the allowed-pair check", () => {
     expect(errC.issues.some((i) => i.loc === "fields[0].control")).toBe(true);
   });
 
+  it("accepts a person format on a list field, the table's first non-empty list row", () => {
+    const parsed = fieldDef.parse({ id: "field_x", key: "x", label: { en: "X" }, type: "list", format: "person" });
+    expect(parsed.format).toBe("person");
+    expect(() =>
+      compileProcessBody(bodyWith({ id: "field_x", key: "x", label: { en: "X" }, type: "list", format: "person" }) as ProcessBody),
+    ).not.toThrow();
+  });
+
+  it("rejects a person format on a boolean field, which the table gives no formats", () => {
+    const err = rejects(bodyWith({ id: "field_x", key: "x", label: { en: "X" }, type: "boolean", format: "person" }));
+    expect(err.issues.some((i) => i.loc === "fields[0].format" && i.value === "person")).toBe(true);
+  });
+
   it("reaches a field nested inside a group, so a group cannot hide a bad pair", () => {
     const err = rejects(
       bodyWith({
@@ -372,6 +419,23 @@ describe("compile: a literal default faces the format", () => {
         bodyWith({ id: "field_x", key: "x", label: { en: "X" }, type: "string", format: "date", default: "2026-02-28" }) as ProcessBody,
       ),
     ).not.toThrow();
+  });
+
+  // `isLiteralDefault` returns `true` for an array, so a `list` field's
+  // default reaches the same widened `formatMatches` call the `string` arm
+  // does. No `list`-specific branch exists, and none is needed.
+  it("rejects an unprefixed person default on a string field", () => {
+    const err = rejects(
+      bodyWith({ id: "field_x", key: "x", label: { en: "X" }, type: "string", format: "person", default: "role_finance" }),
+    );
+    expect(err.issues.some((i) => i.loc === "fields[0].default")).toBe(true);
+  });
+
+  it("rejects a person default list carrying one unprefixed element", () => {
+    const err = rejects(
+      bodyWith({ id: "field_x", key: "x", label: { en: "X" }, type: "list", format: "person", default: ["user_a", "not-a-principal-id"] }),
+    );
+    expect(err.issues.some((i) => i.loc === "fields[0].default")).toBe(true);
   });
 
   it("skips an Expression default, which the CEL layer types and which reads no format", () => {
