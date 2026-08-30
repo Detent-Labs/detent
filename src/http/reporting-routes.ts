@@ -33,7 +33,8 @@ import {
 } from "../runtime/api.js";
 import { instanceStatus, type ProcessId } from "../schema/definition.js";
 import type { ActorResolver } from "../auth/resolve.js";
-import { requireRole, REPORTS_ROLE } from "../auth/authorize.js";
+import type { Actor } from "../cel/eval.js";
+import { requireRole, requirePermission, REPORTS_ROLE } from "../auth/authorize.js";
 import { RequestShapeError, notFound, type HttpResult } from "./errors.js";
 import { route, readJson } from "./routes.js";
 
@@ -114,6 +115,23 @@ export async function handleReportingListProcesses(req: Request, resolver: Actor
 }
 
 /**
+ * The gate the three process-scoped reporting aggregates share: the reports
+ * role answers whether the actor may use the reporting area at all, `read`
+ * answers whether this process's data is theirs to see. Both stay
+ * independent checks, per `docs/decisions.md`'s "Process-scoped
+ * permissions" entry, "Shape decided 2026-08-25". A failed `read` check
+ * throws `AuthorizationError` here, mapped to `403` by `guarded()` — unlike
+ * `handleExecuteReport`/`previewReportDraft`, which degrade to an empty
+ * result because those two also honor report *sharing*
+ * (`viewers`/`editors`) independent of the process `read` grant. No such
+ * sharing concept exists for a direct aggregate view.
+ */
+async function requireReportingAccess(actor: Actor, processId: ProcessId, db: SQL): Promise<void> {
+  requireRole(actor, REPORTS_ROLE);
+  await requirePermission(actor, "read", processId, db);
+}
+
+/**
  * The three views differ only in which engine function they call, so they share
  * one handler rather than three near-identical ones. `view` is fixed by the
  * router's own path match, never read off the request.
@@ -125,9 +143,9 @@ async function handleView(
   resolver: ActorResolver,
   db: SQL,
 ): Promise<HttpResult> {
-  return route(req, resolver, db, (actor) => requireRole(actor, REPORTS_ROLE), async () => {
+  const id = processId as ProcessId;
+  return route(req, resolver, db, (actor) => requireReportingAccess(actor, id, db), async () => {
     const range = parseRange(new URL(req.url));
-    const id = processId as ProcessId;
     const result = view === "cycle-time"
       ? await cycleTime(id, range, db)
       : view === "bottleneck"

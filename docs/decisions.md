@@ -713,6 +713,11 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   they need no part of this migration. It stays scoped to the three
   aggregates above.
 
+  Landed 2026-08-30 as `reporting-aggregate-read-permission`. The three
+  aggregate routes now share `requireReportingAccess`
+  (`src/http/reporting-routes.ts`), which runs `requireRole(actor,
+  REPORTS_ROLE)` then `requirePermission(actor, "read", processId, db)`.
+
   The work is not the default. It is that a process-scoped grant cannot
   gate a query naming no process: `requireRole(actor, ADMIN_ROLE)` at
   `src/http/routes.ts:449` answers yes or no without one, and

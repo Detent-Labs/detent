@@ -28,6 +28,7 @@ const RANGE = `from=${FROM}&to=${TO}`;
 const owner: Actor = { id: "user_owner", roles: [REPORTS_ROLE] };
 const bystander: Actor = { id: "user_bystander", roles: [] };
 const admin: Actor = { id: "user_admin", roles: [ADMIN_ROLE] };
+const adminReports: Actor = { id: "user_admin_reports", roles: [REPORTS_ROLE, ADMIN_ROLE] };
 
 const req = (url: string, actor: Actor, method = "GET") =>
   new Request(url, {
@@ -69,8 +70,10 @@ test.skipIf(!DB)("every reporting route answers 200 for an actor holding the rep
   expect(list.status).toBe(200);
   expect(Array.isArray(((await list.json()) as { processes: unknown[] }).processes)).toBe(true);
 
+  // The three views also need process `read`, so they take `adminReports`
+  // (REPORTS_ROLE + ADMIN_ROLE) here, not `owner` (REPORTS_ROLE alone).
   for (const view of VIEWS) {
-    const res = await fetch(req(`http://x/reporting/${P}/${view}?${RANGE}`, owner));
+    const res = await fetch(req(`http://x/reporting/${P}/${view}?${RANGE}`, adminReports));
     expect(res.status).toBe(200);
   }
 });
@@ -99,8 +102,11 @@ test.skipIf(!DB)("a caller lacking the role gets 403, not 404, for a process id 
 });
 
 test.skipIf(!DB)("an unknown process id with the role gets 404", async () => {
+  // `adminReports` clears the `read` gate too, via ADMIN_ROLE's
+  // short-circuit — `can` never reads a row, so an unresolvable process id
+  // reaches the existence check unchanged.
   for (const view of VIEWS) {
-    const res = await fetch(req(`http://x/reporting/proc_does_not_exist/${view}?${RANGE}`, owner));
+    const res = await fetch(req(`http://x/reporting/proc_does_not_exist/${view}?${RANGE}`, adminReports));
     expect(res.status).toBe(404);
   }
 });
@@ -116,8 +122,31 @@ test.skipIf(!DB)("a malformed range gets 400", async () => {
     `from=${FROM}`,
   ];
   for (const qs of bad) {
-    const res = await fetch(req(`http://x/reporting/${P}/cycle-time?${qs}`, owner));
+    const res = await fetch(req(`http://x/reporting/${P}/cycle-time?${qs}`, adminReports));
     expect(res.status).toBe(400);
+  }
+});
+
+test.skipIf(!DB)("an actor holding only the reports role gets 403 from an aggregate view with no read grant", async () => {
+  const P = pid();
+  await publishBody(P, body("v1"), reg, dataSourceReg);
+
+  for (const view of VIEWS) {
+    const res = await fetch(req(`http://x/reporting/${P}/${view}?${RANGE}`, owner));
+    expect(res.status).toBe(403);
+  }
+});
+
+test.skipIf(!DB)("a stored read grant admits the reports role to an aggregate view", async () => {
+  const P = pid();
+  await publishBody(P, body("v1"), reg, dataSourceReg);
+  await sql`INSERT INTO permission_grants (role, permission, scope)
+    VALUES (${"finance-reports"}, ${"read"}, ${{ type: "process", config: { processId: P } }})`;
+  const grantedReports: Actor = { id: "user_granted_reports", roles: [REPORTS_ROLE, "finance-reports"] };
+
+  for (const view of VIEWS) {
+    const res = await fetch(req(`http://x/reporting/${P}/${view}?${RANGE}`, grantedReports));
+    expect(res.status).toBe(200);
   }
 });
 

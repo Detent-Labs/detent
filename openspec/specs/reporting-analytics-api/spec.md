@@ -358,20 +358,29 @@ the optional range bounds as ISO date query parameters. Every route SHALL be a
 required by the `authorization` capability. The process listing SHALL return
 the same processes the existing engine-wide listing returns.
 
+The three per-process views SHALL additionally require the `read` permission
+over the named process, per the `authorization` capability's process-scoped
+gate. A caller holding the reports role but no `read` permission over the
+named process SHALL receive `403`, not the view's result. This tightened a
+route that previously answered any reports-role holder for any process id
+(landed 2026-08-30 as `reporting-aggregate-read-permission`); an installation
+restores an affected caller's access with a `read` grant scoped to the
+process, or with the operator role.
+
 A request naming a process id that does not exist SHALL return `404`. A
 request whose range bounds are not parseable ISO dates, or whose start is
 after its end, SHALL return `400` and run no query.
 
 #### Scenario: Each view is reachable over HTTP
 
-- **WHEN** an actor holding the reports role requests the cycle-time,
-  bottleneck or SLA route for an existing process
+- **WHEN** an actor holding the reports role and `read` over the named process
+  requests the cycle-time, bottleneck or SLA route for that process
 - **THEN** each returns `200` with that view's result
 
 #### Scenario: An unknown process id is a 404
 
-- **WHEN** an actor holding the reports role requests a view for a process id
-  that does not exist
+- **WHEN** an actor holding the reports role and `read` over the named process
+  requests a view for a process id that does not exist
 - **THEN** the response is `404`
 
 #### Scenario: A malformed range is rejected
@@ -384,3 +393,10 @@ after its end, SHALL return `400` and run no query.
 
 - **WHEN** any `/reporting/*` route is called
 - **THEN** no instance, definition, draft, outbox row or timer changes state
+
+#### Scenario: The reports role alone does not reach a process's view
+
+- **WHEN** an actor holds the reports role but no `read` permission over the
+  requested process, and requests the cycle-time, bottleneck or SLA route for
+  that process
+- **THEN** the response is `403`, and the view's result is not returned
