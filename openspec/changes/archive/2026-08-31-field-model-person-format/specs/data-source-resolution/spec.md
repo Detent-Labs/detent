@@ -1,89 +1,6 @@
-# data-source-resolution
-
-## Purpose
-
-Runtime resolution of `FieldDef.dataSource` into an actual `FieldOption[]`
-list, consumed by both view rendering (`getInstanceView`) and submission
-validation (`submitAndTransition`/`createProcessInstance`). Before this
-capability, a `dataSource`-bound field accepted any submitted value with no
-server-side membership validation and `getInstanceView` had no resolved
-options to hand a UI. A `DataSourceRegistry` (`src/engine/registry.ts`)
-mirrors the action `Registry`, with one built-in `"static"` handler shipped
-in v1. Publish-time validation of the registry itself (type/config
-resolution) is the `data-source-registry-validation` capability's concern,
-not this one's. CEL-readable data-source results are explicitly out of
-scope — a CEL reference to a data source remains a publish error.
-
-## Requirements
-
-### Requirement: A DataSourceRegistry resolves a data source's type to a handler
-
-<!-- antislop: allow sentence-length -->
-<!-- Every sentence below is at or under 20 words. The linter merges a
-sentence that opens with a code span into the sentence before it, doubling
-the counted length; see antislop-sentence-split-breaks-on-code-span.md. -->
-The engine SHALL provide a `DataSourceRegistry` (`src/engine/registry.ts`)
-mirroring the existing action `Registry`: a `Map<string, DataSourceHandlerDef>`
-keyed by `type`. `DataSourceHandlerDef` is `{ resolve: (ctx: DataSourceContext)
-=> Promise<FieldOption[]>, configSchema?: z.ZodTypeAny }`. `DataSourceContext`
-is `{ config: Record<string, unknown>, heldValues?: string[], instance: { id:
-InstanceId, processId: ProcessId, data: Record<string, Literal>, baseLocale:
-LocaleCode } }`.
-`heldValues` carries the values the instance already holds for the field under
-resolution, so a handler can return a value that is otherwise retired; a
-handler that has no such notion ignores it.
-`instance` carries the reading instance, the one whose form or submission the
-engine is resolving. A handler comparing against the reader's own values needs
-`data`, a handler excluding the reader from its own result needs `id` and
-`processId`, and a handler synthesizing a `LocalizedText` from a non-localized
-value needs `baseLocale`. `"static"` and `"db.list"` ignore it.
-
-Every `DataSourceContext` carries `instance`, never omitting it. A handler
-needing the reader has no sane fallback without it, and every resolution runs
-for exactly one instance.
-`createDataSourceRegistry` SHALL construct a `DataSourceRegistry`, mirroring
-the action registry's own factory. Registration and lookup use the
-`DataSourceRegistry` `Map` directly. A caller registers a handler with
-`reg.set(type, def)` and looks one up with `reg.get(type)`. `resolve` SHALL
-be `async` regardless of whether a given handler's resolution is itself
-synchronous, so a future I/O-backed handler type is a drop-in rather than an
-interface change.
-
-#### Scenario: A registered type resolves to its handler
-- **WHEN** a caller calls `reg.get(type)` on a `DataSourceRegistry` after a
-  prior `reg.set(type, def)` call
-- **THEN** it returns that type's `DataSourceHandlerDef`
-
-#### Scenario: An unregistered type resolves to nothing
-- **WHEN** a caller calls `reg.get(type)` on a `DataSourceRegistry` for a
-  type never set
-- **THEN** it returns `undefined`
-
-<!-- Scenario bullets stay verbatim: the OpenSpec archive step matches this block by exact text. -->
-<!-- antislop: allow passive-voice -->
-#### Scenario: The context carries the reading instance
-- **WHEN** a handler's `resolve` is called for a field of some instance
-- **THEN** `ctx.instance` carries that instance's `id`, its `processId`, its
-  `data`, and its process's `baseLocale`
-
-### Requirement: A built-in "static" data source handler echoes a configured option list
-
-The engine SHALL ship a built-in `"static"` data source handler, registered
-by `createDefaultDataSourceRegistry` (`src/engine/host.ts`), whose
-`configSchema` requires `{ options: FieldOption[] }` and whose `resolve`
-returns exactly `ctx.config.options` unchanged. The handler SHALL ignore
-`ctx.heldValues`: a static option list holds no notion of a retired value.
-`"static"` is no longer the only data source type shipped; see the
-`db-data-source-type` capability.
-
-#### Scenario: The static handler echoes its configured options
-- **WHEN** the `"static"` handler's `resolve` is called with `{ config: {
-  options: [...] } }`
-- **THEN** it returns exactly that `options` array
-
-#### Scenario: The static handler ignores heldValues
-- **WHEN** the `"static"` handler resolves with `heldValues` present
-- **THEN** it returns exactly its configured `options`
+<!-- antislop: allow-file em-dash passive-voice sentence-length -->
+<!-- The MODIFIED blocks below carry live-spec text verbatim, which the archive step matches by exact header, so its existing findings stay unrewritten. -->
+## MODIFIED Requirements
 
 ### Requirement: A data-source-bound view field's options are resolved at runtime
 
@@ -122,14 +39,10 @@ that field held at step entry.
 same call is seeding does not count. At creation the instance holds nothing,
 so `heldValues` is empty there.
 
-<!-- antislop: allow sentence-length -->
-<!-- Normative wording reviewed in field-model-person-format; a rewrite here would change the rule. -->
 A view field whose `FieldDef` declares `format: "person"` and neither
 `options` nor `dataSource` SHALL instead resolve its options from the
 process body's own `allowedGroups` (`?? []`), in three layers:
 
-<!-- antislop: allow passive-voice sentence-length -->
-<!-- Normative wording reviewed in field-model-person-format; a rewrite here would change the rule. -->
 - one option per group id in `allowedGroups`, `value` the group id and
   `label` that group's own name;
 - one option per member account of those groups, `value` the user id and
@@ -138,8 +51,6 @@ process body's own `allowedGroups` (`?? []`), in three layers:
   layers above did not produce, so a member who has left the group or whose
   account is disabled does not strand the value the instance holds.
 
-<!-- antislop: allow passive-voice sentence-length -->
-<!-- Normative wording reviewed in field-model-person-format; a rewrite here would change the rule. -->
 The resolved array SHALL carry those three layers in that order: every group
 entry, then every member entry, then every held-value entry. Within the first
 layer the order SHALL be `allowedGroups`'s own declared order. Within the
@@ -148,16 +59,12 @@ declared order, with a member appearing in two groups keeping its first
 position. `FieldOption[]` is ordered and the renderer draws it in array
 order, so this is what a participant sees, not an internal detail.
 
-<!-- antislop: allow em-dash passive-voice sentence-length -->
-<!-- Normative wording reviewed in field-model-person-format; a rewrite here would change the rule. -->
 Every `label` SHALL be keyed by the process body's `baseLocale`.
 An option's `label` is `localizedText`, and neither an account nor a group
 carries a per-locale name. Where no name resolves — a group id the store no
 longer holds, a user id matching no account — the id itself SHALL be the
 label, rather than the option being dropped.
 
-<!-- antislop: allow sentence-length -->
-<!-- Normative wording reviewed in field-model-person-format; a rewrite here would change the rule. -->
 `dataSource` stays orthogonal to `format` per the `definition-contract`
 capability: a `person`-formatted field declaring `dataSource` resolves through
 the ordinary `dataSource` branch above instead, unchanged by this rule.
@@ -213,8 +120,6 @@ from, rather than reading `FieldDef.options` directly.
 - **THEN** submission validation resolves the same list, and accepts that
   value
 
-<!-- antislop: allow sentence-length -->
-<!-- Normative wording reviewed in field-model-person-format; a rewrite here would change the rule. -->
 #### Scenario: A bare person field's options come from allowedGroups
 - **WHEN** a view field's `FieldDef` declares `{type: "string", format:
   "person"}` with neither `options` nor `dataSource`, and the process
@@ -230,8 +135,6 @@ from, rather than reading `FieldDef.options` directly.
 
 #### Scenario: A held value survives its account leaving the group
 
-<!-- antislop: allow sentence-length -->
-<!-- Normative wording reviewed in field-model-person-format; a rewrite here would change the rule. -->
 - **WHEN** an instance holds `"user_b"` for a bare person field, and
   `user_b` is no longer a member of any group the body's `allowedGroups`
   names
@@ -264,8 +167,6 @@ data-source-bound fields) rather than reading `FieldDef.options` directly, so
 a `dataSource`-bound field's submission is now checked for membership instead
 of accepting any value.
 
-<!-- antislop: allow passive-voice sentence-length synonym-rotation -->
-<!-- Normative wording reviewed in field-model-person-format; a rewrite here would change the rule. -->
 This covers a `format: "person"` field declaring neither `options` nor
 `dataSource` as well, with no separate rule: the requirement above populates
 that field's `options`, and this check reads whatever was populated. A
@@ -274,8 +175,6 @@ submitted principal id the body never offered therefore draws an
 picker draws, so a participant cannot route a step to an account outside the
 process's own `allowedGroups`.
 
-<!-- antislop: allow sentence-length -->
-<!-- Normative wording reviewed in field-model-person-format; a rewrite here would change the rule. -->
 One case places no bound: an empty resolved list. `optionValuesValid` reads
 an empty `options` array the same way it reads an absent one and accepts any
 value of the right shape. A body declaring no `allowedGroups` therefore gets
@@ -293,12 +192,8 @@ person field stands before this change.
 - **THEN** the result carries an `invalid-option` issue for that field,
   matching the existing behavior for a static-`options` field
 
-<!-- antislop: allow passive-voice -->
-<!-- Normative wording reviewed in field-model-person-format; a rewrite here would change the rule. -->
 #### Scenario: A person id outside the allowedGroups expansion is rejected
 
-<!-- antislop: allow sentence-length -->
-<!-- Normative wording reviewed in field-model-person-format; a rewrite here would change the rule. -->
 - **WHEN** a body declares `"allowedGroups": ["group_finance"]`, and a
   participant submits `"user_z"` for a bare person field, where `user_z`
   belongs to no group that list names
@@ -317,92 +212,3 @@ person field stands before this change.
   `"user_a"` for a bare person field whose resolved `options` is empty
 - **THEN** the submission passes option-membership validation, and the
   `format` shape check is the only rule the value faces
-
-### Requirement: A runtime registry-lookup failure after passing publish-time validation is a canary error
-
-If `resolveFields` looks up a data source's `type` in the injected `registry`
-and finds no handler, despite the body having passed publish-time
-`data-source-registry-validation`, the engine SHALL throw a plain `Error`
-identifying the unresolved type — matching the project's existing
-"should-never-happen" canary style (e.g. a `definitionHash` pin mismatch),
-not a typed `SubmissionValidationError`. This can only occur when the
-registry instance passed to a runtime caller differs from the one the body
-was published against.
-
-#### Scenario: A registry mismatch at runtime throws a canary error
-- **WHEN** `resolveFields` is called with a `registry` that has no handler
-  registered for a data source `type` the body's publish-time validation
-  previously confirmed was registered
-- **THEN** it throws a plain `Error` naming the unresolved type, not
-  `SubmissionValidationError`
-
-### Requirement: A data source that reads the database takes it from the context
-
-A data source needing its own database access SHALL take that handle from the
-resolution context. It SHALL NOT take one bound at registry construction.
-
-Every context SHALL carry the handle. It is not optional, unlike the frozen
-actor ids beside it. An absent handle has no sane fallback once one process
-serves many tenants. It would quietly read whichever database built the
-registry.
-
-`db.list` reads the `data_lists` tables. Bound at construction it would offer
-one tenant's option values to every tenant. That is the cross-tenant read this
-model exists to prevent.
-
-`instance.query` reads another process's instances. The same rule binds it,
-for the same reason. It reaches those instances through the Runtime API
-Layer's instance data read, and passes that read the context's own handle.
-
-The `static` type reads no database and SHALL ignore the handle.
-
-#### Scenario: A list resolves in the instance's own tenant
-
-- **WHEN** a field in tenant `acme` resolves a `db.list` source
-- **THEN** the options come from `acme`'s `data_lists` tables
-
-#### Scenario: One registry serves two tenants
-
-- **WHEN** one registry resolves the same list key for two tenants
-- **THEN** each answer carries that tenant's own values
-
-#### Scenario: The static type keeps its behaviour
-
-- **WHEN** a field resolves a `static` source
-- **THEN** it answers its configured options, as it does today
-
-#### Scenario: An instance query resolves in the instance's own tenant
-
-- **WHEN** a field in tenant `acme` resolves an `instance.query` source
-- **THEN** the options come from `acme`'s own instances
-
-### Requirement: A resolved option carries its attributes to the view
-
-`ResolvedViewField.options` SHALL carry each option's `attributes` unchanged
-from the handler that produced them. The resolution layer SHALL neither add an
-entry nor drop one.
-
-`InstanceView` SHALL therefore expose them, so a renderer shows what a row
-carries without a second request.
-
-Attributes SHALL take no part in option membership validation. A submission is
-valid when its value names an offered option, whatever the attributes hold.
-
-Attributes SHALL reach no CEL context. A data source stays invisible to CEL,
-and `docs/decisions.md` keeps that deferral. An attribute becomes readable only
-after the write-back lands it in an ordinary field. CEL then reads it as
-`data.<key>`, like any other value.
-
-#### Scenario: The view carries an option's attributes
-- **WHEN** an actor reads the view of a step whose field binds a
-  column-declaring list
-- **THEN** each option of that field carries its attributes
-
-#### Scenario: An attribute does not widen membership
-- **WHEN** an actor submits a value that names no offered option
-- **THEN** the submission fails with `invalid-option`, whatever any attribute
-  holds
-
-#### Scenario: A guard cannot read a data source
-- **WHEN** an author writes a guard naming a data source
-- **THEN** the publish fails, exactly as it does today

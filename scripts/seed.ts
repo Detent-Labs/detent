@@ -1,7 +1,8 @@
 /**
  * Roadmap #19: idempotent seed script. Publishes the repo's example process
- * definitions and provisions one demo user per reserved role, so a fresh
- * devcontainer database has something to look at instead of nothing.
+ * definitions, provisions one demo user per reserved role and one demo group,
+ * so a fresh devcontainer database has something to look at instead of
+ * nothing.
  *
  * Reserved for seed data — do not reuse for an unrelated process: the keys
  * `expense_approval`, `purchase_requisition`, `loan_application`,
@@ -24,6 +25,7 @@ import { publishBody, listProcesses, listVersions } from "../src/engine/definiti
 import { createDefaultRegistry, createDefaultDataSourceRegistry } from "../src/engine/host.js";
 import { createDefaultAssignmentRegistry } from "../src/engine/assignment-strategies.js";
 import { createUser, listUsers, setRoles, setPassword } from "../src/auth/users.js";
+import type { GroupScope } from "../src/auth/groups.js";
 import {
   PUBLISH_ROLE,
   CANCEL_ANY_ROLE,
@@ -63,7 +65,26 @@ const EXAMPLES: { path: string; fixedProcessId?: ProcessId }[] = [
   // source pins this literal id.
   { path: "../examples/laptop-inventory.json", fixedProcessId: "proc_laptop_inventory" as ProcessId },
   { path: "../examples/employee-onboarding.json" },
+  // access_request publishes only after seedGroup below has written
+  // DEMO_GROUP_ID: its allowedGroups entry faces validateGroupScope.
+  { path: "../examples/access-request.json" },
 ];
+
+/**
+ * `examples/access-request.json` names this group id in `allowedGroups` and in
+ * its `org.group-members` step, so the fixture needs a stable id the example
+ * can name. `createGroup` cannot supply one — it always mints
+ * `group_${crypto.randomUUID()}`, a guarantee worth keeping — so the row goes
+ * in directly instead.
+ */
+export const DEMO_GROUP_ID = "group_it_ops";
+const DEMO_GROUP_NAME = "IT Ops";
+// `global`, so the example publishes under whichever processId this script
+// mints for it.
+const DEMO_GROUP_SCOPE: GroupScope = { type: "global" };
+// Real accounts, so both person pickers offer candidates rather than the
+// group entry alone.
+const DEMO_GROUP_MEMBERS = ["demo-admin@example.test", "demo-author@example.test"];
 
 function readExampleBody(path: string): ProcessBody {
   const raw = JSON.parse(readFileSync(new URL(path, import.meta.url), "utf-8"));
@@ -106,6 +127,26 @@ async function seedUser(demo: { role: string; emailSuffix: string }): Promise<vo
   }
 }
 
+/**
+ * Idempotent the way `seedUser` is: a re-run refreshes the name, the scope and
+ * the member list rather than failing on the primary key. Runs after the demo
+ * users, since the members subquery resolves their ids.
+ */
+async function seedGroup(): Promise<void> {
+  const rows = (await sql`
+    INSERT INTO groups (group_id, name, scope, members)
+    VALUES (
+      ${DEMO_GROUP_ID},
+      ${DEMO_GROUP_NAME},
+      ${DEMO_GROUP_SCOPE},
+      (SELECT coalesce(array_agg(user_id), ARRAY[]::text[]) FROM auth_users WHERE email = ANY(${sql.array(DEMO_GROUP_MEMBERS, "TEXT")}))
+    )
+    ON CONFLICT (group_id) DO UPDATE SET name = EXCLUDED.name, scope = EXCLUDED.scope, members = EXCLUDED.members
+    RETURNING members
+  `) as { members: string[] }[];
+  console.log(`- ${DEMO_GROUP_NAME} (${DEMO_GROUP_ID}): ${rows[0]!.members.length} member(s)`);
+}
+
 async function main() {
   // Roadmap #19 accepted "the script never runs on its own" as the mitigation
   // because no production deployment path existed. Stage 14 shipped one, so
@@ -123,14 +164,20 @@ async function main() {
   const registry = createDefaultRegistry();
   const dataSourceReg = createDefaultDataSourceRegistry();
 
-  console.log("Processes:");
-  for (const example of EXAMPLES) {
-    await seedProcess(registry, dataSourceReg, example);
-  }
-
-  console.log("\nDemo users (local development only, fixed password):");
+  // Users, then the group, then the processes: access_request's allowedGroups
+  // entry has to resolve before publishBody validates its scope, and the
+  // group's member ids come from the accounts above it.
+  console.log("Demo users (local development only, fixed password):");
   for (const demo of DEMO_USERS) {
     await seedUser(demo);
+  }
+
+  console.log("\nGroups:");
+  await seedGroup();
+
+  console.log("\nProcesses:");
+  for (const example of EXAMPLES) {
+    await seedProcess(registry, dataSourceReg, example);
   }
 
   console.log("\nDone.");

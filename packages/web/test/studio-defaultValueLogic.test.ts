@@ -68,6 +68,16 @@ describe("literalControlKind", () => {
     expect(literalControlKind({ type: "list", dataSource: "ds_1" as never })).toBe("none");
   });
 
+  it("offers no option for a bare person field of either cardinality", () => {
+    expect(literalControlKind({ type: "string", format: "person" })).toBe("none");
+    expect(literalControlKind({ type: "list", format: "person" })).toBe("none");
+  });
+
+  it("keeps a person field's own static options over the carve-out", () => {
+    expect(literalControlKind({ type: "string", format: "person", options: [{ value: "user_a" }] })).toBe("options");
+    expect(literalControlKind({ type: "list", format: "person", options: [{ value: "user_a" }] })).toBe("options-multi");
+  });
+
   it("prefers the options over the format when a field carries both", () => {
     expect(literalControlKind({ type: "string", format: "date", options: [{ value: "2026-01-01" }] })).toBe("options");
   });

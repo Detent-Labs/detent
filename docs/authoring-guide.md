@@ -88,7 +88,8 @@ A picker is not a type. What makes a field a picker is `options` or a
 `dataSource`. The cardinality is the type: one pick is a `string`, several
 picks are a `list`.
 
-`format` is optional. It takes `date`, `datetime`, `integer` or `email`. The
+`format` is optional. It takes `date`, `datetime`, `integer`, `email` or
+`person`. The
 format narrows the values the field accepts. A `format: "date"` field takes
 `2026-02-28`. It refuses `2026-02-30` and `banane` alike. A literal `default`
 faces the same check at publish time.
@@ -102,10 +103,10 @@ A type admits only some formats and some controls. Publishing rejects the rest.
 
 | `type` | `format` | `control` |
 |---|---|---|
-| `string` | `date`, `datetime`, `email` | `multiline`, `radio` |
+| `string` | `date`, `datetime`, `email`, `person` | `multiline`, `radio` |
 | `number` | `integer` | none |
 | `boolean` | none | `radio` |
-| `list` | none | `checkboxes` |
+| `list` | `person` | `checkboxes` |
 | `file` | none | none |
 | `group` | none | none |
 
@@ -142,6 +143,51 @@ An expression mixing an integer field with a decimal field finds no overload
 and fails the check. Say `anzahl` carries the format and `stueckpreis` does
 not. Then `data.anzahl * data.stueckpreis` does not publish. Mark both fields,
 or neither.
+
+#### A person field
+
+`format: "person"` marks a field that holds people. On a `{type: "string"}`
+field it holds one person. On a `{type: "list"}` field it holds several. That
+is the same single-versus-several split every other picker takes from its
+`type`.
+
+The field stores a bare id and nothing else. `"user_7f3a"` is the whole
+value. The engine writes no name beside it. A screen resolves the display
+name when it draws the field, so a rename reaches every screen at once.
+
+Two prefixes are legal. `user_` names one account, and `group_` names a whole
+group. A literal `default` in any other shape fails at publish. A submitted
+value in any other shape fails the same check.
+
+**Where the candidates come from.** A person field declaring neither `options`
+nor `dataSource` reads the process's own `allowedGroups` list. Each declared
+group yields one entry, labelled with the group's name. Each member account of
+those groups yields one entry too. The group entries come first, in the order
+`allowedGroups` declares them.
+
+A body declaring no `allowedGroups` offers nobody at all. The field resolves to
+an empty list. That is deliberate. The alternative is offering every account
+the deployment holds, and no process asked for that.
+
+**What the list binds.** The resolved candidates bind the submission, exactly
+as an inline `options` list does. An id the process never offered draws
+`invalid-option`. So a participant cannot route a step to an account outside
+`allowedGroups`.
+
+One value escapes that bound. A value the instance already holds stays
+submittable after its account leaves the group. Without that, a participant
+could not resubmit a form they never touched.
+
+An empty list binds nothing, because there is nothing to check against. A
+person field on a body with no `allowedGroups` therefore takes any well-formed
+id. The prefix rule above is the only rule left standing.
+
+A person field naming a `dataSource` reads that source instead, unchanged.
+The `allowedGroups` list is the fallback, never an override.
+
+For a worked body, read `examples/access-request.json`. It declares one group,
+one single-person field and one multi-person field. The seed script writes that
+group and publishes the body, so the example runs as it stands.
 
 ### Default value
 
@@ -792,7 +838,7 @@ and a `config`. Pick the `type` from the picker, which lists the strategies
 your deployment registers. A `type` nobody registered is a publish error, not
 a surprise at run time.
 
-Three strategies ship.
+Four strategies ship.
 
 `static` is the one you get by default. The studio generates a form for it:
 one candidates field, `finance-approver` for example. The engine uses that
@@ -821,7 +867,25 @@ with no republish.
 
 Declare the group's id in the process's own `allowedGroups` list too. A
 `groupId` a step references that is missing from `allowedGroups` fails at
-publish, naming the step and the group id.
+publish, naming the step and the group id. That same list is what a person
+field's picker offers, so one entry serves both readers.
+
+`org.actor-from-field` routes the step to whoever the instance's own data
+names. Its config carries one key, `fieldId`. Use it for the approver a
+requester picks, which no fixed list and no group can express.
+
+The field's value decides, read fresh at every step entry. A `user_` value
+makes that account the sole candidate. A `group_` value expands to that
+group's current members, the same live path `org.group-members` takes.
+
+The named field must declare `format: "person"`. A `fieldId` naming any other
+field fails at publish, naming the step and the field id.
+
+Point it at a single-person field. A multi-person `{type: "list"}` field
+publishes, but the strategy reads no candidate out of an array.
+
+An unwritten field resolves to nobody. The step then waits where anyone can
+see it, the same stall any empty resolution leaves.
 
 Whoever holds the claim delegates it. The target need not be a candidate.
 Delegation is the escape hatch from a frozen list. A rule tying it to that

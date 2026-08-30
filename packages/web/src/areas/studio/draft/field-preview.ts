@@ -22,6 +22,7 @@ const FORMAT_SAMPLE: Record<FieldFormat, unknown> = {
   datetime: "2026-01-15T09:00",
   integer: 42,
   email: "sample@example.com",
+  person: "user_sample",
 };
 
 /** One sample value per base type, for the "How it will look" preview
@@ -31,9 +32,14 @@ const FORMAT_SAMPLE: Record<FieldFormat, unknown> = {
  * as opaque the same way (`JS_TYPE`, `src/schema/definition.ts`).
  *
  * The format wins over the type where the field declares one, since the
- * format is the narrower of the two rules a submitted value faces. */
+ * format is the narrower of the two rules a submitted value faces. It does
+ * not win over the value's shape: `person` is the first format the allowed
+ * pairs admit on `list`, and a `list` holds an array whatever its format, so
+ * that sample goes inside one. A scalar there draws a multi-select with
+ * nothing selected, since `FieldForm` reads a non-array value as an empty
+ * selection (design.md Decision 8). */
 function sampleValue(type: BaseFieldType, format: FieldFormat | undefined, options: FieldOption[]): unknown {
-  if (format !== undefined) return FORMAT_SAMPLE[format];
+  if (format !== undefined) return type === "list" ? [FORMAT_SAMPLE[format]] : FORMAT_SAMPLE[format];
   switch (type) {
     case "string":
       return options[0] ? options[0].value : "Sample text";

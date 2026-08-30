@@ -32,8 +32,8 @@ import {
 } from "../engine/transition.js";
 import { buildGuardContext, evalGuard, evalFieldMap, type Actor } from "../cel/eval.js";
 import { requireRole, can, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE, AuthorizationError } from "../auth/authorize.js";
-import { knownUserIds } from "../auth/users.js";
-import { getGroupMembers, getGroupsForMember } from "../auth/groups.js";
+import { knownUserIds, displayNamesForUserIds } from "../auth/users.js";
+import { getGroupMembers, getGroupsForMember, groupNamesForIds } from "../auth/groups.js";
 import { definitionHash } from "../schema/hash.js";
 import { NotFoundError, InstanceNotRunningError, RequestShapeError } from "../errors.js";
 import { saveInstanceDraft as engineSaveInstanceDraft, getInstanceDraft, type InstanceDraft } from "../engine/instance-drafts.js";
@@ -556,6 +556,49 @@ function resolveDataSourceOptions(
 }
 
 /**
+ * Resolve a bare person field's candidate list — the first of D23's two
+ * layers, for a field declaring neither `options` nor `dataSource`. Three
+ * layers, emitted in this order because `FieldOption[]` is what the renderer
+ * draws in array order:
+ *
+ * 1. One entry per `allowedGroups` id, in the body's declared order, labelled
+ *    with the group's own name. Without it no `group_` value could ever be
+ *    submitted, since the membership bound reads exactly this list.
+ * 2. One entry per member account, walking the groups in that same order with
+ *    the first occurrence winning the dedup.
+ * 3. One entry per held value the two layers above did not already produce, so
+ *    a member leaving the group does not strand the value the instance holds.
+ *
+ * Groups lead because a group is the coarser routing choice and there are few
+ * of them. The held-value tail is last because it is a survival entry, not an
+ * offer.
+ *
+ * It fails closed: no declared group and no held value resolves to `[]`, never
+ * to every account in the system (D15). An id no store row matches keeps the
+ * id itself as its label, so a stale entry stays visible rather than silently
+ * narrowing the list. Every label is keyed by the body's own `baseLocale`,
+ * which `resolveFieldsLocale` falls back to for a viewer in any locale —
+ * neither an account nor a group carries a per-locale name to key any other
+ * way.
+ */
+async function resolvePersonOptions(allowedGroups: string[], heldValues: string[], baseLocale: string, db: SQL): Promise<FieldOption[]> {
+  const memberIds: string[] = [];
+  for (const groupId of allowedGroups) {
+    for (const userId of await getGroupMembers(groupId, db)) {
+      if (!memberIds.includes(userId)) memberIds.push(userId);
+    }
+  }
+  const held = heldValues.filter((v) => !allowedGroups.includes(v) && !memberIds.includes(v));
+
+  const groupNames = await groupNamesForIds([...allowedGroups, ...held.filter((v) => v.startsWith("group_"))], db);
+  const userNames = await displayNamesForUserIds([...memberIds, ...held.filter((v) => !v.startsWith("group_"))], db);
+  const label = (id: string): LocalizedText =>
+    ({ [baseLocale]: groupNames.get(id) ?? userNames.get(id) ?? id }) as LocalizedText;
+
+  return [...allowedGroups, ...memberIds, ...held].map((id) => ({ value: id, label: label(id) })) as FieldOption[];
+}
+
+/**
  * Resolve a step's ViewFields against the field catalog and current data.
  * Invisible fields are omitted. A group-container FieldDef (never a leaf
  * value in `instance.data`) is still included when visible, so a UI can
@@ -570,13 +613,30 @@ function resolveDataSourceOptions(
  * pass also rejects, but `resolveFields` also runs against an uncompiled
  * body — the group rule wins: both flags resolve `false`.
  *
- * `options` is populated from static `FieldDef.options` unchanged, or —
+ * `options` is populated from static `FieldDef.options` unchanged, from the
+ * body's own `allowedGroups` for a person field declaring neither key, or —
  * for a `dataSource`-bound field — resolved at runtime via `registry`. This
  * is the single place downstream code (submission validation, view
  * rendering) reads options from, instead of reading `FieldDef.options`
  * directly.
+ *
+ * `committedData` is the instance's COMMITTED data, which the two resolving
+ * branches read their held values from. It defaults to `instance.data` and
+ * differs from it in exactly one caller: `createProcessInstance` passes `{}`,
+ * since its stub's `data` is the seed payload itself. A held value is one the
+ * instance already holds, so that a member leaving a group does not strand it
+ * — never one the same call is seeding, which would let a value validate
+ * itself against options it alone put there.
  */
-async function resolveFields(body: ProcessBody, step: Step, instance: Instance, actor: Actor, registry: DataSourceRegistry, db: SQL): Promise<ResolvedViewField[]> {
+async function resolveFields(
+  body: ProcessBody,
+  step: Step,
+  instance: Instance,
+  actor: Actor,
+  registry: DataSourceRegistry,
+  db: SQL,
+  committedData: Record<string, Literal> = instance.data as Record<string, Literal>,
+): Promise<ResolvedViewField[]> {
   const ctx = buildGuardContext(body, instance, actor);
   const fieldsById = new Map(collectFieldsDeep(body.fields).map((f) => [f.id as string, f]));
   const dataSourcesById = new Map((body.dataSources ?? []).map((d) => [d.id as string, d]));
@@ -600,11 +660,20 @@ async function resolveFields(body: ProcessBody, step: Step, instance: Instance, 
     const required = group || technical ? false : resolveFlag(vf.required, ctx, false);
     const readonly = group ? false : technical ? true : resolveFlag(vf.readonly, ctx, false);
     const value = group ? undefined : (instance.data[field.id] as Literal | undefined);
+    // A HELD value is one the instance already committed, never one the caller
+    // is seeding in this same call. `committedData` is what separates the two:
+    // at creation it is empty, because nothing is committed yet.
+    const held = group ? [] : heldValuesOf(committedData[field.id as string]);
     let options: FieldOption[] | undefined = field.options;
     if (field.dataSource) {
       const def = dataSourcesById.get(field.dataSource as string);
       if (!def) throw new Error(`data source not found: ${field.dataSource}`); // publish-time invariant guarantees resolution; defensive only
-      options = await resolveDataSourceOptions(def, heldValuesOf(value), dsInstance, registry, db);
+      options = await resolveDataSourceOptions(def, held, dsInstance, registry, db);
+    } else if (field.format === "person" && field.options === undefined) {
+      // The gate reads `=== undefined`, not emptiness: `options: []` is a
+      // legal declaration, and overwriting it would contradict "declaring
+      // neither options nor dataSource".
+      options = await resolvePersonOptions(body.allowedGroups ?? [], held, body.baseLocale, db);
     }
     out.push({ field, value, required, readonly, group: vf.group, options, span: vf.span ?? 1 });
   }
@@ -850,10 +919,10 @@ async function validateSubmissionData(
   data: Record<string, Literal>,
   registry: DataSourceRegistry,
   db: SQL,
-  opts: { checkRequired: boolean; defaultedIds?: Set<string> } = { checkRequired: true },
+  opts: { checkRequired: boolean; defaultedIds?: Set<string>; committedData?: Record<string, Literal> } = { checkRequired: true },
 ): Promise<ResolvedViewField[]> {
   const defaultedIds = opts.defaultedIds ?? new Set<string>();
-  const resolved = await resolveFields(body, step, instance, actor, registry, db);
+  const resolved = await resolveFields(body, step, instance, actor, registry, db, opts.committedData);
   const fieldsById = new Map(resolved.map((r) => [r.field.id as string, r]));
   const catalogById = new Map(leafFields(body.fields).map((f) => [f.id as string, f]));
   const viewFieldsByRef = new Map((step.view?.fields ?? []).map((vf) => [vf.ref as string, vf]));
@@ -1025,7 +1094,11 @@ export async function createProcessInstance(
   // value already there is never overwritten.
   const defaultedIds = applyFieldDefaults(body, stub, actor);
 
-  const resolvedInitial = await validateSubmissionData(body, initial, stub, actor, submitted, registry, db, { checkRequired: false, defaultedIds });
+  // `committedData: {}` — nothing is committed yet. The stub's own `data` is
+  // the seed payload `applyFieldDefaults` just wrote into, so reading held
+  // values off it would let a seeded value (or a catalog `default`) appear in
+  // its own resolved options and validate itself.
+  const resolvedInitial = await validateSubmissionData(body, initial, stub, actor, submitted, registry, db, { checkRequired: false, defaultedIds, committedData: {} });
 
   // The write-back lands before the assignment resolves, so a strategy on the
   // initial step reads the final seed data, mapped values included. `submitted`

@@ -5,10 +5,13 @@
  * DB-backed, skips when DATABASE_URL is unset.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
+import { readFileSync } from "node:fs";
 import { sql, initSchema } from "../src/engine/store.js";
 import { createGroup, setGroupScope } from "../src/auth/groups.js";
 import { publishBody, GroupScopeValidationError } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
+import { createDefaultAssignmentRegistry } from "../src/engine/assignment-strategies.js";
+import { DEMO_GROUP_ID } from "../scripts/seed.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
 
@@ -83,4 +86,21 @@ test.skipIf(!DB)("an identical re-publish stays a no-op despite a scope change s
   const second = await publishBody(pid, body, reg, dataSourceReg);
   expect(second.version).toBe(first.version);
   expect(second.definitionHash).toBe(first.definitionHash);
+});
+
+/**
+ * `examples/access-request.json` names a literal group id, and only
+ * `scripts/seed.ts` writes it. This is the check that fails when the two drift
+ * apart: `compile-validation.test.ts`'s "publishes each example definition
+ * unchanged" calls `compileProcessBody`, so it never reaches this check and
+ * stayed green while the committed body returned a 422 on every real publish.
+ */
+test.skipIf(!DB)("the committed access-request example publishes against the seeded group id", async () => {
+  await sql`INSERT INTO groups (group_id, name, scope, members) VALUES (${DEMO_GROUP_ID}, 'IT Ops', ${{ type: "global" }}, ${sql.array([], "TEXT")})`;
+  const raw = JSON.parse(readFileSync(new URL("../examples/access-request.json", import.meta.url), "utf8"));
+  // The full assignment registry, for the same reason `scripts/seed.ts` wires
+  // it: the example names `org.actor-from-field` and `org.group-members`, and
+  // `publishBody`'s own default carries `static` alone.
+  const v = await publishBody("proc_gsv_access_request" as ProcessId, raw.definition as ProcessBody, reg, dataSourceReg, sql, createDefaultAssignmentRegistry());
+  expect(v.status).toBe("published");
 });

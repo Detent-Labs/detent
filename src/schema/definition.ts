@@ -207,7 +207,7 @@ export const baseFieldType = z.enum([
  * member keeps a publish-time check and a value check (`formatMatches`). A
  * field whose semantics no member covers uses the plugin envelope instead.
  */
-export const fieldFormat = z.enum(["date", "datetime", "integer", "email"]);
+export const fieldFormat = z.enum(["date", "datetime", "integer", "email", "person"]);
 /**
  * The input form. Read by the renderer alone. Closed for the same reason
  * `fieldFormat` is: `compile.ts` verdicts every member a body declares.
@@ -419,10 +419,10 @@ const JS_TYPE: Record<BaseFieldType, string> = {
  * declaring either key is rejected — its own semantics live in its config.
  */
 export const ALLOWED_BY_TYPE: Record<BaseFieldType, { formats: readonly FieldFormat[]; controls: readonly FieldControl[] }> = {
-  string: { formats: ["date", "datetime", "email"], controls: ["multiline", "radio"] },
+  string: { formats: ["date", "datetime", "email", "person"], controls: ["multiline", "radio"] },
   number: { formats: ["integer"], controls: [] },
   boolean: { formats: [], controls: ["radio"] },
-  list: { formats: [], controls: ["checkboxes"] },
+  list: { formats: ["person"], controls: ["checkboxes"] },
   file: { formats: [], controls: [] },
   group: { formats: [], controls: [] },
 };
@@ -444,15 +444,22 @@ function isCalendarDate(ymd: string): boolean {
 }
 
 /**
- * True if `value` lies in `format`'s value domain. The half of the type rule
- * that `type` alone cannot express: `type: "string"` accepts any string, and a
- * `format: "date"` field accepts an ISO-8601 calendar date alone.
+ * True if `value` lies in the field's format's value domain. The half of the
+ * type rule that `type` alone cannot express: `type: "string"` accepts any
+ * string, and a `format: "date"` field accepts an ISO-8601 calendar date
+ * alone.
+ *
+ * Takes the field rather than the format alone, since `person` is the first
+ * format `ALLOWED_BY_TYPE` admits on `list`, and its rule reads a whole array
+ * there against a scalar on `string`. The parameter spells `format` out as
+ * required rather than using `Pick<FieldDef, "type" | "format">`, whose
+ * optional `format` would leave `undefined` uncovered by the `switch`.
  *
  * Exported for the publish-time literal-`default` check in `compile.ts`, which
  * validates an authored value against the same domain a submitted one faces.
  */
-export function formatMatches(format: FieldFormat, value: Literal): boolean {
-  switch (format) {
+export function formatMatches(field: Pick<FieldDef, "type"> & { format: FieldFormat }, value: Literal): boolean {
+  switch (field.format) {
     case "date":
       return typeof value === "string" && DATE_FORMAT.test(value) && isCalendarDate(value);
     case "datetime": {
@@ -466,6 +473,13 @@ export function formatMatches(format: FieldFormat, value: Literal): boolean {
       return typeof value === "number" && Number.isInteger(value);
     case "email":
       return typeof value === "string" && EMAIL_FORMAT.test(value);
+    case "person": {
+      // The two prefixes `src/auth/users.ts` and `src/auth/groups.ts` mint.
+      // Shallow by design: whether a prefixed id resolves to a live account is
+      // the assignment resolver's business, not the schema's.
+      const isPrincipalId = (v: unknown) => typeof v === "string" && (v.startsWith("user_") || v.startsWith("group_"));
+      return field.type === "list" ? Array.isArray(value) && value.every(isPrincipalId) : isPrincipalId(value);
+    }
   }
 }
 
@@ -484,7 +498,7 @@ export function typeMatches(field: Pick<FieldDef, "type" | "format">, value: Lit
   } else if (typeof value !== expected) {
     return false;
   }
-  return field.format === undefined || formatMatches(field.format, value);
+  return field.format === undefined || formatMatches({ type: field.type, format: field.format }, value);
 }
 
 /** The expected-type label `typeMatches` checks against, for a diagnostic

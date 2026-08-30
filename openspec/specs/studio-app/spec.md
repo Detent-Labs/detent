@@ -840,7 +840,17 @@ native input.
 Either control SHALL offer no option when the field is
 `dataSource`-bound, since the draft carries no resolved rows for one.
 That is the same carve-out named below for the preview. The CEL toggle
-SHALL still work there.
+SHALL still work there. A field declaring `format: "person"` and
+neither `options` nor `dataSource` SHALL get the identical carve-out,
+whether its type is `string` or `list`: the draft resolves no
+`allowedGroups`-sourced people list either, since that resolution needs
+a live database read the draft editor does not have. The CEL toggle
+still works there too.
+
+The note the zone shows in the person case SHALL name the people list,
+not a data source. The existing note names a data source by hand, and
+this field declares none; an author reading it would learn the wrong
+thing about their own draft.
 
 For a `file` field the whole Default value zone SHALL show disabled. It
 SHALL state that the type accepts no default here. This mirrors "Only
@@ -912,7 +922,19 @@ them, keyed by field id.
 A dataSource-backed field SHALL preview with no option list. The
 draft carries no resolved rows for one. The row stating so SHALL name
 that the field resolves at runtime. An author previews what a
-participant gets.
+participant gets. A field declaring `format: "person"` and neither
+`options` nor `dataSource` SHALL preview the same way, for the
+identical reason: the draft cannot reach the live `allowedGroups`
+expansion either. That field SHALL get its own row wording, naming the
+people list rather than a data source it does not declare.
+
+The preview's sample value SHALL match the shape the field's own type
+takes. A `format` narrows the value domain, so a formatted field
+previews that format's sample rather than its type's — but a `{type:
+"list"}` field holds an array whatever its format, so its sample SHALL
+be the format's sample inside an array. A scalar there would draw a
+multi-select with nothing selected, since the shared form component
+reads a non-array value as an empty selection.
 
 "Used in" SHALL list, inside its disclosure, every step whose view
 references the field, with the modes those references set. A "Show on
@@ -964,9 +986,16 @@ condition.
 
 - **WHEN** the developer selects a `string` field and opens the format
   picker
-- **THEN** it offers `date`, `datetime` and `email`, plus an entry for
-  declaring no format
+- **THEN** it offers `date`, `datetime`, `email` and `person`, plus an
+  entry for declaring no format
 - **AND** it offers no other member
+
+#### Scenario: The format picker offers person for a list field
+
+- **WHEN** the developer selects a `list` field and opens the format
+  picker
+- **THEN** it offers `person` alone, plus an entry for declaring no
+  format
 
 #### Scenario: A type with no allowed control hides the control picker
 
@@ -1074,6 +1103,24 @@ condition.
 - **THEN** the literal control offers no option, and the CEL toggle
   still lets the developer write an expression default
 
+#### Scenario: A bare person field's default offers no option list
+
+- **WHEN** the developer opens the Default value zone on a `{type:
+  "string", format: "person"}` field declaring neither `options` nor
+  `dataSource`
+- **THEN** the literal control offers no option, and the CEL toggle
+  still lets the developer write an expression default
+- **AND** the note names the people list, not a data source
+
+#### Scenario: A bare person list's default offers no checkbox group
+
+- **WHEN** the developer opens the Default value zone on a `{type:
+  "list", format: "person"}` field declaring neither `options` nor
+  `dataSource`
+- **THEN** the literal control offers no option, rather than a checkbox
+  group over an empty option set, and the CEL toggle still lets the
+  developer write an expression default
+
 #### Scenario: The Default value zone disables for a reference or file field
 
 - **WHEN** the developer opens the Values tab on a `file` field
@@ -1106,6 +1153,21 @@ condition.
   two children
 - **THEN** the shared form component draws the group and both children
   inside it
+
+#### Scenario: A bare person field previews with no option list
+
+- **WHEN** the developer opens the preview on a `{type: "string",
+  format: "person"}` field declaring neither `options` nor `dataSource`
+- **THEN** the preview shows no option list, and the row states that
+  the field's people list resolves at runtime, naming no data source
+
+#### Scenario: A person list previews an array sample
+
+- **WHEN** the developer opens the preview on a `{type: "list", format:
+  "person"}` field
+- **THEN** the synthesized sample value is an array holding the person
+  format's own sample, not that sample as a bare scalar
+- **AND** the `{type: "string"}` twin still previews the scalar
 
 #### Scenario: A tab switch keeps a half-typed developer view
 

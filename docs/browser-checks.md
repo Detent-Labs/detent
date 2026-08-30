@@ -1943,3 +1943,73 @@ pure function. `test/http-disposition.test.ts` and
 `test/http-reporting-reports.test.ts` cover the route's headers and gates.
 None of the three starts a real download or reads a file a real browser
 saved.
+
+### The person format's two pickers (`field-model-person-format`)
+
+Source: `field-model-person-format` task 7.5.
+
+Measured on 2026-08-31 against the production build served from `WEB_ROOT`.
+Built with `bun run --filter './packages/web' build`, then the engine's own
+port. This walk skips `bun run dev`, for the pre-existing Studio dev-mode
+crash the `instance-transition-action` entry above already records.
+
+`scripts/seed.ts` writes the group, so a seeded database needs no setup by
+hand. The row carries the id `group_it_ops`, the name "IT Ops", a global
+scope, and `demo-admin@example.test` plus `demo-author@example.test` as its
+members. The same script publishes `examples/access-request.json`, which
+names that id.
+
+The seed is the only writer of that id. A group made through `/admin/groups`
+never carries it, since `createGroup` mints a `group_<uuid>`.
+
+Shortest route: open `/app/start` and press Start on "Access Request". The
+seeded body declares `group_it_ops` in `allowedGroups`, an `Approver` field
+of `{type: "string", format: "person"}` and a `Reviewers` field of `{type:
+"list", format: "person", control: "checkboxes"}`. Neither field carries
+`options` or `dataSource`.
+
+The studio Player is the other route, and the one to take for a body no
+example covers. Put such a body in a draft. Then choose "Create test
+instance". That plays the draft body rather than a published version.
+
+Pass, single person: the string field renders a `<select>`. Its first
+option is blank. Its second is the group's own name. Its remaining options
+are the member accounts. An account with no display name shows its email
+instead. The group entry comes first, ahead of every member.
+
+Pass, several people: the list field renders one checkbox per entry, over
+the same three entries in the same order. On the seeded route those read
+"IT Ops", `demo-admin@example.test` and `demo-author@example.test`. An empty
+group is the defect to watch for here. The picker then offers the group entry
+alone, and no member is pickable.
+
+Now drop `allowedGroups` from the draft body, and create a second test
+instance. Pass, fail-closed: the list field renders an empty listbox. It
+offers zero options. It shows no error. It never falls back to every
+account in the directory.
+
+The string field renders a plain text input instead. The delta states that
+case as "an empty resolved list places no membership bound". There the
+value faces the format shape check alone.
+
+Open the field catalog, and select the person field. Pass: the format
+picker offers "Person". The note under it reads "A person or a group,
+picked from the ones this process allows."
+
+Expand "How it will look". Pass: one note renders, never two, and it is the
+person one. The disabled sample control holds a `user_` sample.
+
+Open the Values tab. Pass: the Default value zone renders the person note
+in place of the data source note. The "Edit as CEL" control still works.
+
+Select the list field. Pass: it renders a format picker at all, which a
+`list` field never did before this change. That picker offers "(none)" and
+"Person", and nothing else. Its preview renders a listbox rather than a
+single control.
+
+The suite `test/data-source-resolution.test.ts` asserts the resolved
+`FieldOption[]` and its order. Two more suites assert the sample shape and
+the carve-out: `packages/web/test/studio-fieldPreview.test.ts` and
+`packages/web/test/studio-defaultValueLogic.test.ts`. None of them sees
+which widget `FieldForm` draws for a resolved person field. None sees the
+empty list render as an empty control rather than an error.

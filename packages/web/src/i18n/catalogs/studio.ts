@@ -57,6 +57,8 @@ export const en = {
   "fieldCatalog.previewHeading": "How it will look",
   "fieldCatalog.previewResolvesAtRuntime":
     "This field's choices come from a data source. They resolve when a participant reaches this step, not here.",
+  "fieldCatalog.previewPersonResolvesAtRuntime":
+    "This field's people list comes from the groups this process allows. It resolves when a participant reaches this step, not here.",
   "fieldCatalog.usedInHeading": "Used in",
   "fieldCatalog.usedInEmpty": "No step asks for this field yet.",
   "fieldCatalog.showOnCanvas": "Show on the canvas",
@@ -79,6 +81,8 @@ export const en = {
   "defaultValue.typeDisabledNote": "This type accepts no default here.",
   "defaultValue.dataSourceNoOptions":
     "This field's choices come from a data source. They resolve at runtime, so there is nothing to pick a default from here. Use CEL instead.",
+  "defaultValue.personNoOptions":
+    "This field's people list comes from the groups this process allows. It resolves at runtime, so there is nothing to pick a default from here. Use CEL instead.",
 
   "fieldValidation.notEvaluated": "not evaluated for this field type",
 

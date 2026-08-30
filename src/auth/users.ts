@@ -398,6 +398,29 @@ export async function emailsForUserIds(userIds: string[], db: SQL = sql): Promis
   return new Map(rows.map((r) => [r.user_id, r.email]));
 }
 
+/**
+ * The displayable name each of `userIds` holds, keyed by `user_id`. One round
+ * trip whatever the size of the set, for the reason `emailsForUserIds` above
+ * takes one, and applying the same `resolveDisplayName` every other read path
+ * does — so a `NULL` `display_name` falls back to the email exactly as
+ * `listUsers` resolves it.
+ *
+ * It differs from `emailsForUserIds` in one way: it does NOT filter
+ * `disabled`. Its caller labels a person a process instance already holds, and
+ * an account taken out of service still needs a name beside the value it left
+ * behind. An id matching no row is absent from the map, which is how the
+ * caller detects one.
+ *
+ * The empty set short-circuits without touching the database. Read by
+ * `resolveFields`' person-field option resolution (`src/runtime/api.ts`).
+ */
+export async function displayNamesForUserIds(userIds: string[], db: SQL = sql): Promise<Map<string, string>> {
+  if (userIds.length === 0) return new Map();
+  const rows = (await db`SELECT user_id, email, display_name FROM auth_users
+    WHERE user_id = ANY(${db.array(userIds, "TEXT")})`) as { user_id: string; email: string; display_name: string | null }[];
+  return new Map(rows.map((r) => [r.user_id, resolveDisplayName(r.display_name, r.email)]));
+}
+
 async function userIdForEmail(email: string, db: SQL): Promise<string | undefined> {
   const rows = (await db`SELECT user_id FROM auth_users WHERE email = ${email}`) as { user_id: string }[];
   return rows[0]?.user_id;

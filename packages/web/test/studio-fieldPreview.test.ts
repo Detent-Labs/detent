@@ -44,6 +44,16 @@ describe("previewViewFields", () => {
     expect(int?.values.field_a).toBe(42);
   });
 
+  it("previews a person list's sample inside an array", () => {
+    const result = previewViewFields(field({ type: "list", format: "person" }), "en", "en");
+    expect(result?.values.field_a).toEqual(["user_sample"]);
+  });
+
+  it("previews the string twin's person sample as a scalar", () => {
+    const result = previewViewFields(field({ type: "string", format: "person" }), "en", "en");
+    expect(result?.values.field_a).toBe("user_sample");
+  });
+
   it("carries the declared control through to the preview", () => {
     const result = previewViewFields(field({ type: "string", control: "multiline" }), "en", "en");
     expect(result?.fields[0]!.field.control).toBe("multiline");

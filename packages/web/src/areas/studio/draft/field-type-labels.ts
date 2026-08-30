@@ -32,6 +32,7 @@ export const FIELD_FORMAT_LABELS: Record<FieldFormat, { name: string; note: stri
   datetime: { name: "Date and time", note: "A calendar date with a time of day." },
   integer: { name: "Whole number", note: "No decimal part. Conditions compare it as a whole number." },
   email: { name: "Email address", note: "One address the browser and the engine both check." },
+  person: { name: "Person", note: "A person or a group, picked from the ones this process allows." },
 };
 
 /**

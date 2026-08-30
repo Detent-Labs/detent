@@ -57,10 +57,10 @@ describe("nextFieldKey", () => {
 
 describe("allowedForType", () => {
   it("offers each type only the members the compile pass would accept", () => {
-    expect(allowedForType("string")).toEqual({ formats: ["date", "datetime", "email"], controls: ["multiline", "radio"] });
+    expect(allowedForType("string")).toEqual({ formats: ["date", "datetime", "email", "person"], controls: ["multiline", "radio"] });
     expect(allowedForType("number")).toEqual({ formats: ["integer"], controls: [] });
     expect(allowedForType("boolean")).toEqual({ formats: [], controls: ["radio"] });
-    expect(allowedForType("list")).toEqual({ formats: [], controls: ["checkboxes"] });
+    expect(allowedForType("list")).toEqual({ formats: ["person"], controls: ["checkboxes"] });
   });
 
   it("offers neither picker for a type whose row carries no member", () => {

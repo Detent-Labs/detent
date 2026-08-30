@@ -38,14 +38,20 @@ export type LiteralControlKind = "string" | "number" | "boolean" | "date" | "dat
  * against the same domain.
  *
  * A `dataSource`-bound picker offers none: the draft carries no resolved rows
- * to build one from. `control` is deliberately absent. It changes how a
- * participant picks, never what an author may type here. */
+ * to build one from. A bare person field offers none for the identical reason
+ * (design.md Decision 8): its people list resolves from the body's
+ * `allowedGroups` through a live database read the draft editor cannot make.
+ * `control` is deliberately absent. It changes how a participant picks, never
+ * what an author may type here. */
 export function literalControlKind(field: Pick<DraftField, "type" | "format" | "options" | "dataSource">): LiteralControlKind {
   const { type } = field;
   if (type === "boolean" || type === "number") return type;
-  if (type === "list") return field.dataSource !== undefined ? "none" : "options-multi";
+  // A person field declaring its own static options resolves rows like any
+  // other, so the options keep winning over the carve-out.
+  const noResolvedRows = field.dataSource !== undefined || (field.format === "person" && (field.options ?? []).length === 0);
+  if (type === "list") return noResolvedRows ? "none" : "options-multi";
   if (type === "string") {
-    if (field.dataSource !== undefined) return "none";
+    if (noResolvedRows) return "none";
     if ((field.options ?? []).length > 0) return "options";
     if (field.format === "date" || field.format === "datetime" || field.format === "email") return field.format;
   }
