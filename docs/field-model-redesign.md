@@ -161,10 +161,9 @@ people list it needs. The `richtext` member waits for a change of its own. Its
 value is markup, so it raises storage, sanitizing and editor questions.
 Markdown storage is the cheaper answer to the first of those.
 
-The `image` and
-`signature` members refine a `file`. Files are opaque today. The `JS_TYPE`
-record maps `file` to `any`, and `FieldForm:207` renders one in the free-text
-fallback. A format over an unbuilt type buys nothing.
+The `image` and `signature` members refine a `file`. Files are opaque today.
+The `JS_TYPE` record maps `file` to `any`, and `FieldForm:207` renders one in
+the free-text fallback. A format over an unbuilt type buys nothing.
 
 The `email` member is the weakest of the four, because `validation.pattern`
 already covers it. It ships anyway. It reaches `<input type="email">`, a native
@@ -224,16 +223,29 @@ refuses it a default value. No definition under `examples/` declares one. Every
 
 ## What stays out of scope
 
-**S1. Item list.** A repeating sub-table of rows and columns breaks the flat
-`data` object keyed by `fieldId`. The definition contract promises that
-flatness. Under a sub-table, CEL sees `dyn` and the generated columns find
-nothing. It is the most-requested shape in real BPM work, so it gets its own
-change, change 4. Record it as an open question in `docs/decisions.md`.
+**S1. Item list.** An expense claim carries five lines. Each line holds a date,
+an amount and a category. The flat `data` object cannot hold that. An author
+who needs it today declares `pos1_betrag`, `pos2_betrag` and further keys by
+hand. The ceiling is whatever number they pick in advance.
 
-**S2. Display elements.** A chart, a read-only table, a markup block and a tab
-panel carry no participant value. They belong in the `view`, beside the field
-references it already holds. Putting them in the type enum would repeat the
-mistake this record removes. Change 3 carries them.
+A repeating sub-table of rows and columns breaks the flat `data` object keyed
+by `fieldId`. The definition contract promises that flatness. Under a
+sub-table, CEL sees `dyn` and the generated columns find nothing. It is the
+most-requested shape in real BPM work, so it gets its own change, change 4.
+Record it as an open question in `docs/decisions.md`.
+
+**S2. Display elements.** An approver opens an expense claim. A note at the top
+should say that an amount over 5000 also needs the board. Under it belongs a
+summary of what the applicant entered. A form shows only fields today.
+
+An author fakes the note with a read-only string field carrying a default. That
+field then lands in `data` and travels through every report. It never held a
+value.
+
+A chart, a read-only table, a markup block and a tab panel carry no participant
+value. They belong in the `view`, beside the field references it already holds.
+Putting them in the type enum would repeat the mistake this record removes.
+Change 3 carries them.
 
 **S3. Catalog scope.** Reuse of one field across several processes raises a
 scoping question. The catalog is per-process today. Out of scope.
