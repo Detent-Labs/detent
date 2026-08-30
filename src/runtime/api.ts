@@ -2027,6 +2027,57 @@ export async function previewReportDraft(
   return runReportQuery(draft, db);
 }
 
+// ------------------------------------------------------------
+// CSV export
+// ------------------------------------------------------------
+
+const CSV_NO_VALUE = "(no value)";
+const CSV_NOT_IN_VERSION = "(not in this version)";
+const CSV_REDACTED = "(redacted)";
+
+/** RFC 4180 quoting: only a comma, a quote or a newline forces it; an embedded quote doubles. */
+function csvField(text: string): string {
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+/** A field column's own `fieldId`; a merge column's joined source `fieldId`s, since the export has no locale to draw a translated label from. */
+function csvColumnHeader(c: ReportResultColumn): string {
+  return c.type === "field" ? c.fieldId : `merge(${c.fieldIds.join(",")})`;
+}
+
+/**
+ * Plain text for one cell, keeping the three empty-cell kinds distinct —
+ * the same rule `fieldCellDisplay`/`mergeCellDisplay` (`packages/web`)
+ * render visually, restated here since the engine must not depend on
+ * `packages/web`. A stored `null` value stays an empty string, matching
+ * `fieldCellDisplay`'s own choice: that is a real value the author chose to
+ * leave empty, not one of the three states this rule distinguishes.
+ */
+function csvCellText(cell: ReportCell | MergeReportCell): string {
+  switch (cell.kind) {
+    case "value":
+      return cell.value === null ? "" : String(cell.value);
+    case "no-value":
+      return CSV_NO_VALUE;
+    case "not-in-version":
+      return CSV_NOT_IN_VERSION;
+    case "redacted":
+      return CSV_REDACTED;
+  }
+}
+
+/**
+ * The CSV twin of `ReportTable.tsx`: one header row naming each column, one
+ * row per instance. Pure and I/O-free, so a `bun:test` unit test covers the
+ * three-way marker text with no database — see `csv-download-report-table`'s
+ * design.md.
+ */
+export function reportResultToCsv(result: ReportExecutionResult): string {
+  const header = result.columns.map(csvColumnHeader).map(csvField).join(",");
+  const rows = result.rows.map((row) => row.cells.map((cell) => csvField(csvCellText(cell))).join(","));
+  return [header, ...rows].map((line) => `${line}\r\n`).join("");
+}
+
 /**
  * Read one instance's runtime record — its `HistoryEntry` rows merged with
  * its `InstanceEvent` rows into one chronologically ordered, discriminated

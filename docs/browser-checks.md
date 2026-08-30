@@ -1921,3 +1921,25 @@ DOM test library. See `studio-draftProvider-chainingFetch.test.ts`'s own
 note. Neither one sees the two buttons render side by side. Neither sees
 the stamp's actual paint, or a real submit round trip through the running
 server. That stays a browser check.
+
+### CSV download of a saved report (`csv-download-report-table`)
+
+<!-- antislop: allow long-words -->
+<!-- Why: "Purchase Requisition" is examples/purchase-requisition.json's own proper name, not a verb to simplify. -->
+Build a Purchase Requisition report over `cost_center` and `finance_note`,
+a field no instance has written yet. Save it. Pass: a "Download CSV"
+control appears beside Preview and Save only now. It does not appear
+while the report is still an unsaved draft.
+
+Choose the control. Pass: the browser saves a file named
+`report-<reportId>.csv` to disk, rather than rendering it inline.
+
+Read the saved file. Pass: the header row names the two field ids. A row
+holding data shows the seeded value in one column. It shows `(no value)`
+in the other, never the same blank text for both.
+
+`test/reporting-csv.test.ts` covers the marker text and the escaping as a
+pure function. `test/http-disposition.test.ts` and
+`test/http-reporting-reports.test.ts` cover the route's headers and gates.
+None of the three starts a real download or reads a file a real browser
+saved.

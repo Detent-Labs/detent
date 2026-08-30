@@ -7,8 +7,8 @@
  *
  * No port: calls `createServer`'s handler directly with `new Request(...)`,
  * the way `test/http-static.test.ts` does. DB-backed: the `filename: true`
- * entry needs a published process, an instance and an uploaded attachment
- * row.
+ * entries need a published process, an instance, an uploaded attachment row
+ * and a saved report.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql } from "../src/engine/store.js";
@@ -17,13 +17,17 @@ import { clearInstanceAudit } from "./audit-cleanup.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
+import { REPORTS_ROLE, ADMIN_ROLE } from "../src/auth/authorize.js";
 import { createServer, BINARY_ROUTES } from "../src/http/server.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
 const reg = createRegistry();
 const dataSourceReg = createDataSourceRegistry();
-const user1: Actor = { id: "user_1", roles: [] };
+// REPORTS_ROLE + ADMIN_ROLE so the same actor also owns and executes the
+// report CSV route below (ADMIN_ROLE short-circuits the process `read`
+// gate) — the attachment route's own authorization does not key off roles.
+const user1: Actor = { id: "user_1", roles: [REPORTS_ROLE, ADMIN_ROLE] };
 
 const jsonReq = (url: string, method: string, actor: Actor, body: unknown = {}) =>
   new Request(url, { method, headers: { ...authHeaders(actor), "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -68,7 +72,9 @@ function serverWithToken(): (req: Request) => Promise<Response> {
 
 beforeAll(initDb);
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_attachments, definitions`;
+  if (DB) {
+    await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_attachments, definitions, reports, report_principals`;
+  }
   if (DB) await clearInstanceAudit();
 });
 
@@ -82,14 +88,23 @@ test.skipIf(!DB)("every BINARY_ROUTES entry marked filename: true carries Conten
   const uploaded = (await (
     await fetch(jsonReq(`http://x/instances/${created.instanceId}/attachments`, "POST", user1, { filename: "a report.txt", contentType: "text/plain", dataBase64 }))
   ).json()) as { id: string };
+  const report = (await (
+    await fetch(jsonReq("http://x/reporting/reports", "POST", user1, { processId: PID, name: "Disposition report" }))
+  ).json()) as { reportId: string };
 
   const filenameRoutes = BINARY_ROUTES.filter((r) => r.filename);
   expect(filenameRoutes.length).toBeGreaterThan(0);
   for (const route of filenameRoutes) {
-    const path = route.pattern.replace(":instanceId", created.instanceId).replace(":attachmentId", uploaded.id);
+    const path = route.pattern
+      .replace(":instanceId", created.instanceId)
+      .replace(":attachmentId", uploaded.id)
+      .replace(":reportId", report.reportId);
     const res = await fetch(authedReq(`http://x${path}`, route.method, user1));
     expect(res.status, `${route.method} ${route.pattern}`).toBe(200);
-    expect(res.headers.get("Content-Disposition"), `${route.method} ${route.pattern}`).toBe('attachment; filename="a%20report.txt"');
+    const expectedFilename = route.pattern.includes(":reportId") ? `report-${report.reportId}.csv` : "a report.txt";
+    expect(res.headers.get("Content-Disposition"), `${route.method} ${route.pattern}`).toBe(
+      `attachment; filename="${encodeURIComponent(expectedFilename)}"`,
+    );
   }
 });
 

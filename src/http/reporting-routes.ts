@@ -26,6 +26,7 @@ import {
   getReport,
   listMyReports,
   executeReport,
+  reportResultToCsv,
   previewReportDraft,
   previewReportColumnChoices,
   type ReportQuery,
@@ -35,7 +36,7 @@ import { instanceStatus, type ProcessId } from "../schema/definition.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import type { Actor } from "../cel/eval.js";
 import { requireRole, requirePermission, REPORTS_ROLE } from "../auth/authorize.js";
-import { RequestShapeError, notFound, type HttpResult } from "./errors.js";
+import { RequestShapeError, notFound, type HttpResult, type HttpBinaryResult } from "./errors.js";
 import { route, readJson } from "./routes.js";
 
 /**
@@ -239,6 +240,25 @@ export async function handleExecuteReport(reportId: string, req: Request, resolv
     const result = await executeReport(reportId, actor, db);
     if (!result) return notFound(`no such report: ${reportId}`);
     return { status: 200, body: result };
+  });
+}
+
+/**
+ * The CSV twin of `handleExecuteReport`: same gate, same `executeReport`
+ * call, so the export can never drift from the JSON table's authorization
+ * or its row set. `csv-download-report-table`'s design.md names this
+ * reuse as the load-bearing decision.
+ */
+export async function handleExecuteReportCsv(reportId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpBinaryResult | HttpResult> {
+  return route<HttpBinaryResult | HttpResult>(req, resolver, db, (actor) => requireRole(actor, REPORTS_ROLE), async (actor) => {
+    const result = await executeReport(reportId, actor, db);
+    if (!result) return notFound(`no such report: ${reportId}`);
+    return {
+      status: 200,
+      contentType: "text/csv; charset=utf-8",
+      data: new TextEncoder().encode(reportResultToCsv(result)),
+      filename: `report-${reportId}.csv`,
+    };
   });
 }
 

@@ -94,6 +94,7 @@ import {
   handleUpdateReport,
   handleDeleteReport,
   handleExecuteReport,
+  handleExecuteReportCsv,
   handlePreviewReport,
   handleReportColumnChoices,
 } from "./reporting-routes.js";
@@ -263,6 +264,7 @@ type Route = {
  */
 export const BINARY_ROUTES: { method: string; pattern: string; filename: boolean }[] = [
   { method: "GET", pattern: "/instances/:instanceId/attachments/:attachmentId", filename: true },
+  { method: "GET", pattern: "/reporting/reports/:reportId/table.csv", filename: true },
   { method: "GET", pattern: "/metrics", filename: false },
 ];
 
@@ -699,6 +701,8 @@ export function createServer(
       handler: (p, req, _c, db) => handleDeleteReport(p[0]!, req, resolver, db) },
     { method: "GET", segments: seg("/reporting/reports/:reportId/table"),
       handler: (p, req, _c, db) => handleExecuteReport(p[0]!, req, resolver, db) },
+    { method: "GET", segments: seg("/reporting/reports/:reportId/table.csv"),
+      handler: (p, req, _c, db) => handleExecuteReportCsv(p[0]!, req, resolver, db) },
     { method: "GET", segments: seg("/drafts"),
       handler: (_p, req, _c, db) => handleListDrafts(req, resolver, db) },
     { method: "GET", segments: seg("/drafts/:processId"),

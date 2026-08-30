@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   createReport,
+  downloadReportCsv,
   fetchReportColumnChoices,
   getReport,
   previewReport,
@@ -50,6 +51,8 @@ export function ReportBuilderScreen({
   const [preview, setPreview] = useState<ReportExecutionResult | undefined>();
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<ClientError | undefined>();
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<ClientError | undefined>();
 
   // Load the existing report, once, when editing.
   useEffect(() => {
@@ -127,6 +130,28 @@ export function ReportBuilderScreen({
       .then((report) => onSaved(report.reportId))
       .catch((cause: unknown) => setSaveError(describeCaughtError(cause)))
       .finally(() => setSaving(false));
+  };
+
+  /**
+   * Blob + `URL.createObjectURL` + `<a download>`, the same pattern
+   * `TaskScreen.tsx`'s `doDownloadAttachment` uses. A plain `<a href>`
+   * cannot carry the bearer-header auth this route needs.
+   */
+  const downloadCsv = () => {
+    if (!reportId) return;
+    setDownloading(true);
+    setDownloadError(undefined);
+    downloadReportCsv(reportId, token)
+      .then((blob) => {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `report-${reportId}.csv`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      })
+      .catch((cause: unknown) => setDownloadError(describeCaughtError(cause)))
+      .finally(() => setDownloading(false));
   };
 
   return (
@@ -226,9 +251,15 @@ export function ReportBuilderScreen({
         <button type="button" className="btn btn-primary" onClick={save} disabled={saving || !isValidReportName(draft.name)}>
           {t(locale, saving ? "builder.saving" : "builder.save")}
         </button>
+        {reportId && (
+          <button type="button" className="btn btn-secondary" onClick={downloadCsv} disabled={downloading}>
+            {t(locale, downloading ? "builder.downloadingCsv" : "builder.downloadCsv")}
+          </button>
+        )}
       </div>
       {saveError && <ErrorNote error={saveError} locale={locale} />}
       {previewError && <ErrorNote error={previewError} locale={locale} />}
+      {downloadError && <ErrorNote error={downloadError} locale={locale} />}
       {preview && (draft.columns.length === 0 ? <EmptyState>{t(locale, "builder.columnsEmpty")}</EmptyState> : <ReportTable result={preview} locale={locale} />)}
     </main>
   );

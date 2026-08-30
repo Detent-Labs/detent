@@ -76,6 +76,12 @@ export function executeReport(reportId: string, token: string): Promise<ReportEx
   return get(`/reporting/reports/${encodeURIComponent(reportId)}/table`, token);
 }
 
+/** The raw CSV bytes as a `Blob`, auth carried on the bearer header — a plain `<a href>` cannot, so the caller drives the download itself. */
+export async function downloadReportCsv(reportId: string, token: string): Promise<Blob> {
+  const res = await request(`/reporting/reports/${encodeURIComponent(reportId)}/table.csv`, token);
+  return res.blob();
+}
+
 export async function previewReport(
   draft: { processId: string; query?: ReportQuery; columns?: ReportColumn[] },
   token: string,

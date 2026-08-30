@@ -24,6 +24,9 @@ const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 const owner: Actor = { id: "user_owner", roles: [REPORTS_ROLE] };
 const bystander: Actor = { id: "user_bystander", roles: [] };
 const adminReports: Actor = { id: "user_admin_reports", roles: [REPORTS_ROLE, ADMIN_ROLE] };
+// Holds the reports role, but is neither owner, editor nor viewer of any
+// report created below — the "non-member" half of the CSV route's gate.
+const nonMember: Actor = { id: "user_non_member", roles: [REPORTS_ROLE] };
 
 const req = (url: string, actor: Actor, method = "GET", body?: unknown) =>
   new Request(url, {
@@ -180,6 +183,43 @@ test.skipIf(!DB)("POST /reporting/reports/columns returns column choices, empty 
 
   const noRead = await fetch(req("http://x/reporting/reports/columns", owner, "POST", { processId: P }));
   expect(((await noRead.json()) as { choices: unknown[] }).choices).toEqual([]);
+});
+
+// ============================================================
+// 4.2b CSV export — reuses executeReport's gates unchanged
+// ============================================================
+
+test.skipIf(!DB)("GET /reporting/reports/:id/table.csv refuses a non-member", async () => {
+  const P = pid();
+  await publishBody(P, body(), reg, dataSourceReg);
+  const created = (await (
+    await fetch(req("http://x/reporting/reports", owner, "POST", { processId: P, name: "CSV report" }))
+  ).json()) as { reportId: string };
+
+  const res = await fetch(req(`http://x/reporting/reports/${created.reportId}/table.csv`, nonMember));
+  expect(res.status).toBe(403);
+});
+
+test.skipIf(!DB)("GET /reporting/reports/:id/table.csv returns a header-only CSV for a member without read permission", async () => {
+  const P = pid();
+  const v = await publishBody(P, body(), reg, dataSourceReg);
+  await createInstance(v.definition, { processId: P, version: v.version, data: { field_x: "hi" } as never }, sql);
+  const created = (await (
+    await fetch(
+      req("http://x/reporting/reports", owner, "POST", {
+        processId: P,
+        name: "CSV report",
+        columns: [{ type: "field", fieldId: "field_x" }],
+      }),
+    )
+  ).json()) as { reportId: string };
+
+  // `owner` is the report's own creator (a member), but holds no `read`
+  // permission on the process: an empty CSV, not a refusal.
+  const res = await fetch(req(`http://x/reporting/reports/${created.reportId}/table.csv`, owner));
+  expect(res.status).toBe(200);
+  expect(res.headers.get("content-type")).toContain("text/csv");
+  expect(await res.text()).toBe("field_x\r\n");
 });
 
 // ============================================================
