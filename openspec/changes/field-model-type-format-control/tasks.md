@@ -73,53 +73,53 @@
 
 ## 4. The renderer
 
-- [ ] 4.1 Invoke `/frontend-design:frontend-design` and read
+- [x] 4.1 Invoke `/frontend-design:frontend-design` and read
       `.claude/rules/design-language.md` before drawing the textarea, the radio
       group, the checkbox group and the two studio pickers; verify the notes
       land in the change before task 4.3 starts.
-- [ ] 4.2 Add `format` and `control` to `WireField` in
+- [x] 4.2 Add `format` and `control` to `WireField` in
       `packages/form-ui/src/types.ts`, which lists the wire field's keys by
       hand; verify `bun run typecheck` accepts a renderer reading either key.
-- [ ] 4.3 Rewrite `FieldForm`'s widget switch in `packages/form-ui` to read
+- [x] 4.3 Rewrite `FieldForm`'s widget switch in `packages/form-ui` to read
       options, then `control`, then `format`, then `type`, per design.md
       Decision 7; verify one render test per branch.
-- [ ] 4.4 Add the `<textarea>`, the radio group, the boolean radio pair and the
+- [x] 4.4 Add the `<textarea>`, the radio group, the boolean radio pair and the
       checkbox group, each inside a `<fieldset>` with a `<legend>`; verify a
       test asserts `aria-required`, `aria-invalid` and `aria-describedby` on
       the fieldset.
-- [ ] 4.5 Add the yes and no locale record beside `issue-messages.ts`'s own
+- [x] 4.5 Add the yes and no locale record beside `issue-messages.ts`'s own
       catalog; verify the German locale renders its own two labels.
-- [ ] 4.6 Make an inapplicable `control` fall back to the type default; verify a
+- [x] 4.6 Make an inapplicable `control` fall back to the type default; verify a
       `control: "radio"` string field with no options renders a text input.
 
 ## 5. The studio
 
-- [ ] 5.1 Shrink `FIELD_TYPE_LABELS` to six entries and add label records for
+- [x] 5.1 Shrink `FIELD_TYPE_LABELS` to six entries and add label records for
       the format and control members; verify the exhaustive-record pattern
       makes a missing entry a compile error.
-- [ ] 5.2 Add the format picker and the control picker to the field catalog
+- [x] 5.2 Add the format picker and the control picker to the field catalog
       panel, each offering the selected type's allowed members and an empty
       entry; verify a `file` field shows neither picker.
-- [ ] 5.3 Drop a `format` or `control` the new type refuses when the developer
+- [x] 5.3 Drop a `format` or `control` the new type refuses when the developer
       switches the type, naming the drop first; verify a logic test covers the
       drop and the notice.
-- [ ] 5.4 Update `mintField.ts`'s `baseTypeForPaletteKind` to return a type and
+- [x] 5.4 Update `mintField.ts`'s `baseTypeForPaletteKind` to return a type and
       an optional format, since its `date` palette kind now mints
       `{type: "string", format: "date"}` and its `choice` kind mints
       `{type: "string"}`; verify a dropped date field renders a date input.
-- [ ] 5.5 Update `field-preview.ts`'s sample values,
+- [x] 5.5 Update `field-preview.ts`'s sample values,
       `defaultValueLogic.ts`'s `literalControlKind` and its reference/file
       carve-out, `fieldValidationLogic.ts`'s `offeredKeys`,
       `columnMappingLogic.ts`'s `select` test, and the
       `.default-value-multiselect` class in the studio stylesheet; verify each
       module's own test file passes.
-- [ ] 5.6 Add the `int` arm to `celLiteral` in `conditionLogic.ts` and the date
+- [x] 5.6 Add the `int` arm to `celLiteral` in `conditionLogic.ts` and the date
       and datetime value editors to the condition builder; verify the builder
       writes `data.prioritaet > 3` for an integer operand.
-- [ ] 5.7 Update `ruleLogic.ts` and `migrationPlanLogic.ts` for the new
+- [x] 5.7 Update `ruleLogic.ts` and `migrationPlanLogic.ts` for the new
       `celType` signature; verify the migration-plan form reports a `double`
       source onto an `int` target.
-- [ ] 5.8 Update the web suites naming a removed member, including
+- [x] 5.8 Update the web suites naming a removed member, including
       `studio-fieldTypeLabels.test.ts` and `studio-fieldPreview.test.ts`, which
       both iterate `baseFieldType.options`; verify `bun test` inside
       `packages/web` is green.
