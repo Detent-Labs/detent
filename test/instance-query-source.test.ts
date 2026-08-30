@@ -27,7 +27,7 @@ const pid = (n: string) => n as ProcessId;
 
 /**
  * step_shelf: field_t_label (string), field_t_dept (string), field_t_price
- * (number), field_t_tags (multiselect — a non-scalar source for the
+ * (number), field_t_tags (list — a non-scalar source for the
  * label/attributes fallback tests) --(path_issue, manual, guardless)-->
  * step_issued (terminal).
  */
@@ -44,7 +44,7 @@ const targetBody = (): ProcessBody =>
         id: "field_t_tags",
         key: "tags",
         label: { en: "Tags" },
-        type: "multiselect",
+        type: "list",
         options: [{ value: "x", label: { en: "X" } }, { value: "y", label: { en: "Y" } }],
       },
     ],

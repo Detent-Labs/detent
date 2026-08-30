@@ -140,7 +140,7 @@ describe("compile: unknown-key rejection", () => {
       [
         "fieldOption",
         (b) => {
-          b.fields[0].type = "select";
+          b.fields[0].type = "string";
           b.fields[0].options = [{ value: "a", label: { en: "A" }, zzOption: 1 }];
         },
       ],
@@ -485,18 +485,18 @@ describe("compile: a body violating a new check still reads (no new Zod refineme
 // bounds live here, not as a Zod refinement. An unbypassable check is the
 // reason; see `definition-contract`.
 describe("compile: columnMapping bounds", () => {
-  /** A body whose one select field binds a data source and maps `price` onto a number field. */
+  /** A body whose one string field binds a data source and maps `price` onto a number field. */
   const mappingBody = (over: Record<string, unknown> = {}): any => {
     const b = baseBody();
     b.dataSources = [{ id: "ds_products", key: "products", type: "db.list", config: { listKey: "products" } }];
     b.fields = [
-      { id: "field_product", key: "product", label: { en: "Product" }, type: "select", dataSource: "ds_products", columnMapping: { price: "field_amount" }, ...over },
+      { id: "field_product", key: "product", label: { en: "Product" }, type: "string", dataSource: "ds_products", columnMapping: { price: "field_amount" }, ...over },
       { id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" },
     ];
     return b;
   };
 
-  it("accepts a select field mapping a column onto another catalog field", () => {
+  it("accepts a string field mapping a column onto another catalog field", () => {
     expect(() => compileProcessBody(mappingBody() as ProcessBody)).not.toThrow();
   });
 
@@ -506,8 +506,8 @@ describe("compile: columnMapping bounds", () => {
     expect(rejects(b).issues.some((i) => i.message.includes("needs a dataSource"))).toBe(true);
   });
 
-  it("rejects a mapping on a multiselect: several rows cannot fill one target", () => {
-    expect(rejects(mappingBody({ type: "multiselect" })).issues.some((i) => i.message.includes("needs a select field"))).toBe(true);
+  it("rejects a mapping on a list field: several rows cannot fill one target", () => {
+    expect(rejects(mappingBody({ type: "list" })).issues.some((i) => i.message.includes("needs a string field"))).toBe(true);
   });
 
   it("rejects a key outside the slug grammar", () => {
@@ -553,14 +553,14 @@ describe("compile: columnMapping bounds", () => {
     ];
     b.fields = [
       { id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" },
-      { id: "field_pick", key: "pick", label: { en: "Pick" }, type: "select", options: [{ value: "a", label: { en: "A" }, attributes: { n: 1 } }] },
+      { id: "field_pick", key: "pick", label: { en: "Pick" }, type: "string", options: [{ value: "a", label: { en: "A" }, attributes: { n: 1 } }] },
     ];
     expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
   });
 
   it("rejects a non-scalar attribute value", () => {
     const b = baseBody();
-    b.fields[0] = { id: "field_pick", key: "pick", label: { en: "Pick" }, type: "select", options: [{ value: "a", label: { en: "A" }, attributes: { bad: { nested: 1 } } }] };
+    b.fields[0] = { id: "field_pick", key: "pick", label: { en: "Pick" }, type: "string", options: [{ value: "a", label: { en: "A" }, attributes: { bad: { nested: 1 } } }] };
     expect(() => compileProcessBody(b as ProcessBody)).toThrow();
   });
 
@@ -878,7 +878,7 @@ describe("compile: unsatisfiable required+readonly pair", () => {
       id: "field_picker",
       key: "picker",
       label: { en: "Picker" },
-      type: "select",
+      type: "string",
       dataSource: "ds_products",
       columnMapping: { price: "field_amount" },
     });
@@ -899,7 +899,7 @@ describe("compile: unsatisfiable required+readonly pair", () => {
       id: "field_picker",
       key: "picker",
       label: { en: "Picker" },
-      type: "select",
+      type: "string",
       dataSource: "ds_products",
       columnMapping: { price: "field_amount" },
     });

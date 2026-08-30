@@ -1,7 +1,7 @@
 {
   "processId": "proc_employee_onboarding",
   "version": 1,
-  "definitionHash": "414bdf125ca26143607262f216203da4a1f503ebbbd7c5c549725fa35ca773f6",
+  "definitionHash": "fe22f1e280a3736a434afd8ddcdbc36df6a11b32d8df03ff493479995a3ddbd8",
   "status": "published",
   "publishedAt": "2026-08-29T09:00:00Z",
   "definition": {
@@ -35,7 +35,7 @@
         "description": {
           "en": "Offers every Laptop Inventory instance standing on its shelf step. The option value is that instance's own id, never its asset tag — renaming a device afterward leaves this reference intact."
         },
-        "type": "select",
+        "type": "string",
         "dataSource": "ds_2f6a8c40-0001-4a1c-8e2f-000000000001",
         "columnMapping": {
           "serial": "field_4d7f9b30-0003-4a1c-8e2f-000000000003"

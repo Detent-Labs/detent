@@ -494,7 +494,7 @@ describe("definition-contract: full-depth id and key uniqueness", () => {
   it("rejects a field dataSource naming an id absent from dataSources", () => {
     const body = {
       key: "p", label: { en: "P" }, baseLocale: "en",
-      fields: [{ id: "field_x", key: "x", label: { en: "X" }, type: "select", dataSource: "ds_missing" }],
+      fields: [{ id: "field_x", key: "x", label: { en: "X" }, type: "string", dataSource: "ds_missing" }],
       dataSources: [{ id: "ds_a", key: "a", type: "http", config: {} }],
       workflow: { initialStep: "step_a", steps: [terminalStep("step_a", "a")] },
     };
@@ -504,7 +504,7 @@ describe("definition-contract: full-depth id and key uniqueness", () => {
   it("accepts a field dataSource resolving to a declared data source", () => {
     const body = {
       key: "p", label: { en: "P" }, baseLocale: "en",
-      fields: [{ id: "field_x", key: "x", label: { en: "X" }, type: "select", dataSource: "ds_a" }],
+      fields: [{ id: "field_x", key: "x", label: { en: "X" }, type: "string", dataSource: "ds_a" }],
       dataSources: [{ id: "ds_a", key: "a", type: "http", config: {} }],
       workflow: { initialStep: "step_a", steps: [terminalStep("step_a", "a")] },
     };
@@ -516,7 +516,7 @@ describe("definition-contract: full-depth id and key uniqueness", () => {
       key: "p", label: { en: "P" }, baseLocale: "en",
       fields: [
         { id: "field_g", key: "grp", label: { en: "G" }, type: "group", fields: [
-          { id: "field_n", key: "nested", label: { en: "N" }, type: "select", dataSource: "ds_missing" },
+          { id: "field_n", key: "nested", label: { en: "N" }, type: "string", dataSource: "ds_missing" },
         ] },
       ],
       workflow: { initialStep: "step_a", steps: [terminalStep("step_a", "a")] },

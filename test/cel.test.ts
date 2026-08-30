@@ -8,8 +8,15 @@ import { instance as instanceSchema, baseFieldType, type ProcessBody, type Migra
 // Minimal ProcessBody builders. validateProcessBody reads only fields /
 // dataSources / workflow.steps, so these cast loosely on purpose — the full
 // structural invariants are exercised by validate.test.ts, not here.
-const field = (key: string, type: string) => ({ id: `field_${key}`, key, label: { en: key }, type });
-const fieldDef = (key: string, type: string): FieldDef => field(key, type) as unknown as FieldDef;
+const field = (key: string, type: string, format?: string) => ({
+  id: `field_${key}`,
+  key,
+  label: { en: key },
+  type,
+  ...(format ? { format } : {}),
+});
+const fieldDef = (key: string, type: string, format?: string): FieldDef =>
+  field(key, type, format) as unknown as FieldDef;
 
 const body = (opts: {
   fields?: ReturnType<typeof field>[];
@@ -20,7 +27,7 @@ const body = (opts: {
     key: "p",
     label: { en: "P" },
     baseLocale: "en",
-    fields: opts.fields ?? [field("booking_status", "select"), field("amount", "number")],
+    fields: opts.fields ?? [field("booking_status", "string"), field("amount", "number")],
     dataSources: opts.dataSources,
     workflow: { initialStep: "step_a", steps: opts.steps ?? [] },
   }) as unknown as ProcessBody;
@@ -223,9 +230,9 @@ const deadlineStep = (src: string) => ({
 const typedFields = [
   field("amount", "number"),
   field("approved", "boolean"),
-  field("tags", "multiselect"),
-  field("due_at", "datetime"),
-  field("due_on", "date"),
+  field("tags", "list"),
+  field("due_at", "string", "datetime"),
+  field("due_on", "string", "date"),
   field("note", "string"),
   field("receipt", "file"),
 ];
@@ -359,12 +366,39 @@ test.each([
   expect(validateProcessBody(compileProcessBody(authored))).toEqual([]);
 });
 
-// 5.8 mapping coverage: every catalog field type maps to a CEL type
+// 5.8 mapping coverage: every catalog field type maps to a CEL type. `celType`
+// takes the field, not its type alone, since `format: "integer"` narrows a
+// number to `int` (field-model-type-format-control).
 test("every base field type has a CEL-type mapping", () => {
   for (const t of baseFieldType.options) {
-    expect(typeof celType(t)).toBe("string");
-    expect(celType(t).length).toBeGreaterThan(0);
+    const f = fieldDef("probe", t);
+    expect(typeof celType(f)).toBe("string");
+    expect(celType(f).length).toBeGreaterThan(0);
   }
+});
+
+test("a number field reports int under format: \"integer\" and double without it", () => {
+  expect(celType(fieldDef("anzahl", "number", "integer"))).toBe("int");
+  expect(celType(fieldDef("anzahl", "number"))).toBe("double");
+});
+
+// D24: an author can now write a bare integer comparison and a modulo. Both
+// fail against an unmarked number field, which stays a `double`.
+test("an integer-formatted field type-checks the expressions a double refuses", () => {
+  expect(checkAgainstFields("data.anzahl % 2 == 0", [fieldDef("anzahl", "number", "integer")]).ok).toBe(true);
+  expect(checkAgainstFields("data.anzahl == 5", [fieldDef("anzahl", "number", "integer")]).ok).toBe(true);
+  expect(checkAgainstFields("data.anzahl % 2 == 0", [fieldDef("anzahl", "number")]).ok).toBe(false);
+  expect(checkAgainstFields("data.anzahl == 5", [fieldDef("anzahl", "number")]).ok).toBe(false);
+});
+
+// D24's second consequence, measured against the pinned CEL library: equality
+// and arithmetic between an `int` field and a `double` field find no overload.
+// The ordering comparators do carry a cross-numeric overload, so those two mix.
+test("equality and arithmetic mixing an integer field with a decimal field find no overload", () => {
+  const both = [fieldDef("anzahl", "number", "integer"), fieldDef("betrag", "number")];
+  expect(checkAgainstFields("data.anzahl == data.betrag", both).ok).toBe(false);
+  expect(checkAgainstFields("data.anzahl + data.betrag > 1.0", both).ok).toBe(false);
+  expect(checkAgainstFields("data.anzahl > data.betrag", both).ok).toBe(true);
 });
 
 // parse-only entry point
