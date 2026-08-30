@@ -4268,110 +4268,126 @@ of the six write sites calls it immediately before its own statement:
 
 ## Report Builder (`instance-data-tables`, `reporting-data-tables`)
 
-A saved report is a first-class object, not a query string: target process,
-status/date-range/field filters (the same shape `queryInstances` already
-accepts), an ordered list of columns, an `owner`, and two principal lists,
-`viewers` and `editors`. Each list holds actor ids, role names, and group
-ids; a group id expands to its current member ids before the membership
-test runs. That test is the same id-or-role membership check
-`isEligibleCandidate` already applies to assignment candidates.
-`isEligibleCandidate` itself carries no notion of a group — a new reverse
-lookup, `getGroupsForMember` (`src/auth/groups.ts`), lets "list my reports"
-find a report shared only through a group the caller belongs to.
+A saved report is a first-class object, not a query string. It holds a
+target process, status/date-range/field filters (the same shape
+`queryInstances` already accepts), and an ordered list of columns. It
+also holds an `owner` and two principal lists, `viewers` and `editors`.
 
-A column is either a direct field reference or a `merge` column, which
-collects the first non-empty value from an ordered list of source fields.
-Two source fields in one `merge` column both holding a value is a
-collision: the read concatenates them and marks the row, rather than
-silently picking one.
+Each list holds actor ids, role names, and group ids. A group id expands
+to its current member ids before the membership test runs. That test is the
+same id-or-role membership check `isEligibleCandidate` already applies to
+assignment candidates. `isEligibleCandidate` itself carries no notion of
+a group. A new reverse lookup, `getGroupsForMember`
+(`src/auth/groups.ts`), lets "list my reports" find a report shared only
+through a group the caller belongs to.
 
-Reading a report (saved or an unsaved draft) resolves the union of field
-catalogs across every process version in the query's date range, for
-column selection, and renders each cell as one of three distinct states: a
-value, empty-because-no-value, or empty-because-the-field-didn't-exist-on-
-that-version — plus a fourth, a redacted marker. These never collapse into
-one generic "empty".
+A column is either a direct field reference or a `merge` column. A
+`merge` column collects the first non-empty value from an ordered list
+of source fields. Two source fields in one `merge` column can both hold
+a value. That is a collision. The read concatenates them and marks the
+row instead of picking one silently.
 
-Storage: a new `report_principals` join table holds a report's mixed
+Reading a report resolves the union of field catalogs across every
+process version in the query's date range. This applies to a saved
+report or an unsaved draft alike. The union drives column selection.
+The read renders each cell as one of four states: a value,
+empty-because-no-value, empty-because-the-field-did-not-exist-on-that-
+version, or a redacted marker. These four never collapse into one
+generic "empty".
+
+A new `report_principals` join table holds a report's mixed
 id/role/group principal list, a different shape from
 `permission_grants`' single-grantee-per-row table. Execution reuses
 `buildInstanceWhere`/`buildDataWhere` (`src/runtime/api.ts`, exported for
-this purpose) rather than duplicating `queryInstances`'s predicate.
+this purpose) instead of duplicating `queryInstances`'s predicate.
 
 Authorization stacks two checks. The read enforces the process-scoped
 `read` permission (`process-read-permission`) on top of report
-`viewers`/`editors`: a viewer without process-level `read` sees an empty
-table, so sharing a report can only narrow access, never grant it. CRUD
-(build, change, delete, list-mine, share) is gated by ownership or
-`editors` membership; the owner always stays in `editors`.
+`viewers`/`editors`. A viewer without process-level `read` sees an empty
+table. Sharing a report can therefore only narrow access, never grant
+it. Ownership or `editors` membership gates the CRUD operations: build,
+change, delete, list-mine, share. The owner always stays in `editors`.
 
-`reporting-data-tables` is its own capability, holding the reporting-area
-screen that builds, saves, shares and views a report table — kept separate
-from `reporting-app`'s existing read-only cycle-time/bottleneck/SLA views,
-which accept no user-authored persistent object and mutate nothing.
-`reporting-app`'s own "issues only read requests" requirement narrows to
-name the report builder, confined to the `/reporting/reports` routes, as
-its one exception.
+`reporting-data-tables` is its own capability. It holds the
+reporting-area screen that builds, saves, shares and views a report
+table. That screen stays separate from `reporting-app`'s existing
+read-only cycle-time/bottleneck/SLA views. Those views accept no
+user-authored persistent object and mutate nothing. `reporting-app`'s
+own "issues only read requests" requirement narrows here. It now names
+the report builder, confined to the `/reporting/reports` routes, as its
+one exception.
 
-Out of scope, deliberately: no expression language (a `merge` column only
-collects values, it does not compute them), no aggregates, groupings or
-charts, no report-driven grant of process access, no share-time validation
-blocking a viewer lacking the process grant (a hint, not an error), no
-as-of/historical values, no CSV/NDJSON download, and no indexing of
-`body->'data'` for sort/filter performance.
+Deliberately out of scope:
+- An expression language. A `merge` column only collects values. It
+  does not compute them.
+- Aggregates, groupings or charts.
+- A report-driven grant of process access.
+- Share-time validation that blocks a viewer lacking the process grant.
+  A hint stays fine; an error does not.
+- As-of or historical values.
+- A CSV or NDJSON download.
+- Indexing `body->'data'` for sort/filter performance.
 
 ## Draft test instances (`studio-play-draft-instance`)
 
 The Studio Player gains a "Create test instance" action beside its
-existing "Create new instance" action. It runs the process's current draft
-body instead of requiring a published version — the gap it closes is that
-a draft with unpublished edits could not be test-run at all;
-`POST /processes/:processId/instances` threw `no published version for
-process <id>`, surfaced as an opaque server error.
+existing "Create new instance" action. It runs the process's current
+draft body instead of requiring a published version. This closes a real
+gap. A draft with unpublished edits could not run as a test at all. The
+route `POST /processes/:processId/instances` used to throw `no
+published version for process <id>`. That surfaced to the developer as
+an opaque server error.
 
-A test-instance run is a real instance: real assignment, real claim/submit,
-real action dispatch (emails, webhooks and the rest fire for real) —
-nothing about execution is simulated. The draft body is frozen into a new
-`draft_snapshots` table at the moment the test instance is created;
-further edits to the draft do not affect an already-running test instance.
-`definitions.ts::resolveBody` gained a fallback path so a negative
-(test-instance) version resolves a frozen snapshot instead of a published
-`definitions` row, leaving every other `resolveBody` caller unchanged. No
-pre-play validation runs: an invalid draft fails when execution reaches
-the broken part, the same way any other malformed content would.
+A test-instance run is a real instance. Assignment, claim, submit and
+action dispatch, including emails and webhooks, all fire for real. The
+run simulates nothing. Creating a test instance freezes the draft body
+at that moment, into a new `draft_snapshots` table. Further edits to
+the draft do not touch an already-running test instance.
+
+A new fallback path in `definitions.ts::resolveBody` handles this. A
+negative test-instance version now resolves a frozen snapshot, not a
+published `definitions` row. Every other `resolveBody` caller stays
+unchanged. No pre-play validation runs. An invalid draft fails only
+when execution reaches the broken part. Any other malformed content
+would fail the same way.
 
 Every instance now carries a `kind` discriminator, `"test"` or
-`"published"`, backed by a real SQL column
-(`instances.kind text NOT NULL DEFAULT 'published'`) rather than only a
-JSON field, since the exclusion predicates below filter the stored row
-directly via `body->>'field'`, before a Zod default could apply.
+`"published"`. A real SQL column backs it,
+`instances.kind text NOT NULL DEFAULT 'published'`, not only a JSON
+field. The exclusion predicates below filter the stored row directly
+through `body->>'field'`, before a Zod default could apply.
 
-Visibility is narrow and categorical, routed through one predicate rather
-than scattered per call site. A test instance shows only in the admin
-all-instances list, with a `kind` badge; it is never visible in the
-end-user app area (My tasks, direct instance access) for any actor, and
-it is excluded from Reporting (cycle time, bottleneck, SLA) entirely. The
-shared `buildInstanceWhere` predicate excludes `kind: "test"` by default;
-`listInstances` opts back in only for the admin (`scope=all`) caller,
-while `queryInstances` (and so its own two callers, the `instance.query`
-CEL data source and the report builder's `runReportQuery`) carries no
-opt-in and stays excluded unconditionally. The single-instance read path
-(`loadInstanceForActor`, backing `getInstanceView`, comments and
-attachments) narrows a non-administrative actor's access to a test
-instance to that instance's own `startedBy` — a claim or candidacy alone,
-sufficient for an ordinary instance, is not sufficient here.
+Visibility is narrow. One predicate routes every check, instead of
+scattering the logic per call site. A test instance shows only in the
+admin all-instances list, with a `kind` badge. It stays invisible in
+the end-user app area, covering My tasks and direct instance access,
+for any actor. It stays out of Reporting (cycle time, bottleneck, SLA)
+entirely.
+
+The shared `buildInstanceWhere` predicate excludes `kind: "test"` by
+default. `listInstances` opts back in only for the admin (`scope=all`)
+caller. `queryInstances` carries no such opt-in. This also holds for
+its own two callers, the `instance.query` CEL data source and the
+report builder's `runReportQuery`. All three stay excluded
+unconditionally.
+
+The single-instance read path narrows further. The function
+`loadInstanceForActor` backs `getInstanceView`, comments and
+attachments. It limits a non-administrative actor's access to a test
+instance down to that instance's own `startedBy`. A claim or candidacy
+alone is enough for an ordinary instance. It is not enough here.
 
 A `process.start` action dispatched from a test instance propagates the
 acting instance's own `kind` to the started instance, instead of
-defaulting to `"published"`, so a chain started from a test instance stays
-entirely within the test-instance visibility rules. A draft's
-`subprocess` step reaching execution from a test instance always fails
-gracefully and never spawns a real child, categorically, whether or not
-the referenced child process has a resolvable published version — a real
-child spawned purely because someone tested a draft would break this
-capability's own visibility guarantee for that child.
+defaulting to `"published"`. A chain started from a test instance
+therefore stays entirely within the test-instance visibility rules. A
+draft's `subprocess` step reaching execution from a test instance always
+fails gracefully and never spawns a real child. This holds categorically,
+whether or not the referenced child process has a resolvable published
+version. A real child spawned purely because someone tested a draft
+would break this capability's own visibility guarantee for that child.
 
-Deliberately out of scope: a later "test user/group" exception letting
-specific real actors see test-instance tasks in their normal app-area task
-list. The one-predicate visibility design leaves room to add that
-exception in one place later.
+Deliberately out of scope: a later "test user/group" exception. It
+would let specific real actors see test-instance tasks in their normal
+app-area task list. The one-predicate visibility design leaves room to
+add that exception in one place later.
