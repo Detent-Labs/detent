@@ -358,6 +358,14 @@ Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
 | 41 | Field matrix | `studio-view-flags-module`, `studio-field-matrix` | `studio-app`, `studio-canvas`, `spa-accessibility`, `studio-form-editor`, `studio-checks-rail` |
 | 42 | Field catalog and data sources as list and detail | `panels-list-and-detail` | `studio-app` |
 | 45 | Auto-derive `key` from `label` in the studio | `auto-derive-key-from-label` | `studio-canvas`, `studio-app` |
+| 46 | Instance audit log: append-only, hash-chained field history | `instance-audit-log-chain` | `admin-operations-api`, `data-retention`, `instance-audit-log`, `persistence` |
+| 47 | Cross-process instance query core (`queryInstances`) | `instance-query-core` | `admin-app`, `http-wrapper`, `instance-data-query`, `instance-query`, `persistence` |
+| 48 | Redactable field flag, narrowing audit-log redaction to marked fields | `redactable-field-flag` | `data-retention`, `definition-contract`, `instance-audit-log`, `persistence` |
+| 49 | Instance audit log admin view (entries + chain verification) | `instance-audit-log-view` | `admin-app`, `admin-operations-api`, `instance-audit-log` |
+| 50 | Instance data tables: a saved report builder over instance field values | `instance-data-tables` | `instance-data-tables`, `reporting-app`, `reporting-data-tables` |
+| 51 | `instance.query` data source: a field's options read from another process's instances | `instance-query-data-source` | `cross-process-validation`, `data-source-resolution`, `definition-store`, `instance-data-query`, `instance-query-data-source`, `studio-plugin-config-form` |
+| 52 | `instance.transition` action, the write half of the aggregated data source pattern | `instance-transition-action` | `cross-process-validation`, `definition-store`, `instance-transition-action`, `runtime-events` |
+| 53 | Studio Player test instances run against a process's current draft | `studio-play-draft-instance` | `admin-app`, `definition-store`, `draft-test-instances`, `instance-query`, `reporting-analytics-api`, `runtime-api`, `studio-player` |
 
 ## Changes with no stage
 

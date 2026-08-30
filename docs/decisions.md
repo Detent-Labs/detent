@@ -441,17 +441,22 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     depend on it.
 
   **Open, deliberately.**
-  - `config-descriptor.ts` cannot generate this form. Its supported subset is
-    flat — string, number, boolean, enum, string-array — and a nested object
-    property falls back to the studio's raw JSON textarea. A list of field
-    comparisons is exactly that shape. Either the module learns nested arrays,
-    or `instance.query` gets a hand-written form, which is the second
-    description beside the schema that the module exists to prevent.
-  - A source instance the step filter excludes while a reader still holds it.
-    `db.list` settled the analogous case: a value is deactivated, never
-    deleted, so `heldValues` keeps resolving its label. A cancelled or retired
-    source instance needs the same treatment, resolved for a held reference
-    even though the filter excludes it.
+  - `config-descriptor.ts` cannot generate this form — resolved by a
+    hand-written form instead of teaching the module nested arrays. Its
+    supported subset is flat — string, number, boolean, enum, string-array —
+    and a nested object property falls back to the studio's raw JSON
+    textarea. A list of field comparisons is exactly that shape, so
+    `instance.query` ships its own form,
+    `packages/web/src/areas/studio/panels/shared/InstanceQueryForm.tsx`, the
+    second description beside the schema the module exists to prevent, taken
+    deliberately.
+  - A source instance the step filter excludes while a reader still holds it
+    — resolved the same way `db.list` settled the analogous case: a value is
+    deactivated, never deleted, so `heldValues` keeps resolving its label. A
+    cancelled or retired source instance gets the same treatment:
+    `src/engine/instance-query-source.ts:145-153` re-queries by
+    `instanceIds` alone, with no step/status/comparison filter, and merges
+    any held-only match after the offered list.
   - Two participants picking the same device — resolved by
     `instance-transition-action`. The collision surfaces where that change
     predicted: a second `instance.transition` delivery arriving at a target no
