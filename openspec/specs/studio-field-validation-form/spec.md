@@ -52,10 +52,15 @@ the submitted value's JavaScript type. The offered set SHALL mirror it:
 | Declared type | Keys offered |
 |---|---|
 | `number` | `min`, `max`, `rule` |
-| `string`, `date`, `datetime`, `select`, `reference` | `minLength`, `maxLength`, `pattern`, `rule` |
-| `multiselect` | `minLength`, `maxLength`, `rule` |
+| `string` | `minLength`, `maxLength`, `pattern`, `rule` |
+| `list` | `minLength`, `maxLength`, `rule` |
 | `boolean`, `group` | `rule` |
 | `file`, a plugin type | `min`, `max`, `minLength`, `maxLength`, `pattern`, `rule` |
+
+The declared `format` SHALL NOT narrow the offered set. A format fixes the
+value's semantics, and `checkConstraints` still reads the same JavaScript type
+underneath it. A `format: "date"` field is a string field to every branch that
+function runs.
 
 `typeMatches` (`src/schema/definition.ts`) treats `file` and a plugin type as
 opaque. Neither constrains the submitted value's JavaScript shape, so
@@ -75,9 +80,16 @@ instance context, not one value's JavaScript type.
 
 #### Scenario: A multiselect field
 
-- **WHEN** an author opens the validation editor on a `multiselect` field
+- **WHEN** an author opens the validation editor on a `list` field
 - **THEN** the editor offers `minLength`, `maxLength` and `rule` alone, since a
   list carries no pattern
+
+#### Scenario: A format leaves the offered set alone
+
+- **WHEN** an author opens the validation editor on a
+  `{type: "string", format: "date"}` field
+- **THEN** the editor offers the same keys it offers on a `string` field
+  declaring no format
 
 #### Scenario: A field whose type carries a plugin envelope
 

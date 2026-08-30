@@ -35,9 +35,16 @@ import { canonicalize } from "../src/schema/canonical-json.js";
  * gained `redactable: true`, a declared key present in the canonical JSON,
  * so its literal below is a third fresh measurement, taken the same way,
  * against the post-edit body and the current schema.
+ *
+ * `field-model-type-format-control` moved it a fourth time: `booking_status`
+ * went from `type: "select"` to `type: "string"`, since a field is a picker
+ * by carrying `options`, not by its type. The literal below is that fourth
+ * fresh measurement. The two subprocess bodies declare no removed type
+ * member, so their literals are unmoved — which is the evidence that the
+ * type rename, and not something wider, is what moved the third.
  */
 const PRE_CHANGE_HASHES: Record<string, string> = {
-  "expense-approval.json": "d9782fcbc99eacf57499c8c9aa406537b8c5a422b2fe8941a2440b04b03df165",
+  "expense-approval.json": "4d340d360fc4c1c92b13d8cf69f72ba2e28a09c0affcac0d0c8358f01162e5b1",
   "subprocess-credit-check-child.json": "aa07358556ff42fc66275e8c2908093a085d501075539768693bb7c01619e5b8",
   "subprocess-loan-parent.json": "c3afcb3c7e5c3b95c63c443ebb054f5b90ab883a2fdc78c8c02f534ee838c208",
 };

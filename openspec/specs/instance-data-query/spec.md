@@ -51,11 +51,11 @@ A comparison SHALL name a field holding a scalar. The read SHALL check each
 compared field id against the instances its other filters select. One of those
 instances may hold an array or an object under a compared field id. The read
 SHALL then fail as a caller error. A silent empty result would read as no
-instance matching. A `multiselect` field holds `string[]`, so a comparison
+instance matching. A `list` field holds `string[]`, so a comparison
 naming one fails once a selected instance holds that array value.
 
 That check reads values, not declared types. A comparison naming a
-`multiselect` therefore passes while no selected instance has written the
+`list` field therefore passes while no selected instance has written the
 field. The type-level check belongs at the consumer's publish step, where the
 target process's field catalog resolves. This row check is the backstop. This
 change builds no publish check.

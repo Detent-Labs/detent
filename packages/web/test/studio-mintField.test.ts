@@ -3,16 +3,17 @@ import { baseTypeForPaletteKind, mintCatalogField, PALETTE_FIELD_KINDS } from ".
 import { insertViewField } from "../src/areas/studio/draft/view-layout.js";
 
 describe("baseTypeForPaletteKind", () => {
-  it("maps every palette entry to the catalog type it mints", () => {
-    expect(baseTypeForPaletteKind("text")).toBe("string");
-    expect(baseTypeForPaletteKind("choice")).toBe("select");
-    expect(baseTypeForPaletteKind("date")).toBe("date");
-    expect(baseTypeForPaletteKind("file")).toBe("file");
-    expect(baseTypeForPaletteKind("section")).toBe("group");
+  it("maps every palette entry to the catalog declaration it mints", () => {
+    expect(baseTypeForPaletteKind("text")).toEqual({ type: "string" });
+    // A picker is no longer a type: the options an author adds next make it one.
+    expect(baseTypeForPaletteKind("choice")).toEqual({ type: "string" });
+    expect(baseTypeForPaletteKind("date")).toEqual({ type: "string", format: "date" });
+    expect(baseTypeForPaletteKind("file")).toEqual({ type: "file" });
+    expect(baseTypeForPaletteKind("section")).toEqual({ type: "group" });
   });
 
   it("covers every declared palette kind", () => {
-    for (const kind of PALETTE_FIELD_KINDS) expect(baseTypeForPaletteKind(kind)).toBeTruthy();
+    for (const kind of PALETTE_FIELD_KINDS) expect(baseTypeForPaletteKind(kind).type).toBeTruthy();
   });
 });
 
@@ -24,11 +25,17 @@ describe("mintCatalogField", () => {
     expect(a.id?.startsWith("field_")).toBe(true);
   });
 
-  it("seeds label and an empty key, and carries the kind's own type", () => {
+  it("seeds label and an empty key, and carries the kind's own type and format", () => {
     const field = mintCatalogField("date", { en: "hello" });
     expect(field.label).toEqual({ en: "hello" });
     expect(field.key).toBe("");
-    expect(field.type).toBe("date");
+    expect(field.type).toBe("string");
+    expect(field.format).toBe("date");
+  });
+
+  it("writes no format key for a kind that names none", () => {
+    const field = mintCatalogField("text", { en: "" });
+    expect(field.format).toBeUndefined();
   });
 
   it("a section (group) mints with an empty sub-fields array", () => {

@@ -40,20 +40,33 @@ describe("FieldForm: every BaseFieldType renders its expected input", () => {
     expect(html).toContain("checked=");
   });
 
-  it("date -> date input", () => {
-    const html = renderFields([{ field: baseField({ id: "f1", type: "date" }), value: "2026-01-01", required: false, readonly: false }]);
-    expect(html).toContain('type="date"');
-  });
-
-  it("datetime -> datetime-local input", () => {
-    const html = renderFields([{ field: baseField({ id: "f1", type: "datetime" }), value: undefined, required: false, readonly: false }]);
-    expect(html).toContain('type="datetime-local"');
-  });
-
-  it("select -> a <select> built from the resolved options", () => {
+  it("list -> a multiple <select> built from the resolved options", () => {
     const html = renderFields([
       {
-        field: baseField({ id: "f1", type: "select" }),
+        field: baseField({ id: "f1", type: "list" }),
+        value: ["a"],
+        required: false,
+        readonly: false,
+        options: [{ value: "a", label: { en: "Option A" } }],
+      },
+    ]);
+    expect(html).toContain('multiple=""');
+  });
+
+  it("file -> a free-text input", () => {
+    const html = renderFields([{ field: baseField({ id: "f1", type: "file" }), value: undefined, required: false, readonly: false }]);
+    expect(html).toContain('type="text"');
+  });
+
+  it("group -> a fieldset, not an input of its own", () => {
+    const html = renderFields([{ field: baseField({ id: "f1", key: "grp", type: "group" }), value: undefined, required: false, readonly: false }]);
+    expect(html).toContain("<fieldset");
+  });
+
+  it("a string carrying options -> a single <select> built from them", () => {
+    const html = renderFields([
+      {
+        field: baseField({ id: "f1", type: "string" }),
         value: undefined,
         required: false,
         readonly: false,
@@ -63,18 +76,179 @@ describe("FieldForm: every BaseFieldType renders its expected input", () => {
     expect(html).toContain("<select");
     expect(html).toContain("Option A");
   });
+});
 
-  it("multiselect -> a multiple <select> built from the resolved options", () => {
+describe("FieldForm: a format reaches its own native input", () => {
+  it("string + date -> date input", () => {
     const html = renderFields([
-      {
-        field: baseField({ id: "f1", type: "multiselect" }),
-        value: ["a"],
-        required: false,
-        readonly: false,
-        options: [{ value: "a", label: { en: "Option A" } }],
-      },
+      { field: baseField({ id: "f1", type: "string", format: "date" }), value: "2026-01-01", required: false, readonly: false },
     ]);
+    expect(html).toContain('type="date"');
+  });
+
+  it("string + datetime -> datetime-local input", () => {
+    const html = renderFields([
+      { field: baseField({ id: "f1", type: "string", format: "datetime" }), value: undefined, required: false, readonly: false },
+    ]);
+    expect(html).toContain('type="datetime-local"');
+  });
+
+  it("string + email -> email input", () => {
+    const html = renderFields([{ field: baseField({ id: "f1", type: "string", format: "email" }), value: undefined, required: false, readonly: false }]);
+    expect(html).toContain('type="email"');
+  });
+
+  it("number + integer -> a number input stepping by one", () => {
+    const html = renderFields([{ field: baseField({ id: "f1", type: "number", format: "integer" }), value: 3, required: false, readonly: false }], {
+      f1: 3,
+    });
+    expect(html).toContain('type="number"');
+    expect(html).toContain('step="1"');
+  });
+
+  it("a plain number declares no step", () => {
+    const html = renderFields([{ field: baseField({ id: "f1", type: "number" }), value: 3, required: false, readonly: false }], { f1: 3 });
+    expect(html).not.toContain("step=");
+  });
+});
+
+describe("FieldForm: a control picks the input", () => {
+  it("string + multiline -> a textarea", () => {
+    const html = renderFields([
+      { field: baseField({ id: "f1", type: "string", control: "multiline" }), value: "long", required: false, readonly: false },
+    ], { f1: "long" });
+    expect(html).toContain("<textarea");
+    expect(html).toContain("long");
+  });
+
+  it("an options field + radio -> one radio input per option, sharing one name", () => {
+    const html = renderFields(
+      [
+        {
+          field: baseField({ id: "f1", type: "string", control: "radio" }),
+          value: "b",
+          required: false,
+          readonly: false,
+          options: [
+            { value: "a", label: { en: "Alpha" } },
+            { value: "b", label: { en: "Beta" } },
+            { value: "c", label: { en: "Gamma" } },
+          ],
+        },
+      ],
+      { f1: "b" },
+    );
+    expect(html.match(/type="radio"/g)).toHaveLength(3);
+    expect(html.match(/name="f1"/g)).toHaveLength(3);
+    expect(html).toContain("Alpha");
+    expect(html).toContain("Gamma");
+    expect(html).not.toContain("<select");
+  });
+
+  it("boolean + radio -> a two-input pair labeled from form-ui's own catalog", () => {
+    const html = renderFields([{ field: baseField({ id: "f1", type: "boolean", control: "radio" }), value: true, required: false, readonly: false }], {
+      f1: true,
+    });
+    expect(html.match(/type="radio"/g)).toHaveLength(2);
+    expect(html).toContain("Yes");
+    expect(html).toContain("No");
+  });
+
+  it("boolean + radio at locale de reads its own German entries", () => {
+    const html = renderToStaticMarkup(
+      <FieldForm
+        fields={[{ field: baseField({ id: "f1", type: "boolean", control: "radio" }), value: false, required: false, readonly: false }]}
+        values={{ f1: false }}
+        onChange={noop}
+        locale="de"
+      />,
+    );
+    expect(html).toContain("Ja");
+    expect(html).toContain("Nein");
+  });
+
+  it("list + checkboxes -> one checkbox per option, the checked ones marked", () => {
+    const html = renderFields(
+      [
+        {
+          field: baseField({ id: "f1", type: "list", control: "checkboxes" }),
+          value: ["a", "c"],
+          required: false,
+          readonly: false,
+          options: [
+            { value: "a", label: { en: "Alpha" } },
+            { value: "b", label: { en: "Beta" } },
+            { value: "c", label: { en: "Gamma" } },
+          ],
+        },
+      ],
+      { f1: ["a", "c"] },
+    );
+    expect(html.match(/type="checkbox"/g)).toHaveLength(3);
+    expect(html.match(/checked=""/g)).toHaveLength(2);
+    expect(html).not.toContain("<select");
+  });
+
+  it("a radio control with no options falls back to the type's default input", () => {
+    const html = renderFields([{ field: baseField({ id: "f1", type: "string", control: "radio" }), value: undefined, required: false, readonly: false }]);
+    expect(html).toContain('type="text"');
+    expect(html).not.toContain('type="radio"');
+  });
+
+  it("a checkboxes control with no options falls back to the list's default picker", () => {
+    const html = renderFields([{ field: baseField({ id: "f1", type: "list", control: "checkboxes" }), value: [], required: false, readonly: false }]);
     expect(html).toContain('multiple=""');
+    expect(html).not.toContain('type="checkbox"');
+  });
+
+  it("a radio label carries the same composed text an <option> would have", () => {
+    const options = [{ value: "a", label: { en: "Widget" }, attributes: { sku: "A-1140" } }];
+    const asSelect = renderFields([{ field: baseField({ id: "f1", type: "string" }), value: undefined, required: false, readonly: false, options }]);
+    const asRadio = renderFields([
+      { field: baseField({ id: "f1", type: "string", control: "radio" }), value: undefined, required: false, readonly: false, options },
+    ]);
+    expect(asSelect).toContain("Widget · A-1140");
+    expect(asRadio).toContain("Widget · A-1140");
+  });
+});
+
+describe("FieldForm: a grouped control carries its label as a legend", () => {
+  const grouped = (control: "radio" | "checkboxes", type: "string" | "list", required: boolean, issues?: Map<string, SubmissionIssue[]>) =>
+    renderFields(
+      [
+        {
+          field: baseField({ id: "f1", type, control, label: { en: "Pick one" } }),
+          value: undefined,
+          required,
+          readonly: false,
+          options: [{ value: "a", label: { en: "Alpha" } }],
+        },
+      ],
+      {},
+      issues,
+    );
+
+  it("names the group with the field's label in a legend, not a label element", () => {
+    const html = grouped("radio", "string", false);
+    expect(html).toContain("<fieldset");
+    expect(html).toContain("<legend");
+    expect(html).toContain("Pick one");
+    // The option's own label element names the input, not the group.
+    expect(html).toContain("Alpha");
+  });
+
+  it("carries the required state on the fieldset, the element the group's state describes", () => {
+    const html = grouped("radio", "string", true);
+    expect(html).toMatch(/<fieldset[^>]*aria-required="true"/);
+    expect(html).toContain("form-ui-required-marker");
+  });
+
+  it("carries the invalid state and the issue description on the fieldset", () => {
+    const issues = new Map<string, SubmissionIssue[]>([["f1", [{ kind: "required-missing", fieldId: "f1" }]]]);
+    const html = grouped("checkboxes", "list", false, issues);
+    expect(html).toMatch(/<fieldset[^>]*aria-invalid="true"/);
+    expect(html).toMatch(/<fieldset[^>]*aria-describedby="f1-issues"/);
+    expect(html).toContain('id="f1-issues"');
   });
 });
 
@@ -127,8 +301,8 @@ describe("FieldForm: readonly and required", () => {
 });
 
 describe("FieldForm: free-text fallback", () => {
-  it("renders reference as free text", () => {
-    const html = renderFields([{ field: baseField({ id: "f1", type: "reference" }), value: undefined, required: false, readonly: false }]);
+  it("renders a plain string through the same branch", () => {
+    const html = renderFields([{ field: baseField({ id: "f1", type: "string" }), value: undefined, required: false, readonly: false }]);
     expect(html).toContain('type="text"');
   });
 
@@ -149,7 +323,7 @@ describe("FieldForm: dataSource-bound field", () => {
   it("renders as a populated <select> from its resolved options, not free text", () => {
     const html = renderFields([
       {
-        field: baseField({ id: "f1", type: "select", dataSource: "ds_countries" }),
+        field: baseField({ id: "f1", type: "string", dataSource: "ds_countries" }),
         value: undefined,
         required: false,
         readonly: false,
@@ -250,7 +424,7 @@ describe("FieldForm: required and invalid state conveyed programmatically", () =
   it("covers the free-text fallback branch", () => {
     const issuesByField = new Map<string, SubmissionIssue[]>([["f1", [{ kind: "required-missing", fieldId: "f1" }]]]);
     const html = renderFields(
-      [{ field: baseField({ id: "f1", type: "reference" }), value: undefined, required: true, readonly: false }],
+      [{ field: baseField({ id: "f1", type: "file" }), value: undefined, required: true, readonly: false }],
       {},
       issuesByField,
     );

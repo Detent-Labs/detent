@@ -154,13 +154,13 @@ const usedBy = async (listKey: string): Promise<Usage[]> =>
   ((await (await fetch(req(`${BASE}/${listKey}`, "GET", maintainer))).json()) as { usedBy: Usage[] }).usedBy;
 
 /**
- * `bodyWithList` plus a select field bound to that list, mapping `mapping`
+ * `bodyWithList` plus a string field bound to that list, mapping `mapping`
  * onto catalog fields. `nest` wraps the pair in a group field, so the walk has
  * to descend to find them.
  */
 const bodyMapping = (listKey: string, mapping: Record<string, string>, nest = false): ProcessBody => {
   const base = bodyWithList(listKey) as unknown as { fields: unknown[] };
-  const picker = { id: "field_pick", key: "pick", label: { en: "Pick" }, type: "select", dataSource: "ds_a", columnMapping: mapping };
+  const picker = { id: "field_pick", key: "pick", label: { en: "Pick" }, type: "string", dataSource: "ds_a", columnMapping: mapping };
   const targets = [...new Set(Object.values(mapping))].map((id) => ({ id, key: id.slice("field_".length), label: { en: id }, type: "string" }));
   const leaves = [picker, ...targets];
   base.fields = nest ? [{ id: "field_group", key: "group", label: { en: "Group" }, type: "group", fields: leaves }] : leaves;
@@ -190,7 +190,7 @@ test.skipIf(!DB)("two fields mapping one column report it once, sorted", async (
   const body = bodyMapping("twice", { sku: "field_a", price: "field_b" }) as unknown as { fields: Record<string, unknown>[] };
   // A second picker on the same source, mapping `price` again onto its own target.
   body.fields.push(
-    { id: "field_pick2", key: "pick2", label: { en: "Pick 2" }, type: "select", dataSource: "ds_a", columnMapping: { price: "field_c" } },
+    { id: "field_pick2", key: "pick2", label: { en: "Pick 2" }, type: "string", dataSource: "ds_a", columnMapping: { price: "field_c" } },
     { id: "field_c", key: "c", label: { en: "C" }, type: "string" },
   );
   await publishBody("proc_twice" as ProcessId, body as unknown as ProcessBody, reg, dataSourceReg);
@@ -218,7 +218,7 @@ test.skipIf(!DB)("a mapping of another list's column stays out of this list's en
   const body = bodyWithList("mine") as unknown as { dataSources: unknown[]; fields: unknown[] };
   body.dataSources.push({ id: "ds_b", key: "b", type: DB_LIST_DATA_SOURCE_TYPE, config: { listKey: "theirs" } });
   body.fields = [
-    { id: "field_pick", key: "pick", label: { en: "Pick" }, type: "select", dataSource: "ds_b", columnMapping: { price: "field_amount" } },
+    { id: "field_pick", key: "pick", label: { en: "Pick" }, type: "string", dataSource: "ds_b", columnMapping: { price: "field_amount" } },
     { id: "field_amount", key: "amount", label: { en: "Amount" }, type: "string" },
   ];
   await publishBody("proc_other" as ProcessId, body as unknown as ProcessBody, reg, dataSourceReg);

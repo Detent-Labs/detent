@@ -26,7 +26,7 @@
 import { Environment, parse, serialize } from "@marcbachmann/cel-js";
 import type { ASTNode } from "@marcbachmann/cel-js";
 import { leafFields, collectFieldsDeep } from "../schema/definition.js";
-import type { ProcessBody, FieldDef, BaseFieldType, Expression, MigrationSpec } from "../schema/definition.js";
+import type { ProcessBody, FieldDef, Expression, MigrationSpec } from "../schema/definition.js";
 import { collect as collectFullActionSites } from "../engine/registry-check.js";
 import { PROCESS_START_ACTION_TYPE } from "../engine/registry.js";
 
@@ -43,26 +43,24 @@ export const ACTOR_SCHEMA = { id: "string", roles: "list<string>" } as const;
 const CHILD_SCHEMA = { outcome: "string", data: "dyn" } as const; // child.data is plugin-shaped
 
 /**
- * Catalog field type -> CEL type string.
+ * Catalog field -> CEL type string. Takes the whole field, not its type
+ * alone: `format: "integer"` narrows a number from `double` to `int`, so
+ * `data.anzahl % 2 == 0` and `data.prioritaet == 3` type-check. The cost the
+ * author carries: integer division truncates, and an expression mixing an
+ * integer field with a decimal field finds no overload.
+ *
  * ponytail: dyn for file / plugin field types / data sources until their plugin
  * output schemas are formalized; add real types when the registry lands.
  */
-export function celType(t: BaseFieldType | object): string {
+export function celType(field: Pick<FieldDef, "type" | "format">): string {
+  const t = field.type;
   if (typeof t !== "string") return "dyn"; // Plugin (custom) field type
   switch (t) {
-    // ponytail: JSON numbers are IEEE doubles, so `double` is correct and catches
-    // number-vs-string. Cost: CEL int literals don't `==`/`%` a double, so
-    // `data.count == 5` needs `== 5.0` (or `int(...)` for `%`). Not fixable without
-    // an int/float split in the catalog; left as a documented papercut.
-    case "number": return "double";
+    case "number": return field.format === "integer" ? "int" : "double";
     case "boolean": return "bool";
-    case "multiselect": return "list<string>";
+    case "list": return "list<string>";
     case "file": return "dyn";
-    case "string":
-    case "date":
-    case "datetime":
-    case "select":
-    case "reference": return "string";
+    case "string": return "string";
     case "group": return "dyn"; // unreached as a leaf; group fields are recursed into
     default: return "dyn";
   }
@@ -77,7 +75,7 @@ export function celType(t: BaseFieldType | object): string {
 function dataSchema(fields: FieldDef[]): Record<string, string> {
   const out: Record<string, string> = {};
   for (const f of leafFields(fields)) {
-    out[f.key] = celType(f.type);
+    out[f.key] = celType(f);
   }
   return out;
 }
@@ -95,7 +93,7 @@ function contractFieldSchema(fields: FieldDef[], ids: readonly string[] | undefi
   const allowed = new Set(ids);
   for (const f of leafFields(fields)) {
     if (!allowed.has(f.id)) continue;
-    out[f.key] = celType(f.type);
+    out[f.key] = celType(f);
   }
   return out;
 }
@@ -389,8 +387,9 @@ export function checkProcessChainingTarget(body: ProcessBody, targetsByLoc: Reco
   return issues;
 }
 
-/** Find a field's declared type by id, recursing groups. `undefined` = not declared. */
-function fieldTypeById(fields: FieldDef[], id: string): BaseFieldType | object | undefined {
+/** Find a field by id, recursing groups. `undefined` = not declared. Returns
+ * the field rather than its type alone, since `celType` reads the format too. */
+function fieldTypeById(fields: FieldDef[], id: string): FieldDef | undefined {
   for (const f of fields) {
     if (typeof f.type === "string" && f.type === "group") {
       if (f.fields) {
@@ -398,7 +397,7 @@ function fieldTypeById(fields: FieldDef[], id: string): BaseFieldType | object |
         if (t !== undefined) return t;
       }
     } else if (f.id === id) {
-      return f.type;
+      return f;
     }
   }
   return undefined;
@@ -421,12 +420,12 @@ export function validateMigrationSpec(spec: MigrationSpec, fromBody: ProcessBody
     const loc = `migration.transforms.${fid}`;
     // The written field must exist in the target catalog; its declared type is the
     // expected result type (dyn — a plugin field — passes, as at the deadline site).
-    const targetType = fieldTypeById(toBody.fields, fid);
-    if (targetType === undefined) {
+    const targetField = fieldTypeById(toBody.fields, fid);
+    if (targetField === undefined) {
       issues.push({ loc, src: expr.src, message: `transforms target ${fid} is not a field in the target catalog` });
       continue;
     }
-    const expect = celType(targetType);
+    const expect = celType(targetField);
     try {
       const bad = forbiddenTimeCall(parse(expr.src).ast);
       if (bad) {

@@ -61,7 +61,7 @@ describe("authored-content-localization: baseLocale entry required", () => {
           id: "field_s",
           key: "s",
           label: { en: "S" },
-          type: "select",
+          type: "string",
           options: [{ value: "a", label: { de: "A" } }],
         },
       ],

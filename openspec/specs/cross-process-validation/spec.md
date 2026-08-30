@@ -224,7 +224,7 @@ read as agreement.
 ### Requirement: A compared field resolves to a scalar-typed field
 
 Publishing SHALL reject an `"instance.query"` comparison naming a target field
-whose declared type holds a non-scalar value. A `multiselect` field holds
+whose declared type holds a non-scalar value. A `list` field holds
 `string[]`, so a comparison naming one can never compare at the JSON level.
 The same rejection SHALL apply to a `group` field.
 
@@ -245,9 +245,9 @@ no declared type to judge.
 
 <!-- Scenario headers stay byte-identical: the OpenSpec archive step matches them by exact text. -->
 <!-- antislop: allow passive-voice -->
-#### Scenario: A comparison naming a multiselect field is rejected
+#### Scenario: A comparison naming a list field is rejected
 - **WHEN** an `"instance.query"` comparison names a target field a live
-  version declares as `multiselect`
+  version declares as `list`
 - **THEN** publishing fails with a cross-process validation error naming that
   data source and field, and the engine persists no version
 

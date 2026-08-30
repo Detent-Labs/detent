@@ -1,7 +1,7 @@
 {
   "processId": "proc_7d41e0b6-5c2a-4f19-9e83-6b0d4a71c58f",
   "version": 1,
-  "definitionHash": "4d76f7bcd5642a28892edfb07ac3bfebdb2c54406b715e6478a3b07873f7b174",
+  "definitionHash": "ec2801217906d692c140fac605e04e2a29ab026f484c7c61ac62235858a54744",
   "status": "published",
   "publishedAt": "2026-08-15T09:00:00Z",
   "definition": {
@@ -42,7 +42,7 @@
         "label": {
           "en": "Cost Center"
         },
-        "type": "select",
+        "type": "string",
         "options": [
           {
             "value": "cc_1000",
@@ -70,7 +70,7 @@
         "label": {
           "en": "Category"
         },
-        "type": "select",
+        "type": "string",
         "options": [
           {
             "value": "it_hardware",
@@ -150,7 +150,7 @@
             "label": {
               "en": "Currency"
             },
-            "type": "select",
+            "type": "string",
             "options": [
               {
                 "value": "CHF",
@@ -184,7 +184,7 @@
         "description": {
           "en": "Options come from the approved-vendor data source. Picking a row copies its payment_terms column into the field below."
         },
-        "type": "select",
+        "type": "string",
         "dataSource": "ds_6f2a8d47-0001-4a1c-8e2f-000000000001",
         "columnMapping": {
           "payment_terms": "field_9c7e5b31-0009-4a1c-8e2f-000000000009"
@@ -207,7 +207,8 @@
         "label": {
           "en": "Needed By"
         },
-        "type": "date"
+        "type": "string",
+        "format": "date"
       },
       {
         "id": "field_9c7e5b31-0011-4a1c-8e2f-000000000011",
@@ -260,7 +261,7 @@
         "description": {
           "en": "Fill this in when you reject. A path carries no data of its own, so a reviewer records the reason in the form before taking the reject path."
         },
-        "type": "select",
+        "type": "string",
         "options": [
           {
             "value": "over_budget",
@@ -308,7 +309,7 @@
         "description": {
           "en": "Written back by the ERP action. The two automatic paths out of Issue PO read this and nothing else."
         },
-        "type": "select",
+        "type": "string",
         "options": [
           {
             "value": "pending",

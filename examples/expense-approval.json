@@ -1,7 +1,7 @@
 {
   "processId": "proc_3f8a1c2e-9b4d-4e7a-a1c8-2e5f7b9d0a13",
   "version": 1,
-  "definitionHash": "bd2d20580123132164ddfc3be552ea164baa3fbec06c5a841aaec693f9beed18",
+  "definitionHash": "f44f36ef02ecf7694e6812d9f6b2a52eb028c80c8aa2bfee88639330a7e4aab9",
   "status": "published",
   "publishedAt": "2026-07-18T09:00:00Z",
   "definition": {
@@ -70,7 +70,7 @@
         "description": {
           "en": "Internal status, set by the booking action (write-back into the payload). Not part of any editable view."
         },
-        "type": "select",
+        "type": "string",
         "options": [
           {
             "value": "pending",

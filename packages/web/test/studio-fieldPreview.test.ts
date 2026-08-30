@@ -23,17 +23,35 @@ describe("previewViewFields", () => {
       expect(result?.fields[0]!.field.type).toBe(type);
       expect(result?.fields[0]!.group).toBeUndefined();
       expect(result?.fields[0]!.readonly).toBe(true);
-      // Every synthesized field gets a `values` entry, keyed by its own id —
-      // a `select` field with no declared options is the one type whose
-      // sample value is legitimately `undefined`, so this checks presence
-      // of the key rather than its value.
+      // Every synthesized field gets a `values` entry, keyed by its own id.
+      // This checks the key's presence rather than its value, since a `group`
+      // entry's own sample is legitimately `undefined`.
       expect(Object.keys(result?.values ?? {})).toEqual(["field_a"]);
     }
   });
 
+  it("previews a sample inside the format's own value domain", () => {
+    for (const [format, sample] of [
+      ["date", "2026-01-15"],
+      ["datetime", "2026-01-15T09:00"],
+      ["email", "sample@example.com"],
+    ] as const) {
+      const result = previewViewFields(field({ type: "string", format }), "en", "en");
+      expect(result?.values.field_a).toBe(sample);
+      expect(result?.fields[0]!.field.format).toBe(format);
+    }
+    const int = previewViewFields(field({ type: "number", format: "integer" }), "en", "en");
+    expect(int?.values.field_a).toBe(42);
+  });
+
+  it("carries the declared control through to the preview", () => {
+    const result = previewViewFields(field({ type: "string", control: "multiline" }), "en", "en");
+    expect(result?.fields[0]!.field.control).toBe("multiline");
+  });
+
   it("previews a choice's first option as its sample value", () => {
     const f = field({
-      type: "select",
+      type: "string",
       options: [
         { value: "a", label: { en: "A" } },
         { value: "b", label: { en: "B" } },
@@ -45,10 +63,11 @@ describe("previewViewFields", () => {
   });
 
   it("synthesizes an empty option list for a dataSource-backed choice", () => {
-    const f = field({ type: "select", dataSource: "dataSource_1" });
+    const f = field({ type: "string", dataSource: "dataSource_1" });
     const result = previewViewFields(f, "en", "en");
     expect(result?.fields[0]!.options).toBeUndefined();
-    expect(result?.values.field_a).toBeUndefined();
+    // No options resolve in the draft, so the sample falls back to the type's.
+    expect(result?.values.field_a).toBe("Sample text");
   });
 
   it("returns the group's own entry plus one per child, for a group of two", () => {

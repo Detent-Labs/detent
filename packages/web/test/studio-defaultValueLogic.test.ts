@@ -26,13 +26,12 @@ describe("defaultValueDisabledReason", () => {
     expect(defaultValueDisabledReason("group")).toBe("group");
   });
 
-  it("disables for reference and file, stating the type reason", () => {
-    expect(defaultValueDisabledReason("reference")).toBe("type");
+  it("disables for file, stating the type reason", () => {
     expect(defaultValueDisabledReason("file")).toBe("type");
   });
 
   it("stays enabled for every other type", () => {
-    for (const type of ["string", "number", "boolean", "date", "datetime", "select", "multiselect"] as const) {
+    for (const type of ["string", "number", "boolean", "list"] as const) {
       expect(defaultValueDisabledReason(type)).toBeUndefined();
     }
   });
@@ -40,22 +39,37 @@ describe("defaultValueDisabledReason", () => {
 
 describe("literalControlKind", () => {
   it("maps a plain field's own type directly", () => {
-    expect(literalControlKind("number", false)).toBe("number");
-    expect(literalControlKind("boolean", false)).toBe("boolean");
-    expect(literalControlKind("date", false)).toBe("date");
-    expect(literalControlKind("datetime", false)).toBe("datetime");
-    expect(literalControlKind("select", false)).toBe("select");
-    expect(literalControlKind("multiselect", false)).toBe("multiselect");
+    expect(literalControlKind({ type: "number" })).toBe("number");
+    expect(literalControlKind({ type: "boolean" })).toBe("boolean");
+  });
+
+  it("takes the format's own native input over the type default", () => {
+    expect(literalControlKind({ type: "string", format: "date" })).toBe("date");
+    expect(literalControlKind({ type: "string", format: "datetime" })).toBe("datetime");
+    expect(literalControlKind({ type: "string", format: "email" })).toBe("email");
+  });
+
+  it("offers a picker to a field carrying static options, by cardinality", () => {
+    expect(literalControlKind({ type: "string", options: [{ value: "a" }] })).toBe("options");
+    expect(literalControlKind({ type: "list", options: [{ value: "a" }] })).toBe("options-multi");
+  });
+
+  it("keeps the multi-value control for a list carrying no options yet", () => {
+    expect(literalControlKind({ type: "list" })).toBe("options-multi");
   });
 
   it("falls back to a text control for string and a custom plugin type", () => {
-    expect(literalControlKind("string", false)).toBe("string");
-    expect(literalControlKind({ type: "custom.thing", config: {} } as never, false)).toBe("string");
+    expect(literalControlKind({ type: "string" })).toBe("string");
+    expect(literalControlKind({ type: { type: "custom.thing", config: {} } as never })).toBe("string");
   });
 
-  it("offers no option for a dataSource-bound select or multiselect", () => {
-    expect(literalControlKind("select", true)).toBe("none");
-    expect(literalControlKind("multiselect", true)).toBe("none");
+  it("offers no option for a dataSource-bound picker of either cardinality", () => {
+    expect(literalControlKind({ type: "string", dataSource: "ds_1" as never })).toBe("none");
+    expect(literalControlKind({ type: "list", dataSource: "ds_1" as never })).toBe("none");
+  });
+
+  it("prefers the options over the format when a field carries both", () => {
+    expect(literalControlKind({ type: "string", format: "date", options: [{ value: "2026-01-01" }] })).toBe("options");
   });
 });
 

@@ -9,6 +9,25 @@ export function resolveText(value: LocalizedText | undefined, locale: LocaleCode
 }
 
 /**
+ * The two labels a boolean radio pair carries, per locale. Owned by `form-ui`
+ * the way `issue-messages.ts` owns `CONSTRAINT_LABEL`: the process body never
+ * carries them, so no author writes and no translator re-translates "Yes" in
+ * every body. An author wanting other wording, such as Approved and Rejected,
+ * declares a two-option `string` field instead.
+ */
+const BOOLEAN_LABEL: Record<string, { yes: string; no: string }> = {
+  en: { yes: "Yes", no: "No" },
+  de: { yes: "Ja", no: "Nein" },
+};
+
+/** `BOOLEAN_LABEL` for `locale`, falling back to English the way
+ * `issueMessage` does — an unlisted locale renders readable text rather than
+ * nothing. */
+export function booleanLabels(locale: LocaleCode): { yes: string; no: string } {
+  return BOOLEAN_LABEL[locale] ?? BOOLEAN_LABEL.en!;
+}
+
+/**
  * Resolves every field's label, and every option's label, to a single entry
  * keyed by `locale`, falling back to `baseLocale`. `FieldForm`/`FieldInput`
  * take `locale` alone and hold no base-locale concept of their own ("form-ui

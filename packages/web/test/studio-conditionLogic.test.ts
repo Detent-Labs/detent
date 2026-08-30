@@ -89,7 +89,7 @@ describe("fromCel", () => {
   });
 
   it("a macro yields a raw row holding exactly that substring", () => {
-    const ops = catalog([field("tags", "multiselect"), field("amount", "number")]);
+    const ops = catalog([field("tags", "list"), field("amount", "number")]);
     const src = 'data.tags.exists(t, t == "vip") && data.amount > 1000.0';
     const condition = fromCel(src, ops)!;
     expect(condition.rows[0]).toEqual({ kind: "raw", src: 'data.tags.exists(t, t == "vip")' });
@@ -112,7 +112,7 @@ describe("fromCel", () => {
 });
 
 describe("`in` is the one mirrored form", () => {
-  const operands = catalog([field("tags", "multiselect")]);
+  const operands = catalog([field("tags", "list")]);
 
   it('"manager" in actor.roles reads and re-emits mirrored', () => {
     const src = '"manager" in actor.roles';
@@ -122,7 +122,7 @@ describe("`in` is the one mirrored form", () => {
     expect(toCel(condition, ops)).toBe(src);
   });
 
-  it("a multiselect operand offers contains and nothing else", () => {
+  it("a list operand offers contains and nothing else", () => {
     expect(operatorsFor("list<string>")).toEqual(["in"]);
     const condition: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.tags", op: "in", value: "vip" }] };
     expect(toCel(condition, operands)).toBe('"vip" in data.tags');
@@ -137,6 +137,21 @@ describe("literals follow the operand's declared type", () => {
     expect(toCel(condition, operands)).toBe("data.amount > 1000.0");
     expect(celLiteral(1000, "double")).toBe("1000.0");
     expect(celLiteral(10.5, "double")).toBe("10.5");
+  });
+
+  it("an integer operand emits a bare integer, since int and double do not mix", () => {
+    const ints = catalog([field("prioritaet", "number", { format: "integer" })]);
+    const operand = ints.find((o) => o.path === "data.prioritaet")!;
+    expect(operand.celType).toBe("int");
+    const condition: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.prioritaet", op: ">", value: "3" }] };
+    expect(toCel(condition, ints)).toBe("data.prioritaet > 3");
+    // A decimal is no `int` literal at all, so the row stays incomplete
+    // rather than emitting text the publish-time check refuses.
+    expect(celLiteral(3.5, "int")).toBeUndefined();
+  });
+
+  it("an integer operand keeps the full comparator set", () => {
+    expect(operatorsFor("int")).toEqual(["==", "!=", "<", "<=", ">", ">="]);
   });
 
   it("a bare boolean operand round-trips as an explicit comparison against true", () => {
@@ -223,14 +238,14 @@ describe("the operand picker", () => {
   // neither takes a plain text input. A `freeText` flag said the same thing
   // and nothing read it (`simplify-web-logic-modules`).
   it("actor.roles and a data-source-bound field enumerate no options", () => {
-    const bound = catalog([field("city", "select", { dataSource: "ds_cities" })]);
+    const bound = catalog([field("city", "string", { dataSource: "ds_cities" })]);
     expect(bound.find((o) => o.path === "actor.roles")!.options).toBeUndefined();
     expect(bound.find((o) => o.path === "data.city")!.options).toBeUndefined();
   });
 
-  it("a select declaring options offers them by label, writing the value", () => {
+  it("a string field declaring options offers them by label, writing the value", () => {
     const ops = catalog([
-      field("status", "select", { options: [{ value: "booked", label: { en: "Booked" } }] }),
+      field("status", "string", { options: [{ value: "booked", label: { en: "Booked" } }] }),
     ]);
     expect(ops.find((o) => o.path === "data.status")!.options).toEqual([{ value: "booked", label: "Booked" }]);
   });
@@ -340,7 +355,7 @@ describe("summarizeCondition", () => {
 
   it("uses an option's own label for a coded value", () => {
     const operands = catalog([
-      field("status", "select", {
+      field("status", "string", {
         options: [
           { value: "approved", label: { en: "Approved" } },
           { value: "rejected", label: { en: "Rejected" } },

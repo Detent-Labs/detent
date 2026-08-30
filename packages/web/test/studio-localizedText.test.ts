@@ -75,7 +75,7 @@ const gapDraft = (): Draft =>
       {
         id: "field_choice",
         key: "choice",
-        type: "select",
+        type: "string",
         label: { en: "Choice", de: "Auswahl" },
         options: [
           { value: "a", label: { en: "A" } },

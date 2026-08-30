@@ -33,12 +33,8 @@ export function offeredKeys(type: BaseFieldType | object): ValidationKey[] {
     case "number":
       return NUMBER_KEYS;
     case "string":
-    case "date":
-    case "datetime":
-    case "select":
-    case "reference":
       return STRING_KEYS;
-    case "multiselect":
+    case "list":
       return LIST_KEYS;
     case "file":
       return ALL_KEYS; // opaque, like a plugin type: every key

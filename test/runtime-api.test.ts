@@ -58,7 +58,9 @@ beforeEach(async () => {
 // ============================================================
 
 /**
- * step_a: amount/name/category required, tags optional (multiselect+options),
+ * step_a: amount/name/category required, tags optional (a `list` field with
+ * options), due_on optional (`format: "date"`, so the submission validator
+ * checks the value against the format's own domain, not only its JS shape),
  * note optional (has a validation.rule), readonly (view-readonly), group (a
  * group-container ref, marked required in the view — must never actually be
  * enforceable). field_untouched exists in the catalog but is NOT referenced
@@ -83,14 +85,14 @@ const viewBody = (): ProcessBody =>
         id: "field_category",
         key: "category",
         label: { en: "Category" },
-        type: "select",
+        type: "string",
         options: [{ value: "a", label: { en: "A" } }, { value: "b", label: { en: "B" } }],
       },
       {
         id: "field_tags",
         key: "tags",
         label: { en: "Tags" },
-        type: "multiselect",
+        type: "list",
         options: [{ value: "x", label: { en: "X" } }, { value: "y", label: { en: "Y" } }],
       },
       {
@@ -100,6 +102,7 @@ const viewBody = (): ProcessBody =>
         type: "string",
         validation: { rule: cel("data.note != 'forbidden'") },
       },
+      { id: "field_due_on", key: "due_on", label: { en: "Due On" }, type: "string", format: "date" },
       { id: "field_readonly", key: "readonly_f", label: { en: "Readonly" }, type: "string" },
       { id: "field_untouched", key: "untouched", label: { en: "Untouched" }, type: "string" },
       {
@@ -124,6 +127,7 @@ const viewBody = (): ProcessBody =>
               { ref: "field_name", required: true },
               { ref: "field_category", required: true },
               { ref: "field_tags" },
+              { ref: "field_due_on" },
               { ref: "field_note" },
               { ref: "field_readonly", readonly: true },
               { ref: "field_group", required: true },
@@ -154,7 +158,7 @@ const cascadeBody = (): ProcessBody =>
         id: "field_decision",
         key: "decision",
         label: { en: "Decision" },
-        type: "select",
+        type: "string",
         options: [{ value: "approve", label: { en: "Approve" } }, { value: "reject", label: { en: "Reject" } }],
       },
     ],
@@ -869,7 +873,7 @@ test.skipIf(!DB)("an off-view dataSource-bound field's Literal default seeds reg
     dataSources: [{ id: "ds_1", key: "ds1", type: "test.defaults-offview-options", config: {} }],
     fields: [
       { id: "field_visible", key: "visible", label: { en: "Visible" }, type: "string" },
-      { id: "field_offview", key: "offview", label: { en: "Offview" }, type: "select", dataSource: "ds_1", default: "not-a-listed-option" },
+      { id: "field_offview", key: "offview", label: { en: "Offview" }, type: "string", dataSource: "ds_1", default: "not-a-listed-option" },
     ],
     workflow: {
       initialStep: "step_a",
@@ -1208,12 +1212,36 @@ test.skipIf(!DB)("type-mismatch: a wrongly-shaped value is rejected", async () =
   await expectIssue({ field_amount: "not-a-number" }, { kind: "type-mismatch", fieldId: "field_amount" });
 });
 
-test.skipIf(!DB)("invalid-option: a select value outside options is rejected", async () => {
+test.skipIf(!DB)("invalid-option: a single-pick value outside options is rejected", async () => {
   await expectIssue({ field_category: "z" }, { kind: "invalid-option", fieldId: "field_category" });
 });
 
-test.skipIf(!DB)("invalid-option: a multiselect item outside options is rejected", async () => {
+test.skipIf(!DB)("invalid-option: a list item outside options is rejected", async () => {
   await expectIssue({ field_tags: ["x", "z"] }, { kind: "invalid-option", fieldId: "field_tags" });
+});
+
+// The format half of the type rule (field-model-type-format-control, D19).
+// `type: "string"` alone accepted any string; the format narrows it to an
+// ISO-8601 calendar date, and the issue names the format rather than the JS
+// shape, so `issue-messages.ts` needs no new branch.
+test.skipIf(!DB)("type-mismatch: a value the field's format refuses is rejected, naming the format", async () => {
+  await expectIssue({ field_due_on: "banane" }, { kind: "type-mismatch", fieldId: "field_due_on", expected: "date" });
+});
+
+test.skipIf(!DB)("type-mismatch: a date the calendar does not hold is rejected", async () => {
+  await expectIssue({ field_due_on: "2026-02-30" }, { kind: "type-mismatch", fieldId: "field_due_on", expected: "date" });
+});
+
+test.skipIf(!DB)("a value inside the format's domain submits", async () => {
+  const instanceId = await freshInstance();
+  const after = await submitAndTransition(
+    instanceId,
+    "path_ab" as PathId,
+    { field_due_on: "2026-02-28" } as unknown as Instance["data"],
+    actor,
+    dataSourceReg,
+  );
+  expect((after.data as Record<string, unknown>).field_due_on).toBe("2026-02-28");
 });
 
 test.skipIf(!DB)("constraint: a numeric value below min is rejected", async () => {

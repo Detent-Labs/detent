@@ -200,14 +200,26 @@ export const pathTrigger = z.enum(["manual", "automatic"]);
 export const execution = z.enum(["async", "blocking"]); // v1 implements async only
 export const instanceStatus = z.enum(["running", "completed", "cancelled", "faulted"]);
 export const baseFieldType = z.enum([
-  "string", "number", "boolean", "date", "datetime",
-  "select", "multiselect", "reference", "file", "group",
+  "string", "number", "boolean", "list", "file", "group",
 ]);
+/**
+ * The semantics of a value, over and above its value form. Closed, so every
+ * member keeps a publish-time check and a value check (`formatMatches`). A
+ * field whose semantics no member covers uses the plugin envelope instead.
+ */
+export const fieldFormat = z.enum(["date", "datetime", "integer", "email"]);
+/**
+ * The input form. Read by the renderer alone. Closed for the same reason
+ * `fieldFormat` is: `compile.ts` verdicts every member a body declares.
+ */
+export const fieldControl = z.enum(["multiline", "radio", "checkboxes"]);
 
 export type StepType = z.infer<typeof stepType>;
 export type PathTrigger = z.infer<typeof pathTrigger>;
 export type InstanceStatus = z.infer<typeof instanceStatus>;
 export type BaseFieldType = z.infer<typeof baseFieldType>;
+export type FieldFormat = z.infer<typeof fieldFormat>;
+export type FieldControl = z.infer<typeof fieldControl>;
 
 // ============================================================
 // Reserved cancellation identity. Owned by the publish-time compile pass
@@ -271,6 +283,21 @@ export type FieldDef = {
   label: LocalizedText;
   description?: LocalizedText;
   type: BaseFieldType | Plugin;
+  /**
+   * The semantics of the value, over and above `type`'s value form. Read by
+   * `typeMatches` (the value check), by `celType` (`format: "integer"` reports
+   * the CEL type `int`) and by the publish-time allowed-pair check. Optional:
+   * an omitted `format` means the type's own value domain. The pair rule lives
+   * in `compile.ts::checkFieldFormatControl`, not in a refinement here, per
+   * `definition-contract`'s unbypassable-check criterion.
+   */
+  format?: FieldFormat;
+  /**
+   * The input form. Read by the form renderer alone. Optional: an omitted
+   * `control` means the type's default control. Same placement rule as
+   * `format` above.
+   */
+  control?: FieldControl;
   options?: FieldOption[];
   dataSource?: DataSourceId;
   /**
@@ -315,6 +342,8 @@ export const fieldDef: z.ZodType<FieldDef, unknown> = z.lazy(() =>
       label: localizedText,
       description: localizedText.optional(),
       type: z.union([baseFieldType, plugin]),
+      format: fieldFormat.optional(),
+      control: fieldControl.optional(),
       options: z.array(fieldOption).optional(),
       dataSource: dataSourceId.optional(),
       columnMapping: z.record(z.string(), fieldId).optional(),
@@ -372,29 +401,98 @@ export function leafFields(fields: FieldDef[]): FieldDef[] {
  */
 const JS_TYPE: Record<BaseFieldType, string> = {
   string: "string",
-  date: "string",
-  datetime: "string",
-  select: "string",
-  reference: "string",
   number: "number",
   boolean: "boolean",
-  multiselect: "string[]",
+  list: "string[]",
   file: "any", // opaque / unreachable (group refs are excluded before this is called)
   group: "any",
 };
 
-/** True if `value`'s JS shape matches `fieldType`'s declared shape. A plugin type is opaque and always accepted. */
-export function typeMatches(fieldType: FieldDef["type"], value: Literal): boolean {
-  if (typeof fieldType !== "string") return true; // plugin type: opaque, accept
-  const expected = JS_TYPE[fieldType];
-  if (expected === "any") return true;
-  if (expected === "string[]") return Array.isArray(value) && value.every((v) => typeof v === "string");
-  return typeof value === expected;
+/**
+ * The one table of allowed `format` and `control` members per value form.
+ * Read by the publish-time check (`compile.ts::checkFieldFormatControl`),
+ * which rejects any pair absent from it, and by the studio's two pickers.
+ * Exhaustive over BaseFieldType for the reason `JS_TYPE` is: a future member
+ * missing here is a compile error.
+ *
+ * A plugin envelope has no row. The lookup misses, so a plugin-typed field
+ * declaring either key is rejected — its own semantics live in its config.
+ */
+export const ALLOWED_BY_TYPE: Record<BaseFieldType, { formats: readonly FieldFormat[]; controls: readonly FieldControl[] }> = {
+  string: { formats: ["date", "datetime", "email"], controls: ["multiline", "radio"] },
+  number: { formats: ["integer"], controls: [] },
+  boolean: { formats: [], controls: ["radio"] },
+  list: { formats: [], controls: ["checkboxes"] },
+  file: { formats: [], controls: [] },
+  group: { formats: [], controls: [] },
+};
+
+const DATE_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
+// An ISO-8601 date and time: seconds, a fractional part and a zone offset are
+// each optional. That covers what `<input type="datetime-local">` produces
+// plus the offsets a handler writes back.
+const DATETIME_FORMAT = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?$/;
+// The WHATWG email-input regex, verbatim. `<input type="email">` enforces
+// exactly this, so the native control and the engine cannot disagree on which
+// values a participant can enter.
+const EMAIL_FORMAT = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+/** A calendar round trip, so `2026-02-30` fails where the regex alone passes. */
+function isCalendarDate(ymd: string): boolean {
+  const d = new Date(`${ymd}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === ymd;
 }
 
-/** The expected-type label `typeMatches` checks against, for a diagnostic message. */
-export function expectedTypeLabel(fieldType: FieldDef["type"]): string {
-  return typeof fieldType !== "string" ? "any" : JS_TYPE[fieldType];
+/**
+ * True if `value` lies in `format`'s value domain. The half of the type rule
+ * that `type` alone cannot express: `type: "string"` accepts any string, and a
+ * `format: "date"` field accepts an ISO-8601 calendar date alone.
+ *
+ * Exported for the publish-time literal-`default` check in `compile.ts`, which
+ * validates an authored value against the same domain a submitted one faces.
+ */
+export function formatMatches(format: FieldFormat, value: Literal): boolean {
+  switch (format) {
+    case "date":
+      return typeof value === "string" && DATE_FORMAT.test(value) && isCalendarDate(value);
+    case "datetime": {
+      if (typeof value !== "string") return false;
+      const m = DATETIME_FORMAT.exec(value);
+      if (!m) return false;
+      if (!isCalendarDate(m[1]!)) return false;
+      return Number(m[2]) <= 23 && Number(m[3]) <= 59 && (m[4] === undefined || Number(m[4]) <= 59);
+    }
+    case "integer":
+      return typeof value === "number" && Number.isInteger(value);
+    case "email":
+      return typeof value === "string" && EMAIL_FORMAT.test(value);
+  }
+}
+
+/**
+ * True if `value` matches the field's declared shape: the JS shape `type`
+ * names first, then the value domain `format` names. Takes the whole field
+ * rather than its type alone, since the format is half the rule. A plugin
+ * type is opaque and always accepted.
+ */
+export function typeMatches(field: Pick<FieldDef, "type" | "format">, value: Literal): boolean {
+  if (typeof field.type !== "string") return true; // plugin type: opaque, accept
+  const expected = JS_TYPE[field.type];
+  if (expected === "any") return true;
+  if (expected === "string[]") {
+    if (!Array.isArray(value) || !value.every((v) => typeof v === "string")) return false;
+  } else if (typeof value !== expected) {
+    return false;
+  }
+  return field.format === undefined || formatMatches(field.format, value);
+}
+
+/** The expected-type label `typeMatches` checks against, for a diagnostic
+ * message. The format name where the field declares one, since that is the
+ * narrower of the two rules the value failed; the JS-shape label otherwise. */
+export function expectedTypeLabel(field: Pick<FieldDef, "type" | "format">): string {
+  if (typeof field.type !== "string") return "any";
+  return field.format ?? JS_TYPE[field.type];
 }
 
 // ============================================================

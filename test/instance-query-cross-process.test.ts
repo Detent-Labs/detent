@@ -28,7 +28,7 @@ const pid = (n: string) => n as ProcessId;
 const TARGET_ID = pid("proc_iqcp_target");
 const READER_ID = pid("proc_iqcp_reader");
 
-/** step_a (initial) --(path_ab, manual)--> step_b (terminal). Fields: a scalar comparison target and two non-scalar ones (multiselect, group). */
+/** step_a (initial) --(path_ab, manual)--> step_b (terminal). Fields: a scalar comparison target and two non-scalar ones (list, group). */
 const targetV1Body = (): ProcessBody =>
   ({
     key: "target",
@@ -36,7 +36,7 @@ const targetV1Body = (): ProcessBody =>
     baseLocale: "en",
     fields: [
       { id: "field_t_common", key: "common", label: { en: "Common" }, type: "string" },
-      { id: "field_t_multi", key: "multi", label: { en: "Multi" }, type: "multiselect", options: [{ value: "x", label: { en: "X" } }] },
+      { id: "field_t_multi", key: "multi", label: { en: "Multi" }, type: "list", options: [{ value: "x", label: { en: "X" } }] },
       { id: "field_t_group", key: "group", label: { en: "Group" }, type: "group", fields: [] },
     ],
     workflow: {
@@ -56,7 +56,7 @@ const targetV2Body = (): ProcessBody =>
     baseLocale: "en",
     fields: [
       { id: "field_t_common", key: "common", label: { en: "Common" }, type: "string" },
-      { id: "field_t_multi", key: "multi", label: { en: "Multi" }, type: "multiselect", options: [{ value: "x", label: { en: "X" } }] },
+      { id: "field_t_multi", key: "multi", label: { en: "Multi" }, type: "list", options: [{ value: "x", label: { en: "X" } }] },
       { id: "field_t_v2", key: "v2field", label: { en: "V2" }, type: "string" },
     ],
     workflow: {
@@ -77,7 +77,7 @@ const readerBody = (config: Record<string, unknown>): ProcessBody =>
     baseLocale: "en",
     fields: [
       { id: "field_r_dummy", key: "dummy", label: { en: "Dummy" }, type: "string" },
-      { id: "field_r_multi", key: "multi", label: { en: "Multi" }, type: "multiselect", options: [{ value: "x", label: { en: "X" } }] },
+      { id: "field_r_multi", key: "multi", label: { en: "Multi" }, type: "list", options: [{ value: "x", label: { en: "X" } }] },
       { id: "field_r_group", key: "group", label: { en: "Group" }, type: "group", fields: [] },
     ],
     dataSources: [{ id: "ds_iq", key: "iq", type: "instance.query", config }],
@@ -176,7 +176,7 @@ test.skipIf(!DB)("a target with no live instances reports every reference", asyn
 
 // ---- 5.3: the compared field's declared type (rejects) ----
 
-test.skipIf(!DB)("a comparison naming a multiselect field is rejected", async () => {
+test.skipIf(!DB)("a comparison naming a list field is rejected", async () => {
   await publishBody(TARGET_ID, targetV1Body(), reg, defaultDsReg);
   await createProcessInstance(TARGET_ID, actor, emptyDsReg);
 
@@ -296,7 +296,7 @@ test.skipIf(!DB)("an unresolvable valueFromField fails the publish", async () =>
   expect(raised).toBeInstanceOf(DataSourceRegistryValidationError);
 });
 
-test.skipIf(!DB)("a multiselect-typed valueFromField fails the publish", async () => {
+test.skipIf(!DB)("a list-typed valueFromField fails the publish", async () => {
   let raised: unknown;
   try {
     await publishBody(

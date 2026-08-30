@@ -44,7 +44,7 @@ describe("buildRuleOperands", () => {
 
   it("excludes a multiselect field, whose celType offers no comparator this builder writes", () => {
     const own = field("amount", "number");
-    const ops = operandsFor(own, [field("tags", "multiselect")]);
+    const ops = operandsFor(own, [field("tags", "list")]);
     expect(ops.map((o) => o.path)).toEqual(["data.amount"]);
   });
 

@@ -831,19 +831,21 @@ zones are "Only ask this when" (the condition) and "Validation" (the
 field's validation rules).
 
 The Default value zone SHALL offer a literal input matching the
-field's base type. For a `select` field that input SHALL be a
-`<select>` bound to the field's own static `options`. For a
-`multiselect` field it SHALL be the multi-value equivalent.
+field's type and its declared format. For a field carrying static
+`options` that input SHALL be a `<select>` bound to those options, or
+the multi-value equivalent when the field's type is `list`. For a
+`string` field declaring a `format` it SHALL be that format's own
+native input.
 
 Either control SHALL offer no option when the field is
 `dataSource`-bound, since the draft carries no resolved rows for one.
 That is the same carve-out named below for the preview. The CEL toggle
 SHALL still work there.
 
-For a `reference` or `file` field the whole Default value zone SHALL
-show disabled. It SHALL state that the type accepts no default here.
-This mirrors "Only ask this when" 's own disabled state for a field no
-step view references.
+For a `file` field the whole Default value zone SHALL show disabled. It
+SHALL state that the type accepts no default here. This mirrors "Only
+ask this when" 's own disabled state for a field no step view
+references.
 
 For a `group` field the whole Default value zone SHALL also show
 disabled. It SHALL state that a group's own default is never read. A
@@ -874,10 +876,23 @@ A disclosure inside the Field tab SHALL keep its own open/closed state,
 independent of the active tab. Switching away from Field and back SHALL
 NOT reset an open disclosure to closed.
 
-The type picker SHALL list the ten base field types under friendly
+The type picker SHALL list the six base field types under friendly
 names, each with a short note. It SHALL write the raw `baseFieldType`
 value to the draft. It SHALL offer no type the contract does not carry.
 It SHALL keep the custom plugin envelope.
+
+A format picker and a control picker SHALL sit below the type picker.
+Each SHALL offer the members the selected type allows, per the table
+the `definition-contract` capability states. Each SHALL also offer an
+entry for declaring no member at all. Each SHALL write the raw member
+value to the draft. Each SHALL drop its key when the developer picks
+the empty entry. A type whose row allows no member SHALL hide that
+picker outright.
+
+Switching the type SHALL drop a `format` or a `control` the new type
+does not allow. It SHALL name that drop before it happens. Leaving the
+key in place lets the developer publish a body the compile pass
+rejects. No control on screen would show why.
 
 "How it will look" SHALL preview the field through the shared form
 component, read-only, inside its disclosure. Every previewed entry's
@@ -941,9 +956,29 @@ condition.
 
 #### Scenario: The type picker writes a raw type
 
-- **WHEN** the developer chooses "Choice" in the type picker
-- **THEN** the draft's field type reads `select`, and the definition
+- **WHEN** the developer chooses "Text" in the type picker
+- **THEN** the draft's field type reads `string`, and the definition
   serializes unchanged
+
+#### Scenario: The format picker offers what the type allows
+
+- **WHEN** the developer selects a `string` field and opens the format
+  picker
+- **THEN** it offers `date`, `datetime` and `email`, plus an entry for
+  declaring no format
+- **AND** it offers no other member
+
+#### Scenario: A type with no allowed control hides the control picker
+
+- **WHEN** the developer selects a `file` field
+- **THEN** neither the format picker nor the control picker renders
+
+#### Scenario: Switching the type drops a member the new type refuses
+
+- **WHEN** the developer switches a `{type: "string", format: "date"}`
+  field to `number`
+- **THEN** the studio names the drop, and the draft's field carries no
+  `format` key afterwards
 
 #### Scenario: The Field tab shows identity without a click
 
@@ -1027,7 +1062,7 @@ condition.
 
 #### Scenario: A literal default on a Choice field uses its own options
 
-- **WHEN** the developer chooses one of a `select` field's own
+- **WHEN** the developer chooses one of a `string` field's own
   `options` in its Default value zone, with the CEL toggle off
 - **THEN** the draft's field carries `default` set to that option's
   value
@@ -1035,16 +1070,21 @@ condition.
 #### Scenario: A dataSource-bound field's default offers no option list
 
 - **WHEN** the developer opens the Default value zone on a
-  `dataSource`-bound `select` field
+  `dataSource`-bound `string` field
 - **THEN** the literal control offers no option, and the CEL toggle
   still lets the developer write an expression default
 
 #### Scenario: The Default value zone disables for a reference or file field
 
-- **WHEN** the developer opens the Values tab on a `reference` or a
-  `file` field
+- **WHEN** the developer opens the Values tab on a `file` field
 - **THEN** the Default value zone shows disabled, and states that the
   type accepts no default here
+
+#### Scenario: A formatted string field's default uses that format's input
+
+- **WHEN** the developer opens the Default value zone on a
+  `{type: "string", format: "date"}` field, with the CEL toggle off
+- **THEN** the literal input is a native date input
 
 #### Scenario: The Default value zone disables for a group field
 

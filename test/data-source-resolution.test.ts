@@ -25,8 +25,8 @@ const COUNTRY_OPTIONS = [
   { value: "ca", label: { en: "Canada" } },
 ];
 
-// step_a: field_country (select, dataSource-bound to ds_countries) and
-// field_tags (multiselect, sharing the same data source — each field
+// step_a: field_country (string, dataSource-bound to ds_countries) and
+// field_tags (list, sharing the same data source — each field
 // resolves it through its own independent call) --(path_ab, manual,
 // guardless)--> step_b.
 const dsBody = (): ProcessBody =>
@@ -35,8 +35,8 @@ const dsBody = (): ProcessBody =>
     label: { en: "DS Body" },
     baseLocale: "en",
     fields: [
-      { id: "field_country", key: "country", label: { en: "Country" }, type: "select", dataSource: "ds_countries" },
-      { id: "field_tags", key: "tags", label: { en: "Tags" }, type: "multiselect", dataSource: "ds_countries" },
+      { id: "field_country", key: "country", label: { en: "Country" }, type: "string", dataSource: "ds_countries" },
+      { id: "field_tags", key: "tags", label: { en: "Tags" }, type: "list", dataSource: "ds_countries" },
     ],
     dataSources: [{ id: "ds_countries", key: "countries", type: "static", config: { options: COUNTRY_OPTIONS } }],
     workflow: {
@@ -65,7 +65,7 @@ const dsMarkerBody = (): ProcessBody =>
     baseLocale: "en",
     fields: [
       { id: "field_marker", key: "marker", label: { en: "Marker" }, type: "string" },
-      { id: "field_country", key: "country", label: { en: "Country" }, type: "select", dataSource: "ds_countries" },
+      { id: "field_country", key: "country", label: { en: "Country" }, type: "string", dataSource: "ds_countries" },
     ],
     dataSources: [{ id: "ds_countries", key: "countries", type: "static", config: { options: COUNTRY_OPTIONS } }],
     workflow: {
@@ -191,7 +191,7 @@ test.skipIf(!DB)("createProcessInstance's seed data is validated against resolve
   expect(raised).toBeInstanceOf(SubmissionValidationError);
 });
 
-test.skipIf(!DB)("a select contributes one held value and a multiselect contributes its whole array", async () => {
+test.skipIf(!DB)("a string field contributes one held value and a list field contributes its whole array", async () => {
   const { handler, heldValueSets } = countingStaticHandler();
   const dsReg = createDataSourceRegistry();
   dsReg.set("static", handler);
@@ -201,7 +201,7 @@ test.skipIf(!DB)("a select contributes one held value and a multiselect contribu
   });
   const before = heldValueSets().length;
   await getInstanceView(created.instanceId, actor, dsReg);
-  // Sorted, so the multiselect's array order does not leak into the memo key.
+  // Sorted, so the list field's array order does not leak into the memo key.
   expect(heldValueSets().slice(before)).toEqual([["us"], ["ca", "us"]]);
 });
 
@@ -318,7 +318,7 @@ test.skipIf(!DB)("an instance.query-bound field resolves through resolveFields/g
       key: "iq_reader",
       label: { en: "Reader" },
       baseLocale: "en",
-      fields: [{ id: "field_device", key: "device", label: { en: "Device" }, type: "select", dataSource: "ds_devices" }],
+      fields: [{ id: "field_device", key: "device", label: { en: "Device" }, type: "string", dataSource: "ds_devices" }],
       dataSources: [
         { id: "ds_devices", key: "devices", type: "instance.query", config: { processId: TARGET, stepIds: ["step_shelf"], labelFieldId: "field_t_label" } },
       ],

@@ -22,15 +22,15 @@ const SOURCES = [
 ];
 
 const field = (over: Record<string, unknown> = {}): DraftField =>
-  ({ id: "field_pick", key: "pick", type: "select", dataSource: "ds_products", ...over }) as DraftField;
+  ({ id: "field_pick", key: "pick", type: "string", dataSource: "ds_products", ...over }) as unknown as DraftField;
 
 describe("showsColumnMapping", () => {
-  it("accepts a select field bound to a db.list source", () => {
+  it("accepts a string field bound to a db.list source", () => {
     expect(showsColumnMapping(field(), SOURCES)).toBe(true);
   });
 
-  it("refuses a multiselect: it picks several rows for one target", () => {
-    expect(showsColumnMapping(field({ type: "multiselect" }), SOURCES)).toBe(false);
+  it("refuses a list field: it picks several rows for one target", () => {
+    expect(showsColumnMapping(field({ type: "list" }), SOURCES)).toBe(false);
   });
 
   it("refuses a field carrying no dataSource", () => {

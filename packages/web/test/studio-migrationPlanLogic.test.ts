@@ -77,7 +77,7 @@ describe("readCatalog", () => {
   it("carries the CEL type, not the declared field type", () => {
     const catalog = readCatalog(
       body([
-        { id: FIELD_A, key: "when", type: "date", label: { en: "When" } },
+        { id: FIELD_A, key: "when", type: "string", format: "date", label: { en: "When" } },
         { id: FIELD_B, key: "who", type: "string", label: { en: "Who" } },
         { id: FIELD_C, key: "count", type: "number", label: { en: "Count" } },
       ]),
@@ -166,7 +166,7 @@ describe("checkPlan", () => {
     source: readCatalog(
       body(
         [
-          { id: FIELD_A, key: "when", type: "date" },
+          { id: FIELD_A, key: "when", type: "string", format: "date" },
           { id: FIELD_B, key: "count", type: "number" },
         ],
         [{ id: STEP_A, key: "start" }],
@@ -212,10 +212,24 @@ describe("checkPlan", () => {
   });
 
   it("passes two declared types that share one CEL type", () => {
-    // A `date` source onto a `string` target: `celType` maps both to `string`,
-    // which is what `validatePlan` compares.
+    // A `format: "date"` source onto a plain `string` target: `celType` maps
+    // both to `string`, which is what `validatePlan` compares.
     const rowId = nextRowId();
     expect(checkPlan({ ...EMPTY_ROWS, fieldMap: [{ rowId, from: FIELD_A, to: FIELD_A }] }, catalogs)).toEqual([]);
+  });
+
+  it("reports a plain number source mapped onto an integer target", () => {
+    // `format: "integer"` narrows the CEL type from `double` to `int`, and the
+    // two find no overload together — so the pair is a real disagreement, not
+    // one the shared `number` type hides.
+    const integerTarget: Catalogs = {
+      source: readCatalog(body([{ id: FIELD_B, key: "count", type: "number" }], [{ id: STEP_A, key: "start" }])),
+      target: readCatalog(body([{ id: FIELD_B, key: "count", type: "number", format: "integer" }], [{ id: STEP_B, key: "review" }])),
+    };
+    const rowId = nextRowId();
+    expect(checkPlan({ ...EMPTY_ROWS, fieldMap: [{ rowId, from: FIELD_B, to: FIELD_B }] }, integerTarget)).toEqual([
+      { rowId, message: "type double does not match target type int" },
+    ]);
   });
 
   it("reports the reserved cancel-sink as a stepMap target", () => {

@@ -38,7 +38,7 @@ export interface RuleCondition {
   rows: RuleRow[];
 }
 
-/** `celType` reads a list type (`multiselect`) as `list<string>`, which
+/** `celType` reads a `list` field as `list<string>`, which
  * `operatorsFor` offers `in` alone for — a comparator this builder never
  * writes. Excluding it here, once, keeps every call site (the operand
  * picker, `addRow`'s default comparator) from needing its own guard. */

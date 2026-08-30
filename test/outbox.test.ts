@@ -955,6 +955,53 @@ test.skipIf(!DB)("a handler value that doesn't match its target field's declared
   expect(o[0].droppedTargets).toEqual(["field_n"]);
 });
 
+// The format half of that same rule (field-model-type-format-control, D19):
+// `typeMatches` is the ONE type rule submission validation and this writeback
+// share, so a handler's value faces the format's own value domain too. Without
+// it a handler could write "banane" into a `format: "date"` field a
+// participant could not, and the ISO-8601 reporting column over that field
+// would stop being trustworthy.
+test.skipIf(!DB)("a handler value the target field's format refuses is dropped, exactly as a shape mismatch is", async () => {
+  const pid = "proc_typecheck_format" as Instance["processId"];
+  const typedBody: ProcessBody = {
+    key: "typecheck_format", baseLocale: "en", label: { en: "Typecheck Format" }, fields: [
+      { id: "field_due", key: "due", label: { en: "Due" }, type: "string", format: "date" },
+    ],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
+        {
+          id: "step_b", key: "b", label: { en: "B" }, type: "task", // non-terminal: stays 'running', isolating the drop from terminal suppression
+          onEntry: [actOut("set_due", "setter", "field_due", "result.val")],
+          paths: [{ id: "path_bc", key: "bc", label: "Bc", to: "step_c", trigger: "manual" }],
+        },
+        { id: "step_c", key: "c", label: { en: "C" }, type: "task", terminal: true },
+      ],
+    },
+  } as unknown as ProcessBody;
+  const pv = await publishBody(pid, typedBody, reg, dataSourceReg);
+  const store = createDefinitionStore(sql);
+
+  // A string, so the JS-shape check alone would pass it. Only the format rejects it.
+  const inst = await createInstance(pv.definition, { processId: pid, version: pv.version });
+  await executeManualTransition(inst, "path_ab", pv.definition, actor);
+  const badDeliver: DeliverFn = async () => ({ field_due: "banane" });
+  expect(await drainOutbox(sql, reg, badDeliver, CLAIM_LEASE_MS, store.resolveBody)).toBe(1);
+  expect((await instData(inst.instanceId)).field_due).toBeUndefined();
+  const dropped = await outcomes(inst.instanceId);
+  expect(dropped[0]).toMatchObject({ status: "succeeded" });
+  expect(dropped[0].droppedTargets).toEqual(["field_due"]);
+
+  // An ISO-8601 calendar date through the same path lands.
+  const ok = await createInstance(pv.definition, { processId: pid, version: pv.version });
+  await executeManualTransition(ok, "path_ab", pv.definition, actor);
+  const goodDeliver: DeliverFn = async () => ({ field_due: "2026-02-28" });
+  expect(await drainOutbox(sql, reg, goodDeliver, CLAIM_LEASE_MS, store.resolveBody)).toBe(1);
+  expect((await instData(ok.instanceId)).field_due).toBe("2026-02-28");
+  expect((await outcomes(ok.instanceId))[0].droppedTargets).toBeUndefined();
+});
+
 test.skipIf(!DB)("a mixed patch writes its conforming entries and drops only the mismatched one", async () => {
   const pid = "proc_typecheck_mixed" as Instance["processId"];
   const typedBody: ProcessBody = {

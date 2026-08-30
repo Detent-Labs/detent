@@ -282,6 +282,58 @@ authoring context and the runtime projection cannot drift.
 - **WHEN** the whitelisted field set is changed in `INSTANCE_SCHEMA`
 - **THEN** both the authoring check and the runtime projection reflect the change with no second field list to update
 
+### Requirement: A catalog field's CEL type follows its type and its format
+
+Every catalog field SHALL report one CEL type, derived from its declared `type`
+and its declared `format`:
+
+| declared `type` | CEL type |
+|---|---|
+| `string` | `string` |
+| `number` | `double`, or `int` when `format` is `"integer"` |
+| `boolean` | `bool` |
+| `list` | `list<string>` |
+| `file` | `dyn` |
+| `group` | `dyn` |
+
+A field whose `type` is a plugin envelope SHALL report `dyn`, unchanged. A
+`group` field is a container. It contributes no entry to the `data` namespace,
+and no caller reads its own CEL type as a leaf.
+
+Only `format` moves a CEL type, and only its `integer` member does so. The
+`date`, `datetime` and `email` members all sit over `string` and report
+`string`.
+
+An author marking a number field `format: "integer"` can then compare it to a
+bare CEL integer and take its remainder. Both fail against `double` today. A
+bare `3` is a CEL `int`, and the library holds no overload mixing the two. The
+same rule makes an expression mixing an integer field with a decimal field a
+publish error. No overload covers that pair either.
+
+#### Scenario: An integer field compares against a bare integer literal
+
+- **WHEN** a guard reads a `{type: "number", format: "integer"}` field and
+  compares it to `3`
+- **THEN** the expression type-checks, and publishing succeeds
+
+#### Scenario: A plain number field still reports double
+
+- **WHEN** a guard reads a `{type: "number"}` field declaring no `format` and
+  compares it to `3`
+- **THEN** the expression fails the type check, exactly as it does today
+
+#### Scenario: An expression mixing an integer field with a decimal field fails
+
+- **WHEN** an expression adds a `format: "integer"` field to a `number` field
+  declaring no format
+- **THEN** authoring-time validation rejects it, naming the type error
+
+#### Scenario: A format over string leaves the CEL type alone
+
+- **WHEN** a guard reads a `{type: "string", format: "date"}` field and
+  compares it to a string literal
+- **THEN** the expression type-checks as a `string` comparison
+
 ### Requirement: A timer deadline is validated against the context the engine builds
 
 The engine evaluates a `deadline` over the guard context it builds at runtime, which
@@ -315,14 +367,15 @@ knowable at authoring time.
 #### Scenario: non-string deadline is rejected
 
 - **WHEN** a timer `deadline` expression infers to a non-string type — a `number`
-  field (`double`), a `boolean` field (`bool`), or a `multiselect` field
-  (`list<string>`)
+  field (`double`), a `format: "integer"` field (`int`), a `boolean` field
+  (`bool`), or a `list` field (`list<string>`)
 - **THEN** authoring-time validation rejects it, naming the expected and actual type
 
 #### Scenario: string-typed and dyn-typed deadlines are accepted
 
-- **WHEN** a `deadline` reads a `date`, `datetime` or `string` field, yields a string
-  from an expression, or reads a field whose CEL type is `dyn`
+- **WHEN** a `deadline` reads a `string` field, whatever `format` that field
+  declares, yields a string from an expression, or reads a field whose CEL type
+  is `dyn`
 - **THEN** authoring-time validation accepts it
 
 #### Scenario: the result-type expectation does not leak to other sites

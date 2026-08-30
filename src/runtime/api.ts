@@ -535,7 +535,7 @@ function heldValuesOf(value: Literal | undefined): string[] {
 
 /**
  * Resolve a `dataSource`-bound field's options via the registry. Held values
- * are sorted before reaching the handler, so a multiselect's array order
+ * are sorted before reaching the handler, so a `list` field's array order
  * never leaks into what the handler sees. A missing handler here means the
  * registry passed at runtime differs from the one the body was published
  * against — publish-time `data-source-registry-validation` already confirmed
@@ -683,7 +683,7 @@ function applyColumnMapping(
       if (attribute === undefined) continue; // an unfilled or undeclared column writes nothing
       const target = fieldsById.get(targetId as string);
       if (!target) continue; // publish-time invariant guarantees resolution; defensive only
-      if (!typeMatches(target.type, attribute)) {
+      if (!typeMatches(target, attribute)) {
         dropped.push({ fieldId: rf.field.id, column, targetFieldId: targetId, reason: "type-mismatch" });
         continue;
       }
@@ -878,8 +878,8 @@ async function validateSubmissionData(
         issues.push({ kind: "unknown-field", fieldId: fieldId as FieldId });
         continue;
       }
-      if (!typeMatches(field.type, value)) {
-        issues.push({ kind: "type-mismatch", fieldId: fieldId as FieldId, expected: expectedTypeLabel(field.type) });
+      if (!typeMatches(field, value)) {
+        issues.push({ kind: "type-mismatch", fieldId: fieldId as FieldId, expected: expectedTypeLabel(field) });
         continue;
       }
       if (!field.dataSource && !optionValuesValid(field.options, value)) {
@@ -907,8 +907,8 @@ async function validateSubmissionData(
       }
       continue;
     }
-    if (!typeMatches(rf.field.type, value)) {
-      issues.push({ kind: "type-mismatch", fieldId: fieldId as FieldId, expected: expectedTypeLabel(rf.field.type) });
+    if (!typeMatches(rf.field, value)) {
+      issues.push({ kind: "type-mismatch", fieldId: fieldId as FieldId, expected: expectedTypeLabel(rf.field) });
       continue; // skip further checks on a value of the wrong shape
     }
     if (!optionValuesValid(rf.options, value)) {

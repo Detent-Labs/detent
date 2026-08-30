@@ -66,10 +66,82 @@ Every field of the process, declared once. A field has a key, a type and a
 label. The stored payload is one flat object, and a field id is its key.
 
 The example declares four fields. `amount` is a number, `reason` is a string,
-`review_note` is a string, and `booking_status` is a select.
+`review_note` is a string, and `booking_status` is a string carrying options.
 
 A field key must match `/^[a-z_][a-z0-9_]*$/`, because a guard reads it as
 `data.<key>`.
+
+#### Type, format and control
+
+Three keys describe a field. Each one has its own reader.
+
+| Key | What it says | Who reads it |
+|---|---|---|
+| `type` | the value form | CEL, the submission check, a reporting column |
+| `format` | the meaning of the value | validation and the publish-time check |
+| `control` | the input form | the renderer alone |
+
+`type` takes one of six values: `string`, `number`, `boolean`, `list`, `file`
+and `group`. A `list` holds strings.
+
+A picker is not a type. What makes a field a picker is `options` or a
+`dataSource`. The cardinality is the type: one pick is a `string`, several
+picks are a `list`.
+
+`format` is optional. It takes `date`, `datetime`, `integer` or `email`. The
+format narrows the values the field accepts. A `format: "date"` field takes
+`2026-02-28`. It refuses `2026-02-30` and `banane` alike. A literal `default`
+faces the same check at publish time.
+
+`control` is optional. It takes `multiline`, `radio` or `checkboxes`. The
+control changes the widget alone. Omit it and the field renders the default
+control for its type. That is a checkbox for a boolean, a dropdown for a field
+with options, and a single-line input otherwise.
+
+A type admits only some formats and some controls. Publishing rejects the rest.
+
+| `type` | `format` | `control` |
+|---|---|---|
+| `string` | `date`, `datetime`, `email` | `multiline`, `radio` |
+| `number` | `integer` | none |
+| `boolean` | none | `radio` |
+| `list` | none | `checkboxes` |
+| `file` | none | none |
+| `group` | none | none |
+
+A field whose meaning no `format` member covers declares a plugin type instead,
+the `{type, config}` envelope. That field takes neither key.
+
+#### A group of booleans, or one list
+
+Two shapes hide behind a list of checkboxes. One question separates them. Do
+the entries need separate CEL access and separate requiredness?
+
+Yes means several `boolean` fields inside a `group`. Each one carries its own
+key. A guard reads `data.hat_zustimmung` on its own, and a view marks one of
+them required without touching the others.
+
+No means one `list` field with options and `control: "checkboxes"`. That is one
+question with several answers. A guard reads the whole answer,
+`'express' in data.versandarten`. Requiredness applies to the question rather
+than to an entry.
+
+#### An integer field and CEL
+
+A `number` field is a CEL `double`. Marking it `format: "integer"` makes it a
+CEL `int`, so `data.prioritaet == 3` and `data.anzahl % 2 == 0` type-check.
+Both fail without the format. A bare `3` is an `int`, and the library holds no
+overload against a `double`.
+
+Two consequences follow, and the studio reports each one at publish time.
+
+Division between two integers truncates. `7 / 2` is `3`, never `3.5`. A guard
+comparing a computed average therefore reads lower than you expect.
+
+An expression mixing an integer field with a decimal field finds no overload
+and fails the check. Say `anzahl` carries the format and `stueckpreis` does
+not. Then `data.anzahl * data.stueckpreis` does not publish. Mark both fields,
+or neither.
 
 ### Default value
 
@@ -112,7 +184,7 @@ A step can override any of these per field. See View, below.
 
 ### Data source
 
-Where a select field gets its options. A field carries its options inline, or
+Where a field gets its options. A field carries its options inline, or
 it names a data source, never both. The engine resolves a data source when a
 participant opens the form.
 
@@ -189,8 +261,7 @@ Widening it admits a completed or cancelled instance. A picker almost never
 wants those.
 `labelFieldId` names the field the picker shows. A source instance holding no
 value there falls back to showing the instance's own id. So does a source
-instance holding a non-scalar value there, such as a `multiselect` or a
-`group`.
+instance holding a non-scalar value there, such as a `list` or a `group`.
 
 The studio form draws `stepIds`, `labelFieldId`, a comparison's target field,
 and an attribute's target field from the target process's own published
@@ -232,7 +303,7 @@ the mismatched pairing outright rather than let it fail at runtime.
 `columnMapping` to pick up:
 
 ```json
-{ "id": "field_device", "key": "device", "type": "select",
+{ "id": "field_device", "key": "device", "type": "string",
   "dataSource": "ds_devices",
   "columnMapping": { "serial": "field_serial" } }
 ```
@@ -290,7 +361,7 @@ The other part does. A field that binds the list maps a column onto another
 field of your catalog:
 
 ```json
-{ "id": "field_product", "key": "product", "type": "select",
+{ "id": "field_product", "key": "product", "type": "string",
   "dataSource": "ds_products",
   "columnMapping": { "unit_price": "field_price" } }
 ```
@@ -306,8 +377,8 @@ A column key matches `/^[a-z_][a-z0-9_]*$/`, the same grammar a field key
 takes, and stays under the same length bound. Publishing rejects a key that
 does not.
 
-The field must name a `dataSource`, and its type must be `select`. A
-`multiselect` picks several rows, and one target field takes one value.
+The field must name a `dataSource`, and its type must be `string`. A `list`
+picks several rows, and one target field takes one value.
 
 A target must be another field of this process. It cannot be the mapping field
 itself, and it cannot be a group.
@@ -340,7 +411,7 @@ shows one row per mapped column. The first control picks a column key the
 bound list declares. The second picks the catalog field it writes. The panel
 marks a row whose key the list no longer declares.
 
-The editor appears for a `select` field bound to a `db.list` source. For any
+The editor appears for a `string` field bound to a `db.list` source. For any
 other source type, write the mapping as JSON in the studio's raw definition
 view.
 
@@ -633,7 +704,7 @@ field.
 Give each field a key that matches `/^[a-z_][a-z0-9_]*$/`. A guard reads it as
 `data.<key>`, and the key must survive that.
 
-Does a select field take its options from somewhere else? Declare that source
+Does a field take its options from somewhere else? Declare that source
 in the **Data sources** panel. Then point the field at it.
 
 ### 3. Add the steps

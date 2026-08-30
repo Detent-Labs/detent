@@ -615,7 +615,7 @@ Switch the locale to German. Pass: every heading, every refusal line and the
 warning above read in German, with no reload. Read the values table at
 1100px. A German heading is longer, and this is where it shows.
 
-Open Studio. Assemble a process with a `select` field bound to a `db.list` source
+Open Studio. Assemble a process with a `string` field bound to a `db.list` source
 naming `products`. On the raw definition view, give that field a
 `columnMapping` sending `sku` to a text field and `unit_price` to a number
 field. Mark both targets readonly on the step's view. Publish.
@@ -667,9 +667,9 @@ declaring `sku` and `price`, and a draft to edit.
 Open Studio, then a draft, then Fields. Add a `db.list` data source naming
 `products`. Pass: the key picker offers it, which is the widened read working.
 
-Set a field's type to `select` and bind it to that source. Pass: the column
+Set a field's type to `string` and bind it to that source. Pass: the column
 mapping editor appears under the `dataSource` picker. Set the type to
-`multiselect`. Pass: it goes. Set it back to `select`. Pass: it returns.
+`list`. Pass: it goes. Set it back to `string`. Pass: it returns.
 
 Choose "Map a column". Pass: the first picker offers `sku` and `price`, and no
 other key. The second offers the catalog's fields, without the mapping field
@@ -1512,7 +1512,7 @@ tab, then back to Field. Pass: the preview is still open, and the Field
 tab's own content is the only content on screen. Values and Rules render
 nothing while another tab is active.
 
-Switch to the Values tab on a `select` field with static options. Pass:
+Switch to the Values tab on a `string` field with static options. Pass:
 three ruled zones show in order: "Where values come from", "Default
 value", "Column mapping". The third shows only when the field's data
 source is mappable. Choose an option in the Default value zone's own

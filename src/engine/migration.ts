@@ -56,7 +56,7 @@ function fieldTypeById(fields: FieldDef[]): Map<string, string> {
       if (typeof f.type === "string" && f.type === "group") {
         if (f.fields) walk(f.fields);
       } else {
-        m.set(f.id, celType(f.type));
+        m.set(f.id, celType(f));
       }
     }
   };

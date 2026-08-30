@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { LocaleCode } from "workflow-engine/schema";
 import type { ResolvedViewField, SubmissionIssue } from "./types.js";
-import { resolveText } from "./locale.js";
+import { booleanLabels, resolveText } from "./locale.js";
 import { issueMessage } from "./issue-messages.js";
 
 interface FieldFormProps {
@@ -21,6 +21,20 @@ interface FieldFormProps {
 export function effectiveSpan(span: 1 | 2 | undefined, columns: 1 | 2): 1 | 2 {
   return Math.min(span ?? 1, columns) as 1 | 2;
 }
+
+/**
+ * The native input a `string` field's `format` reaches. `integer` is absent:
+ * it belongs to `number`, whose branch reads it as a `step` instead. A format
+ * with no entry here, and a field declaring none, takes the plain text input.
+ *
+ * The native control enforces the same value domain `formatMatches` does, so
+ * a participant cannot enter a value the engine then refuses.
+ */
+const NATIVE_INPUT_TYPE: Record<string, string | undefined> = {
+  date: "date",
+  datetime: "datetime-local",
+  email: "email",
+};
 
 /** Separates an option's label from its attributes, and each attribute from the next. */
 export const OPTION_ATTRIBUTE_SEPARATOR = " · ";
@@ -149,85 +163,174 @@ export function FieldInput({ field, allFields, values, onChange, locale, issuesB
     "aria-invalid": hasIssues || undefined,
     "aria-describedby": hasIssues ? issuesId : undefined,
   } as const;
-  // Select/multiselect share this one option-list build — never two
-  // independently-maintained copies of the same map.
-  const options = (field.options ?? []).map((o) => (
+  // Every option-reading branch — the two pickers, the radio group and the
+  // checkbox group — composes its visible text here, once. An author who
+  // switches a field's `control` sees the same option wording afterwards.
+  const optionEntries = (field.options ?? []).map((o) => ({
+    value: o.value,
+    text: optionText(resolveText(o.label, locale, locale) || o.value, o.attributes, locale),
+  }));
+  const hasOptions = optionEntries.length > 0;
+  const optionElements = optionEntries.map((o) => (
     <option key={o.value} value={o.value}>
-      {optionText(resolveText(o.label, locale, locale) || o.value, o.attributes, locale)}
+      {o.text}
     </option>
   ));
+  const checked = Array.isArray(value) ? (value as string[]) : [];
 
+  // The widget reads four things: the resolved options, `control`, `format`
+  // and `type`. Within a type, the options decide first, then the control,
+  // then the format. A `control` the field's own shape cannot draw falls
+  // through to the type's default rather than rendering an empty group — a
+  // `dataSource`-bound field resolves its options at runtime, so no
+  // publish-time check can see them.
+  //
+  // Only a `string` and a `list` reach a picker. Those are the two types the
+  // allowed-pairs table lets carry a picker's control, and a `<select>`
+  // writing a string into a `number` field would fail `typeMatches`.
   let control: ReactNode;
+  // A radio group and a checkbox group have no single control to label, so
+  // they render as a <fieldset> whose <legend> carries the field's label. A
+  // <label> would name one input and leave the rest unnamed.
+  let grouped = false;
   if (def.type === "boolean") {
-    control = <input type="checkbox" disabled={disabled} checked={!!value} onChange={(e) => onChange(def.id, e.target.checked)} {...a11yProps} />;
+    if (def.control === "radio") {
+      grouped = true;
+      const { yes, no } = booleanLabels(locale);
+      control = (
+        <>
+          {[
+            { on: true, text: yes },
+            { on: false, text: no },
+          ].map((o) => (
+            <label className="form-ui-option" key={String(o.on)}>
+              <input type="radio" name={def.id} disabled={disabled} checked={value === o.on} onChange={() => onChange(def.id, o.on)} />
+              <span>{o.text}</span>
+            </label>
+          ))}
+        </>
+      );
+    } else {
+      control = <input type="checkbox" disabled={disabled} checked={!!value} onChange={(e) => onChange(def.id, e.target.checked)} {...a11yProps} />;
+    }
   } else if (def.type === "number") {
     control = (
       <input
         type="number"
+        // An integer field steps by one, so the spinner and the browser's own
+        // step check agree with the format the engine validates against.
+        step={def.format === "integer" ? 1 : undefined}
         disabled={disabled}
         value={value === undefined || value === null ? "" : String(value)}
         onChange={(e) => onChange(def.id, e.target.value === "" ? undefined : Number(e.target.value))}
         {...a11yProps}
       />
     );
-  } else if (def.type === "date") {
+  } else if (hasOptions && def.type === "string" && def.control === "radio") {
+    grouped = true;
     control = (
-      <input type="date" disabled={disabled} value={(value as string) ?? ""} onChange={(e) => onChange(def.id, e.target.value)} {...a11yProps} />
+      <>
+        {optionEntries.map((o) => (
+          <label className="form-ui-option" key={o.value}>
+            <input type="radio" name={def.id} value={o.value} disabled={disabled} checked={value === o.value} onChange={() => onChange(def.id, o.value)} />
+            <span>{o.text}</span>
+          </label>
+        ))}
+      </>
     );
-  } else if (def.type === "datetime") {
+  } else if (hasOptions && def.type === "list" && def.control === "checkboxes") {
+    grouped = true;
+    control = (
+      <>
+        {optionEntries.map((o) => (
+          <label className="form-ui-option" key={o.value}>
+            <input
+              type="checkbox"
+              value={o.value}
+              disabled={disabled}
+              checked={checked.includes(o.value)}
+              // Rebuilt from the option order, not from click order, so the
+              // stored array reads the way the author declared it.
+              onChange={(e) =>
+                onChange(
+                  def.id,
+                  optionEntries.filter((c) => (c.value === o.value ? e.target.checked : checked.includes(c.value))).map((c) => c.value),
+                )
+              }
+            />
+            <span>{o.text}</span>
+          </label>
+        ))}
+      </>
+    );
+  } else if (def.type === "list") {
+    control = (
+      <select
+        multiple
+        disabled={disabled}
+        value={checked}
+        onChange={(e) => onChange(def.id, Array.from(e.target.selectedOptions).map((o) => o.value))}
+        {...a11yProps}
+      >
+        {optionElements}
+      </select>
+    );
+  } else if (hasOptions && def.type === "string") {
+    control = (
+      <select disabled={disabled} value={(value as string) ?? ""} onChange={(e) => onChange(def.id, e.target.value)} {...a11yProps}>
+        <option value="" />
+        {optionElements}
+      </select>
+    );
+  } else if (def.type === "string" && def.control === "multiline") {
+    control = (
+      <textarea disabled={disabled} rows={4} value={(value as string) ?? ""} onChange={(e) => onChange(def.id, e.target.value)} {...a11yProps} />
+    );
+  } else {
+    // One text-input branch for three cases: a `file` field, a plugin
+    // envelope, and a plain `string`. A `string` declaring a format takes that
+    // format's own native input, which enforces the same domain the engine
+    // checks. A dataSource-bound picker is NOT here — its options resolve
+    // server-side into `field.options`, same as a static-options field.
     control = (
       <input
-        type="datetime-local"
+        type={def.type === "string" ? NATIVE_INPUT_TYPE[def.format ?? ""] ?? "text" : "text"}
         disabled={disabled}
         value={(value as string) ?? ""}
         onChange={(e) => onChange(def.id, e.target.value)}
         {...a11yProps}
       />
     );
-  } else if (def.type === "select") {
-    control = (
-      <select disabled={disabled} value={(value as string) ?? ""} onChange={(e) => onChange(def.id, e.target.value)} {...a11yProps}>
-        <option value="" />
-        {options}
-      </select>
-    );
-  } else if (def.type === "multiselect") {
-    const selected = Array.isArray(value) ? (value as string[]) : [];
-    control = (
-      <select
-        multiple
-        disabled={disabled}
-        value={selected}
-        onChange={(e) => onChange(def.id, Array.from(e.target.selectedOptions).map((o) => o.value))}
-        {...a11yProps}
-      >
-        {options}
-      </select>
-    );
-  } else {
-    // string, reference, file, or a Plugin envelope type share this one
-    // free-text branch: no dedicated widget beyond free text exists for
-    // reference/file/plugin. A dataSource-bound select/multiselect field is
-    // NOT included here — its options are resolved server-side into
-    // `field.options`, same as a static-options field.
-    control = (
-      <input type="text" disabled={disabled} value={(value as string) ?? ""} onChange={(e) => onChange(def.id, e.target.value)} {...a11yProps} />
-    );
   }
+
+  const marker = field.required && (
+    <span className="form-ui-required-marker" title="required">
+      *
+    </span>
+  );
 
   return (
     <div className="form-ui-field" data-span={span}>
-      <label className="form-ui-field-control">
-        <span className="form-ui-field-label">
-          {label}
-          {field.required && (
-            <span className="form-ui-required-marker" title="required">
-              *
-            </span>
-          )}
-        </span>
-        {control}
-      </label>
+      {grouped ? (
+        // The group's own state lives on the <fieldset>: it is the element the
+        // required and invalid state describes, and the element the issue list
+        // describes. Each input inside carries its own <label>.
+        <fieldset className="form-ui-field-options" {...a11yProps}>
+          <legend className="form-ui-field-label">
+            {label}
+            {marker}
+          </legend>
+          {control}
+        </fieldset>
+      ) : (
+        <label className="form-ui-field-control">
+          <span className="form-ui-field-label">
+            {label}
+            {marker}
+          </span>
+          {control}
+        </label>
+      )}
       {hasIssues && (
         <ul className="form-ui-field-issues" id={issuesId}>
           {issues.map((issue, i) => (

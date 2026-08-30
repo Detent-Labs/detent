@@ -1,5 +1,5 @@
 import { t } from "../../catalog.js";
-import { isComplete, operatorsFor, type CmpOp, type Condition, type Operand, type Row } from "./conditionLogic";
+import { inputTypeFor, isComplete, operatorsFor, type CmpOp, type Condition, type Operand, type Row } from "./conditionLogic";
 
 interface Props {
   condition: Condition;
@@ -12,13 +12,6 @@ function operatorLabel(op: CmpOp): string {
   return op === "in" ? t("condition.contains") : op;
 }
 
-/** The native input type a value editor uses, by the field's declared type. */
-function inputTypeFor(declared: string | undefined): "number" | "date" | "datetime-local" | "text" {
-  if (declared === "number") return "number";
-  if (declared === "date") return "date";
-  if (declared === "datetime") return "datetime-local";
-  return "text";
-}
 
 function ValueEditor({
   row,
@@ -62,7 +55,7 @@ function ValueEditor({
 
   return (
     <input
-      type={inputTypeFor(operand.declaredType)}
+      type={inputTypeFor(operand)}
       aria-label={label}
       placeholder={t("condition.valuePlaceholder")}
       value={String(row.value ?? "")}

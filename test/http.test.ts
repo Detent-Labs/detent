@@ -274,7 +274,7 @@ test.skipIf(!DB)("GET /instances/:instanceId resolves a dataSource-bound field's
     key: "ds_view_body",
     label: { en: "DS View Body" },
     baseLocale: "en",
-    fields: [{ id: "field_country", key: "country", label: { en: "Country" }, type: "select", dataSource: "ds_countries" }],
+    fields: [{ id: "field_country", key: "country", label: { en: "Country" }, type: "string", dataSource: "ds_countries" }],
     dataSources: [{ id: "ds_countries", key: "countries", type: "static", config: { options: [{ value: "us", label: { en: "United States" } }] } }],
     workflow: {
       initialStep: "step_a",

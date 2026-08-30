@@ -13,6 +13,34 @@ Stage-by-stage status is in `ROADMAP.md`.
   StepId is not interchangeable with a PathId. Literal and FieldDef are recursive,
   so those two types are hand-written and their schemas use z.lazy (the only place
   a type is not inferred).
+- The field model is three keys (`field-model-type-format-control`,
+  `docs/field-model-redesign.md`). `type` is the value form, `format` the
+  meaning of the value, `control` the input form. One test sorts a candidate
+  member: anything a reader outside the renderer touches belongs in `format`.
+  - `baseFieldType` holds six value forms: `string`, `number`, `boolean`,
+    `list`, `file` and `group`. Each one maps to a single CEL type and a
+    single JS shape, so neither `celType` (`src/cel/check.ts`) nor `JS_TYPE`
+    collapses members any more.
+  - `fieldFormat` holds `date`, `datetime`, `integer` and `email`.
+    `fieldControl` holds `multiline`, `radio` and `checkboxes`. Both keys are
+    optional on `FieldDef`, and both enums stay closed, so every member
+    carries a publish-time check.
+  - `ALLOWED_BY_TYPE` is the one table of allowed pairs.
+    `checkFieldFormatControl` (`src/schema/compile.ts`) reads it inside
+    `checkFieldTree` and rejects a pair the table omits, plus a literal
+    `default` the declared format refuses.
+  - `formatMatches` checks a value against its format, and `typeMatches`
+    runs it after the JS-shape check. Both take the whole field, as do
+    `celType` and `expectedTypeLabel`, since the format is half the rule.
+  - A `format: "integer"` field reports the CEL type `int` rather than
+    `double`, so `data.anzahl % 2 == 0` type-checks. The author pays twice
+    for it: integer division truncates, and an expression mixing an integer
+    field with a decimal field finds no overload.
+  - The removed `select`, `multiselect`, `date`, `datetime` and `reference`
+    members map onto the new model. What makes a field a picker is `options`
+    or a `dataSource`, over a `string` for one pick and a `list` for several.
+    A `date` field becomes a `string` carrying `format: "date"`, and a
+    `reference` field becomes a plain `string`.
 - `examples/expense-approval.json`: a complete Capture -> Review -> Book example
   (booking wait-state, result-driven automatic paths, a reminder timer, a visible
   booking-error state, a declared contract). `processVersion.safeParse` accepts
@@ -367,10 +395,11 @@ Stage-by-stage status is in `ROADMAP.md`.
   every future poll). The race does not cancel the handler; releasing the
   underlying resource is the handler's own job (`http.request`'s own timeout
   does this for the shipped handler). Before writing a patch entry, the
-  worker resolves the target field's declared type (via an injected
-  `resolveBody`, keyed off the row's `field_version`) and checks the value
-  with the same `typeMatches` rule (`src/schema/definition.ts`, shared with
-  the submission validator) a participant's own submission faces; a
+  worker resolves the target field (via an injected `resolveBody`, keyed off
+  the row's `field_version`) and checks the value with the same `typeMatches`
+  rule (`src/schema/definition.ts`, shared with the submission validator) a
+  participant's own submission faces (that rule reads the field's `type` and
+  its `format` together, so `banane` fails against a `date` field); a
   mismatching entry is dropped — not written, not retried, since the
   delivery itself already succeeded — and recorded in the `ActionOutcome`'s
   `droppedTargets`, distinct from `suppressed` (a whole-patch fact about
@@ -2869,7 +2898,7 @@ Stage-by-stage status is in `ROADMAP.md`.
 
   `FieldDef` gains an optional `columnMapping`, column key to target `FieldId`.
   `compile.ts::checkColumnMapping` runs inside `checkFieldTree`, the third
-  structural write-path check. It requires a `dataSource` and a `select` type. It holds each key to the slug
+  structural write-path check. It requires a `dataSource` and a `string` type. It holds each key to the slug
   grammar and the length bound. It resolves every target in the recursive field
   set. It refuses a self-target, a group target, and two keys naming one
   target.
@@ -2914,8 +2943,8 @@ Stage-by-stage status is in `ROADMAP.md`.
 
   `DataSourceContext` gains an optional `heldValues: string[]`.
   `resolveFields` supplies the values the instance holds for the field under
-  resolution: none when unset, one for a `select`, the whole array for a
-  `multiselect`. The handler's query returns active values plus any value
+  resolution: none when unset, one for a `string` field, the whole array for
+  a `list` field. The handler's query returns active values plus any value
   `heldValues` names. A value an operator retires therefore stays visible to
   the instances that already hold it. Its label still renders, and
   `optionValuesValid` accepts it with no change of its own, since that
@@ -3352,9 +3381,11 @@ bodies:
 - the reserved cancel-sink as a `stepMap` value or as `unmappableStep`.
 
 Type agreement imports `celType` from `workflow-engine/cel/check`, the
-function `validatePlan` itself compares. Several declared types share one
-CEL type. A check over the declared type would report an error the server
-does not raise. Everything else stays on the server, including the
+function `validatePlan` itself compares. A declared type does not settle the
+CEL type alone. A `number` reports `int` or `double` by its `format`, and
+`file` and `group` both report `dyn`. A check over the declared type
+would report an error the server does not raise. Everything else stays on
+the server, including the
 `transforms` expressions and the identity-carried type check. The form never
 blocks a save on its own finding.
 
@@ -4050,10 +4081,10 @@ meets `scope=started` should infer no new permission tier from it.
   that feeds it. The first control picks a key the bound list declares. The
   second picks a catalog field.
 
-  It appears for a `select` field bound to a `"db.list"` source, and nowhere
+  It appears for a `string` field bound to a `"db.list"` source, and nowhere
   else. `checkColumnMapping` supplies two of those conditions. It refuses a
-  mapping on a field carrying no `dataSource`, and on a field that is not a
-  `select`. The `db.list` narrowing is the editor's own, because no other
+  mapping on a field carrying no `dataSource`, and on a field whose type is
+  not `string`. The `db.list` narrowing is the editor's own, because no other
   source type declares columns. Hiding the editor never deletes what the field
   carries, so switching a type back restores the rows.
 
