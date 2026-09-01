@@ -33,7 +33,7 @@ field), `FieldOption.label`, and `ViewNote.text` SHALL be `LocalizedText`
 non-empty entry keyed by the process's `baseLocale`. Entries for other
 locales are optional.
 
-`ViewNote.text` is the newest of those keys, and it is the first that sits
+`ViewNote.text` is the newest of those keys. It is the first that sits
 in a step's `view` rather than in the catalog or on the step itself. It
 changes nothing about the rule. The enumeration names it so the key list and
 the rule cannot drift apart.
@@ -46,9 +46,10 @@ option list, and its per-locale gap count. A position absent from the walk
 reaches neither of them, and no type error marks its absence.
 
 The inline missing-translation warning does not read that walk.
-`missingTranslationWarning` takes one value, and each render site calls it
-directly. A new `LocalizedText` position therefore SHALL carry its own call,
-beside the input that renders it.
+`missingTranslationWarning` takes one value. Each site declaring a
+`LocalizedTextInput` also calls it, directly beside that input. A new
+`LocalizedText` position therefore SHALL carry its own call, beside its own
+input.
 
 #### Scenario: A label missing the base-locale entry is rejected
 - **WHEN** a process declares `baseLocale: "en"` and a step's `label` is

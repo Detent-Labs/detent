@@ -218,8 +218,8 @@ visible required marker with no client-side submission enforcement
 `readonly` set SHALL render its input in a disabled state.
 
 The container houses view entries, not field entries alone. A note entry
-naming the group's key renders inside it, on the same rule and at the same
-position the array gives it. The two sentences about `required` and
+naming the group's key renders inside it, on the same rule. It sits at the
+same position the array gives it. The two sentences about `required` and
 `readonly` reach field entries alone, because a note declares neither.
 
 #### Scenario: A group field nests its member fields
@@ -243,7 +243,8 @@ position the array gives it. The two sentences about `required` and
 #### Scenario: A note carrying the group's key nests beside the member fields
 
 - **WHEN** a step view includes a `group` field, a field entry and a note
-  entry, and both entries name that group's key
+  entry
+- **AND** both entries name that group's key
 - **THEN** both render nested within the group's container, in the order the
   resolved view array carries them
 
@@ -584,12 +585,12 @@ A note SHALL honor `group` and `span` the way a field entry does. A note naming
 a group's key renders inside that group's container. Its `span` sets how many
 of the form's columns it occupies.
 
-The grid rules a note's `span` obeys are the ones "Fields render across the
-view's declared column count, honoring each field's span" already states. That
-requirement's every clause reads over a view entry, a note included: the grid,
-the `min(span, columns)` clamp, and a group's own full-width container. It
-needs no change of its own, because a note's `span` behaves as a leaf field's
-`span` behaves.
+A note's `span` obeys the grid rules already stated. Those rules are
+"Fields render across the view's declared column count, honoring each
+field's span". That requirement's every clause reads over a view entry, a
+note included. It covers the grid, the `min(span, columns)` clamp, and a
+group's own full-width container. It needs no change of its own. A note's
+`span` behaves the way a leaf field's `span` behaves.
 
 #### Scenario: A note renders between the fields around it
 

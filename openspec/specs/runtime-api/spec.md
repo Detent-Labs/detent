@@ -1671,10 +1671,10 @@ requiredness and no readonly state into the resolved view.
 `kind` is what a caller discriminates on, mirroring the authored rule the
 `definition-contract` capability states. A resolved entry carrying no `kind`
 is a field entry. Emitting a note without it leaves a caller reading the note
-as a field, which is the one shape the renderer cannot draw.
+as a field. That is the one shape the renderer cannot draw.
 
 Resolution SHALL evaluate a note's `visible` the way it evaluates a field
-entry's. A note the guard hides SHALL produce no resolved entry, so its `text`
+entry's. A note the guard hides SHALL create no resolved entry, so its `text`
 never reaches a caller. Withholding the text matters on its own. An author uses
 a note to explain a rule that applies to some instances. A hidden note's wording
 can name a threshold the reader is not meant to see.

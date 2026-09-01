@@ -1254,7 +1254,7 @@ unwritten pair.
 The check SHALL skip three kinds of entry. A `group` field: a group holds
 fields and takes no value, and the engine resolves its view flags false.
 A `technical` field: the technical-field rule already rejects its flags. An
-entry carrying no `ref`: a note entry names no field, so this rule has no
+entry carrying no `ref`: a note entry names no field. This rule has no
 field to look for a writer of.
 
 The rejection SHALL apply only to an entry on a step that carries a manual
@@ -1509,10 +1509,11 @@ Reading a stored body SHALL keep stripping, as it does for every other
 undeclared key. Publishing SHALL reject a note entry that carries a field
 entry's key. The two paths then behave exactly as they already do elsewhere.
 
-An entry carrying a `kind` this contract does not declare SHALL be read as a
-field entry, and publishing SHALL then report `kind` as an unknown key on it.
-A `kind` that is not a string SHALL be read the same way. No entry SHALL
-escape the unknown-key check by carrying a `kind` no member claims.
+The schema SHALL read an entry carrying a `kind` this contract does not
+declare as a field entry. Publishing SHALL then report `kind` as an unknown
+key on it. The schema SHALL read a `kind` that is not a string the same way.
+No entry SHALL escape the unknown-key check by carrying a `kind` no member
+claims.
 
 Every other requirement in this capability phrased over a `view.fields[]`
 entry reaches field entries alone. A note declares none of the keys those
@@ -1587,5 +1588,5 @@ It states no new rule about unknown keys.
 
 - **WHEN** an authored body declares a view entry carrying `kind: "notes"`, a
   `ref` that resolves, and a `text`
-- **THEN** publishing fails with a located issue naming `kind` on that entry,
-  rather than publishing it as a field entry with the two keys stripped
+- **THEN** publishing fails with a located issue naming `kind` on that entry.
+  It does not publish as a field entry with the two keys stripped
