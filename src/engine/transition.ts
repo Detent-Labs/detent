@@ -607,7 +607,7 @@ async function sweepCancelledChildren(
   resolveBody: ResolveBodyFn,
 ): Promise<CancelSweepResult> {
   const rows = (await db`SELECT instance_id, body FROM instances
-    WHERE body->'parent'->>'instanceId' = ${parentInstanceId} AND body->>'status' = 'running'`) as
+    WHERE parent_instance_id = ${parentInstanceId} AND body->>'status' = 'running'`) as
     { instance_id: string; body: unknown }[];
   const result: CancelSweepResult = { cancelled: [], conflicted: [], failed: [] };
   for (const row of rows) {

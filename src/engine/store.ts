@@ -261,19 +261,6 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // (harmless pre-production, not a bug).
   await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now()`;
   await db`CREATE INDEX IF NOT EXISTS instances_created_idx ON instances (created_at DESC, instance_id DESC)`;
-  // The inbox predicate ("claimed by me, or unclaimed and I am a candidate")
-  // needs its own indexes over the jsonb-nested assignment fields:
-  // instances_selection_idx does not cover them.
-  await db`CREATE INDEX IF NOT EXISTS instances_claimed_by_idx ON instances ((body->'assignment'->>'claimedBy'))`;
-  await db`CREATE INDEX IF NOT EXISTS instances_candidates_idx ON instances USING GIN ((body->'assignment'->'candidates'))`;
-  // Child-instance lookup: the cancel cascade's child sweep and the migration
-  // live-child gate both filter on the parent's instanceId. A plain B-tree
-  // expression index — equality on one extracted text value, the same shape
-  // as instances_claimed_by_idx (GIN above is for the candidates containment
-  // predicate, not this one). `status` is deliberately left out: it is low
-  // cardinality, and the parent id alone reduces the scan to a handful of
-  // rows. Readers: transition.ts::sweepCancelledChildren, migration.ts::migrateOne.
-  await db`CREATE INDEX IF NOT EXISTS instances_parent_idx ON instances ((body->'parent'->>'instanceId'))`;
   // The instance list read and the instance data read both reach these two
   // through buildInstanceWhere's shared currentStepId/startedBy filters
   // (src/runtime/api.ts). currentStepId also backs the bottlenecks view's
@@ -317,6 +304,39 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // to filter on this column directly — the planner would not substitute this
   // index into a query still naming the original body->>'startedAt' expression.
   await db`CREATE INDEX IF NOT EXISTS instances_started_idx ON instances (started_at)`;
+  // The five keys Change 1 deferred, promoted on the same mechanism. candidates
+  // is jsonb, not text[]: unnesting a jsonb array needs a set-returning function
+  // inside a subquery, which a generation expression forbids ("cannot use
+  // subquery in column generation expression", verified against Postgres 16.15).
+  // Holding it as jsonb keeps both operators the inbox predicate uses, @> and ?|.
+  // current_step_entered_at is text for the reason started_at above is: a
+  // timestamptz cast is not immutable. chained_from has no reader and no index
+  // yet; it is the report dimension "which instances did this process start".
+  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS claimed_by text GENERATED ALWAYS AS ((body->'assignment'->>'claimedBy')) STORED`;
+  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS candidates jsonb GENERATED ALWAYS AS ((body->'assignment'->'candidates')) STORED`;
+  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS parent_instance_id text GENERATED ALWAYS AS ((body->'parent'->>'instanceId')) STORED`;
+  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS current_step_entered_at text GENERATED ALWAYS AS ((body->>'currentStepEnteredAt')) STORED`;
+  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS chained_from text GENERATED ALWAYS AS ((body->>'chainedFrom')) STORED`;
+  // The three expression indexes the columns above replace. New names, not the
+  // old ones: CREATE INDEX IF NOT EXISTS would not rebuild an index of a given
+  // name whose definition differs, so reusing a name would need a DROP on every
+  // initSchema run. DROP IF EXISTS on the old name is a no-op from the second
+  // run onward.
+  await db`DROP INDEX IF EXISTS instances_claimed_by_idx`;
+  await db`DROP INDEX IF EXISTS instances_candidates_idx`;
+  await db`DROP INDEX IF EXISTS instances_parent_idx`;
+  // The inbox predicate ("claimed by me, or unclaimed and I am a candidate").
+  // instances_selection_idx does not cover either half. Reader:
+  // runtime/api.ts::buildInstanceWhere, for its claimedBy and assignedTo filters.
+  await db`CREATE INDEX IF NOT EXISTS instances_claimed_idx ON instances (claimed_by)`;
+  await db`CREATE INDEX IF NOT EXISTS instances_candidate_idx ON instances USING GIN (candidates)`;
+  // Child-instance lookup: the cancel cascade's child sweep and the migration
+  // live-child gate both filter on the parent's instanceId. A plain B-tree —
+  // equality on one text value (the GIN above is for the candidates containment
+  // predicate, not this one). `status` is deliberately left out: it is low
+  // cardinality, and the parent id alone reduces the scan to a handful of
+  // rows. Readers: transition.ts::sweepCancelledChildren, migration.ts::migrateOne.
+  await db`CREATE INDEX IF NOT EXISTS instances_parent_instance_idx ON instances (parent_instance_id)`;
   // Project-local user accounts (src/auth/users.ts). user_id is the value used
   // as Actor.id — the same convention as assignment.candidates/claimedBy.
   await db`CREATE TABLE IF NOT EXISTS auth_users (

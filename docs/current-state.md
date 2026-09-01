@@ -2384,9 +2384,11 @@ Stage-by-stage status is in `ROADMAP.md`.
   indexes beside their siblings. `history_entries_instance_idx
   (instance_id, transition_seq)` mirrors the index `instance_events`
   already had; `outbox.ts::appendOutcome` and `api.ts::getInstanceRecord`
-  read it. `instances_parent_idx ((body->'parent'->>'instanceId'))` is a
-  B-tree expression index; `transition.ts::sweepCancelledChildren` and
-  `migration.ts::migrateOne` read it. Both close a sequential-scan gap the
+  read it. `instances_parent_instance_idx (parent_instance_id)` is a
+  plain B-tree over a generated column; `transition.ts::sweepCancelledChildren`
+  and `migration.ts::migrateOne` read it. It arrived as the expression index
+  `instances_parent_idx ((body->'parent'->>'instanceId'))` and moved onto the
+  column with `promote-instance-assignment-columns`. Both close a sequential-scan gap the
   function's other jsonb-nested predicates already had an index for.
 
 - CI, local (`.githooks/pre-push`, `add-ci-and-dependency-hygiene`;

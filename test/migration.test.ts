@@ -1427,15 +1427,15 @@ test.skipIf(!DB)("schema init creates the history_entries and instances parent i
   await initSchema();
   const before = (await sql`
     SELECT indexname FROM pg_indexes
-    WHERE indexname IN ('history_entries_instance_idx', 'instances_parent_idx')
+    WHERE indexname IN ('history_entries_instance_idx', 'instances_parent_instance_idx')
     ORDER BY indexname
   `) as { indexname: string }[];
-  expect(before.map((r) => r.indexname)).toEqual(["history_entries_instance_idx", "instances_parent_idx"]);
+  expect(before.map((r) => r.indexname)).toEqual(["history_entries_instance_idx", "instances_parent_instance_idx"]);
 
   await initSchema(); // second run must not throw or duplicate either index
   const after = (await sql`
     SELECT indexname FROM pg_indexes
-    WHERE indexname IN ('history_entries_instance_idx', 'instances_parent_idx')
+    WHERE indexname IN ('history_entries_instance_idx', 'instances_parent_instance_idx')
     ORDER BY indexname
   `) as { indexname: string }[];
   expect(after).toEqual(before);

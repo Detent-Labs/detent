@@ -432,7 +432,7 @@ async function migrateOne(
       const srcStep = fromBody.workflow.steps.find((s) => (s.id as string) === srcStepId);
       if (srcStep?.subprocess) {
         const liveChild = (await tx`SELECT 1 FROM instances c
-          WHERE c.body->'parent'->>'instanceId' = ${id}
+          WHERE c.parent_instance_id = ${id}
             AND c.body->'parent'->>'stepId' = ${srcStepId}
             AND (c.body->>'status' = 'running'
                  OR EXISTS (SELECT 1 FROM outbox o

@@ -63,14 +63,17 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   `instance_id`, `transition_seq`, `body`, `resolve_state`,
   `resolve_claimed_at`, `cancel_sweep_state`, `next_timer_at`, `created_at`
   and `redacted_at`. Every other field of `Instance` lives inside the jsonb,
-  and six expression indexes stand in for eight of those keys:
+  and three expression indexes still stand in for four of those keys:
   `instances_selection_idx` over `processId`/`version`/`status`,
-  `instances_claimed_by_idx` over `assignment.claimedBy`,
-  `instances_candidates_idx` (GIN) over `assignment.candidates`,
-  `instances_parent_idx` over `parent.instanceId`,
   `instances_current_step_idx` over `currentStepId` and
-  `instances_started_by_idx` over `startedBy`
-  (`src/engine/store.ts:240`, `:253`, `:254`, `:262`, `:268`, `:269`).
+  `instances_started_by_idx` over `startedBy`. The table also holds the
+  eleven generated columns the two promotion changes added. The three
+  expression indexes that once covered the assignment pair and
+  `parent.instanceId` are gone: `promote-instance-assignment-columns`
+  replaced them with `instances_claimed_idx (claimed_by)`,
+  `instances_candidate_idx` (GIN over `candidates`) and
+  `instances_parent_instance_idx (parent_instance_id)`, each a plain index
+  over a generated column.
 
   Ten keys are standardized in the sense that matters here: the engine owns
   them, every instance carries them, and their shape never depends on a
@@ -621,11 +624,30 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
 - **Promoting standardized instance keys out of `body` into columns.** A
   design pass on 2026-08-25 settled which keys qualify, in the same session
   as the entry above, which asked for it. Change 1, the six scalars below,
-  landed as `promote-instance-scalar-columns` (2026-08-30). Change 2 (the
-  assignment pair, `parent.instanceId`, `currentStepEnteredAt`,
-  `chainedFrom`, and a rebuild of the five expression indexes those and the
-  six scalars share) is not started; `tmp/offene-items.md` item 25 carries
-  the split.
+  landed as `promote-instance-scalar-columns` (2026-08-30). Change 2, the
+  assignment pair plus `parent.instanceId`, `currentStepEnteredAt` and
+  `chainedFrom`, landed as `promote-instance-assignment-columns`
+  (2026-09-01). It retired the three expression indexes those keys carried.
+  What remains is Change 3, the three that still cover keys Change 1 already
+  promoted: `instances_selection_idx`, `instances_current_step_idx` and
+  `instances_started_by_idx`. That one is optional and not started;
+  `tmp/offene-items.md` item 25 carries the split.
+
+  **What Change 2 measured.** The inbox predicate is the hottest read in the
+  product, so the change measured it rather than assuming a gain. Paired
+  `EXPLAIN (ANALYZE, BUFFERS)` runs against Postgres 16.15, 200,000
+  instance rows, both phases over a byte-identical heap, median of nine:
+  1.336 ms before and 1.323 ms after for an actor with rows, 1.264 ms and
+  1.287 ms for one with none. The retention sweep read 0.424 ms and
+  0.445 ms; the child sweep 0.011 ms either way. The plans match node for
+  node and the index sizes match too. The cost side does move: the five new
+  columns take the heap from 104 MB to 116 MB, 11.6% or about 63 bytes a
+  row, and 200,000 inserts from 1852 ms to 1960 ms.
+
+  So the promotion buys no runtime gain at this scale. What it buys is one
+  predicate vocabulary, and no reader having to know which keys got an
+  expression index and which did not. Change 3 inherits that verdict: it
+  should be judged on the same ground, not on an expected speedup.
 
   **The goal.** A predicate over an instance key reads a plain column
   through a plain index. Eight expression indexes stood in for that before

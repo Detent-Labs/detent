@@ -405,3 +405,46 @@ test.skipIf(!DB)("an instance the sweep skips logs an error line carrying its id
   expect(await rowRedactedAt(good.instanceId)).not.toBeNull();
   expect(await rowData(good.instanceId)).toEqual({});
 });
+
+// The age predicate compares ISO-8601 text on both sides since the
+// promote-instance-assignment-columns change: `current_step_entered_at` and
+// `started_at` are generated text columns (a timestamptz generation
+// expression is not immutable), and the cutoff is rendered with `to_char` in
+// the same statement. These three pin the boundary that rewrite moved.
+
+const isoDaysAgo = (days: number): string => new Date(Date.now() - days * 86_400_000).toISOString();
+
+test.skipIf(!DB)("sweepRetention redacts an instance one day past the window boundary", async () => {
+  const i = await mk();
+  await setStatus(i.instanceId, "completed");
+  await setEnteredAt(i.instanceId, isoDaysAgo(31));
+
+  await sweepRetention(sql, 30);
+  expect(await rowRedactedAt(i.instanceId)).not.toBeNull();
+});
+
+test.skipIf(!DB)("sweepRetention leaves an instance one day inside the window boundary", async () => {
+  const i = await mk();
+  await setStatus(i.instanceId, "completed");
+  await setEnteredAt(i.instanceId, isoDaysAgo(29));
+
+  await sweepRetention(sql, 30);
+  expect(await rowRedactedAt(i.instanceId)).toBeNull();
+});
+
+test.skipIf(!DB)("sweepRetention compares a currentStepEnteredAt written without milliseconds", async () => {
+  // `timestamp` in definition.ts is a bare z.string(), so a hand-written body
+  // can carry a second-precision form. Text comparison must still place it on
+  // the right side of the cutoff.
+  const past = await mk();
+  await setStatus(past.instanceId, "completed");
+  await setEnteredAt(past.instanceId, isoDaysAgo(31).replace(/\.\d{3}Z$/, "Z"));
+
+  const inside = await mk();
+  await setStatus(inside.instanceId, "completed");
+  await setEnteredAt(inside.instanceId, isoDaysAgo(29).replace(/\.\d{3}Z$/, "Z"));
+
+  await sweepRetention(sql, 30);
+  expect(await rowRedactedAt(past.instanceId)).not.toBeNull();
+  expect(await rowRedactedAt(inside.instanceId)).toBeNull();
+});

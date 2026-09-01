@@ -87,6 +87,12 @@ export async function redactInstance(
  * every other reader of that field already applies — without it, the
  * oldest instances (exactly the ones retention exists to bound) would never
  * become eligible.
+ *
+ * Both sides of the age comparison are ISO-8601 text, not timestamptz. The two
+ * columns it reads are generated `text` (a timestamptz generation expression is
+ * not immutable), so `to_char` renders the cutoff in the same form
+ * `Date.prototype.toISOString` produces. `make_interval` still supplies the
+ * window, so it keeps counting calendar days rather than fixed 24-hour spans.
  */
 export async function sweepRetention(db: SQL, days: number): Promise<void> {
   let last = "";
@@ -95,8 +101,8 @@ export async function sweepRetention(db: SQL, days: number): Promise<void> {
       WHERE instance_id > ${last}
         AND redacted_at IS NULL
         AND body->>'status' IN ('completed', 'cancelled')
-        AND COALESCE((body->>'currentStepEnteredAt')::timestamptz, (body->>'startedAt')::timestamptz)
-          < now() - make_interval(days => ${days})
+        AND COALESCE(current_step_entered_at, started_at)
+          < to_char((now() - make_interval(days => ${days})) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
       ORDER BY instance_id LIMIT ${BATCH}`) as { instance_id: string }[];
     if (rows.length === 0) break;
     for (const { instance_id: id } of rows) {

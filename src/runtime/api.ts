@@ -1483,7 +1483,11 @@ type InstanceWhereFilter = Omit<InstanceListFilter, "includeDegraded" | "dataWhe
  * or a cursor — see design.md "The predicate is a SQL fragment builder, not a
  * query builder". `excludeInstanceId` compares the `instance_id` column
  * directly rather than `body->>'instanceId'`, since that column is the
- * table's own key.
+ * table's own key. `claimedBy` and `assignedTo` read the generated
+ * `claimed_by`/`candidates` columns for the same reason: naming the jsonb
+ * path they were generated from would leave instances_claimed_idx and
+ * instances_candidate_idx unused, since the planner substitutes neither for
+ * the other.
  */
 export function buildInstanceWhere(filter: InstanceWhereFilter, db: SQL) {
   const statusArr = filter.status && filter.status.length > 0 ? db.array(filter.status, "TEXT") : null;
@@ -1504,13 +1508,13 @@ export function buildInstanceWhere(filter: InstanceWhereFilter, db: SQL) {
     AND (${currentStepIdArr}::text[] IS NULL OR body->>'currentStepId' = ANY(${currentStepIdArr}))
     AND (${instanceIdsArr}::text[] IS NULL OR instance_id = ANY(${instanceIdsArr}))
     AND (${filter.startedBy ?? null}::text IS NULL OR body->>'startedBy' = ${filter.startedBy ?? null})
-    AND (${filter.claimedBy ?? null}::text IS NULL OR body->'assignment'->>'claimedBy' = ${filter.claimedBy ?? null})
+    AND (${filter.claimedBy ?? null}::text IS NULL OR claimed_by = ${filter.claimedBy ?? null})
     AND (
       ${filter.assignedTo ?? null}::text IS NULL
-      OR body->'assignment'->>'claimedBy' = ${filter.assignedTo ?? null}
-      OR (body->'assignment'->>'claimedBy' IS NULL AND (
-        body->'assignment'->'candidates' @> to_jsonb(${filter.assignedTo ?? null}::text)
-        OR (${assignedToRolesArr}::text[] IS NOT NULL AND body->'assignment'->'candidates' ?| ${assignedToRolesArr})
+      OR claimed_by = ${filter.assignedTo ?? null}
+      OR (claimed_by IS NULL AND (
+        candidates @> to_jsonb(${filter.assignedTo ?? null}::text)
+        OR (${assignedToRolesArr}::text[] IS NOT NULL AND candidates ?| ${assignedToRolesArr})
       ))
     )
     AND (${filter.excludeInstanceId ?? null}::text IS NULL OR instance_id <> ${filter.excludeInstanceId ?? null})
