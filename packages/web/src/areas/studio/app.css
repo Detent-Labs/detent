@@ -333,8 +333,8 @@
 }
 
 /* The accent marks the active tab as a stamp, a 2px rule under it. Not
-   `font-weight: 600`, which `.studio-surface-toggle` uses: Archivo ships at
-   400 and 800 here, and nothing between. */
+   `font-weight: 600`, which `.studio-surface-toggle` uses: the written face
+   ships at 400 and 800 here, and nothing between. */
 .studio-dock-tabs button[aria-selected="true"] {
   border-bottom-color: var(--color-accent);
   color: var(--color-text);
@@ -1674,7 +1674,10 @@ tr[data-group="true"] .studio-matrix-row-header {
 
 .studio-matrix-cel-stamp {
   font-family: var(--font-mono);
-  font-size: 10px;
+  /* 11px, not 10px: design-language.md's Type rule floors a tracked label at
+     11px, and this one tracks at 0.06em. The src beside it carries no
+     tracking, so it stays at 10px. */
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-accent);
@@ -1707,7 +1710,13 @@ tr[data-group="true"] .studio-matrix-row-header {
 
 .studio-matrix-flag-badge {
   font-family: var(--font-mono);
-  font-size: 10px;
+  /* 11px, not 10px: design-language.md's tracked-label floor, same as the CEL
+     stamp above. Measured in a browser at this size and tracking: "RO" sets
+     13.8px, "VIS" and "REQ" 20.7px. The widest overruns the 18px content box
+     `--matrix-flag-col` leaves after padding and border, so it renders into
+     the 4px padding, about 2.7px clear of the border on each side. Nothing
+     clips, and the fixed width below still holds. */
+  font-size: 11px;
   line-height: 1.6;
   text-transform: uppercase;
   letter-spacing: 0.04em;

@@ -1,0 +1,390 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-02T00:00:00Z",
+  "title": "Design System: Detent",
+  "extensions": {
+    "colorMeta": {
+      "stamp-600": {
+        "role": "primary",
+        "displayName": "Docket Red",
+        "canonical": "#d42b11",
+        "darkValue": "#ff563c",
+        "tonalRamp": [
+          "oklch(15% 0.09 33)",
+          "oklch(26% 0.14 33)",
+          "oklch(37% 0.18 33)",
+          "oklch(48% 0.20 33)",
+          "oklch(55% 0.19 33)",
+          "oklch(70% 0.15 33)",
+          "oklch(83% 0.09 33)",
+          "oklch(95% 0.03 33)"
+        ]
+      },
+      "refusal-700": {
+        "role": "secondary",
+        "displayName": "Refusal",
+        "canonical": "#ae1800",
+        "darkValue": "#ff9783",
+        "tonalRamp": [
+          "oklch(15% 0.09 32)",
+          "oklch(26% 0.14 32)",
+          "oklch(37% 0.17 32)",
+          "oklch(46% 0.18 32)",
+          "oklch(59% 0.17 32)",
+          "oklch(72% 0.13 32)",
+          "oklch(84% 0.08 32)",
+          "oklch(95% 0.03 32)"
+        ]
+      },
+      "paper-50": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#f3f2f2",
+        "darkValue": "#201e1d",
+        "tonalRamp": [
+          "oklch(15% 0.003 40)",
+          "oklch(26% 0.003 40)",
+          "oklch(37% 0.003 40)",
+          "oklch(48% 0.003 40)",
+          "oklch(59% 0.003 40)",
+          "oklch(70% 0.003 40)",
+          "oklch(83% 0.003 40)",
+          "oklch(96% 0.003 40)"
+        ]
+      },
+      "ledger-100": {
+        "role": "neutral",
+        "displayName": "Ledger",
+        "canonical": "#eae9e9",
+        "darkValue": "#2d2b2b",
+        "tonalRamp": [
+          "oklch(15% 0.003 40)",
+          "oklch(24% 0.003 40)",
+          "oklch(37% 0.003 40)",
+          "oklch(48% 0.003 40)",
+          "oklch(59% 0.003 40)",
+          "oklch(72% 0.003 40)",
+          "oklch(85% 0.003 40)",
+          "oklch(93% 0.003 40)"
+        ]
+      },
+      "ink-900": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#201e1d",
+        "darkValue": "#f3f2f2",
+        "tonalRamp": [
+          "oklch(15% 0.004 45)",
+          "oklch(22% 0.004 45)",
+          "oklch(35% 0.004 45)",
+          "oklch(47% 0.004 45)",
+          "oklch(59% 0.004 45)",
+          "oklch(71% 0.004 45)",
+          "oklch(83% 0.004 45)",
+          "oklch(95% 0.004 45)"
+        ]
+      },
+      "slate-500": {
+        "role": "neutral",
+        "displayName": "Slate",
+        "canonical": "#605d5d",
+        "darkValue": "#9b9797",
+        "tonalRamp": [
+          "oklch(15% 0.004 40)",
+          "oklch(26% 0.004 40)",
+          "oklch(37% 0.004 40)",
+          "oklch(45% 0.004 40)",
+          "oklch(59% 0.004 40)",
+          "oklch(67% 0.004 40)",
+          "oklch(83% 0.004 40)",
+          "oklch(95% 0.004 40)"
+        ]
+      },
+      "hairline-300": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#d7d3d3",
+        "darkValue": "#444141",
+        "tonalRamp": [
+          "oklch(15% 0.004 40)",
+          "oklch(26% 0.004 40)",
+          "oklch(33% 0.004 40)",
+          "oklch(48% 0.004 40)",
+          "oklch(59% 0.004 40)",
+          "oklch(70% 0.004 40)",
+          "oklch(86% 0.004 40)",
+          "oklch(95% 0.004 40)"
+        ]
+      },
+      "flag-visible": {
+        "role": "tertiary",
+        "displayName": "Flag Blue",
+        "canonical": "#1450b8",
+        "darkValue": "#6fa8ff",
+        "tonalRamp": [
+          "oklch(15% 0.07 260)",
+          "oklch(26% 0.11 260)",
+          "oklch(37% 0.15 260)",
+          "oklch(45% 0.17 260)",
+          "oklch(59% 0.15 260)",
+          "oklch(72% 0.12 260)",
+          "oklch(84% 0.07 260)",
+          "oklch(95% 0.03 260)"
+        ]
+      },
+      "flag-required": {
+        "role": "tertiary",
+        "displayName": "Flag Amber",
+        "canonical": "#7a4d00",
+        "darkValue": "#d4a017",
+        "tonalRamp": [
+          "oklch(15% 0.04 75)",
+          "oklch(26% 0.06 75)",
+          "oklch(40% 0.09 75)",
+          "oklch(48% 0.10 75)",
+          "oklch(59% 0.11 75)",
+          "oklch(72% 0.12 75)",
+          "oklch(84% 0.09 75)",
+          "oklch(95% 0.04 75)"
+        ]
+      },
+      "flag-readonly": {
+        "role": "tertiary",
+        "displayName": "Flag Violet",
+        "canonical": "#6b2fa0",
+        "darkValue": "#b98aff",
+        "tonalRamp": [
+          "oklch(15% 0.07 300)",
+          "oklch(26% 0.12 300)",
+          "oklch(37% 0.16 300)",
+          "oklch(43% 0.17 300)",
+          "oklch(59% 0.16 300)",
+          "oklch(72% 0.13 300)",
+          "oklch(84% 0.08 300)",
+          "oklch(95% 0.03 300)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "The h1. One per screen."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "The h2 section heading. Uppercase, tracked, slate."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Prose and control text. The reading column stays under 68 characters."
+      },
+      "button": {
+        "displayName": "Button",
+        "purpose": "Every action label, flush left in any button wider than its text."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "A field label, a table header, a term in the profile register."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Anything the engine matches exactly: a stamp, an id, a hash, a version, a role name, CEL, or a column of figures."
+      }
+    },
+    "shadows": [
+      {
+        "name": "shadow-md",
+        "value": "0 3px 10px color-mix(in srgb, var(--color-text) 16%, transparent)",
+        "purpose": "The account menu popover and the dialog. The only two on-page surfaces that leave the page."
+      },
+      {
+        "name": "shadow-lg",
+        "value": "0 12px 32px color-mix(in srgb, var(--color-text) 22%, transparent)",
+        "purpose": "A deeper top-layer surface. Derived from the current scheme's ink, so it stays correct in dark mode."
+      }
+    ],
+    "motion": [
+      {
+        "name": "none",
+        "value": "none",
+        "purpose": "The system declares no motion tokens. State changes are instant: a hover wash, an active darken, a focus ring. No transition, no easing curve, no duration token exists in tokens.css."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "narrow",
+        "value": "30rem",
+        "purpose": "Below this the shell header wraps, the nav takes its own row, and the profile register drops to one column."
+      },
+      {
+        "name": "reading-column",
+        "value": "46rem",
+        "purpose": "The shell screen cap. A participant reads, so the column stays narrow."
+      },
+      {
+        "name": "tool-surface",
+        "value": "60rem",
+        "purpose": "The reporting screen cap. An operator scans, so the surface goes wide."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one filled action per screen. Accent fill, paper text, square corners.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Submit</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-heading, system-ui, sans-serif); font-weight: 800; font-size: 14px; border: 1px solid transparent; border-radius: 0; padding: 8px 14.4px; cursor: pointer; } .ds-btn:focus-visible { outline: 2px solid var(--color-accent, #d42b11); outline-offset: 2px; } .ds-btn:disabled { opacity: 0.45; cursor: not-allowed; } .ds-btn-primary { background: var(--color-accent, #d42b11); color: var(--color-accent-contrast, #f3f2f2); } .ds-btn-primary:hover { background: var(--color-accent-600, #dd2b0f); } .ds-btn-primary:active { background: var(--color-accent-700, #ae1800); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Every non-primary commit. Transparent, ink text, divider border.",
+      "html": "<button class=\"ds-btn ds-btn-secondary\">Cancel</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-heading, system-ui, sans-serif); font-weight: 800; font-size: 14px; border: 1px solid transparent; border-radius: 0; padding: 8px 14.4px; cursor: pointer; } .ds-btn:focus-visible { outline: 2px solid var(--color-accent, #d42b11); outline-offset: 2px; } .ds-btn-secondary { background: transparent; color: var(--color-text, #201e1d); border-color: var(--color-divider, color-mix(in srgb, #201e1d 40%, transparent)); } .ds-btn-secondary:hover { background: color-mix(in srgb, var(--color-text, #201e1d) 7%, transparent); } .ds-btn-secondary:active { background: color-mix(in srgb, var(--color-text, #201e1d) 14%, transparent); }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "An inline action inside a row or a panel. Accent text, no border, tight inline padding.",
+      "html": "<button class=\"ds-btn ds-btn-ghost\">Release claim</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-heading, system-ui, sans-serif); font-weight: 800; font-size: 14px; border: 1px solid transparent; border-radius: 0; padding: 8px 14.4px; cursor: pointer; } .ds-btn:focus-visible { outline: 2px solid var(--color-accent, #d42b11); outline-offset: 2px; } .ds-btn-ghost { background: transparent; color: var(--color-accent, #d42b11); padding-inline: 4px; } .ds-btn-ghost:hover { background: color-mix(in srgb, var(--color-accent, #d42b11) 10%, transparent); } .ds-btn-ghost:active { background: color-mix(in srgb, var(--color-accent, #d42b11) 18%, transparent); }"
+    },
+    {
+      "name": "Destructive Button",
+      "kind": "button",
+      "refersTo": "button-destructive",
+      "description": "A destructive commit. Outlined in the accent, never filled and never red.",
+      "html": "<button class=\"ds-btn ds-btn-secondary ds-btn-destructive\">Cancel instance</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-heading, system-ui, sans-serif); font-weight: 800; font-size: 14px; border: 1px solid transparent; border-radius: 0; padding: 8px 14.4px; cursor: pointer; background: transparent; } .ds-btn:focus-visible { outline: 2px solid var(--color-accent, #d42b11); outline-offset: 2px; } .ds-btn-destructive { border-color: var(--color-accent, #d42b11); color: var(--color-accent, #d42b11); } .ds-btn-destructive:hover { background: color-mix(in srgb, var(--color-text, #201e1d) 7%, transparent); }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Label above control, flush left, 4px apart. The border is the field; no fill stands behind it.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-field-label\" for=\"ds-f1\">Cost centre</label><input class=\"ds-field-input\" id=\"ds-f1\" value=\"CC-4471\" /><ul class=\"ds-field-issues\"><li>Required.</li></ul></div>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 4px; max-width: 22rem; } .ds-field-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-text-muted, #605d5d); } .ds-field-input { font: inherit; font-size: 14px; padding: 8px; border: 1px solid var(--color-border, #d7d3d3); border-radius: 0; background: var(--color-surface, #f3f2f2); color: var(--color-text, #201e1d); } .ds-field-input:focus-visible { border-color: var(--color-accent, #d42b11); outline: 2px solid var(--color-accent, #d42b11); outline-offset: 0; } .ds-field-issues { margin: 0; padding: 0; list-style: none; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; color: var(--color-refusal, #ae1800); }"
+    },
+    {
+      "name": "State Stamp",
+      "kind": "chip",
+      "refersTo": "stamp-open",
+      "description": "The signature mark. Five tones and no sixth: open, settled, dormant, refusal, case. Straight in a row, tilted only where it marks an error.",
+      "html": "<span class=\"ds-stamp ds-stamp-open\">Unclaimed</span> <span class=\"ds-stamp ds-stamp-settled\">Completed</span> <span class=\"ds-stamp ds-stamp-dormant\">Cancelled</span> <span class=\"ds-stamp ds-stamp-refusal\">Faulted</span>",
+      "css": ".ds-stamp { display: inline-block; font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; border: 2px solid currentcolor; border-radius: 0; padding: 2px 7px; } .ds-stamp-open { color: var(--color-accent, #d42b11); } .ds-stamp-settled { color: var(--color-text, #201e1d); } .ds-stamp-dormant { color: #726e6e; } .ds-stamp-refusal { color: var(--color-surface, #f3f2f2); background: var(--color-refusal, #ae1800); border-color: var(--color-refusal, #ae1800); }"
+    },
+    {
+      "name": "Register Row",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "The ledger row. Three columns: a stamp, an identity, and a right-aligned quantity in mono. The identity is a real control; the row carries no click handler.",
+      "html": "<ul class=\"ds-register\"><li class=\"ds-register-row\"><span class=\"ds-stamp ds-stamp-open\">Unclaimed</span><button class=\"ds-register-link\"><strong>Expense approval</strong><span class=\"ds-register-step\">Manager review</span></button><span class=\"ds-register-qty\">3d 04h</span></li><li class=\"ds-register-row\"><span class=\"ds-stamp ds-stamp-settled\">Completed</span><button class=\"ds-register-link\"><strong>Employee onboarding</strong><span class=\"ds-register-step\">Issue laptop</span></button><span class=\"ds-register-qty\">11h 22m</span></li></ul>",
+      "css": ".ds-register { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-border, #d7d3d3); } .ds-register-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--color-border, #d7d3d3); } .ds-register-row:hover { background: var(--color-surface-muted, #eae9e9); } .ds-register-link { display: flex; align-items: baseline; gap: 8px; width: 100%; background: none; border: none; border-radius: 0; margin: 0; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; } .ds-register-link:focus-visible { outline: 2px solid var(--color-accent, #d42b11); outline-offset: 2px; } .ds-register-step { color: var(--color-text-muted, #605d5d); font-size: 0.85rem; } .ds-register-qty { font-family: var(--font-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; font-size: 0.85rem; white-space: nowrap; } .ds-stamp { display: inline-block; font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; border: 2px solid currentcolor; padding: 2px 7px; } .ds-stamp-open { color: var(--color-accent, #d42b11); } .ds-stamp-settled { color: var(--color-text, #201e1d); }"
+    },
+    {
+      "name": "Register Tab",
+      "kind": "nav",
+      "refersTo": "register-tab",
+      "description": "The header's leading edge names the open area, set in the stamp voice with its trailing edge cut. A divider tab slotted into a ledger, never a pill.",
+      "html": "<header class=\"ds-header\"><span class=\"ds-tab\">Admin</span><nav class=\"ds-nav\"><a href=\"#\" aria-current=\"page\">Instances</a><a href=\"#\">Outbox</a><a href=\"#\">Timers</a></nav></header>",
+      "css": ".ds-header { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 2px solid var(--color-divider, color-mix(in srgb, #201e1d 40%, transparent)); background: var(--color-surface-muted, #eae9e9); } .ds-tab { font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--color-accent-contrast, #f3f2f2); background: var(--color-accent, #d42b11); padding: 4px 14.4px 4px 8px; clip-path: polygon(0 0, 100% 0, calc(100% - 0.4rem) 100%, 0 100%); } .ds-nav { display: flex; gap: 8px; } .ds-nav a { color: inherit; text-decoration: none; padding: 4px 8px; font-size: 0.9rem; } .ds-nav a:hover { background: color-mix(in srgb, var(--color-text, #201e1d) 7%, transparent); } .ds-nav a[aria-current=\"page\"] { background: color-mix(in srgb, var(--color-text, #201e1d) 7%, transparent); } .ds-nav a:focus-visible { outline: 2px solid var(--color-accent, #d42b11); outline-offset: 2px; }"
+    },
+    {
+      "name": "Measuring Rule",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Reporting's one chart form. A hairline whose accent fill carries a quantity, with the figure printed beside it in mono. The bar is aria-hidden; the number is the content.",
+      "html": "<ul class=\"ds-measure\"><li class=\"ds-measure-row\"><span class=\"ds-measure-label\">Manager review</span><span class=\"ds-rule\" aria-hidden=\"true\"><span class=\"ds-rule-fill\" style=\"width:72%\"></span></span><span class=\"ds-figure\">3d 04h</span></li><li class=\"ds-measure-row\"><span class=\"ds-measure-label\">Finance check</span><span class=\"ds-rule\" aria-hidden=\"true\"><span class=\"ds-rule-fill ds-rule-fill-danger\" style=\"width:96%\"></span></span><span class=\"ds-figure\">9d 11h</span></li></ul>",
+      "css": ".ds-measure { list-style: none; margin: 0; padding: 0; } .ds-measure-row { display: flex; align-items: baseline; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--color-border, #d7d3d3); } .ds-measure-label { flex: 0 0 9rem; font-size: 0.9rem; } .ds-rule { flex: 1; min-width: 3rem; height: 0.5rem; border-bottom: 1px solid var(--color-border, #d7d3d3); display: flex; align-items: flex-end; } .ds-rule-fill { display: block; height: 0.5rem; background: var(--color-accent, #d42b11); opacity: 0.65; } .ds-rule-fill-danger { background: var(--color-refusal, #ae1800); opacity: 0.8; } .ds-figure { font-family: var(--font-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; font-size: 0.85rem; white-space: nowrap; }"
+    },
+    {
+      "name": "Error Banner",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "A failed request reported where its data would have sat. Never a toast. The stamp tilts here, because it marks an error rather than sitting in a row.",
+      "html": "<div class=\"ds-banner\" role=\"alert\"><span class=\"ds-banner-stamp\">Failed</span><p class=\"ds-banner-message\">The instance could not be cancelled. The engine returned 409.</p></div>",
+      "css": ".ds-banner { display: flex; align-items: baseline; gap: 12px; border: 2px solid var(--color-refusal, #ae1800); border-radius: 0; padding: 8px 12px; margin: 12px 0; } .ds-banner-stamp { flex: none; font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-refusal, #ae1800); border: 2px solid currentcolor; padding: 2px 7px; transform: rotate(-2deg); } .ds-banner-message { flex: 1; margin: 0; color: var(--color-text, #201e1d); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Rubber Stamp Ledger",
+    "overview": "Detent moves a case through explicit states. The interface is the record of that movement. Two devices carry the whole identity. A ruled row holds the case. A stamp marks the state it reached.\n\nNothing floats. No surface pretends to be a card when it is a row in a register. Alignment and rules organize the page. Shadow, color and radius do not.\n\nThe screen prints two kinds of value. Prose takes the written face. A value the engine matches exactly takes the mono face. That split is a signal, not decoration.",
+    "keyCharacteristics": [
+      "Zero radius, everywhere, with no exception.",
+      "Two rule weights, and nothing between them.",
+      "One accent, used as a stamp rather than as a paint.",
+      "Machine values in mono, prose in the written face.",
+      "Flush-left alignment, including inside a wide button."
+    ],
+    "rules": [
+      {
+        "name": "The Stamp Rule",
+        "body": "The accent marks state and one primary action per screen. It never becomes the ground under content.",
+        "section": "colors"
+      },
+      {
+        "name": "The Five Tones Rule",
+        "body": "A stamp has five tones and no sixth. Adding one is a design change, not a screen decision.",
+        "section": "colors"
+      },
+      {
+        "name": "The Never Green Rule",
+        "body": "A settled case prints in ink. Success never turns green. A destructive action stays outlined in the accent and never turns red.",
+        "section": "colors"
+      },
+      {
+        "name": "The Role Rule",
+        "body": "A component reads a semantic role, never a ramp step and never a hex. The three flag tokens are the only exception.",
+        "section": "colors"
+      },
+      {
+        "name": "The Machine Face Rule",
+        "body": "A string takes mono only when you can name the reason. Otherwise it takes the written face.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tracking Floor Rule",
+        "body": "A tracked label stays at 11px or above. Its uppercase tracking must survive umlauts and eszett.",
+        "section": "typography"
+      },
+      {
+        "name": "The Long German Rule",
+        "body": "German runs up to 40% longer than English. No control derives its width from the English label. No stamp takes a fixed width: a two-line stamp is correct, a clipped one is not.",
+        "section": "layout"
+      },
+      {
+        "name": "The Escape Hatch Rule",
+        "body": "A shadow marks an element that left the page. On the page there is no shadow, at rest or on hover.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Zero Radius Rule",
+        "body": "Every corner is square. No size, no state and no surface earns a curve.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do keep every radius at 0px.",
+      "Do give a screen exactly one filled primary action.",
+      "Do print a machine value in mono. That means an id, a hash, a version, a role name, CEL, or a figure in a column.",
+      "Do name a state with a stamp in one of the five tones.",
+      "Do style a state from the attribute the DOM already carries: [aria-current=\"page\"], [aria-expanded=\"true\"], :disabled, :focus-visible.",
+      "Do name a class prefix-block-element, one hyphen per level, with a variant as a suffix class.",
+      "Do wrap a row's identifying content in a real control."
+    ],
+    "donts": [
+      "Don't add a sixth stamp tone.",
+      "Don't read a primitive or a hex from a component. Read a role.",
+      "Don't style another area's prefix. Move a shared motif into shell/.",
+      "Don't turn success green, or a destructive action red.",
+      "Don't put a shadow on a resting surface, or on a hover state.",
+      "Don't report an error as a toast, or let an empty table stand in for one.",
+      "Don't size a control from its English label.",
+      "Don't turn a state into a class name."
+    ]
+  }
+}

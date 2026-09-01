@@ -119,6 +119,22 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   four). Nothing is designed yet for any of the four.
 
 ## Decided, not yet built (each needs its own OpenSpec change)
+- **Archivo as the written face.** The Type section of
+  `.claude/rules/design-language.md` names Archivo. `tokens.css` sets both
+  `--font-heading` and `--font-body` to `system-ui, sans-serif`, and neither an
+  `@font-face` rule nor a font link exists anywhere in `packages/web`, so the
+  reader's OS supplies the face today and it differs per platform. The
+  two-weight rule holds either way: 800 for a heading and a button label, 400
+  for everything else, nothing between. Deferred 2026-09-02 — we do not need
+  Archivo yet. When it lands, self-host the woff2: the build-time CSP is
+  `default-src 'self'` with no `font-src`
+  (`packages/web/vite.config.ts:26`), so a self-hosted file needs no CSP change
+  and no `frontend-security-headers` delta, while a Google Fonts link would
+  need `style-src` and `font-src` additions plus that delta. It changes the
+  type of every screen in all four areas, so it needs its own OpenSpec change,
+  a browser check, and a `DESIGN.md` refresh. The studio area's `app.css`
+  reasons from the two weights in a comment; that comment now names the
+  written face rather than Archivo.
 - **Instance audit log: a tamper-evident change record for field data.**
   Shipped in full. A design pass on 2026-08-25 settled the shape; the owner
   approved each piece in turn. All three changes landed and archived, in

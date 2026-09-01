@@ -40,8 +40,11 @@ directly by a component. No other component reads any of the three
 ## Type
 
 Two faces, one rule each:
-- **Archivo** carries everything a person writes: headings at weight 800,
-  body copy, labels, and button text at weight 400. No other weight appears.
+- **The written face** carries everything a person writes: headings at weight
+  800, body copy, labels, and button text at weight 400. No other weight
+  appears. The stack is `system-ui, sans-serif`, from `tokens.css`. Archivo is
+  the intended face and does not ship yet. Only the two weights bind until it
+  lands, and `docs/decisions.md` records that deferral.
 - **Mono** carries everything the engine matches exactly. That includes ids,
   hashes, versions, role names, CEL, and any number that must align in a
   column. The stack is `ui-monospace, "SF Mono", "Cascadia Code", "Roboto

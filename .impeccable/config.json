@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "packages/web/src/areas/studio/app.css"
+        ],
+        "createdAt": "2026-09-01T22:35:22.159Z",
+        "reason": "Detent has no cards; the left rule IS the depth vocabulary (design-language.md: 'Alignment and rules organize the page, not shadow, color, or radius'). All three sites are text-adjacent rules with reasoned comments, not card accents."
+      }
+    ]
+  }
+}

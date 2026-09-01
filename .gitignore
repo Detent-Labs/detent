@@ -52,3 +52,9 @@ PONYTAIL-DEBT.md
 .superpowers/
 # superpowers plans/specs (personal, must not be pushed)
 docs/superpowers/
+
+# Impeccable per-machine state. config.json and design.json are shared;
+# these two are not: consent is per-machine, and the cache stores absolute
+# paths that the no-machine-paths push gate rejects.
+.impeccable/config.local.json
+.impeccable/hook.cache.json
