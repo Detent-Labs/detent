@@ -279,36 +279,56 @@ paths on. The enumeration below names the predicates identified so far:
   throughput. The instance record read has an indexed `instance_events`
   counterpart.
 - `instances ((body->'parent'->>'instanceId'))`. A plain expression index,
-  matching the treatment the sibling jsonb predicates already get. Those are
-  `instances_claimed_by_idx`, the selection index and the candidates GIN index.
-  Its readers are the cancel cascade's child sweep and the migration live-child
-  gate. The cancel sweep runs once per nesting level, inside the caller's
-  transaction, holding instance row locks.
-- `instances ((body->>'currentStepId'))`, named `instances_current_step_idx`. A
-  plain expression index too, of the same shape as the parent-instance one.
-  Its readers are the instance list read and the instance data read, both
-  reaching it through `buildInstanceWhere`'s shared `currentStepId` filter.
-- `instances ((body->>'startedBy'))`, named `instances_started_by_idx`. A plain
-  expression index of that same shape. Its readers are the instance list read
-  and the instance data read, both reaching it through `buildInstanceWhere`'s
-  shared `startedBy` filter. The `GET /instances` route sets that filter for
-  every `scope=started` request, which is a participant-facing screen.
+  matching the treatment the sibling jsonb-only predicates get. Those are
+  `instances_claimed_by_idx` and the candidates GIN index. Its readers are the
+  cancel cascade's child sweep and the migration live-child gate. The cancel
+  sweep runs once per nesting level, inside the caller's transaction, holding
+  instance row locks.
+- `instances (current_step_id)`, named `instances_current_step_col_idx`. A
+  plain btree over the generated column, not an expression index. Its readers
+  are the instance list read and the instance data read, both reaching it
+  through `buildInstanceWhere`'s shared `currentStepId` filter. The bottlenecks
+  work-in-progress query's `GROUP BY` reads it too.
+- `instances (started_by)`, named `instances_started_by_col_idx`. A plain btree
+  over the generated column too. Its readers are the instance list read and the
+  instance data read, both reaching it through `buildInstanceWhere`'s shared
+  `startedBy` filter. The `GET /instances` route sets that filter for every
+  `scope=started` request, which is a participant-facing screen.
+- `instances (process_id, version, status)`, named
+  `instances_selection_col_idx`. A plain btree over three generated columns.
+  It is the index the requirement "The instance population scan is indexed"
+  asks for. Its readers are the migration population scan, the orphan-key
+  scan, the live-version count and the bottlenecks work-in-progress query. The
+  per-status instance count reaches its third key alone, as an index-only
+  scan. One branch of the inbox predicate reaches it too, as do
+  `buildInstanceWhere`'s `processId`, `version` and `status` filters.
+- `instance_principals (principal, created_at DESC, instance_id DESC)`, named
+  `instance_principals_page_idx`. A sibling requirement below states its column
+  order. That order is load-bearing. Its one reader is the instance list read
+  under `scope: "visible"`.
 
-Those last two predicates carry filters both reads share: `currentStepId` and
-`startedBy`. Both reads carry six plain filters in common: `processId`,
-`status`, `currentStepId`, `startedBy`, `claimedBy` and `version`. Of the six,
-`processId` reaches `instances_selection_idx`'s leading column. The `version`
-filter reaches that index's second column with `processId` bound beside it.
-That index covers `processId`, `version` and `status`.
+Those last three predicates carry filters both reads share: `currentStepId`,
+`startedBy`, `processId`, `status` and `version`. Both reads carry six plain
+filters in common, the five above plus `claimedBy`.
 
-A `status` filter reaches its third column, which needs the two ahead of it
-bound to narrow a scan. A `claimedBy` filter reaches
+Of the six, `processId` reaches `instances_selection_col_idx`'s leading
+column. The `version` filter reaches that index's second column with
+`processId` bound beside it. A `status` filter reaches its third column, which
+needs the two ahead of it bound to narrow a scan. A `claimedBy` filter reaches
 `instances_claimed_by_idx`. The `currentStepId` and `startedBy` filters reach
-the two indexes above.
+the two column indexes above.
 
-A `STORED` generated column does not serve the current-step predicate. Postgres
-substitutes an expression index into a predicate. It substitutes no generated
-column. So the index SHALL be an expression index.
+An index over a generated column and an index over the expression that
+generates it are not interchangeable. Postgres substitutes an expression index
+into a query naming that expression. It substitutes a plain index into a query
+naming that column. It crosses neither way. A predicate SHALL therefore name
+the same form its index is built over. Where a column exists for a key, the
+index and its predicates SHALL use the column.
+
+A predicate that reaches none of these indexes is not bound by that rule. Two
+kinds may keep naming the jsonb expression. One is a comparison already
+narrowed to a single row by `instance_id`. The other is a residual filter
+behind another index's selection.
 
 Both tables are append-only or never pruned. So an unindexed predicate against
 them grows with lifetime volume rather than live volume.
@@ -340,12 +360,17 @@ specification.
 #### Scenario: Initialisation creates the current-step index
 
 - **WHEN** `initSchema` runs
-- **THEN** an expression index over `instances (body->>'currentStepId')` exists
+- **THEN** a plain index over `instances (current_step_id)` exists
 
 #### Scenario: Initialisation creates the started-by index
 
 - **WHEN** `initSchema` runs
-- **THEN** an expression index over `instances (body->>'startedBy')` exists
+- **THEN** a plain index over `instances (started_by)` exists
+
+#### Scenario: Initialisation creates the selection index
+
+- **WHEN** `initSchema` runs
+- **THEN** a plain index over `instances (process_id, version, status)` exists
 
 #### Scenario: Initialisation is idempotent
 
@@ -640,6 +665,84 @@ is what makes the new index usable.
 - **THEN** its query filters on `started_at`, not on a `timestamptz` cast of
   `body->>'startedAt'`, and returns the same instances a range check against
   `startedAt` would
+
+### Requirement: The rebuilt column indexes replace their expression predecessors by name
+
+`initSchema` SHALL drop `instances_selection_idx`,
+`instances_current_step_idx` and `instances_started_by_idx` with
+`DROP INDEX IF EXISTS`, before it creates the three column indexes.
+
+Each new index SHALL carry a name none of the three old ones uses. A
+`CREATE INDEX IF NOT EXISTS` statement leaves an index of that name alone,
+whatever its definition. A reused name would therefore strand every
+already-initialised database on the expression form. This project has exactly
+one schema path, `initSchema`, and it MUST NOT hold a definition check or an
+unconditional rebuild.
+
+The drop SHALL stay in `initSchema` rather than run once and retire. A
+database that has never run it reaches it through the same code path as one
+that has.
+
+A rebuilt index carries the predicates the dropped index carried. No such
+predicate SHALL keep naming the dropped index's expression.
+
+#### Scenario: Initialisation over a database holding the old indexes
+
+- **WHEN** `initSchema` runs against a database whose `instances` relation
+  carries `instances_selection_idx`, `instances_current_step_idx` and
+  `instances_started_by_idx`
+- **THEN** those three indexes are gone and the three column indexes exist
+
+#### Scenario: Initialisation over a fresh database
+
+- **WHEN** `initSchema` runs against a database with no `instances` relation
+  yet
+- **THEN** it succeeds, creates the three column indexes, and creates none of
+  the three dropped names
+
+#### Scenario: Re-initialisation leaves the rebuilt indexes alone
+
+- **WHEN** `initSchema` runs twice in a row
+- **THEN** the second run succeeds and the three column indexes are unchanged
+
+### Requirement: The instance version filter compares as an integer
+
+A predicate filtering instances by `version` SHALL compare against the
+generated `version integer` column, not against `body->>'version'` as text.
+
+`version` is a JSON number in every stored body, so the two forms agree on
+every row the engine has written. They part on a value that names no stored
+row. Two classes qualify, and they fail in different ways.
+
+A value outside the range an `integer` column carries makes the datastore
+raise. The read binds the filter through a cast, and that cast is where the
+range fails.
+
+A value that is not an integer raises nothing. The datastore rounds it, or
+promotes the comparison and matches no row. Its cost is a silently empty page
+rather than an answer.
+
+Neither outcome is one the read should hand back. A caller-supplied value of
+either class SHALL be rejected before the query runs. The `instance-query`
+capability carries that rule. The `http-wrapper` applies it to every version a
+route reads, since every `version integer` column shares the range.
+
+A cast around an indexed expression is not that expression. A predicate
+casting `body->>'version'` to `int` therefore reaches no column of an index
+built over `(body->>'version')`. That is why the migration scans carried an
+unusable second index column beforehand.
+
+#### Scenario: A version filter selects the pinned instances
+
+- **WHEN** the instance list read runs with `processId` and `version` set
+- **THEN** it returns exactly the instances pinned to that process and version
+
+#### Scenario: The migration population scan reads the column
+
+- **WHEN** the migration population scan selects the instances pinned to one
+  process and version
+- **THEN** its predicate names `process_id`, `version` and `status`
+- **AND** its `version` comparison carries no cast
 
 ### Requirement: initSchema creates the instance principals relation
 

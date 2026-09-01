@@ -25,6 +25,12 @@ bypass note in 8. Both are text a contributor reads, so a copy that fell
 behind would teach the wrong thing. The findings and the repair command stay
 per gate, because they differ per gate.
 
+A gate that reads ranges on stdin needs a range. Documentation and examples that
+show a hand run SHALL pipe `scripts/gates/range.sh` into that gate. They SHALL
+NOT hand the gate an empty stdin. The fallback in `range.sh` reaches
+`origin/main..HEAD` on a hand run. That fallback holds the hand run to the same
+commits the push sends.
+
 #### Scenario: A rejected push names its rule
 
 - **WHEN** a gate rejects a push
@@ -46,7 +52,7 @@ per gate, because they differ per gate.
 #### Scenario: A gate still runs alone
 
 - **WHEN** a contributor runs one gate by hand while repairing it, for example
-  `sh scripts/gates/whitespace.sh < /dev/null`
+  `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`
 - **THEN** that gate finds the shared library through a path relative to its
   own location
 - **AND** it runs as it does under the hook
@@ -181,6 +187,11 @@ eol=lf`, so git normalizes the worktree file on `git add`. The gate therefore
 SHALL read the worktree bytes for the CR check. It SHALL NOT rely on the diff
 alone. `CLAUDE.md` records this trap.
 
+The gate SHALL print a line naming itself when the range leaves it no file to
+check. It SHALL exit 0 there, because a push that sends no text file is
+legitimate. A branch deletion is one such push. Silence would read as a pass, and
+a contributor who piped nothing in would trust a check that never ran.
+
 #### Scenario: A new CRLF file blocks the push
 
 - **WHEN** the pushed range adds a text file with CRLF line endings
@@ -196,6 +207,12 @@ alone. `CLAUDE.md` records this trap.
 
 - **WHEN** the pushed range adds a line with a trailing space
 - **THEN** the gate rejects the push and names the line
+
+#### Scenario: A push that touches no text file reports nothing to check
+
+- **WHEN** the gate reads an empty range list, or a range that changes no file
+- **THEN** it prints a line naming its rule and saying it checked nothing
+- **AND** the push proceeds
 
 ### Requirement: Changed Markdown passes the prose linter
 

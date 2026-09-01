@@ -2458,6 +2458,52 @@ test.skipIf(!DB)("listInstances' version filter excludes another version of the 
   expect(raised).toBeInstanceOf(RequestShapeError);
 });
 
+// rebuild-instance-expression-indexes: the filter compares against the
+// generated `version integer` column, not `body->>'version'` as text. Two
+// classes of value cannot name a stored row, and they fail differently.
+//
+// A value past int4 raises. `buildInstanceWhere` emits a leading `::int` cast
+// on the filter's own null test, and that cast is where Postgres 16.15 raises
+// "integer out of range" for 2147483648 and -2147483649. An unmapped
+// PostgresError maps to a 500 with no message (src/http/errors.ts), so this
+// is the class that regressed a 200 into a 500.
+//
+// A fractional value raises nothing at all: `1.5::int` rounds to 2, and
+// `version = 1.5` promotes to numeric and matches nothing. Rejecting it buys
+// a 400 in place of a silently empty page.
+//
+// So the guard is not asserting what the datastore tolerates — it makes the
+// read answer for its own input either way. The bounds below are the edges
+// themselves, not round numbers near them.
+test.skipIf(!DB)("listInstances rejects an unusable version as a request-shape error, never as an empty page or a 500", async () => {
+  const PID = pid("proc_list_version_frac");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  await createProcessInstance(PID, actor, dataSourceReg);
+
+  for (const version of [1.5, 2147483648, -2147483649, 3000000000]) {
+    let raised: unknown;
+    try {
+      await listInstances({ processId: PID, version });
+    } catch (e) {
+      raised = e;
+    }
+    expect({ version, type: (raised as Error | undefined)?.constructor.name }).toEqual({
+      version,
+      type: "RequestShapeError",
+    });
+  }
+
+  // The integer path still works, the guard carries no sign check (a draft
+  // snapshot's version is negative — createDraftSnapshot), and both int4 edges
+  // pass the guard and reach the datastore without raising.
+  const page = await listInstances({ processId: PID, version: 1 });
+  expect(page.items).toHaveLength(1);
+  for (const version of [-1, 2147483647, -2147483648]) {
+    const none = await listInstances({ processId: PID, version });
+    expect({ version, items: none.items }).toEqual({ version, items: [] });
+  }
+});
+
 test.skipIf(!DB)("listInstances' excludeInstanceId omits the named instance, keeps every other matching instance", async () => {
   const PID = pid("proc_list_exclude");
   await publishBody(PID, twoPathsBody(), reg, dataSourceReg);

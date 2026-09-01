@@ -63,14 +63,21 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   `instance_id`, `transition_seq`, `body`, `resolve_state`,
   `resolve_claimed_at`, `cancel_sweep_state`, `next_timer_at`, `created_at`
   and `redacted_at`. Every other field of `Instance` lives inside the jsonb,
-  and six expression indexes stand in for eight of those keys:
-  `instances_selection_idx` over `processId`/`version`/`status`,
-  `instances_claimed_by_idx` over `assignment.claimedBy`,
-  `instances_candidates_idx` (GIN) over `assignment.candidates`,
-  `instances_parent_idx` over `parent.instanceId`,
-  `instances_current_step_idx` over `currentStepId` and
-  `instances_started_by_idx` over `startedBy`
-  (`src/engine/store.ts:240`, `:253`, `:254`, `:262`, `:268`, `:269`).
+  and six indexes stand in for eight of those keys. Three are expression
+  indexes over keys no column carries: `instances_claimed_by_idx` over
+  `assignment.claimedBy`, `instances_candidates_idx` (GIN) over
+  `assignment.candidates`, and `instances_parent_idx` over
+  `parent.instanceId`. The other three are plain btrees over generated
+  columns: `instances_selection_col_idx` over
+  `process_id`/`version`/`status`, `instances_current_step_col_idx` over
+  `current_step_id` and `instances_started_by_col_idx` over `started_by`.
+  All six live in `initSchema` (`src/engine/store.ts`).
+
+  Change 1 (2026-08-30) promoted six of those keys into generated columns and
+  left the three indexes over them in expression form. Change 3
+  (`rebuild-instance-expression-indexes`, 2026-09-01) rebuilt those three onto
+  the columns and moved the reader predicates with them. The promotion entry
+  below carries the numbers.
 
   Ten keys are standardized in the sense that matters here: the engine owns
   them, every instance carries them, and their shape never depends on a
@@ -641,8 +648,85 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   landed as `promote-instance-scalar-columns` (2026-08-30). Change 2 (the
   assignment pair, `parent.instanceId`, `currentStepEnteredAt`,
   `chainedFrom`, and a rebuild of the five expression indexes those and the
-  six scalars share) is not started; `tmp/offene-items.md` item 25 carries
-  the split.
+  six scalars share) shipped in three commits, pushed and never merged. The
+  annotated tag `change2-rejected` holds them. A benchmark on 2026-09-01 then
+  rejected it. Change 3, the rebuild of the three expression indexes no
+  Change 2 column replaces, measured out as worth building.
+  `tmp/offene-items.md` item 25 carries Change 3 alone from here on.
+
+  **Change 2: built, measured, rejected.** The five columns bought no
+  runtime. Numbers from the 2026-09-01 benchmark, 200,000 rows, median of
+  nine `EXPLAIN (ANALYZE, BUFFERS)` runs after a warm-up:
+
+  - Inbox predicate, an actor with rows: 1.336 → 1.323 ms. An actor without
+    rows: 1.264 → 1.287 ms.
+  - Plans matched node for node, at identical buffer counts and identical
+    index sizes.
+  - Heap 104 → 116 MB, about 63 byte per row, +11.6%.
+  - 200,000 inserts 1852 → 1960 ms, +5.8%.
+
+  The tag `change2-rejected` is the evidence, and its annotation carries this
+  verdict. A tag rather than a branch, for two reasons. Nobody can merge it by
+  accident, and it survives a branch cleanup. Nobody needs to redo that work,
+  and nobody should read the missing merge as work lost.
+
+  **Change 3: measured, worth building.** The rebuild pays, and it needs no
+  column Change 2 would add.
+
+  - `liveVersionCounts` 1.549 → 0.343 ms, because the column form allows an
+    index-only scan.
+  - Orphan scan 5.990 → 2.816 ms. Migration population scan
+    2.568 → 1.548 ms.
+  - The selection index's write surcharge drops from +24.8% to +17.1%, at an
+    unchanged 1456 kB index size.
+  - Dropping the three indexes outright is no option. Every query falls to a
+    seq scan, 18 to 21 ms.
+  - Narrowing them is no option either. `process_id` alone triples the
+    migration scan, 1.548 → 4.771 ms.
+
+  **Change 3 needs only the Change 1 columns.** A two-world run confirmed
+  that. It applied Change 3 once against `main` and once against the
+  Change 2 branch. The difference between the two sets of deltas sits
+  between −0.018 and +0.185 ms. Runtimes ran from 0.05 to 5.9 ms. That is
+  noise, and it carries no sign.
+
+  Two counter-probes came back negative as well.
+
+  - Postgres rejects an expression in an included column, so `INCLUDE` is
+    genuinely column-only. It pays nothing while `listInstances` selects
+    `body`, which keeps an index-only scan out of reach for the hottest
+    read.
+  - A composite spans one Change 1 key and one Change 2 key. In expression
+    form it runs just as fast, 1.127 against 1.156 ms.
+
+  **What would make Change 2 due after all.** Four named triggers, in
+  descending order of sharpness.
+
+  - The sharpest is a narrow projection that leaves out `body`. Every
+    instance query selects `body` today, so an index-only scan stays out of
+    reach and `INCLUDE` buys nothing. A summary query over `instance_id`,
+    `process_id`, `status` and `claimed_by` reverses that. A covering
+    `INCLUDE` index carries such a query whole, and no expression index
+    copies that. Whoever writes one measures this question again.
+  - A real foreign key on `parent.instanceId` needs the column. An
+    expression index cannot carry a foreign key. The engine enforces that
+    reference in application code today.
+  - Wide `candidates` lists make Change 2 more expensive, not more due. The
+    benchmark gave every list two entries. A group of 200 members
+    duplicates 200 entries per row, so 11.6% is a floor there.
+  - A `data`-heavy body cuts the other way. The benchmark body carries no
+    `data`, so the fixed ~63 byte per row weigh heaviest there. Against a
+    real body, 11.6% is the pessimistic bound.
+
+  **The method trap.** Do not measure this schema casually.
+
+  Every `ORDER BY` plus `LIMIT` query over `instances` flips between an
+  index-scan plan and a sort plan. Small cost shifts are enough. That
+  pathology appeared three times during the benchmark. Once it looked like a
+  28-fold regression and was a heap-width artefact.
+
+  Hold heap width, `VACUUM` state and hit count constant. Otherwise you
+  measure the pathology instead of your question.
 
   **The goal.** A predicate over an instance key reads a plain column
   through a plain index. Eight expression indexes stood in for that before
@@ -702,7 +786,7 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   engine, for no gain a promoted column does not already give.
 
   **Not a prerequisite for the report builder.** Its first shape filters
-  by process and by date range, and `instances_selection_idx` plus
+  by process and by date range, and the selection index plus
   `instances_created_idx` already cover both. `created_at` is an
   approximate double of `startedAt` — `DEFAULT now()` on the insert that
   writes the body a few milliseconds after the application clock stamped

@@ -84,8 +84,8 @@ function parseRow<T>(raw: unknown, parse: (v: unknown) => T): T {
 }
 
 /**
- * The in-range instances of one process. `body->>'processId'` leads
- * `instances_selection_idx`, so the process predicate is indexed; the range
+ * The in-range instances of one process. `process_id` leads
+ * `instances_selection_col_idx`, so the process predicate is indexed; the range
  * predicate filters on the generated `started_at` text column, backed by
  * `instances_started_idx`, instead of casting `body->>'startedAt'` to
  * `timestamptz` — `range.from`/`range.to` are already ISO-8601 UTC strings
@@ -96,7 +96,7 @@ function parseRow<T>(raw: unknown, parse: (v: unknown) => T): T {
 async function selectInRange(processId: ProcessId, range: DateRange, db: SQL): Promise<Instance[]> {
   const rows = (await db`
     SELECT body FROM instances
-    WHERE body->>'processId' = ${processId}
+    WHERE process_id = ${processId}
       AND kind <> 'test'
       AND started_at >= ${range.from}
       AND started_at <= ${range.to}
@@ -316,10 +316,10 @@ export async function bottleneck(processId: ProcessId, range: DateRange, db: SQL
     .sort((a, b) => b.medianMs - a.medianMs);
 
   const wipRows = (await db`
-    SELECT body->>'currentStepId' AS step_id, count(*)::int AS n
+    SELECT current_step_id AS step_id, count(*)::int AS n
     FROM instances
-    WHERE body->>'processId' = ${processId} AND body->>'status' = 'running' AND kind <> 'test'
-    GROUP BY body->>'currentStepId'
+    WHERE process_id = ${processId} AND status = 'running' AND kind <> 'test'
+    GROUP BY current_step_id
   `) as { step_id: string; n: number }[];
   const wip = new Map(wipRows.map((r) => [r.step_id as StepId, r.n]));
   const workInProgress = s.latest.workflow.steps

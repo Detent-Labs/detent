@@ -1177,9 +1177,12 @@ Stage-by-stage status is in `ROADMAP.md`.
   CLAUDE.md — so ordering needs its own column) plus three indexes: paging
   (`created_at DESC, instance_id DESC`), and two backing the assignment
   filter (`assignment->>claimedBy`, a GIN index on `assignment->candidates`).
-  `instance-query-core` adds two more expression indexes,
-  `instances_current_step_idx` and `instances_started_by_idx`, backing the
-  `currentStepId`/`startedBy` filters below. `listInstances(filter, page,
+  `instance-query-core` adds two more indexes backing the
+  `currentStepId`/`startedBy` filters below. They started as expression
+  indexes; `rebuild-instance-expression-indexes` rebuilt them as
+  `instances_current_step_col_idx` and `instances_started_by_col_idx`, plain
+  btrees over the generated columns, beside `instances_selection_col_idx`
+  over `(process_id, version, status)`. `listInstances(filter, page,
   db)` returns a keyset-paginated (`created_at`/`instance_id` cursor,
   base64url-encoded, opaque) page of `InstanceSummary`, lifecycle fields
   only, never `data`. Filters (`processId`, `version`, `status[]`,

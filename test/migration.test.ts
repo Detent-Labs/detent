@@ -6,6 +6,8 @@
  * Postgres and skip when DATABASE_URL is unset — a skip is visible, a false green is
  * not.
  */
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { createDefaultAssignmentRegistry, resolveStepAssignment } from "../src/engine/registry.js";
@@ -1445,7 +1447,7 @@ test.skipIf(!DB)("schema init is idempotent and leaves the definitions relation 
   await initSchema(); // second run must not throw
   const rel = (await sql`SELECT tablename FROM pg_tables WHERE tablename = 'migration_plans'`) as { tablename: string }[];
   expect(rel).toHaveLength(1);
-  const idx = (await sql`SELECT indexname FROM pg_indexes WHERE indexname = 'instances_selection_idx'`) as { indexname: string }[];
+  const idx = (await sql`SELECT indexname FROM pg_indexes WHERE indexname = 'instances_selection_col_idx'`) as { indexname: string }[];
   expect(idx).toHaveLength(1);
   // definitions gained no migration column.
   const cols = (await sql`SELECT column_name FROM information_schema.columns WHERE table_name = 'definitions'`) as { column_name: string }[];
@@ -1470,22 +1472,99 @@ test.skipIf(!DB)("schema init creates the history_entries and instances parent i
   expect(after).toEqual(before);
 });
 
-test.skipIf(!DB)("schema init creates the current-step and started-by indexes, unchanged by a second run", async () => {
+test.skipIf(!DB)("schema init creates the current-step and started-by column indexes, unchanged by a second run", async () => {
   await initSchema();
   const before = (await sql`
     SELECT indexname FROM pg_indexes
-    WHERE indexname IN ('instances_current_step_idx', 'instances_started_by_idx')
+    WHERE indexname IN ('instances_current_step_col_idx', 'instances_started_by_col_idx')
     ORDER BY indexname
   `) as { indexname: string }[];
-  expect(before.map((r) => r.indexname)).toEqual(["instances_current_step_idx", "instances_started_by_idx"]);
+  expect(before.map((r) => r.indexname)).toEqual(["instances_current_step_col_idx", "instances_started_by_col_idx"]);
 
   await initSchema(); // second run must not throw or duplicate either index
   const after = (await sql`
     SELECT indexname FROM pg_indexes
-    WHERE indexname IN ('instances_current_step_idx', 'instances_started_by_idx')
+    WHERE indexname IN ('instances_current_step_col_idx', 'instances_started_by_col_idx')
     ORDER BY indexname
   `) as { indexname: string }[];
   expect(after).toEqual(before);
+});
+
+// rebuild-instance-expression-indexes: the three expression indexes over keys
+// Change 1 promoted to columns gave way to plain column indexes under NEW
+// names. CREATE INDEX IF NOT EXISTS leaves an index of a given name alone
+// whatever its definition, so a database initialised before that change keeps
+// the expression form unless initSchema drops it by name. This recreates the
+// old three by hand and asserts the drop.
+test.skipIf(!DB)("schema init drops the three expression indexes the column indexes replaced", async () => {
+  await initSchema();
+  await sql`CREATE INDEX IF NOT EXISTS instances_selection_idx
+    ON instances ((body->>'processId'), (body->>'version'), (body->>'status'))`;
+  await sql`CREATE INDEX IF NOT EXISTS instances_current_step_idx ON instances ((body->>'currentStepId'))`;
+  await sql`CREATE INDEX IF NOT EXISTS instances_started_by_idx ON instances ((body->>'startedBy'))`;
+  const seeded = (await sql`
+    SELECT indexname FROM pg_indexes
+    WHERE indexname IN ('instances_selection_idx', 'instances_current_step_idx', 'instances_started_by_idx')
+  `) as { indexname: string }[];
+  expect(seeded).toHaveLength(3); // the fixture itself has to hold, or the assertion below is vacuous
+
+  await initSchema();
+  const after = (await sql`
+    SELECT indexname FROM pg_indexes
+    WHERE indexname IN ('instances_selection_idx', 'instances_current_step_idx', 'instances_started_by_idx')
+  `) as { indexname: string }[];
+  expect(after).toEqual([]);
+  const rebuilt = (await sql`
+    SELECT indexname FROM pg_indexes
+    WHERE indexname IN ('instances_selection_col_idx', 'instances_current_step_col_idx', 'instances_started_by_col_idx')
+    ORDER BY indexname
+  `) as { indexname: string }[];
+  expect(rebuilt.map((r) => r.indexname)).toEqual([
+    "instances_current_step_col_idx",
+    "instances_selection_col_idx",
+    "instances_started_by_col_idx",
+  ]);
+});
+
+// rebuild-instance-expression-indexes: the readers that reach the three rebuilt
+// indexes name the generated columns, and have to keep naming them. Postgres
+// substitutes a plain index only into a query naming the column, so a predicate
+// that drifts back to `body->>'...'` loses the index silently: the rows still
+// come back, every behavioural test still passes, and only a query plan shows
+// the loss. These two are source-text assertions for that reason, the shape
+// test/duration.test.ts already uses to pin the duration parser's one caller.
+//
+// The sites that deliberately keep the jsonb expression are elsewhere — a
+// comparison already narrowed to one row by instance_id, or a residual filter
+// behind another index's selection. The change's design.md enumerates them.
+const PROMOTED_KEYS = ["processId", "version", "status", "currentStepId", "startedBy"];
+const REWRITTEN_MODULES = ["runtime/api.ts", "engine/definitions.ts", "engine/reporting.ts"];
+
+function engineSource(rel: string): string {
+  return readFileSync(fileURLToPath(new URL(`../src/${rel}`, import.meta.url)), "utf8");
+}
+
+test("the fully rewritten instance readers name the generated columns, never the jsonb expressions", () => {
+  const offenders: string[] = [];
+  for (const rel of REWRITTEN_MODULES) {
+    const src = engineSource(rel);
+    for (const key of PROMOTED_KEYS) {
+      if (src.includes(`body->>'${key}'`)) offenders.push(`src/${rel}: body->>'${key}'`);
+    }
+  }
+  expect(offenders).toEqual([]);
+});
+
+test("the migration scans compare version against the column, with no cast", () => {
+  const src = engineSource("engine/migration.ts");
+  // The cast is the specific defect: (body->>'version') is a text expression, so
+  // ::int around it matches no index column at all — measured as the planner
+  // estimating 49 rows against 500 actual before the rewrite.
+  expect(src).not.toMatch(/\(body->>'version'\)::int/);
+  // Both keyset scans name the column. Asserting their presence as well as the
+  // cast's absence keeps a scan that drops the predicate entirely from passing.
+  expect(src).toMatch(/AND version = \$\{fromVersion\}/);
+  expect(src).toMatch(/AND version = \$\{version\}/);
 });
 
 // =============================================================================

@@ -13,7 +13,10 @@
 #
 # Each gate lives in scripts/gates/ and names the rule it enforces when it
 # rejects a push. Run one alone while repairing it, for example:
-#   sh scripts/gates/whitespace.sh < /dev/null
+#   sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh
+#
+# The `< /dev/null` belongs on range.sh, which falls back to origin/main..HEAD.
+# A gate handed an empty stdin gets no range and checks nothing.
 #
 # Enable once per clone:
 #   git config core.hooksPath .githooks
