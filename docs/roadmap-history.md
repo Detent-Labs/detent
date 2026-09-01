@@ -1634,3 +1634,342 @@ as it stands.
 
     The delta landed in `studio-canvas` (process key, step key) and
     `studio-app` (field catalog key).
+
+46. **Instance audit log, append-only and hash-chained: DONE.** Change:
+    `instance-audit-log-chain`. Nothing recorded what a field's value used to
+    be. `history_entries` and `instance_events` carry structural facts alone:
+    which step, which path, which actor, which kind. "Who was in
+    `assigned_manager` before somebody changed it" had no answer.
+
+    A new relation, `instance_audit`, holds one row per field change, a delta
+    rather than a snapshot. Two triggers on `instances` write it, one
+    `AFTER INSERT` and one `AFTER UPDATE`, sharing a function that diffs
+    `OLD.body->'data'` against `NEW.body->'data'`. The trigger placement is
+    the load-bearing choice. Five statements write `instances.body.data` and a
+    sixth can join them, so an application-level log stays complete only while
+    every future author remembers it. No write reaches the row without passing
+    a trigger. The insert half matters on its own: `createProcessInstance`
+    inserts a body already carrying start-form data and seeded catalog
+    defaults, so an update-only trigger would lose every field's first value.
+
+    Actor and source arrive through a transaction-scoped `set_config`, since a
+    trigger reads `OLD` and `NEW` and nothing else. That also separates a
+    participant's submit from a migration, which commits through the same
+    `applyStepEntry` statement. Each row's hash covers its own metadata, its
+    `value_hash` and the previous row's hash, so a row edited, deleted or
+    reordered mid-chain fails a later `verify_instance_chain(instance_id)`.
+    Truncating a chain's tail does not: what remains is a shorter,
+    self-consistent chain, and a signed checkpoint over the chain heads was
+    left to a later change.
+
+    Specs: `admin-operations-api`, `data-retention`, `instance-audit-log`,
+    `persistence`.
+
+47. **Cross-process instance query core: DONE.** Change:
+    `instance-query-core`. Two planned features needed to read one process's
+    instances on behalf of another, and both filter over `Instance.data`:
+    the aggregated data source resolving a field's options from another
+    process's instances, and the instance data table reporting over field
+    values. Nothing in the engine could compare against `data`.
+
+    `listInstances` already carried the rest, filtering conjunctively over
+    `body->>'…'` and paging by keyset. Rather than let either feature widen
+    that read or copy its predicate, this change made the predicate one thing.
+    A shared builder produces the instance `WHERE` fragment once;
+    `listInstances` consumes it with no observable change.
+
+    `queryInstances` is the new Runtime API Layer read. Each match returns
+    `instanceId`, `version`, `data` and `redactedAt`, resolving no process or
+    step labels and applying no keyset cursor, because the option-list path
+    re-resolves on every form render, submission, timer fire and automatic
+    transition and would pay for labels it discards. A `dataWhere` filter
+    names a field id, an operator and a scalar right side, joining
+    conjunctively. Both `dataWhere` and the new `version` filter require a
+    `processId` beside them: a field id anchors to one process, and
+    `instances_selection_idx`'s second column is reachable only with its
+    leading column bound.
+
+    Specs: `admin-app`, `http-wrapper`, `instance-data-query`,
+    `instance-query`, `persistence`.
+
+48. **Redactable field flag: DONE.** Change: `redactable-field-flag`. Stage 46
+    shipped a `redact_instance_fields()` that cleared **every** field an
+    instance's audit log held an entry for. That was deliberate and explicitly
+    deferred as "Change 2": narrowing the set to author-designated fields
+    needed an authoring flag first. Until then a redaction erased a field's
+    whole history whether or not its author meant it to be erasable,
+    including the fields the audit trail exists to preserve, like who approved
+    what.
+
+    `FieldDef` gains an optional `redactable: boolean`, a pure authoring-time
+    signal that changes no hashing behaviour, since every audit row is already
+    salted regardless. `redact_instance_fields()` gains a `field_ids text[]`
+    parameter and clears only what it names. `redactInstance` resolves the
+    instance's currently pinned body, flattens its catalog, filters to
+    `redactable === true`, and passes those ids through, reading a process
+    definition for the first time.
+
+    One accepted limit, written down rather than hidden: a field id present in
+    the audit log but absent from the pinned version's catalog stays
+    uncleared. That covers a field removed in a later republish.
+
+    Specs: `data-retention`, `definition-contract`, `instance-audit-log`,
+    `persistence`.
+
+49. **Instance audit log admin view: DONE.** Change:
+    `instance-audit-log-view`. Stage 46 built the relation, the triggers, the
+    chain and `verify_instance_chain()`. Its one TypeScript entry point,
+    `verifyInstanceChain`, had no caller. The capability's stated goal is one
+    readable record per change without ceremony, naming the field, the old
+    value in clear text, the actor, the timestamp and the write path. Only
+    someone with direct database access could reach any of it.
+
+    The engine gains a read over one instance's audit log, returning entries
+    in sequence order and adding no new visibility rule. Two admin routes
+    expose it, one for the entries and one for the existing chain
+    verification, both behind `system:admin` like every other `/admin/*`
+    route. The admin area's instance screen gains an Audit Log section: a
+    keyset-paginated entry list beside the existing transition and event
+    record, plus a verified-or-failed indicator.
+
+    Specs: `admin-app`, `admin-operations-api`, `instance-audit-log`.
+
+50. **Instance data tables: DONE.** Change: `instance-data-tables`. A process
+    owner could read instance data through three time-based views (cycle time,
+    bottleneck, SLA) or by opening one instance at a time. Neither answers
+    "list every onboarding from the last twelve months with these three fields
+    as columns". `docs/decisions.md` settled the design on 2026-08-25 and
+    named two prerequisites, a process-scoped `read` permission and a shared
+    query core; both shipped on 2026-08-27.
+
+    A saved report holds a target process, status/date-range/field filters in
+    the shape `queryInstances` already accepts, and an ordered column list.
+    A column is a direct field reference or a `merge` column taking the first
+    non-empty value from an ordered source list. Where two sources both hold a
+    value, the read concatenates and marks the row as a collision rather than
+    silently picking one.
+
+    Two rules carry the design. The read keeps three empty states distinct and
+    never collapses them: no value, field did not exist in that version, and
+    redacted. And sharing can only narrow access, never grant it: the read
+    enforces process `read` grants on top of the report's own
+    `viewers`/`editors`, so a viewer without the process permission sees an
+    empty table. A group id in either principal list expands to its current
+    members before the membership test, which is otherwise the same test
+    `isEligibleCandidate` applies to assignment candidates.
+
+    Specs: `instance-data-tables`, `reporting-app`, `reporting-data-tables`.
+
+51. **`instance.query` data source: DONE.** Change:
+    `instance-query-data-source`. A field's options could come from a static
+    array or an operator-owned data list. Neither answers the case the owner
+    raised on 2026-08-25: a Laptop Inventory process holds one instance per
+    device, the step that instance stands on says where the device is, and an
+    onboarding step should offer the devices standing on the shelf step. The
+    read half had shipped as stage 47, but nothing bound it to a field.
+
+    A third data source type, `instance.query`, joins `static` and `db.list`
+    in the `DataSourceRegistry`. It is a leaf handler: it reads and composes
+    nothing, issuing no SQL of its own. Its `resolve` substitutes the reading
+    instance's own field values into the configured comparisons, then calls
+    `queryInstances`. `DataSourceContext` gains the reading instance
+    (`{ id, processId, data, baseLocale }`), which the comparisons need for
+    their right side and the self-exclusion rule needs for the rest. An
+    option's `value` is the source instance's id.
+
+    A query against the reading instance's own process excludes that instance
+    through the `excludeInstanceId` filter. The instance data read gains an
+    `instanceIds` filter, needed to re-resolve a reference an instance already
+    holds.
+
+    Specs: `cross-process-validation`, `data-source-resolution`,
+    `definition-store`, `instance-data-query`, `instance-query-data-source`,
+    `studio-plugin-config-form`.
+
+52. **`instance.transition` action: DONE.** Change:
+    `instance-transition-action`. Stage 51's reading half was decorative on
+    its own. Nothing moved the picked device's instance off the shelf step, so
+    the option list never shrank and the next participant saw the same laptop
+    again. `docs/decisions.md` calls this "The missing half" and had already
+    recorded that the transition action ships; only its packaging stayed open.
+
+    A fourth author-visible handler, `instance.transition`, joins
+    `http.request`, `notification.email` and `process.start`. It reads a
+    target instance id out of the acting instance's own data, loads that
+    instance, and drives it along one named manual path. Its config carries
+    three flat string keys: `processId`, `instanceIdField` and `pathId`.
+
+    The alternative an author could already reach was `http.request` against
+    `POST /instances/:id/submit`. That path leaves the transaction,
+    authenticates as the configured credential rather than as the participant,
+    and guards the HTTP call rather than the business effect with its
+    idempotency key. It is not the path to recommend for a first-class
+    capability, which is why this one exists.
+
+    Specs: `cross-process-validation`, `definition-store`,
+    `instance-transition-action`, `runtime-events`.
+
+53. **Studio Player test instances against a draft: DONE.** Change:
+    `studio-play-draft-instance`. The Player could only create an instance
+    against a published version. A process with saved but unpublished draft
+    edits could not be test-run at all: the route threw `no published version
+    for process <id>`, surfaced to the developer as an opaque server error.
+    That defeated the Player's purpose, since an author had to publish
+    sight-unseen before seeing whether the process worked.
+
+    The Player gains a "Create test instance" action that runs the current
+    draft body. The run is real, not simulated: real assignment, real
+    claim and submit, real action dispatch, so emails and webhooks fire. The
+    draft body freezes at creation, so later draft edits do not reach an
+    already-running test instance. No pre-play validation was added; an
+    invalid draft fails when execution reaches the broken part.
+
+    `Instance` gains a `kind`, backed by an `instances.kind` column with
+    `NOT NULL DEFAULT 'published'` so every existing row backfills through the
+    default with no data rewrite. A `kind: "test"` instance appears only in
+    the admin all-instances list, never in the end-user app area for any
+    actor, and is excluded from reporting entirely.
+
+    Specs: `admin-app`, `definition-store`, `draft-test-instances`,
+    `instance-query`, `reporting-analytics-api`, `runtime-api`,
+    `studio-player`.
+
+54. **Field model split into `type`, `format` and `control`: DONE.** Change:
+    `field-model-type-format-control`. One key, `FieldDef.type`, did three
+    jobs: it fixed the value form the engine checks, the semantics a validator
+    would enforce, and the widget the renderer draws. Ten enum members
+    collapsed onto five engine types, so five existed for the renderer alone,
+    and a `date` field accepted `"banane"` because `typeMatches` read
+    `typeof value === "string"` and stopped there. Every new widget cost a
+    member in `baseFieldType`, a row in `JS_TYPE`, a case in `celType`, an
+    entry in `FIELD_TYPE_LABELS` and a branch in `FieldForm`. That price is
+    why `docs/decisions.md` had turned down a "Long text" type.
+
+    `FieldDef.type` shrinks to six value forms (`string`, `number`, `boolean`,
+    `list`, `file`, `group`), each mapping to exactly one CEL type and one JS
+    type. `select`, `multiselect`, `date`, `datetime` and `reference` leave
+    the enum: a one-pick field is `string`, a several-pick field is `list`,
+    and what makes either a picker is the presence of `options` or
+    `dataSource`. `FieldDef` gains an optional `format` (`date`, `datetime`,
+    `integer`, `email`), whose check joins `typeMatches`, the one type rule
+    submission and outbox writeback already share, and an optional `control`
+    (`multiline`, `radio`, `checkboxes`) at catalog level.
+
+    Decisions D1 to D25 in `docs/field-model-redesign.md` settle every
+    question this change implements.
+
+    Specs: `authored-content-localization`, `cel-expressions`,
+    `data-source-resolution`, `definition-contract`,
+    `field-tree-check-consolidation`, `form-ui`, `instance-data-query`,
+    `instance-query-data-source`, `runtime-api`,
+    `runtime-field-type-check-consolidation`, `studio-app`,
+    `studio-column-mapping-form`, `studio-condition-builder`,
+    `studio-field-validation-form`, `studio-migration-plan-form`.
+
+55. **`person` field format and `org.actor-from-field`: DONE.** Change:
+    `field-model-person-format`. A process routing a step to a specific person
+    had two options: an author maintaining a `static` list by hand, or
+    `org.group-members` pointed at a fixed group. Neither let a step route to
+    whoever the process itself names, so the requester's chosen approver and a
+    case's assigned handler stayed out of reach. No field type held a person
+    and no assignment strategy read one.
+
+    Stage 54 built the `format` axis this needs, and D20 named `person` as the
+    format it deliberately deferred, waiting on the strategy and the people
+    list. This change ships all three. `FieldDef.format` gains a fifth member,
+    `person`, legal on `{type: "string"}` for one person and on
+    `{type: "list"}` for several, which is the first format `list` can carry.
+    `formatMatches` gains a `person` branch requiring the value, or every
+    element of an array value, to start with `user_` or `group_`, the two
+    prefixes the users and groups stores already mint.
+
+    Decisions D10 through D15, D20, D22 and D23 in
+    `docs/field-model-redesign.md` settle the rest.
+
+    Specs: `actor-from-field-assignment`, `database-seed-script`,
+    `data-source-resolution`, `definition-contract`, `runtime-api`,
+    `studio-app`.
+
+56. **Authored notes in a step's view: DONE.** Change: `field-model-view-note`.
+    An approver opens an expense claim, and a note at the top should say that
+    an amount over 5000 also needs the board. A step form rendered fields and
+    nothing else, so an author faked the note with a read-only string field
+    carrying a default. The faked field then landed in `data` and travelled
+    through every report having never held a value.
+
+    Two of the three shapes `docs/field-model-redesign.md` groups under S2
+    already worked: a summary of what the applicant entered is a view field
+    with `readonly: true`, which `filterToEditable` drops before submission,
+    and a section heading is a `group` field, which `leafFields` keeps out of
+    the CEL `data` namespace. Static text referencing no field had no home.
+
+    `view.fields` becomes an ordered list of entries. An entry without `kind`
+    is a field reference and parses exactly as before; an entry with
+    `kind: "note"` carries authored `text` as `LocalizedText`, plus optional
+    `visible`, `group` and `span`, and declares no `ref`, `required`,
+    `readonly`, `validation` or `validationMode`. The runtime resolves a note
+    in the same pass as fields, and a note whose `visible` evaluates false
+    reaches no client, its text included. The submit filter reads field
+    entries alone, so a note cannot reach `data`.
+
+    The unknown-key walker learned to tell the two entry kinds apart; without
+    that, a two-member union made it skip every view entry.
+
+    Specs: `authored-content-localization`, `definition-contract`, `form-ui`,
+    `runtime-api`, `studio-app`, `studio-checks-rail`, `studio-form-editor`.
+
+57. **Per-instance visibility: DONE.** Change: `instance-visibility-set`.
+    Decided 2026-09-01 by the owner, on five points put to them after the
+    options were written up and measured. Four were approved as recommended.
+    The fifth, an additive rule where access once granted could never be
+    withdrawn, was rejected: access has to stay revocable. The revocation
+    design is what that rejection produced.
+
+    An engine-maintained set of principals per instance, `instance_principals`,
+    answers "who may see instance 101". The set is never derived from a
+    definition, so `ProcessBody` gains nothing and no published body or pinned
+    instance moves. The `visibleTo` field sketched on 2026-08-25 was not
+    built. The engine appends at four points, each inside the transaction that
+    already commits: `createInstance` adds the starter, `applyStepEntry` adds
+    the entered step's candidates, `updateAssignment` adds the claimant, and
+    `createSeededInstance` copies the parent's whole set into a subprocess
+    child. Migration is the one step entry that appends nobody, because it
+    carries the instance's existing assignment rather than resolving the
+    target step's.
+
+    The set has exactly one consumer, a fourth scope value on the instance
+    list, `GET /instances?scope=visible`. `getInstanceView`,
+    `loadInstanceForActor` and `executeReport` are untouched, and the
+    aggregate views stay unfiltered permanently: an aggregate over a partly
+    invisible population either reports a number the reader cannot reconcile
+    or refuses to answer.
+
+    An administrator revokes, restores and grants per person per instance,
+    gated by a fifth `Permission` value, `"visibility"`. Three rules make that
+    safe. A revocation names the person, never the principal they matched by,
+    so revoking one actor leaves every other holder of their group untouched.
+    A live assignment outranks a revocation at read time, so nobody holds work
+    they cannot open. And no commit path ever clears a revocation, which was
+    affordable at 0.009 ms per entry and rejected anyway, because a bulk
+    migration would then erase an operator's decisions with nothing recorded.
+
+    The read is a `UNION ALL` of one bounded branch per principal, with every
+    filter inside every branch. A per-branch `LIMIT` whose rows are filtered
+    afterwards under-fills the page, and `keysetPage` reads `hasMore` off the
+    row count, so the walk stops while instances remain. Measured against
+    200 000 instances and 601 000 principal rows: 1.51 ms for a narrow reader
+    and 1.85 ms for a broad one, against 31.7 ms with an external merge for
+    the `DISTINCT ... = ANY` form and 59 ms for a single predicate over
+    `instances`.
+
+    Neither new relation carries a foreign key to `instances`, matching every
+    sibling per-instance relation. One breaks the `TRUNCATE` that 43 test
+    files run in `beforeEach`. A one-off backfill script derives a set for
+    older instances from `body.startedBy`, the current assignment and
+    `history_entries.actorId`; it cannot recover a candidate on a step the
+    instance has already left who never acted, and the runbook names that
+    limit.
+
+    Specs: `authorization`, `data-retention`, `instance-query`,
+    `instance-visibility-set`, `permission-grant-administration`,
+    `persistence`, `runtime-events`, `transition-execution`.
