@@ -63,21 +63,21 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   `instance_id`, `transition_seq`, `body`, `resolve_state`,
   `resolve_claimed_at`, `cancel_sweep_state`, `next_timer_at`, `created_at`
   and `redacted_at`. Every other field of `Instance` lives inside the jsonb,
-  and six expression indexes stand in for eight of those keys:
-  `instances_selection_idx` over `processId`/`version`/`status`,
-  `instances_claimed_by_idx` over `assignment.claimedBy`,
-  `instances_candidates_idx` (GIN) over `assignment.candidates`,
-  `instances_parent_idx` over `parent.instanceId`,
-  `instances_current_step_idx` over `currentStepId` and
-  `instances_started_by_idx` over `startedBy`
-  (`src/engine/store.ts:240`, `:253`, `:254`, `:262`, `:268`, `:269`).
+  and six indexes stand in for eight of those keys. Three are expression
+  indexes over keys no column carries: `instances_claimed_by_idx` over
+  `assignment.claimedBy`, `instances_candidates_idx` (GIN) over
+  `assignment.candidates`, and `instances_parent_idx` over
+  `parent.instanceId`. The other three are plain btrees over generated
+  columns: `instances_selection_col_idx` over
+  `process_id`/`version`/`status`, `instances_current_step_col_idx` over
+  `current_step_id` and `instances_started_by_col_idx` over `started_by`.
+  All six live in `initSchema` (`src/engine/store.ts`).
 
-  Change 1 (2026-08-30) promoted six of those keys into generated columns.
-  Three of the indexes above now stand over keys that are already columns:
-  `instances_selection_idx`, `instances_current_step_idx` and
-  `instances_started_by_idx`. Rebuilding those three onto the columns
-  measured out as worth doing. The promotion entry below carries the
-  numbers.
+  Change 1 (2026-08-30) promoted six of those keys into generated columns and
+  left the three indexes over them in expression form. Change 3
+  (`rebuild-instance-expression-indexes`, 2026-09-01) rebuilt those three onto
+  the columns and moved the reader predicates with them. The promotion entry
+  below carries the numbers.
 
   Ten keys are standardized in the sense that matters here: the engine owns
   them, every instance carries them, and their shape never depends on a
@@ -767,7 +767,7 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   engine, for no gain a promoted column does not already give.
 
   **Not a prerequisite for the report builder.** Its first shape filters
-  by process and by date range, and `instances_selection_idx` plus
+  by process and by date range, and the selection index plus
   `instances_created_idx` already cover both. `created_at` is an
   approximate double of `startedAt` — `DEFAULT now()` on the insert that
   writes the body a few milliseconds after the application clock stamped

@@ -1622,6 +1622,26 @@ test.skipIf(!DB)("GET /instances?version=abc is a 400 request error", async () =
   expect(body.error.type).toBe("request-shape");
 });
 
+// rebuild-instance-expression-indexes: the reported regression. Before that
+// change the text comparison answered an empty 200 for a version past int4;
+// after it, the `::int` bind raised and the wrapper answered 500 with no
+// message. parseVersion bounds it, so both edges of the range stay a 400.
+test.skipIf(!DB)("GET /instances?version= beyond int4 is a 400 request error, not a 500", async () => {
+  for (const version of ["2147483648", "-2147483649", "99999999999"]) {
+    const res = await fetch(authedReq(`http://x/instances?processId=p1&version=${version}`, "GET", admin));
+    expect({ version, status: res.status }).toEqual({ version, status: 400 });
+  }
+});
+
+test.skipIf(!DB)("GET /instances?version= at either int4 edge reaches the query and returns an empty page", async () => {
+  for (const version of ["2147483647", "-2147483648"]) {
+    const res = await fetch(authedReq(`http://x/instances?processId=p1&version=${version}`, "GET", admin));
+    expect({ version, status: res.status }).toEqual({ version, status: 200 });
+    const body = (await res.json()) as { items: unknown[] };
+    expect({ version, items: body.items }).toEqual({ version, items: [] });
+  }
+});
+
 test.skipIf(!DB)("GET /instances?version=2 with no processId is a 400 request error", async () => {
   const res = await fetch(authedReq("http://x/instances?version=2", "GET", admin));
   expect(res.status).toBe(400);
