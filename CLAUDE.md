@@ -138,7 +138,9 @@ printed, not that you ran it.
   runs, over the same range: `sh scripts/gates/range.sh < /dev/null | sh
   scripts/gates/whitespace.sh`. The `< /dev/null` belongs on `range.sh`, which
   falls back to `origin/main..HEAD`. Handing `whitespace.sh` an empty stdin
-  checks nothing; it now says so instead of exiting 0 in silence. Run the gate
+  checks nothing; it now says so instead of exiting 0 in silence. Measured
+  2026-09-01, while it still passed in silence: that form went green twice while
+  the pre-push hook rejected the same tree for a blank line at EOF. Run the gate
   rather than reconstructing its two probes by hand: `git diff --check` alone
   misses CRLF here, since
   `.gitattributes` sets `* text=auto eol=lf` and git normalizes a CRLF
