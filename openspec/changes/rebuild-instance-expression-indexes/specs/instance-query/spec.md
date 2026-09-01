@@ -296,4 +296,3 @@ than `limit` even while more matching instances exist.
 - **AND** that instance is absent from `items`
 - **AND** no item in the page is a degraded summary
 - **AND** every other matched instance returns as a normal summary
-
