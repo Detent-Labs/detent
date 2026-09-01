@@ -39,8 +39,8 @@
 - [ ] 3.1 Extend `test/instance-column-promotion.test.ts` with a
   schema-init test for the five new columns and the three new indexes. Run
   `initSchema` twice. Assert via `information_schema.columns` and
-  `pg_indexes` that the five columns and the three indexes exist and are
-  unchanged on the second run.
+  `pg_indexes` that the five columns and the three indexes exist. Assert
+  the second run leaves each one as the first run left it.
 - [ ] 3.2 Assert in the same file that `instances_claimed_by_idx`,
   `instances_candidates_idx` and `instances_parent_idx` are absent from
   `pg_indexes` after `initSchema`.
@@ -52,11 +52,13 @@
 - [ ] 3.4 Add a test that claims a step, then releases it, and asserts
   `claimed_by` follows `body->'assignment'->>'claimedBy'` both ways with no
   separate write.
-- [ ] 3.5 Add a test that `listInstances` with `assignedTo` returns the
-  same instances the jsonb-path predicate returned: one claimed by the
-  actor, one unclaimed with the actor among `candidates`, one unclaimed
-  with a role of the actor among `candidates`, and one that matches
-  neither.
+- [ ] 3.5 Confirm `listInstances` with `assignedTo` still returns what the
+  jsonb-path predicate returned. Add whatever `test/runtime-api.test.ts`
+  misses across these four cases:
+  - an instance the actor claims
+  - an unclaimed instance naming the actor among `candidates`
+  - an unclaimed instance naming a role of the actor among `candidates`
+  - an instance matching neither
 - [ ] 3.6 Add a retention boundary test. Seed one instance whose
   `currentStepEnteredAt` is one day past the window and one that is one day
   inside it. Assert the sweep redacts the first and leaves the second.

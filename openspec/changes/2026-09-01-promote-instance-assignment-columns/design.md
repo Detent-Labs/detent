@@ -1,18 +1,17 @@
-<!-- antislop: allow synonym-rotation -->
-<!-- "ALTER TABLE", "DROP INDEX" and "CREATE INDEX" are SQL statement names throughout this file, not rotated synonyms for "change". -->
+<!-- antislop: allow-file synonym-rotation -->
+<!-- "ALTER TABLE", "DROP INDEX", "CREATE INDEX" and "DROP COLUMN" throughout this file are SQL statement names, not rotated synonyms for "change"/"alter". -->
 ## Context
 
 See `proposal.md` - Why. `promote-instance-scalar-columns` (2026-08-30)
 settled the mechanism. A `GENERATED ALWAYS AS (...) STORED` column sits
-beside the jsonb, the key stays in `body`, and `parseInstance` reads the
+beside the jsonb. The key stays in `body`, and `parseInstance` reads the
 body as before. This change applies that mechanism to the five remaining
-keys and retires the three expression indexes those keys carry.
+keys. It also retires the three expression indexes those keys carry.
 
-One property from Change 1 governs the whole design. The planner does not
-substitute a generated column into a predicate naming the expression it was
-generated from, and it does not substitute the other way either. A new
-column and a new index over it therefore change nothing until the query is
-rewritten too.
+One property from Change 1 governs the whole design. The planner never
+swaps a generated column for the expression behind it. It never swaps the
+other way either. So a new column and a new index over it change nothing
+until the query moves too.
 
 ## Goals / Non-Goals
 
@@ -20,12 +19,13 @@ rewritten too.
 
 - Promote `assignment.claimedBy`, `assignment.candidates`,
   `parent.instanceId`, `currentStepEnteredAt` and `chainedFrom` into
-  generated columns, additive, with the key untouched in `body`.
-- Retire the three expression indexes those keys carry, replacing each with
-  a plain index over its new column, and rewrite each reader's predicate in
-  the same commit.
-- Measure the inbox predicate before and after, against a real Postgres 16
-  and a row count high enough that the planner picks an index.
+  generated columns. The promotion stays additive, and the key stays
+  untouched in `body`.
+- Retire the three expression indexes those keys carry. Each gives way to a
+  plain index over its new column, and each reader's predicate moves in the
+  same commit.
+- Measure the inbox predicate before and after. The measurement runs against
+  a real Postgres 16, over enough rows that the planner picks an index.
 
 **Non-Goals:**
 
@@ -41,10 +41,11 @@ rewritten too.
 
 ### `candidates` is a `jsonb` column, not a `text[]` column
 
-`assignment.candidates` is an array, so a generated column over it is the
-only one of the five that is not a scalar. Two shapes were tried against
-this devcontainer's Postgres 16.15:
+`assignment.candidates` is an array. So a generated column over it is the
+one of the five that is not a scalar. This devcontainer's Postgres 16.15
+answered both candidate shapes directly:
 
+<!-- antislop: allow sentence-length -->
 ```
 CREATE TABLE gen_probe_c (body jsonb NOT NULL,
   candidates text[] GENERATED ALWAYS AS
@@ -57,13 +58,13 @@ CREATE TABLE gen_probe_b (body jsonb NOT NULL,
 ```
 
 Postgres settles it. Unnesting a jsonb array into a `text[]` needs a
-set-returning function, which needs a subquery, which a generation
-expression forbids. `jsonb -> text` is immutable and returns jsonb, so the
-column is jsonb and the index over it is GIN, the same operator class the
-expression index already uses.
+set-returning function. That needs a subquery, and a generation expression
+forbids one. The `jsonb -> text` operator is immutable and yields jsonb. So
+the column is jsonb, and the index over it is GIN. That is the operator
+class the expression index already uses.
 
-That shape also keeps both operators the inbox predicate needs. Both were
-run against the probe table and both used the GIN index:
+The jsonb shape also keeps both operators the inbox predicate needs. The
+probe table ran each one, and each used the GIN index:
 
 ```
 SELECT candidates FROM gen_probe_b WHERE candidates @> to_jsonb('user_1'::text);
@@ -71,8 +72,8 @@ SELECT candidates FROM gen_probe_b WHERE candidates ?| ARRAY['role:approver'];
 ```
 
 A `text[]` column would have needed a rewrite of `@>` and `?|` into array
-operators, on top of a trigger to populate it. The jsonb column needs
-neither.
+operators. It would have needed a trigger to fill the column too. The jsonb
+column needs neither.
 
 ### `current_step_entered_at` is a `text` column
 
@@ -85,43 +86,42 @@ CREATE TABLE gen_probe_d (body jsonb NOT NULL,
 -- ERROR:  generation expression is not immutable
 ```
 
-`text::timestamptz` reads session `DateStyle` and `TimeZone`, so Postgres
-refuses it. Every writer produces `currentStepEnteredAt` as
-`new Date().toISOString()`, a fixed-width ISO-8601 string in UTC, which
-orders lexicographically the way it orders chronologically.
+A `text::timestamptz` cast reads session `DateStyle` and `TimeZone`, so
+Postgres refuses it. Every writer creates `currentStepEnteredAt` as
+`new Date().toISOString()`. That is a fixed-width ISO-8601 string in UTC,
+and it orders lexicographically the way it orders chronologically.
 
-The retention sweep is the one reader. Its predicate compares
-`COALESCE(currentStepEnteredAt, startedAt)` against a cutoff `now()` builds.
-Comparing text to text needs the cutoff as an ISO-8601 string, and
-`to_char` builds one in the same statement:
+The retention sweep is the one reader. Its predicate weighs
+`COALESCE(currentStepEnteredAt, startedAt)` against a cutoff from `now()`.
+Comparing text to text needs the cutoff as an ISO-8601 string too. The
+`to_char` function builds one in the same statement:
 
 ```
 to_char((now() - make_interval(days => $1)) AT TIME ZONE 'UTC',
         'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
 ```
 
-The probe returned `2026-08-02T09:01:10.652Z` for a 30-day window, matching
-`toISOString()`'s shape exactly. Building the cutoff in SQL rather than in
-TypeScript keeps the sweep's window semantics identical: `make_interval`
-counts calendar days, and a `Date.now() - days * 86400000` in TypeScript
-would count fixed 24-hour spans instead.
+The probe returned `2026-08-02T09:01:10.652Z` for a 30-day window. That
+matches `toISOString()`'s shape exactly. The cutoff stays in SQL rather
+than moving to TypeScript, which keeps the window semantics identical.
+`make_interval` counts calendar days. A `Date.now() - days * 86400000` in
+TypeScript would count fixed 24-hour spans instead.
 
 ### The retention sweep keeps its jsonb `status` predicate
 
-The rewritten sweep reads `COALESCE(current_step_entered_at, started_at)`
-beside an unchanged `body->>'status' IN ('completed','cancelled')`. Mixing
-the two shapes in one statement is deliberate. The `status` column is
-Change 1's, and rewriting the predicates that read it is Change 3's scope.
-Doing it here would move that scope line for no measured gain, since
-`instances_redacted_idx` already narrows this scan before either predicate
-runs.
+The rewritten sweep reads `COALESCE(current_step_entered_at, started_at)`.
+Beside it stands an unchanged `body->>'status' IN ('completed','cancelled')`.
+Mixing the two shapes in one statement is deliberate. The `status` column is
+Change 1's, and the predicates reading it belong to Change 3. Moving them
+here would move that scope line for no measured gain, since
+`instances_redacted_idx` already narrows this scan first.
 
 ### The three new indexes carry new names
 
-`CREATE INDEX IF NOT EXISTS instances_claimed_by_idx` would not rebuild an
-index of that name whose definition differs. Reusing the name means a
-`DROP` on every `initSchema` run, or a definition check nobody wants in a
-schema initialiser. New names avoid both:
+A `CREATE INDEX IF NOT EXISTS instances_claimed_by_idx` will not rebuild an
+index of that name whose definition differs. Reusing the name means a `DROP`
+on every `initSchema` run. The alternative is a definition check nobody
+wants in a schema initialiser. New names avoid both:
 
 | dropped | created |
 | --- | --- |
@@ -129,20 +129,22 @@ schema initialiser. New names avoid both:
 | `instances_candidates_idx` | `instances_candidate_idx` over `candidates` |
 | `instances_parent_idx` | `instances_parent_instance_idx` over `parent_instance_id` |
 
-`DROP INDEX IF EXISTS` on the old name is a no-op from the second
-`initSchema` run onward. A database that already holds the old three
-converges in one run.
+A `DROP INDEX IF EXISTS` on the old name is a no-op from the second
+`initSchema` run onward. A database already holding the old three converges
+in one run.
 
 ### Measured: the promotion buys no speed
 
-The inbox predicate is the hottest read in the product, so this change was
-measured rather than argued. `tmp/bench-inbox.ts` (scratch database
-`inbox_bench`, dropped and recreated per run) seeds 200,000 `instances`
-rows across 20 processes, 5,000 actors and 40 roles, one fifth of them
-claimed. It creates the table with every generated column present in both
-phases, so the heap is byte-identical and only the index shape and the
-predicate vary. Each figure is the median of nine `EXPLAIN (ANALYZE,
-BUFFERS)` runs after a warm-up, on Postgres 16.15 in this devcontainer.
+The inbox predicate is the hottest read in the product. So this change
+measured it rather than arguing it. The bench seeds 200,000 `instances`
+rows into a scratch database, across 20 processes, 5,000 actors and 40
+roles. One fifth of the rows carry a claim.
+
+The bench creates the table with every generated column present in both
+phases. The heap is therefore byte-identical. Only the index shape and the
+predicate vary. Each figure below is the median of nine
+`EXPLAIN (ANALYZE, BUFFERS)` runs, after a warm-up. The host is Postgres
+16.15 in this devcontainer.
 
 | query | before | after | plan |
 | --- | --- | --- | --- |
@@ -152,92 +154,97 @@ BUFFERS)` runs after a warm-up, on Postgres 16.15 in this devcontainer.
 | child sweep by parent | 0.011 ms | 0.011 ms | index scan, buffers 4 |
 
 The plans match node for node. Before, the bitmap ORs
-`instances_claimed_by_idx` with two scans of `instances_candidates_idx` and
-ANDs the result against `instances_selection_idx`. After, the same shape
-reads `instances_claimed_idx` and `instances_candidate_idx` instead. Buffer
-counts are identical. The index sizes are identical too: 2456 kB for the
-GIN index either way, 1384 kB for the btree.
+`instances_claimed_by_idx` with two scans of `instances_candidates_idx`. It
+ANDs that against `instances_selection_idx`. After, the same shape reads
+`instances_claimed_idx` and `instances_candidate_idx` instead. Buffer counts
+are identical. The index sizes match too: 2456 kB for the GIN index either
+way, and 1384 kB for the btree.
 
-The cost side does move. `tmp/bench-heap.ts` builds the same 200,000 rows
-twice, once with Change 1's six columns and once with all eleven:
+The cost side does move. A second bench builds the same 200,000 rows twice.
+The first table carries Change 1's six columns. The second carries all
+eleven:
 
 | table | heap | 200,000 inserts |
 | --- | --- | --- |
 | Change 1 columns only | 104 MB | 1852 ms |
 | plus this change's five | 116 MB | 1960 ms |
 
-That is 11.6% more heap, about 63 bytes per row, and 5.8% more insert time.
-`candidates` carries most of it: a duplicated jsonb array is wider than the
-four text scalars beside it.
+That is 11.6% more heap, about 63 bytes per row. Insert time rises 5.8%.
+The `candidates` column carries most of that width. A duplicated jsonb
+array is wider than the four text scalars beside it.
 
-So the honest verdict is that this change buys no runtime gain and costs
-real storage. What it buys is a single predicate vocabulary. Every
-predicate over a standardized instance key reads a column, and no reader
+So the honest verdict is plain. This change buys no runtime gain, and it
+costs real storage. What it buys is a single predicate vocabulary.
+
+Every predicate over a standardized instance key reads a column. No reader
 has to know which keys got an expression index and which did not.
-`docs/decisions.md` settled that direction on 2026-08-25, and this measures
-its price rather than assuming it away.
+`docs/decisions.md` settled that direction on 2026-08-25. This bench prices
+it rather than assuming it away.
 
-One earlier measurement is worth recording because it looks like a result
-and is not. Running the two phases against tables of different width
-(columns added by `ALTER TABLE` between phases) produced 1.334 ms before
-and 37.345 ms after, a plan flip onto `instances_created_idx` with 199,960
-rows filtered. The flip came from the wider heap changing the cost of the
-`ORDER BY created_at DESC LIMIT 50` path, not from the index shape. It
-reproduces in either direction once the widths differ, so the paired
-measurement above holds both widths equal.
+One earlier reading is worth recording. It looks like a result and is not.
+An early run put the two phases against tables of different width, because
+`ALTER TABLE` added the columns between phases. It read 1.334 ms before and
+37.345 ms after. The plan had flipped onto `instances_created_idx`,
+filtering 199,960 rows.
+
+The wider heap caused that flip. It changed the cost of the
+`ORDER BY created_at DESC LIMIT 50` path. The flip reproduces in either
+direction once the widths differ. So the paired bench above holds both
+widths equal.
 
 ## Risks / Trade-offs
 
-- [The heap grows 11.6% for no measured speed] → Accepted, and recorded
-  above rather than buried. Pre-1.0, no deployment holds production data,
-  and the alternative is a permanent split where some standardized keys
-  read as columns and others as jsonb paths.
-- [`DROP INDEX` on a live table takes an `ACCESS EXCLUSIVE` lock] → The
-  three drops run inside `initSchema`, at server start, before the poll
-  loops begin. `CLAUDE.md`'s stage note rules out a rolling deployment that
-  would need `DROP INDEX CONCURRENTLY`.
+- [The heap grows 11.6% for no measured speed] → Accepted. The verdict sits
+  above rather than buried. Pre-1.0, no deployment holds production data.
+  The alternative is a permanent split, where some standardized keys read as
+  columns and others as jsonb paths.
+- [A `DROP INDEX` on a live table takes an `ACCESS EXCLUSIVE` lock] → The
+  three drops run inside `initSchema`. That is server start, ahead of the
+  poll loops. `CLAUDE.md`'s stage note rules out a rolling deployment. Only
+  such a deployment would need `DROP INDEX CONCURRENTLY`.
 - [A rewritten predicate changes which rows match] → Each of the four
-  rewrites replaces an expression with the column generated from that exact
-  expression, so the two are equal by construction for every row. The
-  retention rewrite is the one exception, since it also moves the
-  comparison from `timestamptz` to text. `tasks.md` covers it with a
-  boundary test.
-- [`chained_from` has no reader and no index] → It is the one column here
-  added on `docs/decisions.md`'s judgment rather than on a present need.
-  The alternative is a second `ALTER TABLE` change later. The column costs
-  a few bytes per row and `parseInstance` never sees it.
-- [The retention cutoff's `to_char` format drifts from `toISOString`] →
-  Both produce `YYYY-MM-DDTHH:MM:SS.sssZ`, verified against the probe. A
-  boundary test in `tasks.md` pins it, and a drift would show as a sweep
-  that redacts an instance one window early or late.
-- [A `currentStepEnteredAt` in some other ISO-8601 form sorts wrong against
-  the cutoff] → `timestamp` in `src/schema/definition.ts:160` is a bare
-  `z.string()`, so the schema does not pin the form. Two forms would
-  misorder. A value with no milliseconds sorts after one with, inside the
-  same second, because `Z` is above `.`. A value carrying an offset such as
-  `+02:00` sorts by its wall clock rather than its instant. Every engine
-  writer produces `new Date().toISOString()`, confirmed at
-  `src/engine/store.ts:1107` and `src/engine/transition.ts:203` and `:215`,
-  so neither form reaches the column from the engine. A hand-written body
-  can still carry one, and `test/retention.test.ts:181` already writes a
-  no-millisecond `startedAt`. The window is measured in days, so a
-  sub-second misorder changes no outcome, and an offset form was already
-  mis-sorted by Change 1's `started_at` column. `tasks.md` covers the
-  no-millisecond case with an assertion rather than a schema change.
+  rewrites swaps an expression for the column behind it. The two are equal
+  by construction, on every row. The retention rewrite is the one
+  exception. It also moves the comparison from `timestamptz` to text, and
+  `tasks.md` covers that with a boundary test.
+- [Another ISO-8601 form sorts wrong] → The `timestamp` schema at
+  `src/schema/definition.ts:160` is a bare `z.string()`. It pins no form. Two forms would misorder. A value
+  with no milliseconds sorts after one with, inside the same second. That is
+  because `Z` is above `.`. A value carrying an offset such as `+02:00`
+  sorts by its wall clock rather than its instant.
+
+  Neither form reaches the column from the engine. Every engine writer emits
+  `new Date().toISOString()`, at `src/engine/store.ts:1107` and
+  `src/engine/transition.ts:203` and `:215`. A hand-written body can still
+  carry one, and `test/retention.test.ts:181` already writes a
+  no-millisecond `startedAt`. The window counts in days, so a sub-second
+  misorder changes no outcome. Change 1's `started_at` column already
+  mis-sorts an offset form. `tasks.md` covers the no-millisecond case with
+  an assertion, rather than tightening the schema.
+- [`chained_from` has no reader and no index] → It is the one column added
+  on `docs/decisions.md`'s judgment, not on a present need. The alternative
+  is a second `ALTER TABLE` change later. The column costs a few bytes per
+  row, and `parseInstance` never sees it.
+- [The retention cutoff's `to_char` format drifts from `toISOString`] → Both
+  emit `YYYY-MM-DDTHH:MM:SS.sssZ`, as the probe confirms. A boundary test in
+  `tasks.md` pins it. A drift would read as a sweep redacting an instance
+  one window early or late.
 
 ## Migration Plan
 
-`initSchema` runs the five `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
-statements, the three `DROP INDEX IF EXISTS` and the three `CREATE INDEX IF
-NOT EXISTS`, in that order. Every statement is idempotent. A database
-holding the old three indexes converges on its next run, which is a server
-start or the user-administration CLI. `GENERATED ALWAYS ... STORED`
-populates every existing row as part of the `ALTER TABLE` itself, so no
+`initSchema` runs three statement groups, in order. First the five
+`ALTER TABLE ... ADD COLUMN IF NOT EXISTS` statements. Then the three
+`DROP INDEX IF EXISTS`. Then the three `CREATE INDEX IF NOT EXISTS`. Every
+statement is idempotent.
+
+A database holding the old three indexes converges on its next run. That run
+is a server start or the user-administration CLI. `GENERATED ALWAYS ...
+STORED` fills every existing row as part of the `ALTER TABLE` itself, so no
 backfill script exists. Pre-1.0, rollback is a plain `DROP COLUMN` plus
 recreating the three expression indexes.
 
 ## Open Questions
 
-None. The two questions this change turned on, the array column's shape and
-the timestamp column's type, are answered under Decisions against a real
-Postgres 16.15.
+None. This change turned on two questions: the array column's shape, and the
+timestamp column's type. The Decisions section above answers each one
+against a real Postgres 16.15.

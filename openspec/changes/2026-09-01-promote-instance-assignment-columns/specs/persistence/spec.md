@@ -1,5 +1,7 @@
 <!-- antislop: allow-file passive-voice -->
-<!-- Matches the base persistence spec.md's own directive: Gherkin-style scenarios ("WHEN the schema is initialised") read naturally as passive and that file already permits it. -->
+<!-- Matches the base persistence spec.md's own directive: Gherkin scenarios ("WHEN the schema is initialised") read as passive and that file already permits it. -->
+<!-- antislop: allow-file synonym-rotation -->
+<!-- "ALTER TABLE" and "DROP INDEX" are SQL statement names here, not rotated synonyms for "change". -->
 ## ADDED Requirements
 
 ### Requirement: Five more standardized instance keys are generated columns
@@ -15,14 +17,14 @@ the jsonb `body`:
 - `chained_from text GENERATED ALWAYS AS ((body->>'chainedFrom')) STORED`
 
 `initSchema` SHALL add each with `ALTER TABLE instances ADD COLUMN IF NOT
-EXISTS`, the additive pattern the six columns above already follow.
+EXISTS`. That is the additive pattern the six columns above follow.
 
 `candidates` SHALL be `jsonb`, not `text[]`. `assignment.candidates` is a
-jsonb array, and unnesting one into a `text[]` needs a set-returning
-function inside a subquery. Postgres rejects a subquery in a generation
-expression. `jsonb -> text` is immutable and yields jsonb, so the column
-holds the array as jsonb and the two operators the inbox predicate uses,
-`@>` and `?|`, apply to it unchanged.
+jsonb array. Unnesting one into a `text[]` needs a set-returning function
+inside a subquery. Postgres rejects a subquery in a generation expression.
+The `jsonb -> text` operator is immutable and yields jsonb. So the column
+holds the array as jsonb, and the inbox predicate's two operators still
+apply: `@>` and `?|`.
 
 `current_step_entered_at` SHALL be `text`, not `timestamptz`, for the
 reason `started_at` already is. A generation expression casting to
@@ -70,7 +72,7 @@ The jsonb key backing each column SHALL remain in `body`, unchanged.
 ### Requirement: The assignment and parent predicates read generated columns
 
 The datastore SHALL carry three indexes over the columns the requirement
-above adds, and SHALL NOT carry the three expression indexes they replace:
+above adds. It SHALL NOT carry the three expression indexes they replace:
 
 - `instances_claimed_idx`, a btree over `instances (claimed_by)`
 - `instances_candidate_idx`, a GIN index over `instances (candidates)`
@@ -79,9 +81,9 @@ above adds, and SHALL NOT carry the three expression indexes they replace:
 
 `initSchema` SHALL drop `instances_claimed_by_idx`,
 `instances_candidates_idx` and `instances_parent_idx` with `DROP INDEX IF
-EXISTS`, then create the three above with `CREATE INDEX IF NOT EXISTS`. The
-new names differ from the old ones, so no run has to compare an index's
-definition against the one it wants.
+EXISTS`. It SHALL then create the three above with `CREATE INDEX IF NOT
+EXISTS`. The new names differ from the old ones. So no run has to compare
+an index's definition against the one it wants.
 
 Each reader's predicate SHALL name the column rather than the jsonb path
 the column was generated from. The planner substitutes neither for the
@@ -132,9 +134,9 @@ surrounding indexes follow.
 
 ### Requirement: The retention sweep compares ISO-8601 text
 
-This requirement constrains how the sweep's SQL is written, not which
-instances it selects. `data-retention` owns the eligibility rule and keeps
-it unchanged: `completed` or `cancelled`, `redacted_at` NULL, and
+This requirement constrains the sweep's SQL, not which instances it
+selects. `data-retention` owns the eligibility rule and keeps it unchanged.
+That rule is `completed` or `cancelled`, `redacted_at` NULL, and
 `currentStepEnteredAt` older than the window.
 
 `sweepRetention` (`src/engine/retention.ts`) SHALL select an instance for
@@ -142,18 +144,18 @@ redaction by comparing `COALESCE(current_step_entered_at, started_at)`
 against a cutoff string, rather than by casting either `body` key to
 `timestamptz`.
 
-The cutoff SHALL be built in the same statement, as
+The cutoff SHALL be built in the same statement. Its form is
 `to_char((now() - make_interval(days => $1)) AT TIME ZONE 'UTC',
 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`. That format matches what
-`Date.prototype.toISOString` produces, so the two sides of the comparison
-share one representation.
+`Date.prototype.toISOString` emits. So both sides of the comparison share
+one representation.
 
 `make_interval` SHALL stay the source of the window, so the sweep keeps
 counting calendar days rather than fixed 24-hour spans.
 
 The `COALESCE` fallback to `started_at` SHALL remain. An instance created
-before `currentStepEnteredAt` existed has no value at that key, and without
-the fallback the oldest instances would never become eligible.
+before `currentStepEnteredAt` existed has no value at that key. Without the
+fallback the oldest instances would never become eligible.
 
 #### Scenario: An instance past the window is selected
 
