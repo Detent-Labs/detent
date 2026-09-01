@@ -18,7 +18,7 @@ while keeping its rows.
 
 ## Requirements
 
-### Requirement: redactInstance clears personal data across five relations
+### Requirement: redactInstance clears personal data across six relations
 
 `redactInstance(instanceId, db, opts?: { actor?, reason? })`
 (`src/engine/retention.ts`) SHALL clear a non-`running` instance's
@@ -43,6 +43,20 @@ neither leaves alone, deletes from, nor clears unconditionally. Its rows
 stay and the redactable fields' values go. The log still shows that a
 field changed, when, and at whose hand. That holds for a redactable field
 as much as for one that stays intact.
+
+The instance's visibility state (`instance-visibility-set`) is the sixth
+relation. Redaction SHALL delete it in the same transaction. That covers its
+principal rows and any revocation rows standing against them. Each names a
+person. Each is personal data itself, and neither outlives the values it stood
+beside.
+
+Deleting the set makes a redacted instance invisible under
+`scope: "visible"`. That is the intended outcome. A redacted instance holds no
+field value a participant could want. The reader who lost it took no action to
+lose it.
+
+Redaction is one of the two things that delete a principal. An administrative
+revocation is the other. The `instance-visibility-set` capability names both.
 
 The `history_entries` and `instance_events` relations SHALL NOT be
 touched. Neither carries a field value, so neither needs redaction. That
@@ -82,6 +96,22 @@ design.
 
 - **WHEN** chain verification runs after `redactInstance`
 - **THEN** it reports the chain as holding
+
+#### Scenario: Redaction deletes the principal set
+
+- **WHEN** `redactInstance` runs on an instance carrying principals
+- **THEN** no principal row for that instance remains
+
+#### Scenario: A redacted instance leaves its participants' visible list
+
+- **WHEN** actor A, a principal of an instance, calls the instance list with
+  `scope: "visible"` after that instance is redacted
+- **THEN** the result excludes it
+
+#### Scenario: A failed redaction keeps the principal set
+
+- **WHEN** a `redactInstance` transaction fails
+- **THEN** the instance's principals are unchanged, alongside its data
 
 ### Requirement: redactInstance refuses a running instance
 
