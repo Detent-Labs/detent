@@ -369,6 +369,7 @@ Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
 | 54 | Field model split into `type`, `format` and `control` | `field-model-type-format-control` | `authored-content-localization`, `cel-expressions`, `data-source-resolution`, `definition-contract`, `field-tree-check-consolidation`, `form-ui`, `instance-data-query`, `instance-query-data-source`, `runtime-api`, `runtime-field-type-check-consolidation`, `studio-app`, `studio-column-mapping-form`, `studio-condition-builder`, `studio-field-validation-form`, `studio-migration-plan-form` |
 | 55 | `person` field format, the `org.actor-from-field` assignment strategy, and the people list a person picker reads | `field-model-person-format` | `actor-from-field-assignment`, `database-seed-script`, `data-source-resolution`, `definition-contract`, `runtime-api`, `studio-app` |
 | 56 | Authored notes in a step's view, the first non-field `ViewEntry` | `field-model-view-note` | `authored-content-localization`, `definition-contract`, `form-ui`, `runtime-api`, `studio-app`, `studio-checks-rail`, `studio-form-editor` |
+| 57 | Per-instance visibility: an engine-maintained principal set behind `scope=visible` | `instance-visibility-set` | `authorization`, `data-retention`, `instance-query`, `instance-visibility-set`, `permission-grant-administration`, `persistence`, `runtime-events`, `transition-execution` |
 
 ## Changes with no stage
 
