@@ -134,9 +134,13 @@ printed, not that you ran it.
   `origin/main..HEAD` lives in `scripts/gates/range.sh`, not in `prose.sh`
   itself — `prose.sh` reads its ranges on stdin, and an empty list checks
   nothing and exits 0.
-- Trailing whitespace, blank-at-eof, and CRLF. Run
-  `sh scripts/gates/whitespace.sh < /dev/null` rather than reconstructing its
-  two probes by hand: `git diff --check` alone misses CRLF here, since
+- Trailing whitespace, blank-at-eof, and CRLF. Run the same check the push gate
+  runs, over the same range: `sh scripts/gates/range.sh < /dev/null | sh
+  scripts/gates/whitespace.sh`. The `< /dev/null` belongs on `range.sh`, which
+  falls back to `origin/main..HEAD`. Handing `whitespace.sh` an empty stdin
+  checks nothing; it now says so instead of exiting 0 in silence. Run the gate
+  rather than reconstructing its two probes by hand: `git diff --check` alone
+  misses CRLF here, since
   `.gitattributes` sets `* text=auto eol=lf` and git normalizes a CRLF
   worktree file on `git add`, and `grep -lI $'\r'` finds nothing in Git Bash,
   since MSYS grep opens a file in text mode and strips the CR before matching.
