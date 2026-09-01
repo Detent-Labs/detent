@@ -4,6 +4,7 @@ import { t } from "../catalog.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text";
 import { effectiveFlag, isFlagGated, setFlag, writtenFieldCounts, type FlagKey, type WrittenAccessor } from "../draft/view-flags";
 import { technicalFieldIds } from "../draft/fields";
+import { isDraftViewField, type DraftViewField } from "../draft/view-layout";
 import type { BoolOrExpr } from "./shared/overrideMode";
 import { isExpression } from "./shared/overrideMode";
 import {
@@ -224,9 +225,9 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
     mutate((d) => {
       const fields = d.workflow?.steps?.[stepIndex]?.view?.fields;
       if (!fields) return;
-      const idx = fields.findIndex((f) => f.ref === fieldId);
+      const idx = fields.findIndex((f) => isDraftViewField(f) && f.ref === fieldId);
       if (idx === -1) return;
-      fields[idx] = setFlag(fields[idx]!, key, next);
+      fields[idx] = setFlag(fields[idx] as DraftViewField, key, next);
     });
   };
 

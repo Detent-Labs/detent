@@ -69,9 +69,11 @@ does not match the action's contract. That is worth failing loudly on, not
 an unset optional field.
 
 **Data vs presentation.** Fields are defined once in a process-wide catalog.
-Each step carries a flat `view` that references catalog fields and overrides
-per-step presentation (visible / required / readonly / order / group). The
-instance payload is a flat object keyed by `fieldId`, stable across the whole
+Each step carries a flat `view` whose entries either reference a catalog
+field, overriding its per-step presentation (visible / required / readonly /
+order / group), or stand alone as a note (`text`, plus visible / order /
+group — no field underneath, so no required or readonly). The instance
+payload is a flat object keyed by `fieldId`, stable across the whole
 lifecycle. Requiredness lives only in the view, never in the catalog.
 `FieldDef.technical` refines that rule rather than breaching it: it is a
 catalog-level fact that forces `required: false, readonly: true` on every

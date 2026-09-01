@@ -18,7 +18,7 @@ import { ChecksRail } from "./ChecksRail.js";
 import { parseChildProcessJson } from "../draft/io";
 import { missingTranslationWarning } from "../draft/localized-text";
 import { stepIssueCount } from "../draft/panel-rail";
-import { nextStepKey } from "./stepsPanelLogic.js";
+import { nextStepKey, configuredFieldCount } from "./stepsPanelLogic.js";
 
 type DraftStep = DraftOf<Step>;
 
@@ -152,7 +152,7 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
   const tabs: BehaviorTab[] = ["assignment", "paths", "actions", "timers", ...(step.type === "subprocess" ? (["subprocess"] as const) : [])];
   const issueTotal = stepIssueCount(validation.issues, step);
   const isInitialStep = draft.workflow?.initialStep === step.id;
-  const configuredFieldCount = (step.view?.fields ?? []).length;
+  const configuredFieldCountValue = configuredFieldCount(step.view?.fields);
   // A step with no assignment still works: the assignment-less floor in
   // `submitAndTransition` is starter-or-`system:admin`. That is not thereby
   // an invariant a self-service step must avoid, so this is a warning, never
@@ -250,7 +250,7 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
 
         <button type="button" className="btn btn-secondary step-identity-view" onClick={() => navigate(step.id!)}>
           <span className="step-section-name">
-            {configuredFieldCount} / {fields.length} {t("stepSections.viewFieldsConfigured")}
+            {configuredFieldCountValue} / {fields.length} {t("stepSections.viewFieldsConfigured")}
           </span>
           <span className="step-identity-view-build">{t("stepSections.viewBuildForm")}</span>
         </button>

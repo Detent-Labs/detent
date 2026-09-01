@@ -5,6 +5,7 @@ import { resolveDraftLocalizedText } from "./localized-text";
 import type { FlagKey } from "./view-flags";
 import { isExpression, type BoolOrExpr } from "../panels/shared/overrideMode";
 import { draftFields } from "./fields";
+import { isDraftViewField } from "./view-layout";
 
 /** One step whose view references the field, and which of `visible` /
  * `required` / `readonly` that step's view entry carries — regardless of
@@ -29,7 +30,7 @@ export function fieldUsage(draft: Draft, fieldId: string, locale: string, baseLo
   const rows: FieldUsageRow[] = [];
   for (const step of draft.workflow?.steps ?? []) {
     if (step.id === undefined) continue;
-    for (const entry of step.view?.fields ?? []) {
+    for (const entry of (step.view?.fields ?? []).filter(isDraftViewField)) {
       if (entry.ref !== fieldId) continue;
       rows.push({
         stepId: step.id,
@@ -60,7 +61,7 @@ export function fieldVisibleOverrides(draft: Draft, fieldId: string): FieldVisib
   const entries: { stepId: string; visible: BoolOrExpr }[] = [];
   for (const step of draft.workflow?.steps ?? []) {
     if (step.id === undefined) continue;
-    for (const entry of step.view?.fields ?? []) {
+    for (const entry of (step.view?.fields ?? []).filter(isDraftViewField)) {
       if (entry.ref !== fieldId) continue;
       entries.push({ stepId: step.id, visible: entry.visible });
     }
@@ -97,7 +98,7 @@ export function fieldVisibleOverrides(draft: Draft, fieldId: string): FieldVisib
  */
 export function applyVisibleOverride(draft: Draft, fieldId: string, visible: DraftOf<Expression> | undefined): void {
   for (const step of draft.workflow?.steps ?? []) {
-    for (const entry of step.view?.fields ?? []) {
+    for (const entry of (step.view?.fields ?? []).filter(isDraftViewField)) {
       if (entry.ref !== fieldId) continue;
       if (visible === undefined) delete entry.visible;
       else entry.visible = visible;
@@ -114,7 +115,7 @@ export function applyVisibleOverride(draft: Draft, fieldId: string, visible: Dra
 export function countTechnicalClearKeys(draft: Draft, fieldId: string): number {
   let n = 0;
   for (const step of draft.workflow?.steps ?? []) {
-    for (const entry of step.view?.fields ?? []) {
+    for (const entry of (step.view?.fields ?? []).filter(isDraftViewField)) {
       if (entry.ref !== fieldId) continue;
       if ("required" in entry) n++;
       if ("readonly" in entry) n++;
@@ -157,7 +158,7 @@ export function applyTechnicalMarker(draft: Draft, fieldId: string, next: boolea
   if (next) {
     field.technical = true;
     for (const step of draft.workflow?.steps ?? []) {
-      for (const entry of step.view?.fields ?? []) {
+      for (const entry of (step.view?.fields ?? []).filter(isDraftViewField)) {
         if (entry.ref !== fieldId) continue;
         delete entry.required;
         delete entry.readonly;

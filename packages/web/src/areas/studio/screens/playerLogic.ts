@@ -1,6 +1,9 @@
-/** Seeds the form's local edit state from a fresh InstanceView, keyed by field id. */
-export function seedFormValues(fields: { field: { id: string }; value: unknown }[]): Record<string, unknown> {
-  return Object.fromEntries(fields.map((f) => [f.field.id, f.value]));
+import { isResolvedViewField, type ResolvedViewEntry } from "form-ui";
+
+/** Seeds the form's local edit state from a fresh InstanceView, keyed by
+ * field id. A note contributes no key: it carries no `field` of its own. */
+export function seedFormValues(fields: ResolvedViewEntry[]): Record<string, unknown> {
+  return Object.fromEntries(fields.filter(isResolvedViewField).map((f) => [f.field.id, f.value]));
 }
 
 /**

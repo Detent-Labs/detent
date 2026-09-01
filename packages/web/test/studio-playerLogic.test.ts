@@ -41,14 +41,22 @@ describe("describeRecordElement", () => {
 describe("seedFormValues", () => {
   it("keys each field's value by the field's id", () => {
     const fields = [
-      { field: { id: "field_a" }, value: 1 },
-      { field: { id: "field_b" }, value: "x" },
-    ];
+      { field: { id: "field_a" }, value: 1, required: false, readonly: false },
+      { field: { id: "field_b" }, value: "x", required: false, readonly: false },
+    ] as unknown as Parameters<typeof seedFormValues>[0];
     expect(seedFormValues(fields)).toEqual({ field_a: 1, field_b: "x" });
   });
 
   it("returns an empty object for no fields", () => {
     expect(seedFormValues([])).toEqual({});
+  });
+
+  it("contributes no key for a note, which carries no field of its own", () => {
+    const fields = [
+      { field: { id: "field_a" }, value: 1, required: false, readonly: false },
+      { kind: "note", text: { en: "A note" } },
+    ] as unknown as Parameters<typeof seedFormValues>[0];
+    expect(seedFormValues(fields)).toEqual({ field_a: 1 });
   });
 });
 

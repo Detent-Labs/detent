@@ -178,14 +178,14 @@ describe("issueCountForEntityId", () => {
 });
 
 describe("panelEntityCounts", () => {
-  it("counts the matrix's live cells as the total view.fields[] length across every step", () => {
+  it("counts the matrix's live cells as the total field-entry count across every step, a note raising none of it", () => {
     const draft = {
       fields: [{ id: LEAF, key: "city", type: "string" }],
       dataSources: [],
       contract: { outcomes: [] },
       workflow: {
         steps: [
-          { view: { fields: [{ ref: LEAF }, { ref: LEAF }] } },
+          { view: { fields: [{ ref: LEAF }, { ref: LEAF }, { kind: "note", text: { en: "Note" } }] } },
           { view: { fields: [{ ref: LEAF }] } },
           {},
         ],

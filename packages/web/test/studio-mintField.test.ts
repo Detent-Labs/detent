@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { baseTypeForPaletteKind, mintCatalogField, PALETTE_FIELD_KINDS } from "../src/areas/studio/draft/mintField.js";
-import { insertViewField } from "../src/areas/studio/draft/view-layout.js";
+import { insertViewField, isDraftViewField } from "../src/areas/studio/draft/view-layout.js";
 
 describe("baseTypeForPaletteKind", () => {
   it("maps every palette entry to the catalog declaration it mints", () => {
@@ -67,7 +67,7 @@ describe("mint-and-place composes mintCatalogField with insertViewField", () => 
     const catalogIds = [field.id!];
     // Placed already, so it must not still list as unplaced.
     const rows = insertViewField([], field.id!, 0);
-    const placed = new Set(rows.map((r) => r.ref));
+    const placed = new Set(rows.filter(isDraftViewField).map((r) => r.ref));
     expect(catalogIds.filter((id) => !placed.has(id))).toEqual([]);
   });
 });

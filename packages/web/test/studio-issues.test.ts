@@ -43,4 +43,16 @@ describe("resolveLoc", () => {
     const b = body([{ id: FIELD_A, key: "amount", label: { en: "Amount" } }]);
     expect(resolveLoc(b, "fields[0].validation.zz")).toEqual({ entityType: "field", entityId: FIELD_A });
   });
+
+  // task 5.7: a note's requireBaseLocale issue locates at
+  // ["workflow", "steps", i, "view", "fields", j, "text"] — the shape
+  // definition.ts's own view-ref issue uses. The array-form walk sets
+  // stepIdx from "steps" and then reaches the step check (resolveLoc's own
+  // `if (step?.id) return {...}`) before the bare "fields" token inside
+  // "view" could be mistaken for the catalog's own top-level fields index —
+  // no second pass needed to route this to the rail.
+  it("resolves a note's base-locale issue to its step, not to a field", () => {
+    const b = { baseLocale: "en", fields: [], workflow: { steps: [{ id: "step_a" }, { id: "step_b" }] } } as unknown as Draft;
+    expect(resolveLoc(b, ["workflow", "steps", 1, "view", "fields", 0, "text"])).toEqual({ entityType: "step", entityId: "step_b" });
+  });
 });

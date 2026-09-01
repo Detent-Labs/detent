@@ -1,7 +1,7 @@
 import { computeDominatorSets, dominates } from "workflow-engine/schema/step-graph";
 import type { Action } from "workflow-engine/schema";
 import type { Draft, DraftOf } from "./types";
-import type { DraftViewField } from "./view-layout";
+import { isDraftViewField, type DraftViewField } from "./view-layout";
 import type { DraftField } from "./fields";
 import { flattenDraftFields } from "./fields";
 import type { EditorIssue } from "./issues";
@@ -153,7 +153,7 @@ export function writtenFieldCounts(body: Draft): WrittenAccessor {
       }
 
       if (!own && stepDominatesOwn) {
-        for (const entry of step.view?.fields ?? []) {
+        for (const entry of (step.view?.fields ?? []).filter(isDraftViewField)) {
           if (entry.ref !== fieldId) continue;
           if (isGroupField(fieldsById.get(entry.ref))) continue;
           if (entry.visible === false || entry.readonly === true) continue;
@@ -254,7 +254,7 @@ export function checkViewFlags(body: Draft): EditorIssue[] {
 
   steps.forEach((step, stepIndex) => {
     if (!step.id) return;
-    for (const entry of step.view?.fields ?? []) {
+    for (const entry of (step.view?.fields ?? []).filter(isDraftViewField)) {
       if (!entry.ref) continue;
       const field = fieldsById.get(entry.ref);
       if (isGroupField(field)) continue;

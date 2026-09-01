@@ -1884,12 +1884,25 @@ the grid, when engaged. The toggle SHALL affect only the grid's
 columns. It SHALL leave every row in place.
 
 The toolbar SHALL also report one live count line. That line SHALL
-state four numbers:
+state four numbers. A note entry SHALL raise neither the declared
+field-entry count nor, through it, the undeclared-cell count. The one
+case below is its only exception. The fourth number subtracts the
+first from a grid of cells, so the two must count the same thing.
 
-- the number of declared view entries
+- the number of declared field entries
 - the field count
 - the count of steps the grid currently draws
 - the number of cells among those steps that carry no entry
+
+That case moves two of the four numbers. Where a note is the first
+entry in a step that declared no `view`, that step stops being inert.
+It then joins the drawn columns. `stepCount` rises by one, and
+`undeclaredCells` by the whole field count.
+
+That is one more cell than a first field entry moves it. A field entry
+adds a declared entry, and the fourth number subtracts that entry back
+out. A note adds none. The note itself still counts as no entry and
+occupies no cell.
 
 #### Scenario: Hiding inert columns removes steps with no view
 
@@ -1905,11 +1918,26 @@ state four numbers:
 
 #### Scenario: The count line reflects the currently drawn columns
 
-- **WHEN** a draft carries 54 view entries, 22 fields and 13 steps, of
+- **WHEN** a draft carries 54 field entries, 22 fields and 13 steps, of
   which 3 declare no view
 - **AND** the developer engages the "Hide inert columns" toggle
-- **THEN** the count line reads 54 view entries, 22 fields, 10 steps,
+- **THEN** the count line reads 54 field entries, 22 fields, 10 steps,
   and 166 cells the visible steps do not declare
+
+#### Scenario: A note moves none of the four numbers
+
+- **WHEN** a step that already declares a view in that same draft gains
+  three note entries
+- **THEN** the count line still reads 54 field entries and 166
+  undeclared cells, because a note occupies no cell
+
+#### Scenario: A note in a viewless step joins the drawn columns
+
+- **WHEN** a note is the first entry in one of that same draft's 3 steps
+  declaring no `view`
+- **AND** the developer engages the "Hide inert columns" toggle
+- **THEN** the count line reads 54 field entries, 22 fields, 11 steps, and
+  188 cells the visible steps do not declare
 
 ### Requirement: The panels screen's field matrix toolbar explains its marks with a legend
 
@@ -2123,11 +2151,15 @@ grid.
 - **THEN** the field matrix returns to being one stop in the page's
   tab order
 
-### Requirement: The field matrix's rail entry counts view entries and view findings
+### Requirement: The field matrix's rail entry counts field entries and view findings
 
 The panels screen's index rail SHALL show the field matrix's entity
-count. That count is the total number of view entries across every
+count. That count is the total number of field entries across every
 step in the draft. A live cell represents one of that same total.
+
+A note entry SHALL count as none of them. The count answers how much a
+step binds to the catalog, and a note binds to nothing. Counting one
+would report a step as busier than its data says.
 
 This is the matrix's analogue of two other counts. The Fields view
 counts catalog rows. The Contract view counts outcomes.
@@ -2147,9 +2179,20 @@ draft.
 
 #### Scenario: The entity count matches the live-cell total
 
-- **WHEN** the developer opens the field matrix on a draft with 54 view
-  entries across its steps
+- **WHEN** the developer opens the field matrix on a draft with 54
+  field entries across its steps
 - **THEN** the rail's Field matrix entry shows 54 as its entity count
+
+#### Scenario: A note leaves the field matrix count alone
+
+- **WHEN** a draft holds one step whose view carries two field entries
+  and three notes
+- **THEN** the rail's Field matrix entry shows 2 as its entity count
+
+#### Scenario: A step holding notes alone contributes no entity count
+
+- **WHEN** a draft holds one step whose view carries notes alone
+- **THEN** that step raises the rail's Field matrix entity count by none
 
 #### Scenario: The issue count reflects only view-source findings
 
@@ -2163,6 +2206,29 @@ draft.
 - **WHEN** the draft carries one unwritten-technical-field finding and
   no other `view`-source finding
 - **THEN** the rail's Field matrix entry shows an issue count of 1
+
+### Requirement: The Steps panel's configured-field count reads field entries alone
+
+The Steps panel SHALL report how many of the catalog's fields a step's view
+configures. That line reads `N / M`, where `M` is the catalog's own size.
+
+The first number SHALL count field entries alone. A note occupies no catalog
+row. Counting one would report a step as binding more of the catalog than it
+does. The second number never moves for a note, because the catalog holds
+none.
+
+This count sits on the Steps panel, not in the form editor. The form editor
+displays no count of its own.
+
+#### Scenario: A note raises no configured-field count
+
+- **WHEN** a step's view holds one field entry and three notes
+- **THEN** the Steps panel reports that step's configured fields as 1
+
+#### Scenario: A step holding notes alone reports none configured
+
+- **WHEN** a step's view holds notes alone
+- **THEN** the Steps panel reports that step's configured fields as 0
 
 ### Requirement: The process header declares the process's base locale
 
@@ -2462,6 +2528,7 @@ It SHALL draw at every `LocalizedTextInput` site:
 - each step's label and description
 - each field's label and description
 - each field option's label
+- each note's text
 
 An entry that lacks the `baseLocale` value SHALL NOT draw this warning.
 The existing base-locale `EditorIssue` already flags it. The warning
@@ -2472,6 +2539,10 @@ list, scoped to `src/areas/studio/`. Every `LocalizedTextInput` rendered
 there SHALL sit beside a call to `missingTranslationWarning`. An exempt site
 SHALL instead carry an inline comment stating why. A hand-kept list does not
 grow with the code. This rule does.
+
+That rule also pins the number of sites it found. The note's text is the
+tenth. A change adding a site SHALL move that literal in the same commit.
+Otherwise the rule rejects a site it exists to admit.
 
 #### Scenario: A step label missing the current locale draws a warning
 
@@ -2513,3 +2584,9 @@ grow with the code. This rule does.
 
 - **WHEN** a site legitimately needs no warning
 - **THEN** an inline comment states the reason, and the rule skips it
+
+#### Scenario: A note's text missing the current locale draws a warning
+
+- **WHEN** the studio's `contentLocale` is `de`, and a note's `text` carries
+  the base-locale value alone
+- **THEN** the note's strip shows the warning beside its text input

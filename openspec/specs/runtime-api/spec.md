@@ -368,10 +368,10 @@ to an ordinary instance's real assignment holder. The `ADMIN_ROLE` role
 continues to authorize access to a test instance exactly as it does to
 an ordinary one.
 
-`fields` SHALL contain exactly the current step's `ViewField`s whose
+`fields` SHALL contain exactly the current step's view entries whose
 resolved `visible` (literal `boolean`, used as-is, or CEL, evaluated
 with total semantics, default `true`) is `true` against
-`buildGuardContext(body, instance, actor)`. Each entry carries its
+`buildGuardContext(body, instance, actor)`. A field entry carries its
 resolved `required`, `readonly`, `span`, and `options`, per the
 `data-source-resolution` capability. That capability names three sources
 for `options`. Static `FieldDef.options` carries through unchanged. A
@@ -380,6 +380,14 @@ for `options`. Static `FieldDef.options` carries through unchanged. A
 `allowedGroups` expansion. A field resolving invisible SHALL be
 omitted entirely, not included with a flag. `span` SHALL be the
 matching `ViewField.span`, or `1` when the view declares none.
+
+A view entry is a field entry or a note entry, per the
+`definition-contract` capability. Every rule in this requirement that
+names a `ViewField` reaches a field entry. A note entry resolves under
+the same `visible` rule and carries `kind`, `text`, `group` and `span`
+alone.
+The "View resolution emits a note in place and withholds a hidden one"
+requirement states the rest.
 
 `InstanceView` SHALL also carry `columns`: the current step's
 `view.columns`, or `1` when the view declares none. `columns` reports
@@ -1652,3 +1660,61 @@ does not land, and the record names it.
 #### Scenario: One drop does not stop the others
 - **WHEN** one mapped attribute mismatches and another matches
 - **THEN** the matching one is written and only the mismatching one is recorded
+
+### Requirement: View resolution emits a note in place and withholds a hidden one
+
+Resolving a step's view SHALL emit a note entry at the position the authored
+array gives it. The emitted entry SHALL carry `kind: "note"`, the note's
+`text`, and its `group` and `span`. A note SHALL carry no value, no
+requiredness and no readonly state into the resolved view.
+
+`kind` is what a caller discriminates on, mirroring the authored rule the
+`definition-contract` capability states. A resolved entry carrying no `kind`
+is a field entry. Emitting a note without it leaves a caller reading the note
+as a field, which is the one shape the renderer cannot draw.
+
+Resolution SHALL evaluate a note's `visible` the way it evaluates a field
+entry's. A note the guard hides SHALL produce no resolved entry, so its `text`
+never reaches a caller. Withholding the text matters on its own. An author uses
+a note to explain a rule that applies to some instances. A hidden note's wording
+can name a threshold the reader is not meant to see.
+
+#### Scenario: A visible note reaches the resolved view in array order
+
+- **WHEN** a step's view holds a field entry, then a note whose `visible`
+  evaluates true, then a second field entry
+- **THEN** the resolved view carries three entries in that order, the middle
+  one a note carrying `kind: "note"` and its text
+
+#### Scenario: A hidden note's text never leaves the engine
+
+- **WHEN** a step's view holds a note whose `visible` evaluates false
+- **THEN** the resolved view carries no entry for that note, and the response
+  carries none of its text
+
+#### Scenario: A note with no visible key resolves as shown
+
+- **WHEN** a step's view holds a note declaring no `visible`
+- **THEN** the resolved view carries it, matching how a field entry with no
+  `visible` resolves
+
+### Requirement: A note widens no submission check
+
+A note SHALL contribute no key to the field set the engine checks a submission
+against. A step whose view holds a note SHALL accept exactly the keys its field
+entries accept.
+
+#### Scenario: A note leaves the accepted key set alone
+
+- **WHEN** a caller creates an instance at a step whose view holds one field
+  entry and one note
+- **THEN** the caller may seed that one field, and every other key still throws
+  `unknown-field`
+
+#### Scenario: A note changes no required-field verdict
+
+- **WHEN** a caller submits a path from a step whose view holds a note and a
+  required field entry
+- **AND** the caller supplies that field
+- **THEN** the submission succeeds, because the note carries no requiredness of
+  its own

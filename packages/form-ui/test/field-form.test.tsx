@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { FieldForm, effectiveSpan, optionText } from "../src/FieldForm.js";
-import type { ResolvedViewField, SubmissionIssue } from "../src/types.js";
+import type { ResolvedViewEntry, ResolvedViewField, SubmissionIssue } from "../src/types.js";
 
 /** `react-dom/server`'s `renderToStaticMarkup`, no jsdom/testing-library —
  * matches the editor's own rendering-test convention. */
@@ -10,7 +10,7 @@ function noop() {
   // FieldForm/FieldInput require an onChange handler; static rendering never fires one.
 }
 
-function renderFields(fields: ResolvedViewField[], values: Record<string, unknown> = {}, issuesByField?: Map<string, SubmissionIssue[]>): string {
+function renderFields(fields: ResolvedViewEntry[], values: Record<string, unknown> = {}, issuesByField?: Map<string, SubmissionIssue[]>): string {
   return renderToStaticMarkup(<FieldForm fields={fields} values={values} onChange={noop} locale="en" issuesByField={issuesByField} />);
 }
 
@@ -283,6 +283,44 @@ describe("FieldForm: group nesting", () => {
   });
 });
 
+describe("FieldForm: notes", () => {
+  it("renders a note's text between the two field entries around it", () => {
+    const html = renderFields([
+      { field: baseField({ id: "f1", key: "before", label: { en: "Before" } }), value: undefined, required: false, readonly: false },
+      { kind: "note", text: { en: "A helpful note." } },
+      { field: baseField({ id: "f2", key: "after", label: { en: "After" } }), value: undefined, required: false, readonly: false },
+    ]);
+    expect(html).toContain("A helpful note.");
+    const beforePos = html.indexOf("Before");
+    const notePos = html.indexOf("A helpful note.");
+    const afterPos = html.indexOf("After");
+    expect(notePos).toBeGreaterThan(beforePos);
+    expect(afterPos).toBeGreaterThan(notePos);
+  });
+
+  it("renders a note whose group names a group field, nested in that container", () => {
+    const html = renderFields([
+      { field: baseField({ id: "f_group", key: "grp", type: "group" }), value: undefined, required: false, readonly: false },
+      { kind: "note", text: { en: "Group note." }, group: "grp" },
+    ]);
+    expect(html).toContain("<fieldset");
+    const fieldsetOpen = html.indexOf("<fieldset");
+    const fieldsetClose = html.indexOf("</fieldset>");
+    const notePos = html.indexOf("Group note.");
+    expect(notePos).toBeGreaterThan(fieldsetOpen);
+    expect(notePos).toBeLessThan(fieldsetClose);
+  });
+
+  it("draws no input, no label element and no required marker for a note", () => {
+    const html = renderFields([{ kind: "note", text: { en: "Just text." } }]);
+    expect(html).not.toContain("<input");
+    expect(html).not.toContain("<select");
+    expect(html).not.toContain("<textarea");
+    expect(html).not.toContain("<label");
+    expect(html).not.toContain("form-ui-required-marker");
+  });
+});
+
 describe("FieldForm: readonly and required", () => {
   it("disables the input when readonly is set", () => {
     const html = renderFields([{ field: baseField({ id: "f1" }), value: "x", required: false, readonly: true }]);
@@ -437,7 +475,7 @@ describe("FieldForm: required and invalid state conveyed programmatically", () =
  * the stylesheet keys on rather than computed geometry. `renderToStaticMarkup`
  * applies no CSS. The rule that must not regress is that a view declaring
  * neither key produces exactly the markup it produced before both existed. */
-function renderGrid(fields: ResolvedViewField[], columns?: 1 | 2): string {
+function renderGrid(fields: ResolvedViewEntry[], columns?: 1 | 2): string {
   return renderToStaticMarkup(<FieldForm fields={fields} values={{}} onChange={noop} locale="en" columns={columns} />);
 }
 

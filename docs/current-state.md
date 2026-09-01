@@ -1112,6 +1112,63 @@ Stage-by-stage status is in `ROADMAP.md`.
   store resolves keeps the id as its own label. A body declaring no
   `allowedGroups` resolves to `[]`, and `optionValuesValid` reads that as no
   bound at all.
+- View notes (`ViewNote`, `ViewEntry`, `src/schema/definition.ts`,
+  `src/schema/compile.ts`, `src/cel/check.ts`, `src/runtime/api.ts`,
+  `packages/form-ui/`, `docs/authoring-guide.md`'s "Note, readonly field, or
+  group"). A step's `view.fields[]` entry is now a union, `ViewEntry =
+  ViewField | ViewNote`. A `ViewNote` carries `kind: "note"`, its sole
+  discriminant, plus `text: LocalizedText`. It takes the same `visible`,
+  `group` and `span` a `ViewField` takes. It never takes `required`,
+  `readonly`, `validation` or `validationMode`. It names no field for any
+  of those to describe.
+
+  `isViewField` narrows the union by the absence of a `kind` key. A
+  `ViewField` carries no discriminant of its own. Every downstream reader
+  narrows through that guard. `compileProcessBody`'s `checkLengthBounds`,
+  `src/cel/check.ts`'s CEL-length collector, and
+  `checkUnsatisfiableRequiredReadonly` all skip a note's entry through it.
+  None of them reads a key a note cannot carry. The `checkUnknownKeys` check
+  needs no change: it already validates whichever schema `unionObjectMatch`
+  resolves an entry against.
+
+  `unionObjectMatch` (`compile.ts`) gained a `kind`-literal dispatch branch
+  ahead of its existing single-object-member fallback. A `kind`-carrying
+  union member now matches by its literal value first.
+
+  `resolveFields` (`src/runtime/api.ts`) now emits `ResolvedViewEntry[]`
+  (`ResolvedViewField | ResolvedViewNote`). A note resolves its own
+  `visible` through `resolveFlag`, exactly as a field does. A false result
+  drops it from the array. `isResolvedViewField` is the wire-level twin of
+  `isViewField`. Every existing `InstanceView.fields` reader
+  (`editableFieldIds`, `requiredFieldIds`, `applyColumnMapping`,
+  `validateSubmissionData`, the app/studio Player/Task screens) narrows
+  through it first.
+
+  `packages/form-ui` renders a note through a new `NoteText` component
+  (`FieldForm.tsx`), reached through a new `ViewEntryInput` wrapper. Both
+  the top-level render and a group's own child render route through it. A
+  note's locale resolution runs through `resolveFieldsLocale`'s existing
+  walk, extended to visit `text` for a `kind: "note"` entry.
+
+  The studio gained a third, draft-layer guard, `isDraftViewField`
+  (`draft/view-layout.ts`), over `DraftOf<ViewEntry>`. It stays separate
+  from the two guards above. The Zod schema, the wire shape and the draft
+  shape each had their own field-shaped type already. The `insertViewNote`
+  helper seeds an inserted note's `baseLocale` text immediately, never
+  empty. An
+  empty entry would fail `authoredProcessBody.safeParse` for the whole
+  draft. That blanks the checks rail, not just the one field.
+
+  Every existing `view.fields[]` reader across `field-usage.ts`,
+  `view-flags.ts`, `fieldMatrixLogic.ts`, `panel-rail.ts` and
+  `stepsPanelLogic.ts` now filters through this guard. A note counts
+  toward neither a step's declared field count nor the field matrix's
+  per-field grid. The `FormEditorScreen.tsx` screen gained a note card,
+  with its own strip for text, span, group and visible. It also gained
+  a palette
+  "Add a note" control. It keys the card `note:<index>` beside a field
+  entry's `field:<ref>`. React then never reuses a DOM node across a
+  reorder that changes an entry's kind.
 - Read/query API (`src/runtime/api.ts`, `src/engine/definitions.ts`, `src/http/`,
   `test/runtime-api.test.ts`, `test/definitions.test.ts`, `test/http.test.ts`):
   closes the gap where the HTTP wrapper could only address a single instance by

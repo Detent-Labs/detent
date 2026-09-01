@@ -120,6 +120,9 @@ field set the CEL layer already type-checks expressions against. A
 `view.fields[].ref` naming a nested field id SHALL NOT be rejected, and one
 naming no field at any depth SHALL fail to parse.
 
+This rule reaches field entries alone. A note entry declares no `ref` to
+resolve, and its absence SHALL NOT read as an unresolvable reference.
+
 #### Scenario: A view referencing a nested group field's id resolves
 - **WHEN** a step's `view.fields` includes an entry whose `ref` names a field id declared inside a `group` field's `fields`
 - **THEN** the process body parses successfully (subject to every other invariant)
@@ -127,6 +130,12 @@ naming no field at any depth SHALL fail to parse.
 #### Scenario: A view reference to an unknown field id is still rejected
 - **WHEN** a step's `view.fields` includes an entry whose `ref` names no field id at any depth
 - **THEN** the process body fails to parse
+
+#### Scenario: A note entry needs no resolvable field reference
+
+- **WHEN** a step's `view.fields` holds a note entry and the body declares no
+  field the note could name
+- **THEN** the body parses, because this rule reaches field entries alone
 
 ### Requirement: A step's view field may override the catalog field's validation
 
@@ -1245,8 +1254,8 @@ unwritten pair.
 The check SHALL skip three kinds of entry. A `group` field: a group holds
 fields and takes no value, and the engine resolves its view flags false.
 A `technical` field: the technical-field rule already rejects its flags. An
-entry carrying no `ref`: such an entry names no field, and the Zod gate
-rejects it anyway.
+entry carrying no `ref`: a note entry names no field, so this rule has no
+field to look for a writer of.
 
 The rejection SHALL apply only to an entry on a step that carries a manual
 path. The required check runs only at a manual submission. So a pair on an
@@ -1427,6 +1436,14 @@ bypass. The compile pass is where its siblings sit.
 - **AND** no source in the body writes the field
 - **THEN** the publish fails with a validation error naming that field and step
 
+#### Scenario: A note beside an unwritten pair moves neither verdict
+
+- **WHEN** a step carrying a manual path holds a note and a view entry
+  declaring `required: true` and `readonly: true`
+- **AND** no source in the body writes the field that entry names
+- **THEN** the publish fails with a validation error naming that field and
+  step, and reports nothing against the note
+
 ### Requirement: A step's org.actor-from-field reference resolves to a field declaring format: person
 
 <!-- antislop: allow sentence-length -->
@@ -1472,3 +1489,103 @@ no fallback assignee.
   process
 - **THEN** the publish fails with a validation error naming that step and
   `"field_ghost"`
+
+### Requirement: A step view holds entries of two kinds, and one of them is a note
+
+A `view.fields` array SHALL hold entries of two kinds. An entry carrying no
+`kind` key SHALL be a field entry, with the shape and the meaning it carries
+today. An entry carrying `kind: "note"` SHALL be a note entry. A note
+references no field and carries authored text.
+
+A note entry SHALL declare `text` as `LocalizedText`. It MAY declare `visible`,
+`group` and `span`, each meaning what it means on a field entry. It SHALL
+declare no `ref`, `required`, `readonly`, `validation` or `validationMode`.
+
+A field entry SHALL carry no `kind` key at all, rather than a literal marking
+it as a field. The schema also deserializes stored immutable bodies. A required
+discriminant would make every body published before this change throw on read.
+
+Reading a stored body SHALL keep stripping, as it does for every other
+undeclared key. Publishing SHALL reject a note entry that carries a field
+entry's key. The two paths then behave exactly as they already do elsewhere.
+
+An entry carrying a `kind` this contract does not declare SHALL be read as a
+field entry, and publishing SHALL then report `kind` as an unknown key on it.
+A `kind` that is not a string SHALL be read the same way. No entry SHALL
+escape the unknown-key check by carrying a `kind` no member claims.
+
+Every other requirement in this capability phrased over a `view.fields[]`
+entry reaches field entries alone. A note declares none of the keys those
+rules name.
+
+#### Scenario: A view mixes a note with field entries
+
+- **WHEN** a step's `view.fields` holds a note entry followed by two field
+  entries
+- **THEN** the body parses, and the note keeps the position the array gives it
+
+#### Scenario: Publishing rejects a note entry carrying a field key
+
+- **WHEN** an authored body declares a note entry that also carries `ref`
+- **THEN** publishing fails with a located issue naming `ref` on that entry
+
+#### Scenario: A body published before this change parses unchanged
+
+- **WHEN** the engine reads a stored body whose view entries carry no `kind`
+- **THEN** every entry parses as a field entry, and the body's
+  `definitionHash` matches the one stored beside it
+
+### Requirement: A note's base-locale check takes the schema placement
+
+The rule a note's `text` meets is `authored-content-localization`'s. It is not
+a second rule. That capability requires a non-empty base-locale entry for
+every `LocalizedText` value in the body. A note's `text` is one of them.
+
+This requirement records where that check runs. It SHALL run in the
+`definition.ts` schema. Its call sits beside the ones `processBody`'s
+superRefine already makes for a label, a description and an option label.
+
+That placement follows this capability's own placement rule. An invariant
+whose violation cannot exist in an already-published body MAY live in the
+schema. No body published before this change carries a note.
+
+#### Scenario: The check runs on the read path, not at publish alone
+
+- **WHEN** the engine reads a body whose note text omits the body's
+  `baseLocale`
+- **THEN** it fails to parse, rather than passing the read and failing only at
+  publish
+
+#### Scenario: A note omitting the base locale fails to parse
+
+- **WHEN** a note entry's `text` declares `fr` alone, and the body's
+  `baseLocale` is `de`
+- **THEN** the body fails to parse, with an issue locating the step and the
+  entry
+
+### Requirement: Publishing reports an unknown key on either kind of view entry
+
+Publishing SHALL report an unknown key on a note entry and on a field entry
+alike. A second entry kind SHALL NOT weaken the check on the first. A view
+holding a note keeps every field entry beside it under the same scrutiny.
+
+This requirement adds a note to the surface an existing rule already covers.
+It states no new rule about unknown keys.
+
+#### Scenario: Publishing reports an unknown key on a note entry
+
+- **WHEN** an authored body declares a note entry carrying `txet`
+- **THEN** publishing fails with a located issue naming that key
+
+#### Scenario: Publishing still reports an unknown key on a field entry beside a note
+
+- **WHEN** an authored body declares a view holding a note entry and a field
+  entry, and the field entry carries `requried`
+- **THEN** publishing fails with a located issue naming that key
+
+#### Scenario: Publishing rejects a view entry whose kind names no member
+
+- **WHEN** an authored body declares a view entry carrying `kind: "notes"`, a
+  `ref` that resolves, and a `text`
+- **THEN** publishing fails with a located issue naming `kind` on that entry,
+  rather than publishing it as a field entry with the two keys stripped

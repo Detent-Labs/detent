@@ -38,7 +38,7 @@ import { definitionHash } from "../schema/hash.js";
 import { NotFoundError, InstanceNotRunningError, RequestShapeError } from "../errors.js";
 import { saveInstanceDraft as engineSaveInstanceDraft, getInstanceDraft, type InstanceDraft } from "../engine/instance-drafts.js";
 import { encodeCursor, decodeCursor } from "../pagination.js";
-import { instance as instanceSchema, processBody as processBodySchema, historyEntry as historyEntrySchema, instanceEvent as instanceEventSchema, collectFieldsDeep, leafFields, typeMatches, expectedTypeLabel } from "../schema/definition.js";
+import { instance as instanceSchema, processBody as processBodySchema, historyEntry as historyEntrySchema, instanceEvent as instanceEventSchema, collectFieldsDeep, leafFields, typeMatches, expectedTypeLabel, isViewField } from "../schema/definition.js";
 import {
   createDefaultAssignmentRegistry,
   resolveStepAssignment,
@@ -105,6 +105,29 @@ export type ResolvedViewField = {
   span: 1 | 2;
 };
 
+/** A resolved note: static text at its place in the view, carrying no value,
+ * no requiredness and no readonly state. `kind: "note"` is what a caller
+ * discriminates on, mirroring the authored rule `definition-contract` states
+ * — a resolved entry carrying no `kind` is a field entry. */
+export type ResolvedViewNote = {
+  kind: "note";
+  text: LocalizedText;
+  group?: string;
+  span: 1 | 2;
+};
+
+/** A resolved view entry: a field entry or a note. Field-first order in the
+ * union mirrors `ResolvedViewField`'s pre-existing precedence at every call
+ * site that narrows this union with `isResolvedViewField`. */
+export type ResolvedViewEntry = ResolvedViewField | ResolvedViewNote;
+
+/** True for a resolved field entry, the discriminant every reader narrows
+ * on: a resolved entry carries `kind: "note"` for a note and no `kind` key
+ * at all for a field. */
+export function isResolvedViewField(entry: ResolvedViewEntry): entry is ResolvedViewField {
+  return !("kind" in entry);
+}
+
 export type AvailablePath = { id: PathId; key: string; label?: string };
 
 export type InstanceView = {
@@ -121,7 +144,7 @@ export type InstanceView = {
   // rather than transient instance state.
   baseLocale: LocaleCode;
   step: { id: StepId; key: string; label: LocalizedText; type: StepType };
-  fields: ResolvedViewField[];
+  fields: ResolvedViewEntry[];
   // The current step's `view.columns`, or 1 when the view declares none.
   // Reported for every status, the same way `step` is: it describes the step's
   // declared layout rather than instance state.
@@ -636,7 +659,7 @@ async function resolveFields(
   registry: DataSourceRegistry,
   db: SQL,
   committedData: Record<string, Literal> = instance.data as Record<string, Literal>,
-): Promise<ResolvedViewField[]> {
+): Promise<ResolvedViewEntry[]> {
   const ctx = buildGuardContext(body, instance, actor);
   const fieldsById = new Map(collectFieldsDeep(body.fields).map((f) => [f.id as string, f]));
   const dataSourcesById = new Map((body.dataSources ?? []).map((d) => [d.id as string, d]));
@@ -650,8 +673,13 @@ async function resolveFields(
     data: instance.data,
     baseLocale: body.baseLocale,
   };
-  const out: ResolvedViewField[] = [];
+  const out: ResolvedViewEntry[] = [];
   for (const vf of step.view?.fields ?? []) {
+    if (!isViewField(vf)) {
+      if (!resolveFlag(vf.visible, ctx, true)) continue;
+      out.push({ kind: "note", text: vf.text, group: vf.group, span: vf.span ?? 1 });
+      continue;
+    }
     const field = fieldsById.get(vf.ref as string);
     if (!field) continue; // publish-time invariant guarantees resolution; defensive only
     if (!resolveFlag(vf.visible, ctx, true)) continue;
@@ -681,13 +709,17 @@ async function resolveFields(
 }
 
 /** Visible-and-editable field ids (`visible && !readonly`), excluding group-container refs. */
-function editableFieldIds(resolved: ResolvedViewField[]): Set<string> {
-  return new Set(resolved.filter((r) => !isGroupField(r.field) && !r.readonly).map((r) => r.field.id as string));
+function editableFieldIds(resolved: ResolvedViewEntry[]): Set<string> {
+  return new Set(
+    resolved.filter(isResolvedViewField).filter((r) => !isGroupField(r.field) && !r.readonly).map((r) => r.field.id as string),
+  );
 }
 
 /** Visible-and-required field ids, excluding group-container refs. */
-function requiredFieldIds(resolved: ResolvedViewField[]): Set<string> {
-  return new Set(resolved.filter((r) => !isGroupField(r.field) && r.required).map((r) => r.field.id as string));
+function requiredFieldIds(resolved: ResolvedViewEntry[]): Set<string> {
+  return new Set(
+    resolved.filter(isResolvedViewField).filter((r) => !isGroupField(r.field) && r.required).map((r) => r.field.id as string),
+  );
 }
 
 /** Manual paths on `step` whose guard currently holds (guardless always qualifies). */
@@ -734,13 +766,13 @@ export interface DroppedAttribute {
  * it — the same rule `Action.output` already takes in the outbox.
  */
 function applyColumnMapping(
-  resolved: ResolvedViewField[],
+  resolved: ResolvedViewEntry[],
   submitted: Record<string, Literal>,
   fieldsById: Map<string, FieldDef>,
 ): { writes: Record<string, Literal>; dropped: DroppedAttribute[] } {
   const writes: Record<string, Literal> = {};
   const dropped: DroppedAttribute[] = [];
-  for (const rf of resolved) {
+  for (const rf of resolved.filter(isResolvedViewField)) {
     const mapping = rf.field.columnMapping;
     if (!mapping) continue;
     const picked = submitted[rf.field.id as string];
@@ -920,12 +952,12 @@ async function validateSubmissionData(
   registry: DataSourceRegistry,
   db: SQL,
   opts: { checkRequired: boolean; defaultedIds?: Set<string>; committedData?: Record<string, Literal> } = { checkRequired: true },
-): Promise<ResolvedViewField[]> {
+): Promise<ResolvedViewEntry[]> {
   const defaultedIds = opts.defaultedIds ?? new Set<string>();
   const resolved = await resolveFields(body, step, instance, actor, registry, db, opts.committedData);
-  const fieldsById = new Map(resolved.map((r) => [r.field.id as string, r]));
+  const fieldsById = new Map(resolved.filter(isResolvedViewField).map((r) => [r.field.id as string, r]));
   const catalogById = new Map(leafFields(body.fields).map((f) => [f.id as string, f]));
-  const viewFieldsByRef = new Map((step.view?.fields ?? []).map((vf) => [vf.ref as string, vf]));
+  const viewFieldsByRef = new Map((step.view?.fields ?? []).filter(isViewField).map((vf) => [vf.ref as string, vf]));
   const editable = editableFieldIds(resolved);
   const required = requiredFieldIds(resolved);
 

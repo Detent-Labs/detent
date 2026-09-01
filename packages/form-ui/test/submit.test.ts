@@ -19,12 +19,23 @@ describe("editableFieldIds", () => {
     ];
     expect(editableFieldIds(fields)).toEqual(new Set(["f1"]));
   });
+
+  it("contributes no key for a note, which carries no field of its own", () => {
+    const fields = [field("f1"), { kind: "note" as const, text: { en: "A note" } }];
+    expect(editableFieldIds(fields)).toEqual(new Set(["f1"]));
+  });
 });
 
 describe("filterToEditable", () => {
   it("keeps only editable-field entries from submitted data", () => {
     const fields = [field("f1"), field("f2", { readonly: true })];
     const result = filterToEditable({ f1: "a", f2: "b", f3: "c" }, fields);
+    expect(result).toEqual({ f1: "a" });
+  });
+
+  it("carries field keys alone past a note", () => {
+    const fields = [field("f1"), { kind: "note" as const, text: { en: "A note" } }];
+    const result = filterToEditable({ f1: "a", f3: "c" }, fields);
     expect(result).toEqual({ f1: "a" });
   });
 });

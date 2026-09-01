@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
 import type { LocaleCode } from "workflow-engine/schema";
-import type { ResolvedViewField, SubmissionIssue } from "./types.js";
+import { isResolvedViewField, type ResolvedViewEntry, type ResolvedViewField, type ResolvedViewNote, type SubmissionIssue } from "./types.js";
 import { booleanLabels, resolveText } from "./locale.js";
 import { issueMessage } from "./issue-messages.js";
 
 interface FieldFormProps {
-  fields: ResolvedViewField[];
+  fields: ResolvedViewEntry[];
   values: Record<string, unknown>;
   onChange: (fieldId: string, value: unknown) => void;
   locale: LocaleCode;
@@ -66,6 +66,43 @@ export function optionText(
   return [label, ...parts].join(OPTION_ATTRIBUTE_SEPARATOR);
 }
 
+/** A React key prefix per entry kind, so a reorder can never make React
+ * reuse a note's node for a field's or the reverse: a field keys by its
+ * stable `FieldId`, a note (which has none) keys by its position in the
+ * resolved array. */
+function entryKey(entry: ResolvedViewEntry, index: number): string {
+  return isResolvedViewField(entry) ? `field:${entry.field.id}` : `note:${index}`;
+}
+
+interface ViewEntryProps {
+  entry: ResolvedViewEntry;
+  allFields: ResolvedViewEntry[];
+  values: Record<string, unknown>;
+  onChange: (fieldId: string, value: unknown) => void;
+  locale: LocaleCode;
+  issuesByField?: Map<string, SubmissionIssue[]>;
+  columns?: 1 | 2;
+}
+
+/** Dispatches one resolved view entry to its renderer: a field reaches
+ * `FieldInput` unchanged, a note reaches `NoteText`. */
+function ViewEntryInput({ entry, allFields, values, onChange, locale, issuesByField, columns }: ViewEntryProps) {
+  if (!isResolvedViewField(entry)) {
+    return <NoteText note={entry} locale={locale} columns={columns} />;
+  }
+  return (
+    <FieldInput
+      field={entry}
+      allFields={allFields}
+      values={values}
+      onChange={onChange}
+      locale={locale}
+      issuesByField={issuesByField}
+      columns={columns}
+    />
+  );
+}
+
 /** Renders every root-level (non-nested) field from an `InstanceView` in a
  * `columns`-wide grid; a `group` field recurses into the fields that carry its
  * key as their `ResolvedViewField.group`, at that same width.
@@ -74,17 +111,17 @@ export function optionText(
  * wraps down, so a view array built before this grid existed lays out in the
  * order its `↑`/`↓` buttons already gave it. */
 export function FieldForm({ fields, values, onChange, locale, issuesByField, columns = 1 }: FieldFormProps) {
-  const roots = fields.filter((f) => !f.group);
+  const roots = fields.map((entry, index) => ({ entry, index })).filter(({ entry }) => !entry.group);
   return (
     // The wrapper carries the size container the collapse rule measures. A
     // container query matches descendants of the container, never the element
     // declaring it, so the grid cannot be its own container.
     <div className="form-ui-form">
       <div className="form-ui-field-form" data-columns={columns}>
-        {roots.map((f) => (
-          <FieldInput
-            key={f.field.id}
-            field={f}
+        {roots.map(({ entry, index }) => (
+          <ViewEntryInput
+            key={entryKey(entry, index)}
+            entry={entry}
             allFields={fields}
             values={values}
             onChange={onChange}
@@ -98,9 +135,21 @@ export function FieldForm({ fields, values, onChange, locale, issuesByField, col
   );
 }
 
+/** A note's text, at its place in the grid. Static text a participant reads:
+ * no form control, no label element and no required marker, so it takes no
+ * tab stop of its own. */
+function NoteText({ note, locale, columns = 1 }: { note: ResolvedViewNote; locale: LocaleCode; columns?: 1 | 2 }) {
+  const span = effectiveSpan(note.span, columns);
+  return (
+    <p className="form-ui-note" data-span={span}>
+      {resolveText(note.text, locale, locale)}
+    </p>
+  );
+}
+
 interface FieldInputProps {
   field: ResolvedViewField;
-  allFields: ResolvedViewField[];
+  allFields: ResolvedViewEntry[];
   values: Record<string, unknown>;
   onChange: (fieldId: string, value: unknown) => void;
   locale: LocaleCode;
@@ -127,14 +176,14 @@ export function FieldInput({ field, allFields, values, onChange, locale, issuesB
   const span = isGroup(field) ? columns : effectiveSpan(field.span, columns);
 
   if (def.type === "group") {
-    const children = allFields.filter((f) => f.group === def.key);
+    const children = allFields.map((c, i) => ({ c, i })).filter(({ c }) => c.group === def.key);
     return (
       <fieldset className="form-ui-field form-ui-field-group" data-span={span} data-columns={columns}>
         <legend>{label}</legend>
-        {children.map((c) => (
-          <FieldInput
-            key={c.field.id}
-            field={c}
+        {children.map(({ c, i }) => (
+          <ViewEntryInput
+            key={entryKey(c, i)}
+            entry={c}
             allFields={allFields}
             values={values}
             onChange={onChange}

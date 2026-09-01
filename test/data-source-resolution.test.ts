@@ -10,7 +10,7 @@ import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry } from "../src/engine/registry.js";
 import { createDataSourceRegistry, type DataSourceHandlerDef } from "../src/engine/registry.js";
 import { createDefaultDataSourceRegistry } from "../src/engine/host.js";
-import { createProcessInstance, getInstanceView, submitAndTransition, SubmissionValidationError } from "../src/runtime/api.js";
+import { createProcessInstance, getInstanceView, submitAndTransition, SubmissionValidationError, isResolvedViewField } from "../src/runtime/api.js";
 import { createUser, setDisplayName } from "../src/auth/users.js";
 import { createGroup, setGroupMembers } from "../src/auth/groups.js";
 import type { ProcessBody, ProcessId, PathId, Instance, FieldId } from "../src/schema/definition.js";
@@ -138,7 +138,7 @@ test.skipIf(!DB)("getInstanceView resolves a dataSource-bound field's options", 
   await publishBody(PID, dsBody(), reg, dsReg);
   const created = await createProcessInstance(PID, actor, dsReg);
   const view = await getInstanceView(created.instanceId, actor, dsReg);
-  const country = view.fields.find((f) => f.field.key === "country")!;
+  const country = view.fields.filter(isResolvedViewField).find((f) => f.field.key === "country")!;
   expect(country.options).toEqual(COUNTRY_OPTIONS);
 });
 
@@ -246,10 +246,10 @@ test.skipIf(!DB)("a retired value the instance holds stays visible and stays sub
 
   // The holder still sees it, with its label — not a bare key.
   const view = await getInstanceView(created.instanceId, actor, dsReg);
-  const country = view.fields.find((f) => f.field.key === "country")!;
+  const country = view.fields.filter(isResolvedViewField).find((f) => f.field.key === "country")!;
   expect(country.options).toContainEqual({ value: "cc_old", label: { en: "Old" } });
   // And a field nobody holds it for no longer offers it.
-  const tags = view.fields.find((f) => f.field.key === "tags")!;
+  const tags = view.fields.filter(isResolvedViewField).find((f) => f.field.key === "tags")!;
   expect(tags.options).toEqual([{ value: "cc1", label: { en: "One" } }]);
 
   // Resubmitting the unchanged value passes membership validation, which reads
@@ -346,7 +346,7 @@ test.skipIf(!DB)("an instance.query-bound field resolves through resolveFields/g
   const created = await createProcessInstance(READER, actor, dsReg);
 
   const view = await getInstanceView(created.instanceId, actor, dsReg);
-  const deviceField = view.fields.find((f) => f.field.key === "device")!;
+  const deviceField = view.fields.filter(isResolvedViewField).find((f) => f.field.key === "device")!;
   expect(deviceField.options).toEqual([{ value: device.instanceId, label: { en: "Widget" } }]);
 
   const updated = await submitAndTransition(created.instanceId, "path_r_done" as PathId, { field_device: device.instanceId } as unknown as Instance["data"], actor, dsReg);
@@ -426,7 +426,7 @@ test.skipIf(!DB)("a bare person field resolves one option per allowed group, the
   const created = await createProcessInstance(PERSON_PID, actor, dsReg);
   const view = await getInstanceView(created.instanceId, actor, dsReg);
 
-  const approver = view.fields.find((f) => f.field.key === "approver")!;
+  const approver = view.fields.filter(isResolvedViewField).find((f) => f.field.key === "approver")!;
   const values = approver.options!.map((o) => o.value);
   // Groups lead, in the declared order of allowedGroups. The member tail
   // follows in getGroupMembers' own order, which carries no ORDER BY, so the
@@ -448,7 +448,7 @@ test.skipIf(!DB)("a bare person field resolves an empty list when the body decla
   await publishBody(PERSON_PID, personBody([]), reg, dsReg);
   const created = await createProcessInstance(PERSON_PID, actor, dsReg);
   const view = await getInstanceView(created.instanceId, actor, dsReg);
-  expect(view.fields.find((f) => f.field.key === "approver")!.options).toEqual([]);
+  expect(view.fields.filter(isResolvedViewField).find((f) => f.field.key === "approver")!.options).toEqual([]);
 });
 
 test.skipIf(!DB)("a held value survives its account leaving the group, appended after the two layers", async () => {
@@ -461,7 +461,7 @@ test.skipIf(!DB)("a held value survives its account leaving the group, appended 
 
   await setGroupMembers(groupId, [userIds[0]!]);
   const view = await getInstanceView(created.instanceId, actor, dsReg);
-  const approver = view.fields.find((f) => f.field.key === "approver")!;
+  const approver = view.fields.filter(isResolvedViewField).find((f) => f.field.key === "approver")!;
   // The departed account is last: a survival entry, not an offer.
   expect(approver.options!.map((o) => o.value)).toEqual([groupId, userIds[0], userIds[1]]);
   expect(approver.options![2]!.label).toEqual({ en: "p4@example.com" });
@@ -477,7 +477,7 @@ test.skipIf(!DB)("a person field declaring a dataSource still resolves through t
   await publishBody(PERSON_PID, body as ProcessBody, reg, dsReg);
   const created = await createProcessInstance(PERSON_PID, actor, dsReg);
   const view = await getInstanceView(created.instanceId, actor, dsReg);
-  expect(view.fields.find((f) => f.field.key === "approver")!.options).toEqual(COUNTRY_OPTIONS);
+  expect(view.fields.filter(isResolvedViewField).find((f) => f.field.key === "approver")!.options).toEqual(COUNTRY_OPTIONS);
 });
 
 // D11: the stored value is the bare id, never an object carrying a name.

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Stamp } from "lucide-react";
-import { FieldForm, PathButtons, filterToEditable, resolveFieldsLocale } from "form-ui";
+import { FieldForm, PathButtons, filterToEditable, resolveFieldsLocale, isResolvedViewField } from "form-ui";
 import type { SubmissionIssue } from "form-ui";
 import {
   cancelInstance,
@@ -68,7 +68,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
   const applyView = useCallback((next: InstanceView) => {
     setView(next);
     const seeded: Record<string, unknown> = {};
-    for (const f of next.fields) seeded[f.field.id] = next.draft?.data[f.field.id] ?? f.value;
+    for (const f of next.fields.filter(isResolvedViewField)) seeded[f.field.id] = next.draft?.data[f.field.id] ?? f.value;
     setFormValues(seeded);
     setDraftRestoredAt(next.draft?.updatedAt);
   }, []);
@@ -232,7 +232,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
     ? resolveClaimControls(view.status, view.assignment, actorId, actorRoles)
     : { state: "none" };
 
-  const fieldIds = new Set(view?.fields.map((f) => f.field.id) ?? []);
+  const fieldIds = new Set(view?.fields.filter(isResolvedViewField).map((f) => f.field.id) ?? []);
   const issuesByField = new Map<string, SubmissionIssue[]>();
   const unmatchedIssues: SubmissionIssue[] = [];
   for (const issue of validationIssues) {

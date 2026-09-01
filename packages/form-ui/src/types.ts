@@ -37,6 +37,26 @@ export interface ResolvedViewField {
   span?: 1 | 2;
 }
 
+/** A resolved note: static text at its place in the view, carrying no
+ * value, no requiredness and no readonly state. `kind: "note"` is what a
+ * caller discriminates on — a resolved entry carrying no `kind` is a field
+ * entry. */
+export interface ResolvedViewNote {
+  kind: "note";
+  text: LocalizedText;
+  group?: string;
+  span?: 1 | 2;
+}
+
+/** A resolved view entry: a field entry or a note. */
+export type ResolvedViewEntry = ResolvedViewField | ResolvedViewNote;
+
+/** True for a resolved field entry, the discriminant every reader narrows
+ * on. */
+export function isResolvedViewField(entry: ResolvedViewEntry): entry is ResolvedViewField {
+  return !("kind" in entry);
+}
+
 export interface AvailablePath {
   id: string;
   key: string;

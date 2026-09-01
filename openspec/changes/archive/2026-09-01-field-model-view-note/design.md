@@ -363,8 +363,9 @@ makes that acceptable rather than a blocker.
 **Should a dangling `group` be a publish error?** An entry naming no real
 group renders nowhere, silently. This change keeps the current behavior for
 notes and fields alike. The answer changes no spec and no task here. It wants
-its own change, and a measurement first: no definition under `examples/`
-carries a dangling `group` today.
+its own change, and a measurement first: `purchase-requisition.json` alone
+carries 45 dangling `group` references across 6 of its 13 steps today,
+predating this change.
 
 **Can the form editor slip to a follow-up change?** Task group 5 builds the
 editor last. Until it lands, the JSON view is the only route to a note. That

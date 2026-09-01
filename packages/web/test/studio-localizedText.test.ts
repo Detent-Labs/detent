@@ -116,6 +116,17 @@ describe("collectUsedLocales", () => {
   it("falls back to en for a draft declaring no base locale", () => {
     expect(collectUsedLocales({} as Draft)).toEqual(["en"]);
   });
+
+  it("reaches a locale only a note's text declares", () => {
+    const draft = {
+      baseLocale: "en",
+      label: { en: "P" },
+      workflow: {
+        steps: [{ id: "step_a", label: { en: "A" }, view: { fields: [{ kind: "note", text: { en: "Note", fr: "Note-fr" } }] } }],
+      },
+    } as unknown as Draft;
+    expect(collectUsedLocales(draft)).toEqual(["en", "fr"]);
+  });
 });
 
 describe("localeGapCount", () => {
@@ -153,6 +164,19 @@ describe("localeGapCount", () => {
 
     expect(localeGapCount(draft, "de")).toBe(5);
     expect(localeGapCount(draft, "en")).toBe(0);
+  });
+
+  it("counts an untranslated note's text", () => {
+    const draft = {
+      baseLocale: "en",
+      label: { en: "P", fr: "P" },
+      workflow: {
+        steps: [
+          { id: "step_a", label: { en: "A", fr: "A" }, view: { fields: [{ kind: "note", text: { en: "Note" } }] } },
+        ],
+      },
+    } as unknown as Draft;
+    expect(localeGapCount(draft, "fr")).toBe(1);
   });
 });
 

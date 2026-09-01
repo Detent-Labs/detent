@@ -56,8 +56,9 @@ only the cancel-sink count.
 - `unmappableStep` present iff `onUnmappable === "route-to-step"`; migration
   maps reference valid ids.
 - Every `LocalizedText` value anywhere in the body (process, steps, fields
-  incl. nested `group` fields, field options) has a non-empty entry for
-  `ProcessBody.baseLocale`; other locales are optional per entry.
+  incl. nested `group` fields, field options, `ViewNote.text`) has a
+  non-empty entry for `ProcessBody.baseLocale`; other locales are optional
+  per entry.
 - Every CEL Expression parses and type-checks against the field catalog. The
   CEL step below enforces this one, not definition.ts, since it needs the CEL
   library.
@@ -69,7 +70,7 @@ only the cancel-sink count.
   compiled body on sight.
 - The authored body carries no key the definition contract does not declare.
   This applies at any depth: process, contract, field, data source, workflow,
-  step, path, action, timer, view field, validation. It includes fields
+  step, path, action, timer, view entry, validation. It includes fields
   nested inside a group. The compile pass checks this
   (`compile.ts::checkUnknownKeys`). The read path (`processBody.parse`)
   keeps stripping unchanged, so `definitionHash` stays reproducible.
@@ -118,8 +119,9 @@ only the cancel-sink count.
   dominates the entry's own step, a `contract.inputFields` entry, a literal
   catalog `default`, or an editable entry on a step that dominates the
   entry's own step), except on a step carrying no manual path, on a group or
-  technical field, on a ref-less entry, or on an entry declaring
-  `visible: false`. The compile pass checks this
+  technical field, on an entry carrying no `ref` (a note entry names no
+  field, so this rule has no field to look for a writer of), or on an entry
+  declaring `visible: false`. The compile pass checks this
   (`compile.ts::checkUnsatisfiableRequiredReadonly`), not a Zod refinement on
   `viewField` — see `definition-contract`'s placement rule.
 - A step whose `assignment.strategy.type === "org.group-members"` and whose

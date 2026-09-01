@@ -185,3 +185,14 @@
   display: flex;
   gap: var(--space-2);
 }
+
+/* Static text, not a field: no border box (the field border marks a
+   control, and a note has none), a left rule instead — the same "rules
+   organize, not shadow or color" register the fields around it follow. */
+.form-ui-note {
+  margin: 0;
+  padding: 0 0 0 var(--space-3);
+  border-left: 2px solid var(--color-border);
+  font-size: 14px;
+  color: var(--color-text);
+}

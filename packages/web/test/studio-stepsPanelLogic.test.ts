@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { nextStepKey } from "../src/areas/studio/panels/stepsPanelLogic.js";
+import { nextStepKey, configuredFieldCount } from "../src/areas/studio/panels/stepsPanelLogic.js";
 import { mergeLocalizedTextEntry } from "../src/areas/studio/draft/localized-text.js";
+import type { DraftViewEntry } from "../src/areas/studio/draft/view-layout.js";
 
 describe("nextStepKey", () => {
   it("derives a new step's key (key '') from its label", () => {
@@ -43,5 +44,26 @@ describe("nextStepKey", () => {
     // The key already reads as the base-locale derivation; the base-locale
     // text itself did not change, so the lock check sees no change to derive.
     expect(nextStepKey("manager_review", priorLabel, newLabel, "en", new Set())).toBe("manager_review");
+  });
+});
+
+describe("configuredFieldCount", () => {
+  it("counts field entries alone: one field entry beside three notes reports 1", () => {
+    const fields: DraftViewEntry[] = [
+      { ref: "field_a" } as unknown as DraftViewEntry,
+      { kind: "note", text: { en: "One" } },
+      { kind: "note", text: { en: "Two" } },
+      { kind: "note", text: { en: "Three" } },
+    ];
+    expect(configuredFieldCount(fields)).toBe(1);
+  });
+
+  it("reports 0 for a view holding notes alone", () => {
+    const fields: DraftViewEntry[] = [{ kind: "note", text: { en: "One" } }];
+    expect(configuredFieldCount(fields)).toBe(0);
+  });
+
+  it("reports 0 for an undefined view", () => {
+    expect(configuredFieldCount(undefined)).toBe(0);
   });
 });

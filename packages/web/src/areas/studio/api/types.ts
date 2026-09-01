@@ -1,7 +1,7 @@
 import type { LocalizedText, LocaleCode } from "workflow-engine/schema";
-import type { ResolvedViewField, AvailablePath, SubmissionIssue } from "form-ui";
+import type { ResolvedViewField, ResolvedViewEntry, AvailablePath, SubmissionIssue } from "form-ui";
 
-export type { LocalizedText, LocaleCode, ResolvedViewField, AvailablePath, SubmissionIssue };
+export type { LocalizedText, LocaleCode, ResolvedViewField, ResolvedViewEntry, AvailablePath, SubmissionIssue };
 
 export type { Actor, LoginResponse, ClientError, PublishIssue, VersionSummary, InstanceRecordElement, InstanceRecordPage } from "../../../api/types.js";
 
@@ -127,7 +127,7 @@ export interface InstanceView {
   kind: "published" | "test";
   baseLocale: LocaleCode;
   step: { id: string; key: string; label: LocalizedText; type: string };
-  fields: ResolvedViewField[];
+  fields: ResolvedViewEntry[];
   /** The step's declared form width. Optional here, unlike on the engine's own
    * type: a response predating the key omits it, and the form reads that as 1. */
   columns?: 1 | 2;

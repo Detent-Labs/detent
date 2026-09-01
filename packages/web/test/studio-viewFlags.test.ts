@@ -232,6 +232,16 @@ describe("checkViewFlags: hidden required field", () => {
     const body = withViewField(baseBody(), "step_a", { ref: "field_group", visible: false, required: true });
     expect(checkViewFlags(body)).toHaveLength(0);
   });
+
+  it("draws no finding for a note with visible: false, but still reports a field entry beside it", () => {
+    const b = structuredClone(baseBody()) as any;
+    b.workflow.steps[0].view = {
+      fields: [{ kind: "note", text: { en: "Note" }, visible: false }, { ref: "field_vendor", visible: false, required: true }],
+    };
+    const issues = checkViewFlags(b as Draft);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].message).toContain("vendor");
+  });
 });
 
 describe("checkViewFlags: unwritable required field", () => {
