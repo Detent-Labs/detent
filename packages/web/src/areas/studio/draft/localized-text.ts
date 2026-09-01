@@ -1,6 +1,7 @@
 import { localeCode } from "workflow-engine/schema";
 import type { Draft } from "./types";
 import { draftFields, type DraftField } from "./fields";
+import { isDraftViewField } from "./view-layout";
 
 /** A Draft's `LocalizedText` fields are deeply partial (`DraftOf`), unlike
  * the engine's schema-valid `LocalizedText` where the base-locale entry is
@@ -27,20 +28,25 @@ export function mergeLocalizedTextEntry(value: DraftLocalizedText, locale: strin
 }
 
 /** Every `LocalizedText` position in a Draft, visited once: the process
- * label and description, each step's label and description, each field's
- * label and description (recursing into a `group` field's sub-fields
- * through `draftFields`), and each field option's label.
+ * label and description, each step's label and description, each step's
+ * notes' text, each field's label and description (recursing into a
+ * `group` field's sub-fields through `draftFields`), and each field
+ * option's label.
  *
- * `collectUsedLocales`, `localeGapCount` and `missingTranslationWarning`
- * read the same set of entries, so they share this walk rather than
- * carrying three copies of it. A `LocalizedText` position added here
- * reaches all three at once. */
+ * `collectUsedLocales` and `localeGapCount` read the same set of entries, so
+ * they share this walk rather than carrying two copies of it. A
+ * `LocalizedText` position added here reaches both at once.
+ * `missingTranslationWarning` is not a third consumer: it reads one value at
+ * a time, and each render site calls it directly. */
 function forEachLocalizedEntry(draft: Draft, visit: (entry: DraftLocalizedText) => void): void {
   visit(draft.label);
   visit(draft.description);
   for (const step of draft.workflow?.steps ?? []) {
     visit(step.label);
     visit(step.description);
+    for (const entry of step.view?.fields ?? []) {
+      if (!isDraftViewField(entry)) visit(entry.text);
+    }
   }
   for (const field of draftFields(draft)) {
     visit(field.label);

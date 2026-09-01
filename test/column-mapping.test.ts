@@ -9,7 +9,7 @@ import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
-import { createProcessInstance, submitAndTransition, getInstanceView, SubmissionValidationError } from "../src/runtime/api.js";
+import { createProcessInstance, submitAndTransition, getInstanceView, SubmissionValidationError, isResolvedViewField } from "../src/runtime/api.js";
 import type { ProcessBody, ProcessId, PathId, StepId, Instance, InstanceEvent, FieldOption, FieldId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
@@ -188,7 +188,7 @@ test.skipIf(!DB)("creation applies the mapping too", async () => {
   expect((created.data as Record<string, unknown>).field_sku).toBe("A-1140");
   // And the view reads back what was written, not a value resolved on the fly.
   const view = await getInstanceView(created.instanceId, actor, dsReg, sql);
-  expect(view.fields.find((f) => f.field.id === "field_price")!.value).toBe(12.5);
+  expect(view.fields.filter(isResolvedViewField).find((f) => f.field.id === "field_price")!.value).toBe(12.5);
 });
 
 test.skipIf(!DB)("a field that is both a columnMapping target and carries its own default has that default overwritten by the mapping's write", async () => {
@@ -271,7 +271,7 @@ test.skipIf(!DB)("the view carries an option's attributes, unchanged from the ha
   const pid = await publish(mappingBody(), dsReg);
   const created = await createProcessInstance(pid, actor, dsReg, {}, sql);
   const view = await getInstanceView(created.instanceId, actor, dsReg, sql);
-  const picker = view.fields.find((f) => f.field.id === "field_product")!;
+  const picker = view.fields.filter(isResolvedViewField).find((f) => f.field.id === "field_product")!;
   expect(picker.options).toEqual(PRODUCTS);
   // The resolution layer neither adds an entry nor drops one.
   expect(picker.options!.find((o) => o.value === "bare")!.attributes).toBeUndefined();
@@ -362,5 +362,5 @@ test.skipIf(!DB)("a request writing a technical mapped target directly is reject
   expect((raised as SubmissionValidationError).issues).toEqual([{ kind: "readonly-field", fieldId: "field_price" as FieldId }]);
 
   const view = await getInstanceView(created.instanceId, actor, dsReg, sql);
-  expect(view.fields.find((f) => f.field.id === "field_price")?.value).toBeUndefined();
+  expect(view.fields.filter(isResolvedViewField).find((f) => f.field.id === "field_price")?.value).toBeUndefined();
 });

@@ -616,8 +616,36 @@ export const viewField = z
   });
 export type ViewField = z.infer<typeof viewField>;
 
+/** Static text at its place in a step's view, referencing no field. The
+ * union's only discriminant: a field entry carries no `kind` at all, rather
+ * than a literal marking it as a field, because this schema also
+ * deserializes stored immutable bodies, and a required discriminant would
+ * make an already-published body throw on read. */
+export const viewNote = z.object({
+  kind: z.literal("note"),
+  text: localizedText,
+  visible: z.union([z.boolean(), expression]).optional(),
+  group: z.string().optional(),
+  span: z.union([z.literal(1), z.literal(2)]).optional(),
+});
+export type ViewNote = z.infer<typeof viewNote>;
+
+/** A view entry is a note or a field reference. `viewNote` comes first: an
+ * entry carrying `kind: "note"` plus a stray field-only key (e.g. `ref`)
+ * must parse as a note, not silently as a field with the stray key
+ * stripped. Zod tries union members in order and takes the first that
+ * parses. */
+export const viewEntry = z.union([viewNote, viewField]);
+export type ViewEntry = z.infer<typeof viewEntry>;
+
+/** True for a field entry (no `kind`), the discriminant every reader outside
+ * this schema narrows on. */
+export function isViewField(entry: ViewEntry): entry is ViewField {
+  return !("kind" in entry);
+}
+
 export const view = z.object({
-  fields: z.array(viewField),
+  fields: z.array(viewEntry),
   /** How many columns the step's form lays its root fields out in. Layout
    * only, like `ViewField.span`. Absent means 1, which is the single stacked
    * column every body written before this key parsed to, so no stored body
@@ -879,7 +907,11 @@ export const processBody = z
       // sink has no onEntry, so this reduces to disjointness among onCancel.
       disjointOutputs([...(s.onCancel ?? []), ...(sink?.onEntry ?? [])], ["workflow", "steps", i, "onCancel"]);
       (s.view?.fields ?? []).forEach((vf, j) => {
-        if (!fieldIds.has(vf.ref)) add(`view ref does not resolve: ${vf.ref}`, ["workflow", "steps", i, "view", "fields", j, "ref"]);
+        if (isViewField(vf)) {
+          if (!fieldIds.has(vf.ref)) add(`view ref does not resolve: ${vf.ref}`, ["workflow", "steps", i, "view", "fields", j, "ref"]);
+        } else {
+          requireBaseLocale(vf.text, ["workflow", "steps", i, "view", "fields", j, "text"]);
+        }
       });
       (s.timers ?? []).forEach((t, j) => {
         const tp = t.onFire.targetPath;

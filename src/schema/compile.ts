@@ -41,6 +41,7 @@ import {
   RESERVED_ACTION_PREFIX,
   ALLOWED_BY_TYPE,
   formatMatches,
+  isViewField,
   type Action,
   type BaseFieldType,
   type FieldControl,
@@ -299,6 +300,20 @@ const LEAF_TYPES = new Set([
  * object always carries a string `lang`. Any other plain-object value is
  * left unmatched, which is the correct answer for an opaque `Literal` — no
  * key-set check, no recursion into it at all.
+ *
+ * A union whose object members include one declaring a literal `kind` key
+ * (the view entry union: `viewNote` carries `kind`, `viewField` does not)
+ * takes a discriminant match ahead of the single-object-member rule below.
+ * A string `kind` matching a member's literal picks that member. Every
+ * other value — an absent `kind`, a `kind` no member's literal equals, or a
+ * non-string `kind` — matches the member declaring no `kind` at all. Landing
+ * on no member instead would skip the unknown-key check entirely for that
+ * value (`walkSchema`'s union branch checks no keys when the match is
+ * `undefined`), which is what lets `checkUnknownKeys` report an unrecognized
+ * `kind` as a located issue rather than silently stripping it. No other union
+ * this walker reaches declares `kind` on an object member, so this gate
+ * changes nothing elsewhere (`FieldDef.default`'s `Expression` member has no
+ * `kind` key of its own).
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function unionObjectMatch(options: any[], value: Record<string, unknown>): z.ZodTypeAny | undefined {
@@ -306,6 +321,24 @@ function unionObjectMatch(options: any[], value: Record<string, unknown>): z.Zod
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const typeOf = (m: any): string | undefined => m?._zod?.def?.type;
   const objectMembers = unwrapped.filter((m) => typeOf(m) === "object");
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const shapeOf = (m: any): Record<string, unknown> | undefined => m?.shape;
+  const kindMembers = objectMembers.filter((m) => {
+    const shape = shapeOf(m);
+    return shape && "kind" in shape && typeOf(shape.kind) === "literal";
+  });
+  if (kindMembers.length > 0) {
+    const noKindMembers = objectMembers.filter((m) => !kindMembers.includes(m));
+    if (noKindMembers.length !== 1) return undefined;
+    if (typeof value.kind === "string") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const match = kindMembers.find((m) => (shapeOf(m)!.kind as any)._zod.def.values.includes(value.kind));
+      if (match) return match;
+    }
+    return noKindMembers[0];
+  }
+
   const ambiguousMembers = unwrapped.filter((m) => typeOf(m) !== "object" && !LEAF_TYPES.has(typeOf(m) ?? ""));
 
   // No known union site in this schema produces zero or two-plus object
@@ -764,9 +797,11 @@ function collectExpressionSites(body: ProcessBody): ExpressionSite[] {
     });
     (s.view?.fields ?? []).forEach((vf, vi) => {
       push(vf.visible, `${sloc}.view.fields[${vi}].visible`);
-      push(vf.required, `${sloc}.view.fields[${vi}].required`);
-      push(vf.readonly, `${sloc}.view.fields[${vi}].readonly`);
-      push(vf.validation?.rule, `${sloc}.view.fields[${vi}].validation.rule`);
+      if (isViewField(vf)) {
+        push(vf.required, `${sloc}.view.fields[${vi}].required`);
+        push(vf.readonly, `${sloc}.view.fields[${vi}].readonly`);
+        push(vf.validation?.rule, `${sloc}.view.fields[${vi}].validation.rule`);
+      }
     });
     if (s.subprocess) {
       Object.entries(s.subprocess.inputMapping ?? {}).forEach(([fid, e]) => push(e, `${sloc}.subprocess.inputMapping.${fid}`));

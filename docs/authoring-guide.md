@@ -473,8 +473,9 @@ The example has seven steps. `capture` is the initial step. `booked` and
 
 ### View
 
-What a step shows. The view names catalog fields. It overrides how this step
-presents each one: visible, required, readonly, its span, its order, its group.
+What a step shows. A view entry either names a catalog field or stands alone
+as a note. A field entry overrides how this step presents that field:
+visible, required, readonly, its span, its order, its group.
 
 Requiredness lives in the view, never in the catalog. One step can demand a
 field that the next step only displays.
@@ -553,6 +554,31 @@ one column, whatever it declares. The stored values again stay as they are.
 A group takes the form's own column count. It declares none of its own, and
 it always fills the form's width. A `span` on a group is not read: two columns
 inside the group need the room two columns take.
+
+#### Note, readonly field, or group
+
+Three ways to put text a participant does not change onto a step, and each
+answers a different question.
+
+A **readonly field** names a catalog field. It holds a value, one written
+somewhere else and only displayed here. Use it when the text on screen is
+data: an amount from an earlier step, a status the engine set.
+
+A **group** also names a catalog field, one that holds child fields. Use it
+to organize related inputs under one heading, not to display static text.
+
+A **note** names no field at all. It carries `text` (a `LocalizedText`, the
+same shape a field's `label` uses) and nothing to submit. Use it for
+instructional or explanatory copy that exists only on this step's form. A
+warning above a decision. A reminder of what a value means. A line no field
+in the catalog should carry as its label.
+
+A note takes the same `visible`, `group` and `span` a field entry takes. It
+can sit inside a group. It can hide behind a guard exactly as a field does.
+It never takes `required`, `readonly`, `validation` or `validationMode`:
+there is no field underneath for any of those to describe. Its `text` needs
+a non-empty entry for the process's `baseLocale`, the rule every
+`LocalizedText` follows.
 
 ### Path
 

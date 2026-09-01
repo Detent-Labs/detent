@@ -25,7 +25,7 @@
 
 import { Environment, parse, serialize } from "@marcbachmann/cel-js";
 import type { ASTNode } from "@marcbachmann/cel-js";
-import { leafFields, collectFieldsDeep } from "../schema/definition.js";
+import { leafFields, collectFieldsDeep, isViewField } from "../schema/definition.js";
 import type { ProcessBody, FieldDef, Expression, MigrationSpec } from "../schema/definition.js";
 import { collect as collectFullActionSites } from "../engine/registry-check.js";
 import { PROCESS_START_ACTION_TYPE } from "../engine/registry.js";
@@ -231,13 +231,15 @@ function collect(body: ProcessBody): Site[] {
     });
     (s.view?.fields ?? []).forEach((vf, vi) => {
       push(asExpr(vf.visible), `${sloc}.view.fields[${vi}].visible`, false, child);
-      push(asExpr(vf.required), `${sloc}.view.fields[${vi}].required`, false, child);
-      push(asExpr(vf.readonly), `${sloc}.view.fields[${vi}].readonly`, false, child);
-      // Unlike the three flags above, this runs during submission against
-      // buildGuardContext(body, mergedInstance, actor), which registers no
-      // `child` on any step type — so this site takes `child: false` always,
-      // not `child` from the enclosing step.
-      push(vf.validation?.rule, `${sloc}.view.fields[${vi}].validation.rule`, false, false);
+      if (isViewField(vf)) {
+        push(asExpr(vf.required), `${sloc}.view.fields[${vi}].required`, false, child);
+        push(asExpr(vf.readonly), `${sloc}.view.fields[${vi}].readonly`, false, child);
+        // Unlike the two flags above, this runs during submission against
+        // buildGuardContext(body, mergedInstance, actor), which registers no
+        // `child` on any step type — so this site takes `child: false` always,
+        // not `child` from the enclosing step.
+        push(vf.validation?.rule, `${sloc}.view.fields[${vi}].validation.rule`, false, false);
+      }
     });
     if (s.subprocess) {
       Object.entries(s.subprocess.inputMapping).forEach(([fid, e]) =>

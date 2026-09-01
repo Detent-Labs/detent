@@ -987,6 +987,38 @@ Repeat the walk in German. Pass: the Visible, Required and Read-only labels
 and the checks rail heading translate. The two new rail messages stay in
 English, the same as every other engine-validator message the rail shows.
 
+### The note card in the form editor (`field-model-view-note`)
+
+`insertNote`, `moveViewField` and `insertViewNote`'s dedup rule are pure
+functions with their own `bun:test` coverage
+(`studio-view-layout.test.ts`), and `FieldForm`'s order, group nesting,
+hidden case and no-tab-stop rendering carry their own coverage too
+(`field-form.test.tsx`). This walk is the one thing neither suite reaches:
+whether the real screen wires those functions to a click.
+
+Open Studio, `purchase-requisition`, step `finance_review`, the form
+editor. Pass: the palette carries a "Notes" heading and an "Add a note"
+button, below the catalog field list. Select the existing note card. Pass:
+its own strip opens, reading "Note", with a `text` box, a Visible
+checkbox, a span control and a group control — the same group control a
+field card's strip offers.
+
+Edit the `text` box. Pass: the canvas card's own preview text updates as
+you type. Click Move up. Pass: the card moves one slot toward the front of
+the list, the same slot a drag there would give it. Click Remove. Pass:
+the card leaves the list and the "Add a note" button still offers a fresh
+one. Click "Add a note". Pass: a new card appears, seeded with non-empty
+placeholder text, selected, its own strip open.
+
+Open the diagnostics drawer. Pass: it still reads issues for this step,
+never blanks. Clear the new note's `text` box to empty and reopen the
+drawer. Pass: it names exactly one Zod issue, the missing base-locale
+entry, and every other check the step already carried still shows. Restore
+the text or remove the card before leaving.
+
+Open the palette again. Pass: every catalog field still listed there sits
+above the Notes section, unaffected by anything just done to a note.
+
 <!-- antislop: allow-file synonym-rotation -->
 <!-- Why: this file already carries the rule's two collisions elsewhere.
      "JSON surface" is `.claude/rules/ui-glossary.md`'s fixed name, and an
@@ -1009,7 +1041,7 @@ column header shows the step's `key` beside its label; each row header
 shows the field's `key` beside its `type`.
 
 Pass: a toolbar sits above the grid. It carries a "Hide inert columns"
-toggle, a count line reading "54 view entries · 22 fields × 13 steps ·
+toggle, a count line reading "54 field entries · 22 fields × 13 steps ·
 232 cells the visible steps do not declare", and a seven-line legend,
 visible with no click or hover.
 

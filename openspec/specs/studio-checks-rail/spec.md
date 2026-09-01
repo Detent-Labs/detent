@@ -400,6 +400,11 @@ Two combinations of view flags stop a step, and the rail SHALL report
 both. Each reads off `view.fields[]` alone. Each carries the `view`
 source, and each anchors on the step that holds the view entry.
 
+Both states SHALL read field entries alone. A note carries no `required`
+and no `readonly`, so neither state can describe one. The rail SHALL skip
+a note rather than report it. Each state names the field it found, and a
+note names no field.
+
 The first is a hidden requirement. A view entry with `visible` false and
 `required` true drops the requirement without a word. `resolveFields`
 removes the field before `requiredFieldIds` counts it. The rail SHALL
@@ -477,6 +482,17 @@ requirement exists there to drop or to strand.
   carrying `required: true`
 - **THEN** the rail shows no entry for it, whatever `visible` and
   `readonly` hold
+
+#### Scenario: A note draws no view-flag finding
+
+- **WHEN** a step's view carries a note whose `visible` is false
+- **THEN** the rail reports no hidden-requirement finding for that entry
+
+#### Scenario: A field entry beside a note still draws its finding
+
+- **WHEN** a step's view carries a note and a field entry with `visible` false
+  and `required` true
+- **THEN** the rail reports the hidden requirement, and names that field
 
 ### Requirement: The rail reports an unwritten technical field
 

@@ -200,6 +200,13 @@ export const en = {
   "formEditor.group": "group",
   "formEditor.noGroup": "(none)",
   "formEditor.unnamedField": "(unnamed field)",
+  "formEditor.noteSectionHeading": "Notes",
+  "formEditor.addNote": "Add a note",
+  "formEditor.noteHeading": "Note",
+  "formEditor.noteText": "text",
+  "formEditor.newNoteText": "New note",
+  "formEditor.noteType": "note",
+  "formEditor.emptyNote": "(empty note)",
 
   // The condition builder. "guard", "visible"/"required"/"readonly" and the CEL
   // operators stay untranslated, per this file's header: they name the JSON the
@@ -275,7 +282,7 @@ export const en = {
   "fieldMatrix.scrollRegionLabel": "Field matrix grid",
   "fieldMatrix.hatchedCell": "No view on this step",
   "fieldMatrix.hideInertToggle": "Hide inert columns",
-  "fieldMatrix.countLine": "{declared} view entries · {fields} fields × {steps} steps · {cells} cells the visible steps do not declare",
+  "fieldMatrix.countLine": "{declared} field entries · {fields} fields × {steps} steps · {cells} cells the visible steps do not declare",
   "fieldMatrix.legendBulk": "A bulk badge sets the whole column or row it sits on.",
   "fieldMatrix.legendDefault": "A control left at its default writes no key.",
   "fieldMatrix.legendCel": "CEL marks an expression, not a fixed value.",

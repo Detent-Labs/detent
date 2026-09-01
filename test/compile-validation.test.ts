@@ -88,6 +88,12 @@ describe("compile: unknown-key rejection", () => {
     expect(() => compileProcessBody(baseBody() as ProcessBody)).not.toThrow();
   });
 
+  it("a body carrying a note beside a field entry raises no unknown-key issue", () => {
+    const b = baseBody();
+    b.workflow.steps[0].view = { fields: [{ kind: "note", text: { en: "Note" } }, { ref: "field_amount" }] };
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
   // migrate-to-zod-v4: the key sets behind this check come from `shapeKeys`,
   // which reads `.shape` off each schema at module load, so a Zod upgrade can
   // move what they contain.
@@ -236,6 +242,49 @@ describe("compile: unknown-key rejection", () => {
     expect(() => compileProcessBody(structuredClone(b) as ProcessBody)).not.toThrow();
     const parsed = processBody.parse(b);
     expect(canonicalize(parsed)).toEqual(canonicalize(b));
+  });
+});
+
+describe("compile: view note entries", () => {
+  it("reports an unknown key on a note entry", () => {
+    const b = baseBody();
+    b.workflow.steps[0].view = { fields: [{ kind: "note", text: { en: "Note" }, txet: "oops" }] };
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "workflow.steps[0].view.fields[0].txet" && i.value === "txet")).toBe(true);
+  });
+
+  it("still reports an unknown key on a field entry beside a note", () => {
+    const b = baseBody();
+    b.workflow.steps[0].view = {
+      fields: [{ kind: "note", text: { en: "Note" } }, { ref: "field_amount", requried: true }],
+    };
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "workflow.steps[0].view.fields[1].requried" && i.value === "requried")).toBe(true);
+  });
+
+  it("rejects a note entry that also carries ref", () => {
+    const b = baseBody();
+    b.workflow.steps[0].view = { fields: [{ kind: "note", text: { en: "Note" }, ref: "field_amount" }] };
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "workflow.steps[0].view.fields[0].ref" && i.value === "ref")).toBe(true);
+  });
+
+  it("rejects a view entry whose kind names no member, rather than publishing it as a field with the two keys stripped", () => {
+    const b = baseBody();
+    b.workflow.steps[0].view = { fields: [{ kind: "notes", ref: "field_amount", text: { en: "x" } }] };
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "workflow.steps[0].view.fields[0].kind" && i.value === "kind")).toBe(true);
+    expect(err.issues.some((i) => i.loc === "workflow.steps[0].view.fields[0].text")).toBe(true);
+  });
+
+  it("a note beside an unwritten required-and-readonly field entry holds that rejection and draws nothing of its own", () => {
+    const b = baseBody();
+    b.workflow.steps[0].view = {
+      fields: [{ kind: "note", text: { en: "Note" } }, { ref: "field_amount", required: true, readonly: true }],
+    };
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc.startsWith("steps[0].view.fields[1]"))).toBe(true);
+    expect(err.issues.some((i) => i.loc.startsWith("steps[0].view.fields[0]"))).toBe(false);
   });
 });
 
@@ -421,6 +470,15 @@ describe("compile: authored strings are length-bounded", () => {
     };
     const err = rejects(b);
     expect(err.issues.some((i) => i.loc === "steps[0].view.fields[0].validation.rule")).toBe(true);
+  });
+
+  it("rejects an over-long note visible expression", () => {
+    const b = baseBody();
+    b.workflow.steps[0].view = {
+      fields: [{ kind: "note", text: { en: "Note" }, visible: cel("true == true && " + "a".repeat(MAX_EXPRESSION_LENGTH)) }],
+    };
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "steps[0].view.fields[0].visible")).toBe(true);
   });
 });
 

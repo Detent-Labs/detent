@@ -1,13 +1,16 @@
 import { describe, expect, it } from "bun:test";
-import type { FieldId } from "workflow-engine/schema";
+import { authoredProcessBody, type FieldId } from "workflow-engine/schema";
 import {
   clampSpan,
   dropSlot,
   insertViewField,
+  insertViewNote,
+  isDraftViewField,
   moveViewField,
   nudgeViewField,
   reorderIndex,
   unplacedRefs,
+  type DraftViewEntry,
   type DraftViewField,
 } from "../src/areas/studio/draft/view-layout";
 
@@ -129,6 +132,56 @@ describe("insertViewField places a palette field at the drop slot", () => {
     const start = rows("a", "b");
     expect(insertViewField(start, id("a"), 0)).toBe(start);
   });
+
+  it("dedups against field entries alone: a note beside a matching-looking entry does not block the insert", () => {
+    const start: DraftViewEntry[] = [{ kind: "note", text: { en: "hi" } }, { ref: id("a") }];
+    expect(refs(insertViewField(start, id("b"), 2).filter(isDraftViewField))).toEqual(["a", "b"]);
+  });
+});
+
+describe("insertViewNote places a note at the drop slot, with no dedup", () => {
+  it("inserts at the slot", () => {
+    const start: DraftViewEntry[] = [{ ref: id("a") }, { ref: id("c") }];
+    const next = insertViewNote(start, { en: "Note" }, 1);
+    expect(next).toEqual([{ ref: id("a") }, { kind: "note", text: { en: "Note" } }, { ref: id("c") }]);
+  });
+
+  it("appends past the end", () => {
+    const next = insertViewNote(rows("a"), { en: "Note" }, 9);
+    expect(next[1]).toEqual({ kind: "note", text: { en: "Note" } });
+  });
+
+  it("places a second note beside the first: a note names no catalog field, so nothing dedups it", () => {
+    const first = insertViewNote([], { en: "One" }, 0);
+    const both = insertViewNote(first, { en: "Two" }, 1);
+    expect(both).toEqual([
+      { kind: "note", text: { en: "One" } },
+      { kind: "note", text: { en: "Two" } },
+    ]);
+  });
+
+  it("leaves authoredProcessBody.safeParse succeeding: the seeded non-empty base-locale text satisfies the note's own invariant", () => {
+    const body = {
+      key: "p",
+      label: { en: "P" },
+      baseLocale: "en",
+      fields: [{ id: "field_a", key: "a", label: { en: "A" }, type: "string" }],
+      workflow: {
+        initialStep: "step_a",
+        steps: [
+          {
+            id: "step_a",
+            key: "a",
+            label: { en: "A" },
+            type: "task",
+            terminal: true,
+            view: { fields: insertViewNote([{ ref: id("field_a") }], { en: "New note" }, 1) },
+          },
+        ],
+      },
+    };
+    expect(authoredProcessBody.safeParse(body).success).toBe(true);
+  });
 });
 
 describe("unplacedRefs is the palette's content", () => {
@@ -138,6 +191,11 @@ describe("unplacedRefs is the palette's content", () => {
 
   it("empties once every field is placed", () => {
     expect(unplacedRefs([id("a"), id("b")], rows("b", "a"))).toEqual([]);
+  });
+
+  it("a note marks no catalog field as used: the palette still offers every field the notes sit beside", () => {
+    const view: DraftViewEntry[] = [{ kind: "note", text: { en: "hi" } }, { ref: id("b") }];
+    expect(unplacedRefs([id("a"), id("b"), id("c")], view)).toEqual([id("a"), id("c")]);
   });
 });
 

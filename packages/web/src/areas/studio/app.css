@@ -1926,6 +1926,10 @@ tr[data-group="true"] .studio-matrix-row-header {
   overflow-wrap: anywhere;
 }
 
+.studio-form-add-note {
+  margin: var(--space-2) var(--space-3);
+}
+
 .studio-form-palette-type {
   font-family: var(--font-mono);
   color: var(--color-text-muted);
@@ -2041,6 +2045,16 @@ tr[data-group="true"] .studio-matrix-row-header {
   flex: 1;
   min-width: 0;
   font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+/* A note's own preview text is prose, not a machine value, so it takes the
+   body face rather than `.studio-form-card-key`'s mono — the note's own
+   "kind" still reads there, in `.studio-form-card-type`, since that slot
+   already carries a machine-matched value for every other card. */
+.studio-form-card-note-preview {
+  flex: 1;
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 

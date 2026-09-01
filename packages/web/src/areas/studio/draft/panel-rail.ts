@@ -1,6 +1,7 @@
 import type { Step } from "workflow-engine/schema";
 import type { DraftOf } from "./types";
 import type { DraftField } from "./fields";
+import { isDraftViewField, type DraftViewEntry } from "./view-layout";
 import type { EditorIssue, EntityType, IssueSource } from "./issues";
 import type { PanelView } from "../routing";
 
@@ -15,20 +16,24 @@ type DraftStep = DraftOf<Step>;
  * `fields` counts rail rows, not catalog entries: a group field contributes
  * itself and its children, which is what either rail lists.
  *
- * `matrix` counts live cells: every `view.fields[]` entry across every step,
- * the same total the field matrix's grid draws one live cell per.
+ * `matrix` counts live cells: every field entry across every step, the same
+ * total the field matrix's grid draws one live cell per. A note occupies no
+ * cell, so it raises this count by none.
  */
 export function panelEntityCounts(draft: {
   fields?: DraftField[];
   dataSources?: unknown[];
   contract?: { outcomes?: unknown[] };
-  workflow?: { steps?: { view?: { fields?: unknown[] } }[] };
+  workflow?: { steps?: { view?: { fields?: DraftViewEntry[] } }[] };
 }): Record<PanelView, number> {
   return {
     fields: flattenRailFields(draft.fields).length,
     dataSources: (draft.dataSources ?? []).length,
     contract: (draft.contract?.outcomes ?? []).length,
-    matrix: (draft.workflow?.steps ?? []).reduce((sum, step) => sum + (step.view?.fields?.length ?? 0), 0),
+    matrix: (draft.workflow?.steps ?? []).reduce(
+      (sum, step) => sum + (step.view?.fields?.filter(isDraftViewField).length ?? 0),
+      0,
+    ),
   };
 }
 

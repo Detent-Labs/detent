@@ -738,6 +738,13 @@
                 "readonly": true
               },
               {
+                "kind": "note",
+                "text": {
+                  "en": "Approving here commits budget. Confirm the vendor and amount above match the attached quote before deciding."
+                },
+                "span": 2
+              },
+              {
                 "ref": "field_9c7e5b31-0013-4a1c-8e2f-000000000013",
                 "group": "Decision",
                 "readonly": true,

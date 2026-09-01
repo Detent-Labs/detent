@@ -13,7 +13,7 @@ import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { flattenDraftFields } from "../draft/fields";
 import { flattenRailFields } from "../draft/panel-rail";
-import type { DraftViewField } from "../draft/view-layout";
+import { isDraftViewField, type DraftViewField } from "../draft/view-layout";
 import { effectiveFlag, FLAG_DEFAULT, gatedKeys, setFlag, type FlagKey, type WrittenAccessor } from "../draft/view-flags";
 import type { BoolOrExpr } from "./shared/overrideMode";
 import { isExpression } from "./shared/overrideMode";
@@ -58,15 +58,16 @@ export type CellState = "hatched" | "blank" | "live";
  * names this row's field. Live: such an entry exists. */
 export function cellState(step: DraftStep, fieldId: string): CellState {
   if (step.view === undefined) return "hatched";
-  const entry = (step.view.fields ?? []).find((f) => f.ref === fieldId);
+  const entry = (step.view.fields ?? []).filter(isDraftViewField).find((f) => f.ref === fieldId);
   return entry === undefined ? "blank" : "live";
 }
 
-/** A live cell's entry and its array index, the index a write needs. */
+/** A live cell's entry and its array index, the index a write needs. A note
+ * matches no field id, since it carries no `ref`. */
 export function cellEntry(step: DraftStep, fieldId: string): { entry: DraftViewField; index: number } | undefined {
   const fields = step.view?.fields ?? [];
-  const index = fields.findIndex((f) => f.ref === fieldId);
-  return index === -1 ? undefined : { entry: fields[index]!, index };
+  const index = fields.findIndex((f) => isDraftViewField(f) && f.ref === fieldId);
+  return index === -1 ? undefined : { entry: fields[index] as DraftViewField, index };
 }
 
 /** A step with no `view` at all hides its whole column when `hideInert` is
@@ -84,12 +85,13 @@ export interface DrawnStep {
   index: number;
 }
 
-/** The toolbar's count line: declared view entries, the field count, the
+/** The toolbar's count line: declared field entries, the field count, the
  * count of steps the grid currently draws, and the number of cells among
- * those steps that carry no entry (`studio-app`'s toolbar requirement).
- * `drawnSteps` is already `hideInert`-filtered; `declaredEntries` over it
- * equals the total over every step, since a filtered-out step declares no
- * view and so contributes no entries either way. */
+ * those steps that carry no entry (`studio-app`'s toolbar requirement). A
+ * note occupies no cell, so it raises neither the first nor the fourth
+ * number. `drawnSteps` is already `hideInert`-filtered; `declaredEntries`
+ * over it equals the total over every step, since a filtered-out step
+ * declares no view and so contributes no entries either way. */
 export interface MatrixCounts {
   declaredEntries: number;
   fieldCount: number;
@@ -98,7 +100,7 @@ export interface MatrixCounts {
 }
 
 export function matrixCounts(rows: FieldMatrixRow[], drawnSteps: DraftStep[]): MatrixCounts {
-  const declaredEntries = drawnSteps.reduce((sum, step) => sum + (step.view?.fields?.length ?? 0), 0);
+  const declaredEntries = drawnSteps.reduce((sum, step) => sum + (step.view?.fields?.filter(isDraftViewField).length ?? 0), 0);
   const fieldCount = rows.length;
   const stepCount = drawnSteps.length;
   return { declaredEntries, fieldCount, stepCount, undeclaredCells: fieldCount * stepCount - declaredEntries };
@@ -196,9 +198,9 @@ export function applyBulkToggle(
   for (const { target } of eligible) {
     const fields = steps[target.stepIndex]?.view?.fields;
     if (!fields) continue;
-    const idx = fields.findIndex((f) => f.ref === target.fieldId);
+    const idx = fields.findIndex((f) => isDraftViewField(f) && f.ref === target.fieldId);
     if (idx === -1) continue;
-    fields[idx] = setFlag(fields[idx]!, key, next);
+    fields[idx] = setFlag(fields[idx] as DraftViewField, key, next);
   }
 }
 

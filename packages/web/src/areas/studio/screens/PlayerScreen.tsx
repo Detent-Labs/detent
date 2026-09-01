@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { FieldForm, PathButtons, filterToEditable, resolveFieldsLocale } from "form-ui";
+import { FieldForm, PathButtons, filterToEditable, resolveFieldsLocale, isResolvedViewField } from "form-ui";
 import type { SubmissionIssue } from "form-ui";
 import { createInstance, createTestInstance, getInstanceView, submitPath, claimStep, releaseClaim, getInstanceRecord, StudioClientError } from "../api/client.js";
 import type { InstanceView, InstanceRecordElement } from "../api/types.js";
@@ -156,7 +156,7 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
       .catch(failRecord);
   }, [instanceId, recordCursor, token, failRecord]);
 
-  const fieldIds = new Set(view?.fields.map((f) => f.field.id) ?? []);
+  const fieldIds = new Set(view?.fields.filter(isResolvedViewField).map((f) => f.field.id) ?? []);
   const issuesByField = new Map<string, SubmissionIssue[]>();
   const unmatchedIssues: SubmissionIssue[] = [];
   for (const issue of validationIssues) {

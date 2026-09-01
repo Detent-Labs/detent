@@ -1261,6 +1261,26 @@ components:
             it to the view's own column count.
       required: [field, required, readonly, span]
 
+    ResolvedViewNote:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [note]
+        text:
+          $ref: "#/components/schemas/LocalizedText"
+        group:
+          type: string
+        span:
+          type: integer
+          enum: [1, 2]
+          description: >-
+            How many of the view's columns this note occupies, resolved from
+            the matching `ViewNote.span` and 1 when the view declares none.
+            This is the declared span, not the drawn one — the renderer
+            clamps it to the view's own column count.
+      required: [kind, text]
+
     AvailablePath:
       type: object
       properties:
@@ -1298,7 +1318,9 @@ components:
         fields:
           type: array
           items:
-            $ref: "#/components/schemas/ResolvedViewField"
+            oneOf:
+              - $ref: "#/components/schemas/ResolvedViewField"
+              - $ref: "#/components/schemas/ResolvedViewNote"
         availablePaths:
           type: array
           items:

@@ -1,7 +1,19 @@
-import type { FieldId, ViewField } from "workflow-engine/schema";
+import type { FieldId, LocalizedText, ViewEntry, ViewField } from "workflow-engine/schema";
 import type { DraftOf } from "./types";
 
 export type DraftViewField = DraftOf<ViewField>;
+
+/** A drafted view entry: a field reference or a note, before publish-time
+ * validation. `DraftOf` makes every key optional, so a mid-edit note (no
+ * `text` yet) and a mid-edit field (no `ref` yet) both parse as this type. */
+export type DraftViewEntry = DraftOf<ViewEntry>;
+
+/** True for a drafted field entry, the studio's counterpart to
+ * `definition.ts`'s `isViewField`: a drafted note always carries `kind`, and
+ * a drafted field never does. */
+export function isDraftViewField(entry: DraftViewEntry): entry is DraftViewField {
+  return !("kind" in entry);
+}
 
 /** Which edge of a card a pointer or a keyboard command targets. The canvas
  * reports the side rather than a pixel offset, so nothing here reads geometry
@@ -31,9 +43,9 @@ export function reorderIndex(from: number, slot: number): number {
   return slot;
 }
 
-/** Move a placed field to a drop slot. This is the one array change a drag and
+/** Move a placed card to a drop slot. This is the one array change a drag and
  * a keyboard move both produce, so neither can drift from the other. */
-export function moveViewField(rows: DraftViewField[], from: number, slot: number): DraftViewField[] {
+export function moveViewField(rows: DraftViewEntry[], from: number, slot: number): DraftViewEntry[] {
   const to = reorderIndex(from, slot);
   if (from === to || from < 0 || from >= rows.length) return rows;
   const next = [...rows];
@@ -42,10 +54,10 @@ export function moveViewField(rows: DraftViewField[], from: number, slot: number
   return next;
 }
 
-/** Move a placed field one position up or down, the keyboard equivalent of
+/** Move a placed card one position up or down, the keyboard equivalent of
  * dragging it across one neighbour. Out-of-range is a no-op, so a command on
  * the first or last card needs no separate guard at the call site. */
-export function nudgeViewField(rows: DraftViewField[], index: number, delta: -1 | 1): DraftViewField[] {
+export function nudgeViewField(rows: DraftViewEntry[], index: number, delta: -1 | 1): DraftViewEntry[] {
   const target = index + delta;
   if (target < 0 || target >= rows.length) return rows;
   return moveViewField(rows, index, delta === 1 ? target + 1 : target);
@@ -53,12 +65,23 @@ export function nudgeViewField(rows: DraftViewField[], index: number, delta: -1 
 
 /** Place a catalog field on the canvas at a drop slot. A field already on the
  * view is not re-added: the palette lists only unplaced fields, and a stale
- * drag must not duplicate a row. */
-export function insertViewField(rows: DraftViewField[], ref: FieldId, slot: number): DraftViewField[] {
-  if (rows.some((r) => r.ref === ref)) return rows;
+ * drag must not duplicate a row. A note names no catalog field, so it never
+ * collides with this dedup. */
+export function insertViewField(rows: DraftViewEntry[], ref: FieldId, slot: number): DraftViewEntry[] {
+  if (rows.filter(isDraftViewField).some((r) => r.ref === ref)) return rows;
   const at = Math.max(0, Math.min(slot, rows.length));
   const next = [...rows];
   next.splice(at, 0, { ref });
+  return next;
+}
+
+/** Place a note on the canvas at a drop slot, seeded with `text`. Unlike
+ * `insertViewField`, this dedups nothing: a note names no catalog field, so
+ * two may sit side by side. */
+export function insertViewNote(rows: DraftViewEntry[], text: LocalizedText, slot: number): DraftViewEntry[] {
+  const at = Math.max(0, Math.min(slot, rows.length));
+  const next = [...rows];
+  next.splice(at, 0, { kind: "note", text });
   return next;
 }
 
@@ -67,9 +90,10 @@ export function insertViewField(rows: DraftViewField[], ref: FieldId, slot: numb
  *
  * Typed on `FieldId` rather than `string` throughout: `ViewField.ref` is the
  * branded id, and the contract makes that id the sole reference anchor. A
- * `string` here would let a key or a label reach the array. */
-export function unplacedRefs(catalogIds: FieldId[], rows: DraftViewField[]): FieldId[] {
-  const placed = new Set<FieldId | undefined>(rows.map((r) => r.ref));
+ * `string` here would let a key or a label reach the array. A note carries
+ * no `ref`, so it never places a catalog field. */
+export function unplacedRefs(catalogIds: FieldId[], rows: DraftViewEntry[]): FieldId[] {
+  const placed = new Set<FieldId | undefined>(rows.filter(isDraftViewField).map((r) => r.ref));
   return catalogIds.filter((id) => !placed.has(id));
 }
 

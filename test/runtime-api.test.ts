@@ -26,6 +26,7 @@ import {
   PinMismatch,
   NotFoundError,
   InstanceNotRunningError,
+  isResolvedViewField,
   type InstanceRecordElement,
   type InstanceSummary,
   type DegradedInstanceSummary,
@@ -131,6 +132,40 @@ const viewBody = (): ProcessBody =>
               { ref: "field_note" },
               { ref: "field_readonly", readonly: true },
               { ref: "field_group", required: true },
+            ],
+          },
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+/** step_a's view: field_amount, a note visible only when data.amount > 5000, a
+ * second note declaring no `visible` at all, then field_name. */
+const noteViewBody = (): ProcessBody =>
+  ({
+    key: "note_view_body",
+    label: { en: "Note View Body" },
+    baseLocale: "en",
+    fields: [
+      { id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      { id: "field_name", key: "name", label: { en: "Name" }, type: "string" },
+    ],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          view: {
+            fields: [
+              { ref: "field_amount" },
+              { kind: "note", text: { en: "Over 5000 needs the board." }, visible: cel("data.amount > 5000") },
+              { kind: "note", text: { en: "Always shown." } },
+              { ref: "field_name" },
             ],
           },
           paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
@@ -403,11 +438,73 @@ test.skipIf(!DB)("createProcessInstance succeeds with a valid data seed, and get
   expect(view.status).toBe("running");
   expect(view.step.key).toBe("a");
   expect(view.baseLocale).toBe("en");
-  const byKey = new Map(view.fields.map((f) => [f.field.key, f]));
+  const byKey = new Map(view.fields.filter(isResolvedViewField).map((f) => [f.field.key, f]));
   expect(byKey.get("amount")!.value).toBe(100);
   expect(byKey.get("readonly_f")!.readonly).toBe(true);
   expect(view.availablePaths).toEqual([{ id: "path_ab" as PathId, key: "ab", label: "Ab" }]);
   expect(view.columns).toBe(1); // step_a's view declares no columns
+});
+
+test.skipIf(!DB)("a hidden note's text never appears in the resolved view", async () => {
+  const PID = pid("proc_note_hidden");
+  await publishBody(PID, noteViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, {
+    data: { field_amount: 100, field_name: "Bob" } as unknown as Instance["data"],
+  });
+
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
+  // field_amount, the always-shown note, field_name — the conditional note's
+  // visible (data.amount > 5000) is false, so it resolves to no entry at all.
+  expect(view.fields).toHaveLength(3);
+  expect(JSON.stringify(view)).not.toContain("board");
+});
+
+test.skipIf(!DB)("a field entry, a visible note and a field entry resolve in array order", async () => {
+  const PID = pid("proc_note_visible");
+  await publishBody(PID, noteViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, {
+    data: { field_amount: 6000, field_name: "Bob" } as unknown as Instance["data"],
+  });
+
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
+  expect(view.fields).toHaveLength(4);
+  expect(isResolvedViewField(view.fields[0]!)).toBe(true);
+  expect(view.fields[1]).toEqual({ kind: "note", text: { en: "Over 5000 needs the board." }, group: undefined, span: 1 });
+  expect(view.fields[2]).toEqual({ kind: "note", text: { en: "Always shown." }, group: undefined, span: 1 });
+  expect(isResolvedViewField(view.fields[3]!)).toBe(true);
+});
+
+test.skipIf(!DB)("a note declaring no visible resolves, the way a field entry with none does", async () => {
+  const PID = pid("proc_note_default_visible");
+  await publishBody(PID, noteViewBody(), reg, dataSourceReg);
+  const hidden = await createProcessInstance(PID, actor, dataSourceReg, {
+    data: { field_amount: 100, field_name: "Bob" } as unknown as Instance["data"],
+  });
+  const shown = await createProcessInstance(PID, actor, dataSourceReg, {
+    data: { field_amount: 6000, field_name: "Bob" } as unknown as Instance["data"],
+  });
+
+  const hiddenView = await getInstanceView(hidden.instanceId, actor, dataSourceReg);
+  const shownView = await getInstanceView(shown.instanceId, actor, dataSourceReg);
+  expect(JSON.stringify(hiddenView)).toContain("Always shown.");
+  expect(JSON.stringify(shownView)).toContain("Always shown.");
+});
+
+test.skipIf(!DB)("a note leaves the accepted submission keys unchanged", async () => {
+  const PID = pid("proc_note_submit");
+  await publishBody(PID, noteViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, {
+    data: { field_amount: 100, field_name: "Bob" } as unknown as Instance["data"],
+  });
+
+  const result = await submitAndTransition(
+    created.instanceId,
+    "path_ab" as PathId,
+    { field_amount: 200, field_name: "Alice" } as unknown as Instance["data"],
+    actor,
+    dataSourceReg,
+  );
+  expect(result.currentStepId as string).toBe("step_b");
 });
 
 /** step_a --(path_ab, manual, guardless)--> step_b (terminal). view.columns: 2, one field with span: 2. */
@@ -440,7 +537,7 @@ test.skipIf(!DB)("getInstanceView reports a declared view.columns, and a field's
 
   const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
   expect(view.columns).toBe(2);
-  const field = view.fields.find((f) => f.field.key === "amount")!;
+  const field = view.fields.filter(isResolvedViewField).find((f) => f.field.key === "amount")!;
   expect(field.span).toBe(2);
 });
 
@@ -468,7 +565,7 @@ test.skipIf(!DB)("a group-container field never reports required, even when the 
   });
 
   const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
-  const groupField = view.fields.find((f) => f.field.key === "grp")!;
+  const groupField = view.fields.filter(isResolvedViewField).find((f) => f.field.key === "grp")!;
   expect(groupField).toBeDefined();
   expect(groupField.required).toBe(false);
   expect(groupField.value).toBeUndefined();
@@ -521,7 +618,7 @@ test.skipIf(!DB)("getInstanceView reports a technical field as required:false, r
   const created = await createInstance(body, { processId: PID, version: 1, startedBy: actor.id });
 
   const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
-  const field = view.fields.find((f) => f.field.key === "amount")!;
+  const field = view.fields.filter(isResolvedViewField).find((f) => f.field.key === "amount")!;
   expect(field.required).toBe(false);
   expect(field.readonly).toBe(true);
 });
@@ -548,7 +645,7 @@ test.skipIf(!DB)("a field declaring both type: group and technical: true resolve
   const created = await createInstance(body, { processId: PID, version: 1, startedBy: actor.id });
 
   const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
-  const field = view.fields.find((f) => f.field.key === "g")!;
+  const field = view.fields.filter(isResolvedViewField).find((f) => f.field.key === "g")!;
   expect(field.required).toBe(false);
   expect(field.readonly).toBe(false); // group wins over technical: neither flag forces readonly:true here
   expect(field.value).toBeUndefined();
@@ -570,8 +667,8 @@ test.skipIf(!DB)("getInstanceView resolves a technical: false field from its own
 
   const baselineView = await getInstanceView(createdBaseline.instanceId, actor, dataSourceReg);
   const falseView = await getInstanceView(createdFalse.instanceId, actor, dataSourceReg);
-  const baselineField = baselineView.fields.find((f) => f.field.key === "amount")!;
-  const falseField = falseView.fields.find((f) => f.field.key === "amount")!;
+  const baselineField = baselineView.fields.filter(isResolvedViewField).find((f) => f.field.key === "amount")!;
+  const falseField = falseView.fields.filter(isResolvedViewField).find((f) => f.field.key === "amount")!;
   expect(falseField.required).toBe(baselineField.required);
   expect(falseField.readonly).toBe(baselineField.readonly);
 });
@@ -1468,7 +1565,7 @@ test.skipIf(!DB)("step override: the resolved view field carries no new key on t
   const created = await createProcessInstance(PID, actor, dataSourceReg, { data: { field_amount: 100 } as unknown as Instance["data"] });
 
   const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
-  const amountField = view.fields.find((f) => f.field.key === "amount")!;
+  const amountField = view.fields.filter(isResolvedViewField).find((f) => f.field.key === "amount")!;
   expect(Object.keys(amountField)).not.toContain("validation");
 });
 
@@ -1866,7 +1963,7 @@ test.skipIf(!DB)("happy path: create -> view -> submit -> view against expense-a
 
   const reviewView = await getInstanceView(afterCapture.instanceId, demoActor, dataSourceReg);
   expect(reviewView.step.key).toBe("review");
-  const byId = new Map(reviewView.fields.map((f) => [f.field.id as string, f]));
+  const byId = new Map(reviewView.fields.filter(isResolvedViewField).map((f) => [f.field.id as string, f]));
   expect(byId.get(amountField)!.readonly).toBe(true);
   expect(byId.get(amountField)!.value).toBe(42);
   expect(byId.get(reviewNoteField)!.required).toBe(true);

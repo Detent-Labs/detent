@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type DragEvent } from "react";
-import type { FieldId, Step, View } from "workflow-engine/schema";
+import type { FieldId, Step, View, ViewNote } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { useDraft } from "../draft/store";
@@ -9,15 +9,19 @@ import {
   clampSpan,
   dropSlot,
   insertViewField,
+  insertViewNote,
+  isDraftViewField,
   moveViewField,
   nudgeViewField,
   unplacedRefs,
+  type DraftViewEntry,
   type DraftViewField,
   type DropSide,
 } from "../draft/view-layout";
 import { PALETTE_FIELD_KINDS, mintCatalogField, type PaletteFieldKind } from "../draft/mintField";
-import { seedLocalizedText } from "../draft/localized-text";
+import { seedLocalizedText, missingTranslationWarning, resolveDraftLocalizedText, type DraftLocalizedText } from "../draft/localized-text";
 import { BooleanOrExpressionInput } from "../panels/shared/BooleanOrExpressionInput";
+import { LocalizedTextInput } from "../panels/shared/LocalizedTextInput";
 import { isExpression, type BoolOrExpr } from "../panels/shared/overrideMode";
 import { effectiveFlag, gatedKeys, setFlag, writtenFieldCounts, type FlagKey, type WrittenAccessor } from "../draft/view-flags";
 
@@ -189,6 +193,63 @@ export function FormEditorStrip({
   );
 }
 
+/** A note carries no `ref` for the group select's key attribute, unlike a
+ * field row (`row.ref ?? rowIndex`); it keys by index alone, which costs
+ * nothing here since `LocalizedTextInput` holds no state of its own
+ * (task 5.4d). */
+export interface NoteEditorStripProps {
+  row: DraftOf<ViewNote>;
+  stepId: DraftStep["id"];
+  baseLocale: string | undefined;
+  groupKeys: string[];
+  onChangeText: (text: DraftLocalizedText) => void;
+  onChangeVisible: (visible: BoolOrExpr) => void;
+  onChangeSpan: (span: 1 | 2) => void;
+  onChangeGroup: (group: string | undefined) => void;
+}
+
+/**
+ * A selected note's strip (`studio-form-editor`'s "A note's strip sets its
+ * text, its span, its group and its visibility"): the note's text, its
+ * `visible` condition (the same input a field card's strip offers), its
+ * span and its group. No requiredness, no readonly state, no validation —
+ * a note carries none of those.
+ */
+export function NoteEditorStrip({ row, stepId, baseLocale, groupKeys, onChangeText, onChangeVisible, onChangeSpan, onChangeGroup }: NoteEditorStripProps) {
+  const { contentLocale } = useDraft();
+  return (
+    <section className="studio-form-strip" aria-label={t("formEditor.stripLabel")}>
+      <h3 className="studio-form-strip-heading">{t("formEditor.noteHeading")}</h3>
+      <label className="studio-form-strip-field">
+        {t("formEditor.noteText")}
+        <LocalizedTextInput value={row.text} onChange={onChangeText} />
+      </label>
+      {missingTranslationWarning(row.text, contentLocale, baseLocale) && (
+        <p className="studio-warning">{missingTranslationWarning(row.text, contentLocale, baseLocale)}</p>
+      )}
+      <OverrideField label={t("formEditor.visible")} stepId={stepId} flagKey="visible" value={row.visible} onChange={onChangeVisible} />
+      <label className="studio-form-strip-field">
+        {t("formEditor.span")}
+        <select value={String(row.span ?? 1)} onChange={(e) => onChangeSpan(Number(e.target.value) as 1 | 2)}>
+          <option value="1">1</option>
+          <option value="2">2</option>
+        </select>
+      </label>
+      <label className="studio-form-strip-field">
+        {t("formEditor.group")}
+        <select value={row.group ?? ""} onChange={(e) => onChangeGroup(e.target.value === "" ? undefined : e.target.value)}>
+          <option value="">{t("formEditor.noGroup")}</option>
+          {groupKeys.map((k) => (
+            <option key={k} value={k}>
+              {k}
+            </option>
+          ))}
+        </select>
+      </label>
+    </section>
+  );
+}
+
 interface Props {
   /** The step whose view this page builds, and its index in
    * `workflow.steps` — the same pair `FormEditorDialog`'s `open` carried,
@@ -229,7 +290,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
     setSelected(undefined);
   }, [step.id]);
 
-  const rows: DraftViewField[] = step.view?.fields ?? [];
+  const rows: DraftViewEntry[] = step.view?.fields ?? [];
   // Absent means one column, which is the width every view had before
   // `view.columns` existed. A form built before this editor therefore opens
   // one-column with every card full width, in its existing array order.
@@ -239,7 +300,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
     updateInDraftArray<DraftStep>(mutate, (d) => d.workflow?.steps?.[index], { view: next });
   };
 
-  const setRows = (next: DraftViewField[]) => {
+  const setRows = (next: DraftViewEntry[]) => {
     if (next === rows) return;
     writeView({ ...(step.view ?? {}), fields: next });
   };
@@ -250,16 +311,20 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
     writeView({ ...(step.view ?? { fields: [] }), fields: rows, columns: next });
   };
 
-  const updateRow = (rowIndex: number, patch: Partial<DraftViewField>) => {
+  const updateRow = (rowIndex: number, patch: Partial<DraftViewEntry>) => {
     setRows(rows.map((r, i) => (i === rowIndex ? { ...r, ...patch } : r)));
   };
 
   /** The one writer for the three view flags: `setFlag` deletes a key on a
    * return to the engine's default instead of writing it, and deletes
    * `required`/`readonly` too when `visible` goes to literal `false`
-   * (view-flags.ts). `updateRow`'s plain spread cannot delete a key. */
+   * (view-flags.ts). `updateRow`'s plain spread cannot delete a key. Also the
+   * writer for a note's own `visible`: `setFlag`'s implementation touches no
+   * field-only key unless `key` names one, so it is correct for either row
+   * kind even though its declared parameter type names the field member
+   * (design.md Risks: "A half-typed note card...", the `setFlag` site). */
   const setViewFlag = (rowIndex: number, key: FlagKey, next: BoolOrExpr) => {
-    setRows(rows.map((r, i) => (i === rowIndex ? setFlag(r, key, next) : r)));
+    setRows(rows.map((r, i) => (i === rowIndex ? setFlag(r as DraftViewField, key, next) : r)));
   };
 
   const removeRow = (rowIndex: number) => {
@@ -282,6 +347,18 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
       s.view.fields = insertViewField(s.view.fields ?? [], field.id!, slot);
     });
     setSelected(undefined);
+  };
+
+  /** Places a note at the end of the view, seeded with a non-empty entry for
+   * the body's `baseLocale` (task 5.4a). A note inserted with no text at all
+   * would parse against neither union member, failing the draft's whole
+   * `authoredProcessBody.safeParse` and blanking every checks-rail dimension
+   * after `zod` (design.md Risks: "A half-typed note card blanks the whole
+   * checks rail"). */
+  const insertNote = () => {
+    const baseLocale = draft.baseLocale ?? "en";
+    setRows(insertViewNote(rows, { [baseLocale]: t("formEditor.newNoteText") }, rows.length));
+    setSelected(rows.length);
   };
 
   /** One drop handler for all three payloads: a palette field is inserted at
@@ -315,13 +392,15 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   const labelFor = (ref_: FieldId | undefined) => fieldFor(ref_)?.key || ref_ || t("formEditor.unnamedField");
   /** A group's card always draws at the form's full width and `form-ui` reads
    * no `span` on it, so the canvas draws it that way and the strip offers no
-   * span control for it. */
-  const isGroupRow = (row: DraftViewField) => fieldFor(row.ref)?.type === "group";
+   * span control for it. A note names no catalog field, so it is never a
+   * group row. */
+  const isGroupRow = (row: DraftViewEntry) => isDraftViewField(row) && fieldFor(row.ref)?.type === "group";
 
   const catalogIds = fields.map((f) => f.id).filter((id): id is FieldId => id !== undefined);
   const palette = unplacedRefs(catalogIds, rows);
 
   const groupKeys = rows
+    .filter(isDraftViewField)
     .map((r) => fieldFor(r.ref))
     .filter((f) => f?.type === "group")
     .map((f) => f!.key)
@@ -389,6 +468,14 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
               </li>
             ))}
           </ul>
+
+          {/* A note belongs to no catalog, so it sits beside the palette
+              rather than inside it (studio-form-editor: "An author places a
+              note on the form canvas"). */}
+          <h3 className="studio-form-palette-heading">{t("formEditor.noteSectionHeading")}</h3>
+          <button type="button" className="btn btn-secondary studio-form-add-note" onClick={insertNote}>
+            {t("formEditor.addNote")}
+          </button>
         </nav>
 
         <div className="studio-form-canvas-region">
@@ -414,10 +501,14 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
           <ol className="studio-form-canvas" data-columns={columns} aria-label={t("formEditor.canvasLabel")}>
             {rows.length === 0 && <li className="empty">{t("formEditor.canvasEmpty")}</li>}
             {rows.map((row, rowIndex) => {
-              const field = fieldFor(row.ref);
+              const isField = isDraftViewField(row);
+              const field = isField ? fieldFor(row.ref) : undefined;
               const span = isGroupRow(row) ? columns : clampSpan(row.span, columns);
               const hiddenByExpression = isExpression(row.visible);
-              const celMarked = isExpression(row.visible) || isExpression(row.required) || isExpression(row.readonly);
+              const celMarked = isField && (isExpression(row.visible) || isExpression(row.required) || isExpression(row.readonly));
+              const cardKey = isField ? `field:${row.ref}` : `note:${rowIndex}`;
+              const cardLabel = isField ? labelFor(row.ref) : resolveDraftLocalizedText(row.text, contentLocale, draft.baseLocale ?? "en") || t("formEditor.emptyNote");
+              const cardType = isField ? typeLabel(field?.type) : t("formEditor.noteType");
               const dropOn = (side: DropSide) => (e: DragEvent) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -426,8 +517,8 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
               const allowDrop = (e: DragEvent) => e.preventDefault();
               return (
                 <li
-                  key={row.ref ?? rowIndex}
-                  className="studio-form-card"
+                  key={cardKey}
+                  className={isField ? "studio-form-card" : "studio-form-card studio-form-card-note"}
                   data-span={span}
                   data-selected={selected === rowIndex || undefined}
                   data-conditional={hiddenByExpression || undefined}
@@ -448,16 +539,16 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
                     aria-pressed={selected === rowIndex}
                     onClick={() => setSelected(selected === rowIndex ? undefined : rowIndex)}
                   >
-                    <span className="studio-form-card-key">{labelFor(row.ref)}</span>
+                    <span className={isField ? "studio-form-card-key" : "studio-form-card-note-preview"}>{cardLabel}</span>
                     <span className="studio-form-card-marks">
-                      {row.required === true && <span className="studio-form-mark">{t("formEditor.markRequired")}</span>}
-                      {row.readonly === true && <span className="studio-form-mark">{t("formEditor.markReadonly")}</span>}
+                      {isField && row.required === true && <span className="studio-form-mark">{t("formEditor.markRequired")}</span>}
+                      {isField && row.readonly === true && <span className="studio-form-mark">{t("formEditor.markReadonly")}</span>}
                       {celMarked && <span className="studio-form-cel">{t("formEditor.markCel")}</span>}
                       <span className="studio-form-card-span">
                         {span}/{columns}
                       </span>
                     </span>
-                    <span className="studio-form-card-type">{typeLabel(field?.type)}</span>
+                    <span className="studio-form-card-type">{cardType}</span>
                   </button>
                   {/* The keyboard route to the same array change a drag makes.
                       A drag handle alone leaves reordering unreachable without
@@ -494,7 +585,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
             </li>
           </ol>
 
-          {selectedRow ? (
+          {selectedRow && isDraftViewField(selectedRow) ? (
             <FormEditorStrip
               row={selectedRow}
               label={labelFor(selectedRow.ref)}
@@ -505,6 +596,17 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
               isGroup={isGroupRow(selectedRow)}
               groupKeys={groupKeys}
               onChangeFlag={(key, next) => setViewFlag(selected!, key, next)}
+              onChangeSpan={(span) => updateRow(selected!, { span })}
+              onChangeGroup={(group) => updateRow(selected!, { group })}
+            />
+          ) : selectedRow ? (
+            <NoteEditorStrip
+              row={selectedRow}
+              stepId={step.id}
+              baseLocale={draft.baseLocale}
+              groupKeys={groupKeys}
+              onChangeText={(text) => updateRow(selected!, { text })}
+              onChangeVisible={(visible) => setViewFlag(selected!, "visible", visible)}
               onChangeSpan={(span) => updateRow(selected!, { span })}
               onChangeGroup={(group) => updateRow(selected!, { group })}
             />

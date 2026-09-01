@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { processBody, resolveLocalizedText } from "../src/schema/definition.js";
+import { processBody, resolveLocalizedText, type FieldId } from "../src/schema/definition.js";
 import { compileProcessBody } from "../src/schema/compile.js";
 
 const minimalStep = (label: unknown) => ({
@@ -76,6 +76,62 @@ describe("authored-content-localization: baseLocale entry required", () => {
   it("accepts a LocalizedText value with the baseLocale entry plus additional locales", () => {
     const body = bodyWith({ label: { en: "P", de: "P-de" } });
     expect(processBody.safeParse(body).success).toBe(true);
+  });
+
+  it("rejects a note whose text omits the body's baseLocale", () => {
+    const body = bodyWith({
+      workflow: {
+        initialStep: "step_a",
+        steps: [{ ...minimalStep({ en: "A" }), view: { fields: [{ kind: "note", text: { de: "Nur Deutsch" } }] } }],
+      },
+    });
+    expect(processBody.safeParse(body).success).toBe(false);
+  });
+
+  it("accepts a note's text carrying the base locale and one other locale", () => {
+    const body = bodyWith({
+      workflow: {
+        initialStep: "step_a",
+        steps: [{ ...minimalStep({ en: "A" }), view: { fields: [{ kind: "note", text: { en: "Note", de: "Notiz" } }] } }],
+      },
+    });
+    expect(processBody.safeParse(body).success).toBe(true);
+  });
+});
+
+describe("definition-contract: view entries are a two-kind union", () => {
+  it("parses an entry with no kind as a field reference", () => {
+    const body = bodyWith({
+      fields: [{ id: "field_x", key: "x", label: { en: "X" }, type: "string" }],
+      workflow: {
+        initialStep: "step_a",
+        steps: [{ ...minimalStep({ en: "A" }), view: { fields: [{ ref: "field_x" }] } }],
+      },
+    });
+    const parsed = processBody.parse(body);
+    expect(parsed.workflow.steps[0]!.view!.fields).toEqual([{ ref: "field_x" as FieldId }]);
+  });
+
+  it("parses a body mixing a note with two field entries, the note at its own index", () => {
+    const body = bodyWith({
+      fields: [
+        { id: "field_x", key: "x", label: { en: "X" }, type: "string" },
+        { id: "field_y", key: "y", label: { en: "Y" }, type: "string" },
+      ],
+      workflow: {
+        initialStep: "step_a",
+        steps: [
+          {
+            ...minimalStep({ en: "A" }),
+            view: { fields: [{ ref: "field_x" }, { kind: "note", text: { en: "Note" } }, { ref: "field_y" }] },
+          },
+        ],
+      },
+    });
+    const parsed = processBody.parse(body);
+    const fields = parsed.workflow.steps[0]!.view!.fields;
+    expect(fields).toHaveLength(3);
+    expect(fields[1]).toEqual({ kind: "note", text: { en: "Note" } });
   });
 });
 

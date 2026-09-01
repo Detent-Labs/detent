@@ -14,7 +14,7 @@ import {
 } from "../src/areas/studio/panels/fieldMatrixLogic.js";
 import { setFlag, gatedKeys, writtenFieldCounts, type WrittenAccessor } from "../src/areas/studio/draft/view-flags.js";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
-import type { DraftViewField } from "../src/areas/studio/draft/view-layout.js";
+import { isDraftViewField, type DraftViewEntry, type DraftViewField } from "../src/areas/studio/draft/view-layout.js";
 import type { Step } from "workflow-engine/schema";
 import type { Draft, DraftOf } from "../src/areas/studio/draft/types.js";
 
@@ -30,6 +30,17 @@ function ds(entry: Record<string, unknown>): DraftStep {
 
 function vf(entry: Record<string, unknown>): DraftViewField {
   return entry as DraftViewField;
+}
+
+function note(text: Record<string, string> = { en: "Note" }): DraftViewEntry {
+  return { kind: "note", text } as unknown as DraftViewEntry;
+}
+
+/** Narrows a drafted view entry to a field entry through task 5.0b's guard,
+ * for a fixture the test itself built as a field. */
+function field(entry: DraftViewEntry): DraftViewField {
+  if (!isDraftViewField(entry)) throw new Error("expected a field entry");
+  return entry;
 }
 
 const FIELDS: DraftField[] = [
@@ -141,6 +152,32 @@ describe("matrixCounts", () => {
     const counts = matrixCounts(rows, drawnSteps);
     expect(counts).toEqual({ declaredEntries: 3, fieldCount: 3, stepCount: 2, undeclaredCells: 3 });
   });
+
+  it("reports a step's notes in neither declaredEntries nor undeclaredCells", () => {
+    const rows = matrixRows(FIELDS); // 3 rows: field_group, field_qty, field_vendor
+    const drawnSteps: DraftStep[] = [
+      ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor" }), note(), note(), note()] } }),
+    ];
+    const counts = matrixCounts(rows, drawnSteps);
+    expect(counts).toEqual({ declaredEntries: 1, fieldCount: 3, stepCount: 1, undeclaredCells: 2 });
+  });
+
+  it("a note as the sole entry in a viewless step joins the drawn columns, raising stepCount by one and undeclaredCells by the field count", () => {
+    const rows = matrixRows(FIELDS); // 3 rows: field_group, field_qty, field_vendor
+    const withoutNote: DraftStep[] = [
+      ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor" })] } }),
+      ds({ id: "step_b" }), // no view at all — inert, hidden by the toggle
+    ];
+    const before = matrixCounts(rows, filterInertSteps(withoutNote, true).map(({ step }) => step));
+    expect(before).toEqual({ declaredEntries: 1, fieldCount: 3, stepCount: 1, undeclaredCells: 2 });
+
+    const withNote: DraftStep[] = [
+      ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor" })] } }),
+      ds({ id: "step_b", view: { fields: [note()] } }), // a note gives the step a view
+    ];
+    const after = matrixCounts(rows, filterInertSteps(withNote, true).map(({ step }) => step));
+    expect(after).toEqual({ declaredEntries: 1, fieldCount: 3, stepCount: 2, undeclaredCells: 5 });
+  });
 });
 
 describe("bulk targets", () => {
@@ -181,8 +218,8 @@ describe("bulkBadgeOn / applyBulkToggle", () => {
     ];
     expect(bulkBadgeOn(steps, targets, "required", none, noTechnical)).toBe(false);
     applyBulkToggle(steps, targets, "required", none, noTechnical);
-    expect(steps[0]!.view!.fields![0]!.required).toBe(true);
-    expect(steps[1]!.view!.fields![0]!.required).toBe(true);
+    expect(field(steps[0]!.view!.fields![0]!).required).toBe(true);
+    expect(field(steps[1]!.view!.fields![0]!).required).toBe(true);
   });
 
   it("clears every eligible cell's key, when every one already carries the non-default value", () => {
@@ -212,9 +249,9 @@ describe("bulkBadgeOn / applyBulkToggle", () => {
       { stepIndex: 2, fieldId: "field_vendor" },
     ];
     applyBulkToggle(steps, targets, "required", none, noTechnical);
-    expect(steps[0]!.view!.fields![0]!.required).toEqual({ lang: "cel", src: "true" });
+    expect(field(steps[0]!.view!.fields![0]!).required).toEqual({ lang: "cel", src: "true" });
     expect("required" in steps[1]!.view!.fields![0]!).toBe(false);
-    expect(steps[2]!.view!.fields![0]!.required).toBe(true);
+    expect(field(steps[2]!.view!.fields![0]!).required).toBe(true);
   });
 
   it("is a no-op when no target is eligible", () => {
@@ -243,7 +280,7 @@ describe("bulkBadgeOn / applyBulkToggle", () => {
     const written: WrittenAccessor = () => Infinity;
     expect(bulkBadgeOn(steps, targets, "readonly", written, noTechnical)).toBe(false);
     applyBulkToggle(steps, targets, "readonly", written, noTechnical);
-    expect(steps[0]!.view!.fields![0]!.readonly).toBe(true);
+    expect(field(steps[0]!.view!.fields![0]!).readonly).toBe(true);
   });
 
   it("derives the self-exclusion correctly from a real draft via writtenFieldCounts", () => {

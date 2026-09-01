@@ -243,9 +243,14 @@ field then lands in `data` and travels through every report. It never held a
 value.
 
 A chart, a read-only table, a markup block and a tab panel carry no participant
-value. They belong in the `view`, beside the field references it already holds.
-Putting them in the type enum would repeat the mistake this record removes.
-Change 3 carries them.
+value either. They belong in the `view`, beside the field references it already
+holds. Putting them in the type enum would repeat the mistake this record
+removes. Change 3 shipped the first of the five: a `view.fields[]` entry
+carrying `text` and no `ref`, the note case this entry opened with.
+
+The chart, table, markup and tab-panel shapes stay out of scope. Each is one
+more `ViewEntry` union member. Each waits on its own decision of what config
+it needs. See `docs/decisions.md`.
 
 **S3. Catalog scope.** Reuse of one field across several processes raises a
 scoping question. The catalog is per-process today. Out of scope.
@@ -262,7 +267,7 @@ to that source. Out of scope.
 |---|---|---|
 | 1 | The `type`, `format` and `control` split | none |
 | 2 | Person field, `org.actor-from-field`, people list | 1 |
-| 3 | Display elements in the `view` | none |
+| 3 | Display elements in the `view` (note shipped; chart, table, markup, tab panel open) | none |
 | 4 | Item list | 1 |
 
 Only the step from 1 to 2 is a hard dependency. Change 3 touches the `view` and
