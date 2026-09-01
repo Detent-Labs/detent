@@ -38,9 +38,23 @@ The read SHALL accept these optional filters: `processId`, `version`, `status`
 A `version` filter SHALL accompany a `processId` filter. The read SHALL reject
 a `version` with no `processId`. A version number anchors to one process, so a
 bare `version` names version 2 of every process at once. The
-`instances_selection_idx` index also reaches its `version` column only with the
-leading `processId` column bound. That is the rule `dataWhere` carries, for the
-first of those two reasons.
+`instances_selection_col_idx` index also reaches its `version` column only with
+the leading `process_id` column bound. That is the rule `dataWhere` carries,
+for the first of those two reasons.
+
+A `version` filter SHALL be an integer the datastore can hold. The read SHALL
+reject any other value as a request-shape error, before it issues a query.
+The filter compares against a generated `integer` column. A value that column
+cannot hold surfaces from the datastore rather than from the read.
+
+Two classes fail that rule. One is a value that is not an integer. The other
+is an integer outside the `integer` column's own range. Both are caller
+errors, and neither reaches a query.
+
+The two are worth separating, because only one of them is a regression. An
+out-of-range value makes the datastore raise, and an unmapped datastore error
+answers 500. A non-integer raises nothing and would answer an empty page. The
+rule holds for both, and its reason differs.
 
 `assignedTo` SHALL match an instance under either of two conditions. That actor
 holds the claim on its current step. Or its current step carries no claim and
@@ -103,8 +117,8 @@ an equivalent process-scoped read grant.
 A matched instance's summary can fail to resolve. That happens when its pinned
 `(processId, version)` has no resolvable published body. It also happens when
 its `currentStepId` is absent from that body's steps. The read SHALL NOT fail
-the whole page over a failure like this. Every other instance in the same page
-SHALL resolve and return normally.
+the whole page over one instance like this. Every other instance in the same
+page SHALL resolve and return normally.
 
 The read SHALL accept one further filter, `includeDegraded`. No query parameter
 exposes it. See the `http-wrapper` capability for how a caller sets it. When
@@ -146,6 +160,33 @@ than `limit` even while more matching instances exist.
 
 - **WHEN** a caller passes a `version` and no `processId`
 - **THEN** the read rejects the call
+
+#### Scenario: The read rejects a non-integer version
+
+- **WHEN** a caller passes a `processId` and a fractional `version`
+- **THEN** the read rejects the call as a request-shape error
+- **AND** it surfaces no datastore error
+
+#### Scenario: The read rejects a version outside the column's range
+
+- **WHEN** a caller passes a `processId` and a `version` too large for the
+  `integer` column
+- **THEN** the read rejects the call as a request-shape error
+- **AND** it surfaces no datastore error
+
+#### Scenario: A version at the column's edge is accepted
+
+- **WHEN** a caller passes a `processId` and the largest `version` the
+  `integer` column holds
+- **THEN** the read issues its query and returns an empty page, matching no
+  instance
+
+#### Scenario: An out-of-range version over HTTP is a request error, not a server error
+
+- **WHEN** a caller requests the instance list with a `version` query
+  parameter beyond the `integer` column's range, at either end
+- **THEN** the wrapper answers 400 with a request-shape error
+- **AND** it answers no 5xx
 
 #### Scenario: Filtering by a data comparison
 
@@ -224,7 +265,8 @@ than `limit` even while more matching instances exist.
 #### Scenario: scope=mine resolves the same predicate as assignedTo for the caller
 
 - **WHEN** the read is called with `scope: "mine"` by an authenticated actor A
-  who is the claimant or an unclaimed candidate of an instance's current step
+- **AND** A is the claimant or an unclaimed candidate of an instance's current
+  step
 - **THEN** that instance is returned, identically to calling the read with
   `assignedTo: A`
 
@@ -232,7 +274,8 @@ than `limit` even while more matching instances exist.
 
 - **WHEN** the read is called with `scope: "mine"` by authenticated actor A
 - **THEN** the predicate is evaluated against A, resolved from the request's
-  credential, with no way for the request to substitute a different actor id
+  credential
+- **AND** the request has no way to substitute a different actor id
 
 #### Scenario: scope=mine's inbox predicate also matches by role, not id alone
 
@@ -267,7 +310,7 @@ than `limit` even while more matching instances exist.
 - **WHEN** the read is called with `includeDegraded: true` and one matched
   instance's pinned `(processId, version)` has no published body
 - **THEN** the read still returns 200 with a full page
-- **AND** that instance's item is a degraded summary naming the failure
+- **AND** that instance's item is a degraded summary naming the reason
 - **AND** every other instance in the page returns as a normal summary
 
 #### Scenario: With includeDegraded, a missing current step degrades instead of failing the page
@@ -275,7 +318,7 @@ than `limit` even while more matching instances exist.
 - **WHEN** the read is called with `includeDegraded: true` and one matched
   instance's `currentStepId` is not among the steps of its pinned body
 - **THEN** the read still returns 200 with a full page
-- **AND** that instance's item is a degraded summary naming the failure
+- **AND** that instance's item is a degraded summary naming the reason
 
 #### Scenario: A degraded summary omits label fields
 
