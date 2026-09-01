@@ -631,8 +631,8 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   landed as `promote-instance-scalar-columns` (2026-08-30). Change 2 (the
   assignment pair, `parent.instanceId`, `currentStepEnteredAt`,
   `chainedFrom`, and a rebuild of the five expression indexes those and the
-  six scalars share) shipped on the branch `promote-assignment-columns` in
-  three commits, pushed and never merged. A benchmark on 2026-09-01 then
+  six scalars share) shipped in three commits, pushed and never merged. The
+  annotated tag `change2-rejected` holds them. A benchmark on 2026-09-01 then
   rejected it. Change 3, the rebuild of the three expression indexes no
   Change 2 column replaces, measured out as worth building.
   `tmp/offene-items.md` item 25 carries Change 3 alone from here on.
@@ -648,8 +648,10 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   - Heap 104 → 116 MB, about 63 byte per row, +11.6%.
   - 200,000 inserts 1852 → 1960 ms, +5.8%.
 
-  The branch stays on the remote as the evidence. Nobody needs to redo that
-  work, and nobody should read the missing merge as work lost.
+  The tag `change2-rejected` is the evidence, and its annotation carries this
+  verdict. A tag rather than a branch, for two reasons. Nobody can merge it by
+  accident, and it survives a branch cleanup. Nobody needs to redo that work,
+  and nobody should read the missing merge as work lost.
 
   **Change 3: measured, worth building.** The rebuild pays, and it needs no
   column Change 2 would add.
