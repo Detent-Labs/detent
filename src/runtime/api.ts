@@ -254,7 +254,7 @@ export type DataComparison = {
  * membership, not just literal id — `assignment.candidates` holds whichever of the two
  * a step's assignment was authored with. Only meaningful alongside `assignedTo`.
  *
- * `version` needs `processId` beside it (`instances_selection_idx` reaches
+ * `version` needs `processId` beside it (`instances_selection_col_idx` reaches
  * its `version` column only with the leading `processId` column bound), the
  * same rule `dataWhere` carries. `dataWhere` needs `processId` beside it too:
  * a field id anchors to one process's field catalog. See
@@ -1481,16 +1481,15 @@ type InstanceWhereFilter = Omit<InstanceListFilter, "includeDegraded" | "dataWhe
  * The `WHERE` fragment both `listInstances` and `queryInstances` interpolate.
  * Builds no statement, chooses no projection, and knows nothing about paging
  * or a cursor — see design.md "The predicate is a SQL fragment builder, not a
- * query builder". `excludeInstanceId` compares the `instance_id` column
- * directly rather than `body->>'instanceId'`, since that column is the
- * table's own key.
+ * query builder". Every filter with a generated column behind it compares
+ * that column, never the `body->>` expression it was generated from: the
+ * planner substitutes a plain index only into a query naming the column
+ * (see rebuild-instance-expression-indexes). `excludeInstanceId` compares
+ * `instance_id`, the table's own key.
  */
 export function buildInstanceWhere(filter: InstanceWhereFilter, db: SQL) {
   const statusArr = filter.status && filter.status.length > 0 ? db.array(filter.status, "TEXT") : null;
   const assignedToRolesArr = filter.assignedToRoles && filter.assignedToRoles.length > 0 ? db.array(filter.assignedToRoles, "TEXT") : null;
-  // instances_selection_idx indexes body->>'version' as text — see design.md
-  // "The version filter compares as text".
-  const versionText = filter.version !== undefined ? String(filter.version) : null;
   const currentStepIdArr = Array.isArray(filter.currentStepId)
     ? db.array(filter.currentStepId, "TEXT")
     : filter.currentStepId
@@ -1498,12 +1497,12 @@ export function buildInstanceWhere(filter: InstanceWhereFilter, db: SQL) {
       : null;
   const instanceIdsArr = filter.instanceIds && filter.instanceIds.length > 0 ? db.array(filter.instanceIds, "TEXT") : null;
   return db`
-    (${filter.processId ?? null}::text IS NULL OR body->>'processId' = ${filter.processId ?? null})
-    AND (${versionText}::text IS NULL OR body->>'version' = ${versionText})
-    AND (${statusArr}::text[] IS NULL OR body->>'status' = ANY(${statusArr}))
-    AND (${currentStepIdArr}::text[] IS NULL OR body->>'currentStepId' = ANY(${currentStepIdArr}))
+    (${filter.processId ?? null}::text IS NULL OR process_id = ${filter.processId ?? null})
+    AND (${filter.version ?? null}::int IS NULL OR version = ${filter.version ?? null})
+    AND (${statusArr}::text[] IS NULL OR status = ANY(${statusArr}))
+    AND (${currentStepIdArr}::text[] IS NULL OR current_step_id = ANY(${currentStepIdArr}))
     AND (${instanceIdsArr}::text[] IS NULL OR instance_id = ANY(${instanceIdsArr}))
-    AND (${filter.startedBy ?? null}::text IS NULL OR body->>'startedBy' = ${filter.startedBy ?? null})
+    AND (${filter.startedBy ?? null}::text IS NULL OR started_by = ${filter.startedBy ?? null})
     AND (${filter.claimedBy ?? null}::text IS NULL OR body->'assignment'->>'claimedBy' = ${filter.claimedBy ?? null})
     AND (
       ${filter.assignedTo ?? null}::text IS NULL
@@ -1581,11 +1580,21 @@ function validateDataComparisons(comparisons: DataComparison[] | undefined): voi
   }
 }
 
-/** A version number anchors to one process; `instances_selection_idx` reaches its `version` column only with `processId` bound beside it. See design.md "The version filter compares as text". */
-function assertVersionHasProcessId(filter: { processId?: ProcessId; version?: number }): void {
-  if (filter.version !== undefined && !filter.processId) {
-    throw new RequestShapeError("a version filter needs a processId beside it");
-  }
+/**
+ * A version number anchors to one process; `instances_selection_col_idx`
+ * reaches its `version` column only with `process_id` bound beside it.
+ *
+ * The integer check guards the comparison type: `version` is an `integer`
+ * column, so a fractional value would raise from the datastore instead of
+ * reading as a caller error. `Number.isInteger` alone, with no sign check —
+ * `createDraftSnapshot` mints a negative sentinel version and a test instance
+ * pins it. `parseVersion` (src/http/routes.ts) applies the same predicate to
+ * the HTTP query parameter.
+ */
+function assertVersionFilter(filter: { processId?: ProcessId; version?: number }): void {
+  if (filter.version === undefined) return;
+  if (!filter.processId) throw new RequestShapeError("a version filter needs a processId beside it");
+  if (!Number.isInteger(filter.version)) throw new RequestShapeError("a version filter must be an integer");
 }
 
 /** A field id anchors to one process's field catalog; a dataWhere with no processId would scan an unindexed payload across every process. See design.md "A dataWhere needs a processId". */
@@ -1650,7 +1659,7 @@ export async function listInstances(
   page: { limit?: number; cursor?: string } = {},
   db: SQL = sql,
 ): Promise<Page<InstanceSummaryItem>> {
-  assertVersionHasProcessId(filter);
+  assertVersionFilter(filter);
   validateDataComparisons(filter.dataWhere);
   assertDataWhereHasProcessId(filter);
   await assertNoNonScalarComparedField(filter, filter.dataWhere, db);
@@ -1724,7 +1733,7 @@ export async function queryInstances(
   db: SQL = sql,
 ): Promise<InstanceDataPage> {
   assertNoDenylistedQueryKeys(filter);
-  assertVersionHasProcessId(filter);
+  assertVersionFilter(filter);
   assertNoEmptyListFilters(filter);
   validateDataComparisons(filter.dataWhere);
   assertDataWhereHasProcessId(filter);
@@ -1987,7 +1996,7 @@ async function resolveVersionCoverage(processId: ProcessId, query: ReportQuery, 
     createdBefore: query.createdBefore,
   };
   const rows = (await db`
-    SELECT DISTINCT (body->>'version')::int AS version FROM instances
+    SELECT DISTINCT version FROM instances
     WHERE ${buildInstanceWhere(filter, db)} AND ${buildDataWhere(query.dataWhere, db)}
   `) as { version: number }[];
 

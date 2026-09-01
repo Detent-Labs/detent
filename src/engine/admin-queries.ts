@@ -148,8 +148,8 @@ export async function getTimerLagStats(db: SQL = sql): Promise<TimerLagStats> {
  * One count per distinct `body->>'status'` value present across `instances`.
  * A general shape, not a single-purpose faulted-only query, mirroring
  * `countOutboxByStatus`. Unlike that query, this one has no matching
- * functional index (`instances_selection_idx` is a composite on
- * `(processId, version, status)`, not usable by a bare `GROUP BY status`), so
+ * index (`instances_selection_col_idx` is a composite on
+ * `(process_id, version, status)`, not usable by a bare `GROUP BY status`), so
  * it scans the whole table — acceptable at today's scale; see design.md's
  * Risks section if scrape load ever makes this measurable.
  */

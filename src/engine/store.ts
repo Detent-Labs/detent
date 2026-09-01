@@ -248,11 +248,6 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     applied_at timestamptz,
     PRIMARY KEY (process_id, from_version, to_version)
   )`;
-  // The migration population scan selects {processId, version, status} once per
-  // batch across every instance. Those fields live inside the jsonb body, so without
-  // an index each batch sequentially scans the whole instances relation.
-  await db`CREATE INDEX IF NOT EXISTS instances_selection_idx
-    ON instances ((body->>'processId'), (body->>'version'), (body->>'status'))`;
   // Instance listing's paging key. Runtime ids are UUIDv4 (see createInstance's
   // ponytail note), so instance_id carries no time order on its own — a
   // participant inbox ordered by it would be ordered arbitrarily. Idempotent add;
@@ -263,7 +258,8 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   await db`CREATE INDEX IF NOT EXISTS instances_created_idx ON instances (created_at DESC, instance_id DESC)`;
   // The inbox predicate ("claimed by me, or unclaimed and I am a candidate")
   // needs its own indexes over the jsonb-nested assignment fields:
-  // instances_selection_idx does not cover them.
+  // instances_selection_col_idx does not cover them. These two stay expression
+  // indexes — assignment.claimedBy and assignment.candidates have no column.
   await db`CREATE INDEX IF NOT EXISTS instances_claimed_by_idx ON instances ((body->'assignment'->>'claimedBy'))`;
   await db`CREATE INDEX IF NOT EXISTS instances_candidates_idx ON instances USING GIN ((body->'assignment'->'candidates'))`;
   // Child-instance lookup: the cancel cascade's child sweep and the migration
@@ -274,13 +270,6 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // cardinality, and the parent id alone reduces the scan to a handful of
   // rows. Readers: transition.ts::sweepCancelledChildren, migration.ts::migrateOne.
   await db`CREATE INDEX IF NOT EXISTS instances_parent_idx ON instances ((body->'parent'->>'instanceId'))`;
-  // The instance list read and the instance data read both reach these two
-  // through buildInstanceWhere's shared currentStepId/startedBy filters
-  // (src/runtime/api.ts). currentStepId also backs the bottlenecks view's
-  // GROUP BY (src/engine/reporting.ts). startedBy also backs the
-  // participant-facing GET /instances?scope=started route.
-  await db`CREATE INDEX IF NOT EXISTS instances_current_step_idx ON instances ((body->>'currentStepId'))`;
-  await db`CREATE INDEX IF NOT EXISTS instances_started_by_idx ON instances ((body->>'startedBy'))`;
   // Set once by redactInstance (src/engine/retention.ts); NULL means not
   // redacted, the same convention every other additive instances column uses.
   await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS redacted_at timestamptz`;
@@ -317,6 +306,39 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // to filter on this column directly — the planner would not substitute this
   // index into a query still naming the original body->>'startedAt' expression.
   await db`CREATE INDEX IF NOT EXISTS instances_started_idx ON instances (started_at)`;
+  // Three plain btrees over the columns above, replacing the expression indexes
+  // that stood over the same keys (instances_selection_idx,
+  // instances_current_step_idx, instances_started_by_idx). They must sit after
+  // the ADD COLUMN statements: a fresh database has no column to index before
+  // them. Measured at 200k rows: liveVersionCounts 1.549 -> 0.343 ms (an
+  // index-only scan becomes reachable), the orphan scan 5.990 -> 2.816 ms, the
+  // migration scan 2.568 -> 1.548 ms, and the selection index's write overhead
+  // +24.8% -> +17.1%, at identical index size. See the change
+  // rebuild-instance-expression-indexes.
+  //
+  // The names differ from the three dropped ones on purpose. CREATE INDEX IF
+  // NOT EXISTS leaves an index of a given name alone whatever its definition,
+  // so reusing a name would strand every already-initialised database on the
+  // expression form. The DROPs stay here permanently: a database that has
+  // never run them reaches this code by the same path as one that has, and
+  // nothing builds the old names again, so two concurrent initSchema runs
+  // cannot race over them.
+  await db`DROP INDEX IF EXISTS instances_selection_idx`;
+  await db`DROP INDEX IF EXISTS instances_current_step_idx`;
+  await db`DROP INDEX IF EXISTS instances_started_by_idx`;
+  // Readers: the migration population scan and findOrphanKeys
+  // (src/engine/migration.ts), liveVersionCounts (src/engine/definitions.ts),
+  // selectInRange and the bottlenecks WIP query (src/engine/reporting.ts), and
+  // buildInstanceWhere's processId/version/status filters (src/runtime/api.ts),
+  // whose inbox predicate reaches it as one leg of a BitmapAnd.
+  await db`CREATE INDEX IF NOT EXISTS instances_selection_col_idx ON instances (process_id, version, status)`;
+  // Readers: buildInstanceWhere's shared currentStepId filter, reached by the
+  // instance list read and the instance data read (src/runtime/api.ts), and the
+  // bottlenecks view's GROUP BY (src/engine/reporting.ts).
+  await db`CREATE INDEX IF NOT EXISTS instances_current_step_col_idx ON instances (current_step_id)`;
+  // Readers: buildInstanceWhere's shared startedBy filter, reached by the same
+  // two reads, and the participant-facing GET /instances?scope=started route.
+  await db`CREATE INDEX IF NOT EXISTS instances_started_by_col_idx ON instances (started_by)`;
   // Project-local user accounts (src/auth/users.ts). user_id is the value used
   // as Actor.id — the same convention as assignment.candidates/claimedBy.
   await db`CREATE TABLE IF NOT EXISTS auth_users (

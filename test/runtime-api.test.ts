@@ -2458,6 +2458,31 @@ test.skipIf(!DB)("listInstances' version filter excludes another version of the 
   expect(raised).toBeInstanceOf(RequestShapeError);
 });
 
+// rebuild-instance-expression-indexes: the filter compares against the
+// generated `version integer` column, not `body->>'version'` as text. A
+// fractional value would raise from the datastore rather than read as a
+// caller error, so the read rejects it before it builds any SQL.
+test.skipIf(!DB)("listInstances rejects a non-integer version as a caller error, not a datastore error", async () => {
+  const PID = pid("proc_list_version_frac");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  await createProcessInstance(PID, actor, dataSourceReg);
+
+  let raised: unknown;
+  try {
+    await listInstances({ processId: PID, version: 1.5 });
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(RequestShapeError);
+
+  // The integer path still works, and the guard carries no sign check: a
+  // draft snapshot's version is negative (createDraftSnapshot).
+  const page = await listInstances({ processId: PID, version: 1 });
+  expect(page.items).toHaveLength(1);
+  const none = await listInstances({ processId: PID, version: -1 });
+  expect(none.items).toEqual([]);
+});
+
 test.skipIf(!DB)("listInstances' excludeInstanceId omits the named instance, keeps every other matching instance", async () => {
   const PID = pid("proc_list_exclude");
   await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
