@@ -1246,6 +1246,19 @@ export const instanceEvent = z.discriminatedUnion("kind", [
     kind: z.literal("assignment.delegated"),
     payload: z.object({ fromActorId: z.string(), toActorId: z.string() }).strict(),
   }),
+  // An administrator changed who may see this instance
+  // (instance-visibility-set). One kind covers all three directions, because
+  // they differ in direction alone and a reader wants them on one timeline.
+  // Not a transition, so no HistoryEntry and no transitionSeq advance. Recorded
+  // only for an administrative act: an assignment outranking a revocation
+  // changes nothing stored, so it records nothing.
+  z.object({
+    ...instanceEventEnvelope,
+    kind: z.literal("visibility.changed"),
+    payload: z
+      .object({ op: z.enum(["revoked", "restored", "granted"]), actorId: z.string(), byActorId: z.string() })
+      .strict(),
+  }),
   // An advance cascade re-entered a step it had already entered and was
   // stopped, parking the instance `faulted`. Not a transition (no step
   // change) — the migration.skipped shape, not the timer.fired one: no

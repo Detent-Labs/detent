@@ -18,6 +18,9 @@ import {
   listInstances,
   getInstanceRecord,
   cancelInstance,
+  revokeVisibility,
+  restoreVisibility,
+  grantVisibility,
   postComment,
   listComments,
   uploadAttachment,
@@ -34,6 +37,7 @@ import { instanceStatus } from "../schema/definition.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, requirePermission, ADMIN_ROLE } from "../auth/authorize.js";
+import { getGroupsForMember } from "../auth/groups.js";
 import {
   type Registry,
   type DataSourceRegistry,
@@ -436,10 +440,10 @@ function parseInstant(raw: string, label: string): string {
 }
 
 /** An omitted scope resolves to "all" — that is what it has always meant. Any other value is a request error. */
-function parseScope(url: URL): "mine" | "started" | "all" {
+function parseScope(url: URL): "mine" | "started" | "all" | "visible" {
   const raw = url.searchParams.get("scope");
   if (raw === null) return "all";
-  if (raw !== "mine" && raw !== "started" && raw !== "all") throw new RequestShapeError(`unknown scope '${raw}'`);
+  if (raw !== "mine" && raw !== "started" && raw !== "all" && raw !== "visible") throw new RequestShapeError(`unknown scope '${raw}'`);
   return raw;
 }
 
@@ -458,7 +462,7 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
   // still maps to 400 instead of escaping as an unhandled rejection ahead of
   // `route`. `scope` is a `let` in this outer scope so `fn` can read it —
   // `route` always runs `gate` before `fn`, inside that same `guarded` call.
-  let scope: "mine" | "started" | "all";
+  let scope: "mine" | "started" | "all" | "visible";
   return route(
     req,
     resolver,
@@ -527,6 +531,14 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
         // opts in, so a test instance never reaches a participant-facing
         // list, direct-id access aside (loadInstanceForActor's own check).
         includeTestInstances: scope === "all",
+        // instance-visibility-set: the caller's own principals, resolved from
+        // the credential and never from client input — the same rule
+        // scope=mine's assignedTo already follows. `listMyReports` builds the
+        // identical match set for report sharing.
+        visibleTo:
+          scope === "visible"
+            ? { actorId: actor.id, principals: [actor.id, ...actor.roles, ...(await getGroupsForMember(actor.id, db))] }
+            : undefined,
       };
       const limit = parseLimit(url, MAX_LIST_LIMIT);
       const cursor = url.searchParams.get("cursor") ?? undefined;
@@ -553,6 +565,55 @@ export async function handleCancel(instanceId: string, req: Request, resolver: A
     const updated = await cancelInstance(instanceId as InstanceId, actor, db);
     return { status: 200, body: updated };
   });
+}
+
+/**
+ * Change who may see one instance (instance-visibility-set): revoke, restore
+ * or grant, one named actor at a time.
+ *
+ * These sit under `/instances/:instanceId/visibility*` rather than `/admin/*`
+ * on purpose. The `authorization` capability states that every `/admin/*`
+ * route calls `requireRole` with `ADMIN_ROLE`, and these three call
+ * `requirePermission` with the process-scoped `"visibility"` instead — the
+ * same shape `handleCancel` above already uses. Putting them under `/admin/*`
+ * would contradict that rule for no gain.
+ *
+ * The gate lives in the Runtime API Layer, not here, because the permission
+ * names a process and only the loaded instance knows which one.
+ */
+function requireTargetActor(body: Record<string, unknown>): string {
+  const raw = body.actorId;
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    throw new RequestShapeError("actorId is required and must be a non-empty string");
+  }
+  return raw;
+}
+
+async function handleVisibility(
+  instanceId: string,
+  req: Request,
+  resolver: ActorResolver,
+  db: SQL,
+  op: (instanceId: InstanceId, targetActorId: string, actor: Actor, db: SQL) => Promise<void>,
+): Promise<HttpResult> {
+  return guarded(req, async () => {
+    const actor = await resolveActor(req, resolver, db);
+    const targetActorId = requireTargetActor(await readJson(req));
+    await op(instanceId as InstanceId, targetActorId, actor, db);
+    return { status: 204, body: undefined };
+  });
+}
+
+export async function handleRevokeVisibility(instanceId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return handleVisibility(instanceId, req, resolver, db, revokeVisibility);
+}
+
+export async function handleRestoreVisibility(instanceId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return handleVisibility(instanceId, req, resolver, db, restoreVisibility);
+}
+
+export async function handleGrantVisibility(instanceId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return handleVisibility(instanceId, req, resolver, db, grantVisibility);
 }
 
 /**

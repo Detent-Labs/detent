@@ -26,6 +26,7 @@ import {
   createInstance,
   appendInstanceEvent,
   appendInstanceEvents,
+  appendInstancePrincipals,
   newInstanceEventId,
   withTransaction,
   makeAssignmentUnresolvedEvent,
@@ -398,6 +399,13 @@ export async function applyStepEntry(tx: SQL, plan: StepEntryPlan, extraFields?:
   if (updated.length === 0) throw new ConcurrencyConflict(entry.instanceId, prevSeq);
   await tx`INSERT INTO history_entries (id, instance_id, transition_seq, entry)
     VALUES (${entry.id}, ${entry.instanceId}, ${entry.transitionSeq}, ${entry})`;
+  // instance-visibility-set: the entered step's resolved candidates, plus the
+  // actor who drove this entry. One insert, this transaction, so the migration
+  // path (migration.ts::migrateOne) inherits it with no code of its own.
+  await appendInstancePrincipals(tx, entry.instanceId, [
+    ...(next.assignment?.candidates ?? []),
+    ...(entry.actorId ? [entry.actorId] : []),
+  ]);
   await appendInstanceEvents(tx, events);
   for (const row of outbox) {
     // field_version: the instance's version at this entry, i.e. entry.version
@@ -1023,6 +1031,11 @@ async function updateAssignment(
     const next = computeNext(inst.assignment as AssignmentState, at);
     await tx`UPDATE instances SET body = jsonb_set(body, '{assignment}', (${[next]}::jsonb) -> 0)
       WHERE instance_id = ${instanceId}`;
+    // instance-visibility-set: whoever now holds the claim. A release writes
+    // no claimant, so the list below is empty and the helper writes nothing.
+    // A delegation target never joins `candidates`, so without this the
+    // delegate would hold a claim on an instance they cannot list.
+    await appendInstancePrincipals(tx, instanceId, next.claimedBy ? [next.claimedBy] : []);
 
     const event: InstanceEvent = {
       id: newInstanceEventId(),

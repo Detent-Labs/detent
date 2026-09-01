@@ -138,13 +138,13 @@ identity" rather than "valid identity, insufficient permission").
 
 ### Requirement: A process-scoped gate asks one function over two tests
 
-Seven gated operations name one process. The engine SHALL route each one
+Ten gated operations name one process. The engine SHALL route each one
 through a single pair of functions in `src/auth/authorize.ts`. Grant storage
 lives behind that pair, so no call site reads a grant.
 
-The engine SHALL define a `Permission` type of exactly four string values:
-`"publish"`, `"cancel"`, `"migrate"` and `"read"`. These SHALL be the only
-permissions this capability defines. A permission names an operation whose
+The engine SHALL define a `Permission` type of exactly five string values:
+`"publish"`, `"cancel"`, `"migrate"`, `"read"` and `"visibility"`. These SHALL
+be the only permissions this capability defines. A permission names an operation whose
 target is one process. It is not a role, and no deployment grants one to an
 actor.
 
@@ -157,11 +157,22 @@ ProcessId, db: SQL): Promise<boolean>`. It SHALL answer one question: may
 - `"cancel"` takes `CANCEL_ANY_ROLE`
 - `"migrate"` takes `DEVELOPER_ROLE`
 - `"read"` takes `ADMIN_ROLE`
+- `"visibility"` takes `ADMIN_ROLE`
 
 `"read"` SHALL take `ADMIN_ROLE` rather than `REPORTS_ROLE`. `REPORTS_ROLE`
 answers whether an actor may reach the reporting area at all. That is a
 different question from which process's data an actor may see. One role
 answering both would leave an installation no way to narrow the second.
+
+`"visibility"` gates changing who may see one instance, per the
+`instance-visibility-set` capability. It takes `ADMIN_ROLE` too, so today only
+an operator performs it.
+
+It exists as a permission rather than a bare role check for one reason. An
+installation may later want a per-process administrator who manages visibility
+on their own process and nothing else. Writing a grant of `"visibility"` over
+that process admits exactly that actor. No code changes, and no role string
+carries a scope.
 
 `can` SHALL answer true where either of two tests passes. It SHALL run them in
 this order:
@@ -195,14 +206,19 @@ effect where `can` answers true. It SHALL NOT define a second error type.
 The `PERMISSION_ROLE` map SHALL stay private to its module. No caller outside
 `src/auth/authorize.ts` SHALL read it or replace it.
 
-Six gates SHALL await `requirePermission` in place of a bare `requireRole`:
+Nine gates SHALL await `requirePermission` in place of a bare `requireRole`:
 
 - `handlePublish` and `handlePublishDraft`, with `"publish"`
 - `handleGetMigrationPlan` and `handlePutMigrationPlan`, with `"migrate"`
 - `handleGetOrphanKeys`, with `"migrate"`
 - the `scope=all` instance listing, with `"read"`
+- the three instance-visibility routes, with `"visibility"`
 
-The seventh site is `cancelInstance`. It awaits `can` where it holds a loaded
+Those three sit under `/instances/:instanceId/visibility*`, beside
+`handleCancel`, not under `/admin/*`. An `/admin/*` route calls `requireRole`
+with `ADMIN_ROLE`, and the rule below keeps that true.
+
+The tenth site is `cancelInstance`. It awaits `can` where it holds a loaded
 instance. The requirement named "An instance's starter may cancel it without
 the reserved role" states that placement.
 
@@ -318,10 +334,24 @@ stay synchronous.
 
 #### Scenario: An installation with no grants keeps today's answers
 
-- **WHEN** an actor calls any of the seven gated operations, over a store
+- **WHEN** an actor calls any of the ten gated operations, over a store
   holding no grant row
 - **THEN** the operation admits the actors it admitted before this change
 - **AND** it refuses the actors it refused before this change
+
+#### Scenario: The visibility permission answers for an operator
+
+- **WHEN** `can(actor, "visibility", processId, db)` runs for an actor holding
+  `"system:admin"`
+- **THEN** it answers true, reading no grant row
+
+#### Scenario: A visibility grant narrows to one process
+
+- **WHEN** the store holds a grant of `"visibility"` to the role
+  `"hr-process-admin"` over process A
+- **AND** an actor holding that role calls `can` for each process
+- **THEN** `"visibility"` answers true for process A
+- **AND** `"visibility"` answers false for process B
 
 ### Requirement: A grant scope carries the plugin envelope
 
@@ -454,11 +484,11 @@ constant or permission. The engine already follows that pattern for the single
 
 `requirePermission` SHALL NOT weaken that rule. It reads the same
 `Actor.roles`, in the same module, and one table of stored rows beside them. It
-resolves four fixed permissions through one compile-time map. It reaches no
+resolves five fixed permissions through one compile-time map. It reaches no
 registry. It loads no code. A caller SHALL NOT be able to add a permission,
 replace the map, or supply a policy.
 
-A grant is data, not policy. It names a role, one of the four fixed
+A grant is data, not policy. It names a role, one of the five fixed
 permissions, and a scope. It carries no expression, no ordering, no priority
 and no deny form. Two grants over one process combine by answering true, which
 is what a set of independent tests already does.
@@ -488,7 +518,7 @@ is what a set of independent tests already does.
 #### Scenario: The permission map does not extend
 
 - **WHEN** a reader reads the `PERMISSION_ROLE` map
-- **THEN** it is a module constant covering exactly four permissions
+- **THEN** it is a module constant covering exactly five permissions
 - **AND** no exported function adds an entry to it
 
 #### Scenario: A grant carries no policy

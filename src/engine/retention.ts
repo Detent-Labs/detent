@@ -72,6 +72,12 @@ export async function redactInstance(
     await tx`DELETE FROM instance_comments WHERE instance_id = ${instanceId}`;
     await tx`DELETE FROM instance_attachments WHERE instance_id = ${instanceId}`;
     await deleteInstanceDraft(instanceId, tx);
+    // instance-visibility-set is the sixth relation: both its principal rows
+    // and any revocation rows standing against them. Each names a person, so
+    // neither outlives the values it stood beside. A redacted instance is
+    // therefore absent from every participant's `scope=visible` list.
+    await tx`DELETE FROM instance_principals WHERE instance_id = ${instanceId}`;
+    await tx`DELETE FROM instance_principals_denied WHERE instance_id = ${instanceId}`;
 
     return { ...inst, data: {}, redactedAt: at };
   });

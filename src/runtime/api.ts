@@ -9,7 +9,7 @@
  */
 
 import type { SQL } from "bun";
-import { sql, createInstance, createDraftSnapshot, rehydrate, withTransaction, newInstanceEventId, PinMismatch } from "../engine/store.js";
+import { sql, createInstance, createDraftSnapshot, rehydrate, withTransaction, newInstanceEventId, appendInstanceEvent, appendInstancePrincipals, PinMismatch } from "../engine/store.js";
 import { createDefinitionStore } from "../engine/definitions.js";
 import { getDraft } from "../engine/drafts.js";
 import {
@@ -292,6 +292,12 @@ export type InstanceListFilter = {
   // kind: "test" instance from the result, the default every
   // participant-facing scope gets.
   includeTestInstances?: boolean;
+  // instance-visibility-set: the caller's own principals, resolved from the
+  // credential (actor id, roles, group memberships) by the HTTP layer, never
+  // from raw client input. Present only for scope=visible. Its presence is
+  // what switches listInstances onto the visibility read; absent leaves every
+  // existing scope byte-for-byte unchanged.
+  visibleTo?: { actorId: string; principals: string[] };
 };
 
 /**
@@ -1675,6 +1681,83 @@ async function assertNoNonScalarComparedField(filter: InstanceWhereFilter, compa
  * filter implicitly scopes to the caller; an unfiltered call returns every
  * instance.
  */
+/**
+ * The `scope=visible` row set (instance-visibility-set): one ordered, bounded
+ * branch per principal the reader holds, plus one for the instances the reader
+ * is currently assigned, combined by Postgres into a `Merge Append`.
+ *
+ * Two properties are load-bearing and easy to lose in a rewrite.
+ *
+ * Every branch applies the request's own filters BEFORE its own `LIMIT`. A
+ * branch bounded at `n` whose rows are filtered afterwards returns fewer than
+ * `n`, and `keysetPage` reads `hasMore` off the row count, so a short page
+ * reports no cursor and the walk stops while visible instances remain.
+ * Measured: a 21-row branch filtered afterwards by the test-instance exclusion
+ * alone returns 19. See design.md, "Every branch carries the filters".
+ *
+ * The instance filters sit in a correlated `EXISTS` rather than a join, so
+ * `instances` is the only relation in scope where `buildInstanceWhere` and
+ * `buildDataWhere` emit their unqualified column names. A join would make
+ * `instance_id` and `created_at` ambiguous against the principal row.
+ *
+ * The assignment branch is why a revocation cannot strand an actor holding
+ * live work: it carries no denial test, so an assigned actor sees the instance
+ * even while revoked from it (design.md, "A live assignment overrides a
+ * revocation at read time").
+ *
+ * Exported for the plan guards in `test/instance-visibility.test.ts`, which
+ * run `EXPLAIN (ANALYZE)` over this fragment. No other caller.
+ */
+export function buildVisibleRowSet(
+  filter: InstanceListFilter,
+  visibleTo: { actorId: string; principals: string[] },
+  bound: number,
+  cursorCreatedAt: string | undefined,
+  cursorInstanceId: string | undefined,
+  db: SQL,
+) {
+  const instanceFilters = db`${buildInstanceWhere(filter, db)} AND ${buildDataWhere(filter.dataWhere, db)}`;
+  const rolesArr = visibleTo.principals.length > 0 ? db.array(visibleTo.principals, "TEXT") : null;
+
+  const branch = (principal: string) => db`
+    (SELECT vp.instance_id, vp.created_at FROM instance_principals vp
+      WHERE vp.principal = ${principal}
+        AND NOT EXISTS (SELECT 1 FROM instance_principals_denied vd
+                        WHERE vd.instance_id = vp.instance_id AND vd.actor_id = ${visibleTo.actorId})
+        AND EXISTS (SELECT 1 FROM instances WHERE instances.instance_id = vp.instance_id AND ${instanceFilters})
+        AND (${cursorCreatedAt ?? null}::timestamptz IS NULL
+             OR (vp.created_at, vp.instance_id) < (${cursorCreatedAt ?? null}::timestamptz, ${cursorInstanceId ?? null}))
+      ORDER BY vp.created_at DESC, vp.instance_id DESC
+      LIMIT ${bound})`;
+
+  const assigned = db`
+    (SELECT instance_id, created_at FROM instances
+      WHERE ${instanceFilters}
+        AND (
+          body->'assignment'->>'claimedBy' = ${visibleTo.actorId}
+          OR (body->'assignment'->>'claimedBy' IS NULL AND (
+            body->'assignment'->'candidates' @> to_jsonb(${visibleTo.actorId}::text)
+            OR (${rolesArr}::text[] IS NOT NULL AND body->'assignment'->'candidates' ?| ${rolesArr})
+          ))
+        )
+        AND (${cursorCreatedAt ?? null}::timestamptz IS NULL
+             OR (created_at, instance_id) < (${cursorCreatedAt ?? null}::timestamptz, ${cursorInstanceId ?? null}))
+      ORDER BY created_at DESC, instance_id DESC
+      LIMIT ${bound})`;
+
+  // Left-nested reduce, the shape buildDataWhere already uses to fold a
+  // variable fragment list: an empty principal list still leaves the
+  // assignment branch, so the union is never empty SQL.
+  const union = visibleTo.principals
+    .map(branch)
+    .reduce((acc, frag) => db`${acc} UNION ALL ${frag}`, assigned);
+
+  return db`
+    SELECT DISTINCT ON (created_at, instance_id) instance_id, created_at FROM (${union}) vu
+    ORDER BY created_at DESC, instance_id DESC
+    LIMIT ${bound}`;
+}
+
 export async function listInstances(
   filter: InstanceListFilter = {},
   page: { limit?: number; cursor?: string } = {},
@@ -1697,7 +1780,14 @@ export async function listInstances(
   // rounded cursor and the true boundary value) from the walk — see
   // fix-instance-list-cursor-precision's design.md. Encoding from the
   // lossless text avoids that entirely, the same fix listComments applies.
-  const rows = (await db`
+  const rows = (await (filter.visibleTo
+    ? db`
+    SELECT i.instance_id, i.body, i.created_at, i.created_at::text AS created_at_cursor
+    FROM instances i
+    JOIN (${buildVisibleRowSet(filter, filter.visibleTo, limit + 1, cursorCreatedAt, cursorInstanceId, db)}) v
+      ON v.instance_id = i.instance_id
+    ORDER BY i.created_at DESC, i.instance_id DESC`
+    : db`
     SELECT instance_id, body, created_at, created_at::text AS created_at_cursor FROM instances
     WHERE ${buildInstanceWhere(filter, db)}
       AND ${buildDataWhere(filter.dataWhere, db)}
@@ -1707,7 +1797,7 @@ export async function listInstances(
       )
     ORDER BY created_at DESC, instance_id DESC
     LIMIT ${limit + 1}
-  ` as unknown) as { instance_id: string; body: unknown; created_at: string; created_at_cursor: string }[];
+  `) as unknown) as { instance_id: string; body: unknown; created_at: string; created_at_cursor: string }[];
 
   const { pageRows, cursor } = keysetPage(rows, limit, (r) => [r.created_at_cursor, r.instance_id]);
   const store = getStore(db);
@@ -1727,7 +1817,7 @@ export async function listInstances(
  * design.md "The data read takes its own filter type and rejects a borrowed
  * key".
  */
-const QUERY_FILTER_DENYLIST = ["assignedTo", "assignedToRoles", "scope", "includeDegraded"] as const;
+const QUERY_FILTER_DENYLIST = ["assignedTo", "assignedToRoles", "scope", "includeDegraded", "visibleTo"] as const;
 
 function assertNoDenylistedQueryKeys(filter: object): void {
   const raw = filter as Record<string, unknown>;
@@ -2299,6 +2389,82 @@ export async function getInstanceRecord(
  * `delegateClaim` already applies to `toActorId`. This function performs no
  * independent length or emptiness check.
  */
+// ============================================================
+// Per-instance visibility administration (instance-visibility-set)
+// ============================================================
+
+/** The three visibility operations, distinguished by what each writes. */
+export type VisibilityOp = "revoked" | "restored" | "granted";
+
+/**
+ * Shared body of `revokeVisibility` / `restoreVisibility` / `grantVisibility`:
+ * gate, mutate, record, in one transaction.
+ *
+ * The gate is the process-scoped `"visibility"` permission against the
+ * instance's own process, not a bare `ADMIN_ROLE` check. It answers the same
+ * today — `PERMISSION_ROLE` maps it to `ADMIN_ROLE` — and it lets an
+ * installation admit a per-process administrator later by writing one grant,
+ * with no code change and no scope inside a role string.
+ *
+ * Loading the instance first is deliberate: the permission names a process,
+ * and only the instance knows which one. A caller with no standing therefore
+ * learns nothing an unauthorized read would not already tell them, since the
+ * load itself is unauthenticated and the refusal follows it.
+ */
+async function changeVisibility(
+  instanceId: InstanceId,
+  targetActorId: string,
+  actor: Actor,
+  op: VisibilityOp,
+  db: SQL,
+): Promise<void> {
+  const { instance } = await loadInstanceForRead(instanceId, db);
+  if (!(await can(actor, "visibility", instance.processId, db))) {
+    throw new AuthorizationError(`actor '${actor.id}' may not change visibility of instance '${instanceId}'`);
+  }
+  await withTransaction(db, async (tx) => {
+    if (op === "revoked") {
+      await tx`INSERT INTO instance_principals_denied (instance_id, actor_id)
+        VALUES (${instanceId}, ${targetActorId}) ON CONFLICT DO NOTHING`;
+    } else if (op === "restored") {
+      await tx`DELETE FROM instance_principals_denied
+        WHERE instance_id = ${instanceId} AND actor_id = ${targetActorId}`;
+    } else {
+      // A grant is an ordinary principal append, so a granted actor is
+      // indistinguishable from a participant afterwards. It also lifts any
+      // standing revocation: granting someone you are still denying would
+      // leave the grant inert and nothing on screen would say why.
+      await appendInstancePrincipals(tx, instanceId, [targetActorId]);
+      await tx`DELETE FROM instance_principals_denied
+        WHERE instance_id = ${instanceId} AND actor_id = ${targetActorId}`;
+    }
+    await appendInstanceEvent(tx, {
+      id: newInstanceEventId(),
+      instanceId: instance.instanceId,
+      transitionSeq: instance.transitionSeq,
+      version: instance.version,
+      kind: "visibility.changed",
+      payload: { op, actorId: targetActorId, byActorId: actor.id },
+      at: new Date().toISOString(),
+    } as InstanceEvent);
+  });
+}
+
+/** Remove one actor's sight of one instance. Names the person, never the principal they matched by. */
+export async function revokeVisibility(instanceId: InstanceId, targetActorId: string, actor: Actor, db: SQL = sql): Promise<void> {
+  return changeVisibility(instanceId, targetActorId, actor, "revoked", db);
+}
+
+/** Undo a revocation, returning the actor to the visibility they had before. */
+export async function restoreVisibility(instanceId: InstanceId, targetActorId: string, actor: Actor, db: SQL = sql): Promise<void> {
+  return changeVisibility(instanceId, targetActorId, actor, "restored", db);
+}
+
+/** Give one actor sight of an instance they never took part in. */
+export async function grantVisibility(instanceId: InstanceId, targetActorId: string, actor: Actor, db: SQL = sql): Promise<void> {
+  return changeVisibility(instanceId, targetActorId, actor, "granted", db);
+}
+
 export async function postComment(instanceId: InstanceId, actor: Actor, text: string, db: SQL = sql): Promise<InstanceComment> {
   const { instance } = await loadInstanceForActor(instanceId, actor, db);
   const id = `comment_${crypto.randomUUID()}`;

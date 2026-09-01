@@ -345,6 +345,39 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // Readers: buildInstanceWhere's shared startedBy filter, reached by the same
   // two reads, and the participant-facing GET /instances?scope=started route.
   await db`CREATE INDEX IF NOT EXISTS instances_started_by_col_idx ON instances (started_by)`;
+  // Who took part in an instance (instance-visibility-set). One row per
+  // (instance, principal); a principal is an actor id, a role string or a group
+  // id — the same value kind assignment.candidates holds. created_at duplicates
+  // the instance's own value on purpose: the visible-scope read filters on
+  // principal and pages by that key, no index spans two relations, and
+  // instances.created_at never changes after insert (column default, no writer).
+  // No FK to instances, matching instance_comments, instance_attachments,
+  // history_entries and instance_events: none of the per-instance relations
+  // carries one. A foreign key here breaks `TRUNCATE ... instances ...`, which
+  // 43 test files run in beforeEach (verified: "cannot truncate a table
+  // referenced in a foreign key constraint"). Nothing deletes an instance —
+  // redaction wipes and stamps redacted_at — and redactInstance deletes both
+  // relations explicitly, so no orphan arises.
+  await db`CREATE TABLE IF NOT EXISTS instance_principals (
+    instance_id text NOT NULL,
+    principal   text NOT NULL,
+    created_at  timestamptz NOT NULL,
+    PRIMARY KEY (instance_id, principal)
+  )`;
+  // The visible-scope read's driving index. Column order is load-bearing:
+  // principal is an equality bound, then created_at/instance_id are the range
+  // and tie-break the keyset page walks. Any other order forces a sort.
+  await db`CREATE INDEX IF NOT EXISTS instance_principals_page_idx
+    ON instance_principals (principal, created_at DESC, instance_id DESC)`;
+  // A revocation names the PERSON, never the principal they matched by: an
+  // actor usually reaches an instance through a role or a group, and deleting
+  // that principal would revoke it for every other holder. Subtracted inside
+  // each branch of the visible-scope read, so a denial never shortens a page.
+  await db`CREATE TABLE IF NOT EXISTS instance_principals_denied (
+    instance_id text NOT NULL,
+    actor_id    text NOT NULL,
+    PRIMARY KEY (actor_id, instance_id)
+  )`;
   // Project-local user accounts (src/auth/users.ts). user_id is the value used
   // as Actor.id — the same convention as assignment.candidates/claimedBy.
   await db`CREATE TABLE IF NOT EXISTS auth_users (
@@ -1056,6 +1089,31 @@ export async function appendInstanceEvents(tx: SQL, events: readonly InstanceEve
 }
 
 /**
+ * Record who took part in an instance (instance-visibility-set). One statement,
+ * idempotent, called from every point that learns a new principal: creation,
+ * every step entry (migration included), a claim or delegation, and a
+ * subprocess spawn.
+ *
+ * `created_at` is read from the instance row rather than passed in, so the
+ * duplicated key cannot drift from the value the list pages by. That makes the
+ * insert depend on the instance row already existing in this transaction —
+ * true at every call site, since each writes the instance first.
+ *
+ * Never removes. A revocation is a separate relation the read subtracts, and
+ * nothing on a commit path deletes one (design.md, "A live assignment
+ * overrides a revocation at read time").
+ */
+export async function appendInstancePrincipals(tx: SQL, instanceId: string, principals: readonly string[]): Promise<void> {
+  const unique = [...new Set(principals.filter((p) => p.length > 0))];
+  if (unique.length === 0) return;
+  await tx`INSERT INTO instance_principals (instance_id, principal, created_at)
+    SELECT i.instance_id, p.principal, i.created_at
+    FROM instances i, unnest(${tx.array(unique, "TEXT")}) AS p(principal)
+    WHERE i.instance_id = ${instanceId}
+    ON CONFLICT DO NOTHING`;
+}
+
+/**
  * Create an instance pinned to { processId, version, definitionHash }, at the
  * definition's initialStep, transitionSeq 0, and persist it. Creation is not a
  * transition — no HistoryEntry, no trigger actions — but it is a step entry, so
@@ -1211,6 +1269,14 @@ export async function createInstance(
       ON CONFLICT (instance_id) DO NOTHING
       RETURNING instance_id`) as unknown[];
     if (inserted.length === 0) return;
+    // Creation is a step entry (see this function's own doc comment), so it
+    // carries the same principal append every later entry does: the starter,
+    // plus the initial step's resolved candidates. A seeded child has no
+    // startedBy, so it contributes candidates alone.
+    await appendInstancePrincipals(tx, inst.instanceId, [
+      ...(inst.startedBy ? [inst.startedBy] : []),
+      ...(inst.assignment?.candidates ?? []),
+    ]);
     await appendInstanceEvents(tx, events);
     if (spawn && spawnEvent) {
       await tx`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, event_id, field_version, actors)

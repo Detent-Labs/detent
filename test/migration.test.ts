@@ -466,6 +466,35 @@ test.skipIf(!DB)("6.x a migration resolves nothing, even where the target declar
   expect(after!.assignment?.candidates).toEqual(["user_1"]);
 });
 
+test.skipIf(!DB)("6.x a migration appends no principal, because it resolves no assignment", async () => {
+  // instance-visibility-set 2.5: the migration path reaches applyStepEntry, so
+  // it inherits the principal append with no code of its own. What it appends
+  // is nothing: `assignment: { carry: true }` skips the resolver, so
+  // `next.assignment` is the set already recorded when the instance entered
+  // its previous step, and a migration carries no actorId. Involvement does
+  // not change, so neither does visibility — including a relocation onto a
+  // step whose own candidates are somebody else's.
+  const p = pid();
+  const v2 = assignedWaitBody("a") as unknown as {
+    workflow: { steps: { id: string; assignment?: { strategy: { config: { candidates: string[] } } } }[] };
+  };
+  v2.workflow.steps.find((s) => s.id === "step_wait")!.assignment!.strategy.config.candidates = ["user_9"];
+  await twoVersions(p, assignedWaitBody("a"), v2 as unknown as ProcessBody, {} as MigrationSpec);
+  const inst = await mkInstance(p, 1);
+  // mkInstance calls createInstance directly, which is the write point that
+  // records the starter and the initial candidates.
+  const principals = async (): Promise<string[]> => {
+    const r = (await sql`SELECT principal FROM instance_principals
+      WHERE instance_id = ${inst.instanceId} ORDER BY principal`) as { principal: string }[];
+    return r.map((x) => x.principal);
+  };
+  expect(await principals()).toEqual(["user_1"]);
+
+  await migrateInstances(p as Instance["processId"], 1, 2, sql);
+  expect((await loadInstance(inst.instanceId))!.version).toBe(2);
+  expect(await principals()).toEqual(["user_1"]);
+});
+
 test.skipIf(!DB)("6.2 migration onto a terminal step yields completed", async () => {
   const p = pid();
   const v1 = waitBody({ key: "a", fields: [f("x", "string")] });

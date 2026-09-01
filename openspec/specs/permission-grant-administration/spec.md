@@ -107,8 +107,8 @@ reaches the store. It SHALL answer `400` where the body fails. Four cases
 fail:
 
 - `role` missing, empty, or not a string.
-- `permission` outside the four the `authorization` capability defines:
-  `"publish"`, `"cancel"`, `"migrate"` and `"read"`.
+- `permission` outside the five the `authorization` capability defines:
+  `"publish"`, `"cancel"`, `"migrate"`, `"read"` and `"visibility"`.
 - `scope` missing, or carrying a `type` other than `"process"`.
 - A `"process"` scope whose `config.processId` is missing or does not match the
   `proc_` prefix a `ProcessId` requires.
@@ -156,6 +156,14 @@ reads that message rather than guessing.
 
 - **WHEN** any of the four cases above answers `400`
 - **THEN** the error message names the field that failed
+
+#### Scenario: The engine stores a visibility grant
+
+- **WHEN** an operator POSTs a grant whose `permission` is `"visibility"` over a
+  well-formed `"process"` scope
+- **THEN** the response reports success
+- **AND** the store holds that row
+- **AND** listing the grants carries it
 
 ### Requirement: A grant takes effect on the next authorization call
 

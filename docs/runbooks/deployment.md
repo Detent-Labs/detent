@@ -98,6 +98,41 @@ The seed script creates demo accounts with a fixed, published password. One of
 them holds `system:admin`. `.dockerignore` excludes no part of `scripts/`, so
 the script reaches the engine image. Leave `SEED_ALLOW` unset in a deployment.
 
+## The instance-visibility backfill
+
+Run once, after deploying the engine that first carries
+`instance_principals`:
+
+```
+bun run scripts/backfill-instance-principals.ts
+```
+
+The engine records who took part in an instance from that deploy onward. Every
+instance created before it carries nothing. `GET /instances?scope=visible`
+therefore returns none of them to the people who worked them.
+
+The script derives a set from what the engine already stored:
+
+- the starter
+- the current step's candidates and claimant
+- the acting actor on each history entry
+
+Run it after the deploy, not before. The relation has to exist, and the engine
+has to be appending already. Otherwise the script skips every instance created
+in between.
+
+It is idempotent and it never deletes. A second run writes nothing, an
+interrupted run is safe to repeat, and neither needs downtime.
+
+It cannot recover a candidate on a step an instance has already left who never
+acted. Nothing recorded that. Those readers stay unseen until the instance
+moves again.
+
+One consequence belongs on an operator's radar rather than in the script.
+Redaction now deletes an instance's visibility rows, and the scheduled
+`DATA_RETENTION_DAYS` sweep redacts in bulk. Every instance that sweep touches
+leaves its participants' lists at once, with no notice to them.
+
 ## The proxy rule
 
 A proxy in front of the engine must overwrite `X-Forwarded-For`. It must not

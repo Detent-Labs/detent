@@ -3,7 +3,7 @@
  * `hasGrant` alone and holds no SQL of its own; the three admin routes import
  * `listGrants`, `writeGrant` and `revokeGrant`. A grant maps a role string
  * (a principal the identity provider names, never a scope of its own) to one
- * of the four process-scoped permissions and a scope.
+ * of the five process-scoped permissions and a scope.
  *
  * The write path is strict: `grantSchema` rejects an unknown scope `type` at
  * write time. The read path is lenient: `listGrants` returns the stored
@@ -31,7 +31,7 @@ const processScope = z.object({
 /** Strict on write: an unknown `type` fails to parse, so the route answers 400 rather than storing a row no reader can act on. */
 export const grantSchema = z.object({
   role: z.string().min(1).max(MAX_ROLE_LENGTH),
-  permission: z.enum(["publish", "cancel", "migrate", "read"]),
+  permission: z.enum(["publish", "cancel", "migrate", "read", "visibility"]),
   scope: z.discriminatedUnion("type", [processScope]),
 });
 
