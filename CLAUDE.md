@@ -134,13 +134,15 @@ printed, not that you ran it.
   `origin/main..HEAD` lives in `scripts/gates/range.sh`, not in `prose.sh`
   itself — `prose.sh` reads its ranges on stdin, and an empty list checks
   nothing and exits 0.
-- Trailing whitespace, blank-at-eof, and CRLF. Same shape as the bullet above,
-  and for the same reason: `sh scripts/gates/range.sh < /dev/null | sh
-  scripts/gates/whitespace.sh`. This script reads its ranges on stdin too, so
-  `whitespace.sh < /dev/null` checks nothing and exits 0. Measured 2026-09-01:
-  that form passed twice while the pre-push hook rejected the same tree for a
-  blank line at EOF. Run the script rather than reconstructing its
-  two probes by hand: `git diff --check` alone misses CRLF here, since
+- Trailing whitespace, blank-at-eof, and CRLF. Run the same check the push gate
+  runs, over the same range: `sh scripts/gates/range.sh < /dev/null | sh
+  scripts/gates/whitespace.sh`. The `< /dev/null` belongs on `range.sh`, which
+  falls back to `origin/main..HEAD`. Handing `whitespace.sh` an empty stdin
+  checks nothing; it now says so instead of exiting 0 in silence. Measured
+  2026-09-01, while it still passed in silence: that form went green twice while
+  the pre-push hook rejected the same tree for a blank line at EOF. Run the gate
+  rather than reconstructing its two probes by hand: `git diff --check` alone
+  misses CRLF here, since
   `.gitattributes` sets `* text=auto eol=lf` and git normalizes a CRLF
   worktree file on `git add`, and `grep -lI $'\r'` finds nothing in Git Bash,
   since MSYS grep opens a file in text mode and strips the CR before matching.

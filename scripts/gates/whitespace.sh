@@ -46,6 +46,19 @@ done
 
 sort -u "$files" -o "$files"
 
+# An empty range list and a range that changes no file reach the same place: no
+# path to judge. Say so, and exit 0. A push that sends no text file is
+# legitimate — a branch deletion is one. Silence here reads as a pass, and a
+# contributor who piped nothing in would trust a check that never ran.
+#
+# Before the `git ls-files` probe below, so this path calls no git command at
+# all. `bun test` runs in the devcontainer, where /workspace is not a usable
+# repository: a linked worktree's `.git` is a file pointing outside the mount.
+if [ ! -s "$files" ]; then
+  echo "gate '$RULE': the push changes no text file, nothing to check."
+  exit 0
+fi
+
 # A path the range changed and then deleted is absent from this listing, which
 # is the wanted behavior: it has no worktree bytes left to judge.
 git ls-files --eol 2>/dev/null \
