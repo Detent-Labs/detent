@@ -12,8 +12,8 @@
 
 The read SHALL additionally accept `scope: "visible"`. It SHALL return two
 sets, unioned. The first is the instances whose principal set matches the
-calling actor, less those the actor is revoked from. The second is the
-instances the actor is currently assigned, which the existing `scope: "mine"`
+calling actor, less those an administrator revoked from them. The second is
+the instances that assign the actor now, which the existing `scope: "mine"`
 predicate already describes. `instance-visibility-set` owns both rules.
 
 The read resolves that actor from the request's credential, the same rule
@@ -56,8 +56,8 @@ instance outside the caller's visible set.
 
 #### Scenario: A cancelled instance stays visible to its participants
 
-- **WHEN** an instance A took part in is cancelled, and A calls the read with
-  `scope: "visible"`
+- **WHEN** an operator cancels an instance A took part in, and A calls the
+  read with `scope: "visible"`
 - **THEN** the result includes that instance
 
 #### Scenario: An uninvolved actor sees nothing
@@ -85,7 +85,7 @@ instance outside the caller's visible set.
   the read with `scope: "visible"`
 - **THEN** the result includes that instance
 
-#### Scenario: Paging is unchanged
+#### Scenario: Paging works the same way
 
 - **WHEN** a `scope: "visible"` result spans more than one page
 - **THEN** it pages by the same keyset order and cursor the read already uses

@@ -35,33 +35,33 @@ row, history entry, event or outbox row.
 
 #### Scenario: An applied entry writes the entered step's candidates
 
-- **WHEN** a step entry is applied for a step whose assignment resolves to
-  candidates
+- **WHEN** the applier commits a step entry for a step whose assignment
+  resolves to candidates
 - **THEN** those candidates are principals of the instance after the commit
 
 #### Scenario: A failed commit writes no principal
 
 - **WHEN** an applied step entry's transaction fails
-- **THEN** no principal row for that entry is written
-- **AND** no instance row, history entry, event or outbox row is written either
+- **THEN** the transaction leaves no principal row for that entry
+- **AND** it leaves no instance row, history entry, event or outbox row either
 
 #### Scenario: Planning performs no principal write
 
-- **WHEN** a step entry is planned but never applied
-- **THEN** no principal row is written
+- **WHEN** the planner plans a step entry that never reaches the applier
+- **THEN** planning writes no principal row
 
 #### Scenario: Re-entering a step with the same candidates is a no-op for the set
 
 - **WHEN** an instance re-enters a step whose candidates are already principals
-- **THEN** the commit succeeds and the set is unchanged
+- **THEN** the commit succeeds and the set holds what it held before
 
 #### Scenario: A step with no assignment writes no principal
 
-- **WHEN** a step entry is applied for a step declaring no assignment
-- **THEN** the commit writes no principal, and the set is unchanged
+- **WHEN** the applier commits a step entry for a step declaring no assignment
+- **THEN** the commit writes no principal, and the set holds what it held before
 
-#### Scenario: The concurrency token is unaffected
+#### Scenario: The concurrency token advances as before
 
-- **WHEN** a step entry is applied
+- **WHEN** the applier commits a step entry
 - **THEN** its `transitionSeq` advances exactly as it did before the principal
   write existed
