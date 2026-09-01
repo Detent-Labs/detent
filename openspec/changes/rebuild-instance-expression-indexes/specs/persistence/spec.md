@@ -125,8 +125,8 @@ one schema path, `initSchema`, and it MUST NOT hold a definition check or an
 unconditional rebuild.
 
 The drop SHALL stay in `initSchema` rather than run once and retire. A
-database that has never seen this change reaches it through the same code path
-as one that has.
+database that has never run it reaches it through the same code path as one
+that has.
 
 A rebuilt index carries the predicates the dropped index carried. No such
 predicate SHALL keep naming the dropped index's expression.
@@ -175,7 +175,7 @@ route reads, since every `version integer` column shares the range.
 A cast around an indexed expression is not that expression. A predicate
 casting `body->>'version'` to `int` therefore reaches no column of an index
 built over `(body->>'version')`. That is why the migration scans carried an
-unusable second index column before this change.
+unusable second index column beforehand.
 
 #### Scenario: A version filter selects the pinned instances
 
