@@ -366,6 +366,9 @@ Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
 | 51 | `instance.query` data source: a field's options read from another process's instances | `instance-query-data-source` | `cross-process-validation`, `data-source-resolution`, `definition-store`, `instance-data-query`, `instance-query-data-source`, `studio-plugin-config-form` |
 | 52 | `instance.transition` action, the write half of the aggregated data source pattern | `instance-transition-action` | `cross-process-validation`, `definition-store`, `instance-transition-action`, `runtime-events` |
 | 53 | Studio Player test instances run against a process's current draft | `studio-play-draft-instance` | `admin-app`, `definition-store`, `draft-test-instances`, `instance-query`, `reporting-analytics-api`, `runtime-api`, `studio-player` |
+| 54 | Field model split into `type`, `format` and `control` | `field-model-type-format-control` | `authored-content-localization`, `cel-expressions`, `data-source-resolution`, `definition-contract`, `field-tree-check-consolidation`, `form-ui`, `instance-data-query`, `instance-query-data-source`, `runtime-api`, `runtime-field-type-check-consolidation`, `studio-app`, `studio-column-mapping-form`, `studio-condition-builder`, `studio-field-validation-form`, `studio-migration-plan-form` |
+| 55 | `person` field format, the `org.actor-from-field` assignment strategy, and the people list a person picker reads | `field-model-person-format` | `actor-from-field-assignment`, `database-seed-script`, `data-source-resolution`, `definition-contract`, `runtime-api`, `studio-app` |
+| 56 | Authored notes in a step's view, the first non-field `ViewEntry` | `field-model-view-note` | `authored-content-localization`, `definition-contract`, `form-ui`, `runtime-api`, `studio-app`, `studio-checks-rail`, `studio-form-editor` |
 
 ## Changes with no stage
 
