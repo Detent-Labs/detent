@@ -482,24 +482,41 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     Either way one participant's device moves and the other's delivery
     dead-letters, naming the step the device stands on — a better failure than
     a silent duplicate, and still a post-commit one.
-  - Per-instance visibility ("who may see instance 101") stays open, and it is
-    a larger decision than this topic: the same rule would govern the instance
-    list, the detail view, and reporting. Nothing carries such a list today —
-    `assignment.candidates` covers the current step only, and `instance-query`'s
-    spec states the read is not implicitly scoped to the calling actor. Two
-    shapes were sketched on 2026-08-25: accumulate participants as an instance
-    moves through its steps, plus an optional per-process `visibleTo` naming
-    the fields that carry people, for the starter-not-a-candidate gap. Adding
-    it later only narrows a result set, so it invalidates no published
-    definition.
+  - Per-instance visibility ("who may see instance 101") — decided 2026-09-01,
+    after the options were written up and measured against a 200 000-instance
+    fixture. Shipped as `instance-visibility-set`. The rule is an
+    engine-maintained set of principals per instance, `instance_principals`,
+    never a rule derived from the definition. The engine appends to it at four
+    points: instance creation adds the starter, step entry adds the entered
+    step's candidates, a claim or delegation adds the claimant, and a
+    subprocess spawn copies the parent's set into the child. The definition
+    contract gained nothing, so the `visibleTo` field sketched on 2026-08-25
+    was not built.
 
-    One property rests on the choice above and would end with it: because
-    authorization settles at publish, runtime resolution needs no actor at all.
-    A timer, an outbox delivery, an automatic transition, a migration, and a
-    participant's open form all resolve the same list. Should per-instance
-    filtering land, submission validation has to decide whether it checks
-    membership against the viewer's list or the full one, and the actor-free
-    execution paths need an answer for whose view they use.
+    The set has exactly one consumer, a fourth scope value on the instance
+    list, `GET /instances?scope=visible`. `getInstanceView` and
+    `loadInstanceForActor` were left alone, and so was `executeReport`. The
+    aggregate views (cycle time, bottleneck, SLA) stay unfiltered permanently:
+    an aggregate over a partly invisible population would either report a
+    number the reader cannot reconcile or refuse to answer at all, and the
+    process owner who reads them is not the audience the rule protects.
+
+    An administrator revokes and grants per person per instance, gated by a
+    fifth `Permission` value, `"visibility"`. A revocation names the person,
+    never the principal they matched by, so revoking Anna leaves every other
+    holder of her group untouched. A live assignment outranks a revocation at
+    read time, so nobody is ever holding work they cannot open. No commit path
+    ever clears a revocation, so a bulk migration cannot silently undo an
+    operator's decision.
+
+    The property that rested on the earlier answer survives untouched. Runtime
+    resolution still needs no actor, because nothing in the engine reads the
+    principal set. The timer, the outbox delivery, the automatic transition and
+    the migration all commit exactly as before. Submission validation is
+    unchanged: it still checks membership against the full resolved list, since
+    the set narrows a query result and nothing else. A migration is the one
+    step entry that appends nobody, because it carries the instance's existing
+    assignment rather than resolving the target step's.
 - **Instance data tables: a report builder over instance field values.** A
   design pass on 2026-08-25 settled the shape, in the same session as the
   two entries above. Shipped 2026-08-28 as `instance-data-tables`.

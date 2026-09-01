@@ -106,6 +106,18 @@ export async function createSeededInstance(
       tx,
     );
     for (const event of dropEvents) await appendInstanceEvent(tx, event);
+    // instance-visibility-set: a subprocess child inherits the parent's
+    // principals as they stand at the spawn, so whoever can see the parent can
+    // see the child. Gated on `link.parent`: a `process.start` target carries
+    // `chainedFrom` instead, which the contract calls a reporting-only
+    // backlink, so it inherits nothing.
+    if ("parent" in link) {
+      await tx`INSERT INTO instance_principals (instance_id, principal, created_at)
+        SELECT ${created.instanceId}, p.principal, c.created_at
+        FROM instance_principals p, instances c
+        WHERE p.instance_id = ${link.parent.instanceId} AND c.instance_id = ${created.instanceId}
+        ON CONFLICT DO NOTHING`;
+    }
     return created;
   });
 }

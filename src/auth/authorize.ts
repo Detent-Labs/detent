@@ -70,12 +70,13 @@ export function requireRole(actor: Actor, role: string): void {
 
 /**
  * A gated operation whose target is one process, named by what the call site
- * asks rather than by the role that answers it today. Exactly four exist:
- * publishing a body, cancelling an instance, the migration routes, and the
- * unfiltered instance listing (`scope=all`). Every other gated operation
- * names no process and keeps `requireRole`.
+ * asks rather than by the role that answers it today. Exactly five exist:
+ * publishing a body, cancelling an instance, the migration routes, the
+ * unfiltered instance listing (`scope=all`), and changing who may see one
+ * instance. Every other gated operation names no process and keeps
+ * `requireRole`.
  */
-export type Permission = "publish" | "cancel" | "migrate" | "read";
+export type Permission = "publish" | "cancel" | "migrate" | "read" | "visibility";
 
 /**
  * The reserved role each permission takes today. Module-private on purpose:
@@ -86,12 +87,20 @@ export type Permission = "publish" | "cancel" | "migrate" | "read";
  * `"read"` takes `ADMIN_ROLE` rather than `REPORTS_ROLE`: `REPORTS_ROLE`
  * answers whether an actor may reach the reporting area at all, a different
  * question from which process's data an actor may see.
+ *
+ * `"visibility"` gates revoking, restoring and granting one actor's sight of
+ * one instance (instance-visibility-set). It takes `ADMIN_ROLE` today, so only
+ * an operator performs it. It exists as a permission rather than a bare role
+ * check so an installation wanting a per-process administrator writes a grant
+ * over that process instead of a code change — and so no role string ever
+ * carries a scope.
  */
 const PERMISSION_ROLE: Record<Permission, string> = {
   publish: PUBLISH_ROLE,
   cancel: CANCEL_ANY_ROLE,
   migrate: DEVELOPER_ROLE,
   read: ADMIN_ROLE,
+  visibility: ADMIN_ROLE,
 };
 
 /**
