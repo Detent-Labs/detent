@@ -156,11 +156,14 @@ A predicate filtering instances by `version` SHALL compare against the
 generated `version integer` column, not against `body->>'version'` as text.
 
 `version` is a JSON number in every stored body, so the two forms agree on
-every row the engine has written. They differ on a value that is not the
-canonical decimal form of an integer. A text comparison matches no row for
-such a value, while an integer comparison makes the datastore reject it.
+every row the engine has written. They part on a value the column cannot hold.
+Two classes qualify. One is not the canonical decimal form of an integer. The
+other falls outside the range an `integer` column carries.
 
-A caller-supplied non-integer therefore has to be rejected before the query
+A text comparison matches no row for either. An integer comparison makes the
+datastore reject both.
+
+A caller-supplied value of either class has to be rejected before the query
 runs. The `instance-query` capability carries that rule.
 
 A cast around an indexed expression is not that expression. A predicate

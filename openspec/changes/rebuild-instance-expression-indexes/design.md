@@ -163,6 +163,7 @@ These keep the jsonb expression, each for a stated reason:
 |---|---|
 | `outbox.ts` field-value patch | `WHERE instance_id = $1` has found the row already |
 | `outbox.ts` process-id projection | a projection behind that same key lookup |
+| `store.ts` outbox `field_version` backfill | a one-shot `UPDATE` above the `ADD COLUMN` block; the column does not exist yet |
 | `subprocess.ts` parent re-check | same, plus a `FOR UPDATE` on that one row |
 | `transition.ts::sweepCancelledChildren` | `instances_parent_idx` selects; `status` filters |
 | `migration.ts` live-child gate | same index, same role |
@@ -186,23 +187,36 @@ column is `text`. With the column index that reason is gone.
 `InstanceListFilter.version` is a `number` already, so the filter binds the
 number and compares `version = 2`.
 
-The guard checks `Number.isInteger` alone, with no sign check.
-`createDraftSnapshot` mints a negative, per-process-decrementing sentinel
-version, and a test instance pins it. A positive-only guard would reject a
-draft-test-instance filter. `parseVersion` in `src/http/routes.ts` sets the
-precedent, checking the same predicate.
-
 The comparison type changes, and it changes in one direction. Every value the
 engine writes is a JSON number. So `body->>'version'` yields a canonical
 decimal string, and the two forms agree on every stored row. They part on a
-caller value that is not canonical. A fractional `1.5` matches no row under a
-text comparison, and makes Postgres raise under an integer one.
+caller value the column cannot hold.
 
-So the read rejects a non-integer `version` before it builds any SQL. The
-guard `assertVersionHasProcessId` already carries this filter's other rule,
-and becomes `assertVersionFilter` carrying both. Through `parseVersion`, the
-HTTP surface applies the same rule to its `version` query parameter already.
-This closes the same hole for an in-process caller.
+Two classes qualify, and the second is easy to miss. A fractional `1.5` is the
+obvious one. An out-of-range `3000000000` is the other. It is a perfectly good
+integer, and `Number.isInteger` says so. Under the text comparison both
+matched no row and returned an empty page. Under the integer comparison both
+make Postgres raise `integer out of range`.
+
+That raise is not a caller error at the surface. `src/http/errors.ts` maps an
+unmapped `PostgresError` to a 500 with no message. So the rewrite turns two
+empty pages into two 500s unless the guard widens with it.
+
+The read therefore rejects both before it builds any SQL. The old guard
+`assertVersionHasProcessId` carried this filter's other rule, and becomes
+`assertVersionFilter` carrying all of them. It bounds the value to
+`[-2147483648, 2147483647]`, the range an int4 column holds. Verified against
+Postgres 16.15 that both edges bind and that one step past either raises.
+
+No sign check, so the floor is int4's rather than zero. `createDraftSnapshot`
+mints a negative, per-process-decrementing sentinel version. A test instance
+pins it, so a positive-only guard would reject a draft-test-instance filter.
+
+`parseVersion` in `src/http/routes.ts` checks `Number.isInteger` and no range.
+So the HTTP surface carries the same out-of-range hole on its publish and
+migration-plan paths. Those write to other `integer` columns and predate this
+change, so they stay outside its scope. The `GET /instances` path needs no
+second guard: its filter reaches `assertVersionFilter` after `parseVersion`.
 
 The rule that a `version` filter needs a `processId` beside it stays. Its
 first reason never depended on the index: a bare version names version 2 of
@@ -220,6 +234,12 @@ paragraph with the substitution rule in both directions, which is what governs
 the rewrite.
 
 ## Risks / Trade-offs
+
+**A well-formed value only the datastore can reject.** → The guard bounds int4
+explicitly. A test drives both edges plus one step past each.
+The wider lesson outlives this change. Swapping a `text` comparison for a
+typed column narrows what the datastore accepts. A behavioural test does not
+catch that: the rows come back either way, until a value goes out of range.
 
 **A rewritten predicate that nothing re-measures.** → The last task measures
 all three indexes. It runs `EXPLAIN ANALYZE` against a seeded table and

@@ -2459,28 +2459,42 @@ test.skipIf(!DB)("listInstances' version filter excludes another version of the 
 });
 
 // rebuild-instance-expression-indexes: the filter compares against the
-// generated `version integer` column, not `body->>'version'` as text. A
-// fractional value would raise from the datastore rather than read as a
-// caller error, so the read rejects it before it builds any SQL.
-test.skipIf(!DB)("listInstances rejects a non-integer version as a caller error, not a datastore error", async () => {
+// generated `version integer` column, not `body->>'version'` as text. Two
+// classes of value raise from Postgres under that comparison and returned an
+// empty page under the text one — a fractional value, and one outside int4.
+// A raw PostgresError maps to a 500 with no message (src/http/errors.ts), so
+// the read has to reject both before it builds any SQL.
+//
+// The bounds are the edges themselves, not round numbers near them: verified
+// against Postgres 16.15 that 2147483647 and -2147483648 bind, and that
+// 2147483648 and -2147483649 raise "integer out of range".
+test.skipIf(!DB)("listInstances rejects an unusable version as a caller error, not a datastore error", async () => {
   const PID = pid("proc_list_version_frac");
   await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
   await createProcessInstance(PID, actor, dataSourceReg);
 
-  let raised: unknown;
-  try {
-    await listInstances({ processId: PID, version: 1.5 });
-  } catch (e) {
-    raised = e;
+  for (const version of [1.5, 2147483648, -2147483649, 3000000000]) {
+    let raised: unknown;
+    try {
+      await listInstances({ processId: PID, version });
+    } catch (e) {
+      raised = e;
+    }
+    expect({ version, type: (raised as Error | undefined)?.constructor.name }).toEqual({
+      version,
+      type: "RequestShapeError",
+    });
   }
-  expect(raised).toBeInstanceOf(RequestShapeError);
 
-  // The integer path still works, and the guard carries no sign check: a
-  // draft snapshot's version is negative (createDraftSnapshot).
+  // The integer path still works, the guard carries no sign check (a draft
+  // snapshot's version is negative — createDraftSnapshot), and both int4 edges
+  // pass the guard and reach the datastore without raising.
   const page = await listInstances({ processId: PID, version: 1 });
   expect(page.items).toHaveLength(1);
-  const none = await listInstances({ processId: PID, version: -1 });
-  expect(none.items).toEqual([]);
+  for (const version of [-1, 2147483647, -2147483648]) {
+    const none = await listInstances({ processId: PID, version });
+    expect({ version, items: none.items }).toEqual({ version, items: [] });
+  }
 });
 
 test.skipIf(!DB)("listInstances' excludeInstanceId omits the named instance, keeps every other matching instance", async () => {

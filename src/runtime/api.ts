@@ -1580,21 +1580,31 @@ function validateDataComparisons(comparisons: DataComparison[] | undefined): voi
   }
 }
 
+/** The range an `integer` (int4) column holds. A `version` outside it cannot name a stored row, and reaches the datastore as an error rather than as an empty result. */
+const VERSION_MIN = -2147483648;
+const VERSION_MAX = 2147483647;
+
 /**
  * A version number anchors to one process; `instances_selection_col_idx`
  * reaches its `version` column only with `process_id` bound beside it.
  *
- * The integer check guards the comparison type: `version` is an `integer`
- * column, so a fractional value would raise from the datastore instead of
- * reading as a caller error. `Number.isInteger` alone, with no sign check —
- * `createDraftSnapshot` mints a negative sentinel version and a test instance
- * pins it. `parseVersion` (src/http/routes.ts) applies the same predicate to
- * the HTTP query parameter.
+ * The range check guards the comparison type. `version` is an `integer`
+ * column, so the predicate binds an int4: a fractional `1.5` and an
+ * out-of-range `3000000000` both raise from Postgres rather than reading as a
+ * caller error, and a raw `PostgresError` maps to a 500 with no message. The
+ * text comparison this replaced returned an empty page for either, so the
+ * check is what keeps a well-formed-but-unmatchable value a 400.
+ *
+ * No sign check: `createDraftSnapshot` mints a negative sentinel version and a
+ * test instance pins it, so the floor is int4's, not zero. Verified against
+ * Postgres 16.15 that both edges bind and one step past either raises.
  */
 function assertVersionFilter(filter: { processId?: ProcessId; version?: number }): void {
   if (filter.version === undefined) return;
   if (!filter.processId) throw new RequestShapeError("a version filter needs a processId beside it");
-  if (!Number.isInteger(filter.version)) throw new RequestShapeError("a version filter must be an integer");
+  if (!Number.isInteger(filter.version) || filter.version < VERSION_MIN || filter.version > VERSION_MAX) {
+    throw new RequestShapeError(`a version filter must be an integer between ${VERSION_MIN} and ${VERSION_MAX}`);
+  }
 }
 
 /** A field id anchors to one process's field catalog; a dataWhere with no processId would scan an unindexed payload across every process. See design.md "A dataWhere needs a processId". */

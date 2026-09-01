@@ -30,12 +30,14 @@ bare `version` names version 2 of every process at once. The
 the leading `process_id` column bound. That is the rule `dataWhere` carries,
 for the first of those two reasons.
 
-A `version` filter SHALL be an integer. The read SHALL reject a `version` that
-is not, as a request-shape error, before it issues any query. The filter
-compares against a generated `integer` column. So a fractional or unparseable
-value would otherwise surface from the datastore rather than from the read.
-The HTTP surface already applies this rule to its `version` query parameter;
-the read applies it to every caller.
+A `version` filter SHALL be an integer the datastore can hold. The read SHALL
+reject any other value as a request-shape error, before it issues a query.
+The filter compares against a generated `integer` column. A value that column
+cannot hold surfaces from the datastore rather than from the read.
+
+Two classes fail that rule. One is a value that is not an integer. The other
+is an integer outside the `integer` column's own range. Both are caller
+errors, and neither reaches a query.
 
 `assignedTo` SHALL match an instance under either of two conditions. That actor
 holds the claim on its current step. Or its current step carries no claim and
@@ -147,6 +149,20 @@ than `limit` even while more matching instances exist.
 - **WHEN** a caller passes a `processId` and a fractional `version`
 - **THEN** the read rejects the call as a request-shape error
 - **AND** it surfaces no datastore error
+
+#### Scenario: The read rejects a version outside the column's range
+
+- **WHEN** a caller passes a `processId` and a `version` too large for the
+  `integer` column
+- **THEN** the read rejects the call as a request-shape error
+- **AND** it surfaces no datastore error
+
+#### Scenario: A version at the column's edge is accepted
+
+- **WHEN** a caller passes a `processId` and the largest `version` the
+  `integer` column holds
+- **THEN** the read issues its query and returns an empty page, matching no
+  instance
 
 #### Scenario: Filtering by a data comparison
 

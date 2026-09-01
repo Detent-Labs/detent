@@ -310,11 +310,15 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // that stood over the same keys (instances_selection_idx,
   // instances_current_step_idx, instances_started_by_idx). They must sit after
   // the ADD COLUMN statements: a fresh database has no column to index before
-  // them. Measured at 200k rows: liveVersionCounts 1.549 -> 0.343 ms (an
-  // index-only scan becomes reachable), the orphan scan 5.990 -> 2.816 ms, the
-  // migration scan 2.568 -> 1.548 ms, and the selection index's write overhead
-  // +24.8% -> +17.1%, at identical index size. See the change
-  // rebuild-instance-expression-indexes.
+  // them. Two runs at 200k rows, each comparing expression form against column
+  // form on one heap. The change's own benchmark: liveVersionCounts
+  // 1.549 -> 0.343 ms (an index-only scan becomes reachable), the orphan scan
+  // 5.990 -> 2.816 ms, the migration scan 2.568 -> 1.548 ms, write overhead
+  // +24.8% -> +17.1% at identical index size. The verification re-run, over a
+  // denser status mix: liveVersionCounts 3.987 -> 0.660 ms, orphan scan
+  // 6.034 -> 3.267 ms. Same direction, different magnitude — the gain tracks
+  // how selective the process/status pair is, so neither run is the number to
+  // quote alone. See the change rebuild-instance-expression-indexes.
   //
   // The names differ from the three dropped ones on purpose. CREATE INDEX IF
   // NOT EXISTS leaves an index of a given name alone whatever its definition,
