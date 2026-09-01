@@ -85,3 +85,28 @@
       index. Verify each plan names the new index. Hold heap width, `VACUUM`
       state and hit count constant across the readings, per the plan-flip risk
       in design.md.
+
+## 6. Review follow-up
+
+- [x] 6.1 Bound `assertVersionFilter` (`src/runtime/api.ts`) to the int4 range
+      and export `VERSION_MIN`/`VERSION_MAX`. Verify with a test driving both
+      edges and one step past each.
+- [x] 6.2 Apply the same bound in `parseVersion` (`src/http/routes.ts`), which
+      `admin-routes.ts` and `studio-routes.ts` also import. Verify every caller
+      surfaces `RequestShapeError` as a 400 through `route`, so a range error
+      needs no per-caller handling.
+- [x] 6.3 Add HTTP-level coverage in `test/http.test.ts`: a `version` past
+      either int4 edge answers 400, and a `version` at either edge answers 200
+      with an empty page. Verify both in a full-suite run.
+- [x] 6.4 Rewrite `countInstancesByStatus` (`src/engine/admin-queries.ts`) onto
+      `GROUP BY status`. Verify by measuring the three regimes on one heap: the
+      shipped expression `GROUP BY` must read slower than the column one.
+- [x] 6.5 Correct that function's comment. It claimed
+      `instances_selection_col_idx` is "not usable by a bare `GROUP BY status`",
+      which the measurement refutes. Verify the comment names the plan and the
+      buffer counts actually observed.
+- [x] 6.6 Correct the "raises from the datastore" justification in
+      `src/runtime/api.ts`, `specs/persistence/spec.md` and the
+      `test/runtime-api.test.ts` case title. A fractional value rounds rather
+      than raising. Verify by grepping the three for the claim.
+- [x] 6.7 Re-run all four gates and re-measure `countInstancesByStatus`.

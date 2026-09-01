@@ -1580,24 +1580,35 @@ function validateDataComparisons(comparisons: DataComparison[] | undefined): voi
   }
 }
 
-/** The range an `integer` (int4) column holds. A `version` outside it cannot name a stored row, and reaches the datastore as an error rather than as an empty result. */
-const VERSION_MIN = -2147483648;
-const VERSION_MAX = 2147483647;
+/**
+ * The range an `integer` (int4) column holds. Exported: `parseVersion`
+ * (src/http/routes.ts) applies the same bound to every version a route reads,
+ * since every `version integer` column shares the hazard below.
+ */
+export const VERSION_MIN = -2147483648;
+export const VERSION_MAX = 2147483647;
 
 /**
  * A version number anchors to one process; `instances_selection_col_idx`
  * reaches its `version` column only with `process_id` bound beside it.
  *
- * The range check guards the comparison type. `version` is an `integer`
- * column, so the predicate binds an int4: a fractional `1.5` and an
- * out-of-range `3000000000` both raise from Postgres rather than reading as a
- * caller error, and a raw `PostgresError` maps to a 500 with no message. The
- * text comparison this replaced returned an empty page for either, so the
- * check is what keeps a well-formed-but-unmatchable value a 400.
+ * The range check is not cosmetic. `buildInstanceWhere` emits a leading
+ * `::int` cast on the filter's own null test, and that cast is where a value
+ * past int4 raises "integer out of range". Measured against Postgres 16.15:
+ * 2147483648 and -2147483649 raise there, both edges bind, and the comparison
+ * half alone would not raise at all, since it promotes to numeric and matches
+ * nothing. An unmapped PostgresError maps to a 500 with no message
+ * (src/http/errors.ts). So without this bound `GET /instances` answers 500
+ * where the text comparison it replaced answered an empty 200.
+ *
+ * The integer check is a different rule with a different reason. A fractional
+ * value never raises: `1.5::int` rounds to 2, and `version = 1.5` promotes to
+ * numeric and matches nothing. Rejecting it turns a caller's mistake into a
+ * 400 instead of a silent empty page. Neither rule states what the datastore
+ * tolerates; both make the read answer for its own input.
  *
  * No sign check: `createDraftSnapshot` mints a negative sentinel version and a
- * test instance pins it, so the floor is int4's, not zero. Verified against
- * Postgres 16.15 that both edges bind and one step past either raises.
+ * test instance pins it, so the floor is int4's, not zero.
  */
 function assertVersionFilter(filter: { processId?: ProcessId; version?: number }): void {
   if (filter.version === undefined) return;

@@ -156,15 +156,21 @@ A predicate filtering instances by `version` SHALL compare against the
 generated `version integer` column, not against `body->>'version'` as text.
 
 `version` is a JSON number in every stored body, so the two forms agree on
-every row the engine has written. They part on a value the column cannot hold.
-Two classes qualify. One is not the canonical decimal form of an integer. The
-other falls outside the range an `integer` column carries.
+every row the engine has written. They part on a value that names no stored
+row. Two classes qualify, and they fail in different ways.
 
-A text comparison matches no row for either. An integer comparison makes the
-datastore reject both.
+A value outside the range an `integer` column carries makes the datastore
+raise. The read binds the filter through a cast, and that cast is where the
+range fails.
 
-A caller-supplied value of either class has to be rejected before the query
-runs. The `instance-query` capability carries that rule.
+A value that is not an integer raises nothing. The datastore rounds it, or
+promotes the comparison and matches no row. Its cost is a silently empty page
+rather than an answer.
+
+Neither outcome is one the read should hand back. A caller-supplied value of
+either class SHALL be rejected before the query runs. The `instance-query`
+capability carries that rule. The `http-wrapper` applies it to every version a
+route reads, since every `version integer` column shares the range.
 
 A cast around an indexed expression is not that expression. A predicate
 casting `body->>'version'` to `int` therefore reaches no column of an index

@@ -39,6 +39,11 @@ Two classes fail that rule. One is a value that is not an integer. The other
 is an integer outside the `integer` column's own range. Both are caller
 errors, and neither reaches a query.
 
+The two are worth separating, because only one of them is a regression. An
+out-of-range value makes the datastore raise, and an unmapped datastore error
+answers 500. A non-integer raises nothing and would answer an empty page. The
+rule holds for both, and its reason differs.
+
 `assignedTo` SHALL match an instance under either of two conditions. That actor
 holds the claim on its current step. Or its current step carries no claim and
 lists that actor's id among its assignment candidates. Together those two form
@@ -163,6 +168,13 @@ than `limit` even while more matching instances exist.
   `integer` column holds
 - **THEN** the read issues its query and returns an empty page, matching no
   instance
+
+#### Scenario: An out-of-range version over HTTP is a request error, not a server error
+
+- **WHEN** a caller requests the instance list with a `version` query
+  parameter beyond the `integer` column's range, at either end
+- **THEN** the wrapper answers 400 with a request-shape error
+- **AND** it answers no 5xx
 
 #### Scenario: Filtering by a data comparison
 

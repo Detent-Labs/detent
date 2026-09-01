@@ -145,16 +145,26 @@ export async function getTimerLagStats(db: SQL = sql): Promise<TimerLagStats> {
 }
 
 /**
- * One count per distinct `body->>'status'` value present across `instances`.
- * A general shape, not a single-purpose faulted-only query, mirroring
- * `countOutboxByStatus`. Unlike that query, this one has no matching
- * index (`instances_selection_col_idx` is a composite on
- * `(process_id, version, status)`, not usable by a bare `GROUP BY status`), so
- * it scans the whole table — acceptable at today's scale; see design.md's
- * Risks section if scrape load ever makes this measurable.
+ * One count per distinct `status` value present across `instances`. A general
+ * shape, not a single-purpose faulted-only query, mirroring
+ * `countOutboxByStatus`.
+ *
+ * Groups by the generated column, which `instances_selection_col_idx` covers
+ * as its third key. A trailing index column still serves a bare `GROUP BY`:
+ * Postgres reads the index instead of the heap, and never touches the heap at
+ * all. Measured at 200k rows, one heap, medians of 9 runs: 22.9 ms over the
+ * old expression index and expression `GROUP BY`, 49.1 ms over the column
+ * index with the `GROUP BY` left on `body->>'status'`, and 15.0 ms grouping by
+ * the column, a parallel index-only scan reading 944 buffers against 21820.
+ *
+ * That middle figure is why this reads the column rather than the expression.
+ * Dropping the expression index also drops the `n_distinct = 3` statistic
+ * Postgres held for `body->>'status'`, and with it the parallel plan. An
+ * expression `GROUP BY` then falls to a serial HashAggregate over 200k
+ * estimated groups.
  */
 export async function countInstancesByStatus(db: SQL = sql): Promise<Record<string, number>> {
-  const rows = (await db`SELECT body->>'status' AS status, count(*)::int AS n FROM instances GROUP BY body->>'status'`) as {
+  const rows = (await db`SELECT status, count(*)::int AS n FROM instances GROUP BY status`) as {
     status: string;
     n: number;
   }[];

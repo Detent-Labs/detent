@@ -2460,15 +2460,22 @@ test.skipIf(!DB)("listInstances' version filter excludes another version of the 
 
 // rebuild-instance-expression-indexes: the filter compares against the
 // generated `version integer` column, not `body->>'version'` as text. Two
-// classes of value raise from Postgres under that comparison and returned an
-// empty page under the text one — a fractional value, and one outside int4.
-// A raw PostgresError maps to a 500 with no message (src/http/errors.ts), so
-// the read has to reject both before it builds any SQL.
+// classes of value cannot name a stored row, and they fail differently.
 //
-// The bounds are the edges themselves, not round numbers near them: verified
-// against Postgres 16.15 that 2147483647 and -2147483648 bind, and that
-// 2147483648 and -2147483649 raise "integer out of range".
-test.skipIf(!DB)("listInstances rejects an unusable version as a caller error, not a datastore error", async () => {
+// A value past int4 raises. `buildInstanceWhere` emits a leading `::int` cast
+// on the filter's own null test, and that cast is where Postgres 16.15 raises
+// "integer out of range" for 2147483648 and -2147483649. An unmapped
+// PostgresError maps to a 500 with no message (src/http/errors.ts), so this
+// is the class that regressed a 200 into a 500.
+//
+// A fractional value raises nothing at all: `1.5::int` rounds to 2, and
+// `version = 1.5` promotes to numeric and matches nothing. Rejecting it buys
+// a 400 in place of a silently empty page.
+//
+// So the guard is not asserting what the datastore tolerates — it makes the
+// read answer for its own input either way. The bounds below are the edges
+// themselves, not round numbers near them.
+test.skipIf(!DB)("listInstances rejects an unusable version as a request-shape error, never as an empty page or a 500", async () => {
   const PID = pid("proc_list_version_frac");
   await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
   await createProcessInstance(PID, actor, dataSourceReg);

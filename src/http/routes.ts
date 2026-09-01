@@ -25,6 +25,8 @@ import {
   getAttachment,
   MAX_LIST_LIMIT,
   MAX_RECORD_LIMIT,
+  VERSION_MIN,
+  VERSION_MAX,
   type InstanceListFilter,
 } from "../runtime/api.js";
 import { publishBody, listProcesses, listVersions } from "../engine/definitions.js";
@@ -144,6 +146,15 @@ async function parseJsonBody<T>(req: Request, schema: z.ZodType<T>): Promise<T> 
  * segment (a `string`) or a request-body field (`unknown`). `unknown` admits
  * both callers: `Number(raw)` is total either way.
  *
+ * The bound is int4's, not this route's. Every version a caller supplies ends
+ * up compared against a `version integer` column: `instances` here,
+ * `definitions` and `migration_plans` through the other two route modules. A
+ * value past that range names no row that can exist. Rejecting it beats the
+ * answers the callers would otherwise give, which are a 500 from the `::int`
+ * bind on `GET /instances` and a "not published" 404 elsewhere, both for an
+ * input that was wrong rather than absent. Every caller already surfaces
+ * `RequestShapeError` as a 400 through `route`.
+ *
  * Exported: `admin-routes.ts` and `studio-routes.ts` import it. Each wrote
  * its own copy — `parseVersionField`, `parseVersion` — until
  * `http-route-handling-consolidation`.
@@ -151,6 +162,7 @@ async function parseJsonBody<T>(req: Request, schema: z.ZodType<T>): Promise<T> 
 export function parseVersion(raw: unknown, label: string): number {
   const n = Number(raw);
   if (!Number.isInteger(n)) throw new RequestShapeError(`${label} must be an integer`);
+  if (n < VERSION_MIN || n > VERSION_MAX) throw new RequestShapeError(`${label} must be between ${VERSION_MIN} and ${VERSION_MAX}`);
   return n;
 }
 

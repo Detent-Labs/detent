@@ -192,15 +192,26 @@ engine writes is a JSON number. So `body->>'version'` yields a canonical
 decimal string, and the two forms agree on every stored row. They part on a
 caller value the column cannot hold.
 
-Two classes qualify, and the second is easy to miss. A fractional `1.5` is the
-obvious one. An out-of-range `3000000000` is the other. It is a perfectly good
-integer, and `Number.isInteger` says so. Under the text comparison both
-matched no row and returned an empty page. Under the integer comparison both
-make Postgres raise `integer out of range`.
+Two classes qualify, and only one of them raises. Measured against Postgres
+16.15, not assumed:
 
-That raise is not a caller error at the surface. `src/http/errors.ts` maps an
-unmapped `PostgresError` to a 500 with no message. So the rewrite turns two
-empty pages into two 500s unless the guard widens with it.
+| value | `1.5` | `3000000000` |
+|---|---|---|
+| `::int` cast | rounds to `2` | raises `integer out of range` |
+| `version = <value>` | promotes to numeric, no row | promotes to numeric, no row |
+| under the old text comparison | empty page | empty page |
+| under the shipped predicate | empty page | **raises** |
+
+So the regression is the out-of-range class alone. The cast that fails is the
+leading `::int` on the filter's own null test, which `buildInstanceWhere`
+emits. An unmapped `PostgresError` maps to a 500 with no message
+(`src/http/errors.ts`). So the rewrite turns one empty page into a 500, unless
+the guard widens with it.
+
+The fractional class never raised and never will. Rejecting it is still worth
+doing, for the smaller reason: a 400 naming the problem beats a silently empty
+page. Two rules, two reasons. An earlier draft of this section gave both the
+same reason, and that wording is what hid the range case.
 
 The read therefore rejects both before it builds any SQL. The old guard
 `assertVersionHasProcessId` carried this filter's other rule, and becomes
@@ -236,7 +247,9 @@ the rewrite.
 ## Risks / Trade-offs
 
 **A well-formed value only the datastore can reject.** → The guard bounds int4
-explicitly. A test drives both edges plus one step past each.
+explicitly. It does so in `assertVersionFilter` and in `parseVersion`, so every
+route reading a version shares the bound. Tests drive both edges plus one step
+past each, at the runtime layer and over HTTP.
 The wider lesson outlives this change. Swapping a `text` comparison for a
 typed column narrows what the datastore accepts. A behavioural test does not
 catch that: the rows come back either way, until a value goes out of range.
