@@ -298,9 +298,10 @@ paths on. The enumeration below names the predicates identified so far:
   `instances_selection_col_idx`. A plain btree over three generated columns.
   It is the index the requirement "The instance population scan is indexed"
   asks for. Its readers are the migration population scan, the orphan-key
-  scan, the live-version count and the bottlenecks work-in-progress query. One
-  branch of the inbox predicate reaches it too, as do `buildInstanceWhere`'s
-  `processId`, `version` and `status` filters.
+  scan, the live-version count and the bottlenecks work-in-progress query. The
+  per-status instance count reaches its third key alone, as an index-only
+  scan. One branch of the inbox predicate reaches it too, as do
+  `buildInstanceWhere`'s `processId`, `version` and `status` filters.
 
 Those last three predicates carry filters both reads share: `currentStepId`,
 `startedBy`, `processId`, `status` and `version`. Both reads carry six plain

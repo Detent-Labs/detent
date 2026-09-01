@@ -332,9 +332,11 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   await db`DROP INDEX IF EXISTS instances_started_by_idx`;
   // Readers: the migration population scan and findOrphanKeys
   // (src/engine/migration.ts), liveVersionCounts (src/engine/definitions.ts),
-  // selectInRange and the bottlenecks WIP query (src/engine/reporting.ts), and
-  // buildInstanceWhere's processId/version/status filters (src/runtime/api.ts),
-  // whose inbox predicate reaches it as one leg of a BitmapAnd.
+  // selectInRange and the bottlenecks WIP query (src/engine/reporting.ts),
+  // countInstancesByStatus (src/engine/admin-queries.ts), which reaches the
+  // third key alone as an index-only scan, and buildInstanceWhere's
+  // processId/version/status filters (src/runtime/api.ts), whose inbox
+  // predicate reaches it as one leg of a BitmapAnd.
   await db`CREATE INDEX IF NOT EXISTS instances_selection_col_idx ON instances (process_id, version, status)`;
   // Readers: buildInstanceWhere's shared currentStepId filter, reached by the
   // instance list read and the instance data read (src/runtime/api.ts), and the
