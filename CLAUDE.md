@@ -305,17 +305,35 @@ after a substantial change lands.
 ## Conventions
 - TypeScript strict, ESM.
 - **UI work in `packages/web` or `packages/form-ui` goes through the design skills
-  first.** Before implementing or reshaping any screen or component, invoke
-  `/frontend-design:frontend-design` for visual direction; for UI/UX work
-  also pull in the installed Vercel skills (`web-design-guidelines`,
-  `vercel-react-best-practices`, `vercel-composition-patterns`) — do not
-  default to plain React/CSS choices. Prefer semantic HTML5 elements
-  (`<nav>`, `<main>`, `<button>`, `<dialog>`, ...) over generic
-  `<div>`/`<span>` soup. `.claude/rules/design-language.md` carries Detent's
-  own visual language (color roles, type, spacing, component states, class
-  naming) — it loads automatically for `packages/web/**` and
-  `packages/form-ui/**`; the full reference with swatches and specimens is
-  `tmp/Detent Design Language.dc.html`.
+  first.** The `impeccable` skill owns visual direction, and it enters the
+  OpenSpec cycle at three points. In the proposal, `/impeccable shape <screen>`
+  decides UX and layout before any code exists. Its result belongs in the
+  change's `design.md`. During apply, the design detector hook runs by itself
+  after every edit under `packages/web/**`. At the browser check the
+  verification gate already demands, run `/impeccable critique <route>` and
+  `/impeccable audit <route>` against the changed screen.
+  - `audit` covers the a11y, responsive and performance checks
+    `docs/browser-checks.md` otherwise leaves to hand. It replaces no browser
+    check that needs a human eye; it sharpens the pass that already happens.
+  - `init` and `document` ran once, in `8a0f52e`, and do not repeat per change.
+    Run `extract` when a pattern appears a second time, and `doctor` when
+    `DESIGN.md` drifts from the code.
+  - The skill installs per machine, the way `antislop` does. `.gitignore`
+    excludes `.claude/skills/impeccable/` and both settings files, and the
+    detector hook lives in `.claude/settings.local.json`. A fresh machine or
+    worktree therefore edits UI with no detector until somebody runs
+    `/impeccable hooks on` there.
+  - For UI/UX work also pull in the installed Vercel skills
+    (`web-design-guidelines`, `vercel-react-best-practices`,
+    `vercel-composition-patterns`) — do not default to plain React/CSS choices.
+    Prefer semantic HTML5 elements (`<nav>`, `<main>`, `<button>`,
+    `<dialog>`, ...) over generic `<div>`/`<span>` soup.
+  - Three files carry the visual language and change together. `DESIGN.md`
+    holds the tokens the detector reads. `.claude/rules/design-language.md`
+    carries the prose rules (color roles, type, spacing, component states,
+    class naming) and loads automatically for `packages/web/**` and
+    `packages/form-ui/**`. `tmp/Detent Design Language.dc.html` is the full
+    reference, with swatches and type specimens.
 - Bun is the runtime, package manager, and test runner. Use `bun`, not npm/pnpm:
   `bun install`, `bun test`. Typechecking stays with `tsc --noEmit` (`bun run
   typecheck`) — Bun does not typecheck. `BUN_VERSION` in
