@@ -1937,12 +1937,12 @@ as it stands.
     carries the instance's existing assignment rather than resolving the
     target step's.
 
-    The set has exactly one consumer, a fourth scope value on the instance
-    list, `GET /instances?scope=visible`. `getInstanceView`,
-    `loadInstanceForActor` and `executeReport` are untouched, and the
-    aggregate views stay unfiltered permanently: an aggregate over a partly
-    invisible population either reports a number the reader cannot reconcile
-    or refuses to answer.
+    At this stage the set had one consumer, a fourth scope value on the
+    instance list, `GET /instances?scope=visible`. `getInstanceView`,
+    `loadInstanceForActor` and `executeReport` stayed untouched until stages
+    58 and 59. The aggregate views stay unfiltered permanently: an aggregate
+    over a partly invisible population either reports a number the reader
+    cannot reconcile or refuses to answer.
 
     An administrator revokes, restores and grants per person per instance,
     gated by a fifth `Permission` value, `"visibility"`. Three rules make that

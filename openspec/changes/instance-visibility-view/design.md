@@ -141,6 +141,13 @@ decision from 2026-09-01, taking effect where a participant first notices it.
 
 ## Open Questions
 
+Which side is right when the live-assignment predicates disagree? The loader
+tests `isEligibleCandidate`, which matches id and roles on a step whether or
+not somebody claims it. The list tests SQL, which matches the full principal
+array and requires an unclaimed step. A revoked group member on an unclaimed
+step is therefore listed and refused. Nothing records which answer is correct,
+and no caller has asked yet.
+
 None that block. Should `scope=mine` drop a revoked claimant too? That
 question waits for the day someone revokes a live assignee and expects the
 task to leave their inbox. Change 1 decided the engine never hands out a task

@@ -539,6 +539,10 @@ Switch the account menu to German. Pass: the heading, the nav entry, every
 stamp and the empty state read German.
 Pass: the long German nav entry does not wrap the row.
 
+Stop the engine and refresh the screen. Pass: the screen states the failure
+where the list would sit, with a control that retries. Pass: it does not read
+as an empty result. Start the engine again and retry. Pass: the list returns.
+
 A `bun:test` assertion covers the request's scope and the route. It cannot see
 a nav row that wraps under German, and it cannot see the screen's first frame.
 

@@ -1,9 +1,14 @@
 <!-- antislop: allow-file passive-voice -->
 <!-- Every scenario here uses the fixed SHALL/WHEN/THEN Gherkin grammar the rest of this repo's specs use; that grammar is structurally passive. -->
 
+## RENAMED Requirements
+
+- FROM: `### Requirement: Routing is a hand-written History-API hook covering five routes`
+- TO: `### Requirement: Routing is a hand-written History-API hook covering six routes`
+
 ## MODIFIED Requirements
 
-### Requirement: Routing is a hand-written History-API hook covering five routes
+### Requirement: Routing is a hand-written History-API hook covering six routes
 
 The app area SHALL implement `/app`, `/app/tasks/:instanceId`, `/app/start`,
 `/app/started` and `/app/involved`, with `/login` owned by the shell. It SHALL

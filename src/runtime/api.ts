@@ -1198,7 +1198,7 @@ export async function createProcessInstance(
  * 4. Participation admits unless a revocation names the actor: the starter,
  *    or a match between the actor's principals (`actorPrincipals`) and the
  *    instance's principal set (`instance_principals`). A starter skips the
- *    group lookup; the denial probe still applies to them.
+ *    group lookup, and both probes still run: a revocation refuses them too.
  *
  * Steps 3 and 4 differ in whether `instance_principals_denied` applies, so
  * they stay two steps rather than one SQL predicate. The same rule drives the
@@ -1837,15 +1837,6 @@ export async function listInstances(
   return { items, cursor };
 }
 
-/**
- * `queryInstances` never accepts these — each names behaviour only
- * `listInstances` resolves. Checked at runtime, not by `InstanceQueryFilter`
- * alone: this read's consumer builds its filter by spreading a wider object,
- * which a type check alone cannot stop, and `scope` is the HTTP layer's own
- * derivation, declared by no Runtime API Layer filter type at all. See
- * design.md "The data read takes its own filter type and rejects a borrowed
- * key".
- */
 /**
  * The four keys `instance-data-query` names as caller errors. Each resolves
  * the list read's inbox predicate or its degraded-summary behaviour, neither
