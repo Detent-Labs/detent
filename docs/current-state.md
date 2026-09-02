@@ -2341,13 +2341,17 @@ Stage-by-stage status is in `ROADMAP.md`.
   `GET /instances/:id/record`) but left the stronger single-instance read,
   `GET /instances/:id`, open to any authenticated caller holding the id.
   `getInstanceView` now authorizes `actor` against the loaded instance before
-  resolving anything: `ADMIN_ROLE`, `instance.startedBy`, the current step's
-  claimant, or an eligible candidate on the current step's assignment
+  resolving anything, as an ordered fallback: `ADMIN_ROLE`; a live
+  assignment on the current step, the claimant or an eligible candidate
   (`isEligibleCandidate`, imported from `engine/transition.ts` — the same
-  predicate `claimStep` uses, so the read and claim predicates cannot drift).
-  Access follows the *current* step, not history: a candidate on a step the
-  instance has since left loses the read once it advances, mirroring
-  `scope=mine`. Load-failure handling mirrors `cancelInstance`'s existing
+  predicate `claimStep` uses, so the read and claim predicates cannot drift);
+  or participation, the starter or a match between `actorPrincipals` and
+  `instance_principals`, unless `instance_principals_denied` names the actor
+  (`instance-visibility-view`). A live assignment never consults the denial,
+  which is how it outranks a revocation. Access therefore follows the set,
+  not the current step alone: a candidate on a step the instance has since
+  left keeps the read, as `scope=visible` keeps listing it, while
+  `scope=mine` drops it. Load-failure handling mirrors `cancelInstance`'s existing
   two-path shape: an `ADMIN_ROLE` caller loads directly, so a missing
   instance (or any other load failure, e.g. a pin mismatch) still surfaces as
   today's plain not-found/500; every other caller loads inside a `try` whose

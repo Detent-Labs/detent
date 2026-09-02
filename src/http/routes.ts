@@ -37,7 +37,7 @@ import { instanceStatus } from "../schema/definition.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, requirePermission, ADMIN_ROLE } from "../auth/authorize.js";
-import { getGroupsForMember } from "../auth/groups.js";
+import { actorPrincipals } from "../auth/groups.js";
 import {
   type Registry,
   type DataSourceRegistry,
@@ -533,12 +533,9 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
         includeTestInstances: scope === "all",
         // instance-visibility-set: the caller's own principals, resolved from
         // the credential and never from client input — the same rule
-        // scope=mine's assignedTo already follows. `listMyReports` builds the
-        // identical match set for report sharing.
-        visibleTo:
-          scope === "visible"
-            ? { actorId: actor.id, principals: [actor.id, ...actor.roles, ...(await getGroupsForMember(actor.id, db))] }
-            : undefined,
+        // scope=mine's assignedTo already follows. `actorPrincipals` is the
+        // one resolver the direct read and report sharing use too.
+        visibleTo: scope === "visible" ? { actorId: actor.id, principals: await actorPrincipals(actor, db) } : undefined,
       };
       const limit = parseLimit(url, MAX_LIST_LIMIT);
       const cursor = url.searchParams.get("cursor") ?? undefined;

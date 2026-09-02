@@ -516,9 +516,13 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     contract gained nothing, so the `visibleTo` field sketched on 2026-08-25
     was not built.
 
-    The set has exactly one consumer, a fourth scope value on the instance
-    list, `GET /instances?scope=visible`. `getInstanceView` and
-    `loadInstanceForActor` were left alone, and so was `executeReport`. The
+    The set has two consumers. The first is a fourth scope value on the
+    instance list, `GET /instances?scope=visible`. The second, since
+    `instance-visibility-view` (2026-09-02), is the direct read:
+    `loadInstanceForActor` admits a participant the set names unless a
+    revocation stands, after the live-assignment test and never before it,
+    so list and detail agree. The starter is not exempt from a revocation.
+    `executeReport` was left alone. The
     aggregate views (cycle time, bottleneck, SLA) stay unfiltered permanently:
     an aggregate over a partly invisible population would either report a
     number the reader cannot reconcile or refuse to answer at all, and the

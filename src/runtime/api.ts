@@ -33,7 +33,7 @@ import {
 import { buildGuardContext, evalGuard, evalFieldMap, type Actor } from "../cel/eval.js";
 import { requireRole, can, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE, AuthorizationError } from "../auth/authorize.js";
 import { knownUserIds, displayNamesForUserIds } from "../auth/users.js";
-import { getGroupMembers, getGroupsForMember, groupNamesForIds } from "../auth/groups.js";
+import { getGroupMembers, actorPrincipals, groupNamesForIds } from "../auth/groups.js";
 import { definitionHash } from "../schema/hash.js";
 import { NotFoundError, InstanceNotRunningError, RequestShapeError } from "../errors.js";
 import { saveInstanceDraft as engineSaveInstanceDraft, getInstanceDraft, type InstanceDraft } from "../engine/instance-drafts.js";
@@ -1178,18 +1178,33 @@ export async function createProcessInstance(
 }
 
 /**
- * Loads an instance and authorizes `actor` to read it: `ADMIN_ROLE`, the
- * instance's starter, the current step's claimant, or an eligible candidate
- * on the current step's assignment (`isEligibleCandidate`, shared with
- * `claimStep` so the two predicates cannot drift). Load-failure handling
- * mirrors `cancelInstance`: an `ADMIN_ROLE` caller loads directly (a missing
- * instance surfaces as today's not-found); every other caller loads inside a
- * `try` whose `catch` collapses into `AuthorizationError`, so a nonexistent
- * instance and one the caller may not read are indistinguishable.
+ * Loads an instance and authorizes `actor` to read it. The rule is an ordered
+ * fallback, and the order is the rule (instance-visibility-view):
  *
- * Shared by `getInstanceView`, `postComment`, and `listComments` — every
- * Runtime API Layer read that uses this participant-facing visibility rule,
- * as opposed to `getInstanceRecord`'s narrower audit-trail one.
+ * 1. `ADMIN_ROLE` loads directly; a missing instance surfaces as not-found.
+ * 2. A test instance admits only its own `startedBy` (draft-test-instances).
+ * 3. A live assignment on the current step — the claimant, or an eligible
+ *    candidate by `isEligibleCandidate` (shared with `claimStep` so the two
+ *    predicates cannot drift) — admits without consulting a revocation.
+ *    That is how "a live assignment outranks a revocation" holds with no
+ *    special case: the engine never hands out a task nobody can open.
+ * 4. Participation admits unless a revocation names the actor: the starter,
+ *    or a match between the actor's principals (`actorPrincipals`) and the
+ *    instance's principal set (`instance_principals`). A starter skips the
+ *    group lookup; the denial probe still applies to them.
+ *
+ * Steps 3 and 4 differ in whether `instance_principals_denied` applies, so
+ * they stay two steps rather than one SQL predicate. The same rule drives the
+ * `scope=visible` list (`buildVisibleRowSet`), so list and detail agree.
+ *
+ * Every non-admin caller loads inside a `try` whose `catch` collapses into
+ * `AuthorizationError`, so a nonexistent instance and one the caller may not
+ * read are indistinguishable.
+ *
+ * Shared by `getInstanceView`, `postComment`, `listComments`,
+ * `uploadAttachment`, `listAttachments` and `getAttachment` — every Runtime
+ * API Layer call that uses this participant-facing visibility rule, as
+ * opposed to `getInstanceRecord`'s narrower audit-trail one.
  */
 async function loadInstanceForActor(instanceId: InstanceId, actor: Actor, db: SQL): Promise<{ instance: Instance; body: ProcessBody }> {
   if (actor.roles.includes(ADMIN_ROLE)) {
@@ -1212,11 +1227,18 @@ async function loadInstanceForActor(instanceId: InstanceId, actor: Actor, db: SQ
     }
     return { instance, body };
   }
-  if (
-    instance.startedBy !== actor.id &&
-    instance.assignment?.claimedBy !== actor.id &&
-    !isEligibleCandidate(actor, instance.assignment?.candidates ?? [])
-  ) {
+  if (instance.assignment?.claimedBy === actor.id || isEligibleCandidate(actor, instance.assignment?.candidates ?? [])) {
+    return { instance, body };
+  }
+  const isStarter = instance.startedBy === actor.id;
+  const principals = isStarter ? [] : await actorPrincipals(actor, db);
+  const [{ matched, denied }] = (await db`
+    SELECT EXISTS (SELECT 1 FROM instance_principals
+                    WHERE instance_id = ${instanceId} AND principal = ANY(${db.array(principals, "TEXT")})) AS matched,
+           EXISTS (SELECT 1 FROM instance_principals_denied
+                    WHERE instance_id = ${instanceId} AND actor_id = ${actor.id}) AS denied
+  `) as { matched: boolean; denied: boolean }[];
+  if (denied || !(matched || isStarter)) {
     throw new AuthorizationError(`actor '${actor.id}' may not read instance '${instanceId}'`);
   }
   return { instance, body };
@@ -2054,14 +2076,14 @@ export async function getReport(reportId: string, actor: Actor, db: SQL = sql): 
 
 /**
  * Every report naming the caller's own id, a role they hold, or a group they
- * belong to, in either principal list. `getGroupsForMember` runs the reverse
+ * belong to, in either principal list. `actorPrincipals` runs the reverse
  * direction of the per-report membership check above: it starts from the
  * actor and asks which groups they belong to, once, rather than resolving
- * each candidate report's own group principals forward.
+ * each candidate report's own group principals forward. The same resolver
+ * serves the `scope=visible` list and the direct instance read.
  */
 export async function listMyReports(actor: Actor, db: SQL = sql): Promise<Report[]> {
-  const groupIds = await getGroupsForMember(actor.id, db);
-  const matchSet = [actor.id, ...actor.roles, ...groupIds];
+  const matchSet = await actorPrincipals(actor, db);
   const rows = (await db`
     SELECT DISTINCT r.* FROM reports r
     JOIN report_principals rp ON rp.instance_report_id = r.instance_report_id

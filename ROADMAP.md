@@ -370,6 +370,7 @@ Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
 | 55 | `person` field format, the `org.actor-from-field` assignment strategy, and the people list a person picker reads | `field-model-person-format` | `actor-from-field-assignment`, `database-seed-script`, `data-source-resolution`, `definition-contract`, `runtime-api`, `studio-app` |
 | 56 | Authored notes in a step's view, the first non-field `ViewEntry` | `field-model-view-note` | `authored-content-localization`, `definition-contract`, `form-ui`, `runtime-api`, `studio-app`, `studio-checks-rail`, `studio-form-editor` |
 | 57 | Per-instance visibility: an engine-maintained principal set behind `scope=visible` | `instance-visibility-set` | `authorization`, `data-retention`, `instance-query`, `instance-visibility-set`, `permission-grant-administration`, `persistence`, `runtime-events`, `transition-execution` |
+| 58 | Per-instance visibility: the direct read consults the set, so list and detail agree | `instance-visibility-view` | `authorization`, `instance-visibility-set`, `runtime-api` |
 
 ## Changes with no stage
 

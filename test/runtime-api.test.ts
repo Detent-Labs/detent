@@ -1247,7 +1247,7 @@ test.skipIf(!DB)("getInstanceView rejects an unrelated authenticated actor", asy
   expect(raised).toBeInstanceOf(AuthorizationError);
 });
 
-test.skipIf(!DB)("getInstanceView rejects an actor whose candidacy was on a step the instance has since left", async () => {
+test.skipIf(!DB)("getInstanceView keeps admitting an actor whose candidacy was on a step the instance has since left", async () => {
   const PID = pid("proc_view_auth_past_candidate");
   await publishBody(PID, assignedViewBody(), reg, dataSourceReg);
   const created = await createProcessInstance(PID, actor, dataSourceReg);
@@ -1257,18 +1257,15 @@ test.skipIf(!DB)("getInstanceView rejects an actor whose candidacy was on a step
   // pastCandidate could read the view while step_a is current...
   await getInstanceView(created.instanceId, pastCandidate, dataSourceReg);
 
-  // ...but not once the instance has moved on to step_b, which declares no
-  // assignment, and pastCandidate is neither the starter nor ADMIN_ROLE.
+  // ...and still can once the instance has moved on to step_b, which declares
+  // no assignment: step entry recorded them as a principal, and the direct
+  // read consults that set (instance-visibility-view). scope=mine stops
+  // listing the instance at this moment; the direct read does not refuse.
   await claimStep(created.instanceId, claimant);
   await submitAndTransition(created.instanceId, "path_ab" as PathId, {} as Instance["data"], claimant, dataSourceReg);
 
-  let raised: unknown;
-  try {
-    await getInstanceView(created.instanceId, pastCandidate, dataSourceReg);
-  } catch (e) {
-    raised = e;
-  }
-  expect(raised).toBeInstanceOf(AuthorizationError);
+  const view = await getInstanceView(created.instanceId, pastCandidate, dataSourceReg);
+  expect(view.instanceId).toBe(created.instanceId);
 });
 
 // ============================================================
