@@ -122,8 +122,12 @@
 
 /* A flex column stops sibling margin collapsing, so a child's top margin would
    add to `.studio-header-bar`'s `margin-bottom` instead of merging with it.
-   Three children carry one: `.studio-form-editor-page`, and the browser's own
-   `1em` on the `draft-incomplete` and `studio-error` paragraphs. The header
+   Three children carry one, and each states it here in this file rather than
+   inheriting a browser default: `.studio-form-editor-page`, the
+   `.draft-incomplete` paragraph at line 134, and `.studio-error-banner`, whose
+   `margin: var(--space-3) 0` this rule zeroes the top half of. The banner
+   became a direct child when the header bar started returning a fragment, so
+   its failure report sits beside the header rather than inside it. The header
    bar's bottom margin stays the gap. */
 .studio-edit-screen > * {
   margin-top: 0;
@@ -2404,7 +2408,11 @@ tr[data-group="true"] .studio-matrix-row-header {
   background: color-mix(in srgb, var(--color-text) 7%, transparent);
 }
 
-.studio-header-bar-menu-panel button[role="menuitem"]:disabled {
+/* The permission state uses `aria-disabled`, since a natively disabled button
+   takes no focus and so never has its `aria-describedby` read (studio-publish).
+   Both spellings dim the same way. */
+.studio-header-bar-menu-panel button[role="menuitem"]:disabled,
+.studio-header-bar-menu-panel button[role="menuitem"][aria-disabled="true"] {
   opacity: 0.45;
 }
 

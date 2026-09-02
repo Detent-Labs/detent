@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useDraft } from "../draft/store.js";
-import { t } from "../catalog.js";
 import { saveDraft, getDraft, deleteDraft, publishDraft } from "../api/client.js";
 import { applySaveResult, applyReload, type DraftSaveState } from "../screens/draftSaveLogic.js";
 import { isDirty } from "../screens/draftToolbarState.js";
@@ -30,7 +29,21 @@ export interface DraftToolbarProps {
   onPublishResult: (result: PublishResult | null) => void;
   onDiscarded: () => void;
   onUnauthorized: () => void;
+  /** `reload()` re-reads the draft, so it re-reads the caller's own publish
+   * permission with it. Reported upward as its own callback, never folded into
+   * `DraftSaveState`: that interface carries the save/conflict machine alone,
+   * and `studio-draftSaveLogic.test.ts` pins its exact shape with `toEqual`.
+   * `EditorArea` holds the re-read value in its own `useState` and folds it
+   * over the loaded prop, the way `dockBaseVersion` already folds
+   * `publishResult.version`. Without this, a stale `false` would survive the
+   * one control the conflict banner offers. */
+  onCanPublishChange?: (canPublish: boolean) => void;
 }
+
+/** Which confirmation dialog the header bar has open, if any. Publish and
+ * discard each commit an act the developer cannot undo, so each confirms in
+ * the application's own modal dialog (studio-publish, studio-app). */
+export type PendingDialog = "publish" | "discard" | null;
 
 /** What `useDraftToolbarActions` exposes: the four calls a trigger (a
  * button, a menu item) invokes, plus the pending/error state a presentation
@@ -40,6 +53,13 @@ export interface DraftToolbarActions {
   saving: boolean;
   publishing: boolean;
   error: string | null;
+  /** Set by `publish()` or `discard()`, cleared when the developer resolves
+   * the dialog or the act succeeds. A refused request leaves it set, so the
+   * reason renders inside the open dialog rather than behind it. */
+  pendingDialog: PendingDialog;
+  /** Resolves whichever dialog `pendingDialog` names. `true` runs the act,
+   * `false` declines it and sends no request. */
+  resolveDialog: (confirmed: boolean) => void;
   save: () => void;
   discard: () => void;
   publish: () => void;
@@ -48,10 +68,18 @@ export interface DraftToolbarActions {
 
 /**
  * The save/discard/publish logic `DraftToolbar` has always owned — pending
- * flags, the network calls, the 401/conflict/confirm() handling — extracted
- * so `ProcessHeaderBar`'s `⋮` menu can call it too, per design.md's
+ * flags, the network calls, the 401 and conflict handling — extracted so
+ * `ProcessHeaderBar`'s `⋮` menu can call it too, per design.md's
  * "DraftToolbar keeps its logic. ProcessHeaderBar renders the buttons.".
  * This is the one place the logic lives; neither caller reimplements it.
+ *
+ * It raises no native browser prompt. Publish and discard each open the
+ * application's own modal dialog instead: `publish()` and `discard()` only set
+ * `pendingDialog`, and `resolveDialog(true)` runs the act the dialog named.
+ * The native prompt carried neither the version a publish mints nor the rule
+ * that a published version never changes, and it bypassed the design language
+ * entirely. `packages/web/test/studio-no-confirm.test.ts` guards the
+ * regression that would put it back.
  */
 export function useDraftToolbarActions({
   processId,
@@ -64,11 +92,13 @@ export function useDraftToolbarActions({
   onPublishResult,
   onDiscarded,
   onUnauthorized,
+  onCanPublishChange,
 }: DraftToolbarProps): DraftToolbarActions {
   const { draft, replace } = useDraft();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
+  const [pendingDialog, setPendingDialog] = useState<PendingDialog>(null);
   const fail = useFail(onUnauthorized, (e) => setError(describeCaughtError(e)));
 
   const withUnauthorized = async (action: () => Promise<void>) => {
@@ -108,20 +138,38 @@ export function useDraftToolbarActions({
   };
 
   /**
-   * Publish always targets the persisted draft (studio-publish spec) — a dirty
-   * in-browser edit is never sent implicitly. Confirming saves first and only
-   * then publishes; declining or a save conflict leaves the draft unpublished
-   * (studio-app spec: "does not call the publish route until the save completes").
+   * Opens the publish dialog. It sends nothing: the request leaves only from
+   * `resolveDialog(true)` (studio-publish spec: "no publish request is sent
+   * until the developer confirms").
    */
   const publish = () => {
-    if (isDirty(draft, savedBody)) {
-      if (!confirm(t("draftToolbar.publishConfirmSave"))) return;
-      return withUnauthorized(async () => {
-        if (await doSave()) await doPublish();
-      });
-    }
-    return withUnauthorized(doPublish);
+    // A dialog reports its own refusal alone. Without this, a failure from an
+    // earlier action renders inside a dialog that has sent nothing yet, and
+    // reads as a refusal of the act the developer is about to confirm.
+    setError(null);
+    setPendingDialog("publish");
   };
+
+  /**
+   * The act the publish dialog confirms. Publish always targets the persisted
+   * draft (studio-publish spec) — a dirty in-browser edit is never sent
+   * implicitly — so a dirty draft saves first, under that one dialog and with
+   * no second prompt between the two calls (studio-app spec: "does not call
+   * the publish route until the save completes").
+   *
+   * A save conflict closes the dialog rather than reporting inside it. The
+   * conflict is not a refusal; it is a state with its own banner and its own
+   * Reload button, and a modal puts both out of reach.
+   */
+  const runPublish = () =>
+    withUnauthorized(async () => {
+      if (isDirty(draft, savedBody) && !(await doSave())) {
+        setPendingDialog(null);
+        return;
+      }
+      await doPublish();
+      setPendingDialog(null);
+    });
 
   const reload = () =>
     withUnauthorized(async () => {
@@ -136,23 +184,56 @@ export function useDraftToolbarActions({
       // No onSaved() call here (design.md): a reload is not a save, and must
       // not advance EditorArea's lastSavedAt.
       onSavedBodyChange(body);
+      // An administrator can grant or withdraw the publish permission while the
+      // edit screen sits open. Reload is the one control the conflict banner
+      // offers, so it has to clear a stale report too.
+      onCanPublishChange?.(record.canPublish);
       onSaveState(applyReload({ revision: record.revision, layout: record.layout }));
     });
 
-  const discard = () =>
+  /**
+   * Opens the discard dialog. Like `publish()`, it sends nothing: the request
+   * leaves only from `resolveDialog(true)` (studio-app spec: "no request is
+   * sent and the draft stays open, unchanged").
+   */
+  const discard = () => {
+    setError(null);
+    setPendingDialog("discard");
+  };
+
+  /** The act the discard dialog confirms. */
+  const runDiscard = () =>
     withUnauthorized(async () => {
-      if (!confirm(t("draftToolbar.discardConfirm"))) return;
       await deleteDraft(processId, token);
+      setPendingDialog(null);
       onDiscarded();
     });
+
+  /**
+   * Declining closes the dialog and sends nothing. Confirming runs the act the
+   * open dialog named, and leaves the dialog open when the request is refused
+   * — `error` then renders inside it, since a modal puts everything behind it
+   * out of reach (spa-error-reporting).
+   */
+  const resolveDialog = (confirmed: boolean) => {
+    const open = pendingDialog;
+    if (!confirmed || open === null) {
+      setPendingDialog(null);
+      return;
+    }
+    if (open === "publish") void runPublish();
+    else void runDiscard();
+  };
 
   return {
     saving,
     publishing,
     error,
+    pendingDialog,
+    resolveDialog,
     save: () => void save(),
-    discard: () => void discard(),
-    publish: () => void publish(),
+    discard,
+    publish,
     reload: () => void reload(),
   };
 }

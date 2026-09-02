@@ -373,6 +373,7 @@ Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
 | 58 | Per-instance visibility: the direct read consults the set, so list and detail agree | `instance-visibility-view` | `authorization`, `instance-visibility-set`, `runtime-api` |
 | 59 | Per-instance visibility: the report builder narrows per row | `report-row-visibility` | `instance-data-query`, `instance-data-tables`, `instance-visibility-set` |
 | 60 | Per-instance visibility: a took-part screen over `scope=visible` | `involved-cases-screen` | `end-user-app` |
+| 61 | The studio's publish gate, its confirmation dialogs and its failure report | `studio-publish-gate-and-report` | `process-drafts`, `spa-error-reporting`, `studio-app`, `studio-publish` |
 
 ## Changes with no stage
 

@@ -2078,3 +2078,80 @@ the carve-out: `packages/web/test/studio-fieldPreview.test.ts` and
 `packages/web/test/studio-defaultValueLogic.test.ts`. None of them sees
 which widget `FieldForm` draws for a resolved person field. None sees the
 empty list render as an empty control rather than an error.
+
+### The publish path, in both roles (`studio-publish-gate-and-report`)
+
+Source: `studio-publish-gate-and-report` task 12.4.
+
+Three things here need a browser. The focus trap, the Escape key and the
+backdrop all come from `showModal()`. None of the three appears in a rendered
+string. The file
+`packages/web/test/studio-processHeaderBar-publishGate.test.tsx` asserts the
+rest: the gate's own markup, and the banner's alert role.
+
+Sign in as `demo-developer@example.test`. That account holds
+`system:developer` and not `system:publish`, so it is the actor the gate
+catches. Open a draft. Then open the header bar's `⋮` menu.
+
+Pass: Publish still renders, dimmed. One line of label text beneath it reads
+"Needs the publish permission for this process". Click it. Pass: nothing
+happens, and the network tab shows no request.
+
+Tab to the Publish item. Pass: it takes focus, unlike the natively disabled
+Save item beside it while a save runs. A screen reader reads the reason with
+the control, through `aria-describedby`.
+
+Now sign in as an account holding `system:publish` and open the same draft.
+Choose Publish. Pass: a modal dialog opens. It names the process, the process
+id, the revision and the next version. It states that a published version can
+never change.
+
+Press Escape. Pass: the dialog closes and no request goes out. Choose Publish
+again and click the backdrop outside the dialog. Pass: the dialog stays put,
+which is what a native modal does.
+
+Tab through the open dialog. Pass: focus cycles inside it and never reaches
+the header bar behind. Confirm. Pass: the dialog closes and the header's
+published stamp names the version the engine assigned.
+
+Edit the label and choose Publish again. Pass: the dialog says that publishing
+saves the unsaved changes first. Confirm. Pass: one `PUT` then one `POST`, and
+no second prompt between them.
+
+Choose Discard. Pass: a dialog opens naming the process and the revision, and
+stating that the published versions stay. Cancel. Pass: the draft is still
+open and unchanged.
+
+To see a refusal render, sign back in as `demo-developer` and open the draft.
+Publish through the browser console rather than through the gated control.
+Pass: the failure renders as a bordered banner with a FAILED stamp. It sits as
+its own block below the header row. A screen reader announces it, with no move
+of the focus.
+
+### Where a confirmation dialog leaves the focus (`studio-publish-gate-and-report`)
+
+Source: `studio-publish-gate-and-report` task 13.19.
+
+A rendered string carries no active element. So the file
+`packages/web/test/studio-processHeaderBar-publishGate.test.tsx` asserts which
+control the markup primes, and nothing beyond that. Where the focus sits, and
+where it goes on close, needs a browser.
+
+Open a draft as an account holding `system:publish`. Open the header bar's
+kebab menu and choose Publish. Pass: the focus ring sits on Cancel, not on
+Publish. Press Enter without moving. Pass: the dialog closes and no `POST` goes
+out.
+
+Open the menu again and choose Discard. Pass: the focus ring sits on Cancel,
+never on Discard draft. This one matters most: the studio carries no undo, and
+Discard draft is the first focusable control in DOM order.
+
+Now close each dialog by each of its routes, and watch where the focus lands
+every time. Cancel it. Press Escape. Click the backdrop. Confirm a publish and
+let it finish.
+
+Pass: after each route the focus ring returns to the kebab trigger. It never
+lands on the top of the page, and never on nothing at all.
+
+Press Tab straight after each close. Pass: the next stop is the control after
+the kebab trigger, not the first control on the screen.

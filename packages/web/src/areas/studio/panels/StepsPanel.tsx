@@ -68,9 +68,13 @@ interface Props {
    * the step id alone — `EditorArea` owns `processId` and the `Route`
    * shape, so this component stays free of both. */
   navigate: (stepId: string) => void;
+  /** Passed straight through to the `ChecksRail` docked at this inspector's
+   * bottom edge, which states a publish verdict beside its validation one.
+   * This panel reads it for nothing else. */
+  canPublish: boolean;
 }
 
-export function StepsPanel({ fields, token, selectedStepId, onSelectStep, selectedPathId, navigate }: Props) {
+export function StepsPanel({ fields, token, selectedStepId, onSelectStep, selectedPathId, navigate, canPublish }: Props) {
   const { draft, mutate, validation, setChildForStep, contentLocale } = useDraft();
   const steps = draft.workflow?.steps ?? [];
   const baseLocale = draft.baseLocale ?? "en";
@@ -413,7 +417,7 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
             `collapsed` reads the same `validation.issues[]` traversal the
             standalone, expanded rail beside the canvas reads — one counting
             path, per design.md. */}
-        <ChecksRail validation={validation} collapsed />
+        <ChecksRail validation={validation} canPublish={canPublish} collapsed />
       </div>
     </div>
   );

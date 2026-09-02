@@ -5,6 +5,12 @@ import type { ValidationResult } from "../draft/validation";
 
 interface Props {
   validation: ValidationResult;
+  /** The loaded draft's `canPublish` report, threaded from `EditorArea`
+   * through every one of this rail's four mounts. The all-clear box states a
+   * publish verdict, and a rail that never reads the permission states one it
+   * cannot verify: an actor without `system:publish` read "ready to publish"
+   * here while the menu 900px away refused the act (studio-publish). */
+  canPublish: boolean;
   /** True when this rail docks at the step inspector's bottom edge: it opens
    * as a one-line summary and expands in place when chosen. False beside the
    * canvas, where nothing is selected and the full grouped list always shows.
@@ -18,7 +24,7 @@ interface Props {
  * placement already filters; this is one more view over it, not a second
  * validation pass.
  */
-export function ChecksRail({ validation, collapsed = false }: Props) {
+export function ChecksRail({ validation, canPublish, collapsed = false }: Props) {
   const [expanded, setExpanded] = useState(false);
   const groups = groupChecksBySource(validation);
   const clear = allChecksClear(groups);
@@ -53,7 +59,16 @@ export function ChecksRail({ validation, collapsed = false }: Props) {
         <>
           <h2>{t("checksRail.heading")}</h2>
           <div id="studio-checks-rail-groups">
-            {clear && <p className="studio-checks-rail-clear">{t("checksRail.allClear")}</p>}
+            {/* Two sentences, two keys, one box. The first is what this rail
+                measured. The second is what the engine reported about this
+                actor. Conflating them into one sentence is the defect: the
+                rail cannot verify a permission, so it must not assert one. */}
+            {clear && (
+              <p className="studio-checks-rail-clear">
+                {t("checksRail.allClear")}{" "}
+                {t(canPublish ? "checksRail.clearReadyToPublish" : "checksRail.clearNeedsPublishPermission")}
+              </p>
+            )}
             {groups.map((group) => (
               <section key={group.source} className="studio-checks-group">
                 {/* The source name is the same untranslated machine value

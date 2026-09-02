@@ -4565,3 +4565,41 @@ Deliberately out of scope: a later "test user/group" exception. It
 would let specific real actors see test-instance tasks in their normal
 app-area task list. The one-predicate visibility design leaves room to
 add that exception in one place later.
+
+## The studio publish gate and its failure report (`studio-publish-gate-and-report`)
+
+The route `GET /drafts/:processId` carries one further computed field,
+`canPublish`. The handler `handleGetDraft` reads it from
+`can(actor, "publish", processId, db)`. It sits beside the `canPlanMigration`
+field the same handler already returned. The database holds neither field, and
+neither joins the `Draft` row. The studio's `DraftRecord` type declares both.
+
+The studio reads that field rather than a role. Neither authoring role implies
+the publish permission. A scoped grant reaches it without either role. So a
+role check answers wrong in both directions.
+
+The component `EditScreen` passes the loaded value into `EditorArea` as a prop.
+That component folds whatever `reload()` re-read over it, the way
+`dockBaseVersion` folds a publish result's version. The field deliberately does
+not join `DraftSaveState`.
+
+The component `PublishMenuItem` in `ProcessHeaderBar.tsx` renders the `⋮`
+menu's Publish item. It renders the reason line beneath that item when the
+permission is absent. It marks the item `aria-disabled` rather than natively
+disabled, so the item keeps focus and a screen reader reads its
+`aria-describedby` reason. The header bar is its only production caller. The
+export serves that component's own test alone.
+
+The hook `useDraftToolbarActions` raises no native prompt. Its `publish()` and
+`discard()` set `pendingDialog`, and `resolveDialog(true)` runs the act the
+dialog named. `ProcessHeaderBar` renders `PublishConfirmDialog` or
+`DiscardConfirmDialog` for that state. Both take the `studio-dialog` pattern
+`ProcessesScreen.tsx` established. A refused request leaves the dialog open and
+renders its reason inside. A modal puts everything behind it out of reach.
+
+The header bar returns a fragment. A failed save, discard or publish renders as
+a `studio-error-banner` block with an alert role. The save conflict beside it
+takes the same shape. Both sit as siblings of the header, rather than as items
+inside its wrapping flex row. The missing form step, the absent draft and the
+dock's failed diff load now carry that shape too. An open dialog hides the
+banner, because the dialog reports the same failure.

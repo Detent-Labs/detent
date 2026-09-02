@@ -80,7 +80,13 @@ export async function handleGetDraft(processId: string, req: Request, resolver: 
     const draft = await getDraft(processId as ProcessId, db);
     if (!draft) return notFound(`no draft: ${processId}`);
     const canPlanMigration = await can(actor, "migrate", processId as ProcessId, db);
-    const body: Draft & { canPlanMigration: boolean } = { ...draft, canPlanMigration };
+    // The same predicate `handlePublishDraft` enforces, reported rather than
+    // enforced: the studio reads it to decide whether to offer Publish at all
+    // (process-drafts). Neither authoring role implies the publish permission,
+    // and a scoped grant reaches it without either role, so a role check on the
+    // client would answer wrong in both directions.
+    const canPublish = await can(actor, "publish", processId as ProcessId, db);
+    const body: Draft & { canPlanMigration: boolean; canPublish: boolean } = { ...draft, canPlanMigration, canPublish };
     return { status: 200, body };
   });
 }

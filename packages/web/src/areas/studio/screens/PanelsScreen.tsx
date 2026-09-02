@@ -95,6 +95,10 @@ interface Props {
    * named step preselected, through the `edit` route's step target. */
   onShowStep: (stepId: string) => void;
   token: string;
+  /** For this screen's own `ChecksRail` column. `EditorArea` mounts this
+   * screen, so the loaded draft's report is already in scope one level up and
+   * needs no second fetch. */
+  canPublish: boolean;
 }
 
 /**
@@ -120,7 +124,7 @@ interface Props {
  * thing that persists. The note beside Back states that, so leaving never
  * reads as a cancel.
  */
-export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token }: Props) {
+export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, canPublish }: Props) {
   const { draft, mutate, validation, contentLocale } = useDraft();
 
   const railFields = flattenRailFields(draft.fields);
@@ -340,7 +344,7 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token }
         {/* Full grouped list, not the collapsed summary: that form exists
             because a canvas selection takes the third column for an inspector,
             and this screen carries neither. */}
-        <ChecksRail validation={validation} />
+        <ChecksRail validation={validation} canPublish={canPublish} />
       </div>
     </>
   );
