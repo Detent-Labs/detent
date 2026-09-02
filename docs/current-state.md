@@ -3993,6 +3993,23 @@ catches. `test/i18n-substitution.test.ts` covers both helpers.
 The German is a first pass, not a reviewed translation. The override mechanism
 is the repair: a deployment corrects a word with no redeploy.
 
+## A took-part screen over `scope=visible` (`involved-cases-screen`)
+
+`InvolvedScreen.tsx` lists `GET /instances?scope=visible` at `/app/involved`,
+the fourth participant route. It sends no actor id: the engine resolves the
+whole principal set from the credential.
+
+The screen is the started screen's twin. It imports `startedLogic`'s
+`statusKey`, `statusTone` and `startedOnLabel` rather than carrying a second
+copy. One row shape therefore serves both lists. Its own catalog keys are
+`involved.title`, `involved.empty` and `involved.loadMore`, plus the nav entry
+`nav.involvedCases`.
+
+Three lists ask three questions. The inbox asks what awaits this participant
+now. Cases I started asks what became of what they raised.
+This one asks what they reached at all.
+That includes a step they were a candidate on and never claimed.
+
 ## Starter access to a started instance (`starter-instance-list`)
 
 The access half already worked. `loadInstanceForActor` admits the starter. A

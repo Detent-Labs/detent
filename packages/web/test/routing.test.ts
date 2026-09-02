@@ -36,7 +36,13 @@ describe("matchRoute", () => {
 
 describe("routePath", () => {
   it("round-trips every route through matchRoute", () => {
-    const routes = [{ name: "tasks" as const }, { name: "start" as const }, { name: "task" as const, instanceId: "inst_1" }];
+    const routes = [
+      { name: "tasks" as const },
+      { name: "start" as const },
+      { name: "started" as const },
+      { name: "involved" as const },
+      { name: "task" as const, instanceId: "inst_1" },
+    ];
     for (const route of routes) expect(matchRoute(routePath(route))).toEqual(route);
   });
 
@@ -46,6 +52,10 @@ describe("routePath", () => {
 
   it("round-trips the started-cases route", () => {
     expect(matchRoute(routePath({ name: "started" }))).toEqual({ name: "started" });
+  });
+
+  it("round-trips the took-part route", () => {
+    expect(matchRoute(routePath({ name: "involved" }))).toEqual({ name: "involved" });
   });
 });
 
@@ -82,7 +92,13 @@ describe("areaHref", () => {
   });
 
   it("round-trips every app route through the prefix", () => {
-    const routes = [{ name: "tasks" as const }, { name: "start" as const }, { name: "task" as const, instanceId: "inst_1" }];
+    const routes = [
+      { name: "tasks" as const },
+      { name: "start" as const },
+      { name: "started" as const },
+      { name: "involved" as const },
+      { name: "task" as const, instanceId: "inst_1" },
+    ];
     for (const route of routes) {
       const here = matchShell(areaHref("app", routePath(route)));
       expect(here.kind).toBe("area");
