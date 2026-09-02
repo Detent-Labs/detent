@@ -86,7 +86,7 @@ test("a main checkout keeps the established identity", async () => {
   const main = await mainRepo();
   const vars = await sourceEnv(main);
   expect(vars.COMPOSE_PROJECT_NAME).toBe("workflow-engine");
-  expect(vars.PORT_APP).toBe("3000");
+  expect(vars.PORT_APP).toBe("3100");
   expect(vars.PORT_VITE).toBe("5173");
   expect(vars.PORT_MAILPIT).toBe("8025");
 });
@@ -97,7 +97,7 @@ test("a subdirectory of a main checkout keeps that same identity", async () => {
   await Bun.write(join(sub, ".keep"), "");
   const vars = await sourceEnv(sub);
   expect(vars.COMPOSE_PROJECT_NAME).toBe("workflow-engine");
-  expect(vars.PORT_APP).toBe("3000");
+  expect(vars.PORT_APP).toBe("3100");
 });
 
 test("a linked worktree derives an identity distinct from main's", async () => {
@@ -105,7 +105,7 @@ test("a linked worktree derives an identity distinct from main's", async () => {
   const linked = await linkedWorktree(main, "linked", "linked-branch");
   const vars = await sourceEnv(linked);
   expect(vars.COMPOSE_PROJECT_NAME).not.toBe("workflow-engine");
-  expect(vars.PORT_APP).not.toBe("3000");
+  expect(vars.PORT_APP).not.toBe("3100");
   expect(vars.COMPOSE_PROJECT_NAME.startsWith("detent-")).toBe(true);
 });
 
@@ -121,7 +121,7 @@ test("no repository answers: the script exports the established identity and the
   const dir = tempDir();
   const vars = await sourceEnv(dir);
   expect(vars.COMPOSE_PROJECT_NAME).toBe("workflow-engine");
-  expect(vars.PORT_APP).toBe("3000");
+  expect(vars.PORT_APP).toBe("3100");
 });
 
 test("the derivation holds across a recreate: two sourcing runs agree", async () => {
