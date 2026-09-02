@@ -302,10 +302,16 @@ export type InstanceListFilter = {
 
 /**
  * `queryInstances`'s own filter type — the ten members `instance-data-query`'s
- * spec enumerates, and nothing else. No `assignedTo`, `assignedToRoles` or
+ * spec enumerates, plus `visibleTo`. No `assignedTo`, `assignedToRoles` or
  * `includeDegraded`: those resolve the list read's inbox predicate and
  * degraded-summary behaviour, neither of which this read has. See design.md
  * "The data read takes its own filter type and rejects a borrowed key".
+ *
+ * `visibleTo` is opt-in and states a resolved principal set, the way
+ * `claimedBy` states an actor id. It is not `scope`, which the HTTP layer
+ * derives from a credential and this read still refuses. `runReportQuery`
+ * sets it (report-row-visibility); the `instance.query` data source runs with
+ * no actor and passes none.
  */
 export type InstanceQueryFilter = {
   processId?: ProcessId;
@@ -319,6 +325,7 @@ export type InstanceQueryFilter = {
   createdAfter?: string;
   createdBefore?: string;
   dataWhere?: DataComparison[];
+  visibleTo?: { actorId: string; principals: string[] };
 };
 
 /** One matched instance's data, with nothing `queryInstances` would pay to resolve and discard. See design.md "The data read resolves no labels". */
@@ -1731,7 +1738,7 @@ async function assertNoNonScalarComparedField(filter: InstanceWhereFilter, compa
  * run `EXPLAIN (ANALYZE)` over this fragment. No other caller.
  */
 export function buildVisibleRowSet(
-  filter: InstanceListFilter,
+  filter: InstanceWhereFilter & { dataWhere?: DataComparison[] },
   visibleTo: { actorId: string; principals: string[] },
   bound: number,
   cursorCreatedAt: string | undefined,
@@ -1839,7 +1846,14 @@ export async function listInstances(
  * design.md "The data read takes its own filter type and rejects a borrowed
  * key".
  */
-const QUERY_FILTER_DENYLIST = ["assignedTo", "assignedToRoles", "scope", "includeDegraded", "visibleTo"] as const;
+/**
+ * The four keys `instance-data-query` names as caller errors. Each resolves
+ * the list read's inbox predicate or its degraded-summary behaviour, neither
+ * of which this read has. `visibleTo` sat here until
+ * `report-row-visibility`: it is not a derivation from a credential but a
+ * resolved set the caller states, the way it states `claimedBy`.
+ */
+const QUERY_FILTER_DENYLIST = ["assignedTo", "assignedToRoles", "scope", "includeDegraded"] as const;
 
 function assertNoDenylistedQueryKeys(filter: object): void {
   const raw = filter as Record<string, unknown>;
@@ -1873,13 +1887,24 @@ export async function queryInstances(
   await assertNoNonScalarComparedField(filter, filter.dataWhere, db);
 
   const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
-  const rows = (await db`
+  // report-row-visibility: a caller stating `visibleTo` reads the same joined
+  // row set `listInstances` reads under scope=visible, so the report, the
+  // visible list and the direct read cannot disagree. The bound sits inside
+  // every branch and again on the merged set, so `truncated` below reports
+  // the narrowed result rather than the matched one.
+  const rows = (await (filter.visibleTo
+    ? db`
+    SELECT i.body FROM instances i
+    JOIN (${buildVisibleRowSet(filter, filter.visibleTo, limit + 1, undefined, undefined, db)}) v
+      ON v.instance_id = i.instance_id
+    ORDER BY i.created_at DESC, i.instance_id DESC`
+    : db`
     SELECT body FROM instances
     WHERE ${buildInstanceWhere(filter, db)}
       AND ${buildDataWhere(filter.dataWhere, db)}
     ORDER BY created_at DESC, instance_id DESC
     LIMIT ${limit + 1}
-  ` as unknown) as { body: unknown }[];
+  `) as unknown) as { body: unknown }[];
 
   const truncated = rows.length > limit;
   const items: InstanceDataItem[] = rows.slice(0, limit).map((r) => {
@@ -2215,8 +2240,25 @@ function mergeCell(item: InstanceDataItem, fieldIds: FieldId[], declared: Set<Fi
   return { kind: "value", value: values.map((v) => String(v)).join(", "), collision: values.length > 1 };
 }
 
-async function runReportQuery(spec: { processId: ProcessId; query: ReportQuery; columns: ReportColumn[] }, db: SQL): Promise<ReportExecutionResult> {
-  const filter: InstanceQueryFilter = { processId: spec.processId, ...spec.query };
+/**
+ * report-row-visibility: a non-administrative caller reads only the rows they
+ * may see. `actorPrincipals` is the resolver `loadInstanceForActor` and the
+ * `scope=visible` list already use, so all three readers match on one set.
+ *
+ * `ADMIN_ROLE` skips the narrowing and the join with it. That role reads any
+ * instance directly and lists every one under `scope=all`, so narrowing its
+ * report would contradict both. `can(actor, "read", …)` also admits a
+ * per-process grant holder, and that actor is the one this narrows.
+ */
+async function runReportQuery(
+  spec: { processId: ProcessId; query: ReportQuery; columns: ReportColumn[] },
+  actor: Actor,
+  db: SQL,
+): Promise<ReportExecutionResult> {
+  const visibleTo = actor.roles.includes(ADMIN_ROLE)
+    ? undefined
+    : { actorId: actor.id, principals: await actorPrincipals(actor, db) };
+  const filter: InstanceQueryFilter = { processId: spec.processId, ...spec.query, ...(visibleTo ? { visibleTo } : {}) };
   const [{ items, truncated }, coverage] = await Promise.all([
     queryInstances(filter, {}, db),
     resolveVersionCoverage(spec.processId, spec.query, db),
@@ -2241,10 +2283,13 @@ async function runReportQuery(spec: { processId: ProcessId; query: ReportQuery; 
 }
 
 /**
- * Two independent gates, in order: report membership (owner/editor/viewer,
- * refused outright for anyone else), then the target process's own `read`
- * permission (an empty table, not a refusal, when membership passes and this
- * fails — see the "sharing narrows access, never widens it" requirement).
+ * Three gates, in order. Report membership comes first (owner/editor/viewer,
+ * refused outright for anyone else). Then the target process's own `read`
+ * permission: an empty table, not a refusal, when membership passes and this
+ * fails — see the "sharing narrows access, never widens it" requirement.
+ * Then, inside `runReportQuery`, the per-row visibility rule
+ * (report-row-visibility). An `ADMIN_ROLE` caller passes the third one
+ * without a query, since that role already reads every instance.
  */
 export async function executeReport(reportId: string, actor: Actor, db: SQL = sql): Promise<ReportExecutionResult | undefined> {
   const report = await fetchReportRaw(reportId, db);
@@ -2255,13 +2300,15 @@ export async function executeReport(reportId: string, actor: Actor, db: SQL = sq
   if (!(await can(actor, "read", report.processId, db))) {
     return { columns: report.columns.map(emptyResultColumn), rows: [], truncated: false };
   }
-  return runReportQuery(report, db);
+  return runReportQuery(report, actor, db);
 }
 
 /**
  * The same execution as `executeReport`, for a configuration not yet saved
  * as a report — the builder's own live preview. Carries no membership check:
- * nothing is shared yet, so only the process `read` gate applies.
+ * nothing is shared yet, so only the process `read` gate applies. The per-row
+ * rule still applies, so an author never previews a row the saved report
+ * would withhold from them.
  */
 export async function previewReportDraft(
   draft: { processId: ProcessId; query: ReportQuery; columns: ReportColumn[] },
@@ -2271,7 +2318,7 @@ export async function previewReportDraft(
   if (!(await can(actor, "read", draft.processId, db))) {
     return { columns: draft.columns.map(emptyResultColumn), rows: [], truncated: false };
   }
-  return runReportQuery(draft, db);
+  return runReportQuery(draft, actor, db);
 }
 
 // ------------------------------------------------------------

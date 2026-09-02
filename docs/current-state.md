@@ -4425,6 +4425,18 @@ a group. A new reverse lookup, `getGroupsForMember`
 (`src/auth/groups.ts`), lets "list my reports" find a report shared only
 through a group the caller belongs to.
 
+Execution runs three gates in order (`report-row-visibility`). Report
+membership refuses anyone outside the owner, editor and viewer lists. The
+process-wide `read` permission answers with an empty table rather than a
+refusal. Then `runReportQuery` narrows per row for every caller without
+`ADMIN_ROLE`. It joins the same `buildVisibleRowSet` fragment the
+`scope=visible` list joins. The report, the list and the direct read
+therefore cannot disagree.
+
+The bound sits inside that join, so `truncated` reports the narrowed set.
+`previewReportDraft` narrows the same way. The CSV export inherits it by
+rendering the executed result.
+
 A column is either a direct field reference or a `merge` column. A
 `merge` column collects the first non-empty value from an ordered list
 of source fields. Two source fields in one `merge` column can both hold

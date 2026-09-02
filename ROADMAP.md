@@ -371,6 +371,7 @@ Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
 | 56 | Authored notes in a step's view, the first non-field `ViewEntry` | `field-model-view-note` | `authored-content-localization`, `definition-contract`, `form-ui`, `runtime-api`, `studio-app`, `studio-checks-rail`, `studio-form-editor` |
 | 57 | Per-instance visibility: an engine-maintained principal set behind `scope=visible` | `instance-visibility-set` | `authorization`, `data-retention`, `instance-query`, `instance-visibility-set`, `permission-grant-administration`, `persistence`, `runtime-events`, `transition-execution` |
 | 58 | Per-instance visibility: the direct read consults the set, so list and detail agree | `instance-visibility-view` | `authorization`, `instance-visibility-set`, `runtime-api` |
+| 59 | Per-instance visibility: the report builder narrows per row | `report-row-visibility` | `instance-data-query`, `instance-data-tables`, `instance-visibility-set` |
 
 ## Changes with no stage
 
