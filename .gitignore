@@ -59,6 +59,12 @@ docs/superpowers/
 .impeccable/config.local.json
 .impeccable/hook.cache.json
 
+# Generated critique snapshots. One /impeccable critique run wrote 53 antislop
+# findings into a new file, and a new file has base 0, so every finding reads
+# as a rise to the prose gate. The report is a generated archive for
+# /impeccable polish to read back, not this project's prose to rewrite.
+.impeccable/critique/
+
 # Impeccable's installed skill and agent files. Vendored third-party content,
 # reinstalled per machine like .claude/skills/antislop/ above. Tracking them
 # put 2140 antislop findings across 79 files in front of the prose gate, none

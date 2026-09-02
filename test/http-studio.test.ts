@@ -188,6 +188,65 @@ test.skipIf(!DB)("an author with a matching grant sees canPlanMigration true", a
   expect(body.canPlanMigration).toBe(true);
 });
 
+/**
+ * `canPublish` on the same response, for the neighbouring permission
+ * (process-drafts). The studio reads it to decide whether to offer Publish at
+ * all, so the field has to report the permission and never a role: neither
+ * authoring role implies it, and a scoped grant reaches it without either.
+ *
+ * The violating input is the third case below. An authoring role alone must
+ * never read true — that reading is what put a Publish control in front of an
+ * actor the publish route answers 403 to.
+ */
+test.skipIf(!DB)("a developer holding the publish role reads canPublish true", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", publisher, { body: authoredBody("v1"), layout: {}, revision: 0 }));
+
+  const res = await fetch(authedReq(`http://x/drafts/${processId}`, "GET", publisher));
+  const body = (await res.json()) as { canPublish: boolean };
+  expect(body.canPublish).toBe(true);
+});
+
+test.skipIf(!DB)("a developer without the publish role reads canPublish false", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: authoredBody("v1"), layout: {}, revision: 0 }));
+
+  const res = await fetch(authedReq(`http://x/drafts/${processId}`, "GET", developer));
+  const body = (await res.json()) as { canPublish: boolean };
+  expect(body.canPublish).toBe(false);
+});
+
+test.skipIf(!DB)("an author with no matching grant reads canPublish false", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", author, { body: authoredBody("v1"), layout: {}, revision: 0 }));
+
+  const res = await fetch(authedReq(`http://x/drafts/${processId}`, "GET", author));
+  const body = (await res.json()) as { canPublish: boolean };
+  expect(body.canPublish).toBe(false);
+});
+
+test.skipIf(!DB)("an author with a matching grant reads canPublish true", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", financeAuthor, { body: authoredBody("v1"), layout: {}, revision: 0 }));
+  await grantPublish("finance-authors", processId);
+
+  const res = await fetch(authedReq(`http://x/drafts/${processId}`, "GET", financeAuthor));
+  const body = (await res.json()) as { canPublish: boolean };
+  expect(body.canPublish).toBe(true);
+});
+
+test.skipIf(!DB)("that same grant reads canPublish false for another process", async () => {
+  const granted = pid();
+  const other = pid();
+  await fetch(authedReq(`http://x/drafts/${granted}`, "PUT", financeAuthor, { body: authoredBody("v1"), layout: {}, revision: 0 }));
+  await fetch(authedReq(`http://x/drafts/${other}`, "PUT", financeAuthor, { body: authoredBody("v1"), layout: {}, revision: 0 }));
+  await grantPublish("finance-authors", granted);
+
+  const res = await fetch(authedReq(`http://x/drafts/${other}`, "GET", financeAuthor));
+  const body = (await res.json()) as { canPublish: boolean };
+  expect(body.canPublish).toBe(false);
+});
+
 // ============================================================
 // PUT /drafts/:processId
 // ============================================================

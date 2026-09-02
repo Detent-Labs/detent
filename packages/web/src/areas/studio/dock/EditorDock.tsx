@@ -150,7 +150,13 @@ function ChangesTab({ processId, token, draft, baseVersion }: { processId: strin
 
   if (baseVersion === null) return <p className="studio-empty">{t("dock.changesFirstPublish")}</p>;
   if (state.kind === "loading") return <p className="studio-empty">{t("dock.changesLoading")}</p>;
-  if (state.kind === "error") return <p className="studio-error">{state.message}</p>;
+  if (state.kind === "error")
+    return (
+      <div className="studio-error-banner" role="alert">
+        <span className="studio-error-banner-stamp">{t("error.failed")}</span>
+        <span className="studio-error-banner-message">{state.message}</span>
+      </div>
+    );
   if (!diff) return null;
   if (diff.length === 0) return <p className="studio-empty">{t("dock.changesNone")}</p>;
 

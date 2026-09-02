@@ -72,6 +72,13 @@ interface EditorAreaProps {
    * so a publish moves the real base version without moving this prop.
    * `EditorArea` folds `publishResult.version` over it instead. */
   loadedBaseVersion: number | null;
+  /** The loaded draft's `canPublish` report, for the same reason and by the
+   * same route: `load` never re-runs, and an administrator can grant or
+   * withdraw the permission while this screen sits open. `EditorArea` folds
+   * whatever `reload()` re-read over it. It deliberately does NOT join
+   * `DraftSaveState`, whose exact shape `studio-draftSaveLogic.test.ts` pins
+   * with `toEqual`. */
+  loadedCanPublish: boolean;
   navigate: (route: Route, opts?: NavigateOptions) => void;
   onUnauthorized: () => void;
   onDirtyChange?: (dirty: boolean) => void;
@@ -83,7 +90,7 @@ interface EditorAreaProps {
  * remaining direct consumer of `DraftToolbarProps`; `DraftToolbar` itself no
  * longer mounts here (design.md: "DraftToolbar keeps its logic.
  * ProcessHeaderBar renders the buttons."). */
-function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRevision, initialLayout, loadedBaseVersion, navigate, onUnauthorized, onDirtyChange }: EditorAreaProps) {
+function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRevision, initialLayout, loadedBaseVersion, loadedCanPublish, navigate, onUnauthorized, onDirtyChange }: EditorAreaProps) {
   const { draft, mutate, validation, replace, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
@@ -122,6 +129,12 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
   // version — `markDraftPublished` sets `base_version` inside the publish
   // transaction — and the response carries the new number, so fold it over.
   const dockBaseVersion = publishResult?.version ?? loadedBaseVersion;
+  // Folded exactly like `dockBaseVersion` above: the loaded prop underneath,
+  // and whatever `reload()` last re-read on top. `undefined` means nothing has
+  // re-read it yet, which is why the fold uses `??` and not a truthiness test —
+  // a re-read `false` has to win over a loaded `true`.
+  const [reloadedCanPublish, setReloadedCanPublish] = useState<boolean | undefined>(undefined);
+  const canPublish = reloadedCanPublish ?? loadedCanPublish;
   // Client-only, set on every successful save (never on a reload) — new
   // state DraftToolbar tracks nowhere today.
   const [lastSavedAt, setLastSavedAt] = useState<Date | undefined>(undefined);
@@ -206,8 +219,12 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
 
   // Overwrites every step's position at once, unlike onMoveStep's one-step
   // write, and clears every waypoint too (design.md, Decisions 2 and 4).
-  // Gated by hasHandPlacedStep, the same confirm()/t() pattern DraftToolbar
-  // already uses for Publish and Discard (design.md, Decision 5).
+  // Gated by hasHandPlacedStep, through the browser's own confirm() with a
+  // t() string. Publish and Discard no longer share that pattern: each commits
+  // an act the developer cannot undo, so each confirms in the application's own
+  // modal dialog instead (studio-publish, studio-app). An arrange is a local
+  // layout edit the author can undo by moving a step back, and converting it
+  // is the named follow-up, not this change.
   const onArrange = () => {
     if (hasHandPlacedStep(steps as LayoutStep[], saveState.layout) && !confirm(t("canvas.arrangeConfirm"))) return;
     const arranged = arrangeSteps(steps as LayoutStep[], groups, draft.workflow?.initialStep, saveState.layout);
@@ -392,6 +409,7 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
       navigate({ name: "processes" });
     },
     onUnauthorized,
+    onCanPublishChange: setReloadedCanPublish,
   });
 
   return (
@@ -423,6 +441,8 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
         actions={actions}
         structureActive={surface === "structure"}
         processId={processId}
+        canPublish={canPublish}
+        baseVersion={dockBaseVersion}
         go={go}
         surfaceToggle={
           <div className="studio-surface-toggle" role="tablist">
@@ -444,6 +464,7 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
               onOpenView={(view) => navigate({ name: "edit", processId, panel: view })}
               onShowStep={(targetStepId) => navigate({ name: "edit", processId, stepId: targetStepId })}
               token={token}
+              canPublish={canPublish}
             />
           ) : formStepId !== undefined ? (
             formStep ? (
@@ -454,7 +475,10 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
                 onBack={() => navigate({ name: "edit", processId })}
               />
             ) : (
-              <p className="studio-error">{t("formEditor.stepNotFound")}</p>
+              <div className="studio-error-banner" role="alert">
+                <span className="studio-error-banner-stamp">{t("error.failed")}</span>
+                <span className="studio-error-banner-message">{t("formEditor.stepNotFound")}</span>
+              </div>
             )
           ) : (
             <>
@@ -552,7 +576,7 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
                       </button>
                     );
                   })()}
-                  <ChecksRail validation={validation} collapsed />
+                  <ChecksRail validation={validation} canPublish={canPublish} collapsed />
                 </aside>
               ) : inspectedStepId !== undefined || selectedPathId !== undefined ? (
                 <aside className="canvas-inspector">
@@ -563,10 +587,11 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
                     onSelectStep={onSelectStep}
                     selectedPathId={selectedPathId}
                     navigate={(stepId) => navigate({ name: "edit", processId, formStepId: stepId })}
+                    canPublish={canPublish}
                   />
                 </aside>
               ) : (
-                <ChecksRail validation={validation} />
+                <ChecksRail validation={validation} canPublish={canPublish} />
               )}
             </div>
             {/* The dock is a flex SIBLING of the grid, not a fourth grid
@@ -656,7 +681,10 @@ export function EditScreen({ processId, formStepId, panel, stepId, token, go, na
         <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "processes" })}>
           ← Back to processes
         </button>
-        <p className="studio-error">No draft exists for this process.</p>
+        <div className="studio-error-banner" role="alert">
+          <span className="studio-error-banner-stamp">{t("error.failed")}</span>
+          <span className="studio-error-banner-message">No draft exists for this process.</span>
+        </div>
       </main>
     );
   }
@@ -673,6 +701,7 @@ export function EditScreen({ processId, formStepId, panel, stepId, token, go, na
         initialRevision={state.record.revision}
         initialLayout={state.record.layout}
         loadedBaseVersion={state.record.baseVersion}
+        loadedCanPublish={state.record.canPublish}
         navigate={navigate}
         onUnauthorized={onUnauthorized}
         onDirtyChange={onDirtyChange}

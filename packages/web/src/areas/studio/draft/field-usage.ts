@@ -133,8 +133,12 @@ export function countTechnicalClearKeys(draft: Draft, fieldId: string): number {
  * clear (task 3.8). Pulled out so the decision itself is unit-testable —
  * this codebase has no DOM harness to click the checkbox and mock
  * `confirm()` itself, so that wiring stays verified by the manual browser
- * check (task 8.6), the same way `DraftToolbar`'s own `confirm()`-gated
- * `discard()` is.
+ * check (task 8.6).
+ *
+ * `DraftToolbar`'s discard no longer raises a native prompt at all. It opens a
+ * modal dialog of the application's own, and that dialog is what the browser
+ * check exercises there. This checkbox keeps the native prompt: converting the
+ * studio's seven remaining prompts is a named follow-up.
  */
 export function needsTechnicalToggleConfirm(next: boolean, clearCount: number): boolean {
   return next && clearCount > 0;

@@ -18,12 +18,22 @@ export const en = {
   "draftToolbar.save": "Save",
   "draftToolbar.saving": "Saving…",
   "draftToolbar.discard": "Discard draft",
-  "draftToolbar.discardConfirm": "Discard this draft? Unpublished edits will be lost.",
   "draftToolbar.conflictMessage": "This draft was changed elsewhere.",
   "draftToolbar.conflictReload": "Reload",
   "draftToolbar.publish": "Publish",
   "draftToolbar.publishing": "Publishing…",
-  "draftToolbar.publishConfirmSave": "Save your changes and publish?",
+  "draftToolbar.publishUnavailable": "Needs the publish permission for this process",
+  "draftToolbar.dialogCancel": "Cancel",
+  "draftToolbar.dialogProcess": "Process",
+  "draftToolbar.dialogProcessId": "Process id",
+  "draftToolbar.dialogRevision": "Revision",
+  "draftToolbar.publishDialogHeading": "Publish this draft",
+  "draftToolbar.publishDialogNextVersion": "Next version",
+  "draftToolbar.publishDialogUnsaved": "This draft has unsaved changes. Publishing saves them first.",
+  "draftToolbar.publishDialogImmutable": "A published version can never change. To correct it, publish a new one.",
+  "draftToolbar.discardDialogHeading": "Discard this draft",
+  "draftToolbar.discardDialogLastSaved": "Last saved",
+  "draftToolbar.discardDialogKeepsPublished": "The published versions stay. Only the unpublished draft goes.",
 
   "fieldCatalog.heading": "Field catalog",
   "fieldCatalog.empty": "No fields yet.",
@@ -339,7 +349,13 @@ export const en = {
   "checksRail.heading": "Checks",
   "checksRail.heldBack": "Held back until earlier checks pass.",
   "checksRail.groupClear": "No open issues in this group.",
-  "checksRail.allClear": "No open issues. This draft is ready to publish.",
+  // The validation verdict alone. The rail runs checks; it holds no
+  // permission, so it says nothing here about who may publish.
+  "checksRail.allClear": "No open issues.",
+  // The permission verdict, from the loaded draft's own `canPublish` report.
+  // One of the two follows the sentence above, inside the same box.
+  "checksRail.clearReadyToPublish": "This draft is ready to publish.",
+  "checksRail.clearNeedsPublishPermission": "Publishing needs the publish permission for this process.",
   "checksRail.configHeldBack": "Plugin config check held back — verified at publish.",
   "checksRail.unknownKeysHeldBack": "Unknown-key check held back — verified at publish.",
 

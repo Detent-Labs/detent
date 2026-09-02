@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { isDirty } from "../src/areas/studio/screens/draftToolbarState.js";
+import { isDirty, publishAvailability, nextVersionLabel } from "../src/areas/studio/screens/draftToolbarState.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
 /**
@@ -162,5 +162,51 @@ describe("isDirty", () => {
     const a = { workflow: { steps: [{ id: "step_a" }] } };
     const b = { workflow: { steps: [{ id: "step_b" }] } };
     expect(isDirty(a, b)).toBe(true);
+  });
+});
+
+/**
+ * studio-publish-gate-and-report: the studio offers Publish only where the
+ * engine would admit it, and the publish dialog names the version the publish
+ * mints. Both decisions are pure, so both are asserted here rather than left
+ * to the browser check.
+ *
+ * The violating inputs are named in design.md's own Tests section: a `false`
+ * report that still yields an enabled control, and a null base version that a
+ * naive increment renders as `vNaN`.
+ */
+describe("publishAvailability (studio-publish: the client gate reads the engine's report)", () => {
+  it("a true report offers the control, with no reason", () => {
+    expect(publishAvailability(true)).toEqual({ available: true });
+  });
+
+  it("a false report withholds the control and names a reason key", () => {
+    const resolved = publishAvailability(false);
+    expect(resolved.available).toBe(false);
+    expect(resolved.reasonKey).toBe("draftToolbar.publishUnavailable");
+  });
+
+  it("an absent report reads as unavailable, not as permitted", () => {
+    expect(publishAvailability(undefined).available).toBe(false);
+  });
+});
+
+describe("nextVersionLabel (studio-publish: the dialog names a valid version label)", () => {
+  it("increments a published base version", () => {
+    expect(nextVersionLabel(3)).toBe("v4");
+  });
+
+  it("names v1 when nobody has published this process", () => {
+    expect(nextVersionLabel(null)).toBe("v1");
+  });
+
+  it("names v1 for an absent base version too, never vNaN", () => {
+    expect(nextVersionLabel(undefined)).toBe("v1");
+  });
+
+  it("never renders a non-number", () => {
+    for (const base of [null, undefined, 0, 1, 42]) {
+      expect(nextVersionLabel(base)).toMatch(/^v[0-9]+$/);
+    }
   });
 });

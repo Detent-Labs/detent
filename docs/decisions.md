@@ -1010,3 +1010,41 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   never applies or re-checks a default; it seeds a fresh instance's data
   once, at creation, same as any other explicitly submitted value from that
   point on.
+- **The studio's seven remaining `confirm()` prompts.**
+  `studio-publish-gate-and-report` converted the two on the publish path to
+  the application's own modal dialog. The others stay:
+  `root.tsx:66`, `EditScreen.tsx`'s arrange gate,
+  `ProcessesScreen.tsx`'s draft discard, `TemplatesScreen.tsx`'s template
+  discard, and three in `FieldCatalogPanel.tsx`. Two hardcode English rather
+  than reading the catalog, in `ProcessesScreen.tsx` and
+  `TemplatesScreen.tsx`. The navigation prompt at `root.tsx:66` is the odd one
+  out: `studio-app` states the `confirm()`/`t()` pattern for it as a
+  requirement, so converting it rewrites that requirement and every scenario
+  under it. The other six belong to `studio-form-editor` and `studio-app`, and
+  each carries its own facts, its own dialog copy and its own catalog keys.
+  Deferred 2026-09-02, on capability ownership and effort, not on
+  reversibility: two of the six discard server state and the studio carries no
+  undo.
+- **The 22 failure renders outside the studio edit screen.**
+  `packages/web/src` rendered 27 failure states with no alert role.
+  `studio-publish-gate-and-report` fixed five, all in the edit screen's own
+  chrome, and narrowed the `spa-error-reporting` requirement to that screen to
+  match. The remaining 22 sit in the app, admin and reporting areas, on the
+  studio's other screens, and in the panels the edit screen itself mounts. A
+  later change sweeps them into the same `studio-error-banner` shape and widens
+  that requirement back out. Deferred 2026-09-02: the sweep touches four areas
+  and every one of their capability specs, and the measured defect sat on the
+  publish path.
+- **The header reads "Unsaved changes" after a `PUT` that answered 200.**
+  Observed on the studio edit screen. The path looks correct on the page: a
+  defined save result makes `doSave` call `onSavedBodyChange(draft)`,
+  `EditScreen.tsx` clones that body into `savedBody`, and `dirtyNow` compares
+  the two by serializing both. So either something re-dirties the draft after
+  the save, or the save returned nothing, and both readings need a
+  reproduction. It is a dirty-state failure in `EditorArea`, not a publish
+  failure: it shares no cause with the three defects
+  `studio-publish-gate-and-report` fixed, and no file with them but
+  `EditScreen.tsx`. Deferred 2026-09-02, at a cost of one wasted `PUT`: a
+  permanently dirty draft makes the publish dialog always state its
+  unsaved-changes sentence and always save first, which gives no wrong
+  result.
