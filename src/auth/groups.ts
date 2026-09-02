@@ -138,10 +138,10 @@ export async function getGroupsForMember(actorId: string, db: SQL = sql): Promis
 /**
  * The principal set an actor matches by: their own id, every role they hold,
  * and every group they belong to. Resolved from the credential and the group
- * store, never from client input. One function for the three readers that
+ * store, never from client input. One function for the four readers that
  * match on it — the `scope=visible` list, the direct instance read
- * (`loadInstanceForActor`) and report sharing (`listMyReports`) — so the
- * three cannot drift.
+ * (`loadInstanceForActor`), report sharing (`listMyReports`) and a report's
+ * per-row narrowing (`runReportQuery`) — so the four cannot drift.
  */
 export async function actorPrincipals(actor: Actor, db: SQL = sql): Promise<string[]> {
   return [actor.id, ...actor.roles, ...(await getGroupsForMember(actor.id, db))];

@@ -35,10 +35,15 @@ gets. The refusal SHALL disclose nothing about the instance.
 A test instance SHALL keep the narrower rule of the `runtime-api` capability.
 Its principal set is not consulted.
 
-The list and the direct read SHALL agree. An instance the visible scope
-returns to an actor SHALL open for that actor. One it withholds SHALL refuse
-them. The one exception is the one `scope=visible` already has. A test
-instance never reaches a participant list, and its starter still opens it.
+The list and the direct read SHALL agree on the participation ground. An
+instance the visible scope returns to an actor by a principal match SHALL open
+for that actor. One it withholds on that ground SHALL refuse them.
+
+Three cases sit outside that guarantee. A test instance never reaches a
+participant list, and its starter still opens it. The live-assignment ground
+carries its own predicate on each side, and the two do not match today. The
+starter ground has no SQL form at all, so the list omits an instance the
+backfill never reached.
 
 #### Scenario: A past participant opens the instance
 

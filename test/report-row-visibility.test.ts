@@ -11,6 +11,8 @@ import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema, createInstance, withTransaction, appendInstancePrincipals } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
+import { createDefaultDataSourceRegistry } from "../src/engine/host.js";
+import { INSTANCE_QUERY_DATA_SOURCE_TYPE } from "../src/engine/instance-query-source.js";
 import { createReport, executeReport, previewReportDraft, reportResultToCsv, queryInstances, revokeVisibility, type ReportColumn } from "../src/runtime/api.js";
 import { writeGrant } from "../src/auth/grants.js";
 import { ADMIN_ROLE } from "../src/auth/authorize.js";
@@ -93,6 +95,12 @@ test.skipIf(!DB)("a viewer sees only the rows they may see; the operator sees ev
 
   expect(await rowIds(reportId, viewer)).toEqual([ids[0]!]);
   expect((await rowIds(reportId, admin)).sort()).toEqual([...ids].sort());
+
+  // "A viewer with process read access gets the full table": a viewer who may
+  // see every match reads every row, so the narrowing subtracts nothing.
+  await see(ids[1]!, viewer.id);
+  await see(ids[2]!, viewer.id);
+  expect((await rowIds(reportId, viewer)).sort()).toEqual([...ids].sort());
 });
 
 test.skipIf(!DB)("a revoked viewer loses one row and keeps the rest", async () => {
@@ -169,7 +177,16 @@ test.skipIf(!DB)("queryInstances narrows with visibleTo and returns every match 
 
 test.skipIf(!DB)("the instance.query data source keeps today's rows, since it passes no visibleTo", async () => {
   const { processId, ids } = await fixture(2);
-  // No principal anywhere: an actor-less engine read still sees both.
-  const page = await queryInstances({ processId }, { limit: 10 }, sql);
-  expect(page.items.map((i) => i.instanceId).sort()).toEqual([...ids].sort());
+  // One instance names the viewer, the other names nobody. The handler builds
+  // no `visibleTo`, so it offers both: it resolves options for a form, not
+  // rows for a reader.
+  await see(ids[0]!, viewer.id);
+
+  const handler = createDefaultDataSourceRegistry().get(INSTANCE_QUERY_DATA_SOURCE_TYPE)!;
+  const options = await handler.resolve({
+    config: { processId, statuses: ["running", "completed"], labelFieldId: "field_x" },
+    instance: { id: "inst_reader_stub" as InstanceId, processId: "proc_reader_stub" as ProcessId, data: {} as Instance["data"], baseLocale: "en" },
+    db: sql,
+  });
+  expect(options.map((o) => o.value).sort()).toEqual([...ids].sort());
 });
