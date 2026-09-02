@@ -2341,13 +2341,17 @@ Stage-by-stage status is in `ROADMAP.md`.
   `GET /instances/:id/record`) but left the stronger single-instance read,
   `GET /instances/:id`, open to any authenticated caller holding the id.
   `getInstanceView` now authorizes `actor` against the loaded instance before
-  resolving anything: `ADMIN_ROLE`, `instance.startedBy`, the current step's
-  claimant, or an eligible candidate on the current step's assignment
+  resolving anything, as an ordered fallback: `ADMIN_ROLE`; a live
+  assignment on the current step, the claimant or an eligible candidate
   (`isEligibleCandidate`, imported from `engine/transition.ts` — the same
-  predicate `claimStep` uses, so the read and claim predicates cannot drift).
-  Access follows the *current* step, not history: a candidate on a step the
-  instance has since left loses the read once it advances, mirroring
-  `scope=mine`. Load-failure handling mirrors `cancelInstance`'s existing
+  predicate `claimStep` uses, so the read and claim predicates cannot drift);
+  or participation, the starter or a match between `actorPrincipals` and
+  `instance_principals`, unless `instance_principals_denied` names the actor
+  (`instance-visibility-view`). A live assignment never consults the denial,
+  which is how it outranks a revocation. Access therefore follows the set,
+  not the current step alone: a candidate on a step the instance has since
+  left keeps the read, as `scope=visible` keeps listing it, while
+  `scope=mine` drops it. Load-failure handling mirrors `cancelInstance`'s existing
   two-path shape: an `ADMIN_ROLE` caller loads directly, so a missing
   instance (or any other load failure, e.g. a pin mismatch) still surfaces as
   today's plain not-found/500; every other caller loads inside a `try` whose
@@ -3989,6 +3993,23 @@ catches. `test/i18n-substitution.test.ts` covers both helpers.
 The German is a first pass, not a reviewed translation. The override mechanism
 is the repair: a deployment corrects a word with no redeploy.
 
+## A took-part screen over `scope=visible` (`involved-cases-screen`)
+
+`InvolvedScreen.tsx` lists `GET /instances?scope=visible` at `/app/involved`,
+the fourth participant route. It sends no actor id: the engine resolves the
+whole principal set from the credential.
+
+The screen is the started screen's twin. It imports `startedLogic`'s
+`statusKey`, `statusTone` and `startedOnLabel` rather than carrying a second
+copy. One row shape therefore serves both lists. Its own catalog keys are
+`involved.title`, `involved.empty` and `involved.loadMore`, plus the nav entry
+`nav.involvedCases`.
+
+Three lists ask three questions. The inbox asks what awaits this participant
+now. Cases I started asks what became of what they raised.
+This one asks what they reached at all.
+That includes a step they were a candidate on and never claimed.
+
 ## Starter access to a started instance (`starter-instance-list`)
 
 The access half already worked. `loadInstanceForActor` admits the starter. A
@@ -4420,6 +4441,18 @@ assignment candidates. `isEligibleCandidate` itself carries no notion of
 a group. A new reverse lookup, `getGroupsForMember`
 (`src/auth/groups.ts`), lets "list my reports" find a report shared only
 through a group the caller belongs to.
+
+Execution runs three gates in order (`report-row-visibility`). Report
+membership refuses anyone outside the owner, editor and viewer lists. The
+process-wide `read` permission answers with an empty table rather than a
+refusal. Then `runReportQuery` narrows per row for every caller without
+`ADMIN_ROLE`. It joins the same `buildVisibleRowSet` fragment the
+`scope=visible` list joins. The report, the list and the direct read
+therefore cannot disagree.
+
+The bound sits inside that join, so `truncated` reports the narrowed set.
+`previewReportDraft` narrows the same way. The CSV export inherits it by
+rendering the executed result.
 
 A column is either a direct field reference or a `merge` column. A
 `merge` column collects the first non-empty value from an ordered list

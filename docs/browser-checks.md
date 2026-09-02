@@ -513,6 +513,35 @@ A `bun:test` assertion covers the scope, the tone mapping and the route
 already. It cannot see a stamp whose tone reads as a defect where a cancelled
 case belongs. It cannot see a nav entry that wraps.
 
+### Cases I took part in
+
+Source: `involved-cases-screen` task 5.1.
+
+Seed the database. Log in as a participant holding no reserved role. Pass: the
+nav offers Cases I took part in, fourth, after Cases I started. Pass: the four
+entries sit on one row without wrapping.
+
+Log in as an account that has taken part in nothing. Pass: the screen states
+that in words, not as an empty list.
+
+Now have a second account start a case whose first step names the first
+account as a candidate. Claim it as the first account, submit, and let the
+case move to a step that assigns somebody else. Pass: My tasks no longer
+carries it and Cases I took part in does. That is the gap this screen closes.
+
+Open the case from its row. Pass: the task screen opens for that instance.
+
+As an operator, revoke the first account from that case
+(`POST /instances/:id/visibility/revoke`). Return to the screen and refresh.
+Pass: the case is gone, with no error and no gap in its place.
+
+Switch the account menu to German. Pass: the heading, the nav entry, every
+stamp and the empty state read German.
+Pass: the long German nav entry does not wrap the row.
+
+A `bun:test` assertion covers the request's scope and the route. It cannot see
+a nav row that wraps under German, and it cannot see the screen's first frame.
+
 ### The notification.email recipient picker
 
 Log in as a developer and open a draft in the studio. Select a step, then add

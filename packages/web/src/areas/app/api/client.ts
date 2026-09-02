@@ -5,9 +5,15 @@ export { AppClientError, createInstance, submitPath };
 
 /**
  * `scope=started` derives the starter from the credential, so that case sends
- * no `startedBy` of its own — the route rejects the pair.
+ * no `startedBy` of its own — the route rejects the pair. `scope=visible`
+ * resolves the caller's whole principal set from the credential the same way,
+ * so it sends no actor id either.
  */
-export function listInstances(scope: "mine" | "started", token: string, opts: { limit?: number; cursor?: string } = {}): Promise<InstancePage> {
+export function listInstances(
+  scope: "mine" | "started" | "visible",
+  token: string,
+  opts: { limit?: number; cursor?: string } = {},
+): Promise<InstancePage> {
   const params = new URLSearchParams({ scope });
   if (opts.limit !== undefined) params.set("limit", String(opts.limit));
   if (opts.cursor !== undefined) params.set("cursor", opts.cursor);

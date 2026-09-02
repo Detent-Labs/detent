@@ -1,4 +1,4 @@
-import { Inbox, FileClock } from "lucide-react";
+import { Inbox, FileClock, Users } from "lucide-react";
 import { matchRoute, routePath, type Route } from "./routing.js";
 import { useAreaRoute, PROFILE_PATH } from "../../shell/routing.js";
 import { Chrome } from "../../shell/Chrome.js";
@@ -7,6 +7,7 @@ import { TasksScreen } from "./screens/TasksScreen.js";
 import { TaskScreen } from "./screens/TaskScreen.js";
 import { StartScreen } from "./screens/StartScreen.js";
 import { StartedScreen } from "./screens/StartedScreen.js";
+import { InvolvedScreen } from "./screens/InvolvedScreen.js";
 import type { AreaRootProps } from "../../shell/App.js";
 import "./app.css";
 
@@ -37,6 +38,15 @@ export function AppArea({ session, locale, localPath, go, onUnauthorized, onLoca
       >
         <FileClock size={18} strokeWidth={1.75} aria-hidden="true" />
         {t(locale, "nav.startedCases")}
+      </button>
+      <button
+        type="button"
+        className="btn btn-secondary"
+        aria-current={route.name === "involved" ? "page" : undefined}
+        onClick={() => navigate({ name: "involved" })}
+      >
+        <Users size={18} strokeWidth={1.75} aria-hidden="true" />
+        {t(locale, "nav.involvedCases")}
       </button>
       <button
         type="button"
@@ -76,6 +86,7 @@ export function AppArea({ session, locale, localPath, go, onUnauthorized, onLoca
         />
       )}
       {route.name === "started" && <StartedScreen token={session.token} locale={locale} navigate={navigate} onUnauthorized={onUnauthorized} />}
+      {route.name === "involved" && <InvolvedScreen token={session.token} locale={locale} navigate={navigate} onUnauthorized={onUnauthorized} />}
       {route.name === "start" && <StartScreen token={session.token} locale={locale} navigate={navigate} onUnauthorized={onUnauthorized} />}
     </Chrome>
   );

@@ -18,6 +18,7 @@ import { z } from "zod";
 import { sql } from "../engine/store.js";
 import { encodeCursor, decodeCursor } from "../pagination.js";
 import { MAX_LIST_LIMIT, type Page } from "../engine/admin-queries.js";
+import type { Actor } from "../cel/eval.js";
 
 /** A group's scope: every process, or a named list of processes. Strict on write, lenient on read — mirrors `src/auth/grants.ts`'s scope shape. */
 export const groupScope = z.discriminatedUnion("type", [
@@ -132,6 +133,18 @@ export async function getGroupMembers(groupId: string, db: SQL = sql): Promise<s
 export async function getGroupsForMember(actorId: string, db: SQL = sql): Promise<string[]> {
   const rows = (await db`SELECT group_id FROM groups WHERE ${actorId} = ANY(members)`) as { group_id: string }[];
   return rows.map((r) => r.group_id);
+}
+
+/**
+ * The principal set an actor matches by: their own id, every role they hold,
+ * and every group they belong to. Resolved from the credential and the group
+ * store, never from client input. One function for the three readers that
+ * match on it — the `scope=visible` list, the direct instance read
+ * (`loadInstanceForActor`) and report sharing (`listMyReports`) — so the
+ * three cannot drift.
+ */
+export async function actorPrincipals(actor: Actor, db: SQL = sql): Promise<string[]> {
+  return [actor.id, ...actor.roles, ...(await getGroupsForMember(actor.id, db))];
 }
 
 /**
