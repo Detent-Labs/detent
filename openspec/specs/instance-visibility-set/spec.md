@@ -424,3 +424,157 @@ the principal lookup and that order.
 
 - **WHEN** a reader requests a page far into the result
 - **THEN** the read resolves it from the same indexed lookups
+
+### Requirement: The direct read consults the set
+
+The engine SHALL answer a direct read of one instance from the same rule the
+visible scope lists by. A direct read is `getInstanceView`. It is also every
+other Runtime API Layer call that shares its loader: comments and
+attachments, in both directions.
+
+For an ordinary instance and a non-administrative actor, the direct read SHALL
+admit the actor on either of two grounds:
+
+- a live assignment: the actor holds the current step's claim, or is an
+  eligible candidate on it;
+- participation, with no revocation naming the actor on this instance. The
+  actor started the instance. Or the instance's principal set holds the
+  actor's id, a role of theirs, or a group of theirs.
+
+A live assignment SHALL outrank a revocation, and SHALL clear nothing. The
+"A live assignment outranks a revocation" requirement states that rule for
+the list. Here it applies to one instance.
+
+The actor's principal set SHALL resolve as the "An actor's principal set
+resolves from the credential" requirement states. That is id, roles and group
+memberships, from the credential alone. The engine SHALL resolve that set in
+one function. The direct read, the visible scope and report sharing SHALL all
+call it.
+
+A refused actor SHALL get the same `AuthorizationError` an unrelated actor
+gets. The refusal SHALL disclose nothing about the instance.
+
+A test instance SHALL keep the narrower rule of the `runtime-api` capability.
+Its principal set is not consulted.
+
+The list and the direct read SHALL agree on the participation ground. An
+instance the visible scope returns to an actor by a principal match SHALL open
+for that actor. One it withholds on that ground SHALL refuse them.
+
+Three cases sit outside that guarantee. A test instance never reaches a
+participant list, and its starter still opens it. The live-assignment ground
+carries its own predicate on each side, and the two do not match today. The
+starter ground has no SQL form at all, so the list omits an instance the
+backfill never reached.
+
+#### Scenario: A past participant opens the instance
+
+- **WHEN** an actor was a candidate on a step the instance has since left
+- **AND** that actor holds no claim and no candidacy on the current step
+- **THEN** `getInstanceView` returns the view
+
+#### Scenario: A group member opens the instance
+
+- **WHEN** the instance holds group G as a principal and the actor is a member
+  of G
+- **THEN** `getInstanceView` returns the view
+
+#### Scenario: A revoked participant is refused
+
+- **WHEN** an administrator has revoked the actor from the instance
+- **AND** the actor holds no claim and no candidacy on the current step
+- **THEN** `getInstanceView` throws `AuthorizationError`
+
+#### Scenario: A revoked starter is refused
+
+- **WHEN** an administrator has revoked the instance's starter
+- **AND** the starter holds no claim and no candidacy on the current step
+- **THEN** `getInstanceView` throws `AuthorizationError`
+
+#### Scenario: A live assignment outranks the revocation on the direct read
+
+- **WHEN** a revoked actor holds the current step's claim, or is an eligible
+  candidate on it
+- **THEN** `getInstanceView` returns the view
+- **AND** the revocation is still stored
+
+#### Scenario: The revocation applies again after the assignment ends
+
+- **WHEN** an assignment has been overriding a revocation on the direct read
+- **AND** the instance moves to a step that does not assign that actor
+- **THEN** `getInstanceView` throws `AuthorizationError` for that actor
+
+#### Scenario: A granted actor opens the instance
+
+- **WHEN** an administrator has granted an actor an instance they never took
+  part in
+- **THEN** `getInstanceView` returns the view to that actor
+
+#### Scenario: Comments and attachments follow the same rule
+
+- **WHEN** a past participant lists or posts comments on the instance, or
+  uploads, lists or downloads an attachment
+- **THEN** the call succeeds
+- **AND** the same call by a revoked participant with no live assignment
+  throws `AuthorizationError`
+
+#### Scenario: A test instance keeps its own rule
+
+- **WHEN** a test instance holds a group as a principal
+- **AND** a member of that group, who did not start it, requests the view
+- **THEN** `getInstanceView` throws `AuthorizationError`
+
+### Requirement: The report reads by the same rule, the aggregates never do
+
+The engine SHALL narrow a report's rows by the rule the visible scope lists
+by. A row a viewer may not see SHALL be absent from the table. The table
+raises nothing, marks nothing, and counts nothing it left out.
+
+The rule is the one the list and the direct read carry. A live assignment on
+the current step admits, and consults no revocation. Participation admits
+too, unless a revocation names the actor. Taking part means the starter, or a
+match between the actor's principals and the instance's principal set.
+
+The engine SHALL narrow the report through the same row set the visible list
+uses. It SHALL NOT carry a second predicate for one rule. The list, the direct
+read and the report SHALL agree on which instances an actor may see.
+
+An `ADMIN_ROLE` caller SHALL read unnarrowed, as they do on the list and the
+direct read.
+
+The three aggregate views SHALL stay unfiltered permanently. Those are cycle
+time, bottleneck and SLA. They return distributions over steps. They return no
+instance id and no field value. A narrowed population would hand two readers
+two different cycle times, and no screen would explain the difference.
+
+`reporting-analytics-api` owns those three views and keeps its own gate. This
+requirement binds them from outside and asks nothing of them.
+
+#### Scenario: A report withholds a row the list withholds
+
+- **WHEN** an instance matches a report's query
+- **AND** the visible list does not return that instance to the viewer
+- **THEN** the report's table holds no row for it
+
+#### Scenario: A report returns a row the list returns
+
+- **WHEN** an instance matches a report's query
+- **AND** the visible list returns that instance to the viewer
+- **THEN** the report's table holds its row
+
+#### Scenario: A live assignment admits a revoked viewer's row
+
+- **WHEN** a revoked viewer holds the current step's claim on a matching
+  instance
+- **THEN** the report's table holds that instance's row
+
+#### Scenario: An operator reads the whole table
+
+- **WHEN** an actor holding `ADMIN_ROLE` executes a report
+- **THEN** no row is withheld
+
+#### Scenario: The aggregates answer the same numbers to every reader
+
+- **WHEN** two actors with different visible sets read the cycle-time view
+  for one process
+- **THEN** both receive the same distribution

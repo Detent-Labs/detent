@@ -1973,3 +1973,97 @@ as it stands.
     Specs: `authorization`, `data-retention`, `instance-query`,
     `instance-visibility-set`, `permission-grant-administration`,
     `persistence`, `runtime-events`, `transition-execution`.
+
+58. **Per-instance visibility, the direct read: DONE.** Change:
+    `instance-visibility-view`.
+
+    Stage 57 built the set and gave it one consumer, `scope=visible`. The
+    detail view kept the old rule: starter, current claim, current candidacy.
+    An approver from last week found the case in the list and could not open
+    it. This stage closes that gap.
+
+    The loader now runs an ordered fallback of five steps. An operator holding
+    `ADMIN_ROLE` passes. A test instance keeps the narrower rule of its own
+    stage and consults no principal. A live assignment on the current step
+    passes, the claimant or an eligible candidate. Participation passes next,
+    the starter or a principal match, unless a revocation names the actor.
+    Everything else raises `AuthorizationError`.
+
+    The live test comes before the participation test, and it reads no
+    revocation. That ordering is how a live assignment outranks a revocation
+    with no special case. The participation step probes two primary keys in
+    one statement. It reads `instance_principals` and
+    `instance_principals_denied`. A starter skips the group lookup, and the
+    revocation still refuses them.
+
+    One function resolves the principal set for every reader. That function is
+    `actorPrincipals`. It serves the visible scope, the direct read, report
+    sharing and the report's per-row narrowing. Six Runtime API Layer calls
+    share the loader: `getInstanceView`, `postComment`, `listComments`,
+    `uploadAttachment`, `listAttachments` and `getAttachment`. The audit-trail
+    read, `getInstanceRecord`, keeps its own narrower rule.
+
+    List and detail agree on the participation ground alone. Three cases sit
+    outside that guarantee. A test instance never reaches a participant list.
+    The two live-assignment predicates differ, one in TypeScript and one in
+    SQL. The starter ground has no SQL form, so the list omits an instance the
+    backfill never reached.
+
+    Specs: `authorization`, `instance-visibility-set`, `runtime-api`.
+
+59. **Per-instance visibility, the report builder: DONE.** Change:
+    `report-row-visibility`.
+
+    A report checked two things before this stage. The reader had to sit in
+    the report's `viewers` list. They also had to hold `read` on the target
+    process. Both passing handed them every matching row. A viewer with
+    process access read instances they could not open one by one.
+
+    Execution now applies a third gate, per row. `runReportQuery` resolves the
+    reader's principal set and passes it to `queryInstances` as `visibleTo`.
+    An operator holding `ADMIN_ROLE` skips the narrowing and still reads every
+    row. A row the reader may not see is simply absent. The table raises
+    nothing and marks nothing, the rule the sharing comment already stated.
+
+    The read reuses the stage 57 row set rather than a second predicate.
+    `buildVisibleRowSet` joins against `instances` by instance id. One
+    definition of "may see" therefore serves the list, the detail view and the
+    report. The bound applies after the narrowing, so truncation counts the
+    rows the reader gets. The CSV export and the unsaved-draft preview follow
+    the same path.
+
+    The `visibleTo` key moved out of the query filter's denylist. It is not a
+    derivation from a credential, the way `scope` is, but a resolved set the
+    caller states. The `instance.query` data source passes none, so its option
+    lists are unchanged. The three aggregate views stay unfiltered
+    permanently, for the reason stage 57 recorded.
+
+    Specs: `instance-data-query`, `instance-data-tables`,
+    `instance-visibility-set`.
+
+60. **Per-instance visibility, the took-part screen: DONE.** Change:
+    `involved-cases-screen`.
+
+    Stage 57 built the set and stage 58 opened the detail view onto it. No
+    screen showed it. A participant looking for the case they approved last
+    month had no list to look in.
+
+    The app area's fifth route is `/app/involved`, and the nav carries a
+    fourth entry for it. The screen reads `GET /instances?scope=visible` and
+    sends no actor id of its own. The engine resolves the whole principal set
+    from the credential. A revocation drops a case from the list, and a live
+    assignment holds one in place.
+
+    Three lists now ask three questions. My tasks asks what awaits this
+    participant now. Cases I started asks what became of what they raised.
+    Cases I took part in asks what they reached at all. That covers a case
+    they raised, one they held, and one they were only ever a candidate on.
+
+    The row is the started screen's row. `InvolvedScreen` imports `statusKey`,
+    `statusTone`, `startedOnLabel`, `processLabelOf` and `stepLabelOf` from
+    `startedLogic` rather than carrying a second copy. A drifting copy of
+    `statusTone` would be a defect no test catches. The catalog carries
+    `involved.title`, `involved.empty`, `involved.loadMore` and
+    `nav.involvedCases` in both locales.
+
+    Specs: `end-user-app`.

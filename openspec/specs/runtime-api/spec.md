@@ -341,11 +341,16 @@ current step's view.
 
 `getInstanceView` SHALL authorize `actor` against the loaded instance
 before returning anything, per the `authorization` capability's
-relationship rule (`ADMIN_ROLE`, or `startedBy`, or current claimant,
-or eligible candidate on the current step), throwing
-`AuthorizationError` otherwise. `actor` is therefore load-bearing
-twice: as the authorization subject, and as the CEL guard context
-`resolveFields`/`resolveAvailablePaths` evaluate against. For a caller
+relationship rule, throwing `AuthorizationError` otherwise. That rule
+admits `ADMIN_ROLE`, the current claimant, and an eligible candidate
+on the current step. It also admits a participant who holds no
+revocation. That is the starter, or an actor the instance's principal
+set names by id, role or group. A claim or a candidacy on the current
+step outranks a revocation.
+
+The `actor` is load-bearing twice: as the authorization subject, and as
+the CEL guard context `resolveFields`/`resolveAvailablePaths` evaluate
+against. For a caller
 without `ADMIN_ROLE`, a failure to load the instance SHALL surface as
 that same `AuthorizationError`, so an unrelated caller cannot
 distinguish a nonexistent instance from one they may not read. A
@@ -571,10 +576,11 @@ it for a non-running instance, unlike `availablePaths`. A caller reading a
 completed instance can therefore still see who held the final claim.
 
 This adds no authorization work. `getInstanceView` already reads
-`instance.assignment` to authorize the caller. That test accepts four
-relationships to the instance: `ADMIN_ROLE`, `startedBy`, current claimant,
-or eligible candidate on the current step. Every caller that reaches the
-return already passed it.
+`instance.assignment` to authorize the caller. That test accepts
+`ADMIN_ROLE`, the current claimant, and an eligible candidate on the
+current step. It also accepts a participant the principal set names, who
+holds no revocation. Every caller that reaches the return already passed
+it.
 
 #### Scenario: A view on an assignment-bearing step carries the assignment
 - **WHEN** an authorized actor calls `getInstanceView` for an instance whose
@@ -1329,11 +1335,11 @@ visibility rule `getInstanceView` applies, including its test-instance
 narrowing. On a test instance, a non-administrative actor may act only
 as its `startedBy`, never merely as claimant or eligible candidate.
 
-That rule admits `system:admin`. It also admits the instance's
-`startedBy`. On an ordinary instance it also admits the current step's
-`claimedBy`, and an eligible assignment candidate on the current step.
-A test instance narrows those last two away for a non-administrative
-caller.
+That rule admits `system:admin`, a live claimant, or an eligible
+candidate on the current step. It also admits a participant the
+`authorization` capability's relationship rule names, who holds no
+revocation. A test instance admits a non-administrative caller only as
+its `startedBy`.
 
 On success it SHALL insert an `instance_comments` row. That row carries
 a fresh `comment_`-prefixed id, the instance id, the calling actor's id,
@@ -1359,7 +1365,7 @@ for an actor who may not read the instance.
 #### Scenario: An actor with no relation to the instance is refused
 
 - **WHEN** an actor who is not the starter, the claimant, an eligible
-  candidate, or `system:admin` calls `postComment`
+  candidate, a matching principal, or `system:admin` calls `postComment`
 - **THEN** it throws `AuthorizationError` and no row is inserted
 
 #### Scenario: A test instance's creator can comment, a mere claimant cannot
@@ -1395,7 +1401,7 @@ narrowing. It SHALL return a page of the instance's comments ordered
 #### Scenario: An actor with no relation to the instance is refused
 
 - **WHEN** an actor who is not the starter, the claimant, an eligible
-  candidate, or `system:admin` calls `listComments`
+  candidate, a matching principal, or `system:admin` calls `listComments`
 - **THEN** it throws `AuthorizationError`
 
 #### Scenario: A claimant who is not the creator cannot list a test instance's comments
@@ -1408,11 +1414,11 @@ narrowing. It SHALL return a page of the instance's comments ordered
 
 `uploadAttachment(instanceId, actor, { filename, contentType, data, sizeBytes }, db?)` SHALL apply the same
 visibility rule `postComment` applies (`loadInstanceForActor`), including
-its test-instance narrowing. That rule admits `system:admin`. It also
-admits the instance's `startedBy`. On an ordinary instance it also admits
-the current step's `claimedBy`, and an eligible assignment candidate on
-the current step. A test instance narrows those last two away for a
-non-administrative caller.
+its test-instance narrowing. That rule admits `system:admin`, a live
+claimant, or an eligible candidate on the current step. It also admits a
+participant the `authorization` capability's relationship rule names, who
+holds no revocation. A test instance admits a non-administrative caller
+only as its `startedBy`.
 
 On success it SHALL insert an `instance_attachments` row. That row
 carries a fresh `attachment_`-prefixed id, the instance id, the calling
@@ -1439,7 +1445,7 @@ actor who may not read the instance.
 #### Scenario: An actor with no relation to the instance is refused
 
 - **WHEN** an actor who is not the starter, the claimant, an eligible
-  candidate, or `system:admin` calls `uploadAttachment`
+  candidate, a matching principal, or `system:admin` calls `uploadAttachment`
 - **THEN** it throws `AuthorizationError` and no row is inserted
 
 #### Scenario: A claimant who is not the creator cannot upload to a test instance
@@ -1473,7 +1479,7 @@ SHALL NOT include `data` in any returned item.
 #### Scenario: An actor with no relation to the instance is refused
 
 - **WHEN** an actor who is not the starter, the claimant, an eligible
-  candidate, or `system:admin` calls `listAttachments`
+  candidate, a matching principal, or `system:admin` calls `listAttachments`
 - **THEN** it throws `AuthorizationError`
 
 #### Scenario: A claimant who is not the creator cannot list a test instance's attachments
@@ -1504,7 +1510,7 @@ the same as one that does not exist at all. `getAttachment` SHALL raise
 #### Scenario: An actor with no relation to the instance is refused
 
 - **WHEN** an actor who is not the starter, the claimant, an eligible
-  candidate, or `system:admin` calls `getAttachment`
+  candidate, a matching principal, or `system:admin` calls `getAttachment`
 - **THEN** it throws `AuthorizationError`
 
 #### Scenario: An attachment belonging to a different instance is not found

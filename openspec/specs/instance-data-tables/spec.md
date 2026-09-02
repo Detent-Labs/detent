@@ -139,6 +139,20 @@ report's owner, editor or viewer check. That actor might still hold no
 `read` permission on the target process. Such an actor SHALL receive an
 empty table rather than a refusal.
 
+Passing both checks SHALL NOT return every instance of the process. A caller
+without `ADMIN_ROLE` SHALL receive only the rows they may see, by the
+`instance-visibility-set` capability's rule. A row outside that set SHALL be
+absent. There SHALL be no error, no marker and no count of what was withheld.
+That is the rule the empty table above already follows.
+
+An `ADMIN_ROLE` caller SHALL receive every matching row. That role reads any
+instance directly and lists every one under `scope=all`, so a report of theirs
+narrows nothing.
+
+The bound SHALL apply after that narrowing, and the truncation flag SHALL
+report the narrowed set. A viewer SHALL NOT receive a short table reported as
+complete.
+
 The report itself does not name every field a source instance might expose.
 An empty result reveals nothing about instances that exist. Sharing a
 report with an actor SHALL therefore never grant that actor visibility into
@@ -155,7 +169,37 @@ data they could not otherwise read.
 
 - **WHEN** an actor listed in a report's `viewers` list also holds `read` on
   the report's target process
+- **AND** that actor may see every matching instance
 - **THEN** executing the report returns the matching rows
+
+#### Scenario: A viewer sees only the rows they may see
+
+- **WHEN** an actor passes both the membership check and the `read` check
+- **AND** some matching instances lie outside that actor's visible set
+- **THEN** the returned table holds the rows inside it and no others
+- **AND** the response names no error and no withheld count
+
+#### Scenario: A revoked viewer loses one row and keeps the rest
+
+- **WHEN** an administrator has revoked a viewer from one matching instance
+- **AND** that viewer holds no claim and no candidacy on its current step
+- **THEN** that instance's row is absent and every other row stands
+
+#### Scenario: An operator's report stays unnarrowed
+
+- **WHEN** an actor holding `ADMIN_ROLE` executes the report
+- **THEN** the report returns every matching row
+
+#### Scenario: Truncation reports the narrowed set
+
+- **WHEN** 60 instances match the query and the viewer may see 51 of them
+- **THEN** the table holds 50 rows and reports truncation
+- **AND** with 50 visible among the same 60 it holds 50 rows and reports none
+
+#### Scenario: The CSV export narrows the same way
+
+- **WHEN** a viewer downloads the same report as CSV
+- **THEN** the file holds exactly the rows the table holds
 
 ### Requirement: Sharing with an actor lacking process access is not blocked
 
@@ -182,6 +226,11 @@ matches what executing a saved report over the same process would return.
 The preview SHALL never return the process's real field values or instance
 data.
 
+The preview SHALL narrow per row exactly as a saved execution does. An author
+composing a draft SHALL see the rows they may see and no others. A preview
+that showed more would let an author read through the builder what the saved
+report withholds.
+
 #### Scenario: A preview for a process the actor cannot read shows no data
 
 - **WHEN** an actor holding no `read` permission on a process previews an
@@ -196,6 +245,12 @@ data.
 - **AND** that actor then saves it as a report and executes it
 - **THEN** both the preview and the saved execution return the same empty
   result for that actor
+
+#### Scenario: A preview narrows per row like a saved execution
+
+- **WHEN** an actor with `read` permission previews a draft over a process
+  holding instances outside that actor's visible set
+- **THEN** the preview returns only the rows inside it
 
 ### Requirement: Column choices come from the union of field catalogs in range
 

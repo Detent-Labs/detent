@@ -200,6 +200,21 @@ call after call.
 
 The read SHALL NOT scope results to the calling actor implicitly.
 
+The read SHALL accept one further optional filter, a resolved principal set
+naming an actor. When a caller passes it, the read SHALL return only the rows
+that set may see, by the `instance-visibility-set` capability's rule. The
+result stays bounded and truncation-reporting after that narrowing, so a
+narrowed result never reads as a complete one.
+
+This is not the rejected `scope`. That value names a derivation the HTTP layer
+makes from a credential. This one is a resolved set the caller states, the way
+`claimedBy` names an actor the caller states. The read still derives nothing
+from a credential, and two callers passing one identical filter still receive
+one identical result.
+
+A caller passing none SHALL receive today's unnarrowed result. The engine's own
+readers pass none. They run with no actor, so they have no set to match.
+
 The read SHALL still return an instance whose pinned `(processId, version)` has
 no resolvable published body. This read exposes no field that the body
 resolves. So what degrades a list summary has no effect here.
@@ -228,6 +243,17 @@ resolves. So what degrades a list summary has no effect here.
 
 - **WHEN** two callers run the read with one identical filter
 - **THEN** both receive the same items
+
+#### Scenario: A stated principal set narrows the rows
+
+- **WHEN** a caller passes a principal set naming an actor
+- **AND** some matching instances lie outside that actor's visible set
+- **THEN** the read returns only the instances inside it
+
+#### Scenario: A caller passing no principal set sees every match
+
+- **WHEN** a caller passes no principal set
+- **THEN** the read returns every matching instance, as it does today
 
 #### Scenario: An unresolvable body does not remove an instance
 
