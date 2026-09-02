@@ -58,3 +58,13 @@ docs/superpowers/
 # paths that the no-machine-paths push gate rejects.
 .impeccable/config.local.json
 .impeccable/hook.cache.json
+
+# Impeccable's installed skill and agent files. Vendored third-party content,
+# reinstalled per machine like .claude/skills/antislop/ above. Tracking them
+# put 2140 antislop findings across 79 files in front of the prose gate, none
+# of it this project's prose to rewrite.
+.claude/agents/impeccable-*
+.claude/skills/impeccable/
+.github/agents/impeccable-*
+.github/skills/impeccable/
+.github/hooks/impeccable.json
