@@ -7,7 +7,9 @@ focus on the entry point the rule below defines. A roving `tabindex` SHALL
 move focus inside it, so no node takes a stop of its own.
 
 Each step node SHALL carry `role="button"`, an `aria-label` and that roving
-`tabindex`. The `<svg>` SHALL carry `role="application"`, an `aria-label`
+`tabindex`. A node SHALL drop all three while its inline rename is open. That
+rename field is focusable, and ARIA forbids a focusable element inside a
+`role="button"`. The `<svg>` SHALL carry `role="application"`, an `aria-label`
 naming the graph, and a `tabindex` of its own. The role is load-bearing: a
 screen reader's browse mode otherwise consumes an arrow key before the
 element's handler sees it.
@@ -20,11 +22,13 @@ the `<svg>`, which carries the `tabindex` that call needs.
 
 Escape SHALL also move the roving stop itself. The `<svg>` takes
 `tabindex="0"`, and every node, path and box drops to `-1`. Tab then leaves
-the canvas rather than re-entering it. Re-entering the canvas SHALL restore
-the roving `0` to the remembered focus.
+the canvas rather than re-entering it. Re-entering the canvas SHALL land on
+that root. An arrow key from a root focus SHALL move to the entry point.
 
 A key press originating inside the inline rename field SHALL NOT reach the
-canvas handler.
+canvas handler. The exclusion SHALL read the event's target. A target inside a
+text-entry field stops the handler. A disclosure button the surface draws is
+not such a field. An arrow key and Escape SHALL reach the handler from one.
 
 Focus SHALL alternate between a step and a path. Right from a step SHALL move
 to that step's first outgoing path, and Right again to that path's target
@@ -39,8 +43,10 @@ step in the draft order and Up on the first SHALL move nothing. The same holds
 at either end of a fan.
 
 The step's `aria-label` SHALL name, in order, its resolved label, its key, its
-kind, its stamps and its outgoing-path count. The kind SHALL read step,
-subprocess or end, the three words the palette uses.
+kind, its stamps and its outgoing-path count. That count SHALL cover the
+reachable paths alone. The kind SHALL read step, subprocess or end, the three
+words the palette uses. The phrase carrying that count SHALL agree with it in
+number. A step carrying one path SHALL NOT announce a plural.
 
 #### Scenario: Tab reaches the canvas and lands on the initial step
 
@@ -84,12 +90,31 @@ subprocess or end, the three words the palette uses.
 - **THEN** that step becomes the selection, and the inspector opens on it,
   exactly as a click on the node does
 
+#### Scenario: An arrow key leaves a focused group box
+
+- **WHEN** focus sits on a group box's disclosure button and the author
+  presses Down
+- **THEN** the canvas handler receives that key, and focus moves on through
+  the step order
+
+#### Scenario: Escape leaves the canvas, and an arrow key re-enters it
+
+- **WHEN** the author presses Escape on a focused node, then Tab, then
+  Shift+Tab, then Right
+- **THEN** Escape puts the stop on the `<svg>`, and Tab leaves the canvas
+- **AND** Shift+Tab lands on the `<svg>`, and Right moves to the entry point
+
 #### Scenario: A screen reader names a terminal step in full
 
 - **WHEN** focus reaches a terminal step labelled "Approved", keyed
   `approved`, carrying outcome `approved` and no outgoing path
 - **THEN** its accessible name carries the label, the key, the kind word,
   the outcome and a zero path count
+
+#### Scenario: A step carrying one path announces the singular
+
+- **WHEN** focus reaches a step carrying exactly one outgoing path
+- **THEN** its accessible name reads one outgoing path, never the plural
 
 ### Requirement: The traversal is a total function over a deep-partial draft
 
@@ -215,6 +240,11 @@ The path's `aria-label` SHALL name its label, its source step, its target
 step, its trigger and its guard. An automatic path SHALL add its `priority`. A
 path carrying no guard SHALL say so.
 
+The guard slot SHALL take the readable condition the canvas draws on the edge,
+never the CEL source. That readable form already exists on the surface, under
+`aria-hidden`. Where nothing resolves it, the slot SHALL take the source
+itself.
+
 While focus sits on a path, Up and Down SHALL walk the fan the author arrived
 through. A path entered from its source SHALL walk that source's outgoing
 set. A path entered from its target SHALL walk that target's incoming set.
@@ -229,13 +259,20 @@ set. A path entered from its target SHALL walk that target's incoming set.
 
 - **WHEN** focus reaches an automatic path carrying `priority: 10` and a guard
 - **THEN** its accessible name carries the label, both step names, the
-  trigger word, the priority and its guard
+  trigger word and the guard
+- **AND** the priority reads last, after the guard
 
 #### Scenario: A guardless default says it carries no guard
 
 - **WHEN** focus reaches the guardless automatic path at a step's highest
   priority
 - **THEN** its accessible name states that it carries no guard
+
+#### Scenario: A guard announces as the phrase the canvas draws
+
+- **WHEN** focus reaches a path guarded by a condition the edge label
+  summarizes in words
+- **THEN** its accessible name carries that summary, not the CEL source
 
 #### Scenario: The guard label leaves the accessibility tree
 
@@ -251,11 +288,23 @@ follows its shape, so the canvas SHALL draw the ring as an element.
 
 A step node SHALL carry a ring `<rect>`. It sits three pixels outside the node
 on each side. It takes no fill and a 2px accent stroke, painted centered so
-the gap reads 2px. A path SHALL carry a ring `<path>` sharing the focused
-path's own `d`, with the same fill and stroke.
+the gap reads 2px.
+
+That ring SHALL carry a dash. A selected node draws the same 2px accent, and only
+the ring's offset stands between them. That offset scales with the canvas zoom
+while the stroke does not. The gap alone therefore cannot separate focus from
+selection at every zoom.
+
+A path SHALL carry a halo `<path>` instead. A stroke holds no offset. A line's
+indicator is therefore a band around the shape, not a ring at a gap.
+
+That halo sits before the edge and shares the edge's own `d`. It takes no
+fill, the accent stroke and a `stroke-width` of 6. It SHALL carry no
+`stroke-dasharray`. The 1.5px edge paints over the halo's middle. A manual
+path therefore keeps its own dash, and the accent reads on each side.
 
 Each SHALL take `vector-effect="non-scaling-stroke"`, so the canvas zoom does
-not scale the 2px the token states.
+not scale the width the token states.
 
 CSS SHALL hide each ring by default, and SHALL make it visible under
 `:focus-visible` on the element that owns it. The rule SHALL read the state
@@ -287,6 +336,12 @@ button is HTML, so the outline follows its shape already.
 - **WHEN** a focused node is on a canvas zoomed to 200 percent
 - **THEN** the ring's stroke still measures 2px on screen
 
+#### Scenario: A focused node reads apart from a selected one
+
+- **WHEN** a keyboard author moves focus to a node that is also selected
+- **THEN** the dashed ring reads apart from the node's own solid selection
+  stroke, at any canvas zoom
+
 ### Requirement: A canvas node draws no corner radius
 
 Every rect a step node draws SHALL carry `rx="0"`. The design language admits
@@ -303,11 +358,30 @@ rather than omit it.
 ### Requirement: A group box is a disclosure, and traversal skips a hidden member
 
 A group box SHALL carry a real disclosure control. That control is a
-`<button type="button">` inside a `<foreignObject>` at the box's own corner,
-sized to the button rather than to the box. Enter SHALL toggle the group's
-collapsed state, through a groups writer the canvas takes as a prop. The
-button SHALL sit in the canvas's roving `tabindex`. The box SHALL sit in the
-Up/Down step order immediately before its first member.
+`<button type="button">` inside a `<foreignObject>` at the box's bottom-right
+corner. The host SHALL measure 28 by 28, at `x + width - 24` and
+`y + height - 24`. The button SHALL measure 20 by 20 and sit centered in it,
+which puts the button itself at `x + width - 20` and `y + height - 20`.
+
+Those 4 units clear on each side are the focus outline's room. The outline
+paints 2px at a 2px offset, outside the button's border box, and a
+`<foreignObject>` clips to its own rect. A host cut to the button therefore
+draws no indicator at all.
+
+The canvas SHALL draw those hosts last inside the `<svg>`, after every other
+pass. No route, node, guard label or waypoint handle then covers one.
+
+The box itself SHALL keep drawing behind every node. Only its disclosure host
+draws in the late pass. The group's 20-unit margin keeps that host clear of
+every member node.
+
+Enter SHALL toggle the group's collapsed state, through a groups writer the
+canvas takes as a prop. The button handles that key itself, so the canvas
+handler SHALL leave Enter alone for a group focus. The button SHALL sit in the
+canvas's roving `tabindex`. The box SHALL sit in the Up/Down step order
+immediately before its first member, collapsed or expanded. A member SHALL
+lose its own place in that order only where a collapsed group holds it. A box
+holding no place takes no roving stop, and no key then reaches its button.
 
 The button SHALL carry `aria-expanded` reporting the group's collapsed state.
 Its accessible name SHALL identify the group by the group's own name.
@@ -317,21 +391,33 @@ stable DOM `id`. The button's `aria-controls` SHALL name that `<g>`. That
 wrapper SHALL exist in both states. A collapsed group's wrapper holds
 nothing, so the attribute never names an absent element.
 
-The button SHALL stop its own pointer events reaching the box's drag handlers.
-A press on it SHALL open the group rather than move it.
+A press on the button SHALL open the group rather than move it.
 
 The selection toolbar's own collapse control SHALL carry the same
 `aria-expanded` and `aria-controls`. It writes the same collapsed flag, so the
-two controls SHALL NOT report that state two different ways.
+two controls SHALL NOT report that state two different ways. That control
+SHALL carry `aria-controls` only where the group draws a box. Below two
+resolvable members no box draws, and no wrapper `<g>` exists to name.
 
 A step hidden inside a collapsed group SHALL NOT be focusable. Traversal SHALL
 skip it. Where a path's far end hides, Right or Left SHALL land on the
 collapsed box. That box is the element the path already anchors on.
 
+Left and Right SHALL move nothing from a group focus. The author presses Enter
+to expand the group and continues from a member.
+
 #### Scenario: A collapsed group opens from the keyboard
 
 - **WHEN** focus reaches a collapsed group box and the author presses Enter
 - **THEN** the group expands, and its `aria-expanded` reports the new state
+- **AND** focus stays on that button, and an arrow key still moves
+
+#### Scenario: An expanded group's disclosure takes the roving stop
+
+- **WHEN** focus sits on the step above an expanded group and the author
+  presses Down
+- **THEN** focus lands on that group's disclosure button
+- **AND** Down again reaches the group's first member
 
 #### Scenario: Traversal lands on the box rather than a hidden step
 
@@ -399,6 +485,50 @@ carrying a translation in the chosen locale.
 
 ## MODIFIED Requirements
 
+### Requirement: The canvas introduces no authoring operation unavailable through the panels
+
+<!-- Why: this block repeats the base spec's wording, which the delta must -->
+<!-- match for the archive to apply it. Both findings predate this change. -->
+<!-- antislop: allow sentence-length passive-voice -->
+
+Every mutation the canvas can trigger (positioning a step, connecting a
+path, inserting a step into a path) SHALL have an existing panel-based
+equivalent; the canvas SHALL NOT be
+the only way to perform any authoring operation, including deletion, which
+SHALL remain panel-only.
+
+The insert gesture holds to this rule by composition. It performs no mutation
+the panels lack. The rail's own existing step-creation drag creates the step.
+Then `PathsPanel` retargets the source step's existing path to the new step.
+It also adds a new path on it, naming the old target. Both are
+already-existing panel actions.
+
+The canvas spends one gesture where the panels spend four operations, and
+reaches the same draft.
+
+Selection and traversal answer the keyboard directly now. A drag gesture stays
+pointer-driven, and the panel route is its keyboard equivalent.
+
+#### Scenario: A step and its paths remain deletable without the canvas
+
+<!-- Why: the scenario repeats the base spec's own wording, character for -->
+<!-- character. Both findings predate this change. -->
+<!-- antislop: allow passive-voice synonym-rotation -->
+- **WHEN** a step or path is deleted through its panel
+- **THEN** the deletion succeeds identically to before this change, with no
+  canvas-only deletion affordance introduced
+
+#### Scenario: The panels reach an inserted step's end state
+
+<!-- Why: this scenario repeats the base spec's own wording, character for -->
+<!-- character. The rail carries that name on the screen. -->
+<!-- antislop: allow synonym-rotation -->
+- **WHEN** the developer drags a Step from the edit rail onto empty canvas
+- **AND** retargets the source step's path to it in `PathsPanel`
+- **AND** adds a path on the new step naming the old target
+- **THEN** the draft matches what one drop on that path produces
+- **AND** it differs in the new step's position and the cleared waypoints
+
 ### Requirement: A step node on the canvas offers an inline rename
 
 The canvas SHALL let the developer rename a step's label directly on
@@ -461,10 +591,12 @@ The eleventh is the group rule set. It gives a group's box, the hidden step
 ids, and the box a path anchors on.
 
 The twelfth is the keyboard traversal step. It takes the current focus, a key,
-the draft's steps and its groups. The traversal reaches a path through its
-owning step. A path lives at `workflow.steps[i].paths`, and no separate
-collection holds one. It returns the next focus, and it is total over a deep-partial
-draft. `packages/web/src/areas/app/screens/inboxLogic.ts` sets that
+the draft's steps, its groups and its initial step. It reads that last one for
+a root focus alone, which resolves to the entry point. The traversal reaches a
+path through its owning step. A path lives at `workflow.steps[i].paths`, and no separate
+collection holds one.
+
+It returns the next focus, and it is total over a deep-partial draft. `packages/web/src/areas/app/screens/inboxLogic.ts` sets that
 convention. The tests need not cover the SVG rendering or the pointer-event
 wiring.
 
@@ -520,8 +652,8 @@ wiring.
 
 #### Scenario: The traversal step holds without rendering
 
-- **WHEN** a test gives the traversal step a focus, a key, a draft's steps and
-  its groups
+- **WHEN** a test gives the traversal step a focus, a key, a draft's steps, its
+  groups and its initial step
 - **THEN** it returns the next focus, naming the step, the path, the group or
   the `<svg>` root that takes it
 - **AND** the test needs no DOM or canvas rendering

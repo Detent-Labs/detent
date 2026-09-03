@@ -1,5 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import Panzoom, { type PanzoomObject } from "@panzoom/panzoom";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useDraft } from "../draft/store";
 import { updateInDraftArray } from "../draft/draft-array-crud";
 import { newStep } from "../draft/createStep";
@@ -29,6 +30,7 @@ import { drawnBox, hiddenStepIds, anchorBoxFor, type StepGroup } from "./groups"
 import { computeFit, MIN_SCALE, MAX_SCALE, FIT_GUTTER, type Fit } from "./fit";
 import { resolveDropGesture } from "./dropGesture";
 import { inlineRenamePatch } from "./inlineRename";
+import { nextFocus, entryFocus, type ArrowKey, type Focus } from "./traversal";
 import { nextStepKey } from "../panels/stepsPanelLogic.js";
 import { buildOperands, guardEdgeLabel } from "../panels/shared/conditionLogic";
 
@@ -37,6 +39,29 @@ const HANDLE_RADIUS = 7;
  * one control shape, and the connect handle owns it (design.md). */
 const WAYPOINT_HANDLE = 10;
 const REJECT_MESSAGE_MS = 4000;
+/** The disclosure button's side, in user units. It sits inside the group's own
+ * 20-unit margin, so no member node reaches it. */
+const DISCLOSURE_SIZE = 20;
+/** How far the button's focus indicator reaches past its own border box. The
+ * shell's `:focus-visible` token paints a 2px outline at a 2px offset, so the
+ * indicator occupies from 2 to 4 units beyond that box on every side. */
+const DISCLOSURE_OUTLINE_CLEARANCE = 4;
+/** The `<foreignObject>` that hosts the button: the button plus that clearance
+ * on each side. A host cut to the button's own size clips the outline away
+ * whole, because `<foreignObject>` clips to its rect and an outline paints
+ * outside the border box. */
+const DISCLOSURE_HOST = DISCLOSURE_SIZE + 2 * DISCLOSURE_OUTLINE_CLEARANCE;
+/** How far the focus ring stands outside the node on each side. Its 2px stroke
+ * paints centered on that edge, so the gap reads 2px. */
+const FOCUS_RING_OFFSET = 3;
+const ARROW_KEYS: ArrowKey[] = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+
+/** The `<g>` holding a drawn group's member nodes. Both disclosure controls —
+ * the canvas's own and the selection toolbar's — name it in `aria-controls`,
+ * so the id lives here rather than in either caller. */
+export function groupMembersDomId(groupId: string): string {
+  return `canvas-group-members-${groupId}`;
+}
 
 interface Props {
   layout: Record<string, unknown>;
@@ -67,6 +92,10 @@ interface Props {
   /** Presentation only, in the same `layout` blob (design.md). A group never
    * reaches `ProcessBody`, so the engine cannot see one. */
   groups: StepGroup[];
+  /** The one writer for every group edit. A box's own disclosure button flips
+   * `collapsed` through it, the way the selection toolbar's collapse control
+   * already does. */
+  onGroupsChange: (groups: StepGroup[]) => void;
   /** The path under the pointer during an edit-rail drag (design.md: "The
    * rail reports its moving position"), or `undefined` outside a drag or
    * over an `end` step. Drawn as the drop-target state on the matching edge
@@ -109,6 +138,7 @@ export function CanvasView({
   waypoints,
   onWaypointsChange,
   groups,
+  onGroupsChange,
   insertTargetPathId,
 }: Props) {
   const { draft, mutate, contentLocale, loadedChildren } = useDraft();
@@ -342,6 +372,63 @@ export function CanvasView({
   // The step node whose label is being renamed inline (task 3.8), and the
   // text field's live value. Neither writes the draft until commit.
   const [renaming, setRenaming] = useState<{ stepId: string; value: string } | null>(null);
+  // Where the keyboard sits. One element inside the `<svg>` carries the roving
+  // `tabindex="0"`, and this names it. The traversal module decides every move;
+  // this component only holds the result and points the browser at it.
+  const [focus, setFocus] = useState<Focus>(() => entryFocus(steps, groups, initialStepId));
+
+  /** The element a focus names. The stop moves by attribute rather than by a
+   * ref map, so this reads the same attributes the markup already carries. */
+  const elementFor = (f: Focus): SVGElement | HTMLElement | null => {
+    const svg = svgRef.current;
+    if (!svg || f.kind === "root") return svg;
+    const selector =
+      f.kind === "step"
+        ? `.canvas-node[data-step-id="${f.stepId}"]`
+        : f.kind === "path"
+          ? `.canvas-edge-group[data-path-id="${f.pathId}"]`
+          : `.canvas-group-disclosure[data-group-id="${f.groupId}"]`;
+    return svg.querySelector<SVGElement | HTMLElement>(selector);
+  };
+
+  const moveFocus = (next: Focus) => {
+    setFocus(next);
+    // The element already stands in the DOM at `tabindex="-1"`, which
+    // `focus()` accepts; the next render hands it the stop.
+    elementFor(next)?.focus();
+  };
+
+  // A focus the canvas stops drawing — its group collapsed, its step deleted
+  // from a panel — would leave no element carrying the stop, and the canvas
+  // would drop out of the page's tab order. The DOM answers that directly.
+  // Layout, not passive, so no frame paints without a stop; keyed on the
+  // inputs that can invalidate a focus, so the re-render it causes cannot
+  // re-enter it.
+  useLayoutEffect(() => {
+    const svg = svgRef.current;
+    // An open rename takes the node's own `tabindex` away (ARIA forbids a
+    // focusable field inside a `role="button"`), and its input is the stop
+    // meanwhile.
+    if (!svg || renaming) return;
+    if (svg.tabIndex === 0 || svg.querySelector('[tabindex="0"]')) return;
+    setFocus(entryFocus(steps, groups, initialStepId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [steps, groups, hidden, renaming]);
+
+  // The rename's `<foreignObject>` unmounts on commit and on cancel, and focus
+  // would drop to `<body>`. The node takes it back, now that its own
+  // `tabindex` is on the element again.
+  const renamedStepId = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (renaming) {
+      renamedStepId.current = renaming.stepId;
+      return;
+    }
+    const stepId = renamedStepId.current;
+    renamedStepId.current = null;
+    if (stepId) elementFor({ kind: "step", stepId })?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [renaming]);
 
   const toSvgPoint = (e: { clientX: number; clientY: number }): Point => {
     const svg = svgRef.current;
@@ -558,6 +645,9 @@ export function CanvasView({
 
   const startRename = (stepId: string, currentLabel: string) => {
     setRenaming({ stepId, value: currentLabel });
+    // The roving stop follows, so the arrow keys resume from the node the
+    // rename closes back onto.
+    setFocus({ kind: "step", stepId });
   };
 
   const commitRename = () => {
@@ -652,8 +742,96 @@ export function CanvasView({
     if (e.target === svgRef.current) onSelectStep(undefined);
   };
 
-  const stepLabel = (s: (typeof steps)[number]) =>
-    s.key || resolveDraftLocalizedText(s.label, contentLocale, baseLocale) || t("steps.unnamedStep");
+  const stepLabel = (s: (typeof steps)[number] | undefined) =>
+    resolveDraftLocalizedText(s?.label, contentLocale, baseLocale) || s?.key || t("steps.unnamedStep");
+
+  /** The palette's own three words. `end` is a `terminal` flag on an ordinary
+   * task step, never a `type` of its own. */
+  const stepKind = (s: (typeof steps)[number]) =>
+    s.type === "subprocess" ? t("palette.subprocess") : s.terminal === true ? t("palette.end") : t("palette.step");
+
+  /** A step's accessible name. The base template carries the segments every
+   * step has; a stamp appends only where it applies, because an unfilled slot
+   * would print a bare comma. `outgoing` counts the paths the traversal
+   * reaches, which is the set the edge pass below drew, and it picks the
+   * template: one fixed plural announces "1 outgoing paths". */
+  const nodeName = (s: (typeof steps)[number], outgoing: number) => {
+    const parts = [
+      t(outgoing === 1 ? "canvas.nodeLabelOnePath" : "canvas.nodeLabel")
+        .replace("{label}", stepLabel(s))
+        .replace("{key}", s.key ?? "")
+        .replace("{kind}", stepKind(s))
+        .replace("{paths}", String(outgoing)),
+    ];
+    if (s.terminal === true && s.outcome) parts.push(t("canvas.nodeLabelOutcome").replace("{outcome}", s.outcome));
+    if (s.id !== undefined && s.id === initialStepId) parts.push(t("canvas.nodeLabelInitial"));
+    return parts.join(", ");
+  };
+
+  /** A path's accessible name. The guard is a slot rather than an appended
+   * segment: every path either carries one or says it carries none. The
+   * trigger slot takes the schema's own enum value, which this catalog leaves
+   * untranslated on purpose.
+   *
+   * `guardText` is the readable guard the edge label already draws, and the
+   * caller passes it because the operands it rests on resolve per step. A
+   * reader would otherwise hear the CEL source, `data.amount > 1000`, while
+   * the readable string sits beside it under `aria-hidden`. `guardEdgeLabel`
+   * returns the source itself where nothing resolves, so the fallback holds. */
+  const pathName = (
+    path: NonNullable<(typeof steps)[number]["paths"]>[number],
+    source: (typeof steps)[number],
+    guardText: string | undefined,
+  ) => {
+    const parts = [
+      t("canvas.pathLabel")
+        .replace("{label}", path.label ?? "")
+        .replace("{source}", stepLabel(source))
+        .replace("{target}", stepLabel(steps.find((s) => s.id === path.to)))
+        .replace("{trigger}", path.trigger ?? t("canvas.pathLabelNoTrigger"))
+        .replace("{guard}", guardText ?? t("canvas.pathLabelNoGuard")),
+    ];
+    if (path.trigger === "automatic" && path.priority !== undefined) {
+      parts.push(t("canvas.pathLabelPriority").replace("{priority}", String(path.priority)));
+    }
+    return parts.join(", ");
+  };
+
+  /**
+   * The canvas's own keyboard. It binds on the `<svg>` rather than on
+   * `.canvas-wrap`, which would also catch the toolbar's buttons.
+   */
+  const onCanvasKeyDown = (e: React.KeyboardEvent<SVGSVGElement>) => {
+    // The inline rename owns Enter, Escape and its own caret movement. A
+    // disclosure button is no text field, so an arrow key and Escape still
+    // reach this handler from one.
+    if ((e.target as Element).closest("input, textarea, [contenteditable]")) return;
+    if (e.key === "Escape") {
+      // The stop moves with the focus. Without that move Tab walks straight
+      // back in, since the roving `0` would still sit inside the `<svg>`.
+      setFocus({ kind: "root" });
+      svgRef.current?.focus();
+      return;
+    }
+    if (e.key === "Enter") {
+      // A group's disclosure is a real button and answers Enter itself.
+      if (focus.kind === "step") onSelectStep(focus.stepId);
+      else if (focus.kind === "path") {
+        const owner = steps.find((s) => s.paths?.some((p) => p.id === focus.pathId));
+        if (owner?.id) onSelectStep(owner.id, focus.pathId);
+      }
+      return;
+    }
+    const arrow = ARROW_KEYS.find((k) => k === e.key);
+    if (!arrow) return;
+    // Without this an arrow both moves canvas focus and scrolls the page.
+    e.preventDefault();
+    moveFocus(nextFocus(focus, arrow, steps, groups, initialStepId));
+  };
+
+  const toggleGroup = (groupId: string) => {
+    onGroupsChange(groups.map((g) => (g.id === groupId ? { ...g, collapsed: !g.collapsed } : g)));
+  };
 
   // Guard labels render in their own pass, after every node (below), instead
   // of inline in the edge that computes them: `.canvas-node-rect` is opaque,
@@ -668,6 +846,146 @@ export function CanvasView({
   // Drawing after the guard labels also keeps a handle grabbable where the
   // two share the route's midpoint.
   const waypointHandles: Array<{ key: string; x: number; y: number; pathId: string; index?: number; insertAt?: number }> = [];
+
+  // The disclosure buttons ride the same late pass, and they need it most: a
+  // guard label is a 220-wide `<foreignObject>` carrying its own pointer
+  // handler, and it lands wherever a route midpoint lands, so it can cover a
+  // box corner. Collected in the group pass, drawn after every other one.
+  const disclosures: Array<{ group: StepGroup; x: number; y: number }> = [];
+
+  // How many outgoing paths each step reaches, filled by the edge pass below
+  // and read by the node pass after it. The edge pass is the canvas's own
+  // decision about which paths draw, and the traversal walks exactly that set,
+  // so counting what drew states no second rule.
+  const outgoingCount = new Map<string, number>();
+
+  /** One step's node. Two sites call it: the flat pass, for a step no drawn
+   * group holds, and the members `<g>` of a group that draws a box. */
+  const renderNode = (step: (typeof steps)[number]) => {
+    if (!step.id) return null;
+    if (hidden.has(step.id)) return null;
+    const pos = positionOf(step.id);
+    const draggedFrom = nodeDrag?.startPos[step.id];
+    // The preview rounds exactly as the release does, so the node under
+    // the pointer is the node the author gets. Drawing the raw point
+    // here would make it jump at release. Every member of the moving set
+    // previews, not only the node under the pointer.
+    const previewed = draggedFrom
+      ? snapToGrid({
+          x: draggedFrom.x + dragDelta(nodeDrag!.startPointer, nodeDrag!.current).x,
+          y: draggedFrom.y + dragDelta(nodeDrag!.startPointer, nodeDrag!.current).y,
+        })
+      : pos;
+    const x = previewed.x;
+    const y = previewed.y;
+    const isSelected = selectedStepIds.includes(step.id);
+    const isInitial = initialStepId === step.id;
+    const isTerminal = step.terminal === true;
+    const isRenaming = renaming?.stepId === step.id;
+    const label = stepLabel(step);
+
+    return (
+      <g
+        key={step.id}
+        data-step-id={step.id}
+        transform={`translate(${x}, ${y})`}
+        className="canvas-node panzoom-exclude"
+        // All three drop while the rename is open: ARIA forbids a focusable
+        // field inside a `role="button"`, and the field is that node's own.
+        role={isRenaming ? undefined : "button"}
+        tabIndex={isRenaming ? undefined : focus.kind === "step" && focus.stepId === step.id ? 0 : -1}
+        aria-label={isRenaming ? undefined : nodeName(step, outgoingCount.get(step.id) ?? 0)}
+        onPointerDown={(e) => onNodePointerDown(e, step.id as string)}
+        onPointerUp={(e) => onNodePointerUp(e, step.id as string)}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          // The resolved label alone, with no fallback: a step carrying no
+          // entry for the chosen locale opens an empty field, so the author
+          // writes a translation rather than committing a copy of the key.
+          startRename(step.id as string, resolveDraftLocalizedText(step.label, contentLocale, baseLocale) ?? "");
+        }}
+      >
+        {isInitial && (
+          <line x1={-24} y1={NODE_HEIGHT / 2} x2={0} y2={NODE_HEIGHT / 2} className="canvas-initial-arrow" markerEnd="url(#canvas-arrow)" />
+        )}
+        <rect
+          width={NODE_WIDTH}
+          height={NODE_HEIGHT}
+          rx={0}
+          className={isSelected ? "canvas-node-rect canvas-node-selected" : "canvas-node-rect"}
+        />
+        {step.type === "subprocess" && (
+          // The doubled rule BPMN draws on a call activity. It sits before
+          // the label, the key, the stamps and the connect handle, so the
+          // handle's own circle covers the 3px it overlaps on the right.
+          <rect x={4} y={4} width={NODE_WIDTH - 8} height={NODE_HEIGHT - 8} rx={0} className="canvas-node-subprocess" />
+        )}
+        {isRenaming ? (
+          <foreignObject x={6} y={14} width={NODE_WIDTH - 12} height={22} className="panzoom-exclude">
+            <input
+              // eslint-disable-next-line jsx-a11y/no-autofocus
+              autoFocus
+              aria-label={t("stepSections.renameLabel")}
+              className="canvas-rename-input"
+              value={renaming.value}
+              onChange={(e) => setRenaming({ stepId: step.id as string, value: e.target.value })}
+              onBlur={commitRename}
+              onPointerDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitRename();
+                else if (e.key === "Escape") setRenaming(null);
+              }}
+            />
+          </foreignObject>
+        ) : (
+          <text x={10} y={24} className="canvas-node-label">
+            {label}
+          </text>
+        )}
+        {/* The key draws only where the label line does not already print it.
+            A step whose label resolves to nothing falls back to that key, and
+            one value must not appear on both lines. */}
+        {step.key && step.key !== label && (
+          <text x={10} y={44} className="canvas-node-key">
+            {step.key}
+          </text>
+        )}
+        {isTerminal && (
+          <g transform={`translate(${NODE_WIDTH - 22}, -12) rotate(-8)`} className="canvas-terminal-stamp">
+            <circle r={16} />
+            <text y={4}>{(step.outcome ?? "").slice(0, 4) || "•"}</text>
+          </g>
+        )}
+        {isInitial && (
+          <g transform="translate(22, -12)" className="canvas-initial-stamp">
+            <circle r={16} />
+            <text y={4}>{t("canvas.initialStamp")}</text>
+          </g>
+        )}
+        <circle
+          cx={NODE_WIDTH}
+          cy={NODE_HEIGHT / 2}
+          r={HANDLE_RADIUS}
+          className={isTerminal ? "canvas-connect-handle canvas-connect-handle-terminal" : "canvas-connect-handle"}
+          onPointerDown={(e) => onHandlePointerDown(e, step.id as string)}
+          onPointerUp={onHandlePointerUp}
+        />
+        {/* Last, so nothing the node draws paints over it. A CSS outline does
+            not follow an SVG shape, so the ring is an element; the stroke keeps
+            its 2px under the canvas zoom, while the offset scales with the
+            node, which is what makes it hug the shape. */}
+        <rect
+          className="canvas-node-focus-ring"
+          x={-FOCUS_RING_OFFSET}
+          y={-FOCUS_RING_OFFSET}
+          width={NODE_WIDTH + FOCUS_RING_OFFSET * 2}
+          height={NODE_HEIGHT + FOCUS_RING_OFFSET * 2}
+          rx={0}
+          vectorEffect="non-scaling-stroke"
+        />
+      </g>
+    );
+  };
 
   return (
     <div
@@ -699,6 +1017,16 @@ export function CanvasView({
       <svg
         ref={svgRef}
         className="canvas-svg"
+        // `application` is load-bearing, not cosmetic: a screen reader's
+        // browse mode otherwise consumes an arrow key before this handler
+        // sees it. The price is that every element inside must be a named
+        // control, which each node, path and disclosure now is.
+        role="application"
+        aria-label={t("canvas.svgLabel")}
+        // `-1` still answers the `focus()` call Escape makes; the root takes
+        // the roving stop only once a focus names it.
+        tabIndex={focus.kind === "root" ? 0 : -1}
+        onKeyDown={onCanvasKeyDown}
         onPointerMove={(e) => {
           onNodePointerMove(e);
           onHandlePointerMove(e);
@@ -722,6 +1050,15 @@ export function CanvasView({
           const delta = dragging ? dragDelta(groupDrag.startPointer, groupDrag.current) : { x: 0, y: 0 };
           const moved = dragging ? snapToGrid({ x: box.x + delta.x, y: box.y + delta.y }) : box;
           const members = group.stepIds.length;
+          // The drag preview offset rides along, so the button follows a group
+          // the author is dragging. The point is the host's corner, not the
+          // button's: the button sits inset by the clearance below, which puts
+          // it back at `box.width - DISCLOSURE_SIZE`.
+          disclosures.push({
+            group,
+            x: moved.x + box.width - DISCLOSURE_SIZE - DISCLOSURE_OUTLINE_CLEARANCE,
+            y: moved.y + box.height - DISCLOSURE_SIZE - DISCLOSURE_OUTLINE_CLEARANCE,
+          });
           return (
             <g
               key={group.id}
@@ -788,7 +1125,11 @@ export function CanvasView({
             const automaticDefault = path.trigger === "automatic" && path.guard === undefined;
             const isSelected = path.id !== undefined && path.id === selectedPathId;
             const guardSrc = path.guard?.src;
-            const guardLabel = automaticGuarded && guardSrc ? guardEdgeLabel(guardSrc, operands) : undefined;
+            // The readable guard serves both the drawn label and the path's
+            // accessible name, so it resolves once for either. Only an
+            // automatic guarded path draws it.
+            const guardText = guardSrc ? guardEdgeLabel(guardSrc, operands) : undefined;
+            const guardLabel = automaticGuarded ? guardText : undefined;
             if (guardLabel) {
               // Cap the label to the free space on the segment its midpoint
               // actually falls on, so it never needs to spill onto a
@@ -829,17 +1170,31 @@ export function CanvasView({
               });
             }
             const isInsertTarget = path.id !== undefined && path.id === insertTargetPathId;
+            // A path with no id draws, but nothing can reference it, so the
+            // traversal never reaches it and it never joins a fan count.
+            if (path.id !== undefined) {
+              outgoingCount.set(step.id as string, (outgoingCount.get(step.id as string) ?? 0) + 1);
+            }
             return (
               <g
                 key={path.id ?? `${step.id}-${pathIndex}`}
                 className={`canvas-edge-group panzoom-exclude${isSelected ? " canvas-edge-group-selected" : ""}${isInsertTarget ? " canvas-edge-insert-target" : ""}`}
                 data-path-id={path.id}
                 data-step-id={path.id !== undefined ? step.id : undefined}
+                role="button"
+                tabIndex={focus.kind === "path" && focus.pathId === path.id ? 0 : -1}
+                aria-label={pathName(path, step, guardText)}
                 onPointerUp={(e) => {
                   e.stopPropagation();
                   onSelectStep(step.id, path.id);
                 }}
               >
+                {/* The halo, not a ring: a stroke holds no offset, so a line's
+                    indicator is a band around the shape. It shares the edge's
+                    own `d` and draws before it, and the 1.5px edge paints over
+                    its middle — a manual path keeps its dash, and about 2px of
+                    accent reads on each side. */}
+                <path d={d} className="canvas-edge-focus-halo" vectorEffect="non-scaling-stroke" />
                 <path
                   d={d}
                   className={path.trigger === "manual" ? "canvas-edge canvas-edge-manual" : "canvas-edge canvas-edge-automatic"}
@@ -881,103 +1236,25 @@ export function CanvasView({
             );
           })()}
 
-        {steps.map((step) => {
-          if (!step.id) return null;
-          if (hidden.has(step.id)) return null;
-          const pos = positionOf(step.id);
-          const draggedFrom = nodeDrag?.startPos[step.id];
-          // The preview rounds exactly as the release does, so the node under
-          // the pointer is the node the author gets. Drawing the raw point
-          // here would make it jump at release. Every member of the moving set
-          // previews, not only the node under the pointer.
-          const previewed = draggedFrom
-            ? snapToGrid({
-                x: draggedFrom.x + dragDelta(nodeDrag!.startPointer, nodeDrag!.current).x,
-                y: draggedFrom.y + dragDelta(nodeDrag!.startPointer, nodeDrag!.current).y,
-              })
-            : pos;
-          const x = previewed.x;
-          const y = previewed.y;
-          const isSelected = selectedStepIds.includes(step.id);
-          const isInitial = initialStepId === step.id;
-          const isTerminal = step.terminal === true;
-          const isRenaming = renaming?.stepId === step.id;
-
-          return (
-            <g
-              key={step.id}
-              transform={`translate(${x}, ${y})`}
-              className="canvas-node panzoom-exclude"
-              onPointerDown={(e) => onNodePointerDown(e, step.id as string)}
-              onPointerUp={(e) => onNodePointerUp(e, step.id as string)}
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                startRename(step.id as string, stepLabel(step));
-              }}
-            >
-              {isInitial && (
-                <line x1={-24} y1={NODE_HEIGHT / 2} x2={0} y2={NODE_HEIGHT / 2} className="canvas-initial-arrow" markerEnd="url(#canvas-arrow)" />
-              )}
-              <rect
-                width={NODE_WIDTH}
-                height={NODE_HEIGHT}
-                rx={2}
-                className={isSelected ? "canvas-node-rect canvas-node-selected" : "canvas-node-rect"}
-              />
-              {step.type === "subprocess" && (
-                // The doubled rule BPMN draws on a call activity. It sits before
-                // the label, the key, the stamps and the connect handle, so the
-                // handle's own circle covers the 3px it overlaps on the right.
-                <rect x={4} y={4} width={NODE_WIDTH - 8} height={NODE_HEIGHT - 8} rx={0} className="canvas-node-subprocess" />
-              )}
-              {isRenaming ? (
-                <foreignObject x={6} y={14} width={NODE_WIDTH - 12} height={22} className="panzoom-exclude">
-                  <input
-                    // eslint-disable-next-line jsx-a11y/no-autofocus
-                    autoFocus
-                    aria-label={t("stepSections.renameLabel")}
-                    className="canvas-rename-input"
-                    value={renaming.value}
-                    onChange={(e) => setRenaming({ stepId: step.id as string, value: e.target.value })}
-                    onBlur={commitRename}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitRename();
-                      else if (e.key === "Escape") setRenaming(null);
-                    }}
-                  />
-                </foreignObject>
-              ) : (
-                <text x={10} y={24} className="canvas-node-label">
-                  {stepLabel(step)}
-                </text>
-              )}
-              <text x={10} y={44} className="canvas-node-key">
-                {step.key ?? ""}
-              </text>
-              {isTerminal && (
-                <g transform={`translate(${NODE_WIDTH - 22}, -12) rotate(-8)`} className="canvas-terminal-stamp">
-                  <circle r={16} />
-                  <text y={4}>{(step.outcome ?? "").slice(0, 4) || "•"}</text>
-                </g>
-              )}
-              {isInitial && (
-                <g transform="translate(22, -12)" className="canvas-initial-stamp">
-                  <circle r={16} />
-                  <text y={4}>{t("canvas.initialStamp")}</text>
-                </g>
-              )}
-              <circle
-                cx={NODE_WIDTH}
-                cy={NODE_HEIGHT / 2}
-                r={HANDLE_RADIUS}
-                className={isTerminal ? "canvas-connect-handle canvas-connect-handle-terminal" : "canvas-connect-handle"}
-                onPointerDown={(e) => onHandlePointerDown(e, step.id as string)}
-                onPointerUp={onHandlePointerUp}
-              />
-            </g>
-          );
-        })}
+        {/* Each drawn group's members sit inside one `<g>`, the element both
+            disclosure controls name in `aria-controls`. The wrapper renders in
+            both states; a collapsed group's holds nothing, so the attribute
+            never points at an element that is not there. */}
+        {(() => {
+          const emitted = new Set<string>();
+          return steps.map((step) => {
+            if (!step.id) return null;
+            const boxed = groupBoxes.find(({ group }) => group.stepIds.includes(step.id as string));
+            if (!boxed) return renderNode(step);
+            if (emitted.has(boxed.group.id)) return null;
+            emitted.add(boxed.group.id);
+            return (
+              <g key={boxed.group.id} id={groupMembersDomId(boxed.group.id)}>
+                {steps.filter((s) => s.id !== undefined && boxed.group.stepIds.includes(s.id)).map(renderNode)}
+              </g>
+            );
+          });
+        })()}
 
         {guardLabels.map((label) => (
           <foreignObject
@@ -992,6 +1269,10 @@ export function CanvasView({
           >
             <div
               className="canvas-edge-guard-label"
+              // Out of the accessibility tree: the path itself now carries the
+              // role, the name and the tab stop, and this only duplicates a
+              // pointer route the edge group already offers.
+              aria-hidden="true"
               title={label.text}
               onPointerUp={(e) => {
                 e.stopPropagation();
@@ -1032,6 +1313,48 @@ export function CanvasView({
             />
           );
         })}
+
+        {/* Last of all, so no route, node, guard label or waypoint handle can
+            take a press meant for a disclosure. A guard label is a 220-wide
+            `<foreignObject>` carrying its own pointer handler, and it lands
+            wherever a route midpoint lands. Each button is a sibling of its box
+            `<g>`, so the group's drag handlers never see the press either. */}
+        {disclosures.map(({ group, x, y }) => (
+          <foreignObject
+            key={group.id}
+            x={x}
+            y={y}
+            width={DISCLOSURE_HOST}
+            height={DISCLOSURE_HOST}
+            // The host stands 4 units clear of the button on every side, and
+            // that band lies over a member node's corner at one end and over
+            // empty canvas at the other. `canvas-group-disclosure-host` makes
+            // it inert, so only the button's own 20 units take a press.
+            className="canvas-group-disclosure-host panzoom-exclude"
+          >
+            <button
+              type="button"
+              className="canvas-group-disclosure"
+              data-group-id={group.id}
+              tabIndex={focus.kind === "group" && focus.groupId === group.id ? 0 : -1}
+              aria-expanded={group.collapsed !== true}
+              aria-controls={groupMembersDomId(group.id)}
+              aria-label={t("canvas.groupDisclosure").replace("{group}", group.name)}
+              // The press stops here rather than reaching the `<svg>`'s own
+              // handlers, the rule the rename input already follows.
+              // `panzoom-exclude` above is what keeps Panzoom's native
+              // down-handler and the marquee's capture handler off it.
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => toggleGroup(group.id)}
+            >
+              {group.collapsed ? (
+                <ChevronRight size={18} strokeWidth={1.75} aria-hidden="true" />
+              ) : (
+                <ChevronDown size={18} strokeWidth={1.75} aria-hidden="true" />
+              )}
+            </button>
+          </foreignObject>
+        ))}
 
       </svg>
       {marquee &&

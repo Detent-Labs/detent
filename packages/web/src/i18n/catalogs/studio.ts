@@ -381,6 +381,28 @@ export const en = {
   "canvas.groupUngroup": "Ungroup",
   "canvas.groupStepCount": "steps",
 
+  // The accessible names the canvas composes for its nodes, its paths and
+  // its `<svg>` root. Each `{slot}` is filled with `.replace()`. The two
+  // base templates carry only the segments every element has; a segment that
+  // is sometimes absent takes a key of its own, because filling an unused
+  // slot with an empty string prints "Capture, capture, Step, , 2 outgoing
+  // paths". The kind word comes from `palette.step`, `palette.subprocess` or
+  // `palette.end`, and the guard slot takes the readable guard the edge label
+  // draws or, for a guardless path, `canvas.pathLabelNoGuard`.
+  //
+  // The fan count picks between two node templates, because a fixed plural
+  // announces "1 outgoing paths" on every single-path step.
+  "canvas.nodeLabel": "{label}, {key}, {kind}, {paths} outgoing paths",
+  "canvas.nodeLabelOnePath": "{label}, {key}, {kind}, {paths} outgoing path",
+  "canvas.nodeLabelOutcome": "outcome {outcome}",
+  "canvas.nodeLabelInitial": "entry point",
+  "canvas.pathLabel": "{label}, from {source} to {target}, {trigger}, {guard}",
+  "canvas.pathLabelPriority": "priority {priority}",
+  "canvas.pathLabelNoGuard": "no guard",
+  "canvas.pathLabelNoTrigger": "trigger not set",
+  "canvas.groupDisclosure": "Steps in {group}",
+  "canvas.svgLabel": "Process graph",
+
   "dock.region": "Editor dock",
   "dock.expand": "Open the dock",
   "dock.collapse": "Close the dock",

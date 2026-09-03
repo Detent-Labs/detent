@@ -545,6 +545,87 @@
   fill: var(--color-text-muted);
 }
 
+/* The focus indicator the design language fixes at 2px accent, 2px offset. A
+   CSS outline does not follow an SVG shape, so the node draws a rect and the
+   path draws a halo, and each stays hidden until its owner takes keyboard
+   focus. The state comes from `:focus-visible`, the attribute the DOM already
+   carries, never from a class the component sets.
+
+   `display: none` rather than `visibility: hidden`: the fit computation reads
+   `getBBox()`, which counts a hidden element and would frame the canvas around
+   rings nobody can see. */
+.canvas-node-focus-ring,
+.canvas-edge-focus-halo {
+  display: none;
+  fill: none;
+  stroke: var(--color-accent);
+  pointer-events: none;
+}
+
+/* Dashed, and that dash is what separates focus from selection. Both draw the
+   same 2px accent, and the ring's 3-unit offset is the only gap between them.
+   That offset scales with the node while the stroke does not, so at the 0.612
+   default fit the gap renders 1.84px and the two bands read as one thicker
+   band. The dash costs no width and no colour, and it holds at every zoom:
+   `non-scaling-stroke` measures the pattern in screen pixels too. */
+.canvas-node-focus-ring {
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+}
+
+/* Six, not two: a stroke holds no offset, so a line's indicator is a band
+   around the shape rather than a ring at a gap. The 1.5px edge paints over the
+   middle, which leaves the dash of a manual path intact and about 2px of
+   accent reading on each side. A coincident 2px stroke would recolor the edge
+   instead, which is what selection already looks like. */
+.canvas-edge-focus-halo {
+  stroke-width: 6;
+}
+
+.canvas-node:focus-visible .canvas-node-focus-ring,
+.canvas-edge-group:focus-visible .canvas-edge-focus-halo {
+  display: inline;
+}
+
+/* The bare `:focus-visible` rule in the shell's tokens gives every focused
+   element a 2px accent outline, and both Chrome and Firefox paint that on an
+   SVG element as a bounding box. Without this a focused node draws two rings.
+   The `<svg>` root and the disclosure button keep that outline: neither draws
+   a ring element, so it is the only indicator each has. */
+.canvas-node:focus-visible,
+.canvas-edge-group:focus-visible {
+  outline: none;
+}
+
+/* The group box's own disclosure, at the box's bottom-right corner. The button
+   reset strips the border, so the chevron is the whole affordance.
+
+   It measures 20 units and its `<foreignObject>` host measures 28, so the
+   `margin` centers the button and leaves 4 units clear on every side. That band
+   is what the focus outline needs: the shell's `:focus-visible` token paints
+   2px at a 2px offset, an outline paints outside the border box, and the host
+   clips to its own rect. A host cut to the button drew no indicator at all. */
+.canvas-group-disclosure-host {
+  pointer-events: none;
+}
+
+.canvas-group-disclosure {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin: 4px;
+  padding: 0;
+  background: none;
+  color: var(--color-text-muted);
+  pointer-events: auto;
+}
+
+.canvas-group-disclosure:hover {
+  color: var(--color-text);
+}
+
 .canvas-connect-handle {
   fill: var(--color-accent);
   cursor: crosshair;
