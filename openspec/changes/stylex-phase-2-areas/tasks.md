@@ -19,11 +19,12 @@
 ## 2. `shell.css` and its six consumer files
 
 - [ ] 2.1 Add a `stylex.create` block to `Chrome.tsx` covering the account
-  group, the account button, the account menu and every menu row, reading
+  group and the account menu (every menu row included), reading
   `form-ui/tokens.stylex`. Leave the outer `className="shell"` wrapper
   `<div>` untouched: `.shell` and `.shell > *` stay literal (design.md
-  D10). Verify: `bun run typecheck` passes with no reference to an
-  undeclared token.
+  D10). The account button also needs no change: `.shell-account-button`
+  has no rule of its own (design.md D7). Verify: `bun run typecheck`
+  passes with no reference to an undeclared token.
 - [ ] 2.2 Give `.shell-menu:popover-open`'s rule a StyleX conditional
   value. Key it on the literal `:popover-open` pseudo-class, on the
   property that toggles the menu's `display` (design.md D2). Verify:
@@ -34,9 +35,8 @@
   fallback instead. Report back before any later task in this group
   assumes the conditional value works.
 - [ ] 2.3 Apply the new styles at each JSX call site in `Chrome.tsx`. The
-  account button keeps its literal `"btn btn-secondary"` prefix. It
-  composes with the new compiled style through string concatenation, not
-  `stylex.props` (design.md D7). Verify:
+  account button's own `className="btn btn-secondary shell-account-button"`
+  stays untouched (design.md D7). Verify:
   `git grep -c 'className="shell-account\|className="shell-menu' packages/web/src/shell/Chrome.tsx`
   returns 0 for every class this task migrates. The literal `.btn`-family
   substrings legitimately remain.
@@ -105,16 +105,24 @@
   no longer need. Verify:
   `git grep -c 'className="app-stamp\|className="app-task' packages/web/src/areas/app/`
   returns 0.
-- [ ] 3.5 Delete the migrated rules from `app.css`. Verify: `bun run build`
-  succeeds.
+- [ ] 3.5 Delete the migrated rules from `app.css`. Leave only its
+  reduced-motion media query, the universal-selector reset design.md
+  D11 defers. Verify: `bun run build` succeeds.
+
+  Then grep the file for `^\.`; it shows zero rule blocks outside that
+  one media query.
 
 ## 4. `areas/admin/app.css`
 
 - [ ] 4.1 Add `stylex.create` blocks to every component under
   `packages/web/src/areas/admin/` that carries a `className` referencing
   `app.css`, reading `form-ui/tokens.stylex`. This is the largest group:
-  198 call sites across 11 screen files. Verify: `bun run typecheck`
-  passes.
+  198 call sites across 11 screen files.
+
+  `.admin-field` has two separate declarations, at two different lines.
+  Combine both sets of properties into one `admin-field` style (design.md
+  D12). Verify: `bun run typecheck` passes. The built CSS carries every
+  property both source rules declared for `.admin-field`.
 - [ ] 4.2 Replace every `admin-badge-${status}` construction
   (`OutboxScreen.tsx`, `InstanceScreen.tsx`, `InstancesScreen.tsx`,
   `DataListScreen.tsx`, `UsersScreen.tsx`) with a typed lookup instead.
@@ -122,16 +130,21 @@
   named neutral style (design.md D3). Verify: `bun run typecheck` passes
   on every lookup's key type.
 - [ ] 4.3 Apply every other admin-area style (tables, rows, chips, dark
-  mode, reduced motion) at its JSX call site. Verify: `bun run typecheck`
-  passes.
+  mode) at its JSX call site. The `prefers-reduced-motion` block stays
+  literal (design.md D11); it has no call site to apply. Verify: `bun
+  run typecheck` passes.
 - [ ] 4.4 Grep the whole `packages/web/src/areas/admin/` directory for
   every literal class prefix this group migrated (`admin-badge-`,
   `admin-table`, `admin-row`, and the rest task 4.1-4.3 named). Verify:
   zero matches. This is the exit signal for this group, not a green build
   alone. No test in this area asserts on a class name. A stale literal
   here has no other safety net (design.md's Risks).
-- [ ] 4.5 Delete the migrated rules from `app.css`. Verify: `bun run build`
-  succeeds.
+- [ ] 4.5 Delete the migrated rules from `app.css`. Leave only its
+  reduced-motion media query, the universal-selector reset design.md
+  D11 defers. Verify: `bun run build` succeeds.
+
+  Then grep the file for `^\.`; it shows zero rule blocks outside that
+  one media query.
 
 ## 5. `areas/reporting/app.css`
 
@@ -149,20 +162,31 @@
   instead. Key it on the view's known kind values, and fall back to a
   named neutral style (design.md D3). Verify: `bun run typecheck` passes
   on the lookup's key type.
-- [ ] 5.4 Delete every `className="rep-*"` string this group's components
-  no longer need. Verify:
-  `git grep -c 'className="rep-rule\|className="rep-cell' packages/web/src/areas/reporting/`
-  returns 0.
-- [ ] 5.5 Delete the migrated rules from `app.css`. Verify: `bun run build`
-  succeeds.
+- [ ] 5.4 Two call sites use `.rep-error`/`.rep-error:has(.rep-stamp)`
+  today: `components.tsx`'s `ErrorNote`, and `root.tsx`'s validation
+  message. Replace both with two named styles, chosen in code by
+  whether that call site pairs a stamp. This is the same two-way choice
+  phase 1's D2 already established. It needs no `:has()` equivalent:
+  each call site already knows whether it renders a stamp. Verify: `bun
+  run typecheck` passes.
+- [ ] 5.5 Delete every `className="rep-*"` string this group's
+  components no longer need. Verify:
+  `git grep -c 'className="rep-rule\|className="rep-cell\|className="rep-error'
+  packages/web/src/areas/reporting/` returns 0.
+- [ ] 5.6 Delete the migrated rules from `app.css`. Leave only its
+  reduced-motion media query, the universal-selector reset design.md
+  D11 defers. Verify: `bun run build` succeeds.
+
+  Then grep the file for `^\.`; it shows zero rule blocks outside that
+  one media query.
 
 ## 6. Cleanup
 
-- [ ] 6.1 Verify: `git grep -c '^\.'` over the four migrated stylesheets
-  shows only the rule blocks this change defers. A
-  `prefers-color-scheme`/`prefers-reduced-motion` media block stays only
-  if a component under it is out of scope. A media block wrapping only
-  migrated rules goes with them.
+- [ ] 6.1 Verify each area's own cleanup task (2.9, 3.5, 4.5, 5.6)
+  already confirmed its file's rule count. This task re-runs the same
+  grep once more. It covers all four stylesheets together, one final
+  aggregate check. shell.css shows 2 (D10). Each area's own file shows 1
+  (D11).
 - [ ] 6.2 Verify: `tokens.css`'s `.btn`/`.btn-primary`/`.btn-destructive`/
   `.btn-secondary`/`.btn-ghost`/`.app-back` rules are byte-identical to
   `main`. This change does not touch them (design.md D1).

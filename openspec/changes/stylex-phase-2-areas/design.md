@@ -189,21 +189,26 @@ never throw, mirroring `defaultMarker`'s own identity-no-op shape. Task
 1.2 makes this change before any component needs it, so the risk surfaces
 at the stub, not mid-migration.
 
-**D7. A literal `.btn`-family class composes with a compiled style through
-plain string concatenation, not `stylex.props`.** `Chrome.tsx`'s account
-button carries `className="btn btn-secondary shell-account-button"`
-today. D1 keeps `.btn`/`.btn-secondary` literal. `shell-account-button`
-becomes a compiled style. `stylex.props()` composes style objects, not a
-literal string plus a style object.
+**D7. `Chrome.tsx`'s account button needs no change.** It carries
+`className="btn btn-secondary shell-account-button"` today. `shell.css`
+never declared a `.shell-account-button` rule. That class carries no
+style, and never did. D1 keeps `.btn`/`.btn-secondary` literal. Nothing
+on this element migrates, so its className string stays exactly as it
+renders today.
 
-The call site therefore joins the two by hand: a literal prefix, then the
-compiled style's own className.
+This phase's own audit checked all four areas. It found no element that
+mixes a still-literal `.btn`-family class with a class this phase
+migrates.
 
-`PathButtons.tsx` already uses this shape for its own wrapper style. There
-it composes with a caller-supplied one, under phase 1's D5. This decision
-extends the same shape to a literal prefix, standing in for that second
-style object. Any other phase-2 element still carrying a `.btn`-family
-class alongside a migrating area-owned class uses this same shape.
+One may still turn up during apply. The pattern to use is already
+established: join a literal prefix and a compiled style's own className
+by hand.
+
+`stylex.props()` composes style objects, not a literal string plus one.
+`PathButtons.tsx` already uses this shape. It composes its own compiled
+wrapper style with a caller-supplied one, under phase 1's D5.
+`web-styling`'s "A shared class stays literal" requirement records the
+pattern, for this case or a later phase's.
 
 **D8. This change stays one OpenSpec change, not two.** Phase 0's own
 design.md left that open. It named phase 1's close as the point to
@@ -257,6 +262,37 @@ The two rules stay coupled: migrating one breaks the other.
 `Chrome.tsx`'s wrapper keeps its literal `className="shell"`. Both rules
 stay in `shell.css`, the same shape `web-styling`'s "Two class names
 stay literal" requirement already covers.
+
+**D11. Each area's `prefers-reduced-motion` reset stays literal, in its
+own file.** Three files end in a near-identical block: `app.css`,
+`admin/app.css` and `reporting/app.css`. Each reads `@media
+(prefers-reduced-motion: reduce) { * { ... !important } }`.
+
+All three reach every element on the page. That is the same "no single
+component owns this" shape D10 already named for `.shell > *`.
+
+`web-styling`'s own "One global stylesheet carries what the compiler
+cannot" requirement already answers where this rule lives. It reads: "A
+prefers-reduced-motion block belongs to the area whose animation it
+suppresses." It continues: "Those blocks migrate with their areas, not
+into this sheet." Migrating with the area means staying in that area's
+own stylesheet. This phase does not delete that stylesheet outright; it
+only removes what compiles. Each block stays exactly where it sits,
+literal and unhashed, one rule per area.
+
+This is not a StyleX limitation worth working around. A universal
+selector styles the whole page, not one component's own call site. No
+compiled style could express that, regardless of the property inside.
+
+**D12. `admin/app.css` declares `.admin-field` twice.** The merge
+happens in code, not by relying on cascade order. Lines 304 and 424 each
+declare non-overlapping properties under the same selector. The cascade
+merges them today.
+
+A `stylex.create` entry is one object. Task 4.1 SHALL combine both
+declarations' properties into that one `admin-field` style. It verifies
+this by checking the compiled CSS carries every property both source
+rules declared.
 
 ## Risks / Trade-offs
 
