@@ -149,32 +149,41 @@
 
 ## 5. `areas/reporting/app.css`
 
-- [ ] 5.1 Add `stylex.create` blocks to every component under
+- [x] 5.1 Add `stylex.create` blocks to every component under
   `packages/web/src/areas/reporting/` that carries a `className`
-  referencing `app.css`, reading `form-ui/tokens.stylex`. Verify:
-  `bun run typecheck` passes.
-- [ ] 5.2 Migrate `DurationRule`'s `.rep-rule`/`.rep-rule-fill`/
+  referencing `app.css`, reading `form-ui/tokens.stylex`.
+
+  `.rep-empty` and `.rep-table th[scope="row"]` each have two separate
+  declarations, at two different lines. Combine each selector's own two
+  sets of properties into one style (design.md D12). Verify: `bun run
+  typecheck` passes. The built CSS carries every property every source
+  rule declared, for both selectors.
+- [x] 5.2 Migrate `DurationRule`'s `.rep-rule`/`.rep-rule-fill`/
   `.rep-rule-fill-danger` classes to StyleX. Leave the numeric
   `style={{ width }}` exactly as it renders today (design.md D5). Verify:
   `git grep -n 'style={{ width' packages/web/src/areas/reporting/components.tsx`
   still finds the inline style, unchanged.
-- [ ] 5.3 Replace `` `rep-cell rep-cell-${display.kind}` `` and the
+- [x] 5.3 Replace `` `rep-cell rep-cell-${display.kind}` `` and the
   `rep-cell-collision` suffix (`ReportTable.tsx`) with a typed lookup
   instead. Key it on the view's known kind values, and fall back to a
   named neutral style (design.md D3). Verify: `bun run typecheck` passes
   on the lookup's key type.
-- [ ] 5.4 Two call sites use `.rep-error`/`.rep-error:has(.rep-stamp)`
-  today: `components.tsx`'s `ErrorNote`, and `root.tsx`'s validation
-  message. Replace both with two named styles, chosen in code by
-  whether that call site pairs a stamp. This is the same two-way choice
-  phase 1's D2 already established. It needs no `:has()` equivalent:
-  each call site already knows whether it renders a stamp. Verify: `bun
-  run typecheck` passes.
-- [ ] 5.5 Delete every `className="rep-*"` string this group's
+- [x] 5.4 Three call sites use `.rep-error`/`.rep-error:has(.rep-stamp)`
+  today: `components.tsx`'s `ErrorNote`, `root.tsx`'s validation message,
+  and `ReportTable.tsx`'s truncated-results banner. This group's own
+  work found the third. It pairs a stamp too, so it takes `ErrorNote`'s
+  ink tone.
+
+  Replace each with one of two named styles, chosen in code by whether
+  that call site pairs a stamp. This is the same two-way choice phase
+  1's D2 already established. It needs no `:has()` equivalent: each
+  call site already knows whether it renders a stamp.
+  Verify: `bun run typecheck` passes.
+- [x] 5.5 Delete every `className="rep-*"` string this group's
   components no longer need. Verify:
   `git grep -c 'className="rep-rule\|className="rep-cell\|className="rep-error'
   packages/web/src/areas/reporting/` returns 0.
-- [ ] 5.6 Delete the migrated rules from `app.css`. Leave only its
+- [x] 5.6 Delete the migrated rules from `app.css`. Leave only its
   reduced-motion media query, the universal-selector reset design.md
   D11 defers. Verify: `bun run build` succeeds.
 

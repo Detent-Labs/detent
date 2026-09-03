@@ -5,6 +5,7 @@ import { matchRoute, routePath, type Route, type ViewName } from "./routing.js";
 import { useAreaRoute, PROFILE_PATH } from "../../shell/routing.js";
 import { Chrome } from "../../shell/Chrome.js";
 import { navStyles } from "../../shell/navStyles.js";
+import { colors, space } from "form-ui/tokens.stylex";
 import { defaultRange, rangeIsValid, type DateRange } from "./screens/reportingLogic.js";
 import { ProcessPickerScreen } from "./screens/ProcessPickerScreen.js";
 import { CycleTimeScreen } from "./screens/CycleTimeScreen.js";
@@ -30,6 +31,26 @@ const VIEWS: { name: ViewName; labelKey: CatalogKey }[] = [
  * mismatch degrades to a readable name rather than a blank cell.
  */
 const BASE_LOCALE = "en";
+
+/** `.rep-screen` from `app.css`. This root's own `.rep-error` call site
+ * carries no stamp, so it keeps the refusal tone — the other half of
+ * `components.tsx`'s two-way choice (design.md D12's per-call-site
+ * bucket-2 rule). */
+const styles = stylex.create({
+  screen: {
+    maxWidth: "60rem",
+    marginInline: "auto",
+    paddingTop: space.s4,
+    paddingInline: space.s3,
+    paddingBottom: space.s6,
+  },
+  errorRefusal: {
+    fontSize: "0.9rem",
+    color: colors.refusal,
+    marginBlock: space.s3,
+    marginInline: 0,
+  },
+});
 
 /**
  * The process-owner area's root. The `system:reports` gate that used to live
@@ -136,11 +157,11 @@ export function ReportingArea({ session, locale, localPath, go, onLocaleChange, 
           onSaved={(reportId) => navigate({ name: "report", reportId })}
         />
       ) : (
-        <main className="rep-screen">
+        <main {...stylex.props(styles.screen)}>
           <h1>{processLabel ?? route.processId}</h1>
           <DateRangeControl range={range} onChange={setRange} locale={locale} />
           {!rangeIsValid(range) ? (
-            <p className="rep-error" role="alert">
+            <p {...stylex.props(styles.errorRefusal)} role="alert">
               {t(locale, "range.invalid")}
             </p>
           ) : route.view === "cycle-time" ? (

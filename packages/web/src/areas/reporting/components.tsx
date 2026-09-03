@@ -1,7 +1,104 @@
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { ClientError } from "./api/types.js";
 import type { UiLocale } from "../../i18n/locale.js";
 import { t, tCount } from "./catalog.js";
 import { describeError, toDateInput, fromDateInput, type DateRange } from "./screens/reportingLogic.js";
+
+/** `app.css`'s duration-rule, controls, scope-note and error/stamp rules,
+ * as StyleX. `.rep-empty` merges its two source declarations (design.md
+ * D12); `.rep-error`'s two call sites choose between `error` (this
+ * file's, always paired with a stamp) and `root.tsx`'s own unpaired
+ * `errorRefusal` style, the same two-way choice phase 1's D2 established
+ * (design.md's per-call-site bucket-2 rule). The bar's numeric width
+ * stays a literal inline style (design.md D5). */
+const styles = stylex.create({
+  rule: {
+    flex: 1,
+    minWidth: "3rem",
+    height: "0.5rem",
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+    display: "flex",
+    alignItems: "flex-end",
+  },
+  ruleFill: {
+    display: "block",
+    height: "0.5rem",
+    backgroundColor: colors.accent,
+    opacity: 0.65,
+  },
+  ruleFillDanger: {
+    backgroundColor: colors.refusal,
+    opacity: 0.8,
+  },
+  controls: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: space.s3,
+    alignItems: "flex-end",
+    paddingBottom: space.s3,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+  },
+  controlsLabel: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    fontSize: "0.9rem",
+  },
+  controlsLabelSpan: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    color: colors.textMuted,
+  },
+  scope: {
+    fontSize: "0.85rem",
+    color: colors.textMuted,
+    marginTop: 0,
+    marginInline: 0,
+    marginBottom: space.s3,
+    maxWidth: "46rem",
+  },
+  empty: {
+    fontSize: "0.85rem",
+    color: colors.textMuted,
+    marginTop: 0,
+    marginInline: 0,
+    marginBottom: space.s3,
+    maxWidth: "46rem",
+    borderLeftWidth: 2,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.border,
+    paddingLeft: space.s3,
+  },
+  error: {
+    fontSize: "0.9rem",
+    color: colors.text,
+    marginBlock: space.s3,
+    marginInline: 0,
+  },
+  stamp: {
+    display: "inline-block",
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    fontWeight: 600,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "currentcolor",
+    paddingBlock: 2,
+    paddingInline: 7,
+  },
+  stampDanger: {
+    color: colors.refusal,
+  },
+});
 
 /**
  * The duration rule — this package's one visual device, reused by all three
@@ -14,8 +111,8 @@ import { describeError, toDateInput, fromDateInput, type DateRange } from "./scr
  */
 export function DurationRule({ fraction, tone = "neutral" }: { fraction: number; tone?: "neutral" | "danger" }) {
   return (
-    <span className="rep-rule" aria-hidden="true">
-      <span className={`rep-rule-fill${tone === "danger" ? " rep-rule-fill-danger" : ""}`} style={{ width: `${Math.round(fraction * 100)}%` }} />
+    <span {...stylex.props(styles.rule)} aria-hidden="true">
+      <span {...stylex.props(styles.ruleFill, tone === "danger" && styles.ruleFillDanger)} style={{ width: `${Math.round(fraction * 100)}%` }} />
     </span>
   );
 }
@@ -23,9 +120,9 @@ export function DurationRule({ fraction, tone = "neutral" }: { fraction: number;
 /** Shared by all three views: changing it reloads the current view, and it survives a view switch because App owns it. */
 export function DateRangeControl({ range, onChange, locale }: { range: DateRange; onChange: (next: DateRange) => void; locale: UiLocale }) {
   return (
-    <div className="rep-controls">
-      <label>
-        <span>{t(locale, "range.from")}</span>
+    <div {...stylex.props(styles.controls)}>
+      <label {...stylex.props(styles.controlsLabel)}>
+        <span {...stylex.props(styles.controlsLabelSpan)}>{t(locale, "range.from")}</span>
         <input
           type="date"
           name="from"
@@ -34,8 +131,8 @@ export function DateRangeControl({ range, onChange, locale }: { range: DateRange
           onChange={(e) => onChange({ ...range, from: fromDateInput(e.target.value, "start") })}
         />
       </label>
-      <label>
-        <span>{t(locale, "range.to")}</span>
+      <label {...stylex.props(styles.controlsLabel)}>
+        <span {...stylex.props(styles.controlsLabelSpan)}>{t(locale, "range.to")}</span>
         <input
           type="date"
           name="to"
@@ -50,24 +147,24 @@ export function DateRangeControl({ range, onChange, locale }: { range: DateRange
 
 /** Each view states which instances it counts — the numbers differ between views by design, and the reader has to be able to tell why. */
 export function ScopeNote({ children }: { children: React.ReactNode }) {
-  return <p className="rep-scope">{children}</p>;
+  return <p {...stylex.props(styles.scope)}>{children}</p>;
 }
 
 /** An empty result is stated in words, never an empty table (reporting-app spec). */
 export function EmptyState({ children }: { children: React.ReactNode }) {
-  return <p className="rep-empty">{children}</p>;
+  return <p {...stylex.props(styles.empty)}>{children}</p>;
 }
 
 /** One line where the content will appear: no skeleton, no spinner (design-language.md). */
 export function WaitingNote({ locale }: { locale: UiLocale }) {
-  return <p className="rep-scope">{t(locale, "common.loading")}</p>;
+  return <p {...stylex.props(styles.scope)}>{t(locale, "common.loading")}</p>;
 }
 
 /** A failed load renders as a failure, never as an empty result (spa-error-reporting). */
 export function ErrorNote({ error, locale }: { error: ClientError; locale: UiLocale }) {
   return (
-    <p className="rep-error" role="alert">
-      <span className="rep-stamp rep-stamp-danger">{t(locale, "error.failed")}</span> {describeError(error, locale)}
+    <p {...stylex.props(styles.error)} role="alert">
+      <span {...stylex.props(styles.stamp, styles.stampDanger)}>{t(locale, "error.failed")}</span> {describeError(error, locale)}
     </p>
   );
 }
@@ -82,5 +179,5 @@ export function ErrorNote({ error, locale }: { error: ClientError; locale: UiLoc
  */
 export function SkippedNote({ count, locale }: { count: number; locale: UiLocale }) {
   if (count === 0) return null;
-  return <p className="rep-scope">{tCount(locale, count === 1 ? "skipped.one" : "skipped.many", count)}</p>;
+  return <p {...stylex.props(styles.scope)}>{tCount(locale, count === 1 ? "skipped.one" : "skipped.many", count)}</p>;
 }

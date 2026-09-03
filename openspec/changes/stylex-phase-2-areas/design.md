@@ -284,18 +284,28 @@ This is not a StyleX limitation worth working around. A universal
 selector styles the whole page, not one component's own call site. No
 compiled style could express that, regardless of the property inside.
 
-**D12. `admin/app.css` declares `.admin-field` twice, and
-`.admin-role-input` too.** The merge happens in code, not by relying on
-cascade order. `.admin-field`'s two declarations (lines 304 and 424) and
-`.admin-role-input`'s two (lines 200 and 225) each split non-overlapping
-properties across the same selector. The cascade merges them today.
+**D12. Four selectors, across two files, each carry two declarations.**
+The merge happens in code, not by relying on cascade order. Each pair
+splits non-overlapping properties across the same selector. The cascade
+merges them today.
 
-A `stylex.create` entry is one object. Task 4.1 SHALL combine each
-selector's declarations into one style. It verifies this by checking the
-compiled CSS carries every property both source rules declared, for
-both selectors. `.admin-role-input`'s first declaration is a joint one,
-shared with `.admin-role-list`. That rule's own font-mono/0.8rem shape
-never repeats, so it stays intact, unmerged.
+`admin/app.css` declares `.admin-field` twice (lines 304 and 424) and
+`.admin-role-input` twice (lines 200 and 225). `reporting/app.css`
+declares `.rep-empty` twice (lines 226 and 233) and, inside a
+comma-joined selector, `.rep-table th[scope="row"]` twice (lines 185
+and 191).
+
+A `stylex.create` entry is one object. Tasks 4.1 and 5.1 SHALL combine
+each selector's declarations into one style, in their own file. Each
+verifies this by checking the compiled CSS carries every property every
+source rule declared, for its own pair.
+
+`.admin-role-input`'s first declaration is a joint one, shared with
+`.admin-role-list`. That rule's own font-mono/0.8rem shape never
+repeats, so it stays intact, unmerged. `.rep-table th[scope="row"]`'s
+second declaration is joint too, shared with `.rep-table td`. That
+selector's own padding/border/vertical-align shape names no
+`th[scope="row"]`-only property, so it also stays intact, unmerged.
 
 **D13. The current-tab condition moves to JS.** Each root already tracks
 which tab is current, to set its `aria-current` attribute. Task 2.8
