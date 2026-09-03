@@ -1,5 +1,3 @@
-@import "../../shell/tokens.css";
-
 /*
  * Same token structure as packages/web/src/areas/app/app.css: components
  * reference only the shared semantic layer in tokens.css, never a local

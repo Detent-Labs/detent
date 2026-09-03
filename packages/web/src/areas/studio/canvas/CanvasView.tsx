@@ -33,42 +33,6 @@ import { inlineRenamePatch } from "./inlineRename";
 import { nextFocus, entryFocus, type ArrowKey, type Focus } from "./traversal";
 import { nextStepKey } from "../panels/stepsPanelLogic.js";
 import { buildOperands, guardEdgeLabel } from "../panels/shared/conditionLogic";
-import * as stylex from "@stylexjs/stylex";
-import { colors } from "../../../shell/tokens.stylex";
-
-/**
- * The step node's own states, as StyleX. The `<g>` keeps two literal classes
- * beside the compiled ones: `canvas-node`, which `focusSelector` and the a11y
- * test query, and `panzoom-exclude`, which Panzoom reads at runtime. Neither
- * may hash. The focus ring's visibility is an ancestor state, `:focus-visible`
- * on the `<g>`, which StyleX expresses through a marker on the ancestor and
- * `when.ancestor` on the child.
- */
-const nodeStyles = stylex.create({
-  node: {
-    cursor: "grab",
-    // The shell's bare `:focus-visible` outline would draw a bounding box on
-    // the SVG element; the ring element below is the node's one indicator.
-    outline: { default: null, ":focus-visible": "none" },
-  },
-  rect: {
-    fill: colors.surface,
-    stroke: colors.border,
-    strokeWidth: 1.5,
-  },
-  rectSelected: {
-    stroke: colors.accent,
-    strokeWidth: 2,
-  },
-  focusRing: {
-    display: { default: "none", [stylex.when.ancestor(":focus-visible")]: "inline" },
-    fill: "none",
-    stroke: colors.accent,
-    strokeWidth: 2,
-    strokeDasharray: "5 4",
-    pointerEvents: "none",
-  },
-});
 
 const HANDLE_RADIUS = 7;
 /** The waypoint handle's side. A square, not a circle: the canvas already has
@@ -929,7 +893,7 @@ export function CanvasView({
         key={step.id}
         data-step-id={step.id}
         transform={`translate(${x}, ${y})`}
-        className={`canvas-node panzoom-exclude ${stylex.props(stylex.defaultMarker(), nodeStyles.node).className ?? ""}`}
+        className="canvas-node panzoom-exclude"
         // All three drop while the rename is open: ARIA forbids a focusable
         // field inside a `role="button"`, and the field is that node's own.
         role={isRenaming ? undefined : "button"}
@@ -952,7 +916,7 @@ export function CanvasView({
           width={NODE_WIDTH}
           height={NODE_HEIGHT}
           rx={0}
-          {...stylex.props(nodeStyles.rect, isSelected && nodeStyles.rectSelected)}
+          className={isSelected ? "canvas-node-rect canvas-node-selected" : "canvas-node-rect"}
         />
         {step.type === "subprocess" && (
           // The doubled rule BPMN draws on a call activity. It sits before
@@ -1015,7 +979,7 @@ export function CanvasView({
             its 2px under the canvas zoom, while the offset scales with the
             node, which is what makes it hug the shape. */}
         <rect
-          {...stylex.props(nodeStyles.focusRing)}
+          className="canvas-node-focus-ring"
           x={-FOCUS_RING_OFFSET}
           y={-FOCUS_RING_OFFSET}
           width={NODE_WIDTH + FOCUS_RING_OFFSET * 2}

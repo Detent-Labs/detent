@@ -30,8 +30,8 @@ whichever area is open and renders the same header row around it every time.
 
 | Term | Names | Lives in |
 |---|---|---|
-| header | the one fixed row atop every area, holding the register tab, the area nav and the account group | `Chrome.tsx`, `.shell-header` |
-| register tab | the label naming the open area, at the header's left edge; full definition in `design-language.md` | `.shell-tab` |
+| header | the one fixed row atop every area, holding the register tab, the area nav and the account group | `Chrome.tsx` |
+| register tab | the label naming the open area, at the header's left edge; full definition in `design-language.md` | `Chrome.tsx` |
 | area nav | the open area's own navigation buttons, right of the register tab | passed into `Chrome` as its `nav` prop |
 | account group | the identity span and the account menu trigger, right-aligned in the header | `.shell-account-group` |
 | account menu | the popover the account group opens: profile, language, area switch, logout | `.shell-menu` |

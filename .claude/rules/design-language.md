@@ -79,9 +79,9 @@ it works as decoration you can delete without losing meaning.
 Every component already exists in `packages/web`. This section states how
 each one stays in this language.
 
-**The register tab** (`.shell-tab`). One tab shows at a time. The other
-three areas live in the account menu. The actor's roles decide which of
-those the menu shows.
+**The register tab**, `Chrome.tsx`'s compiled style. One tab shows at a
+time. The other three areas live in the account menu. The actor's roles
+decide which of those the menu shows.
 
 **The stamp** (`.app-stamp`, `.admin-badge`, `.rep-stamp`). Mono, uppercase,
 tracked, with a 2px outline in the current color. Five tones exist and no
@@ -140,6 +140,12 @@ class. Style targets the attribute the DOM already carries:
 An area never styles another area's prefix. Shared motifs move to `shell/`,
 or engineers duplicate them on purpose. No component reads a primitive.
 Components read roles only.
+
+**The StyleX pilot.** The shell header and register tab compile from typed
+style objects instead. A compiled class hashes, so the
+`prefix-block-element` convention above does not apply to it. No rule this
+file states changes. `web-styling` carries the styling model a migrated
+component follows, and later phases migrate the rest.
 
 **Labels and locales.** Every string a person reads comes from a catalog.
 EN and DE ship in the shell, app, admin and reporting catalogs, each reached

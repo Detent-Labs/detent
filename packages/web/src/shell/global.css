@@ -1,0 +1,78 @@
+/*
+ * The reset, the `:focus-visible` ring and the element defaults. The style
+ * compiler has no global selector, so this sheet stays hand-written. Every
+ * value below reads a token `tokens.css` declares — this sheet carries no
+ * value of its own.
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+button {
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+input,
+select {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  background: var(--color-surface);
+}
+
+input:focus-visible,
+select:focus-visible {
+  border-color: var(--color-accent);
+  outline-offset: 0;
+}
+
+h1,
+h2 {
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  letter-spacing: -0.015em;
+}
+
+h1 {
+  font-size: 1.25rem;
+  margin: 0 0 var(--space-4);
+}
+
+h2 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin: var(--space-4) 0 var(--space-2);
+}

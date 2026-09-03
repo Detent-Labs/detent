@@ -310,6 +310,28 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
     Specs: `definition-contract`, `runtime-api`, `studio-app`,
     `studio-form-editor`, `studio-checks-rail`.
 
+45. **StyleX styling model for `packages/web`/`packages/form-ui`: PHASE 0
+    DONE. PHASES 1-5 NOT BUILT.** `stylex-phase-0-tooling` installed the
+    compiler, split `tokens.css`'s element rules into `global.css`, moved
+    the design-token module to `packages/form-ui`, gave `bun test` a
+    stub-preload story, and migrated the shell header and register tab as
+    the pilot. Full reasoning, the measured evaluation and the six-phase
+    plan sit in that change's `design.md`, at
+    `openspec/changes/stylex-phase-0-tooling/design.md` before archive.
+
+    Phase 1 migrates `packages/form-ui`. Phase 2 migrates the shell, app,
+    admin and reporting areas. Phase 3 migrates studio outside the canvas.
+    Phase 4 migrates the canvas. Phase 5 deletes the remaining hand-written
+    area stylesheets and updates the design docs that still name a literal
+    class. Each phase is its own OpenSpec change against `web-styling`.
+
+    Reopen triggers: two consecutive StyleX releases that each cost a build
+    fix reopen the compiler-version pin. A phase whose measured effort
+    argues for a split reopens the one-change-per-phase plan.
+
+    Specs: `web-styling`, `development-toolchain`, `unified-shell`,
+    `form-ui`.
+
 ## Done
 
 Stage detail: `docs/roadmap-history.md`. Same numbers, same order.

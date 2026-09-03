@@ -8,38 +8,6 @@ import { usePagedList } from "../../../shell/usePagedList.js";
 import { ErrorBanner } from "../../../shell/ErrorBanner.js";
 import { t } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
-import * as stylex from "@stylexjs/stylex";
-import { colors, fonts } from "../../../shell/tokens.stylex";
-
-/** `.admin-badge` and its tones from `app.css`, as StyleX, for this screen
- * alone; the other five badge emitters keep the stylesheet. A tone keyed on
- * the row status replaces the `admin-badge-${status}` class template, so a
- * status the map does not name gets the base stamp and nothing else. */
-const badge = stylex.create({
-  base: {
-    display: "inline-block",
-    fontFamily: fonts.mono,
-    fontSize: 11,
-    fontWeight: 600,
-    textTransform: "uppercase",
-    letterSpacing: "0.08em",
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: "currentcolor",
-    paddingBlock: 2,
-    paddingInline: 7,
-  },
-  open: { color: colors.accent },
-  settled: { color: colors.text },
-  dormant: { color: colors.textDormant },
-  refusal: { color: colors.surface, backgroundColor: colors.refusal, borderColor: colors.refusal },
-});
-const badgeTone: Partial<Record<OutboxRow["status"], stylex.StyleXStyles>> = {
-  pending: badge.open,
-  delivered: badge.settled,
-  discarded: badge.dormant,
-  "dead-letter": badge.refusal,
-};
 
 interface OutboxScreenProps {
   token: string;
@@ -162,7 +130,7 @@ export function OutboxScreen({ token, locale, onUnauthorized }: OutboxScreenProp
                 <td>{row.type}</td>
                 <td>{row.instanceId}</td>
                 <td>
-                  <span {...stylex.props(badge.base, badgeTone[row.status])}>{row.status}</span>
+                  <span className={`admin-badge admin-badge-${row.status}`}>{row.status}</span>
                 </td>
                 <td>{row.attempts}</td>
                 <td>{row.lastError ?? "—"}</td>

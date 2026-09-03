@@ -5,7 +5,7 @@ import { accountName } from "./accountName.js";
 import type { Session } from "./session.js";
 import type { UiLocale } from "../i18n/locale.js";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "./tokens.stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 
 /** `.shell-header` and `.shell-tab` from `shell.css`, as StyleX. The header's
  * one narrow-viewport rule sits on the property it changes. */

@@ -2282,3 +2282,33 @@ This one stays manual for a mechanical reason. Only a double click sets the
 internal `renaming` state. A static render draws the initial state alone, and
 the web package carries no DOM harness. So the rename branch never renders in
 a test.
+
+### The StyleX pilot: computed styles, not source (`stylex-phase-0-tooling`)
+
+Source: `stylex-phase-0-tooling` tasks 6.1 and 7.5. `web-styling` requires
+this probe for every migrated screen. A `bun:test` render string cannot read
+a compiled class hash or a computed value, so this stays manual.
+
+Build the production bundle and open it on the engine's own port, per
+`WEB_ROOT`. Open DevTools and inspect the shell header in each of the four
+areas.
+
+Pass: the header and the register tab carry hash-only classes, such as
+`x1a2b3c4`. Neither carries `shell-header` or `shell-tab`. Read the computed
+`background-color`, `border-bottom-color`, `padding` and the tab's
+`clip-path`. Pass: each equals the value `shell.css` declared on `main`
+before this change.
+
+Resize the viewport below 30rem. Pass: the header wraps onto a second line,
+the rule the header's own `flexWrap` condition carries. Hover the register
+tab, then Tab to it. Pass: both states still paint, unaffected by the move
+out of `shell.css`.
+
+Open a process draft's field catalog. Select a text field. Read "How it will
+look". Pass: the rendered control's computed `font-size`, `padding` and
+`border` equal what `form-ui.css` declares. Today that reads 14px,
+`var(--space-2)`, and `1px solid var(--color-border)`.
+
+`global.css` now loads before `form-ui.css` (D9 in this change's
+`design.md`). A specificity tie there would widen every form-ui field's
+padding toward the body's own 15px line, silently.

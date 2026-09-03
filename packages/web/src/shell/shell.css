@@ -10,7 +10,6 @@
  * ledger you have open. It is why the header carries no separate "you are
  * here" label — the tab and the URL prefix say it.
  */
-@import "./tokens.css";
 
 /* A column, so the screen below the header has a height to grow into. A screen
    opts in with its own `flex-grow`; one that asks for nothing keeps its content

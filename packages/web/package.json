@@ -27,5 +27,6 @@
     "@vitejs/plugin-react": "^6",
     "typescript": "7.0.2",
     "vite": "^8"
-  }
+  },
+  "browserslist": ["Chrome >= 114", "Safari >= 17", "Firefox >= 125"]
 }

@@ -1048,3 +1048,19 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   permanently dirty draft makes the publish dialog always state its
   unsaved-changes sentence and always save first, which gives no wrong
   result.
+- **StyleX adopted as `packages/web`'s and `packages/form-ui`'s styling
+  model.** `stylex-phase-0-tooling` installed the compiler, settled the
+  token home in `packages/form-ui/src/tokens.stylex.ts`, gave `bun test` a
+  stub-preload story, and migrated the shell header and register tab as the
+  pilot. Full reasoning sits in that change's `design.md`, whose Migration
+  Plan names the six-phase path: phase 0 (this change), then form-ui,
+  shell/app/admin/reporting, studio non-canvas, canvas, and a cleanup phase
+  that deletes the remaining hand-written area stylesheets. Each later
+  phase is its own OpenSpec change against `web-styling`.
+
+  Reopen triggers: two consecutive StyleX releases that each cost a build
+  fix reopen the compiler-version decision (design.md's Risks). Whether
+  phase 2 splits into two changes stays open until phase 1's measured
+  effort answers it. `unstable_moduleResolution.rootDir` alone resolved the
+  form-ui-exported token module from `packages/web`, closing D8's one open
+  question without the `aliases` option.
