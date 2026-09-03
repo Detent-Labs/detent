@@ -105,10 +105,16 @@ function graphOf(steps: TraversalStep[], groups: StepGroup[]): Graph {
   // collapsed or open, because its disclosure carries the roving stop in both
   // states. Only a collapsed group's member loses its own place: the box
   // stands in for it.
+  //
+  // A repeated step id holds one place, its first. `findIndex` below answers
+  // with the first entry naming an id, so a second entry would be a dead end:
+  // Down from it would walk on from the first instead.
   const order: Focus[] = [];
   const placed = new Set<string>();
+  const seen = new Set<string>();
   for (const step of steps) {
-    if (!step.id) continue;
+    if (!step.id || seen.has(step.id)) continue;
+    seen.add(step.id);
     for (const group of drawing) {
       if (placed.has(group.id) || !group.stepIds.includes(step.id)) continue;
       placed.add(group.id);
@@ -181,9 +187,18 @@ export function nextFocus(
       return entryFocus(steps, groups, initialStep);
 
     case "group": {
-      // Left and Right stay put: a box has no fan of its own. Enter expands
-      // the group, and the author continues from a member.
-      if (key === "ArrowLeft" || key === "ArrowRight") return focus;
+      // A collapsed box stands in for its members, so it stands in for their
+      // fan too. Right takes the first path leaving the box, Left the first
+      // one entering it. Every edge with one end inside a box has its other
+      // end outside, because a pair inside one box draws nothing at all, so
+      // the end test alone decides. An expanded box hides no member, and
+      // neither key finds a path.
+      if (key === "ArrowLeft" || key === "ArrowRight") {
+        const hides = (stepId: string) => graph.boxOf.get(stepId)?.id === focus.groupId;
+        const crossing = graph.edges.find((edge) => hides(key === "ArrowRight" ? edge.from : edge.to));
+        if (!crossing) return focus;
+        return { kind: "path", pathId: crossing.id, from: key === "ArrowRight" ? "source" : "target" };
+      }
       const at = graph.order.findIndex((f) => f.kind === "group" && f.groupId === focus.groupId);
       return neighbour(graph.order, at, key) ?? focus;
     }
@@ -226,7 +241,10 @@ export function nextFocus(
 export function entryFocus(steps: TraversalStep[], groups: StepGroup[], initialStep?: string): Focus {
   const graph = graphOf(steps, groups);
   if (initialStep !== undefined && graph.stepIds.has(initialStep)) return focusForStep(initialStep, graph);
-  const first = steps.find((step) => step.id !== undefined && !graph.boxOf.has(step.id))?.id;
+  // `graph.stepIds`, not a defined-ness test: the graph decides reachability,
+  // and it holds no empty-string id. A focus naming an id the graph rejects
+  // answers every key with itself, and no element takes the roving stop.
+  const first = steps.find((step) => step.id !== undefined && graph.stepIds.has(step.id) && !graph.boxOf.has(step.id))?.id;
   if (first !== undefined) return { kind: "step", stepId: first };
   // Only a collapsed group reaches here: an expanded box's members are
   // reachable steps themselves, and the fallback above would have taken one.

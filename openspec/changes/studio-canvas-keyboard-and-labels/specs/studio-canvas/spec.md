@@ -25,6 +25,14 @@ Escape SHALL also move the roving stop itself. The `<svg>` takes
 the canvas rather than re-entering it. Re-entering the canvas SHALL land on
 that root. An arrow key from a root focus SHALL move to the entry point.
 
+A pointer press SHALL move the roving stop to what it presses. A node press
+SHALL take a step focus. A path press SHALL take a path focus, entered through
+its source. A disclosure press SHALL take that group's focus.
+
+Without that move an arrow key walks from whatever the keyboard last touched.
+Enter binds for a step focus and a path focus alone. A disclosure press
+therefore leaves no stop a following Enter also answers.
+
 A key press originating inside the inline rename field SHALL NOT reach the
 canvas handler. The exclusion SHALL read the event's target. A target inside a
 text-entry field stops the handler. A disclosure button the surface draws is
@@ -96,6 +104,14 @@ number. A step carrying one path SHALL NOT announce a plural.
   presses Down
 - **THEN** the canvas handler receives that key, and focus moves on through
   the step order
+
+#### Scenario: A pointer press moves the roving stop
+
+- **WHEN** the author clicks a node other than the focused one, then presses
+  Right
+- **THEN** focus walks from the clicked node
+- **AND** a click on a disclosure moves the stop there, so Enter then toggles
+  the group alone
 
 #### Scenario: Escape leaves the canvas, and an arrow key re-enters it
 
@@ -403,8 +419,15 @@ A step hidden inside a collapsed group SHALL NOT be focusable. Traversal SHALL
 skip it. Where a path's far end hides, Right or Left SHALL land on the
 collapsed box. That box is the element the path already anchors on.
 
-Left and Right SHALL move nothing from a group focus. The author presses Enter
-to expand the group and continues from a member.
+Right SHALL move from a group box to the first path leaving that box. That is
+the first path whose source hides inside it. Left SHALL move to the first path
+entering it, on the same rule. A box no such path crosses SHALL keep the
+focus. Up and Down SHALL keep the step order they already walk.
+
+A collapsed box stands in for its members, so it stands in for their fan too.
+The canvas draws a path between two collapsed groups, names it and gives it a
+roving stop. Neither end step is focusable. Without this rule no arrow
+sequence reaches that path, and the canvas draws a pointer-only control.
 
 #### Scenario: A collapsed group opens from the keyboard
 
@@ -425,6 +448,15 @@ to expand the group and continues from a member.
   inside a collapsed group
 - **AND** the author presses Right twice
 - **THEN** focus lands on the collapsed group box, not on the hidden step
+
+#### Scenario: An arrow key leaves a collapsed box along a crossing path
+
+- **WHEN** focus sits on a collapsed box holding the source of a path leaving
+  it
+- **AND** the author presses Right
+- **THEN** focus lands on that path, entered through its source
+- **AND** Left on the box at the far end lands on the same path, entered
+  through its target
 
 #### Scenario: A hidden step takes no tab stop
 

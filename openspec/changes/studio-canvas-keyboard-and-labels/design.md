@@ -234,6 +234,12 @@ invariants its input type does not carry. Each rule below is therefore total.
 **No id, no focus.** A step with no `id` renders nothing today. The traversal
 skips it, and it holds no place in the Up/Down order.
 
+**A repeated step id holds one place.** It keeps its first. A draft repeating
+an id holds two entries naming it, and a lookup answers with the first. A
+second place would be a dead end. Down from it would walk on from the first
+entry instead. With steps `[A, B, A, C]` the order would cycle A, B, A, B, and
+never reach C.
+
 **A path needs an `id` and a `to`.** Lacking either, the traversal skips it.
 The synthetic React key is a drawing detail, not an identity. `data-path-id`
 is already `undefined` for such a path. Focusing one would name a target no
@@ -280,6 +286,11 @@ that names a reachable step. Otherwise the first reachable step in
 itself. Where `initialStep` names a step inside a collapsed group, the entry
 is that group's box.
 
+Reachable there means one thing: the graph holds the id. A defined-ness test
+would admit a step whose `id` is the empty string, which `graphOf` drops. The
+entry point would then name an id no rule resolves. Every key would answer
+with that focus, and no element would take the stop.
+
 That last fallback matters more than it looks. Under a roving `tabindex`, a
 surface where nothing carries `tabindex=0` leaves the page's tab order
 altogether. A brand-new draft carries no `initialStep`. It would then be worse
@@ -296,6 +307,17 @@ Holding the stale id would leave `focus()` a no-op on an element that does not
 exist. No element would then carry `tabindex="0"`, and the canvas would leave
 the page's tab order. So the component re-runs the entry-point function
 whenever the current focus stops resolving.
+
+**A pointer press moves the roving stop.** The keyboard is not its only
+writer. A press on a node takes a step focus. A press on a path takes a path
+focus, entered through its source. A press on a disclosure takes that group's
+focus.
+
+Two failures follow from leaving the stop where the keyboard left it. An arrow
+key after a click walks from the node the author focused before. Enter after a
+disclosure click toggles the group and also opens the focused step's
+inspector. Enter binds for a step focus and a path focus alone, so the group
+focus ends that second one.
 
 ### The boundary does not wrap and does not beep
 
@@ -446,6 +468,22 @@ A step hidden inside a collapsed group is not focusable and not drawn.
 Traversal skips it. Where a path's far end hides, Right or Left lands on the
 collapsed box. That box is the element the path already anchors on. The author
 then presses Enter to open the group and continues.
+
+**A collapsed box answers Left and Right.** An earlier draft moved neither
+key. Its reason was that a box carries no fan of its own. A path between two
+collapsed groups disproves it. Its source hides in one box and its target in
+the other, so `graphOf` keeps the edge. The canvas then draws it with a name
+and a roving stop.
+
+Neither end step is focusable, so no arrow sequence reached that path. It was
+a pointer-only control, which is what this change exists to end. The box
+stands in for its members, so it stands in for their fan. Right takes the
+first path leaving the box, and Left the first one entering it. A box no path
+crosses keeps the focus.
+
+Dropping the edge instead would keep the drawn control and hide it from the
+keyboard. The rule also removes an asymmetry. Right from a path already lands
+on a collapsed box, and until now nothing left one.
 
 **The toggle needs a prop nobody has written.** `CanvasView`'s `Props` carries
 `groups: StepGroup[]` and no writer (`CanvasView.tsx:69`). The box handlers

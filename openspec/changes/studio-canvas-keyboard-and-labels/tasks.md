@@ -52,17 +52,24 @@ own degenerate case, so the module stays total.
 - [x] 3.8a It keeps its array place and never joins a priority sort
 - [x] 3.9 Return the same focus at a boundary, with no wrap
 - [x] 3.10 Walk `workflow.steps` order for Up and Down on a step
+- [x] 3.10a Emit each step id once in that order, at its first place
+- [x] 3.10a1 A repeated id makes Down from the second entry a dead end
 - [x] 3.11 Substitute a collapsed group's box for a hidden step
 - [x] 3.11a A group whose `stepIds` resolve to fewer than two steps draws no box (`groups.ts:29-31`)
 - [x] 3.11b Such a group hides nothing, offers no entry point, and leaves its members reachable
-- [x] 3.11c Return the same focus for Left and Right on a group focus
-- [x] 3.11c1 The author presses Enter to expand the group, then continues from a member
+- [x] 3.11c Move Right from a group box to the first path leaving that box
+- [x] 3.11c1 Move Left to the first path entering it, on the same rule
+- [x] 3.11c2 Return the same focus where no path crosses that box
+- [x] 3.11c3 The canvas draws a path between two collapsed groups
+- [x] 3.11c4 Neither end step is focusable, so only the box reaches it
 - [x] 3.12 Export the entry point as its own function over the same draft
 - [x] 3.12a Take `workflow.initialStep` when it names a step the author can reach
 - [x] 3.12b Otherwise the first reachable step in `workflow.steps` order
 - [x] 3.12c Otherwise the first group box the canvas draws
 - [x] 3.12d Otherwise the `<svg>` itself, so the canvas keeps its tab stop
 - [x] 3.12e Where `initialStep` names a step inside a collapsed group, enter at that group's box
+- [x] 3.12f Test every entry candidate against the graph's own step ids
+- [x] 3.12f1 A step whose `id` is the empty string is no entry point, since the graph drops it
 
 ## 4. The canvas nodes
 
@@ -84,6 +91,9 @@ own degenerate case, so the module stays total.
 - [x] 4.6d Holding a stale id would leave no element carrying `tabindex="0"`
 - [x] 4.6e A group focus resolves to that group's disclosure button, the only control it draws
 - [x] 4.6f A root focus resolves to the `<svg>` itself
+- [x] 4.6g Move the roving stop on a pointer press, from all three press handlers
+- [x] 4.6g1 A node press takes a step focus, a path press one entered from its source
+- [x] 4.6g2 A disclosure press takes that group's focus, so one Enter does one thing
 - [x] 4.7 Bind Enter to the existing `onSelectStep`
 - [x] 4.7a Bind Escape to move the roving stop to the `<svg>`, then call `svgRef.current?.focus()`
 - [x] 4.7a1 That means `tabIndex={0}` on the root and `-1` on every node, path and box
@@ -250,7 +260,12 @@ suites all test a pure module. The harness precedent is
 - [x] 9.3v A path on a step with no `id` is unreachable, whatever that path carries
 - [x] 9.3w Collapsing the group around the focused step returns a reachable focus
 - [x] 9.3x Deleting the focused step returns a reachable focus, never a stale id
-- [x] 9.3y Left and Right on a group focus return the same focus
+- [x] 9.3y Right from a collapsed box reaches the path leaving it, then the far box
+- [x] 9.3y1 Left from a collapsed box reaches the path entering it
+- [x] 9.3y2 An arrow sweep from the entry point reaches a path between two boxes
+- [x] 9.3y3 Left and Right on a box no path crosses return the same focus
+- [x] 9.3y4 A step whose `id` is the empty string never becomes the entry point
+- [x] 9.3y5 A draft repeating a step id still reaches every later step with Down
 - [x] 9.3z An expanded group's box holds a place, and Down reaches its first member
 - [x] 9.3z1 A group focus stays reachable once that group expands
 

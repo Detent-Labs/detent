@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { nextFocus, entryFocus, type ArrowKey, type TraversalStep } from "../src/areas/studio/canvas/traversal.js";
+import { nextFocus, entryFocus, type ArrowKey, type Focus, type TraversalStep } from "../src/areas/studio/canvas/traversal.js";
 import type { StepGroup } from "../src/areas/studio/canvas/groups.js";
 
 const step = (id: string, paths: TraversalStep["paths"] = []): TraversalStep => ({ id, paths });
@@ -21,6 +21,34 @@ const converge: TraversalStep[] = [
 
 /** One fan out of a, into three targets. */
 const fanOut = (paths: TraversalStep["paths"]): TraversalStep[] => [step("a", paths), step("b"), step("c"), step("d")];
+
+/** Two collapsed groups with one path between them. Both ends hide, so only
+ * the box at each end is drawn, and that path crosses from one to the other. */
+const acrossBoxes: TraversalStep[] = [
+  step("a", [{ id: "p_ab", to: "b", trigger: "manual" }]),
+  step("b", [{ id: "p_bc", to: "c", trigger: "manual" }]),
+  step("c", [{ id: "p_cd", to: "d", trigger: "manual" }]),
+  step("d"),
+];
+const twoBoxes = [group("g1", ["a", "b"], true), group("g2", ["c", "d"], true)];
+
+/** A focus, in one stable string. The key list fixes the order, so two focuses
+ * naming the same place read the same however each was built. */
+const label = (focus: Focus) => JSON.stringify(focus, ["kind", "stepId", "pathId", "from", "groupId"]);
+
+/** Every focus an arrow sequence reaches from the entry point. A control the
+ * canvas draws and this set omits is pointer-only. */
+function reachableFrom(steps: TraversalStep[], groups: StepGroup[]): Set<string> {
+  const keys: ArrowKey[] = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+  const seen = new Set<string>();
+  const queue: Focus[] = [entryFocus(steps, groups)];
+  for (let focus = queue.shift(); focus; focus = queue.shift()) {
+    if (seen.has(label(focus))) continue;
+    seen.add(label(focus));
+    for (const key of keys) queue.push(nextFocus(focus, key, steps, groups));
+  }
+  return seen;
+}
 
 /** The fan a step walks, from its first path down to its last. */
 function fanFrom(steps: TraversalStep[], stepId: string, groups: StepGroup[] = []): string[] {
@@ -57,6 +85,14 @@ describe("canvas traversal: stepping through the graph", () => {
 
   it("stays put on the initial step", () => {
     expect(nextFocus({ kind: "step", stepId: "a" }, "ArrowLeft", chain, [])).toEqual({ kind: "step", stepId: "a" });
+  });
+
+  it("reaches every later step with down where the draft repeats a step id", () => {
+    // A second entry naming an id holds no place of its own. Holding one
+    // walks down from the first entry instead, and the order cycles.
+    const repeated: TraversalStep[] = [step("a"), step("b"), step("a"), step("c")];
+    expect(nextFocus({ kind: "step", stepId: "a" }, "ArrowDown", repeated, [])).toEqual({ kind: "step", stepId: "b" });
+    expect(nextFocus({ kind: "step", stepId: "b" }, "ArrowDown", repeated, [])).toEqual({ kind: "step", stepId: "c" });
   });
 
   it("stays put below the last step", () => {
@@ -191,16 +227,34 @@ describe("canvas traversal: reachability", () => {
     expect(entryFocus(chain, oneMember, "b")).toEqual({ kind: "step", stepId: "b" });
   });
 
-  it("stays put on left and right from a group focus, while up and down still move", () => {
+  it("reaches the path leaving a collapsed box on right, then the far box", () => {
+    const focus = { kind: "group", groupId: "g1" } as const;
+    const path = nextFocus(focus, "ArrowRight", acrossBoxes, twoBoxes);
+    expect(path).toEqual({ kind: "path", pathId: "p_bc", from: "source" });
+    expect(nextFocus(path, "ArrowRight", acrossBoxes, twoBoxes)).toEqual({ kind: "group", groupId: "g2" });
+  });
+
+  it("reaches the path entering a collapsed box on left", () => {
+    const focus = { kind: "group", groupId: "g2" } as const;
+    expect(nextFocus(focus, "ArrowLeft", acrossBoxes, twoBoxes)).toEqual({ kind: "path", pathId: "p_bc", from: "target" });
+  });
+
+  it("reaches a path between two collapsed groups from the entry point", () => {
+    // The canvas draws that path, names it and gives it a roving stop, so an
+    // arrow sequence has to arrive at it. Neither end step is focusable.
+    expect(reachableFrom(acrossBoxes, twoBoxes)).toContain(label({ kind: "path", pathId: "p_bc", from: "source" }));
+  });
+
+  it("stays put on left and right from a box no path crosses, while up and down still move", () => {
     // A step follows the box in the step order, so a box that answered left or
-    // right at all would answer with that step rather than with itself.
-    const steps: TraversalStep[] = [...chain, step("d")];
-    const boxed = [group("g1", ["b", "c"], true)];
+    // right with a neighbour would answer with that step.
+    const steps: TraversalStep[] = [step("a"), step("b"), step("c")];
+    const boxed = [group("g1", ["a", "b"], true)];
     const focus = { kind: "group", groupId: "g1" } as const;
     expect(nextFocus(focus, "ArrowLeft", steps, boxed)).toEqual(focus);
     expect(nextFocus(focus, "ArrowRight", steps, boxed)).toEqual(focus);
-    expect(nextFocus(focus, "ArrowUp", steps, boxed)).toEqual({ kind: "step", stepId: "a" });
-    expect(nextFocus(focus, "ArrowDown", steps, boxed)).toEqual({ kind: "step", stepId: "d" });
+    expect(nextFocus(focus, "ArrowUp", steps, boxed)).toEqual(focus);
+    expect(nextFocus(focus, "ArrowDown", steps, boxed)).toEqual({ kind: "step", stepId: "c" });
   });
 
   it("holds a place for an expanded group's box, before its first member", () => {
@@ -236,6 +290,14 @@ describe("canvas traversal: the entry point", () => {
   it("enters at the first group box where every step hides", () => {
     const hidden: TraversalStep[] = [step("b"), step("c")];
     expect(entryFocus(hidden, [group("g1", ["b", "c"], true)])).toEqual({ kind: "group", groupId: "g1" });
+  });
+
+  it("never enters at a step whose id is the empty string", () => {
+    // The graph holds no empty id, so a focus naming one answers every key
+    // with itself and no element takes the roving stop.
+    const empty: TraversalStep[] = [step(""), step("b")];
+    expect(entryFocus(empty, [])).toEqual({ kind: "step", stepId: "b" });
+    expect(entryFocus([step("")], [])).toEqual({ kind: "root" });
   });
 
   it("enters at the root where the draft holds no reachable step at all", () => {

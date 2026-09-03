@@ -471,6 +471,10 @@ export function CanvasView({
   const onNodePointerDown = (e: React.PointerEvent, stepId: string) => {
     e.stopPropagation();
     capturePointer(e);
+    // The roving stop follows the pointer. Without this the next arrow key
+    // walks from whatever the keyboard last touched, and Enter still binds
+    // against that older focus.
+    moveFocus({ kind: "step", stepId });
     const p = toSvgPoint(e);
     // Pointer-down writes no selection (design.md): every selection write
     // stays at pointer-up, where the shift decides between a toggle and a
@@ -1184,6 +1188,12 @@ export function CanvasView({
                 role="button"
                 tabIndex={focus.kind === "path" && focus.pathId === path.id ? 0 : -1}
                 aria-label={pathName(path, step, guardText)}
+                // The press takes the roving stop, entered through the source,
+                // which is the end Up and Down walk from. A path with no id
+                // takes none: nothing can name it.
+                onPointerDown={() => {
+                  if (path.id !== undefined) moveFocus({ kind: "path", pathId: path.id, from: "source" });
+                }}
                 onPointerUp={(e) => {
                   e.stopPropagation();
                   onSelectStep(step.id, path.id);
@@ -1344,7 +1354,14 @@ export function CanvasView({
               // handlers, the rule the rename input already follows.
               // `panzoom-exclude` above is what keeps Panzoom's native
               // down-handler and the marquee's capture handler off it.
-              onPointerDown={(e) => e.stopPropagation()}
+              //
+              // It also takes the roving stop. Enter binds for a step focus
+              // and a path focus alone, so a stop left on a step would let one
+              // Enter both toggle this group and open that step's inspector.
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                moveFocus({ kind: "group", groupId: group.id });
+              }}
               onClick={() => toggleGroup(group.id)}
             >
               {group.collapsed ? (
