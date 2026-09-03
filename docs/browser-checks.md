@@ -2262,6 +2262,17 @@ Focus the button and press Down. Pass: focus moves on to the next entry in the
 step order. Press Enter on the button instead. Pass: the group toggles, and the
 chevron turns.
 
+Click a node with the pointer, then press an arrow key. Pass: focus walks from
+the node you clicked, not from the one the keyboard last held.
+
+Click a group's disclosure with the pointer, then press Enter. Pass: the group
+toggles and nothing else happens. A stop left on a step would let that one
+Enter both toggle the group and open the step's inspector.
+
+These two stay manual for the same reason as the check below. A pointer press
+and a focus move are both invisible to `renderToStaticMarkup`, and the web
+package carries no DOM harness.
+
 Double-click a node's label to open the inline rename, then read that node's
 `<g>` in the inspector. Pass: it carries no `role`, no `aria-label` and no
 `tabindex` while the field is open. ARIA forbids a focusable input inside a

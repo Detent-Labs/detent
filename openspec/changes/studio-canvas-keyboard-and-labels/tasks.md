@@ -304,6 +304,9 @@ vendor's own behavior, and a visual judgment need a real browser.
 - [x] 10.1k1 A collapsed box with a long name shows the chevron whole, with no text under it
 - [x] 10.1l Down on a focused disclosure button moves focus, and Enter still toggles the group
 - [x] 10.1m Escape, Tab, Shift+Tab and then Right land on the entry point
+- [x] 10.1o A pointer press moves the roving stop to the node, path or box it hit
+- [x] 10.1o1 Click a node, press an arrow, and focus walks from that node
+- [x] 10.1o2 Click a disclosure, press Enter, and only the group toggles
 - [x] 10.1n A renaming node carries no role, no `aria-label` and no `tabindex`
 - [x] 10.1n1 `renaming` is internal state that only a double click sets, so no static render reaches it
 - [x] 10.1n2 `renderToStaticMarkup` draws the initial state alone, and the package carries no DOM harness
