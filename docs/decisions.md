@@ -1064,3 +1064,14 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   effort answers it. `unstable_moduleResolution.rootDir` alone resolved the
   form-ui-exported token module from `packages/web`, closing D8's one open
   question without the `aliases` option.
+
+  Phase 1 (`stylex-phase-1-form-ui`) is done: `packages/form-ui`'s field
+  renderer and `PathButtons` compile from StyleX, `form-ui.css` and its
+  package export are gone, and `PathButtons` gained a `style` prop so a
+  caller can extend its wrapper. Its own design.md introduced a pattern
+  `web-styling` now states generally — a layout choice with a fixed set of
+  outcomes is chosen among named styles in code, never read from a `data-*`
+  attribute by a stylesheet — for phase 2 to build on rather than
+  re-derive. Phases 2 through 5 remain: shell/app/admin/reporting, studio
+  non-canvas, the canvas, and the cleanup phase that deletes the remaining
+  hand-written area stylesheets.

@@ -5,7 +5,6 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./form-ui.css": "./src/form-ui.css",
     "./tokens.stylex": "./src/tokens.stylex.ts"
   },
   "scripts": {

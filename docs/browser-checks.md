@@ -2306,9 +2306,32 @@ out of `shell.css`.
 
 Open a process draft's field catalog. Select a text field. Read "How it will
 look". Pass: the rendered control's computed `font-size`, `padding` and
-`border` equal what `form-ui.css` declares. Today that reads 14px,
-`var(--space-2)`, and `1px solid var(--color-border)`.
+`border` equal the values named below, in "The form-ui field renderer".
 
-`global.css` now loads before `form-ui.css` (D9 in this change's
-`design.md`). A specificity tie there would widen every form-ui field's
-padding toward the body's own 15px line, silently.
+### The form-ui field renderer: Player and Task screens probe identical (`stylex-phase-1-form-ui`)
+
+Source: `stylex-phase-1-form-ui` task 6.1. `form-ui`'s field renderer and
+`PathButtons` compile from StyleX; this probe is that change's exit
+criterion.
+
+Build the production bundle and open it on the engine's own port. Open a
+running instance in the studio area's Player, and the same step on the
+app area's Task screen (or the field catalog's "How it will look"
+preview, a third site rendering the same component). Select a text
+field's input in DevTools on each.
+
+Pass: the computed `font-size` is 14px, `padding` is `var(--space-2)`,
+and `border` is `1px solid var(--color-border)` — on every one of the
+three sites, identically. These are the values `form-ui.css` declared
+before this change; the compiled style must equal them exactly.
+
+Open `PathButtons`. Pass: the wrapper's computed `gap` is `var(--space-2)`.
+The button element still carries the literal `btn btn-primary` class,
+unmigrated.
+
+Resize the Player's own pane, and the Task screen's container, below
+34rem. Pass: a two-column form's fields collapse to one column on both,
+at the same width, since the container query reads the form's own width,
+not the viewport's.
+
+Throughout: zero console errors on either screen.

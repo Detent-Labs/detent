@@ -1552,10 +1552,11 @@ Stage-by-stage status is in `ROADMAP.md`.
   source-only, no-build package extracted from the editor's Player field
   renderer so both the editor's Player and the end-user app render step forms
   through the identical component tree — a fix to one benefits both, and what
-  an author previews is what a participant gets. Only the end-user app
-  currently imports `form-ui/form-ui.css`; the editor's Player does not, so
-  its forms are presently unstyled (a known gap, not a design choice — see
-  `form-ui`'s spec). Two small engine-side additions: `InstanceSummary` gained
+  an author previews is what a participant gets. `packages/form-ui` ships no
+  stylesheet; its field renderer and path buttons compile from StyleX style
+  objects instead (`stylex-phase-1-form-ui`), so both consumers render
+  identically styled with no CSS import of their own. Two small engine-side
+  additions: `InstanceSummary` gained
   `processLabel`/`stepLabel`/`processBaseLocale` (resolved through the pinned
   version body) so the inbox can render without shipping whole process bodies
   to end-user browsers, and `POST /instances/:id/cancel` accepts
@@ -2372,10 +2373,10 @@ Stage-by-stage status is in `ROADMAP.md`.
   `getInstanceView`, `submitPath`, `claimStep`, `releaseClaim`, and
   `getInstanceRecord`, reusing the package's existing `request()`/
   `StudioClientError`, and `form-ui` became a new dependency of
-  the studio area (it had none before Player existed) — including the
-  `form-ui/form-ui.css` import at the Player's own entry point that
-  `packages/editor`'s Player never had, leaving its forms unstyled; Studio's
-  Player closes that gap rather than reproducing it.
+  the studio area (it had none before Player existed). `packages/editor`'s
+  Player never styled its forms; Studio's Player closes that gap, first via
+  a shared stylesheet and, since `stylex-phase-1-form-ui`, via `form-ui`'s
+  own compiled StyleX styles.
 
   Showing the merged record beside Player needed an authorization change,
   not just a new route: `getInstanceRecord` (`src/runtime/api.ts`) gained an
