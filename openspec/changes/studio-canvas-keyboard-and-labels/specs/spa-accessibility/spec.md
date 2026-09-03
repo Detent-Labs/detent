@@ -30,8 +30,9 @@ The surface's own root draws no such element. It SHALL keep the global
 
 A disclosure the surface draws SHALL be a `<button type="button">`, the same
 element an HTML disclosure uses. A `<foreignObject>` sized to that button
-alone hosts it, and a corner-sized rectangle covers nothing the surface draws.
-The surface SHALL NOT except itself from the disclosure rule.
+alone hosts it. The surface SHALL draw that host in a pass late enough that
+nothing the surface paints afterwards covers it. The surface SHALL NOT except
+itself from the disclosure rule.
 
 The studio's canvas is the one surface of this shape today. A future one SHALL
 follow the same pattern rather than inventing a second.

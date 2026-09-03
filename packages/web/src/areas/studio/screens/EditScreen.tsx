@@ -14,7 +14,7 @@ import type { DraftRecord, PublishResult } from "../api/types.js";
 import type { Route, PanelView } from "../routing.js";
 import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
 import { isDirty } from "./draftToolbarState.js";
-import { CanvasView } from "../canvas/CanvasView.js";
+import { CanvasView, groupMembersDomId } from "../canvas/CanvasView.js";
 import { EditRail } from "../canvas/EditRail.js";
 import { snapToGrid, svgPointFromClient, DEFAULT_EDGE_STYLE, type Point, type EdgeStyle } from "../canvas/geometry.js";
 import { canGroup, groupMatching, type StepGroup } from "../canvas/groups.js";
@@ -501,6 +501,7 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
                 waypoints={waypoints}
                 onWaypointsChange={onWaypointsChange}
                 groups={groups}
+                onGroupsChange={onGroupsChange}
                 insertTargetPathId={insertTargetPathId}
               />
               {/* The third column has three states (studio-canvas). Nothing
@@ -541,7 +542,16 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
                           <button
                             type="button"
                             className="btn btn-secondary"
-                            aria-pressed={matched.collapsed === true}
+                            // The same attribute the canvas box's own
+                            // disclosure carries. Both write this one
+                            // `collapsed` flag, so neither may report it as a
+                            // pressed state instead. `aria-controls` names the
+                            // members `<g>`, and only where the box draws:
+                            // below two members `drawnBox` returns nothing and
+                            // no wrapper exists to name. A step delete can
+                            // leave a group at one member.
+                            aria-expanded={matched.collapsed !== true}
+                            aria-controls={matched.stepIds.length > 1 ? groupMembersDomId(matched.id) : undefined}
                             onClick={() =>
                               onGroupsChange(
                                 groups.map((g) => (g.id === matched.id ? { ...g, collapsed: !g.collapsed } : g)),

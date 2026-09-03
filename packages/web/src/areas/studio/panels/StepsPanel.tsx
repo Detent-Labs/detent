@@ -16,7 +16,7 @@ import { IssueList, NotCheckedBadge } from "./shared/IssueList";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { ChecksRail } from "./ChecksRail.js";
 import { parseChildProcessJson } from "../draft/io";
-import { missingTranslationWarning } from "../draft/localized-text";
+import { missingTranslationWarning, resolveDraftLocalizedText } from "../draft/localized-text";
 import { stepIssueCount } from "../draft/panel-rail";
 import { nextStepKey, configuredFieldCount } from "./stepsPanelLogic.js";
 
@@ -170,7 +170,7 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
   return (
     <div className="steps-panel">
       <div className="step-inspector-heading">
-        <strong>{step.key || t("steps.unnamedStep")}</strong>
+        <strong>{resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep")}</strong>
         <span>{step.type ?? "task"}</span>
         {step.terminal && <span className="badge">{t("steps.terminalBadge")}</span>}
       </div>

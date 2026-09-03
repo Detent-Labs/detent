@@ -15,7 +15,7 @@ No step selection means no inspector. No inspector means no authoring. This is
 not a degraded route to the work. It is no route at all. PRODUCT.md names the
 standard: WCAG 2.1.1 Keyboard, Level A.
 
-The second defect hides every step label. Line 655 reads
+The second defect hides every step label. Line 656 reads
 `s.key || resolveDraftLocalizedText(s.label, ...) || t("steps.unnamedStep")`.
 The operands sit in the wrong order. A valid step always carries a key, so the
 label branch never runs. The node then prints that key twice, once at line 952
@@ -93,7 +93,8 @@ None.
   `packages/web/src/areas/studio/screens/FormEditorScreen.tsx`: one line each,
   the same corrected label expression.
 - `packages/web/src/areas/studio/app.css`: the focus-ring rules, and the
-  `outline: none` that keeps the global one from doubling it.
+  `outline: none` that keeps the global one from doubling it. Plus the
+  disclosure button's own rule, which sizes and centers its glyph.
 - `packages/web/src/i18n/catalogs/studio.ts`: the name keys, in English. That
   catalog carries no other locale.
 - `packages/web/test/`: the traversal unit tests and the static-markup

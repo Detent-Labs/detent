@@ -2155,3 +2155,130 @@ lands on the top of the page, and never on nothing at all.
 
 Press Tab straight after each close. Pass: the next stop is the control after
 the kebab trigger, not the first control on the screen.
+
+### Keyboard access to the canvas (`studio-canvas-keyboard`)
+
+Source: `studio-canvas-keyboard-and-labels` task 10.1.
+
+`packages/web` carries no DOM harness. Every component test there reads the
+string `renderToStaticMarkup` returns. A role, a `tabindex` and an `aria-label`
+show up in that string. A focus move does not, and neither does a painted ring
+nor a spoken name.
+
+Build the production bundle and open a draft on the engine's own port. The
+draft needs an initial step, a terminal step and a manual path. It also needs
+an automatic fan of two, an expanded group and a collapsed group. The studio
+dev-mode crash the `instance-transition-action` entry records applies to this
+walk too.
+
+Press Tab from the top of the page until the canvas takes the stop. Pass: the
+focus ring sits on the step `workflow.initialStep` names. Run this whole entry
+twice, once in Chrome and once in Firefox.
+
+A `tabindex` on an SVG `<g>` is a browser vendor's own behavior, and it is what
+the previous check tests. Pass: the node group holds the focus in both
+browsers. A node that never takes focus is the defect this entry exists for.
+
+Press Right, then Right again. Pass: focus moves to the step's first outgoing
+path, then on to that path's target. Press Left twice. Pass: it walks back the
+same way.
+
+Press Up and then Down on a focused step. Pass: focus moves through the order
+`workflow.steps` holds, which the field matrix draws as its column order. Press
+Up and Down on a focused path. Pass: focus walks the fan that path belongs to.
+
+Scroll the page so the canvas sits below the fold, then press each arrow. Pass:
+focus moves and the page holds still. An arrow that scrolls the page means a
+missing `preventDefault`.
+
+Focus a step and press Enter. Pass: the inspector beside the canvas switches to
+that step, and the node draws as selected.
+
+Press Escape from that node. Pass: the outline lands on the `<svg>` itself.
+Press Tab. Pass: the stop leaves the canvas and reaches the control after it,
+rather than another node.
+
+From the canvas press Escape, then Tab, then Shift+Tab, then Right. Pass: the
+Shift+Tab lands on the `<svg>` root, and Right moves from there to the entry
+point. It does not return to the node you left.
+
+Focus a node and count the rings on it. Pass: exactly one draws, an accent
+rectangle held off the node's edge. No second bounding box sits beside it. Do
+the same on a focused path.
+
+The `<svg>` root and each disclosure button keep the global outline instead.
+Pass: focusing either one draws that outline. Neither carries a ring element of
+its own.
+
+Focus a manual path. Pass: its `5 4` dash still reads through the accent, and
+about 2px of accent shows on each side of the line. A path drawn as one solid
+accent stroke is the defect here.
+
+Select a second path with the pointer, then focus the manual one again. Pass:
+the two read differently. A focused path carries a band around the line, and a
+selected path carries a recolored line.
+
+Set the browser zoom to 200 percent and focus a node. Pass: the ring is still
+there, and it still measures 2px. A ring that thickens with the zoom means a
+missing `vector-effect`.
+
+Start a screen reader and focus a step. Pass: it reads the label, the key, the
+kind word and the outgoing count. A terminal step adds its outcome, and the
+initial step says that it is the entry point.
+
+Focus a group's disclosure button with that reader running. Pass: it names the
+group the button opens, and reports that group's open or collapsed state.
+A button announced as "button" alone is the defect.
+
+Keep NVDA running and press each arrow inside the canvas. Pass: focus moves.
+Browse mode taking the key for itself is what `role="application"` exists to
+stop.
+
+Change the header's content locale and watch the nodes. Pass: every label
+repaints in the locale you chose. A label with no entry there falls back to the
+draft's base locale.
+
+Press a group's disclosure button and hold the pointer down. Pass: the group
+does not travel with the pointer. The press belongs to the button, never to the
+box's own drag handlers.
+
+Route a path across the box's bottom-right corner, then press the button. Pass:
+the button takes the press, and no path becomes selected. The 12-wide hit area
+under the route is what would otherwise take it.
+
+Drag a guard label or a waypoint handle over that same corner, then press the
+button again. Pass: the button still takes it. Both of those draw before the
+disclosure pass does.
+
+Move focus to the button and look at the box corner. Pass: the outline is
+findable against the box edge behind it. A ring around the whole box is the
+recorded upgrade where it is not.
+
+Collapse a group whose name runs long. Pass: the chevron draws whole, and no
+glyph of the name runs under it. The name starts 152 units to the left of that
+band.
+
+Focus the button and press Down. Pass: focus moves on to the next entry in the
+step order. Press Enter on the button instead. Pass: the group toggles, and the
+chevron turns.
+
+Click a node with the pointer, then press an arrow key. Pass: focus walks from
+the node you clicked, not from the one the keyboard last held.
+
+Click a group's disclosure with the pointer, then press Enter. Pass: the group
+toggles and nothing else happens. A stop left on a step would let that one
+Enter both toggle the group and open the step's inspector.
+
+These two stay manual for the same reason as the check below. A pointer press
+and a focus move are both invisible to `renderToStaticMarkup`, and the web
+package carries no DOM harness.
+
+Double-click a node's label to open the inline rename, then read that node's
+`<g>` in the inspector. Pass: it carries no `role`, no `aria-label` and no
+`tabindex` while the field is open. ARIA forbids a focusable input inside a
+button, and the node is a button everywhere else.
+
+This one stays manual for a mechanical reason. Only a double click sets the
+internal `renaming` state. A static render draws the initial state alone, and
+the web package carries no DOM harness. So the rename branch never renders in
+a test.

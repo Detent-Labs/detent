@@ -1998,6 +1998,82 @@ Stage-by-stage status is in `ROADMAP.md`.
   matching `autoPlaceSteps`'s own depth-to-column axis convention. Flow
   order exempts a path that closes a cycle, since a rework loop makes
   both directions of that ordering impossible to satisfy at once.
+- Canvas keyboard traversal (`packages/web/src/areas/studio/canvas/traversal.ts`,
+  `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`, `i18n/catalogs/studio.ts`,
+  `areas/studio/app.css`, `studio-canvas`, `spa-accessibility`): the canvas
+  answers the keyboard, not the pointer alone. The `<svg>` root carries
+  `role="application"`, an `aria-label` and a `tabindex` of its own. That role
+  is load-bearing: browse mode otherwise consumes an arrow key before the
+  canvas handler sees it. Each step node `<g>` and each path group carries
+  `role="button"`, an `aria-label` and a roving `tabindex`. A node drops all
+  three while its inline rename is open, since ARIA forbids a focusable field
+  inside a button. Right follows an outgoing path to its target, and Left an
+  incoming path back to its source.
+
+  Up and Down move through the order `workflow.steps` holds, or through the fan
+  a focused path belongs to. Enter selects the focused step and opens its
+  inspector, exactly as a click does. Escape moves the roving stop to the
+  `<svg>` itself, so Tab leaves the canvas rather than re-entering it. No axis
+  wraps, and an arrow key from a root focus goes to the entry point.
+
+  The module `traversal.ts` holds those rules, pure and total over a
+  deep-partial draft. It is the canvas's twelfth pure module, beside `arrange`,
+  `groups` and `selection`. It exports `nextFocus`, `entryFocus`, the `Focus`
+  union, the `ArrowKey` union, and the structural `TraversalStep` and
+  `TraversalPath` shapes it reads. A `Focus` names a step, a path with the end
+  the author arrived through, a group, or the `<svg>` root. A step with no `id`
+  drops out of the traversal, and so does a path with no `id` or no `to`. So
+  does a path whose ends do not both resolve, and a member hidden inside a
+  collapsed group.
+
+  That reachable set matches what `CanvasView` already declines to draw. The
+  entry point falls back four times: `workflow.initialStep`, the first
+  reachable step, the first drawn group box, then the `<svg>` root. The last
+  fallback keeps the canvas in the page's tab order on a brand-new draft. A
+  focus that stops resolving falls back to the entry point too, so some element
+  always carries `tabindex="0"`.
+
+  A group box draws a real `<button type="button">` in a 20 by 20
+  `<foreignObject>` at its bottom-right corner. That corner sits inside the
+  group's own `GROUP_MARGIN` band, clear of every member node. The button
+  carries `aria-expanded`, the roving `tabindex`, and `aria-controls` naming
+  `canvas-group-members-<groupId>`. That `<g>` wraps the group's member nodes
+  and renders in both states. It holds nothing for a collapsed group.
+
+  The buttons draw last inside the `<svg>`, after the guard-label and
+  waypoint-handle passes. No route then takes a press meant for one. The class
+  `panzoom-exclude` keeps Panzoom and the marquee's capture handler off them.
+
+  The selection toolbar's collapse button now carries `aria-expanded` and the
+  same `aria-controls`, in place of the `aria-pressed` it held. It omits the
+  reference where `drawnBox` returns no box, since no wrapper `<g>` exists
+  there.
+
+  Focus draws as an element rather than a CSS `outline`, which does not follow
+  an SVG shape. A node gets a `<rect>` held 2px off its edge. A path gets a
+  6-wide halo `<path>`, sharing the edge's own `d` and drawn under it. Both
+  carry `vector-effect="non-scaling-stroke"`, so the canvas zoom leaves the 2px
+  token alone. The halo is what keeps a manual path's `5 4` dash readable, and
+  what keeps focus distinct from selection. A coincident 2px stroke would
+  recolor the line, which is what selection already draws.
+
+  The node and the path suppress the bare `:focus-visible` outline `tokens.css`
+  gives every element. Chrome and Firefox both paint it on an SVG element, so a
+  focused node would otherwise draw two rings. The `<svg>` root and each
+  disclosure button keep it, since neither draws a ring of its own. The node
+  rect lost its `rx={2}` here, which the zero-radius rule never admitted.
+
+  The node prints the resolved label first and the key second. It draws the key
+  line only where the two differ. Every node read its own key twice before
+  that.
+  The step headings in `StepsPanel` and `FormEditorScreen` took the same
+  corrected expression.
+
+  Accessible names compose from `canvas.nodeLabel`, `canvas.pathLabel` and
+  `canvas.groupDisclosure` in the studio catalog. Each conditional segment
+  takes a key of its own, so no template prints an empty slot. Those chrome
+  words ship in English alone, while the label an author wrote resolves against
+  the studio's content locale.
 - Process Studio — lifecycle (`src/http/studio-routes.ts`, `src/engine/drafts.ts`,
   `src/http/errors.ts`, `packages/web/src/areas/studio/panels/DraftToolbar.tsx`,
   `packages/web/src/areas/studio/screens/{VersionsScreen,MigrationPlanScreen}.tsx`,

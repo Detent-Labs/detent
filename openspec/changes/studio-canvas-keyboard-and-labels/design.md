@@ -218,7 +218,7 @@ conditionals pick a child, a decoration or a pointer set instead:
 - `:792`: whether a path gets a guard label
 - `:816`: the waypoint handles on the selected path
 - `:854` and `:859`: the priority badge and the else marker
-- `:868`: the connect-drag preview line
+- `:869`: the connect-drag preview line
 - `:918`, `:927`, `:933`, `:958`, `:964`: children of a node that draws
 - `:1049`: the reject message
 
@@ -233,6 +233,12 @@ invariants its input type does not carry. Each rule below is therefore total.
 
 **No id, no focus.** A step with no `id` renders nothing today. The traversal
 skips it, and it holds no place in the Up/Down order.
+
+**A repeated step id holds one place.** It keeps its first. A draft repeating
+an id holds two entries naming it, and a lookup answers with the first. A
+second place would be a dead end. Down from it would walk on from the first
+entry instead. With steps `[A, B, A, C]` the order would cycle A, B, A, B, and
+never reach C.
 
 **A path needs an `id` and a `to`.** Lacking either, the traversal skips it.
 The synthetic React key is a drawing detail, not an identity. `data-path-id`
@@ -280,6 +286,11 @@ that names a reachable step. Otherwise the first reachable step in
 itself. Where `initialStep` names a step inside a collapsed group, the entry
 is that group's box.
 
+Reachable there means one thing: the graph holds the id. A defined-ness test
+would admit a step whose `id` is the empty string, which `graphOf` drops. The
+entry point would then name an id no rule resolves. Every key would answer
+with that focus, and no element would take the stop.
+
 That last fallback matters more than it looks. Under a roving `tabindex`, a
 surface where nothing carries `tabindex=0` leaves the page's tab order
 altogether. A brand-new draft carries no `initialStep`. It would then be worse
@@ -296,6 +307,17 @@ Holding the stale id would leave `focus()` a no-op on an element that does not
 exist. No element would then carry `tabindex="0"`, and the canvas would leave
 the page's tab order. So the component re-runs the entry-point function
 whenever the current focus stops resolving.
+
+**A pointer press moves the roving stop.** The keyboard is not its only
+writer. A press on a node takes a step focus. A press on a path takes a path
+focus, entered through its source. A press on a disclosure takes that group's
+focus.
+
+Two failures follow from leaving the stop where the keyboard left it. An arrow
+key after a click walks from the node the author focused before. Enter after a
+disclosure click toggles the group and also opens the focused step's
+inspector. Enter binds for a step focus and a path focus alone, so the group
+focus ends that second one.
 
 ### The boundary does not wrap and does not beep
 
@@ -334,7 +356,7 @@ not a hierarchy and not a table.
 Every key press inside the `<svg>` bubbles to that handler, including one from
 the inline rename input. The rename input at `CanvasView.tsx:944-947` stops
 neither Enter nor Escape today. The canvas handler therefore returns early for
-an event whose target sits inside a `<foreignObject>`.
+an event whose target sits inside a text-entry field.
 
 The `<svg>` also takes an `aria-label` naming the graph, and `tabIndex={-1}`.
 Escape moves focus back to it. A `focus()` call on an element with no
@@ -345,7 +367,8 @@ Escape also hands the roving stop over. The root takes `tabIndex={0}`, and
 every node, path and box drops to `-1`. Without that move Tab walks straight
 back in. Focus navigation resumes from the focused element's document
 position, and the roving `0` still sits inside the `<svg>`. Re-entering the
-canvas restores the `0` to the remembered focus.
+canvas lands on the root, and an arrow key from there moves to the entry
+point.
 
 ### The canvas draws the focus ring, rather than styling it
 
@@ -364,9 +387,34 @@ The stroke takes `vector-effect="non-scaling-stroke"`. Without it the canvas
 zoom scales the ring, and the 2px token becomes whatever the zoom says. The
 offset scales with the node, which is correct. The ring must hug the shape.
 
-A path takes the same treatment. A sibling `<path>` carries the same `d`, no
-fill, a 2px accent stroke and the same vector effect. The same
-`:focus-visible` rule makes both visible.
+**The node's ring takes a dash.** That dash separates focus from selection.
+
+A selected node draws the same 2px accent, so only the ring's 3-unit offset
+stands between the two. That offset scales with the node while the stroke does
+not. At the 0.612 default fit the gap renders 1.84px, and the two bands read
+as one.
+
+Widening the gap cannot fix that, because every zoom rescales it. The dash
+costs no width and no colour. It holds at every zoom: the non-scaling stroke
+measures the pattern in screen pixels too.
+
+**A path takes a halo, not a ring.** The node's rule is a 2px stroke held 2px
+off the shape. A line cannot hold anything off itself. A stroke has no offset,
+and a ring sharing the edge's own `d` is the edge, repainted.
+
+A 2px accent stroke on that `d` therefore recolors the line. That is what
+`.canvas-edge-group-selected .canvas-edge` already draws (`app.css:2805-2807`),
+so focus and selection would read alike. It also erases the `5 4` dash
+`.canvas-edge-manual` carries (`app.css:587-590`).
+
+So the indicator becomes a band around the shape. A sibling `<path>` sits
+before the edge, sharing that edge's `d`. It takes no fill, the accent stroke,
+a `stroke-width` of 6 and the same vector effect. It carries no
+`stroke-dasharray`.
+
+The 1.5px edge then paints over the halo's middle. A manual path keeps its own
+dash, and about 2px of accent reads on each side. The same `:focus-visible`
+rule makes the node's ring and the path's halo visible.
 
 **The node and the path each set `outline: none`.** A bare `:focus-visible`
 rule sits at `packages/web/src/shell/tokens.css:129-132`. It gives every
@@ -405,6 +453,11 @@ button carries `aria-expanded`, an accessible name and a roving `tabindex`.
 Enter toggles the collapse. The box sits in the Up/Down step order immediately
 before its first member.
 
+That order holds the box in both states. A button with no place in it takes no
+roving stop. No key then reaches the disclosure, which fails WCAG 2.1.1. Only
+a collapsed group's member loses its own place, because the box stands in for
+it. An expanded group's members keep theirs, after the box.
+
 The button's name identifies the group, so a reader announces which group it
 opens. It comes from a catalog key filled with `group.name`. The alternative
 was the name a `role="button"` computes from its subtree, over the box's own
@@ -415,6 +468,22 @@ A step hidden inside a collapsed group is not focusable and not drawn.
 Traversal skips it. Where a path's far end hides, Right or Left lands on the
 collapsed box. That box is the element the path already anchors on. The author
 then presses Enter to open the group and continues.
+
+**A collapsed box answers Left and Right.** An earlier draft moved neither
+key. Its reason was that a box carries no fan of its own. A path between two
+collapsed groups disproves it. Its source hides in one box and its target in
+the other, so `graphOf` keeps the edge. The canvas then draws it with a name
+and a roving stop.
+
+Neither end step is focusable, so no arrow sequence reached that path. It was
+a pointer-only control, which is what this change exists to end. The box
+stands in for its members, so it stands in for their fan. Right takes the
+first path leaving the box, and Left the first one entering it. A box no path
+crosses keeps the focus.
+
+Dropping the edge instead would keep the drawn control and hide it from the
+keyboard. The rule also removes an asymmetry. Right from a path already lands
+on a collapsed box, and until now nothing left one.
 
 **The toggle needs a prop nobody has written.** `CanvasView`'s `Props` carries
 `groups: StepGroup[]` and no writer (`CanvasView.tsx:69`). The box handlers
@@ -443,29 +512,37 @@ Two claims held that carve-out up. The file disproves both.
 The first claim was that an `<svg>` cannot host a real button. The canvas
 already places HTML in a `<foreignObject>` twice. The rename `<input>` sits at
 `CanvasView.tsx:934-949`, in a rectangle 22 units tall inside the node group.
-The guard label's `<div>` sits at `:983-1000`.
+The guard label's `<div>` sits at `:993-1002`.
 
 The second claim was that a wrapper over the box would cover its members. The
 file's own comment at `CanvasView.tsx:716-718` says the opposite. Groups draw
 first, so every node and every route sits over them. The group pass runs at
-`:719`, the edge pass at `:746`, the node pass at `:883`. Anything drawn on a
+`:719`, the edge pass at `:746`, the node pass at `:884`. Anything drawn on a
 group box paints under every node.
 
-So the box gets a real `<button type="button">`. It sits in a
-`<foreignObject>` at the box's own corner, sized to the button. The box margin
-is 20 user units (`groups.ts:22`), so that corner stands clear of the
-outermost member. A corner-sized rectangle covers nothing, whatever the paint
-order says.
+So the box gets a real `<button type="button">`. It sits in a 20 by 20
+`<foreignObject>` at the box's bottom-right corner. The box margin is 20 user
+units (`groups.ts:22`), so that corner stands clear of the outermost member.
 
-**The drag gesture survives.** The box `<g>` carries `onPointerDown`,
-`onPointerMove` and `onPointerUp` (`CanvasView.tsx:729-731`). Those three
-drive the whole-group drag. The button stops its own pointer events, the way
-the rename input does at `CanvasView.tsx:943`. That input sits inside a node
-`<g>` carrying the node drag, so the shape is the same one.
+Paint order decides the rest, and it is why the buttons draw last inside the
+`<svg>`. The section below states that rule in full.
 
-The button also takes `panzoom-exclude`, which both existing
-`<foreignObject>`s carry. Without it Panzoom's own down-handler swallows the
-press (`CanvasView.tsx:522`).
+**The drag gesture survives.** The box handlers are not the reason. That `<g>`
+carries `onPointerDown`, `onPointerMove` and `onPointerUp`
+(`CanvasView.tsx:729-731`). Those three drive the whole-group drag. The button
+draws in the late pass, so it is a sibling of that `<g>` rather than a child.
+Its own pointer events never bubble through those handlers.
+
+Two things do reach it. Panzoom binds its down-handler natively on
+`.canvas-wrap`, above the whole surface (`CanvasView.tsx:182-194`). The
+marquee's own capture handler reads the target on the way down
+(`CanvasView.tsx:520-522`). Neither is stoppable from a React handler on the
+button.
+
+So the guard is `panzoom-exclude`, which both existing `<foreignObject>`s
+carry. Both of those two test for that class before they act. The button also
+stops its own pointer events, the way the rename input does at
+`CanvasView.tsx:943`. That keeps a press off the `<svg>`'s own handlers.
 
 **No carve-out ships.** The `spa-accessibility` delta writes no MODIFIED
 disclosure requirement. This change satisfies the live rule rather than
@@ -488,6 +565,16 @@ So this change swaps that one attribute and adds the matching
 `aria-controls`, naming the same members `<g>` the canvas button names. Both
 sit in the same document, so the id reference resolves either way. It is one
 line in a file this change already edits for the groups writer.
+
+**That second attribute is conditional.** The wrapper `<g>` exists only for a
+group the canvas draws a box for. Below two resolvable members `drawnBox`
+returns nothing (`groups.ts:29-31`). A step delete can leave a group at one,
+and `EditScreen.tsx:189` filters `stepIds` to the steps the draft still holds.
+
+The helper `groupMatching` still matches that group when the author selects
+its one step (`groups.ts:92-95`), so the toolbar's button renders. Naming an
+absent element there is the same hazard the canvas button already avoids. The
+toolbar's button therefore carries `aria-controls` only where the box draws.
 
 ### The step node prints the label
 
@@ -548,12 +635,34 @@ words are the palette's own, `palette.step`, `palette.subprocess` and
 palette title-cases them for a button, and a reader announces "Step" and
 "step" alike.
 
+The fan count picks between two templates. A single fixed plural announces "1
+outgoing paths" on every step carrying one path. So the singular takes a key
+of its own, and the count still fills the slot in either template.
+
 ### The accessible name of a path
 
 The name reads the path's label, its source step, its target step, its
-trigger, and its guard. An automatic path adds its priority. A path with no
-guard says so. A guardless default at the highest priority is a fact an author
-needs.
+trigger, and its guard. The guard is the last base segment. An automatic path
+appends its priority after it. A guardless default at the highest priority is
+a fact an author needs.
+
+The guard is a slot rather than an appended key. Every path either carries a
+guard or says it carries none. The base template `canvas.pathLabel` holds that
+slot. A guardless path fills it with `canvas.pathLabelNoGuard`. Every slot
+takes a value, which keeps the appended-segment rule below true.
+
+**The slot takes the readable guard, not the CEL source.** A reader hears the
+summary instead. The canvas already draws that summary through
+`guardEdgeLabel`. Its own `<div>` carries `aria-hidden`, so a reader reaches
+the raw source alone.
+
+The name now takes the string `guardEdgeLabel` returns. That function returns
+the source itself where nothing resolves, which is the honest fallback.
+
+The trigger slot takes the same treatment. A deep-partial draft holds a path
+carrying no `trigger`, and the traversal already answers for one. Such a path
+fills that slot with `canvas.pathLabelNoTrigger`. Leaving it empty would print
+the string this rule exists to stop.
 
 ### Each conditional segment of a name is its own key
 
@@ -562,12 +671,14 @@ can express a segment that is sometimes absent. Filling an unused slot with an
 empty string prints "Capture, capture, Step, , 2 outgoing paths".
 
 So each conditional segment takes a key of its own, appended only where it
-applies. There are four:
+applies. There are three:
 
 - a terminal step's outcome
 - the initial step's entry-point word
 - an automatic path's priority
-- the phrase a guardless path says
+
+A fourth key, the phrase a guardless path says, fills the base template's
+guard slot rather than appending to it.
 
 The group's disclosure button takes a fifth key, which names the group it
 opens.
@@ -642,7 +753,7 @@ The `rx` change is visual only, and it moves toward the rule the rest of the
 UI already follows.
 
 This change earns no `ROADMAP.md` stage row. It is an accessibility pass, and
-`ROADMAP.md:377-383` already sends those to the archive with no stage.
+`ROADMAP.md:378-384` already sends those to the archive with no stage.
 
 ## Open Questions
 
@@ -657,38 +768,87 @@ This change earns no `ROADMAP.md` stage row. It is an accessibility pass, and
   focused node's own name carries the same words, so this change ships
   without one.
 
-### Three findings the fourth review left open
+### This change closes the three findings the fourth review left open
 
-Four review rounds took this change from six critical findings to three. The
-three below stay open. Apply starts once somebody closes them. Each one is a
-cost of dropping the SVG carve-out, not a flaw that decision missed.
+The fourth review round left three findings. Each one was a cost of dropping
+the SVG carve-out. This change settles all three below. The specs and the
+tasks carry each settled rule.
 
-#### The disclosure button sits inside the rename field's exclusion
+#### The key handler excludes a text field, not a `<foreignObject>`
 
-Task 4.7b returns early from the canvas key handler for any event inside a
-`<foreignObject>`. That stops the rename input firing Enter and Escape twice.
-Task 6.1 puts the group box's button in a `<foreignObject>`, and task 9.1j1
-makes the handler ignore its keys.
+An earlier draft returned early from the canvas key handler for any event
+inside a `<foreignObject>`. The group box's disclosure button sits in one. The
+arrows would then never reach the traversal, and a focused box would trap the
+keyboard.
 
-The arrows never reach the traversal, so a focused group box traps the
-keyboard. Task 6.5 and `studio-canvas` at :327-329 both need an arrow to
-leave. The exclusion has to read its target. A text field owns every key, and
-a button owns Enter and Space alone.
+So the exclusion reads its target instead. The handler returns early where the
+target sits inside a text-entry field. The test is
+`closest("input, textarea, [contenteditable]")`. The rename input is that
+field, and it keeps every key it owns today.
 
-#### Escape names no trigger
+The disclosure button is not one. Left, Right, Up, Down and Escape therefore
+reach the traversal from a focused box. The button keeps Enter and Space,
+which a real button already handles. Nothing fires twice: the handler's Enter
+binding covers a step focus and a path focus. A group focus is neither.
 
-The re-entry clause at `studio-canvas` :21-24 and tasks 4.7a1 to 4.7a3
-describe the behaviour. Neither names what raises it. The one candidate is the
-root's own `onFocus`. It cannot tell an Escape from a Tab. Either the canvas
-takes a second tab stop, against `studio-canvas` :5, or Escape does nothing.
+#### Escape moves the stop, and an arrow key brings it back
 
-#### The button's rectangle has no stated corner or size
+An earlier draft said re-entering the canvas restores the roving `0` to the
+remembered focus. Nothing could raise that. The root's own `onFocus` cannot
+tell an Escape from a Tab. A second tab stop is what this change's own
+`studio-canvas` delta forbids at :5-7.
 
-One normative sentence about it is false too. The `spa-accessibility` spec
-states at :33 that a corner-sized rectangle covers nothing the surface draws.
-A collapsed box is the counter-example. It is a flat 180 by 60 from
-`drawnBox`, and it prints its own name at x+8, y+24.
+So the restore goes. Escape moves the roving `0` to the `<svg>` and focuses
+it. Tab then leaves the canvas. Re-entering lands on the root, which holds the
+stop. An arrow key from a root focus moves to the entry point.
 
-The `.canvas-edge-hitarea` stroke is 12 wide. It draws at
-`CanvasView.tsx:746`, after the group pass at :719. So it can take the press
-the scenario at :355-358 gives the button.
+That last rule needs no component state. The `Focus` type already names the
+root, so the traversal answers a root focus the way it answers every other
+one. An author who leaves and returns starts at the entry point rather than
+where they stopped.
+
+`ponytail: an arrow key from the root goes to the entry point, not to the last focus. Hold the last focus in a ref if the browser check finds authors losing their place.`
+
+#### The button sits at the box's bottom-right, in a late pass
+
+The button is 20 by 20. Its `<foreignObject>` sits at the box's bottom-right
+corner, at `x + width - 20` and `y + height - 20`.
+
+That band is the group's own 20-unit margin (`groups.ts:22`, `GROUP_MARGIN`).
+On an expanded box it is therefore clear of every member node. The same
+measurement puts the box's own edge there.
+
+A collapsed box is 180 by 60, from `drawnBox`. The band spans `x+160..x+180`
+and `y+40..y+60`. The name draws at `x + 8, y + 24` and the count at
+`x + 8, y + 44` (`CanvasView.tsx:734`, `:738`). Both start 152 units to the
+left of the band, and the name's own glyphs end above it.
+
+So the collapsed box needs no clipping, and no name can reach the button. The
+top-right corner had neither property. A collapsed box's 13px name at
+`y + 24` runs through a top-corner button's band, and nothing truncates
+`.canvas-group-name`.
+
+The buttons draw last inside the `<svg>`, after every other pass. The group
+pass collects them, the way it already collects a guard label and a waypoint
+handle. The file states that reason at `CanvasView.tsx:658-662`, for the
+guard labels. It holds here too.
+
+Two passes run after the node pass in the same `<svg>`. Guard labels draw at
+`CanvasView.tsx:982-1004` and waypoint handles at `:1006-1034`. A guard label
+is a `<foreignObject>` up to 220 wide, holding a `<div>` whose own
+`onPointerUp` selects a path (`:993-1002`). It lands wherever a route midpoint
+lands, so it can cover a box corner.
+
+Drawing the disclosures after both is what keeps a press on them. Nothing the
+canvas paints needs to sit over a disclosure, so the late pass breaks nothing.
+The group pass runs at `:719` and the edge pass at `:746`. A button drawn in
+either would sit under a route. The `.canvas-edge-hitarea` stroke is 12 wide
+and would take the press.
+
+A button in that late pass is a sibling of its box `<g>` rather than a child.
+It carries the box's drag preview offset, so it follows a group the author is
+dragging.
+
+The `spa-accessibility` requirement drops the sentence claiming a corner-sized
+rectangle covers nothing. A collapsed box disproves it. The rule states the
+paint order instead.

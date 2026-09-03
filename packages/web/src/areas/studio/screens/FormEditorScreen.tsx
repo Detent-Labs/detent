@@ -416,7 +416,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
         </button>
         <h2 id="form-editor-heading">
           {t("formEditor.heading")}
-          <span className="studio-form-editor-step">{step.key || t("steps.unnamedStep")}</span>
+          <span className="studio-form-editor-step">{resolveDraftLocalizedText(step.label, contentLocale, draft.baseLocale ?? "en") || step.key || t("steps.unnamedStep")}</span>
         </h2>
       </header>
 
