@@ -1,7 +1,9 @@
 import { Inbox, FileClock, Users } from "lucide-react";
+import * as stylex from "@stylexjs/stylex";
 import { matchRoute, routePath, type Route } from "./routing.js";
 import { useAreaRoute, PROFILE_PATH } from "../../shell/routing.js";
 import { Chrome } from "../../shell/Chrome.js";
+import { navStyles } from "../../shell/navStyles.js";
 import { t } from "./catalog.js";
 import { TasksScreen } from "./screens/TasksScreen.js";
 import { TaskScreen } from "./screens/TaskScreen.js";
@@ -19,11 +21,18 @@ import "./app.css";
 export function AppArea({ session, locale, localPath, go, onUnauthorized, onLocaleChange, onLogout }: AreaRootProps) {
   const { route, navigate } = useAreaRoute<Route>("app", localPath, matchRoute, routePath, go);
 
+  const navProps = (isCurrent: boolean) => stylex.props(isCurrent && navStyles.navCurrent);
+  const tasksProps = navProps(route.name === "tasks");
+  const startedProps = navProps(route.name === "started");
+  const involvedProps = navProps(route.name === "involved");
+  const startProps = navProps(route.name === "start");
+
   const nav = (
-    <nav className="shell-nav">
+    <nav {...stylex.props(navStyles.nav)}>
       <button
         type="button"
-        className="btn btn-secondary"
+        className={`btn btn-secondary ${tasksProps.className}`}
+        style={tasksProps.style}
         aria-current={route.name === "tasks" ? "page" : undefined}
         onClick={() => navigate({ name: "tasks" })}
       >
@@ -32,7 +41,8 @@ export function AppArea({ session, locale, localPath, go, onUnauthorized, onLoca
       </button>
       <button
         type="button"
-        className="btn btn-secondary"
+        className={`btn btn-secondary ${startedProps.className}`}
+        style={startedProps.style}
         aria-current={route.name === "started" ? "page" : undefined}
         onClick={() => navigate({ name: "started" })}
       >
@@ -41,7 +51,8 @@ export function AppArea({ session, locale, localPath, go, onUnauthorized, onLoca
       </button>
       <button
         type="button"
-        className="btn btn-secondary"
+        className={`btn btn-secondary ${involvedProps.className}`}
+        style={involvedProps.style}
         aria-current={route.name === "involved" ? "page" : undefined}
         onClick={() => navigate({ name: "involved" })}
       >
@@ -50,7 +61,8 @@ export function AppArea({ session, locale, localPath, go, onUnauthorized, onLoca
       </button>
       <button
         type="button"
-        className="btn btn-secondary"
+        className={`btn btn-secondary ${startProps.className}`}
+        style={startProps.style}
         aria-current={route.name === "start" ? "page" : undefined}
         onClick={() => navigate({ name: "start" })}
       >

@@ -1,9 +1,11 @@
 import { useEffect, useRef } from "react";
+import * as stylex from "@stylexjs/stylex";
 import { Workflow, LayoutTemplate } from "lucide-react";
 import { matchRoute, routePath, ROUTE_ROLE, type Route } from "./routing.js";
 import { useAreaRoute, PROFILE_PATH, type NavigateOptions } from "../../shell/routing.js";
 import { t } from "./catalog.js";
 import { Chrome } from "../../shell/Chrome.js";
+import { navStyles } from "../../shell/navStyles.js";
 import { ProcessesScreen } from "./screens/ProcessesScreen.js";
 import { EditScreen } from "./screens/EditScreen.js";
 import { VersionsScreen } from "./screens/VersionsScreen.js";
@@ -75,13 +77,19 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
     if (strandedOnDefault) navigate({ name: "templates" });
   }, [strandedOnDefault, navigate]);
 
+  const processesCurrent = route.name === "processes" || route.name === "edit";
+  const processesProps = stylex.props(processesCurrent && navStyles.navCurrent);
+  const toolsProps = stylex.props(route.name === "tools" && navStyles.navCurrent);
+  const templatesProps = stylex.props(route.name === "templates" && navStyles.navCurrent);
+
   const nav = (
-    <nav className="shell-nav">
+    <nav {...stylex.props(navStyles.nav)}>
       {may(ROUTE_ROLE.processes) && (
         <button
           type="button"
-          className="btn btn-secondary"
-          aria-current={route.name === "processes" || route.name === "edit" ? "page" : undefined}
+          className={`btn btn-secondary ${processesProps.className}`}
+          style={processesProps.style}
+          aria-current={processesCurrent ? "page" : undefined}
           onClick={() => guardedNavigate({ name: "processes" })}
         >
           <Workflow size={18} strokeWidth={1.75} aria-hidden="true" />
@@ -91,7 +99,8 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
       {may(ROUTE_ROLE.tools) && (
         <button
           type="button"
-          className="btn btn-secondary"
+          className={`btn btn-secondary ${toolsProps.className}`}
+          style={toolsProps.style}
           aria-current={route.name === "tools" ? "page" : undefined}
           onClick={() => guardedNavigate({ name: "tools" })}
         >
@@ -101,7 +110,8 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
       {may(ROUTE_ROLE.templates) && (
         <button
           type="button"
-          className="btn btn-secondary"
+          className={`btn btn-secondary ${templatesProps.className}`}
+          style={templatesProps.style}
           aria-current={route.name === "templates" ? "page" : undefined}
           onClick={() => guardedNavigate({ name: "templates" })}
         >

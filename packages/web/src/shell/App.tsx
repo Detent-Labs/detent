@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
 import { matchShell, useLocation, areaHref, LOGIN_PATH, PROFILE_PATH, type NavigateOptions } from "./routing.js";
 import {
   loadSession,
@@ -18,6 +19,25 @@ import { LoginScreen } from "./LoginScreen.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { Chrome } from "./Chrome.js";
 import { ProfilePage } from "./ProfilePage.js";
+import { colors, space } from "form-ui/tokens.stylex";
+
+/** `.shell-empty`'s own base declaration from `shell.css`, unmerged — this
+ * file shares no component with `ErrorBoundary.tsx`, whose own `fallback`
+ * style carries the overridden padding instead. */
+const styles = stylex.create({
+  empty: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: space.s3,
+    maxWidth: "46rem",
+    marginInline: "auto",
+    marginBlock: 0,
+    paddingBlock: space.s6,
+    paddingInline: space.s3,
+    color: colors.textMuted,
+  },
+});
 
 /**
  * One dynamic import per area, so the build emits one chunk per area and a
@@ -186,7 +206,7 @@ export function App() {
         onGoToProfile={() => go(PROFILE_PATH)}
         nav={undefined}
       >
-        <main className="shell-empty">{t(locale, "area.forbidden")}</main>
+        <main {...stylex.props(styles.empty)}>{t(locale, "area.forbidden")}</main>
       </Chrome>
     );
   }
@@ -194,7 +214,7 @@ export function App() {
   // Keyed on the area so navigating away from a tripped area recovers it.
   return (
     <ErrorBoundary key={here.area} locale={locale}>
-      <Suspense fallback={<main className="shell-empty">{t(locale, "area.loading")}</main>}>
+      <Suspense fallback={<main {...stylex.props(styles.empty)}>{t(locale, "area.loading")}</main>}>
         <Root
           session={session}
           locale={locale}

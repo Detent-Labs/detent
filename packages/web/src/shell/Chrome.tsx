@@ -5,7 +5,7 @@ import { accountName } from "./accountName.js";
 import type { Session } from "./session.js";
 import type { UiLocale } from "../i18n/locale.js";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { colors, fonts, space, shadow } from "form-ui/tokens.stylex";
 
 /** `.shell-header` and `.shell-tab` from `shell.css`, as StyleX. The header's
  * one narrow-viewport rule sits on the property it changes. */
@@ -36,6 +36,102 @@ const styles = stylex.create({
     // Cut corners on the leading edge: a tab slotted into the register, not a pill.
     clipPath: "polygon(0 0, 100% 0, calc(100% - 0.4rem) 100%, 0 100%)",
     paddingRight: `calc(${space.s2} + 0.4rem)`,
+  },
+  accountGroup: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.s2,
+    marginLeft: "auto",
+    minWidth: 0,
+  },
+  accountName: {
+    fontFamily: fonts.body,
+    minWidth: "6rem",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  accountNameId: {
+    fontFamily: fonts.mono,
+  },
+  account: {
+    position: "relative",
+  },
+  // The popover's own top-layer promotion strips this element's old CSS
+  // anchoring; Chrome sets top/right inline off the trigger's live rect.
+  menu: {
+    left: "auto",
+    bottom: "auto",
+    margin: 0,
+    zIndex: 1,
+    minWidth: "12rem",
+    padding: space.s2,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    boxShadow: shadow.md,
+    // The UA stylesheet's [popover]:not(:popover-open){display:none} hides
+    // it while closed; an explicit "none" here matches that, deliberately,
+    // so the open state's "flex" wins the cascade the same way (design.md D2).
+    display: { default: "none", ":popover-open": "flex" },
+    flexDirection: "column",
+    gap: space.s2,
+  },
+  menuRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.s2,
+    fontSize: "0.85rem",
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
+    paddingTop: space.s2,
+  },
+  menuGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    paddingTop: space.s2,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
+  },
+  menuLabel: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: colors.textMuted,
+  },
+  menuLogout: {
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
+    paddingTop: space.s2,
+  },
+  menuVersion: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    color: colors.textMuted,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
+    paddingTop: space.s2,
+  },
+  // A menu row, not a committing action: plain ink text with a hover wash.
+  menuItem: {
+    display: "block",
+    width: "100%",
+    textAlign: "left",
+    background: {
+      default: "none",
+      ":hover": `color-mix(in srgb, ${colors.text} 7%, transparent)`,
+    },
+    color: colors.text,
+    paddingBlock: space.s1,
+    paddingInline: space.s2,
   },
 });
 
@@ -111,11 +207,11 @@ export function Chrome({ area, roles, session, locale, onLocaleChange, onLogout,
       <header {...stylex.props(styles.header)}>
         <span {...stylex.props(styles.tab)}>{t(locale, `area.${area}`)}</span>
         {nav}
-        <div className="shell-account-group">
-          <span className={identity.mono ? "shell-account-name shell-account-name-id" : "shell-account-name"} title={identity.text}>
+        <div {...stylex.props(styles.accountGroup)}>
+          <span {...stylex.props(styles.accountName, identity.mono && styles.accountNameId)} title={identity.text}>
             {identity.text}
           </span>
-          <div className="shell-account">
+          <div {...stylex.props(styles.account)}>
             <button
               ref={triggerRef}
               type="button"
@@ -127,10 +223,11 @@ export function Chrome({ area, roles, session, locale, onLocaleChange, onLogout,
             >
               {t(locale, "account.menu")}
             </button>
-            <div id={menuId} ref={menuRef} className="shell-menu" role="menu" popover="auto" onBeforeToggle={onMenuBeforeToggle}>
+            <div id={menuId} ref={menuRef} {...stylex.props(styles.menu)} role="menu" popover="auto" onBeforeToggle={onMenuBeforeToggle}>
               <button
                 type="button"
                 role="menuitem"
+                {...stylex.props(styles.menuItem)}
                 onClick={() => {
                   // Load-bearing: clicking this while already on `/profile`
                   // re-renders inside the same `Chrome` instance, with no
@@ -143,7 +240,7 @@ export function Chrome({ area, roles, session, locale, onLocaleChange, onLogout,
               >
                 {t(locale, "account.profile")}
               </button>
-              <label className="shell-menu-row">
+              <label {...stylex.props(styles.menuRow)}>
                 {t(locale, "account.language")}
                 {/* No hidePopover() call: this selection keeps the menu open for a further one. */}
                 <select value={locale} onChange={(e) => onLocaleChange(e.target.value as UiLocale)}>
@@ -152,13 +249,14 @@ export function Chrome({ area, roles, session, locale, onLocaleChange, onLogout,
                 </select>
               </label>
               {others.length > 0 && (
-                <div className="shell-menu-group">
-                  <span className="shell-menu-label">{t(locale, "account.switchArea")}</span>
+                <div {...stylex.props(styles.menuGroup)}>
+                  <span {...stylex.props(styles.menuLabel)}>{t(locale, "account.switchArea")}</span>
                   {others.map((other) => (
                     <button
                       key={other}
                       type="button"
                       role="menuitem"
+                      {...stylex.props(styles.menuItem)}
                       onClick={() => {
                         // Defensive, not load-bearing: a route change unmounts
                         // `Chrome` on its own, closing the menu regardless.
@@ -175,7 +273,7 @@ export function Chrome({ area, roles, session, locale, onLocaleChange, onLogout,
               <button
                 type="button"
                 role="menuitem"
-                className="shell-menu-logout"
+                {...stylex.props(styles.menuItem, styles.menuLogout)}
                 onClick={() => {
                   // Defensive, not load-bearing: a return to `LoginScreen`
                   // unmounts `Chrome` on its own, closing the menu regardless.
@@ -185,7 +283,7 @@ export function Chrome({ area, roles, session, locale, onLocaleChange, onLogout,
               >
                 {t(locale, "account.logout")}
               </button>
-              <div className="shell-menu-version">{__APP_VERSION__}</div>
+              <div {...stylex.props(styles.menuVersion)}>{__APP_VERSION__}</div>
             </div>
           </div>
         </div>

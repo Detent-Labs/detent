@@ -294,6 +294,21 @@ declarations' properties into that one `admin-field` style. It verifies
 this by checking the compiled CSS carries every property both source
 rules declared.
 
+**D13. `[aria-current="page"]` becomes a JS-computed condition, not a CSS
+one.** Each root already computes whether a tab is current, to set the
+button's own `aria-current` attribute. Task 2.8 reads that same boolean
+and composes `navStyles.navCurrent` only then, the way `Chrome.tsx`
+already composes `accountNameId`.
+
+An unconditional StyleX `background` declaration would need a `default`
+branch. That branch's specificity-boosted output would beat `.btn-
+secondary`'s own `:hover`/`:active` rules on every tab, current or not:
+the wash on hover would stop appearing. `:popover-open` and `:hover`
+(D2, D4) key real states no JS boolean tracks. This state already has
+one, so branching in JS avoids the collision outright and needs no CSS
+condition at all. The `aria-current` DOM attribute itself stays, for
+assistive technology; only its CSS selector goes.
+
 ## Risks / Trade-offs
 
 - [`:popover-open` does not compile as expected] → D2's fallback: a

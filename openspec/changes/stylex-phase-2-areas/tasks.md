@@ -18,14 +18,14 @@
 
 ## 2. `shell.css` and its six consumer files
 
-- [ ] 2.1 Add a `stylex.create` block to `Chrome.tsx` covering the account
+- [x] 2.1 Add a `stylex.create` block to `Chrome.tsx` covering the account
   group and the account menu (every menu row included), reading
   `form-ui/tokens.stylex`. Leave the outer `className="shell"` wrapper
   `<div>` untouched: `.shell` and `.shell > *` stay literal (design.md
   D10). The account button also needs no change: `.shell-account-button`
   has no rule of its own (design.md D7). Verify: `bun run typecheck`
   passes with no reference to an undeclared token.
-- [ ] 2.2 Give `.shell-menu:popover-open`'s rule a StyleX conditional
+- [x] 2.2 Give `.shell-menu:popover-open`'s rule a StyleX conditional
   value. Key it on the literal `:popover-open` pseudo-class, on the
   property that toggles the menu's `display` (design.md D2). Verify:
   `bun run build` succeeds, and the emitted CSS carries a real
@@ -34,24 +34,24 @@
   If it is either, stop. Apply design.md D2's literal-residual-rule
   fallback instead. Report back before any later task in this group
   assumes the conditional value works.
-- [ ] 2.3 Apply the new styles at each JSX call site in `Chrome.tsx`. The
+- [x] 2.3 Apply the new styles at each JSX call site in `Chrome.tsx`. The
   account button's own `className="btn btn-secondary shell-account-button"`
   stays untouched (design.md D7). Verify:
   `git grep -c 'className="shell-account\|className="shell-menu' packages/web/src/shell/Chrome.tsx`
   returns 0 for every class this task migrates. The literal `.btn`-family
   substrings legitimately remain.
-- [ ] 2.4 Add a `stylex.create` block to `LoginScreen.tsx` for
+- [x] 2.4 Add a `stylex.create` block to `LoginScreen.tsx` for
   `.shell-screen`, `.shell-login-form` (plus its `label` rule) and
   `.shell-error`, and apply it at each call site. Verify: `bun run
   typecheck` passes, and `git grep -c 'className="shell-screen\|
   className="shell-login-form\|className="shell-error"'
   packages/web/src/shell/LoginScreen.tsx` returns 0.
-- [ ] 2.5 Add a `stylex.create` block to `ErrorBanner.tsx` for
+- [x] 2.5 Add a `stylex.create` block to `ErrorBanner.tsx` for
   `.shell-error-banner`, `.shell-error-banner-stamp` and
   `.shell-error-banner-message`. Apply it at each call site. Verify:
   `bun run typecheck` passes, and `git grep -c 'className="shell-error-banner'
   packages/web/src/shell/ErrorBanner.tsx` returns 0.
-- [ ] 2.6 Add a `stylex.create` block to `ErrorBoundary.tsx` for
+- [x] 2.6 Add a `stylex.create` block to `ErrorBoundary.tsx` for
   `.shell-empty`, `.shell-boundary-fallback` and `.shell-boundary-stamp`.
   Apply it at each call site.
 
@@ -59,20 +59,20 @@
   applied locally. The two files share no component. Verify: `bun run
   typecheck` passes. Grep both files for the migrated literal classes;
   each returns 0.
-- [ ] 2.7 Add a `stylex.create` block to `ProfilePage.tsx` for every
+- [x] 2.7 Add a `stylex.create` block to `ProfilePage.tsx` for every
   `.shell-profile-*` rule. Reuse `.shell-screen` from task 2.4's shape,
   declared locally here too, per `web-styling`'s per-area duplication
   precedent. Apply it at each call site. Verify: `bun run typecheck`
   passes, and `git grep -c 'className="shell-profile\|className="shell-screen'
   packages/web/src/shell/ProfilePage.tsx` returns 0.
-- [ ] 2.8 Give `.shell-nav` a `stylex.create` block, plus its
+- [x] 2.8 Give `.shell-nav` a `stylex.create` block, plus its
   `[aria-current="page"]` and sub-30rem rules. Declare it once. Import it
   in all four area root components: `admin/root.tsx`, `app/root.tsx`,
   `reporting/root.tsx` and `studio/root.tsx` (design.md D9). Verify: `bun
   run typecheck` passes, and `git grep -rc
   'className="shell-nav' packages/web/src/areas/*/root.tsx` returns 0
   for all four files.
-- [ ] 2.9 Delete every migrated rule from `shell.css`, leaving only
+- [x] 2.9 Delete every migrated rule from `shell.css`, leaving only
   `.shell` and `.shell > *` (design.md D10). Verify: `bun run build`
   succeeds, and `git grep -c '^\.' packages/web/src/shell/shell.css`
   shows exactly 2 rule blocks remaining.

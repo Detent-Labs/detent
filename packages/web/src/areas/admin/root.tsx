@@ -1,8 +1,10 @@
 import { useEffect } from "react";
+import * as stylex from "@stylexjs/stylex";
 import { ListChecks, Send, Timer, Users, GitCompareArrows, Users2, Table2, Languages } from "lucide-react";
 import { matchRoute, routePath, ROUTE_ROLE, type Route } from "./routing.js";
 import { useAreaRoute, PROFILE_PATH } from "../../shell/routing.js";
 import { Chrome } from "../../shell/Chrome.js";
+import { navStyles } from "../../shell/navStyles.js";
 import { InstancesScreen } from "./screens/InstancesScreen.js";
 import { InstanceScreen } from "./screens/InstanceScreen.js";
 import { OutboxScreen } from "./screens/OutboxScreen.js";
@@ -59,25 +61,27 @@ export function AdminArea({ session, locale, localPath, go, onUnauthorized, onLo
   }, [strandedOnDefault, navigate]);
 
   const nav = (
-    <nav className="shell-nav">
-      {TABS.filter((tab) => may(tab.role)).map((tab) => (
-        <button
-          key={tab.name}
-          type="button"
-          className="btn btn-secondary"
-          aria-current={
-            route.name === tab.name ||
-            (tab.name === "instances" && route.name === "instance") ||
-            (tab.name === "dataLists" && route.name === "dataList")
-              ? "page"
-              : undefined
-          }
-          onClick={() => navigate({ name: tab.name } as Route)}
-        >
-          <tab.Icon size={18} strokeWidth={1.75} aria-hidden="true" />
-          {t(locale, tab.labelKey)}
-        </button>
-      ))}
+    <nav {...stylex.props(navStyles.nav)}>
+      {TABS.filter((tab) => may(tab.role)).map((tab) => {
+        const isCurrent =
+          route.name === tab.name ||
+          (tab.name === "instances" && route.name === "instance") ||
+          (tab.name === "dataLists" && route.name === "dataList");
+        const tabProps = stylex.props(isCurrent && navStyles.navCurrent);
+        return (
+          <button
+            key={tab.name}
+            type="button"
+            className={`btn btn-secondary ${tabProps.className}`}
+            style={tabProps.style}
+            aria-current={isCurrent ? "page" : undefined}
+            onClick={() => navigate({ name: tab.name } as Route)}
+          >
+            <tab.Icon size={18} strokeWidth={1.75} aria-hidden="true" />
+            {t(locale, tab.labelKey)}
+          </button>
+        );
+      })}
     </nav>
   );
 

@@ -1,8 +1,10 @@
 import { useState } from "react";
+import * as stylex from "@stylexjs/stylex";
 import { ChartNoAxesColumn, FileSpreadsheet } from "lucide-react";
 import { matchRoute, routePath, type Route, type ViewName } from "./routing.js";
 import { useAreaRoute, PROFILE_PATH } from "../../shell/routing.js";
 import { Chrome } from "../../shell/Chrome.js";
+import { navStyles } from "../../shell/navStyles.js";
 import { defaultRange, rangeIsValid, type DateRange } from "./screens/reportingLogic.js";
 import { ProcessPickerScreen } from "./screens/ProcessPickerScreen.js";
 import { CycleTimeScreen } from "./screens/CycleTimeScreen.js";
@@ -43,33 +45,44 @@ export function ReportingArea({ session, locale, localPath, go, onLocaleChange, 
   // over, and falls back to the id rather than rendering a blank heading.
   const [processLabel, setProcessLabel] = useState<string | undefined>();
 
+  const pickerCurrent = route.name === "picker";
+  const reportsCurrent = route.name === "reports" || route.name === "newReport" || route.name === "report";
+  const pickerProps = stylex.props(pickerCurrent && navStyles.navCurrent);
+  const reportsProps = stylex.props(reportsCurrent && navStyles.navCurrent);
+
   const nav = (
-    <nav className="shell-nav">
+    <nav {...stylex.props(navStyles.nav)}>
       <button
         type="button"
-        className="btn btn-secondary rep-home"
-        aria-current={route.name === "picker" ? "page" : undefined}
+        className={`btn btn-secondary rep-home ${pickerProps.className}`}
+        style={pickerProps.style}
+        aria-current={pickerCurrent ? "page" : undefined}
         onClick={() => navigate({ name: "picker" })}
       >
         <ChartNoAxesColumn size={18} strokeWidth={1.75} aria-hidden="true" />
         {t(locale, "nav.processes")}
       </button>
       {route.name === "view" &&
-        VIEWS.map((v) => (
-          <button
-            key={v.name}
-            type="button"
-            className="btn btn-secondary"
-            aria-current={route.view === v.name ? "page" : undefined}
-            onClick={() => navigate({ name: "view", view: v.name, processId: route.processId })}
-          >
-            {t(locale, v.labelKey)}
-          </button>
-        ))}
+        VIEWS.map((v) => {
+          const viewProps = stylex.props(route.view === v.name && navStyles.navCurrent);
+          return (
+            <button
+              key={v.name}
+              type="button"
+              className={`btn btn-secondary ${viewProps.className}`}
+              style={viewProps.style}
+              aria-current={route.view === v.name ? "page" : undefined}
+              onClick={() => navigate({ name: "view", view: v.name, processId: route.processId })}
+            >
+              {t(locale, v.labelKey)}
+            </button>
+          );
+        })}
       <button
         type="button"
-        className="btn btn-secondary"
-        aria-current={route.name === "reports" || route.name === "newReport" || route.name === "report" ? "page" : undefined}
+        className={`btn btn-secondary ${reportsProps.className}`}
+        style={reportsProps.style}
+        aria-current={reportsCurrent ? "page" : undefined}
         onClick={() => navigate({ name: "reports" })}
       >
         <FileSpreadsheet size={18} strokeWidth={1.75} aria-hidden="true" />
