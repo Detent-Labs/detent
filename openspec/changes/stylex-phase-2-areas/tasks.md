@@ -1,0 +1,176 @@
+## 1. Pre-flight and the stub fix
+
+- [x] 1.1 Grep every source file under `packages/` for `className=.*\bbtn\b`
+  and `className=.*app-back`. Record the file list. Verify: the count and
+  the file set are close to this design's own audit (208 sites, 55 files
+  for `.btn`; 1 site for `.app-back`). Other work may land between this
+  design and this task, so a small drift is normal.
+
+  A large drift is different: one that changes whether studio still holds
+  most of the files. That means the audit is stale. Stop, and re-derive
+  the real count before continuing.
+- [x] 1.2 Add a `when` export to `test/preload-stylex.ts` (design.md D6).
+  Each of `ancestor`, `descendant`, `siblingBefore`, `siblingAfter` and
+  `anySibling` returns a plain string and never throws, mirroring
+  `defaultMarker`'s identity-no-op shape. Verify: `bun run typecheck`
+  passes on the preload file, and importing `@stylexjs/stylex`'s `when`
+  export under `bun test` does not throw.
+
+## 2. `shell.css` and `Chrome.tsx`
+
+- [ ] 2.1 Add a `stylex.create` block to `Chrome.tsx` covering the account
+  group, the account button, the account menu and every menu row, reading
+  `form-ui/tokens.stylex`. Verify: `bun run typecheck` passes with no
+  reference to an undeclared token.
+- [ ] 2.2 Give `.shell-menu:popover-open`'s rule a StyleX conditional
+  value. Key it on the literal `:popover-open` pseudo-class, on the
+  property that toggles the menu's `display` (design.md D2). Verify:
+  `bun run build` succeeds, and the emitted CSS carries a real
+  `:popover-open` selector, not a literal string and not a dropped rule.
+
+  If it is either, stop. Apply design.md D2's literal-residual-rule
+  fallback instead. Report back before any later task in this group
+  assumes the conditional value works.
+- [ ] 2.3 Apply the new styles at each JSX call site in `Chrome.tsx`. The
+  account button keeps its literal `"btn btn-secondary"` prefix. It
+  composes with the new compiled style through string concatenation, not
+  `stylex.props` (design.md D7). Verify:
+  `git grep -c 'className="shell-account\|className="shell-menu' packages/web/src/shell/Chrome.tsx`
+  returns 0 for every class this group migrates. The literal `.btn`-family
+  substrings legitimately remain.
+- [ ] 2.4 Delete the migrated rules from `shell.css`. Leave only what this
+  change does not touch. Verify: `bun run build` succeeds, and
+  `git grep -n 'shell-account\|shell-menu' packages/web/src/shell/shell.css`
+  returns no match for a rule task 2.1 covered.
+
+## 3. `areas/app/app.css`
+
+- [ ] 3.1 Add `stylex.create` blocks to every component under
+  `packages/web/src/areas/app/` that carries a `className` referencing
+  `app.css`, reading `form-ui/tokens.stylex`. Verify: `bun run typecheck`
+  passes.
+- [ ] 3.2 Give `.app-task-link:hover .app-task-step` a `stylex.when.ancestor`
+  treatment (design.md D4), across all three files that render it:
+  `InvolvedScreen.tsx`, `StartedScreen.tsx` and `TasksScreen.tsx`. The
+  link marks itself with `stylex.defaultMarker()`. The step's style keys
+  one property on `stylex.when.ancestor(':hover')`. Verify: `bun run
+  build` succeeds, and the emitted CSS carries a rule that reaches the
+  child on the ancestor's hover. Then check a real hover in a browser via
+  `playwright-cli`, on each of the three screens.
+
+  Either check may fail. If so, apply design.md D4's literal-residual-rule
+  fallback instead. Report back before any later task in this group
+  assumes the mechanism works.
+- [ ] 3.3 Replace `app-stamp-${statusTone(status)}` and the claimed/open
+  ternary (`InvolvedScreen.tsx`, `StartedScreen.tsx`, `TasksScreen.tsx`)
+  with a typed lookup instead. Key it on the known status values. Fall
+  back to a named neutral style (design.md D3, `web-styling`'s
+  typed-lookup requirement). Verify: `bun run typecheck` passes on the
+  lookup's key type.
+- [ ] 3.4 Delete every `className="app-*"` string this group's components
+  no longer need. Verify:
+  `git grep -c 'className="app-stamp\|className="app-task' packages/web/src/areas/app/`
+  returns 0.
+- [ ] 3.5 Delete the migrated rules from `app.css`. Verify: `bun run build`
+  succeeds.
+
+## 4. `areas/admin/app.css`
+
+- [ ] 4.1 Add `stylex.create` blocks to every component under
+  `packages/web/src/areas/admin/` that carries a `className` referencing
+  `app.css`, reading `form-ui/tokens.stylex`. This is the largest group:
+  198 call sites across 11 screen files. Verify: `bun run typecheck`
+  passes.
+- [ ] 4.2 Replace every `admin-badge-${status}` construction
+  (`OutboxScreen.tsx`, `InstanceScreen.tsx`, `InstancesScreen.tsx`,
+  `DataListScreen.tsx`, `UsersScreen.tsx`) with a typed lookup instead.
+  Key each on its own screen's known status values, and fall back to a
+  named neutral style (design.md D3). Verify: `bun run typecheck` passes
+  on every lookup's key type.
+- [ ] 4.3 Apply every other admin-area style (tables, rows, chips, dark
+  mode, reduced motion) at its JSX call site. Verify: `bun run typecheck`
+  passes.
+- [ ] 4.4 Grep the whole `packages/web/src/areas/admin/` directory for
+  every literal class prefix this group migrated (`admin-badge-`,
+  `admin-table`, `admin-row`, and the rest task 4.1-4.3 named). Verify:
+  zero matches. This is the exit signal for this group, not a green build
+  alone. No test in this area asserts on a class name. A stale literal
+  here has no other safety net (design.md's Risks).
+- [ ] 4.5 Delete the migrated rules from `app.css`. Verify: `bun run build`
+  succeeds.
+
+## 5. `areas/reporting/app.css`
+
+- [ ] 5.1 Add `stylex.create` blocks to every component under
+  `packages/web/src/areas/reporting/` that carries a `className`
+  referencing `app.css`, reading `form-ui/tokens.stylex`. Verify:
+  `bun run typecheck` passes.
+- [ ] 5.2 Migrate `DurationRule`'s `.rep-rule`/`.rep-rule-fill`/
+  `.rep-rule-fill-danger` classes to StyleX. Leave the numeric
+  `style={{ width }}` exactly as it renders today (design.md D5). Verify:
+  `git grep -n 'style={{ width' packages/web/src/areas/reporting/components.tsx`
+  still finds the inline style, unchanged.
+- [ ] 5.3 Replace `` `rep-cell rep-cell-${display.kind}` `` and the
+  `rep-cell-collision` suffix (`ReportTable.tsx`) with a typed lookup
+  instead. Key it on the view's known kind values, and fall back to a
+  named neutral style (design.md D3). Verify: `bun run typecheck` passes
+  on the lookup's key type.
+- [ ] 5.4 Delete every `className="rep-*"` string this group's components
+  no longer need. Verify:
+  `git grep -c 'className="rep-rule\|className="rep-cell' packages/web/src/areas/reporting/`
+  returns 0.
+- [ ] 5.5 Delete the migrated rules from `app.css`. Verify: `bun run build`
+  succeeds.
+
+## 6. Cleanup
+
+- [ ] 6.1 Verify: `git grep -c '^\.'` over the four migrated stylesheets
+  shows only the rule blocks this change defers. A
+  `prefers-color-scheme`/`prefers-reduced-motion` media block stays only
+  if a component under it is out of scope. A media block wrapping only
+  migrated rules goes with them.
+- [ ] 6.2 Verify: `tokens.css`'s `.btn`/`.btn-primary`/`.btn-destructive`/
+  `.btn-secondary`/`.btn-ghost`/`.app-back` rules are byte-identical to
+  `main`. This change does not touch them (design.md D1).
+
+## 7. Docs and roadmap
+
+- [ ] 7.1 Add a probe per area to `docs/browser-checks.md`'s StyleX
+  section. Each probe opens a migrated screen and reads computed styles.
+  Each confirms a match against the deleted stylesheet's declarations.
+  Name the outbox badge, the duration bar, and an admin table row's
+  status badge. Name an app task's stamp too, per design.md's Goals.
+- [ ] 7.2 Change `docs/decisions.md`'s StyleX entry and `ROADMAP.md`
+  stage 45. Mark phase 2 done. Resolve the still-open "does phase 2
+  split into two changes" question `docs/decisions.md` carries, per
+  design.md D8: it does not. Name phases 3 through 5 as what remains.
+  Verify: neither restates phase 0's or phase 1's own entry.
+
+  `ROADMAP.md` and `docs/decisions.md` carry no live `.btn`-scope or
+  `:popover-open`-phasing note to correct. Both notes design.md D1 and D2
+  reference exist only in phase 0's archived design.md. This task adds no
+  correction for either, and that is not an oversight.
+
+## 8. Verification
+
+- [ ] 8.1 Run `bun run typecheck`. Verify: exit 0 for the engine and both
+  packages.
+- [ ] 8.2 Run `bun run build`. Verify: exit 0, and the closeBundle
+  assertion still passes.
+- [ ] 8.3 Run the full `bun test` with `DATABASE_URL` set, through
+  `scripts/gates/silent-green.sh`. Verify: zero failures, skip count at
+  the floor, gate exit 0.
+- [ ] 8.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`
+  and the same for `whitespace.sh`, over this change's own commit(s).
+  Verify: both exit 0.
+- [ ] 8.5 Build the production bundle and serve it from `WEB_ROOT`, not
+  `bun run dev` (Studio's dev-mode crash is pre-existing and unrelated).
+  Run each area's probe from task 7.1 in a real browser via
+  `playwright-cli`, with seeded data. Cover the shell's account menu and
+  the app area's My-tasks screen. Cover the admin area's outbox screen and
+  the reporting area's duration bar too.
+
+  Verify: every probe passes, and no console error appears on any screen.
+  Confirm the account menu's `:popover-open` state (task 2.2) renders
+  correctly. Confirm the app area's ancestor-hover state (task 3.2) does
+  too, whichever mechanism each ended up using.

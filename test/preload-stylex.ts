@@ -23,4 +23,11 @@ mock.module("@stylexjs/stylex", () => ({
     className: classNames.filter((name): name is string => typeof name === "string" && name.length > 0).join(" "),
   }),
   defaultMarker: (value?: unknown) => value,
+  when: {
+    ancestor: (pseudo?: unknown) => `ancestor(${String(pseudo)})`,
+    descendant: (pseudo?: unknown) => `descendant(${String(pseudo)})`,
+    siblingBefore: (pseudo?: unknown) => `siblingBefore(${String(pseudo)})`,
+    siblingAfter: (pseudo?: unknown) => `siblingAfter(${String(pseudo)})`,
+    anySibling: (pseudo?: unknown) => `anySibling(${String(pseudo)})`,
+  },
 }));
