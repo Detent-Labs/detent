@@ -35,16 +35,17 @@ its own.
 
 ### Requirement: form-ui ships one stylesheet for both consumers
 
-**Reason**: `form-ui.css` is deleted. The field renderer and the path
-buttons compile from StyleX style objects, reading `form-ui`'s own token
-module, per `web-styling`'s "Component styles compile from source"
-requirement. The fact this requirement protected — that the studio area's
-Player and the app area render identically styled forms — still holds; the
-replacement requirement below states it against the new mechanism.
+**Reason**: `form-ui.css` no longer exists. The field renderer and the
+path buttons now compile from StyleX style objects. Both read `form-ui`'s
+own token module, per `web-styling`'s "Component styles compile from
+source" requirement. This requirement protected one fact: the studio
+area's Player and the app area render identically styled forms. That
+fact still holds. The replacement requirement below states it against
+the new mechanism.
 
-**Migration**: A consumer importing `form-ui/form-ui.css` (there was
-exactly one: `packages/web/src/main.tsx`) drops that import. No hand-written
-stylesheet replaces it; both consumers get compiled styles automatically
+**Migration**: One consumer imported `form-ui/form-ui.css`:
+`packages/web/src/main.tsx`. It drops that import. No hand-written
+stylesheet replaces it. Both consumers get compiled styles automatically
 through the shared component tree, the same way they already share
 `Chrome.tsx`'s compiled header.
 
@@ -53,31 +54,34 @@ through the shared component tree, the same way they already share
 ### Requirement: form-ui's field renderer and path buttons compile from StyleX
 
 `packages/form-ui`'s field renderer (`FieldForm`, `FieldInput`, `NoteText`)
-and `PathButtons` SHALL declare their styles as typed StyleX style objects,
-reading `packages/form-ui/src/tokens.stylex.ts`. `packages/form-ui` SHALL
-ship no hand-written stylesheet. The studio area's Player and the app
-area's Task screen, both consumers of these components, SHALL therefore
-render identically styled forms with no stylesheet import of their own.
+and `PathButtons` SHALL declare their styles as typed StyleX style
+objects. Both read `packages/form-ui/src/tokens.stylex.ts`.
+`packages/form-ui` SHALL ship no hand-written stylesheet. The studio
+area's Player and the app area's Task screen are the two consumers of
+these components. Both SHALL therefore render identically styled forms
+with no stylesheet import of their own.
 
-A layout choice with a fixed, small set of outcomes — how many grid
-columns a form or a group draws, how wide a field spans — SHALL be chosen
-in application code among named StyleX styles, not read from a DOM
-attribute by a stylesheet. `FieldForm` MAY still render a `data-*`
-attribute carrying that same value, as a plain rendering fact a test or a
-future consumer can read; no stylesheet, compiled or hand-written, SHALL
-select on it.
+Two facts have a fixed, small set of outcomes. One is how many grid
+columns a form or a group draws. The other is how wide a field spans.
+Application code SHALL choose among named StyleX styles for each.
+
+A stylesheet SHALL never read a DOM attribute to decide. `FieldForm` MAY
+still render a `data-*` attribute carrying that same value, as a plain
+rendering fact. A test or a future consumer can read it. No stylesheet,
+compiled or hand-written, SHALL select on it.
 
 #### Scenario: The renderer ships no CSS file
 
-- **WHEN** `packages/form-ui`'s `package.json` exports are inspected
-- **THEN** no `./form-ui.css` (or other stylesheet) export is present
+- **WHEN** a contributor inspects `packages/form-ui`'s `package.json`
+  exports
+- **THEN** no `./form-ui.css` (or other stylesheet) export exists
 
 #### Scenario: Both consumers render identically without importing a stylesheet
 
 - **WHEN** the studio area's Player and the app area's Task screen each
   render the same step's form
-- **THEN** both are styled by `form-ui`'s own compiled styles alone, with
-  no `form-ui`-provided stylesheet imported by either
+- **THEN** `form-ui`'s own compiled styles alone style both
+- **AND** neither imports a `form-ui`-provided stylesheet
 
 #### Scenario: A column or span choice compiles from a style, not a selector
 
@@ -89,11 +93,11 @@ select on it.
 
 ### Requirement: Path-submit buttons accept a style prop for their wrapper
 
-`PathButtons` SHALL accept an optional style prop applying to its wrapper
-element, composed after the component's own default wrapper style, so a
-caller MAY extend or override that layout without `form-ui` declaring a
-variant on its own behalf. Its button element's className is unaffected by
-this prop.
+`PathButtons` SHALL accept an optional style prop for its wrapper
+element. It composes after the component's own default wrapper style. A
+caller MAY thereby extend or override that layout, so `form-ui` need not
+declare a variant on its own behalf. This prop does not touch the button
+element's className.
 
 `PathButtons`' button element SHALL keep a plain, literal className for
 the shared control style it does not own. `form-ui` SHALL NOT declare a
@@ -114,5 +118,6 @@ compiled style for that class.
 #### Scenario: The button's shared control class stays literal
 
 - **WHEN** `PathButtons` renders a submit button
-- **THEN** the button element carries the same literal control className it
-  carried before this change, unaffected by the new style prop
+- **THEN** the button element carries the same literal control className
+  it carried before this change
+- **AND** the new style prop leaves that className unaffected

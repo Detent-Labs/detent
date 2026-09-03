@@ -2315,15 +2315,15 @@ Source: `stylex-phase-1-form-ui` task 6.1. `form-ui`'s field renderer and
 criterion.
 
 Build the production bundle and open it on the engine's own port. Open a
-running instance in the studio area's Player, and the same step on the
-app area's Task screen (or the field catalog's "How it will look"
-preview, a third site rendering the same component). Select a text
-field's input in DevTools on each.
+running instance in the studio area's Player. Open the same step on the
+app area's Task screen. A third site renders the same component: the
+field catalog's "How it will look" preview. Select a text field's input
+in DevTools on each.
 
 Pass: the computed `font-size` is 14px, `padding` is `var(--space-2)`,
-and `border` is `1px solid var(--color-border)` — on every one of the
-three sites, identically. These are the values `form-ui.css` declared
-before this change; the compiled style must equal them exactly.
+and `border` is `1px solid var(--color-border)`. All three sites match,
+identically. `form-ui.css` declared these values before this change. The
+compiled style must equal them exactly.
 
 Open `PathButtons`. Pass: the wrapper's computed `gap` is `var(--space-2)`.
 The button element still carries the literal `btn btn-primary` class,
@@ -2331,7 +2331,7 @@ unmigrated.
 
 Resize the Player's own pane, and the Task screen's container, below
 34rem. Pass: a two-column form's fields collapse to one column on both,
-at the same width, since the container query reads the form's own width,
-not the viewport's.
+at the same width. The container query reads the form's own width, not
+the viewport's.
 
 Throughout: zero console errors on either screen.
