@@ -192,12 +192,12 @@
 
 ## 6. Cleanup
 
-- [ ] 6.1 Verify each area's own cleanup task (2.9, 3.5, 4.5, 5.6)
+- [x] 6.1 Verify each area's own cleanup task (2.9, 3.5, 4.5, 5.6)
   already confirmed its file's rule count. This task re-runs the same
   grep once more. It covers all four stylesheets together, one final
   aggregate check. shell.css shows 2 (D10). Each area's own file shows 1
   (D11).
-- [ ] 6.2 Verify: `tokens.css`'s `.btn`/`.btn-primary`/`.btn-destructive`/
+- [x] 6.2 Verify: `tokens.css`'s `.btn`/`.btn-primary`/`.btn-destructive`/
   `.btn-secondary`/`.btn-ghost`/`.app-back` rules are byte-identical to
   `main`. This change does not touch them (design.md D1).
 
