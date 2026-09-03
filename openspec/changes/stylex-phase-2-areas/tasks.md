@@ -79,11 +79,11 @@
 
 ## 3. `areas/app/app.css`
 
-- [ ] 3.1 Add `stylex.create` blocks to every component under
+- [x] 3.1 Add `stylex.create` blocks to every component under
   `packages/web/src/areas/app/` that carries a `className` referencing
   `app.css`, reading `form-ui/tokens.stylex`. Verify: `bun run typecheck`
   passes.
-- [ ] 3.2 Give `.app-task-link:hover .app-task-step` a `stylex.when.ancestor`
+- [x] 3.2 Give `.app-task-link:hover .app-task-step` a `stylex.when.ancestor`
   treatment (design.md D4), across all three files that render it:
   `InvolvedScreen.tsx`, `StartedScreen.tsx` and `TasksScreen.tsx`. The
   link marks itself with `stylex.defaultMarker()`. The step's style keys
@@ -95,17 +95,17 @@
   Either check may fail. If so, apply design.md D4's literal-residual-rule
   fallback instead. Report back before any later task in this group
   assumes the mechanism works.
-- [ ] 3.3 Replace `app-stamp-${statusTone(status)}` and the claimed/open
+- [x] 3.3 Replace `app-stamp-${statusTone(status)}` and the claimed/open
   ternary (`InvolvedScreen.tsx`, `StartedScreen.tsx`, `TasksScreen.tsx`)
   with a typed lookup instead. Key it on the known status values. Fall
   back to a named neutral style (design.md D3, `web-styling`'s
   typed-lookup requirement). Verify: `bun run typecheck` passes on the
   lookup's key type.
-- [ ] 3.4 Delete every `className="app-*"` string this group's components
+- [x] 3.4 Delete every `className="app-*"` string this group's components
   no longer need. Verify:
   `git grep -c 'className="app-stamp\|className="app-task' packages/web/src/areas/app/`
   returns 0.
-- [ ] 3.5 Delete the migrated rules from `app.css`. Leave only its
+- [x] 3.5 Delete the migrated rules from `app.css`. Leave only its
   reduced-motion media query, the universal-selector reset design.md
   D11 defers. Verify: `bun run build` succeeds.
 
