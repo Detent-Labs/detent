@@ -463,10 +463,6 @@
   touch-action: none;
 }
 
-.canvas-node {
-  cursor: grab;
-}
-
 /* A container, not a control: a hairline and no fill, so the grid dots stay
    visible through it and it never reads as a card. A collapsed group is a
    surface instead, because it stands in for the steps it hides. */
@@ -514,23 +510,12 @@
   fill: var(--color-text-muted);
 }
 
-.canvas-node-rect {
-  fill: var(--color-surface);
-  stroke: var(--color-border);
-  stroke-width: 1.5;
-}
-
 /* An SVG rect fills black without this. The hairline is the subordinate of the
    two rule weights, and the outer rule keeps the selection treatment. */
 .canvas-node-subprocess {
   fill: none;
   stroke: var(--color-border);
   stroke-width: 1;
-}
-
-.canvas-node-selected {
-  stroke: var(--color-accent);
-  stroke-width: 2;
 }
 
 .canvas-node-label {
@@ -554,7 +539,6 @@
    `display: none` rather than `visibility: hidden`: the fit computation reads
    `getBBox()`, which counts a hidden element and would frame the canvas around
    rings nobody can see. */
-.canvas-node-focus-ring,
 .canvas-edge-focus-halo {
   display: none;
   fill: none;
@@ -568,11 +552,6 @@
    default fit the gap renders 1.84px and the two bands read as one thicker
    band. The dash costs no width and no colour, and it holds at every zoom:
    `non-scaling-stroke` measures the pattern in screen pixels too. */
-.canvas-node-focus-ring {
-  stroke-width: 2;
-  stroke-dasharray: 5 4;
-}
-
 /* Six, not two: a stroke holds no offset, so a line's indicator is a band
    around the shape rather than a ring at a gap. The 1.5px edge paints over the
    middle, which leaves the dash of a manual path intact and about 2px of
@@ -582,7 +561,6 @@
   stroke-width: 6;
 }
 
-.canvas-node:focus-visible .canvas-node-focus-ring,
 .canvas-edge-group:focus-visible .canvas-edge-focus-halo {
   display: inline;
 }
@@ -592,7 +570,6 @@
    SVG element as a bounding box. Without this a focused node draws two rings.
    The `<svg>` root and the disclosure button keep that outline: neither draws
    a ring element, so it is the only indicator each has. */
-.canvas-node:focus-visible,
 .canvas-edge-group:focus-visible {
   outline: none;
 }

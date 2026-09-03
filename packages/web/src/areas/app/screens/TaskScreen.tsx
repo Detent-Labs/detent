@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Stamp } from "lucide-react";
 import { FieldForm, PathButtons, filterToEditable, resolveFieldsLocale, isResolvedViewField } from "form-ui";
+import { btn } from "../../../shell/buttonStyles";
 import type { SubmissionIssue } from "form-ui";
 import {
   cancelInstance,
@@ -350,7 +351,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
             </p>
           )}
 
-          {maySubmit(claimControls) && <PathButtons paths={view.availablePaths} onSubmit={(pathId) => void doSubmit(pathId)} loading={loading} />}
+          {maySubmit(claimControls) && <PathButtons paths={view.availablePaths} onSubmit={(pathId) => void doSubmit(pathId)} loading={loading} buttonStyle={[btn.base, btn.primary]} />}
 
           <section className="app-task-comments">
             <h2>{t(locale, "task.commentsHeading")}</h2>

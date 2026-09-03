@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import stylex from "@stylexjs/unplugin/vite";
 
 const appVersion = readFileSync(new URL("../../VERSION", import.meta.url), "utf8").trim();
 
@@ -42,7 +44,13 @@ export function contentSecurityPolicy(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), contentSecurityPolicy()],
+  plugins: [
+    // Ahead of plugin-react, as the StyleX docs order them. `rootDir` is the
+    // workspace root so a `.stylex.ts` file under either package resolves.
+    stylex({ unstable_moduleResolution: { type: "commonJS", rootDir: fileURLToPath(new URL("../..", import.meta.url)) } }),
+    react(),
+    contentSecurityPolicy(),
+  ],
   // server.port is the in-container listening port, fixed at 5173 always.
   // hmr.clientPort is the browser-visible port — this checkout's derived
   // PORT_VITE, published to the host by scripts/worktree-env.sh — so the

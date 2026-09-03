@@ -31,30 +31,6 @@
   width: 100%;
 }
 
-.shell-header {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 2px solid var(--color-divider);
-  background: var(--color-surface-muted);
-}
-
-.shell-tab {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--color-accent-contrast);
-  background: var(--color-accent);
-  padding: var(--space-1) var(--space-2);
-  /* Cut corners on the leading edge: a tab slotted into the register, not a pill. */
-  clip-path: polygon(0 0, 100% 0, calc(100% - 0.4rem) 100%, 0 100%);
-  padding-right: calc(var(--space-2) + 0.4rem);
-}
-
 .shell-nav {
   display: flex;
   gap: var(--space-2);
@@ -345,10 +321,6 @@
 }
 
 @media (max-width: 30rem) {
-  .shell-header {
-    flex-wrap: wrap;
-  }
-
   .shell-nav {
     order: 3;
     flex-basis: 100%;

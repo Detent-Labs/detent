@@ -2,6 +2,35 @@ import type { ClientError } from "./api/types.js";
 import type { UiLocale } from "../../i18n/locale.js";
 import { t, tCount } from "./catalog.js";
 import { describeError, toDateInput, fromDateInput, type DateRange } from "./screens/reportingLogic.js";
+import * as stylex from "@stylexjs/stylex";
+import { colors } from "../../shell/tokens.stylex";
+
+/** `.rep-rule` and its fill from `app.css`, as StyleX. The fill length is the
+ * one dynamic value: StyleX compiles the arrow function to a rule reading a
+ * CSS variable and sets that variable through the inline `style` attribute. */
+const rule = stylex.create({
+  track: {
+    flex: 1,
+    minWidth: "3rem",
+    height: "0.5rem",
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+    display: "flex",
+    alignItems: "flex-end",
+  },
+  fill: (percent: number) => ({
+    display: "block",
+    height: "0.5rem",
+    backgroundColor: colors.accent,
+    opacity: 0.65,
+    width: `${percent}%`,
+  }),
+  fillDanger: {
+    backgroundColor: colors.refusal,
+    opacity: 0.8,
+  },
+});
 
 /**
  * The duration rule — this package's one visual device, reused by all three
@@ -14,8 +43,8 @@ import { describeError, toDateInput, fromDateInput, type DateRange } from "./scr
  */
 export function DurationRule({ fraction, tone = "neutral" }: { fraction: number; tone?: "neutral" | "danger" }) {
   return (
-    <span className="rep-rule" aria-hidden="true">
-      <span className={`rep-rule-fill${tone === "danger" ? " rep-rule-fill-danger" : ""}`} style={{ width: `${Math.round(fraction * 100)}%` }} />
+    <span {...stylex.props(rule.track)} aria-hidden="true">
+      <span {...stylex.props(rule.fill(Math.round(fraction * 100)), tone === "danger" && rule.fillDanger)} />
     </span>
   );
 }

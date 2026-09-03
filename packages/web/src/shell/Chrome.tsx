@@ -4,6 +4,40 @@ import { permittedAreas, type Area } from "./areas.js";
 import { accountName } from "./accountName.js";
 import type { Session } from "./session.js";
 import type { UiLocale } from "../i18n/locale.js";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "./tokens.stylex";
+
+/** `.shell-header` and `.shell-tab` from `shell.css`, as StyleX. The header's
+ * one narrow-viewport rule sits on the property it changes. */
+const styles = stylex.create({
+  header: {
+    display: "flex",
+    flex: "0 0 auto",
+    alignItems: "center",
+    gap: space.s3,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
+    backgroundColor: colors.surfaceMuted,
+    flexWrap: { default: "nowrap", "@media (max-width: 30rem)": "wrap" },
+  },
+  tab: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    fontWeight: 600,
+    textTransform: "uppercase",
+    letterSpacing: "0.14em",
+    color: colors.accentContrast,
+    backgroundColor: colors.accent,
+    paddingBlock: space.s1,
+    paddingLeft: space.s2,
+    // Cut corners on the leading edge: a tab slotted into the register, not a pill.
+    clipPath: "polygon(0 0, 100% 0, calc(100% - 0.4rem) 100%, 0 100%)",
+    paddingRight: `calc(${space.s2} + 0.4rem)`,
+  },
+});
 
 interface ChromeProps {
   /**
@@ -74,8 +108,8 @@ export function Chrome({ area, roles, session, locale, onLocaleChange, onLogout,
 
   return (
     <div className="shell">
-      <header className="shell-header">
-        <span className="shell-tab">{t(locale, `area.${area}`)}</span>
+      <header {...stylex.props(styles.header)}>
+        <span {...stylex.props(styles.tab)}>{t(locale, `area.${area}`)}</span>
         {nav}
         <div className="shell-account-group">
           <span className={identity.mono ? "shell-account-name shell-account-name-id" : "shell-account-name"} title={identity.text}>

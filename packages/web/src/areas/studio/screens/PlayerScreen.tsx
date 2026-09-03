@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { FieldForm, PathButtons, filterToEditable, resolveFieldsLocale, isResolvedViewField } from "form-ui";
+import { btn } from "../../../shell/buttonStyles";
 import type { SubmissionIssue } from "form-ui";
 import { createInstance, createTestInstance, getInstanceView, submitPath, claimStep, releaseClaim, getInstanceRecord, StudioClientError } from "../api/client.js";
 import type { InstanceView, InstanceRecordElement } from "../api/types.js";
@@ -247,7 +248,7 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
               </button>
             </div>
 
-            <PathButtons paths={view.availablePaths} onSubmit={(pathId) => void doSubmit(pathId)} loading={loading} />
+            <PathButtons paths={view.availablePaths} onSubmit={(pathId) => void doSubmit(pathId)} loading={loading} buttonStyle={[btn.base, btn.primary]} />
           </section>
 
           <section className="studio-player-record">

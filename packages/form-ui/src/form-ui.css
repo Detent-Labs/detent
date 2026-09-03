@@ -181,11 +181,6 @@
   color: var(--color-refusal);
 }
 
-.form-ui-paths {
-  display: flex;
-  gap: var(--space-2);
-}
-
 /* Static text, not a field: no border box (the field border marks a
    control, and a note has none), a left rule instead — the same "rules
    organize, not shadow or color" register the fields around it follow. */
