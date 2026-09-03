@@ -271,10 +271,16 @@ vendor's own behavior, and a visual judgment need a real browser.
 - [x] 10.1e2 The `<svg>` root and the disclosure button each draw the global outline instead
 - [x] 10.1e3 A focused manual path keeps its dash, and the halo reads on each side of the line
 - [x] 10.1e4 A focused path and a selected path look different, which a recolored edge would not
-- [ ] 10.1f That ring stays visible, and measures 2px at 200 percent zoom
-- [ ] 10.1g A screen reader announces a step's label, kind, outcome and fan
-- [ ] 10.1g1 It also announces a group's disclosure by that group's own name
-- [ ] 10.1h Arrow keys still reach the handler with NVDA running, which the role decides
+- [x] 10.1f That ring stays visible, and measures 2px at 200 percent zoom
+- [x] 10.1f1 Measured through CDP device metrics, not the browser's own zoom control
+- [x] 10.1f2 At device ratio 2 the ring holds 2 CSS px, so it draws 4 device px
+- [x] 10.1g A screen reader announces a step's label, kind, outcome and fan
+- [x] 10.1g0 NVDA 2026.2 read "Done, done, End, 0 outgoing paths, outcome approved"
+- [x] 10.1g1 It also announces a group's disclosure by that group's own name
+- [x] 10.1g2 NVDA read "Steps in Onboarding review, button, expanded"
+- [x] 10.1h Arrow keys still reach the handler with NVDA running, which the role decides
+- [x] 10.1h1 Drive that check with real OS key events, never a driver's injected ones
+- [x] 10.1h2 A driver injects a key below the reader's hook, so the reader never sees it
 - [x] 10.1i The header's content-locale selector repaints every node label
 - [x] 10.1j A pointer press on a group's disclosure button starts no group drag
 - [x] 10.1j1 A route crossing the box's bottom-right corner takes no press meant for that button
@@ -302,6 +308,6 @@ vendor's own behavior, and a visual judgment need a real browser.
 - [x] 12.2 `bun run build`
 - [x] 12.3 Full `bun test` with `DATABASE_URL` set, never a single-file rerun
 - [x] 12.4 Pipe that run through `scripts/gates/silent-green.sh`
-- [ ] 12.5 The browser checks from 10.1, against the production build
+- [x] 12.5 The browser checks from 10.1, against the production build
 - [x] 12.6 The prose gate over the pushed range
 - [x] 12.7 The whitespace gate over the pushed range
