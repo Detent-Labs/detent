@@ -114,32 +114,33 @@
 
 ## 4. `areas/admin/app.css`
 
-- [ ] 4.1 Add `stylex.create` blocks to every component under
+- [x] 4.1 Add `stylex.create` blocks to every component under
   `packages/web/src/areas/admin/` that carries a `className` referencing
   `app.css`, reading `form-ui/tokens.stylex`. This is the largest group:
   198 call sites across 11 screen files.
 
-  `.admin-field` has two separate declarations, at two different lines.
-  Combine both sets of properties into one `admin-field` style (design.md
-  D12). Verify: `bun run typecheck` passes. The built CSS carries every
-  property both source rules declared for `.admin-field`.
-- [ ] 4.2 Replace every `admin-badge-${status}` construction
+  `.admin-field` and `.admin-role-input` each have two separate
+  declarations, at two different lines. Combine each selector's own two
+  sets of properties into one style (design.md D12). Verify: `bun run
+  typecheck` passes. The built CSS carries every property every source
+  rule declared, for both selectors.
+- [x] 4.2 Replace every `admin-badge-${status}` construction
   (`OutboxScreen.tsx`, `InstanceScreen.tsx`, `InstancesScreen.tsx`,
   `DataListScreen.tsx`, `UsersScreen.tsx`) with a typed lookup instead.
   Key each on its own screen's known status values, and fall back to a
   named neutral style (design.md D3). Verify: `bun run typecheck` passes
   on every lookup's key type.
-- [ ] 4.3 Apply every other admin-area style (tables, rows, chips, dark
+- [x] 4.3 Apply every other admin-area style (tables, rows, chips, dark
   mode) at its JSX call site. The `prefers-reduced-motion` block stays
   literal (design.md D11); it has no call site to apply. Verify: `bun
   run typecheck` passes.
-- [ ] 4.4 Grep the whole `packages/web/src/areas/admin/` directory for
+- [x] 4.4 Grep the whole `packages/web/src/areas/admin/` directory for
   every literal class prefix this group migrated (`admin-badge-`,
   `admin-table`, `admin-row`, and the rest task 4.1-4.3 named). Verify:
   zero matches. This is the exit signal for this group, not a green build
   alone. No test in this area asserts on a class name. A stale literal
   here has no other safety net (design.md's Risks).
-- [ ] 4.5 Delete the migrated rules from `app.css`. Leave only its
+- [x] 4.5 Delete the migrated rules from `app.css`. Leave only its
   reduced-motion media query, the universal-selector reset design.md
   D11 defers. Verify: `bun run build` succeeds.
 

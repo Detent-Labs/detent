@@ -1,4 +1,6 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import {
   listGroups,
   createGroup,
@@ -47,6 +49,99 @@ type ScopeType = GroupScope["type"];
 function scopeOf(type: ScopeType, processIds: string[]): GroupScope {
   return type === "global" ? { type: "global" } : { type: "processes", processIds };
 }
+
+/** `app.css`'s screen/controls/table/editor rules, as StyleX. `roleInput`
+ * merges `.admin-role-input`'s two source declarations (design.md D12). */
+const styles = stylex.create({
+  screen: {
+    maxWidth: "60rem",
+    marginInline: "auto",
+    paddingTop: space.s4,
+    paddingInline: space.s3,
+    paddingBottom: space.s6,
+  },
+  controls: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: space.s2,
+    marginBottom: space.s3,
+    alignItems: "center",
+  },
+  empty: {
+    color: colors.textMuted,
+    paddingBlock: space.s4,
+    paddingInline: 0,
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    fontSize: "0.9rem",
+  },
+  th: {
+    textAlign: "left",
+    fontFamily: fonts.body,
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+    padding: space.s2,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
+  },
+  td: {
+    padding: space.s2,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+    verticalAlign: "top",
+  },
+  tr: {
+    background: { default: "none", ":hover": colors.surfaceMuted },
+  },
+  nameEditor: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    minWidth: "18rem",
+  },
+  nameInput: {
+    width: "100%",
+    paddingBlock: 4,
+    paddingInline: 6,
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: colors.accent,
+    backgroundColor: colors.surface,
+    color: colors.text,
+    fontFamily: fonts.body,
+  },
+  roleEditor: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    minWidth: "18rem",
+  },
+  roleInput: {
+    fontFamily: fonts.mono,
+    fontSize: "0.8rem",
+    width: "100%",
+    paddingBlock: 4,
+    paddingInline: 6,
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: colors.accent,
+    backgroundColor: colors.surface,
+    color: colors.text,
+  },
+  mono: {
+    fontFamily: fonts.mono,
+    fontSize: "0.8rem",
+  },
+  error: {
+    color: colors.refusal,
+  },
+});
 
 /**
  * The Groups screen: list, process-filter, create, rename, scope-edit,
@@ -265,10 +360,10 @@ export function GroupsScreen({ token, locale, initialProcessId, onUnauthorized }
   };
 
   return (
-    <main className="admin-screen">
+    <main {...stylex.props(styles.screen)}>
       <h1>{t(locale, "groups.title")}</h1>
 
-      <div className="admin-controls">
+      <div {...stylex.props(styles.controls)}>
         <label>
           {t(locale, "groups.filterProcess")}
           <select value={filterProcessId} onChange={(e) => setFilterProcessId(e.target.value)}>
@@ -290,27 +385,27 @@ export function GroupsScreen({ token, locale, initialProcessId, onUnauthorized }
 
       {error && <ErrorBanner error={error} locale={locale} onRetry={refresh} retryDisabled={loading} />}
 
-      {visible.length === 0 && !creating && !loading && !error && <p className="admin-empty">{t(locale, "groups.empty")}</p>}
+      {visible.length === 0 && !creating && !loading && !error && <p {...stylex.props(styles.empty)}>{t(locale, "groups.empty")}</p>}
 
       {(visible.length > 0 || creating) && (
-        <table className="admin-table">
+        <table {...stylex.props(styles.table)}>
           <thead>
             <tr>
-              <th>{t(locale, "groups.colName")}</th>
-              <th>{t(locale, "groups.colScope")}</th>
-              <th>{t(locale, "groups.colMembers")}</th>
-              <th />
+              <th {...stylex.props(styles.th)}>{t(locale, "groups.colName")}</th>
+              <th {...stylex.props(styles.th)}>{t(locale, "groups.colScope")}</th>
+              <th {...stylex.props(styles.th)}>{t(locale, "groups.colMembers")}</th>
+              <th {...stylex.props(styles.th)} />
             </tr>
           </thead>
           <tbody>
             {creating && (
-              <tr>
-                <td>
-                  <div className="admin-name-editor">
+              <tr {...stylex.props(styles.tr)}>
+                <td {...stylex.props(styles.td)}>
+                  <div {...stylex.props(styles.nameEditor)}>
                     {/* autoFocus: the first field of a form the operator just opened by an explicit click. */}
                     <input
                       type="text"
-                      className="admin-name-input"
+                      {...stylex.props(styles.nameInput)}
                       value={newName}
                       onChange={(e) => setNewName(e.target.value)}
                       onKeyDown={(e) => {
@@ -323,8 +418,8 @@ export function GroupsScreen({ token, locale, initialProcessId, onUnauthorized }
                     />
                   </div>
                 </td>
-                <td>
-                  <div className="admin-role-editor">
+                <td {...stylex.props(styles.td)}>
+                  <div {...stylex.props(styles.roleEditor)}>
                     <select
                       value={newScopeType}
                       onChange={(e) => setNewScopeType(e.target.value as ScopeType)}
@@ -349,8 +444,8 @@ export function GroupsScreen({ token, locale, initialProcessId, onUnauthorized }
                     )}
                   </div>
                 </td>
-                <td>—</td>
-                <td>
+                <td {...stylex.props(styles.td)}>—</td>
+                <td {...stylex.props(styles.td)}>
                   <button
                     type="button"
                     className="btn btn-primary"
@@ -367,14 +462,14 @@ export function GroupsScreen({ token, locale, initialProcessId, onUnauthorized }
             )}
             {visible.map((group) => (
               <Fragment key={group.groupId}>
-                <tr>
-                  <td>
+                <tr {...stylex.props(styles.tr)}>
+                  <td {...stylex.props(styles.td)}>
                     {editingName(group.groupId) ? (
-                      <div className="admin-name-editor">
+                      <div {...stylex.props(styles.nameEditor)}>
                         {/* autoFocus: the single input of an editor the operator just opened by an explicit click. */}
                         <input
                           type="text"
-                          className="admin-name-input"
+                          {...stylex.props(styles.nameInput)}
                           value={draftName}
                           onChange={(e) => setDraftName(e.target.value)}
                           onKeyDown={(e) => {
@@ -391,9 +486,9 @@ export function GroupsScreen({ token, locale, initialProcessId, onUnauthorized }
                       <span>{group.name}</span>
                     )}
                   </td>
-                  <td>
+                  <td {...stylex.props(styles.td)}>
                     {editingScope(group.groupId) ? (
-                      <div className="admin-role-editor">
+                      <div {...stylex.props(styles.roleEditor)}>
                         {/* autoFocus: the first control of an editor the operator just opened by an explicit click. */}
                         <select
                           value={draftScopeType}
@@ -427,19 +522,19 @@ export function GroupsScreen({ token, locale, initialProcessId, onUnauthorized }
                             ))}
                           </select>
                         )}
-                        {draftScopeError && <p className="admin-error">{draftScopeError}</p>}
+                        {draftScopeError && <p {...stylex.props(styles.error)}>{draftScopeError}</p>}
                       </div>
                     ) : (
                       <span>{scopeText(group.scope, locale)}</span>
                     )}
                   </td>
-                  <td>
+                  <td {...stylex.props(styles.td)}>
                     {editingMembers(group.groupId) ? (
-                      <div className="admin-role-editor">
+                      <div {...stylex.props(styles.roleEditor)}>
                         {/* autoFocus: the single input of an editor the operator just opened by an explicit click. */}
                         <input
                           type="text"
-                          className="admin-role-input"
+                          {...stylex.props(styles.roleInput)}
                           value={draftMembers}
                           onChange={(e) => {
                             setDraftMembers(e.target.value);
@@ -456,14 +551,14 @@ export function GroupsScreen({ token, locale, initialProcessId, onUnauthorized }
                           autoFocus
                         />
                         {draftMembersError && (
-                          <p className="admin-error">{tFill(locale, "groups.memberUnresolved", { tokens: draftMembersError.join(", ") })}</p>
+                          <p {...stylex.props(styles.error)}>{tFill(locale, "groups.memberUnresolved", { tokens: draftMembersError.join(", ") })}</p>
                         )}
                       </div>
                     ) : (
-                      <span className="admin-mono">{group.members.length}</span>
+                      <span {...stylex.props(styles.mono)}>{group.members.length}</span>
                     )}
                   </td>
-                  <td>
+                  <td {...stylex.props(styles.td)}>
                     {editingName(group.groupId) && (
                       <>
                         <button type="button" className="btn btn-primary" onClick={() => void saveName(group)} disabled={busyId === group.groupId}>

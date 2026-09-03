@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { listProcesses, listVersions, runMigration } from "../api/client.js";
 import type { ProcessSummary, VersionSummary, MigrationResult } from "../api/types.js";
 import { describeCaughtError } from "../errors.js";
@@ -8,6 +10,55 @@ import { labelText } from "./instancesLogic.js";
 import { parseVersionInput, buildRunConfirmation, migrationBuckets } from "./migrationsLogic.js";
 import { t } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
+
+/** `app.css`'s screen/controls/table rules, as StyleX. */
+const styles = stylex.create({
+  screen: {
+    maxWidth: "60rem",
+    marginInline: "auto",
+    paddingTop: space.s4,
+    paddingInline: space.s3,
+    paddingBottom: space.s6,
+  },
+  controls: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: space.s2,
+    marginBottom: space.s3,
+    alignItems: "center",
+  },
+  controlsSelect: {
+    backgroundColor: colors.surface,
+    color: colors.text,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    fontSize: "0.9rem",
+  },
+  th: {
+    textAlign: "left",
+    fontFamily: fonts.body,
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+    padding: space.s2,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
+  },
+  td: {
+    padding: space.s2,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+    verticalAlign: "top",
+  },
+});
 
 interface MigrationsScreenProps {
   token: string;
@@ -62,13 +113,13 @@ export function MigrationsScreen({ token, locale, onUnauthorized }: MigrationsSc
   };
 
   return (
-    <main className="admin-screen">
+    <main {...stylex.props(styles.screen)}>
       <h1>{t(locale, "migrations.title")}</h1>
 
-      <div className="admin-controls">
+      <div {...stylex.props(styles.controls)}>
         <label>
           {t(locale, "migrations.process")}
-          <select value={processId} onChange={(e) => setProcessId(e.target.value)}>
+          <select {...stylex.props(styles.controlsSelect)} value={processId} onChange={(e) => setProcessId(e.target.value)}>
             <option value="">{t(locale, "migrations.selectProcess")}</option>
             {processes.map((p) => (
               <option key={p.processId} value={p.processId}>
@@ -79,7 +130,7 @@ export function MigrationsScreen({ token, locale, onUnauthorized }: MigrationsSc
         </label>
         <label>
           {t(locale, "migrations.fromVersion")}
-          <select value={fromVersion} onChange={(e) => setFromVersion(e.target.value)} disabled={!processId}>
+          <select {...stylex.props(styles.controlsSelect)} value={fromVersion} onChange={(e) => setFromVersion(e.target.value)} disabled={!processId}>
             <option value="">{t(locale, "migrations.selectVersion")}</option>
             {versions.map((v) => (
               <option key={v.version} value={v.version}>
@@ -90,7 +141,7 @@ export function MigrationsScreen({ token, locale, onUnauthorized }: MigrationsSc
         </label>
         <label>
           {t(locale, "migrations.toVersion")}
-          <select value={toVersion} onChange={(e) => setToVersion(e.target.value)} disabled={!processId}>
+          <select {...stylex.props(styles.controlsSelect)} value={toVersion} onChange={(e) => setToVersion(e.target.value)} disabled={!processId}>
             <option value="">{t(locale, "migrations.selectVersion")}</option>
             {versions.map((v) => (
               <option key={v.version} value={v.version}>
@@ -107,18 +158,18 @@ export function MigrationsScreen({ token, locale, onUnauthorized }: MigrationsSc
       {error && <ErrorBanner error={error} locale={locale} />}
 
       {result && (
-        <table className="admin-table">
+        <table {...stylex.props(styles.table)}>
           <thead>
             <tr>
-              <th>{t(locale, "migrations.colOutcome")}</th>
-              <th>{t(locale, "migrations.colInstances")}</th>
+              <th {...stylex.props(styles.th)}>{t(locale, "migrations.colOutcome")}</th>
+              <th {...stylex.props(styles.th)}>{t(locale, "migrations.colInstances")}</th>
             </tr>
           </thead>
           <tbody>
             {migrationBuckets(result, locale).map((bucket) => (
               <tr key={bucket.key}>
-                <td>{bucket.label}</td>
-                <td>{bucket.ids.length === 0 ? "—" : bucket.ids.join(", ")}</td>
+                <td {...stylex.props(styles.td)}>{bucket.label}</td>
+                <td {...stylex.props(styles.td)}>{bucket.ids.length === 0 ? "—" : bucket.ids.join(", ")}</td>
               </tr>
             ))}
           </tbody>

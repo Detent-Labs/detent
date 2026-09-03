@@ -1,4 +1,6 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { listUsers, createUser, disableUser, enableUser, setUserRoles, setUserManager, setUserPassword } from "../api/client.js";
 import type { UserSummary } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
@@ -51,6 +53,159 @@ const RESERVED_ROLES = [
   "system:datalists",
   "system:templates",
 ];
+
+/** `app.css`'s screen/controls/table/editor/role rules, as StyleX.
+ * `roleInput` and `field` merge their two source declarations each
+ * (design.md D12): `roleInput` shares its font-mono/0.8rem half with
+ * `.admin-role-list`, kept here as its own unmerged `roleList` style. */
+const styles = stylex.create({
+  screen: {
+    maxWidth: "60rem",
+    marginInline: "auto",
+    paddingTop: space.s4,
+    paddingInline: space.s3,
+    paddingBottom: space.s6,
+  },
+  controls: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: space.s2,
+    marginBottom: space.s3,
+    alignItems: "center",
+  },
+  empty: {
+    color: colors.textMuted,
+    paddingBlock: space.s4,
+    paddingInline: 0,
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    fontSize: "0.9rem",
+  },
+  th: {
+    textAlign: "left",
+    fontFamily: fonts.body,
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+    padding: space.s2,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
+  },
+  td: {
+    padding: space.s2,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+    verticalAlign: "top",
+  },
+  tr: {
+    background: { default: "none", ":hover": colors.surfaceMuted },
+  },
+  roleEditor: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    minWidth: "18rem",
+  },
+  field: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+  },
+  fieldLabel: {
+    fontSize: "0.7rem",
+    color: colors.textMuted,
+  },
+  roleInput: {
+    fontFamily: fonts.mono,
+    fontSize: "0.8rem",
+    width: "100%",
+    paddingBlock: 4,
+    paddingInline: 6,
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: colors.accent,
+    backgroundColor: colors.surface,
+    color: colors.text,
+  },
+  roleList: {
+    fontFamily: fonts.mono,
+    fontSize: "0.8rem",
+  },
+  roleCaveat: {
+    margin: 0,
+    fontSize: "0.7rem",
+    color: colors.textMuted,
+    maxWidth: "34rem",
+  },
+  roleHint: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: space.s1,
+    margin: 0,
+    fontSize: "0.7rem",
+    color: colors.textMuted,
+  },
+  roleChip: {
+    fontFamily: fonts.body,
+    fontSize: "0.8rem",
+    borderWidth: 1.5,
+    borderStyle: { default: "dashed", ":hover": "solid" },
+    borderColor: { default: colors.border, ":hover": colors.accent },
+    paddingBlock: 2,
+    paddingInline: 7,
+    background: "none",
+    color: { default: colors.textMuted, ":hover": colors.accent },
+    cursor: "pointer",
+  },
+  managerSelect: {
+    width: "100%",
+    paddingBlock: 4,
+    paddingInline: 6,
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: colors.accent,
+    backgroundColor: colors.surface,
+    color: colors.text,
+    fontSize: "0.85rem",
+  },
+  managerName: {
+    fontSize: "0.85rem",
+  },
+  badge: {
+    display: "inline-block",
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    fontWeight: 600,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "currentcolor",
+    paddingBlock: 2,
+    paddingInline: 7,
+  },
+  badgeSettled: {
+    color: colors.text,
+  },
+  badgeRefusal: {
+    color: colors.surface,
+    backgroundColor: colors.refusal,
+    borderColor: colors.refusal,
+  },
+  editorRowTd: {
+    paddingBlock: space.s3,
+  },
+  editorActions: {
+    display: "flex",
+    gap: space.s2,
+  },
+});
 
 export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps) {
   const [items, setItems] = useState<UserSummary[]>([]);
@@ -216,10 +371,10 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
   };
 
   return (
-    <main className="admin-screen">
+    <main {...stylex.props(styles.screen)}>
       <h1>{t(locale, "users.title")}</h1>
 
-      <div className="admin-controls">
+      <div {...stylex.props(styles.controls)}>
         <button type="button" className="btn btn-primary" onClick={startCreating} disabled={loading || creating}>
           {t(locale, "users.new")}
         </button>
@@ -230,30 +385,30 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
 
       {error && <ErrorBanner error={error} locale={locale} onRetry={refresh} retryDisabled={loading} />}
 
-      {items.length === 0 && !creating && !loading && !error && <p className="admin-empty">{t(locale, "users.empty")}</p>}
+      {items.length === 0 && !creating && !loading && !error && <p {...stylex.props(styles.empty)}>{t(locale, "users.empty")}</p>}
 
       {(items.length > 0 || creating) && (
-        <table className="admin-table">
+        <table {...stylex.props(styles.table)}>
           <thead>
             <tr>
-              <th>{t(locale, "users.colEmail")}</th>
-              <th>{t(locale, "users.colRoles")}</th>
-              <th>{t(locale, "users.colManager")}</th>
-              <th>{t(locale, "users.colStatus")}</th>
-              <th />
+              <th {...stylex.props(styles.th)}>{t(locale, "users.colEmail")}</th>
+              <th {...stylex.props(styles.th)}>{t(locale, "users.colRoles")}</th>
+              <th {...stylex.props(styles.th)}>{t(locale, "users.colManager")}</th>
+              <th {...stylex.props(styles.th)}>{t(locale, "users.colStatus")}</th>
+              <th {...stylex.props(styles.th)} />
             </tr>
           </thead>
           <tbody>
             {creating && (
-              <tr>
-                <td>
-                  <div className="admin-role-editor">
+              <tr {...stylex.props(styles.tr)}>
+                <td {...stylex.props(styles.td)}>
+                  <div {...stylex.props(styles.roleEditor)}>
                     {/* autoFocus: the first field of a form the operator just opened by an explicit click. */}
-                    <label className="admin-field">
-                      <span className="admin-field-label">{t(locale, "users.email")}</span>
+                    <label {...stylex.props(styles.field)}>
+                      <span {...stylex.props(styles.fieldLabel)}>{t(locale, "users.email")}</span>
                       <input
                         type="email"
-                        className="admin-role-input"
+                        {...stylex.props(styles.roleInput)}
                         value={newEmail}
                         onChange={(e) => setNewEmail(e.target.value)}
                         onKeyDown={(e) => {
@@ -265,11 +420,11 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
                         autoFocus
                       />
                     </label>
-                    <label className="admin-field">
-                      <span className="admin-field-label">{t(locale, "users.password")}</span>
+                    <label {...stylex.props(styles.field)}>
+                      <span {...stylex.props(styles.fieldLabel)}>{t(locale, "users.password")}</span>
                       <input
                         type="text"
-                        className="admin-role-input"
+                        {...stylex.props(styles.roleInput)}
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                         onKeyDown={(e) => {
@@ -282,14 +437,14 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
                         spellCheck={false}
                       />
                     </label>
-                    <p className="admin-role-caveat">{t(locale, "users.createCaveat")}</p>
+                    <p {...stylex.props(styles.roleCaveat)}>{t(locale, "users.createCaveat")}</p>
                   </div>
                 </td>
-                <td>
-                  <div className="admin-role-editor">
+                <td {...stylex.props(styles.td)}>
+                  <div {...stylex.props(styles.roleEditor)}>
                     <input
                       type="text"
-                      className="admin-role-input"
+                      {...stylex.props(styles.roleInput)}
                       value={newRoles}
                       onChange={(e) => setNewRoles(e.target.value)}
                       onKeyDown={(e) => {
@@ -300,10 +455,10 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
                       autoComplete="off"
                       spellCheck={false}
                     />
-                    <p className="admin-role-hint">
+                    <p {...stylex.props(styles.roleHint)}>
                       <span>{t(locale, "users.reserved")}</span>
                       {RESERVED_ROLES.map((role) => (
-                        <button key={role} type="button" className="admin-role-chip" onClick={() => setNewRoles((text) => appendRole(text, role))}>
+                        <button key={role} type="button" {...stylex.props(styles.roleChip)} onClick={() => setNewRoles((text) => appendRole(text, role))}>
                           {role}
                         </button>
                       ))}
@@ -312,9 +467,9 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
                 </td>
                 {/* The route takes no manager and no disabled flag: an account
                     is created enabled and unmanaged, then edited from its row. */}
-                <td>—</td>
-                <td>—</td>
-                <td>
+                <td {...stylex.props(styles.td)}>—</td>
+                <td {...stylex.props(styles.td)}>—</td>
+                <td {...stylex.props(styles.td)}>
                   <button
                     type="button"
                     className="btn btn-primary"
@@ -331,15 +486,15 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
             )}
             {items.map((user) => (
               <Fragment key={user.userId}>
-                <tr>
-                  <td>{user.email}</td>
-                  <td>
+                <tr {...stylex.props(styles.tr)}>
+                  <td {...stylex.props(styles.td)}>{user.email}</td>
+                  <td {...stylex.props(styles.td)}>
                     {editingRoles(user.userId) ? (
-                      <div className="admin-role-editor">
+                      <div {...stylex.props(styles.roleEditor)}>
                         {/* autoFocus: the single input of an editor the operator just opened by an explicit click. */}
                         <input
                           type="text"
-                          className="admin-role-input"
+                          {...stylex.props(styles.roleInput)}
                           value={draftRoles}
                           onChange={(e) => setDraftRoles(e.target.value)}
                           onKeyDown={(e) => {
@@ -352,26 +507,31 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
                           spellCheck={false}
                           autoFocus
                         />
-                        <p className="admin-role-hint">
+                        <p {...stylex.props(styles.roleHint)}>
                           <span>{t(locale, "users.reserved")}</span>
                           {RESERVED_ROLES.map((role) => (
-                            <button key={role} type="button" className="admin-role-chip" onClick={() => setDraftRoles((text) => appendRole(text, role))}>
+                            <button
+                              key={role}
+                              type="button"
+                              {...stylex.props(styles.roleChip)}
+                              onClick={() => setDraftRoles((text) => appendRole(text, role))}
+                            >
                               {role}
                             </button>
                           ))}
                         </p>
-                        <p className="admin-role-caveat">{t(locale, "users.roleCaveat")}</p>
+                        <p {...stylex.props(styles.roleCaveat)}>{t(locale, "users.roleCaveat")}</p>
                       </div>
                     ) : (
-                      <span className="admin-role-list">{user.roles.join(", ") || "—"}</span>
+                      <span {...stylex.props(styles.roleList)}>{user.roles.join(", ") || "—"}</span>
                     )}
                   </td>
-                  <td>
+                  <td {...stylex.props(styles.td)}>
                     {editingManager(user.userId) ? (
-                      <div className="admin-role-editor">
+                      <div {...stylex.props(styles.roleEditor)}>
                         {/* autoFocus: the single control of an editor the operator just opened by an explicit click. */}
                         <select
-                          className="admin-manager-select"
+                          {...stylex.props(styles.managerSelect)}
                           value={draftManager}
                           onChange={(e) => setDraftManager(e.target.value)}
                           onKeyDown={(e) => {
@@ -388,18 +548,18 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
                             </option>
                           ))}
                         </select>
-                        <p className="admin-role-caveat">{t(locale, "users.managerCaveat")}</p>
+                        <p {...stylex.props(styles.roleCaveat)}>{t(locale, "users.managerCaveat")}</p>
                       </div>
                     ) : (
-                      <span className="admin-manager-name">{managerLabel(items, user.managerUserId)}</span>
+                      <span {...stylex.props(styles.managerName)}>{managerLabel(items, user.managerUserId)}</span>
                     )}
                   </td>
-                  <td>
-                    <span className={`admin-badge admin-badge-${user.disabled ? "disabled" : "enabled"}`}>
+                  <td {...stylex.props(styles.td)}>
+                    <span {...stylex.props(styles.badge, user.disabled ? styles.badgeRefusal : styles.badgeSettled)}>
                       {t(locale, user.disabled ? "users.statusDisabled" : "users.statusEnabled")}
                     </span>
                   </td>
-                  <td>
+                  <td {...stylex.props(styles.td)}>
                     {editingRoles(user.userId) && (
                       <>
                         <button type="button" className="btn btn-primary" onClick={() => void saveRoles(user)} disabled={busyId === user.userId}>
@@ -442,15 +602,15 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
                   // Its own row rather than a replaced cell: a password matches
                   // no column here, and displacing one would put the editor
                   // under a heading that names something else.
-                  <tr className="admin-editor-row">
-                    <td colSpan={5}>
-                      <div className="admin-role-editor">
-                        <label className="admin-field">
-                          <span className="admin-field-label">{tFill(locale, "users.newPasswordFor", { email: user.email })}</span>
+                  <tr>
+                    <td {...stylex.props(styles.editorRowTd)} colSpan={5}>
+                      <div {...stylex.props(styles.roleEditor)}>
+                        <label {...stylex.props(styles.field)}>
+                          <span {...stylex.props(styles.fieldLabel)}>{tFill(locale, "users.newPasswordFor", { email: user.email })}</span>
                           {/* autoFocus: the single input of an editor the operator just opened by an explicit click. */}
                           <input
                             type="text"
-                            className="admin-role-input"
+                            {...stylex.props(styles.roleInput)}
                             value={draftPassword}
                             onChange={(e) => setDraftPassword(e.target.value)}
                             onKeyDown={(e) => {
@@ -462,8 +622,8 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
                             autoFocus
                           />
                         </label>
-                        <p className="admin-role-caveat">{t(locale, "users.resetCaveat")}</p>
-                        <div className="admin-editor-actions">
+                        <p {...stylex.props(styles.roleCaveat)}>{t(locale, "users.resetCaveat")}</p>
+                        <div {...stylex.props(styles.editorActions)}>
                           <button
                             type="button"
                             className="btn btn-primary"

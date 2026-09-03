@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { listInstances } from "../api/client.js";
-import type { DegradedInstanceSummary, InstanceSummaryItem } from "../api/types.js";
+import type { DegradedInstanceSummary, InstanceStatus, InstanceSummaryItem } from "../api/types.js";
 import type { Route } from "../routing.js";
 import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
@@ -24,6 +26,112 @@ const PAGE_LIMIT = 50;
 function isDegraded(item: InstanceSummaryItem): item is DegradedInstanceSummary {
   return "degraded" in item;
 }
+
+/** `app.css`'s screen/controls/table/badge rules, as StyleX. `InstanceStatus`
+ * is a closed union, so `badgeTone` is exhaustive (design.md D3). */
+const styles = stylex.create({
+  screen: {
+    maxWidth: "60rem",
+    marginInline: "auto",
+    paddingTop: space.s4,
+    paddingInline: space.s3,
+    paddingBottom: space.s6,
+  },
+  controls: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: space.s2,
+    marginBottom: space.s3,
+    alignItems: "center",
+  },
+  controlsField: {
+    backgroundColor: colors.surface,
+    color: colors.text,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+  },
+  empty: {
+    color: colors.textMuted,
+    paddingBlock: space.s4,
+    paddingInline: 0,
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    fontSize: "0.9rem",
+  },
+  th: {
+    textAlign: "left",
+    fontFamily: fonts.body,
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+    padding: space.s2,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
+  },
+  td: {
+    padding: space.s2,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+    verticalAlign: "top",
+  },
+  tr: {
+    background: { default: "none", ":hover": colors.surfaceMuted },
+  },
+  rowLink: {
+    background: "none",
+    borderWidth: 0,
+    margin: 0,
+    padding: 0,
+    font: "inherit",
+    color: "inherit",
+    textAlign: "left",
+    cursor: "pointer",
+    textDecoration: { default: "none", ":hover": "underline" },
+  },
+  badge: {
+    display: "inline-block",
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    fontWeight: 600,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "currentcolor",
+    paddingBlock: 2,
+    paddingInline: 7,
+  },
+  badgeOpen: {
+    color: colors.accent,
+  },
+  badgeSettled: {
+    color: colors.text,
+  },
+  badgeDormant: {
+    color: { default: "#726e6e", "@media (prefers-color-scheme: dark)": colors.neutral500 },
+  },
+  badgeRefusal: {
+    color: colors.surface,
+    backgroundColor: colors.refusal,
+    borderColor: colors.refusal,
+  },
+  loadMore: {
+    marginTop: space.s3,
+  },
+});
+
+const badgeTone: Record<InstanceStatus, typeof styles.badgeOpen> = {
+  running: styles.badgeOpen,
+  completed: styles.badgeSettled,
+  cancelled: styles.badgeDormant,
+  faulted: styles.badgeRefusal,
+};
 
 export function InstancesScreen({ token, locale, navigate, onUnauthorized }: InstancesScreenProps) {
   const [error, setError] = useState<string | undefined>(undefined);
@@ -54,12 +162,12 @@ export function InstancesScreen({ token, locale, navigate, onUnauthorized }: Ins
   }, [load, reloadToken]);
 
   return (
-    <main className="admin-screen">
+    <main {...stylex.props(styles.screen)}>
       <h1>{t(locale, "instances.title")}</h1>
 
-      <div className="admin-controls">
+      <div {...stylex.props(styles.controls)}>
         {/* Every `value` here is the status token the route matches; only the label follows the locale. */}
-        <select value={filter.status} onChange={(e) => setFilter((f) => ({ ...f, status: e.target.value }))}>
+        <select {...stylex.props(styles.controlsField)} value={filter.status} onChange={(e) => setFilter((f) => ({ ...f, status: e.target.value }))}>
           <option value="">{t(locale, "common.allStatuses")}</option>
           <option value="running">{t(locale, "instances.statusRunning")}</option>
           <option value="completed">{t(locale, "instances.statusCompleted")}</option>
@@ -67,27 +175,31 @@ export function InstancesScreen({ token, locale, navigate, onUnauthorized }: Ins
           <option value="faulted">{t(locale, "instances.statusFaulted")}</option>
         </select>
         <input
+          {...stylex.props(styles.controlsField)}
           placeholder={t(locale, "instances.filterProcessId")}
           value={filter.processId}
           onChange={(e) => setFilter((f) => ({ ...f, processId: e.target.value }))}
         />
         <input
+          {...stylex.props(styles.controlsField)}
           placeholder={t(locale, "instances.filterStepId")}
           value={filter.currentStepId}
           onChange={(e) => setFilter((f) => ({ ...f, currentStepId: e.target.value }))}
         />
         <input
+          {...stylex.props(styles.controlsField)}
           placeholder={t(locale, "instances.filterStartedBy")}
           value={filter.startedBy}
           onChange={(e) => setFilter((f) => ({ ...f, startedBy: e.target.value }))}
         />
         <input
+          {...stylex.props(styles.controlsField)}
           placeholder={t(locale, "instances.filterClaimedBy")}
           value={filter.claimedBy}
           onChange={(e) => setFilter((f) => ({ ...f, claimedBy: e.target.value }))}
         />
         {/* Every `value` here is the kind token the route matches; only the label follows the locale. */}
-        <select value={filter.kind} onChange={(e) => setFilter((f) => ({ ...f, kind: e.target.value }))}>
+        <select {...stylex.props(styles.controlsField)} value={filter.kind} onChange={(e) => setFilter((f) => ({ ...f, kind: e.target.value }))}>
           <option value="">{t(locale, "instances.allKinds")}</option>
           <option value="published">{t(locale, "instances.kindPublished")}</option>
           <option value="test">{t(locale, "instances.kindTest")}</option>
@@ -99,43 +211,45 @@ export function InstancesScreen({ token, locale, navigate, onUnauthorized }: Ins
 
       {error && <ErrorBanner error={error} locale={locale} onRetry={refresh} retryDisabled={loading} />}
 
-      {items.length === 0 && !loading && !error && <p className="admin-empty">{t(locale, "instances.empty")}</p>}
+      {items.length === 0 && !loading && !error && <p {...stylex.props(styles.empty)}>{t(locale, "instances.empty")}</p>}
 
       {items.length > 0 && (
-        <table className="admin-table">
+        <table {...stylex.props(styles.table)}>
           <thead>
             <tr>
-              <th>{t(locale, "instances.colProcess")}</th>
-              <th>{t(locale, "instances.colStep")}</th>
-              <th>{t(locale, "instances.colStatus")}</th>
-              <th>{t(locale, "instances.colKind")}</th>
-              <th>{t(locale, "instances.colStartedBy")}</th>
-              <th>{t(locale, "instances.colClaimedBy")}</th>
-              <th>{t(locale, "instances.colCreated")}</th>
+              <th {...stylex.props(styles.th)}>{t(locale, "instances.colProcess")}</th>
+              <th {...stylex.props(styles.th)}>{t(locale, "instances.colStep")}</th>
+              <th {...stylex.props(styles.th)}>{t(locale, "instances.colStatus")}</th>
+              <th {...stylex.props(styles.th)}>{t(locale, "instances.colKind")}</th>
+              <th {...stylex.props(styles.th)}>{t(locale, "instances.colStartedBy")}</th>
+              <th {...stylex.props(styles.th)}>{t(locale, "instances.colClaimedBy")}</th>
+              <th {...stylex.props(styles.th)}>{t(locale, "instances.colCreated")}</th>
             </tr>
           </thead>
           <tbody>
             {items.map((item) =>
               isDegraded(item) ? (
-                <tr key={item.instanceId}>
-                  <td>{item.processId}</td>
-                  <td>
-                    <span className="admin-badge admin-badge-degraded">{item.reason}</span>
+                <tr key={item.instanceId} {...stylex.props(styles.tr)}>
+                  <td {...stylex.props(styles.td)}>{item.processId}</td>
+                  <td {...stylex.props(styles.td)}>
+                    <span {...stylex.props(styles.badge, styles.badgeRefusal)}>{item.reason}</span>
                   </td>
-                  <td>
-                    <span className={`admin-badge admin-badge-${item.status}`}>{item.status}</span>
+                  <td {...stylex.props(styles.td)}>
+                    <span {...stylex.props(styles.badge, badgeTone[item.status])}>{item.status}</span>
                   </td>
-                  <td>{item.kind === "test" ? <span className="admin-badge admin-badge-test">{item.kind}</span> : item.kind}</td>
-                  <td>{item.startedBy ?? "—"}</td>
-                  <td>—</td>
-                  <td>{new Date(item.createdAt).toLocaleString(locale)}</td>
+                  <td {...stylex.props(styles.td)}>
+                    {item.kind === "test" ? <span {...stylex.props(styles.badge, styles.badgeDormant)}>{item.kind}</span> : item.kind}
+                  </td>
+                  <td {...stylex.props(styles.td)}>{item.startedBy ?? "—"}</td>
+                  <td {...stylex.props(styles.td)}>—</td>
+                  <td {...stylex.props(styles.td)}>{new Date(item.createdAt).toLocaleString(locale)}</td>
                 </tr>
               ) : (
-                <tr key={item.instanceId}>
-                  <td>
+                <tr key={item.instanceId} {...stylex.props(styles.tr)}>
+                  <td {...stylex.props(styles.td)}>
                     <button
                       type="button"
-                      className="admin-row-link"
+                      {...stylex.props(styles.rowLink)}
                       aria-label={tFill(locale, "instances.openRow", {
                         process: labelText(item.processLabel, item.processBaseLocale),
                         step: labelText(item.stepLabel, item.processBaseLocale),
@@ -146,14 +260,16 @@ export function InstancesScreen({ token, locale, navigate, onUnauthorized }: Ins
                       {labelText(item.processLabel, item.processBaseLocale)}
                     </button>
                   </td>
-                  <td>{labelText(item.stepLabel, item.processBaseLocale)}</td>
-                  <td>
-                    <span className={`admin-badge admin-badge-${item.status}`}>{item.status}</span>
+                  <td {...stylex.props(styles.td)}>{labelText(item.stepLabel, item.processBaseLocale)}</td>
+                  <td {...stylex.props(styles.td)}>
+                    <span {...stylex.props(styles.badge, badgeTone[item.status])}>{item.status}</span>
                   </td>
-                  <td>{item.kind === "test" ? <span className="admin-badge admin-badge-test">{item.kind}</span> : item.kind}</td>
-                  <td>{item.startedBy ?? "—"}</td>
-                  <td>{item.assignment?.claimedBy ?? "—"}</td>
-                  <td>{new Date(item.createdAt).toLocaleString(locale)}</td>
+                  <td {...stylex.props(styles.td)}>
+                    {item.kind === "test" ? <span {...stylex.props(styles.badge, styles.badgeDormant)}>{item.kind}</span> : item.kind}
+                  </td>
+                  <td {...stylex.props(styles.td)}>{item.startedBy ?? "—"}</td>
+                  <td {...stylex.props(styles.td)}>{item.assignment?.claimedBy ?? "—"}</td>
+                  <td {...stylex.props(styles.td)}>{new Date(item.createdAt).toLocaleString(locale)}</td>
                 </tr>
               ),
             )}
@@ -162,7 +278,7 @@ export function InstancesScreen({ token, locale, navigate, onUnauthorized }: Ins
       )}
 
       {cursor && (
-        <div className="admin-load-more">
+        <div {...stylex.props(styles.loadMore)}>
           <button type="button" className="btn btn-secondary" onClick={() => void loadMore()} disabled={loading}>
             {t(locale, "common.loadMore")}
           </button>

@@ -5,6 +5,7 @@ import { matchRoute, routePath, ROUTE_ROLE, type Route } from "./routing.js";
 import { useAreaRoute, PROFILE_PATH } from "../../shell/routing.js";
 import { Chrome } from "../../shell/Chrome.js";
 import { navStyles } from "../../shell/navStyles.js";
+import { space } from "form-ui/tokens.stylex";
 import { InstancesScreen } from "./screens/InstancesScreen.js";
 import { InstanceScreen } from "./screens/InstanceScreen.js";
 import { OutboxScreen } from "./screens/OutboxScreen.js";
@@ -22,6 +23,20 @@ import "./app.css";
 
 const ADMIN_ROLE = "system:admin";
 const DATALISTS_ROLE = "system:datalists";
+
+/** `.admin-empty-role` from `app.css`. */
+const styles = stylex.create({
+  emptyRole: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "100vh",
+    textAlign: "center",
+    gap: space.s3,
+    padding: space.s4,
+  },
+});
 
 /** The role each tab's screen needs; `ROUTE_ROLE` in `routing.ts` carries the same rule per route. */
 const TABS: { name: Route["name"]; labelKey: CatalogKey; role: string; Icon: typeof ListChecks }[] = [
@@ -41,7 +56,7 @@ const TABS: { name: Route["name"]; labelKey: CatalogKey; role: string; Icon: typ
  */
 function MissingRole({ role, locale }: { role: string; locale: UiLocale }) {
   return (
-    <main className="admin-empty-role">
+    <main {...stylex.props(styles.emptyRole)}>
       <h1>{t(locale, "role.title")}</h1>
       <p>{tFill(locale, "role.body", { role })}</p>
     </main>

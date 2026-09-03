@@ -284,15 +284,18 @@ This is not a StyleX limitation worth working around. A universal
 selector styles the whole page, not one component's own call site. No
 compiled style could express that, regardless of the property inside.
 
-**D12. `admin/app.css` declares `.admin-field` twice.** The merge
-happens in code, not by relying on cascade order. Lines 304 and 424 each
-declare non-overlapping properties under the same selector. The cascade
-merges them today.
+**D12. `admin/app.css` declares `.admin-field` twice, and
+`.admin-role-input` too.** The merge happens in code, not by relying on
+cascade order. `.admin-field`'s two declarations (lines 304 and 424) and
+`.admin-role-input`'s two (lines 200 and 225) each split non-overlapping
+properties across the same selector. The cascade merges them today.
 
-A `stylex.create` entry is one object. Task 4.1 SHALL combine both
-declarations' properties into that one `admin-field` style. It verifies
-this by checking the compiled CSS carries every property both source
-rules declared.
+A `stylex.create` entry is one object. Task 4.1 SHALL combine each
+selector's declarations into one style. It verifies this by checking the
+compiled CSS carries every property both source rules declared, for
+both selectors. `.admin-role-input`'s first declaration is a joint one,
+shared with `.admin-role-list`. That rule's own font-mono/0.8rem shape
+never repeats, so it stays intact, unmerged.
 
 **D13. The current-tab condition moves to JS.** Each root already tracks
 which tab is current, to set its `aria-current` attribute. Task 2.8
