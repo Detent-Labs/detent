@@ -42,10 +42,17 @@ scope." Decision D1 explains why that call changes here.
 
 **Goals:**
 
-- Every rule in `shell.css`'s account group and menu becomes a typed
-  StyleX style. So does every rule in the three areas' own `app.css`
-  files. Each reads the existing token module. All four stylesheets shrink
-  to just the rules this change defers.
+- Every rule in `shell.css` becomes a typed StyleX style. So does every
+  rule in the three areas' own `app.css` files. Each reads the existing
+  token module. All four stylesheets shrink to just the rules this change
+  defers.
+- Six files carry `shell.css`'s rules, and this phase migrates every
+  file. One pair of rules stays behind; see D10. The chrome component
+  carries the account group and menu. The app shell and each area's own
+  root component carry the shared nav wrapper and the loading/forbidden
+  empty state. The login
+  screen, the error banner, the error boundary and the profile page each
+  carry their own.
 - `:popover-open` and one ancestor-hover rule get a real, build-verified
   answer. Neither rests on the assumption phase 0's plan carried.
 - An open-ended status or kind value picks its style from a typed lookup.
@@ -59,7 +66,9 @@ scope." Decision D1 explains why that call changes here.
 
 - `.btn`/`.app-back`. See D1.
 - `areas/studio/app.css`, `CanvasView.tsx`, `EditRail.tsx`. Phase 3 and 4's
-  scope.
+  scope. Its `root.tsx` is not: its one `.shell-nav` wrapper moves with
+  the other three areas' roots. `.shell-nav` belongs to `shell.css`, not
+  to studio's own stylesheet. See D9.
 - A shared cross-area stamp module. See D3.
 - Any change to an area's rendered layout, copy or behavior beyond the
   styling mechanism.
@@ -215,6 +224,40 @@ below. This change may prove unwieldy in practice. A mid-flight split
 would then cost little. The tasks for an unstarted area group move to a
 new change, with no rework of a finished one.
 
+**D9. The shared nav wrapper migrates everywhere at once.** That covers
+studio too.
+
+Four root components carry it: admin's, app's, reporting's and studio's
+own, each on one identical nav wrapper. The class is `.shell-nav`, and it
+belongs to `shell.css`. No area's own stylesheet owns it.
+
+Studio's own call site is a single, self-contained line. Converting it
+needs no other studio file, and no studio `app.css` rule.
+
+This differs from D1's `.btn` deferral. There, an unconverted consumer
+sits inside a large, untouched file this phase has no reason to open.
+Here, studio's root component needs the same one-line swap the other
+three areas' roots already need. Nothing else in that file changes.
+Deferring it anyway would leave studio as the one area still carrying a
+literal `shell-nav` class no compiled rule matches. No reason beyond an
+artificial scope line would justify that.
+
+**D10. `.shell` and `.shell > *` stay literal.** `Chrome.tsx`'s one
+wrapper `<div>` renders `.shell`. Every area screen is its child.
+`.shell > *` sets `width: 100%` on each one. That restores the block-box
+width a flex item's auto margins would otherwise collapse. This child
+set spans every area, studio included, and this phase does not touch
+studio's own screens.
+
+A compiled style could give the wrapper `<div>` a hashed class. Nothing
+could then match `.shell > *`'s descendant rule to it. That rule targets
+a literal string, not a per-call-site hash.
+
+The two rules stay coupled: migrating one breaks the other.
+`Chrome.tsx`'s wrapper keeps its literal `className="shell"`. Both rules
+stay in `shell.css`, the same shape `web-styling`'s "Two class names
+stay literal" requirement already covers.
+
 ## Risks / Trade-offs
 
 - [`:popover-open` does not compile as expected] → D2's fallback: a
@@ -237,7 +280,8 @@ rests on their answer. D6's stub change lands before any task exercises
 `when.ancestor` under `bun test`.
 
 1. Pre-flight and the stub fix (D6).
-2. `shell.css` and `Chrome.tsx`, including D2's `:popover-open` check.
+2. `shell.css` and its six consumer files, including D2's
+   `:popover-open` check and D9's four-root `.shell-nav` swap.
 3. `areas/app/app.css`, including D4's `when.ancestor` check.
 4. `areas/admin/app.css`, the largest file.
 5. `areas/reporting/app.css`, including D5's inline-style carve-out.
@@ -247,10 +291,12 @@ rests on their answer. D6's stub change lands before any task exercises
 8. Verification: typecheck, build, full suite, gates, and a browser probe
    per area.
 
-Rollback: revert this change's commits. It touches no engine file and no
-studio file. `tokens.css`'s `.btn`/`.app-back` rules stay exactly as they
-are on `main` today. No other phase's own plan needs to change if this one
-reverts.
+Rollback: revert this change's commits. It touches no engine file. Its
+one studio-side touch, D9's `.shell-nav` swap in `studio/root.tsx`, is a
+single, standalone line. Nothing else in studio depends on it.
+`tokens.css`'s
+`.btn`/`.app-back` rules stay exactly as they are on `main` today. No
+other phase's own plan needs to change if this one reverts.
 
 ## Open Questions
 

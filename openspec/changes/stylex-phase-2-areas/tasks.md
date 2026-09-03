@@ -16,12 +16,14 @@
   passes on the preload file, and importing `@stylexjs/stylex`'s `when`
   export under `bun test` does not throw.
 
-## 2. `shell.css` and `Chrome.tsx`
+## 2. `shell.css` and its six consumer files
 
 - [ ] 2.1 Add a `stylex.create` block to `Chrome.tsx` covering the account
   group, the account button, the account menu and every menu row, reading
-  `form-ui/tokens.stylex`. Verify: `bun run typecheck` passes with no
-  reference to an undeclared token.
+  `form-ui/tokens.stylex`. Leave the outer `className="shell"` wrapper
+  `<div>` untouched: `.shell` and `.shell > *` stay literal (design.md
+  D10). Verify: `bun run typecheck` passes with no reference to an
+  undeclared token.
 - [ ] 2.2 Give `.shell-menu:popover-open`'s rule a StyleX conditional
   value. Key it on the literal `:popover-open` pseudo-class, on the
   property that toggles the menu's `display` (design.md D2). Verify:
@@ -36,12 +38,44 @@
   composes with the new compiled style through string concatenation, not
   `stylex.props` (design.md D7). Verify:
   `git grep -c 'className="shell-account\|className="shell-menu' packages/web/src/shell/Chrome.tsx`
-  returns 0 for every class this group migrates. The literal `.btn`-family
+  returns 0 for every class this task migrates. The literal `.btn`-family
   substrings legitimately remain.
-- [ ] 2.4 Delete the migrated rules from `shell.css`. Leave only what this
-  change does not touch. Verify: `bun run build` succeeds, and
-  `git grep -n 'shell-account\|shell-menu' packages/web/src/shell/shell.css`
-  returns no match for a rule task 2.1 covered.
+- [ ] 2.4 Add a `stylex.create` block to `LoginScreen.tsx` for
+  `.shell-screen`, `.shell-login-form` (plus its `label` rule) and
+  `.shell-error`, and apply it at each call site. Verify: `bun run
+  typecheck` passes, and `git grep -c 'className="shell-screen\|
+  className="shell-login-form\|className="shell-error"'
+  packages/web/src/shell/LoginScreen.tsx` returns 0.
+- [ ] 2.5 Add a `stylex.create` block to `ErrorBanner.tsx` for
+  `.shell-error-banner`, `.shell-error-banner-stamp` and
+  `.shell-error-banner-message`. Apply it at each call site. Verify:
+  `bun run typecheck` passes, and `git grep -c 'className="shell-error-banner'
+  packages/web/src/shell/ErrorBanner.tsx` returns 0.
+- [ ] 2.6 Add a `stylex.create` block to `ErrorBoundary.tsx` for
+  `.shell-empty`, `.shell-boundary-fallback` and `.shell-boundary-stamp`.
+  Apply it at each call site.
+
+  `App.tsx` also renders `.shell-empty` twice. Give it the same style,
+  applied locally. The two files share no component. Verify: `bun run
+  typecheck` passes. Grep both files for the migrated literal classes;
+  each returns 0.
+- [ ] 2.7 Add a `stylex.create` block to `ProfilePage.tsx` for every
+  `.shell-profile-*` rule. Reuse `.shell-screen` from task 2.4's shape,
+  declared locally here too, per `web-styling`'s per-area duplication
+  precedent. Apply it at each call site. Verify: `bun run typecheck`
+  passes, and `git grep -c 'className="shell-profile\|className="shell-screen'
+  packages/web/src/shell/ProfilePage.tsx` returns 0.
+- [ ] 2.8 Give `.shell-nav` a `stylex.create` block, plus its
+  `[aria-current="page"]` and sub-30rem rules. Declare it once. Import it
+  in all four area root components: `admin/root.tsx`, `app/root.tsx`,
+  `reporting/root.tsx` and `studio/root.tsx` (design.md D9). Verify: `bun
+  run typecheck` passes, and `git grep -rc
+  'className="shell-nav' packages/web/src/areas/*/root.tsx` returns 0
+  for all four files.
+- [ ] 2.9 Delete every migrated rule from `shell.css`, leaving only
+  `.shell` and `.shell > *` (design.md D10). Verify: `bun run build`
+  succeeds, and `git grep -c '^\.' packages/web/src/shell/shell.css`
+  shows exactly 2 rule blocks remaining.
 
 ## 3. `areas/app/app.css`
 
