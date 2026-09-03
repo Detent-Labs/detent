@@ -1059,11 +1059,17 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   phase is its own OpenSpec change against `web-styling`.
 
   Reopen triggers: two consecutive StyleX releases that each cost a build
-  fix reopen the compiler-version decision (design.md's Risks). Whether
-  phase 2 splits into two changes stays open until phase 1's measured
-  effort answers it. `unstable_moduleResolution.rootDir` alone resolved the
-  form-ui-exported token module from `packages/web`, closing D8's one open
-  question without the `aliases` option.
+  fix reopen the compiler-version decision (design.md's Risks).
+  `unstable_moduleResolution.rootDir` alone resolved the form-ui-exported
+  token module from `packages/web`, closing D8's one open question without
+  the `aliases` option.
+
+  Whether phase 2 splits into two changes is resolved: it does not.
+  `stylex-phase-2-areas`'s own design.md D8 weighed phase 1's paid
+  propose-review-apply-verify-archive overhead against paying it four
+  times, once per area, for no independent-review benefit. Each area
+  keeps its own commit boundary instead, so a mid-flight split would
+  still cost little if the change proved unwieldy.
 
   Phase 1 (`stylex-phase-1-form-ui`) is done: `packages/form-ui`'s field
   renderer and `PathButtons` compile from StyleX, `form-ui.css` and its
@@ -1075,3 +1081,14 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   re-derive. Phases 2 through 5 remain: shell/app/admin/reporting, studio
   non-canvas, the canvas, and the cleanup phase that deletes the remaining
   hand-written area stylesheets.
+
+  Phase 2 (`stylex-phase-2-areas`) is done: the shell's remaining nav
+  wrapper and all four areas' stylesheets compile from StyleX now.
+  `shell.css`, `app/app.css`, `admin/app.css` and `reporting/app.css`
+  each carry only their D10/D11 literal reset block. `InstanceStatus`
+  and `statusTone`'s closed unions became exhaustive `badgeTone`/
+  `stampTone` lookups; `OutboxRow.status`'s open-ended string became a
+  `Partial<Record<string, ...>>` lookup with the same no-op fallback the
+  pre-migration CSS gave an unmatched status. Phases 3 through 5 remain:
+  studio non-canvas, the canvas, and the cleanup phase that deletes the
+  remaining hand-written stylesheets.

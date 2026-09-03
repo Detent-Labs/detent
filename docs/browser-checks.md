@@ -2335,3 +2335,40 @@ at the same width. The container query reads the form's own width, not
 the viewport's.
 
 Throughout: zero console errors on either screen.
+
+### The four areas: outbox badge, duration bar, and two stamp mechanisms (`stylex-phase-2-areas`)
+
+Source: `stylex-phase-2-areas` task 7.1. The shell, app, admin and
+reporting areas compile from StyleX now. `shell.css`, `app/app.css`,
+`admin/app.css` and `reporting/app.css` carry only their D10/D11 literal
+blocks. Every rule that once lived in them is a compiled style now. Seed
+the database before this check, per `docs/decisions.md`'s seed script.
+
+Build the production bundle and open it on the engine's own port. Open
+the account menu in the shell header, from any area. Pass: the menu still
+opens as a native `:popover-open` state, unaffected by the move of
+`.shell-nav` into `packages/web/src/shell/navStyles.ts`.
+
+Open the app area's My-tasks screen. Pass: each row's status stamp reads
+`stampTone`, exhaustive over the four `statusTone` values. Its computed
+`border`, `padding` and letter-spacing match what `app.css` declared
+before this change. Hover a task's step name. Pass: the underline
+paints, whether the browser applies it through
+`stylex.when.ancestor(':hover')` or a plain descendant hover. Both
+compile to the same visible result.
+
+Open the admin area's Outbox screen. Pass: each row's status badge reads
+`badgeTone`, an open-ended lookup keyed by the row's own status string.
+A status with no matching tone, such as `claimed`, renders the bare
+badge shape with no extra style. That matches the pre-migration
+fallback. Open the Instances screen. Pass: each row's status badge reads
+the exhaustive `InstanceStatus`-keyed `badgeTone` instead, with the same
+five tones the design language names.
+
+Open the reporting area's cycle-time or bottleneck view. Pass: each
+duration rule's fill still sets its width through a literal inline
+`style`, not a compiled value (design.md D5). The fill's computed
+`background-color` and the rule's `border-bottom` match `app.css`'s
+pre-migration values.
+
+Throughout: zero console errors on any of the four screens.

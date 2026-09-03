@@ -203,12 +203,12 @@
 
 ## 7. Docs and roadmap
 
-- [ ] 7.1 Add a probe per area to `docs/browser-checks.md`'s StyleX
+- [x] 7.1 Add a probe per area to `docs/browser-checks.md`'s StyleX
   section. Each probe opens a migrated screen and reads computed styles.
   Each confirms a match against the deleted stylesheet's declarations.
   Name the outbox badge, the duration bar, and an admin table row's
   status badge. Name an app task's stamp too, per design.md's Goals.
-- [ ] 7.2 Change `docs/decisions.md`'s StyleX entry and `ROADMAP.md`
+- [x] 7.2 Change `docs/decisions.md`'s StyleX entry and `ROADMAP.md`
   stage 45. Mark phase 2 done. Resolve the still-open "does phase 2
   split into two changes" question `docs/decisions.md` carries, per
   design.md D8: it does not. Name phases 3 through 5 as what remains.
