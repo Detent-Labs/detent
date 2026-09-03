@@ -388,29 +388,6 @@ resolves it before it calls `form-ui`.
 - **THEN** the component's prop type offers no `baseLocale` prop
 - **AND** `locale` is the only locale value the component accepts
 
-### Requirement: form-ui ships one stylesheet for both consumers
-
-`form-ui` SHALL ship the CSS for everything it renders (fields, groups,
-validation errors, path buttons) as part of the package, so both the studio
-area's Player and the app area CAN render forms with
-identical structure and identical styling — a shared component tree without
-a shared stylesheet would still let the two areas' rendering drift visually.
-The stylesheet SHALL be imported once, at `packages/web/src/main.tsx`, rather
-than once per consuming area: one bundle now carries both consumers, so a
-second import would be the same sheet twice.
-
-#### Scenario: The end-user app imports the shared stylesheet
-
-- **WHEN** `packages/web`'s entry point is inspected
-- **THEN** it imports `form-ui/form-ui.css`
-
-#### Scenario: Both consumers import the same stylesheet
-
-- **WHEN** the studio area's Player and the app area each render a step form
-  via `form-ui`
-- **THEN** both are styled by the same `form-ui`-provided stylesheet, not two
-  independently maintained copies
-
 ### Requirement: Fields render across the view's declared column count, honoring each field's span
 
 `FieldForm` SHALL accept `columns` (`1 | 2`, default `1`) as a prop.
@@ -639,9 +616,6 @@ stay source-only. The consumer's build compiles its styles and its
 token module through the workspace link. The package needs no build step of
 its own.
 
-The `./form-ui.css` export SHALL remain until the renderer's own styles
-migrate in a later phase.
-
 #### Scenario: A consumer resolves the token module
 
 - **WHEN** `packages/web` imports the accent token from form-ui
@@ -658,3 +632,74 @@ migrate in a later phase.
 
 - **WHEN** a contributor opens `packages/form-ui`'s `package.json`
 - **THEN** `packages/web` does not appear among its dependencies or peers
+
+### Requirement: form-ui's field renderer and path buttons compile from StyleX
+
+`packages/form-ui`'s field renderer (`FieldForm`, `FieldInput`, `NoteText`)
+and `PathButtons` SHALL declare their styles as typed StyleX style
+objects. Both read `packages/form-ui/src/tokens.stylex.ts`.
+`packages/form-ui` SHALL ship no hand-written stylesheet. The studio
+area's Player and the app area's Task screen are the two consumers of
+these components. Both SHALL therefore render identically styled forms
+with no stylesheet import of their own.
+
+Two facts have a fixed, small set of outcomes. One is how many grid
+columns a form or a group draws. The other is how wide a field spans.
+Application code SHALL choose among named StyleX styles for each.
+
+A stylesheet SHALL never read a DOM attribute to decide. `FieldForm` MAY
+still render a `data-*` attribute carrying that same value, as a plain
+rendering fact. A test or a future consumer can read it. No stylesheet,
+compiled or hand-written, SHALL select on it.
+
+#### Scenario: The renderer ships no CSS file
+
+- **WHEN** a contributor inspects `packages/form-ui`'s `package.json`
+  exports
+- **THEN** no `./form-ui.css` (or other stylesheet) export exists
+
+#### Scenario: Both consumers render identically without importing a stylesheet
+
+- **WHEN** the studio area's Player and the app area's Task screen each
+  render the same step's form
+- **THEN** `form-ui`'s own compiled styles alone style both
+- **AND** neither imports a `form-ui`-provided stylesheet
+
+#### Scenario: A column or span choice compiles from a style, not a selector
+
+- **WHEN** `FieldForm` renders at `columns: 2`
+- **THEN** the two-column layout comes from a StyleX style the component
+  selected in code
+- **AND** no compiled or hand-written rule in the bundle selects on a
+  `data-columns` or `data-span` attribute
+
+### Requirement: Path-submit buttons accept a style prop for their wrapper
+
+`PathButtons` SHALL accept an optional style prop for its wrapper
+element. It composes after the component's own default wrapper style. A
+caller MAY thereby extend or override that layout, so `form-ui` need not
+declare a variant on its own behalf. This prop does not touch the button
+element's className.
+
+`PathButtons`' button element SHALL keep a plain, literal className for
+the shared control style it does not own. `form-ui` SHALL NOT declare a
+compiled style for that class.
+
+#### Scenario: A caller extends the wrapper's style
+
+- **WHEN** a caller renders `PathButtons` and passes a style
+- **THEN** the rendered wrapper carries both the component's own compiled
+  style and the caller's, with the caller's applied after it
+
+#### Scenario: The default wrapper needs no caller-supplied style
+
+- **WHEN** a caller renders `PathButtons` with no style prop
+- **THEN** the wrapper renders with `form-ui`'s own default layout, exactly
+  as it did before this change
+
+#### Scenario: The button's shared control class stays literal
+
+- **WHEN** `PathButtons` renders a submit button
+- **THEN** the button element carries the same literal control className
+  it carried before this change
+- **AND** the new style prop leaves that className unaffected
