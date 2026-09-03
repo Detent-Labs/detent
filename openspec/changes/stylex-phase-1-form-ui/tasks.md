@@ -129,20 +129,43 @@
 
 ## 7. Verification
 
-- [ ] 7.1 Run `bun run typecheck`. Verify: exit 0 for the engine and both
+- [x] 7.1 Run `bun run typecheck`. Verify: exit 0 for the engine and both
   packages.
-- [ ] 7.2 Run `bun run build`. Verify: exit 0 and the closeBundle assertion
+- [x] 7.2 Run `bun run build`. Verify: exit 0 and the closeBundle assertion
   prints the stylesheet it checked, unchanged in behavior from phase 0.
-- [ ] 7.3 Run the full `bun test` with `DATABASE_URL` set, through
+- [x] 7.3 Run the full `bun test` with `DATABASE_URL` set, through
   `scripts/gates/silent-green.sh`. Verify: zero failures, skip count at the
   floor, gate exit 0.
-- [ ] 7.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`
+- [x] 7.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`
   and the same for `whitespace.sh`, over this change's own commit(s).
   Verify: both exit 0.
-- [ ] 7.5 Build the production bundle and serve it from `WEB_ROOT`, not
+- [x] 7.5 Build the production bundle and serve it from `WEB_ROOT`, not
   `bun run dev`. (Studio's dev-mode `process is not defined` crash is
   pre-existing and unrelated to this change.) Run the probe from task
   6.1 in a real browser via `playwright-cli`. Cover both the Player and
   the Task screen, at both a wide and a sub-34rem container width.
   Verify: every probe passes, and no console error appears on either
   screen.
+
+  Found and fixed one error while doing this: `bun run build` alone
+  after the source change still bundled the pre-migration `FieldForm`.
+  Bun's `node_modules/.bun/form-ui@...` snapshot had lost its hardlink
+  to `packages/form-ui/src`. An editor tool's write-and-replace breaks
+  that link. `bun install --frozen-lockfile` refreshed it. A rebuild
+  then produced the correct hashed classes.
+
+  Confirmed on the `expense_approval` example (`capture` step,
+  `demo-superuser`): the Amount and Reason inputs carry the identical
+  hashed className list. Both read `14px`/`8px`/`1px solid rgb(215, 211,
+  211)`, on both the studio area's Player and the app area's Task
+  screen. `PathButtons`' wrapper computed `gap: 8px`. Its button kept
+  the literal `btn btn-primary` class. Zero console errors on either
+  screen, narrow or wide.
+
+  The sub-34rem two-column collapse has only a build-level check. Task
+  2.2 already found the real `@container` rule in the emitted CSS. No
+  seeded example process declares a `columns: 2` view with root-level
+  fields, so nothing exercises the collapse live. `Chrome.tsx`'s own
+  `@media` collapse mechanism uses the same shape, and phase 0 already
+  verified that one. The risk here reads low, but this is not a
+  live-browser confirmation of this specific rule.
