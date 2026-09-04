@@ -1,4 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import Panzoom, { type PanzoomObject } from "@panzoom/panzoom";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useDraft } from "../draft/store";
@@ -55,6 +57,282 @@ const DISCLOSURE_HOST = DISCLOSURE_SIZE + 2 * DISCLOSURE_OUTLINE_CLEARANCE;
  * paints centered on that edge, so the gap reads 2px. */
 const FOCUS_RING_OFFSET = 3;
 const ARROW_KEYS: ArrowKey[] = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+
+const styles = stylex.create({
+  wrap: {
+    position: "relative",
+    flex: "1 1 auto",
+    minWidth: 0,
+    border: `1px solid ${colors.border}`,
+    overflow: "hidden",
+    backgroundColor: colors.surfaceMuted,
+    backgroundImage: `radial-gradient(${colors.border} 1px, transparent 1px)`,
+    // paintGrid() writes these two custom properties via style.setProperty()
+    // inside the same useLayoutEffect that mounts Panzoom, which always runs
+    // before the browser's first paint — so no fallback declaration for
+    // either property is reachable and none is declared here.
+    backgroundSize: "var(--canvas-grid-size) var(--canvas-grid-size)",
+    backgroundPosition: "var(--canvas-grid-offset-x) var(--canvas-grid-offset-y)",
+  },
+  toolbar: {
+    position: "absolute",
+    top: space.s2,
+    left: space.s2,
+    zIndex: 1,
+    display: "flex",
+    gap: space.s2,
+  },
+  // The chosen edge style reads off `aria-pressed` today; this composes the
+  // same active-state treatment directly from the `edgeStyle === "smoothstep"`
+  // boolean that already drives that attribute, instead of an attribute
+  // selector (design.md D3, case 4).
+  toolbarToggleActive: {
+    borderColor: colors.accent,
+    color: colors.accent,
+    boxShadow: `inset 0 -2px 0 ${colors.accent}`,
+  },
+  svg: {
+    width: "100%",
+    height: "100%",
+    overflow: "visible",
+    touchAction: "none",
+  },
+  // `canvas-node` stays a literal, unhashed class name (elementFor()'s
+  // querySelector, per the task's own mandate). This style composes
+  // alongside it. `outline: "none"` is unconditional rather than gated on
+  // `:focus-visible`: the shell's global `:focus-visible` rule is the only
+  // thing that would ever paint an outline here, so suppressing it always
+  // has no effect outside that state.
+  node: {
+    cursor: "grab",
+    outline: "none",
+  },
+  group: {
+    cursor: "grab",
+  },
+  groupBox: {
+    fill: "none",
+    stroke: colors.border,
+    strokeWidth: 1,
+    pointerEvents: "none",
+  },
+  groupBoxCollapsed: {
+    fill: colors.surface,
+    strokeWidth: 1.5,
+    pointerEvents: "all",
+  },
+  groupName: {
+    cursor: "grab",
+    fontFamily: fonts.body,
+    fontSize: 12,
+    fill: colors.textMuted,
+  },
+  groupNameCollapsed: {
+    fontSize: 13,
+    fill: colors.text,
+  },
+  groupCount: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    fill: colors.textMuted,
+  },
+  nodeRect: {
+    fill: colors.surface,
+    stroke: colors.border,
+    strokeWidth: 1.5,
+  },
+  nodeRectSelected: {
+    stroke: colors.accent,
+    strokeWidth: 2,
+  },
+  nodeSubprocess: {
+    fill: "none",
+    stroke: colors.border,
+    strokeWidth: 1,
+  },
+  nodeLabel: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    fill: colors.text,
+  },
+  nodeKey: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    fill: colors.textMuted,
+  },
+  // Merges app.css's two declarations for this selector (the shared
+  // display/fill/stroke/pointer-events block plus its own stroke-width/
+  // stroke-dasharray block) into one entry, per design.md D3 case 1. The
+  // ancestor is `.canvas-node`, marked via `stylex.defaultMarker()` at its
+  // own render site.
+  nodeFocusRing: {
+    display: { default: "none", [stylex.when.ancestor(":focus-visible")]: "inline" },
+    fill: "none",
+    stroke: colors.accent,
+    pointerEvents: "none",
+    strokeWidth: 2,
+    strokeDasharray: "5 4",
+  },
+  // `canvas-edge-group` composes this style at its own render site, marked
+  // via `stylex.defaultMarker()` for `edgeFocusHalo`'s ancestor selector.
+  // See `node`'s own comment for why `outline` is unconditional.
+  edgeGroup: {
+    outline: "none",
+  },
+  // Merges app.css's two declarations for this selector, the same way
+  // `nodeFocusRing` does (design.md D3, case 1).
+  edgeFocusHalo: {
+    display: { default: "none", [stylex.when.ancestor(":focus-visible")]: "inline" },
+    fill: "none",
+    stroke: colors.accent,
+    pointerEvents: "none",
+    strokeWidth: 6,
+  },
+  groupDisclosureHost: {
+    pointerEvents: "none",
+  },
+  groupDisclosure: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 20,
+    height: 20,
+    margin: 4,
+    padding: 0,
+    background: "none",
+    color: { default: colors.textMuted, ":hover": colors.text },
+    pointerEvents: "auto",
+  },
+  connectHandle: {
+    fill: colors.accent,
+    cursor: "crosshair",
+  },
+  waypointHandle: {
+    fill: colors.accent,
+    stroke: colors.accent,
+    strokeWidth: 1,
+    cursor: "grab",
+  },
+  waypointHandleNew: {
+    fill: colors.surface,
+  },
+  connectHandleTerminal: {
+    fill: colors.textMuted,
+    cursor: "not-allowed",
+  },
+  initialArrow: {
+    stroke: colors.textMuted,
+    strokeWidth: 2,
+    fill: "none",
+  },
+  edge: {
+    fill: "none",
+    strokeWidth: 1.5,
+  },
+  edgeAutomatic: {
+    stroke: colors.textMuted,
+  },
+  edgeManual: {
+    stroke: colors.textMuted,
+    strokeDasharray: "5 4",
+  },
+  edgeDragging: {
+    stroke: colors.accent,
+    strokeDasharray: "3 3",
+  },
+  // Was `.canvas-edge-group-selected .canvas-edge`. `isSelected` is already
+  // in scope where the edge `<path>` renders, so this composes directly off
+  // that boolean instead of an ancestor selector (design.md D3, case 2).
+  edgeSelected: {
+    stroke: colors.accent,
+  },
+  // Was `.canvas-edge-insert-target .canvas-edge`, the same treatment as
+  // `edgeSelected` off `isInsertTarget` (design.md D3, case 2).
+  edgeInsertTarget: {
+    stroke: colors.accent,
+    strokeWidth: 3,
+    strokeLinecap: "butt",
+    strokeLinejoin: "miter",
+  },
+  edgeHitarea: {
+    fill: "none",
+    stroke: "transparent",
+    strokeWidth: 12,
+    cursor: "pointer",
+  },
+  edgeBadge: {
+    fontFamily: fonts.mono,
+    fontSize: 10,
+    fill: colors.accent,
+    textAnchor: "middle",
+  },
+  arrowhead: {
+    fill: colors.textMuted,
+  },
+  // Stands in for both the terminal stamp and the initial stamp: app.css
+  // declared `.canvas-terminal-stamp circle`/`.canvas-initial-stamp circle`
+  // identically, so one style covers both, the same de-duplication phase 2
+  // applied to `.app-stamp-mine`/`.app-stamp-open`.
+  stampCircle: {
+    fill: "none",
+    stroke: colors.neutral900,
+    strokeWidth: 1.5,
+  },
+  // Stands in for both stamps' `text`, identically declared for the same
+  // reason `stampCircle` does.
+  stampText: {
+    fontFamily: fonts.mono,
+    fontSize: 9,
+    textTransform: "uppercase",
+    textAnchor: "middle",
+    fill: colors.neutral900,
+  },
+  marquee: {
+    position: "absolute",
+    zIndex: 1,
+    background: `color-mix(in srgb, ${colors.accent} 8%, transparent)`,
+    border: `1px dashed ${colors.accent}`,
+    pointerEvents: "none",
+  },
+  rejectMessage: {
+    position: "absolute",
+    zIndex: 2,
+    transform: "translate(-50%, -100%)",
+    background: colors.surface,
+    color: colors.refusal,
+    border: `1px solid ${colors.refusal}`,
+    padding: `${space.s1} ${space.s2}`,
+    fontSize: "0.8rem",
+    pointerEvents: "none",
+    maxWidth: "16rem",
+  },
+  edgeGuardLabel: {
+    width: "100%",
+    height: 16,
+    lineHeight: "16px",
+    textAlign: "center",
+    fontFamily: fonts.body,
+    fontSize: 10,
+    color: colors.textMuted,
+    background: colors.surface,
+    padding: "0 3px",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    cursor: "pointer",
+  },
+  renameInput: {
+    width: "100%",
+    height: "100%",
+    boxSizing: "border-box",
+    font: "inherit",
+    fontSize: 13,
+    border: `1px solid ${colors.accent}`,
+    padding: `0 ${space.s1}`,
+    background: colors.surface,
+    color: colors.text,
+  },
+});
 
 /** The `<g>` holding a drawn group's member nodes. Both disclosure controls —
  * the canvas's own and the selection toolbar's — name it in `aria-controls`,
@@ -893,7 +1171,7 @@ export function CanvasView({
         key={step.id}
         data-step-id={step.id}
         transform={`translate(${x}, ${y})`}
-        className="canvas-node panzoom-exclude"
+        className={`canvas-node panzoom-exclude ${stylex.props(styles.node, stylex.defaultMarker()).className}`}
         // All three drop while the rename is open: ARIA forbids a focusable
         // field inside a `role="button"`, and the field is that node's own.
         role={isRenaming ? undefined : "button"}
@@ -909,20 +1187,13 @@ export function CanvasView({
           startRename(step.id as string, resolveDraftLocalizedText(step.label, contentLocale, baseLocale) ?? "");
         }}
       >
-        {isInitial && (
-          <line x1={-24} y1={NODE_HEIGHT / 2} x2={0} y2={NODE_HEIGHT / 2} className="canvas-initial-arrow" markerEnd="url(#canvas-arrow)" />
-        )}
-        <rect
-          width={NODE_WIDTH}
-          height={NODE_HEIGHT}
-          rx={0}
-          className={isSelected ? "canvas-node-rect canvas-node-selected" : "canvas-node-rect"}
-        />
+        {isInitial && <line x1={-24} y1={NODE_HEIGHT / 2} x2={0} y2={NODE_HEIGHT / 2} {...stylex.props(styles.initialArrow)} markerEnd="url(#canvas-arrow)" />}
+        <rect width={NODE_WIDTH} height={NODE_HEIGHT} rx={0} {...stylex.props(styles.nodeRect, isSelected && styles.nodeRectSelected)} />
         {step.type === "subprocess" && (
           // The doubled rule BPMN draws on a call activity. It sits before
           // the label, the key, the stamps and the connect handle, so the
           // handle's own circle covers the 3px it overlaps on the right.
-          <rect x={4} y={4} width={NODE_WIDTH - 8} height={NODE_HEIGHT - 8} rx={0} className="canvas-node-subprocess" />
+          <rect x={4} y={4} width={NODE_WIDTH - 8} height={NODE_HEIGHT - 8} rx={0} {...stylex.props(styles.nodeSubprocess)} />
         )}
         {isRenaming ? (
           <foreignObject x={6} y={14} width={NODE_WIDTH - 12} height={22} className="panzoom-exclude">
@@ -930,7 +1201,7 @@ export function CanvasView({
               // eslint-disable-next-line jsx-a11y/no-autofocus
               autoFocus
               aria-label={t("stepSections.renameLabel")}
-              className="canvas-rename-input"
+              {...stylex.props(styles.renameInput)}
               value={renaming.value}
               onChange={(e) => setRenaming({ stepId: step.id as string, value: e.target.value })}
               onBlur={commitRename}
@@ -942,7 +1213,7 @@ export function CanvasView({
             />
           </foreignObject>
         ) : (
-          <text x={10} y={24} className="canvas-node-label">
+          <text x={10} y={24} {...stylex.props(styles.nodeLabel)}>
             {label}
           </text>
         )}
@@ -950,27 +1221,31 @@ export function CanvasView({
             A step whose label resolves to nothing falls back to that key, and
             one value must not appear on both lines. */}
         {step.key && step.key !== label && (
-          <text x={10} y={44} className="canvas-node-key">
+          <text x={10} y={44} {...stylex.props(styles.nodeKey)}>
             {step.key}
           </text>
         )}
         {isTerminal && (
-          <g transform={`translate(${NODE_WIDTH - 22}, -12) rotate(-8)`} className="canvas-terminal-stamp">
-            <circle r={16} />
-            <text y={4}>{(step.outcome ?? "").slice(0, 4) || "•"}</text>
+          <g transform={`translate(${NODE_WIDTH - 22}, -12) rotate(-8)`}>
+            <circle r={16} {...stylex.props(styles.stampCircle)} />
+            <text y={4} {...stylex.props(styles.stampText)}>
+              {(step.outcome ?? "").slice(0, 4) || "•"}
+            </text>
           </g>
         )}
         {isInitial && (
-          <g transform="translate(22, -12)" className="canvas-initial-stamp">
-            <circle r={16} />
-            <text y={4}>{t("canvas.initialStamp")}</text>
+          <g transform="translate(22, -12)">
+            <circle r={16} {...stylex.props(styles.stampCircle)} />
+            <text y={4} {...stylex.props(styles.stampText)}>
+              {t("canvas.initialStamp")}
+            </text>
           </g>
         )}
         <circle
           cx={NODE_WIDTH}
           cy={NODE_HEIGHT / 2}
           r={HANDLE_RADIUS}
-          className={isTerminal ? "canvas-connect-handle canvas-connect-handle-terminal" : "canvas-connect-handle"}
+          {...stylex.props(styles.connectHandle, isTerminal && styles.connectHandleTerminal)}
           onPointerDown={(e) => onHandlePointerDown(e, step.id as string)}
           onPointerUp={onHandlePointerUp}
         />
@@ -979,7 +1254,7 @@ export function CanvasView({
             its 2px under the canvas zoom, while the offset scales with the
             node, which is what makes it hug the shape. */}
         <rect
-          className="canvas-node-focus-ring"
+          {...stylex.props(styles.nodeFocusRing)}
           x={-FOCUS_RING_OFFSET}
           y={-FOCUS_RING_OFFSET}
           width={NODE_WIDTH + FOCUS_RING_OFFSET * 2}
@@ -993,7 +1268,7 @@ export function CanvasView({
 
   return (
     <div
-      className="canvas-wrap"
+      {...stylex.props(styles.wrap)}
       onPointerDownCapture={onCanvasPointerDownCapture}
       onPointerMove={onMarqueePointerMove}
       onPointerUp={onMarqueePointerUp}
@@ -1002,13 +1277,13 @@ export function CanvasView({
         releasePan();
       }}
     >
-      <div className="canvas-toolbar panzoom-exclude" ref={toolbarRef}>
+      <div className={`panzoom-exclude ${stylex.props(styles.toolbar).className}`} ref={toolbarRef}>
         <button type="button" className="btn btn-secondary" onClick={fitToView}>
           {t("canvas.fitToView")}
         </button>
         <button
           type="button"
-          className="btn btn-secondary"
+          className={`btn btn-secondary ${stylex.props(edgeStyle === "smoothstep" && styles.toolbarToggleActive).className}`}
           aria-pressed={edgeStyle === "smoothstep"}
           onClick={() => onEdgeStyleChange(edgeStyle === "smoothstep" ? "step" : "smoothstep")}
         >
@@ -1020,7 +1295,7 @@ export function CanvasView({
       </div>
       <svg
         ref={svgRef}
-        className="canvas-svg"
+        {...stylex.props(styles.svg)}
         // `application` is load-bearing, not cosmetic: a screen reader's
         // browse mode otherwise consumes an arrow key before this handler
         // sees it. The price is that every element inside must be a named
@@ -1041,7 +1316,7 @@ export function CanvasView({
       >
         <defs>
           <marker id="canvas-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M0,0 L10,5 L0,10 z" className="canvas-arrowhead" />
+            <path d="M0,0 L10,5 L0,10 z" {...stylex.props(styles.arrowhead)} />
           </marker>
         </defs>
 
@@ -1066,17 +1341,28 @@ export function CanvasView({
           return (
             <g
               key={group.id}
-              className={`canvas-group panzoom-exclude${group.collapsed ? " canvas-group-collapsed" : ""}`}
+              className={`panzoom-exclude ${stylex.props(styles.group).className}`}
               onPointerDown={(e) => onGroupPointerDown(e, group)}
               onPointerMove={onGroupPointerMove}
               onPointerUp={(e) => onGroupPointerUp(e, group)}
             >
-              <rect x={moved.x} y={moved.y} width={box.width} height={box.height} rx={0} className="canvas-group-box" />
-              <text x={moved.x + 8} y={group.collapsed ? moved.y + 24 : moved.y - 6} className="canvas-group-name">
+              <rect
+                x={moved.x}
+                y={moved.y}
+                width={box.width}
+                height={box.height}
+                rx={0}
+                {...stylex.props(styles.groupBox, group.collapsed && styles.groupBoxCollapsed)}
+              />
+              <text
+                x={moved.x + 8}
+                y={group.collapsed ? moved.y + 24 : moved.y - 6}
+                {...stylex.props(styles.groupName, group.collapsed && styles.groupNameCollapsed)}
+              >
                 {group.name}
               </text>
               {group.collapsed && (
-                <text x={moved.x + 8} y={moved.y + 44} className="canvas-group-count">
+                <text x={moved.x + 8} y={moved.y + 44} {...stylex.props(styles.groupCount)}>
                   {members} {t("canvas.groupStepCount")}
                 </text>
               )}
@@ -1182,7 +1468,7 @@ export function CanvasView({
             return (
               <g
                 key={path.id ?? `${step.id}-${pathIndex}`}
-                className={`canvas-edge-group panzoom-exclude${isSelected ? " canvas-edge-group-selected" : ""}${isInsertTarget ? " canvas-edge-insert-target" : ""}`}
+                className={`panzoom-exclude ${stylex.props(styles.edgeGroup, stylex.defaultMarker()).className}`}
                 data-kind="edge"
                 data-path-id={path.id}
                 data-step-id={path.id !== undefined ? step.id : undefined}
@@ -1205,25 +1491,30 @@ export function CanvasView({
                     own `d` and draws before it, and the 1.5px edge paints over
                     its middle — a manual path keeps its dash, and about 2px of
                     accent reads on each side. */}
-                <path d={d} className="canvas-edge-focus-halo" vectorEffect="non-scaling-stroke" />
+                <path d={d} {...stylex.props(styles.edgeFocusHalo)} vectorEffect="non-scaling-stroke" />
                 <path
                   d={d}
-                  className={path.trigger === "manual" ? "canvas-edge canvas-edge-manual" : "canvas-edge canvas-edge-automatic"}
+                  {...stylex.props(
+                    styles.edge,
+                    path.trigger === "manual" ? styles.edgeManual : styles.edgeAutomatic,
+                    isSelected && styles.edgeSelected,
+                    isInsertTarget && styles.edgeInsertTarget,
+                  )}
                   markerEnd="url(#canvas-arrow)"
                 />
                 {/* The same `d`, so the pointer target follows the route
                     rather than a straight line the canvas no longer draws.
-                    `.canvas-edge-hitarea` needs `fill: none` for that: a
+                    `edgeHitarea` needs `fill: none` for that: a
                     `<line>` cannot fill, a `<path>` can, and a five-segment
                     route encloses area SVG would otherwise paint black. */}
-                <path d={d} className="canvas-edge-hitarea" />
+                <path d={d} {...stylex.props(styles.edgeHitarea)} />
                 {automaticGuarded && (
-                  <text x={midX} y={midY - 6} className="canvas-edge-badge">
+                  <text x={midX} y={midY - 6} {...stylex.props(styles.edgeBadge)}>
                     {path.priority ?? "?"}
                   </text>
                 )}
                 {automaticDefault && (
-                  <text x={midX} y={midY - 6} className="canvas-edge-badge">
+                  <text x={midX} y={midY - 6} {...stylex.props(styles.edgeBadge)}>
                     {t("canvas.elseMarker")}
                   </text>
                 )}
@@ -1242,7 +1533,7 @@ export function CanvasView({
                 y1={start.y}
                 x2={connectDrag.current.x}
                 y2={connectDrag.current.y}
-                className="canvas-edge canvas-edge-dragging"
+                {...stylex.props(styles.edge, styles.edgeDragging)}
               />
             );
           })()}
@@ -1279,7 +1570,7 @@ export function CanvasView({
             data-step-id={label.pathId !== undefined ? label.stepId : undefined}
           >
             <div
-              className="canvas-edge-guard-label"
+              {...stylex.props(styles.edgeGuardLabel)}
               // Out of the accessibility tree: the path itself now carries the
               // role, the name and the tab stop, and this only duplicates a
               // pointer route the edge group already offers.
@@ -1316,7 +1607,7 @@ export function CanvasView({
               // `.canvas-wrap`, and React listens at the root, an ancestor.
               // Without the class the press never reaches this rect and pans
               // the canvas instead. Every node and edge group carries it.
-              className={`canvas-waypoint-handle panzoom-exclude${h.index === undefined ? " canvas-waypoint-handle-new" : ""}`}
+              className={`panzoom-exclude ${stylex.props(styles.waypointHandle, h.index === undefined && styles.waypointHandleNew).className}`}
               onPointerDown={(e) => onWaypointPointerDown(e, h.pathId, { index: h.index, insertAt: h.insertAt })}
               onPointerMove={onWaypointPointerMove}
               onPointerUp={onWaypointPointerUp}
@@ -1339,13 +1630,13 @@ export function CanvasView({
             height={DISCLOSURE_HOST}
             // The host stands 4 units clear of the button on every side, and
             // that band lies over a member node's corner at one end and over
-            // empty canvas at the other. `canvas-group-disclosure-host` makes
+            // empty canvas at the other. `groupDisclosureHost` makes
             // it inert, so only the button's own 20 units take a press.
-            className="canvas-group-disclosure-host panzoom-exclude"
+            className={`panzoom-exclude ${stylex.props(styles.groupDisclosureHost).className}`}
           >
             <button
               type="button"
-              className="canvas-group-disclosure"
+              {...stylex.props(styles.groupDisclosure)}
               data-group-id={group.id}
               tabIndex={focus.kind === "group" && focus.groupId === group.id ? 0 : -1}
               aria-expanded={group.collapsed !== true}
@@ -1382,13 +1673,13 @@ export function CanvasView({
           const r = normalizeRect(marquee.startClient, marquee.currentClient);
           return (
             <div
-              className="canvas-marquee"
+              {...stylex.props(styles.marquee)}
               style={{ left: r.x - marquee.origin.x, top: r.y - marquee.origin.y, width: r.width, height: r.height }}
             />
           );
         })()}
       {rejectMessage && (
-        <div className="canvas-reject-message" style={{ left: rejectMessage.x, top: rejectMessage.y }}>
+        <div {...stylex.props(styles.rejectMessage)} style={{ left: rejectMessage.x, top: rejectMessage.y }}>
           {rejectMessage.text}
         </div>
       )}

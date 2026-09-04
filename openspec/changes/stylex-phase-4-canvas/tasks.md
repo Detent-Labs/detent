@@ -43,7 +43,7 @@
 
 ## 3. CanvasView.tsx and EditScreen.tsx CSS conversion
 
-- [ ] 3.1 Add a `stylex.create()` style object to `CanvasView.tsx` covering
+- [x] 3.1 Add a `stylex.create()` style object to `CanvasView.tsx` covering
   every one of its 45 rule blocks except the two that stay driven by JS
   booleans with no compiled counterpart of their own beyond the base style
   (`.canvas-edge-group-selected`/`.canvas-edge-insert-target` combinators,
@@ -52,16 +52,18 @@
   entries for `canvas-node-focus-ring`'s and `canvas-edge-focus-halo`'s
   `display` property, each merged with its selector's second, duplicate
   `app.css` declaration into one entry (design.md D3, case 1). Verify
-  `bun run typecheck` passes.
-- [ ] 3.2 Replace every literal `canvas-*` `className` in `CanvasView.tsx`
+  `bun run typecheck` passes. Done.
+- [x] 3.2 Replace every literal `canvas-*` `className` in `CanvasView.tsx`
   with `stylex.props(...)`, keeping `canvas-node` and `panzoom-exclude`
   literal and composed alongside the compiled className on every element
   that carries them today (the node `<g>`, the edge-group `<g>`, the
   waypoint handle, the rename `<foreignObject>`, the disclosure host, the
   group `<g>`). Compute `stylex.props()` into a variable first wherever a
   literal class composes conditionally, per the established composition
-  pattern. Verify `bun run typecheck` passes.
-- [ ] 3.3 Convert the edge's selected/insert-target stroke variant and the
+  pattern. Verify `bun run typecheck` passes. Done. (Terminal stamp/initial
+  stamp `<g>` wrappers additionally lost their now-empty `className`
+  entirely — their own CSS was always on the `circle`/`text` children.)
+- [x] 3.3 Convert the edge's selected/insert-target stroke variant and the
   group box's collapsed variant to a direct JS-computed style pick off
   the already-in-scope `isSelected`/`isInsertTarget`/`group.collapsed`
   booleans (design.md D3, cases 2-3) — no ancestor selector, no new
@@ -69,8 +71,8 @@
   `aria-pressed`-driven border/color/box-shadow to a direct pick off
   `edgeStyle === "smoothstep"` (design.md D3, case 4), composed alongside
   its literal `.btn.btn-secondary` classes. Verify `bun run typecheck`
-  passes.
-- [ ] 3.4 In `EditScreen.tsx`, add `cursor: "grab"` to the existing
+  passes. Done.
+- [x] 3.4 In `EditScreen.tsx`, add `cursor: "grab"` to the existing
   `canvasGroupNameField` `stylex.create()` entry, and change the
   group-rename `<label>`'s `className` from
   `` `canvas-group-name ${stylex.props(styles.canvasGroupNameField).className}` ``
@@ -81,36 +83,45 @@
   own compiled style, following the same `group.collapsed`-driven pick as
   3.3. Verify `bun run typecheck` passes and re-run
   `packages/web/test/studio-canvas-node-a11y.test.tsx`'s group-collapse
-  scenarios (they render both files) with no failure.
-- [ ] 3.5 Delete the 45 now-migrated `CanvasView.tsx` rule blocks from
+  scenarios (they render both files) with no failure. Done: 12 pass.
+- [x] 3.5 Delete the 45 now-migrated `CanvasView.tsx` rule blocks from
   `app.css`, including `.canvas-group-name`'s two blocks and
   `.canvas-group-collapsed .canvas-group-name` (fully migrated per 3.4),
   leaving only the `prefers-reduced-motion` media block and
   `.studio-dialog::backdrop`. Verify with
   `grep -oP '^[^{]+(?=\{)' app.css | sed 's/[[:space:]]*$//' | sort -u`
   showing exactly the surviving 3 lines (the media query, its nested `* {}`,
-  and `.studio-dialog::backdrop`).
+  and `.studio-dialog::backdrop`). Done: reads exactly those 3 lines.
+  `bun run build` also passes (real `@stylexjs/unplugin` compile,
+  isolated-probed beforehand for every SVG-specific property this group
+  introduced — `fill`/`stroke`/`strokeWidth`/`strokeDasharray`/
+  `strokeLinecap`/`strokeLinejoin`/`textAnchor`/`pointerEvents`/
+  `textTransform`/`when.ancestor(":focus-visible")` — all confirmed
+  compiling to correct, correctly-scoped CSS).
 
 ## 4. Test updates
 
-- [ ] 4.1 Delete `studio-canvas-fit.test.ts`'s
+- [x] 4.1 Delete `studio-canvas-fit.test.ts`'s
   `describe("canvas fit: the clipping surface", ...)` block (the one that
   reads `app.css` via `readFileSync`). Verify the file's remaining
   `describe("canvas fit: an empty canvas", ...)` block (pure `computeFit()`
-  coverage) still runs and passes.
-- [ ] 4.2 Delete the one `it(...)` block in `studio-canvas-node-a11y.test.tsx`
+  coverage) still runs and passes. Done: 15 pass, 0 fail.
+- [x] 4.2 Delete the one `it(...)` block in `studio-canvas-node-a11y.test.tsx`
   that reads `.canvas-group-disclosure {`'s CSS text. Verify every other
-  `it`/`describe` block in that file still runs and passes.
-- [ ] 4.3 Update every remaining literal `canvas-*` class-name assertion in
-  `studio-canvas-node-a11y.test.tsx` (`canvas-edge-group`,
-  `canvas-group-disclosure`, `canvas-edge-guard-label`, `canvas-group`) to
-  the class name `test/preload-stylex.ts`'s stub derives for the
-  corresponding `stylex.create()` key; leave the `canvas-node` assertion
-  unchanged (it stays literal). Verify the full file passes.
-- [ ] 4.4 Check `studio-canvas-node-label.test.tsx` for any literal
+  `it`/`describe` block in that file still runs and passes. Done.
+- [x] 4.3 Update every remaining literal `canvas-*` class-name assertion in
+  `studio-canvas-node-a11y.test.tsx` (`canvas-edge-group` -> `edgeGroup`,
+  `canvas-group-disclosure` -> `groupDisclosure`,
+  `canvas-edge-guard-label` -> `edgeGuardLabel`, `canvas-group` -> `group`,
+  `canvas-svg` -> `svg`) to the class name `test/preload-stylex.ts`'s stub
+  derives for the corresponding `stylex.create()` key; leave the
+  `canvas-node` assertion unchanged (it stays literal). Verify the full
+  file passes. Done: 12 pass, 0 fail.
+- [x] 4.4 Check `studio-canvas-node-label.test.tsx` for any literal
   `canvas-node-label`/`canvas-node-key` class-name assertions beyond its
   existing `data-step-id`-based structural split, and update any found the
-  same way. Verify the file passes.
+  same way. Verify the file passes. Done: two regexes updated to
+  `nodeLabel`/`nodeKey`; 5 pass, 0 fail.
 - [ ] 4.5 Add a "Studio canvas (`stylex-phase-4-canvas`)" section to
   `docs/browser-checks.md` covering what the two deleted CSS-text tests
   used to assert (the clipping surface's `overflow: visible` /

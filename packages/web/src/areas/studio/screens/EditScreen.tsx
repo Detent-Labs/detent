@@ -155,15 +155,17 @@ const styles = stylex.create({
     fontFamily: fonts.mono,
     fontVariantNumeric: "tabular-nums",
   },
-  // `.canvas-group-name` stays literal (D2): `canvas/CanvasView.tsx` also
-  // renders it, on an SVG `<text>` element whose own `font-family`/
-  // `font-size`/`fill` declaration this label never reads. Only its
-  // `cursor: grab` half applies here. The label-above-control shape
-  // design-language.md's own field rule states is this file's addition.
+  // `.canvas-group-name` (stylex-phase-3-studio's D2) is now fully compiled
+  // (stylex-phase-4-canvas's D5): `canvas/CanvasView.tsx`'s own SVG `<text>`
+  // reads its own independent style for `font-family`/`font-size`/`fill`,
+  // and this label's only borrowed property, `cursor: grab`, moved here.
+  // The label-above-control shape design-language.md's own field rule
+  // states is this file's addition.
   canvasGroupNameField: {
     display: "flex",
     flexDirection: "column",
     gap: space.s1,
+    cursor: "grab",
   },
   // `.canvas-selection .studio-checks-rail-docked`: `ChecksRail`'s own root
   // no longer carries a literal class this descendant selector can reach,
@@ -692,7 +694,7 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
                     if (matched) {
                       return (
                         <>
-                          <label className={`canvas-group-name ${stylex.props(styles.canvasGroupNameField).className}`}>
+                          <label {...stylex.props(styles.canvasGroupNameField)}>
                             {t("canvas.groupName")}
                             <input
                               value={matched.name}
