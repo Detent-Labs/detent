@@ -1136,3 +1136,21 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   it for the shell account menu, and phase 2 reused it. `::backdrop`
   is the pseudo-element that saw genuine first use in phase 3, and
   design.md D12 is where its real-build failure is recorded.
+
+  Phase 4 (`stylex-phase-4-canvas`) is done: `canvas/CanvasView.tsx`
+  and `canvas/EditRail.tsx` compile from StyleX now. `app.css` carries
+  only the reduced-motion block and `.studio-dialog::backdrop`.
+
+  Two class names stay literal, by the change's own mandate.
+  `canvas-node` backs `elementFor()`'s keyboard-focus `querySelector`.
+  `panzoom-exclude` backs Panzoom's own exclude-class contract.
+  `elementFor()`'s other two selectors moved off class qualifiers
+  instead. A new `data-kind="edge"` attribute replaces the
+  `.canvas-edge-group` qualifier. `.canvas-group-disclosure` dropped
+  its own qualifier, since `data-group-id` was already unique.
+
+  The change also closed `stylex-phase-3-studio`'s D2 deferral on
+  `.canvas-group-name`. `EditScreen.tsx`'s group-rename label now
+  reads its own compiled style. Both consumers of that shared class
+  converted together. Phase 5 remains: the cleanup phase that deletes
+  the remaining hand-written stylesheets.
