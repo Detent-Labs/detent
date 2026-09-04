@@ -160,27 +160,51 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Run `bun run typecheck` and confirm zero errors.
-- [ ] 6.2 Run `bun run build` and confirm it succeeds, including the
-  `@stylexjs/unplugin` compile step for both converted files.
-- [ ] 6.3 Run the full `bun test` suite with `DATABASE_URL` set, piped
+- [x] 6.1 Run `bun run typecheck` and confirm zero errors. Done: exits 0.
+- [x] 6.2 Run `bun run build` and confirm it succeeds, including the
+  `@stylexjs/unplugin` compile step for both converted files. Done: the
+  build compiles both files, including every SVG-specific property and
+  the two `when.ancestor(":focus-visible")` rules.
+- [x] 6.3 Run the full `bun test` suite with `DATABASE_URL` set, piped
   through `scripts/gates/silent-green.sh`. Confirm 0 failures and the
-  skip count at the existing floor.
-- [ ] 6.4 Run the antislop and whitespace gates over every Markdown file
+  skip count at the existing floor. Done: `bun run check` inside the
+  devcontainer, captured to a log and run through
+  `scripts/gates/silent-green.sh` on the host (the gate script has no
+  git dependency, so it runs directly against a captured log). 3813
+  pass, 1 skip (at the floor), 0 fail across 207 files; the `test:tz`
+  suite adds 20 pass, 0 fail. Gate exits 0.
+- [x] 6.4 Run the antislop and whitespace gates over every Markdown file
   this change touched (`docs/browser-checks.md`, `docs/decisions.md`,
   `ROADMAP.md`, and this change's own `proposal.md`/`design.md`/`tasks.md`/
   delta spec):
   `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`
   and `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`.
-  Confirm both pass with no rising finding count.
-- [ ] 6.5 Serve the production build from `WEB_ROOT` (dev mode has a known
+  Confirm both pass with no rising finding count. Done: both gates exit
+  0 against HEAD (`7296008`).
+- [x] 6.5 Serve the production build from `WEB_ROOT` (dev mode has a known
   pre-existing `process is not defined` crash in Studio). Via
   `playwright-cli`, walk the canvas's keyboard model in Chromium. Tab
   into the canvas, and arrow through at least one node and one path.
   Confirm the focus ring/halo appears exactly as before. Repeat the same
   walk in Firefox. Verify both browsers show the same focus/selection
-  visuals the deleted stylesheet declared.
-- [ ] 6.6 Via `playwright-cli` against the same production build, run a drag
+  visuals the deleted stylesheet declared. Done: served from
+  `http://127.0.0.1:3350/`, logged in as `demo-superuser@example.test`,
+  opened an existing draft's canvas. Real Tab/ArrowRight/ArrowDown/
+  ArrowLeft key presses moved a roving focus across an edge group and
+  two step nodes in both Chromium and Firefox; `document.activeElement`
+  confirmed `canvas-node` and `panzoom-exclude` stayed literal
+  (unhashed) throughout, alongside the compiled `x-default-marker`
+  ancestor marker on both node and edge groups. Screenshots in each
+  browser show the node's dashed focus ring and the edge's bold focus
+  halo rendering distinctly from the plain (solid) selection outline.
+- [x] 6.6 Via `playwright-cli` against the same production build, run a drag
   probe. Start a pointer drag on a step node and confirm the canvas does not
   pan (Panzoom's exclude-class still holds). Then start a drag on empty
-  canvas space and confirm it does pan. Verify both outcomes.
+  canvas space and confirm it does pan. Verify both outcomes. Done: read
+  Panzoom's inline `transform` on the `svg[role="application"]` element
+  before and after each drag. A drag on a step node left the transform
+  byte-for-byte unchanged (`scale(0.704619) translate(-97.5px,
+  184.968px)` both before and after). A drag on empty canvas space
+  changed it (`translate(-239.421px, 270.12px)`), confirming Panzoom
+  panned only when the press started outside every `panzoom-exclude`
+  element.
