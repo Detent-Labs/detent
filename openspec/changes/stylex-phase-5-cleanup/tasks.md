@@ -142,11 +142,14 @@
 
 - [x] 5.3 Run the full `bun test` suite with `DATABASE_URL` set, piped
   through `scripts/gates/silent-green.sh`. Confirm 0 failures and the
-  skip count at the existing floor. Done: `bun run check` captured to a
-  log inside the devcontainer, gate run against it on the host. 3812
-  pass (one fewer than phase 4's 3813, since Group 3 deleted one test),
-  1 skip at the floor, 0 fail, across 207 files. The `test:tz` suite
-  adds 20 pass, 0 fail. Gate exits 0.
+  skip count at the existing floor.
+
+  Done: ran `bun run check` inside the devcontainer and captured its
+  output to a log. The gate ran against that log on the host. The
+  suite passed 3812 of 3813 tests, one fewer than phase 4's count
+  since Group 3 deleted one test. It skipped 1 at the floor and failed
+  0, across 207 files. The `test:tz` suite added 20 more passes and 0
+  failures. The gate exits 0.
 
 - [x] 5.4 Run the antislop and whitespace gates over every Markdown file
   this change touched, over the committed range. That set includes
